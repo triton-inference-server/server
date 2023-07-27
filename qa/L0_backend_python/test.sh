@@ -132,271 +132,10 @@ mkdir -p models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
-# Skip torch install on Jetson since it is already installed.
-if [ "$TEST_JETSON" == "0" ]; then
-  pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-else
-  # GPU tensor tests are disabled on jetson
-  EXPECTED_NUM_TESTS=9
-fi
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-set +e
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    ls /dev/shm
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-prev_num_pages=`get_shm_pages`
-# Triton non-graceful exit
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-sleep 5
-
-triton_procs=`pgrep --parent $SERVER_PID`
-
-set +e
-
-# Trigger non-graceful termination of Triton
-kill -9 $SERVER_PID
-
-# Wait 10 seconds so that Python stub can detect non-graceful exit
-sleep 10
-
-for triton_proc in $triton_procs; do
-    kill -0 $triton_proc > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
-        RET=1
-        break
-    fi
-done
-set -e
-
-#
-# Test KIND_GPU
-# Disable env test for Jetson since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ]; then
-  rm -rf models/
-  mkdir -p models/add_sub_gpu/1/
-  cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
-  cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
-
-  prev_num_pages=`get_shm_pages`
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      exit 1
-  fi
-
-  if [ $? -ne 0 ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** KIND_GPU model test failed \n***"
-      RET=1
-  fi
-
-  kill $SERVER_PID
-  wait $SERVER_PID
-
-  current_num_pages=`get_shm_pages`
-  if [ $current_num_pages -ne $prev_num_pages ]; then
-      cat $CLIENT_LOG
-      ls /dev/shm
-      echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-  Shared memory pages before starting triton equals to $prev_num_pages
-  and shared memory pages after starting triton equals to $current_num_pages \n***"
-      exit 1
-  fi
-fi
-
-# Test Multi file models
-rm -rf models/
-mkdir -p models/multi_file/1/
-cp ../python_models/multi_file/*.py ./models/multi_file/1/
-cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
-(cd models/multi_file && \
-          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** multi-file model test failed \n***"
-    RET=1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-# Test environment variable propagation
-rm -rf models/
-mkdir -p models/model_env/1/
-cp ../python_models/model_env/model.py ./models/model_env/1/
-cp ../python_models/model_env/config.pbtxt ./models/model_env/
-
-export MY_ENV="MY_ENV"
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    echo -e "\n***\n*** Environment variable test failed \n***"
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-rm -fr ./models
-mkdir -p models/identity_fp32/1/
-cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
-
-shm_default_byte_size=$((1024*1024*4))
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-for shm_page in `ls /dev/shm/`; do
-    if [[ $shm_page !=  triton_python_backend_shm* ]]; then
-        continue
-    fi
-    page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
-    if [ $page_size -ne $shm_default_byte_size ]; then
-        echo -e "Shared memory region size is not equal to
-$shm_default_byte_size for page $shm_page. Region size is
-$page_size."
-        RET=1
-    fi
-done
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-# Test model getting killed during initialization
-rm -fr ./models
-mkdir -p models/init_exit/1/
-cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
-cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
-
-ERROR_MESSAGE="Stub process 'init_exit_0_0' is not healthy."
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill $SERVER_PID
-    wait $SERVER_PID
-else
-    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-    else
-        echo $CLIENT_LOG
-        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-        RET=1
-    fi
-fi
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
+# Env test should be run first so we can get the stubs for each of the
+# environments
 # Disable env test for Jetson since cloud storage repos are not supported
-# Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
-# Disable variants test for Jetson since already built without GPU Tensor support
-# Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble io bls decoupled variants"
-    for TEST in ${SUBTESTS}; do
-        # Run each subtest in a separate virtual environment to avoid conflicts
-        # between dependencies.
-        virtualenv --system-site-packages venv
-        source venv/bin/activate
-
-        (cd ${TEST} && bash -ex test.sh)
-        if [ $? -ne 0 ]; then
-        echo "Subtest ${TEST} FAILED"
-        RET=1
-        fi
-
-        deactivate
-        rm -fr venv
-    done
-
     # In 'env' test we use miniconda for dependency management. No need to run
     # the test in a virtual environment.
     (cd env && bash -ex test.sh)
@@ -406,22 +145,300 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
-for TEST in ${SUBTESTS}; do
-    # Run each subtest in a separate virtual environment to avoid conflicts
-    # between dependencies.
-    virtualenv --system-site-packages venv
-    source venv/bin/activate
+PYTHON_ENV_VERSION="8 9 10 11"
+for PYTHON_ENV in $PYTHON_ENV_VERSION; do
+    echo "python environment 3.${PYTHON_ENV}"
+    # Set up environment and stub for each test
+    add-apt-repository ppa:deadsnakes/ppa -
+    apt-get update
+    apt-get install "python3.${PYTHON_ENV}" -y
+    rm -f /usr/bin/python3 && \
+    ln -s "/usr/bin/python3.${PYTHON_ENV}" /usr/bin/python3
+    PYTHON_STUB_LOCATION=/opt/tritonserver/backend/python/3-${PYTHON_ENV}/triton_python_backend_stub
+    cp ${PYTHON_STUB_LOCATION} /opt/tritonserver/backend/python/
 
-    (cd ${TEST} && bash -ex test.sh)
+    # Skip torch install on Jetson since it is already installed.
+    if [ "$TEST_JETSON" == "0" ]; then
+    pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    else
+    # GPU tensor tests are disabled on jetson
+    EXPECTED_NUM_TESTS=9
+    fi
 
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
+
+    set +e
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
-        echo "Subtest ${TEST} FAILED"
+        cat $CLIENT_LOG
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        ls /dev/shm
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
         RET=1
     fi
 
-    deactivate
-    rm -fr venv
+    prev_num_pages=`get_shm_pages`
+    # Triton non-graceful exit
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
+
+    sleep 5
+
+    triton_procs=`pgrep --parent $SERVER_PID`
+
+    set +e
+
+    # Trigger non-graceful termination of Triton
+    kill -9 $SERVER_PID
+
+    # Wait 10 seconds so that Python stub can detect non-graceful exit
+    sleep 10
+
+    for triton_proc in $triton_procs; do
+        kill -0 $triton_proc > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
+            RET=1
+            break
+        fi
+    done
+    set -e
+
+    #
+    # Test KIND_GPU
+    # Disable env test for Jetson since GPU Tensors are not supported
+    if [ "$TEST_JETSON" == "0" ]; then
+    rm -rf models/
+    mkdir -p models/add_sub_gpu/1/
+    cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
+    cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
+
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
+
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** KIND_GPU model test failed \n***"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $CLIENT_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        exit 1
+    fi
+    fi
+
+    # Test Multi file models
+    rm -rf models/
+    mkdir -p models/multi_file/1/
+    cp ../python_models/multi_file/*.py ./models/multi_file/1/
+    cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
+    (cd models/multi_file && \
+            sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
+
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
+
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** multi-file model test failed \n***"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $SERVER_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        exit 1
+    fi
+
+    # Test environment variable propagation
+    rm -rf models/
+    mkdir -p models/model_env/1/
+    cp ../python_models/model_env/model.py ./models/model_env/1/
+    cp ../python_models/model_env/config.pbtxt ./models/model_env/
+
+    export MY_ENV="MY_ENV"
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        echo -e "\n***\n*** Environment variable test failed \n***"
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $CLIENT_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        exit 1
+    fi
+
+    rm -fr ./models
+    mkdir -p models/identity_fp32/1/
+    cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
+    cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+
+    shm_default_byte_size=$((1024*1024*4))
+    SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
+
+    for shm_page in `ls /dev/shm/`; do
+        if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+            continue
+        fi
+        page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
+        if [ $page_size -ne $shm_default_byte_size ]; then
+            echo -e "Shared memory region size is not equal to
+    $shm_default_byte_size for page $shm_page. Region size is
+    $page_size."
+            RET=1
+        fi
+    done
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Test model getting killed during initialization
+    rm -fr ./models
+    mkdir -p models/init_exit/1/
+    cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
+    cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
+
+    ERROR_MESSAGE="Stub process 'init_exit_0_0' is not healthy."
+
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+            echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        else
+            echo $CLIENT_LOG
+            echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $SERVER_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        exit 1
+    fi
+
+    # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
+    # Disable variants test for Jetson since already built without GPU Tensor support
+    # Disable decoupled test because it uses GPU tensors
+    if [ "$TEST_JETSON" == "0" ]; then
+        SUBTESTS="ensemble io bls decoupled variants"
+        for TEST in ${SUBTESTS}; do
+            # Run each subtest in a separate virtual environment to avoid conflicts
+            # between dependencies.
+            virtualenv --system-site-packages venv
+            source venv/bin/activate
+
+            (cd ${TEST} && bash -ex test.sh)
+            if [ $? -ne 0 ]; then
+            echo "Subtest ${TEST} FAILED"
+            RET=1
+            fi
+
+            deactivate
+            rm -fr venv
+        done
+    fi
+
+    SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
+    for TEST in ${SUBTESTS}; do
+        # Run each subtest in a separate virtual environment to avoid conflicts
+        # between dependencies.
+        virtualenv --system-site-packages venv
+        source venv/bin/activate
+
+        (cd ${TEST} && bash -ex test.sh)
+
+        if [ $? -ne 0 ]; then
+            echo "Subtest ${TEST} FAILED"
+            RET=1
+        fi
+
+        deactivate
+        rm -fr venv
+    done
 done
 
 if [ $RET -eq 0 ]; then
