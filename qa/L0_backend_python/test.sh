@@ -149,9 +149,8 @@ PYTHON_ENV_VERSION="8 9 10 11"
 for PYTHON_ENV in $PYTHON_ENV_VERSION; do
     echo "python environment 3.${PYTHON_ENV}"
     # Set up environment and stub for each test
-    add-apt-repository ppa:deadsnakes/ppa -
-    apt-get update
-    apt-get install "python3.${PYTHON_ENV}" -y
+    add-apt-repository ppa:deadsnakes/ppa -y
+    apt-get update && apt-get -y install "python3.${PYTHON_ENV}"
     rm -f /usr/bin/python3 && \
     ln -s "/usr/bin/python3.${PYTHON_ENV}" /usr/bin/python3
     PYTHON_STUB_LOCATION=/opt/tritonserver/backend/python/3-${PYTHON_ENV}/triton_python_backend_stub
