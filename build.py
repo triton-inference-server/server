@@ -68,13 +68,13 @@ from inspect import getsourcefile
 #
 TRITON_VERSION_MAP = {
     "2.37.0dev": (
-        "23.08dev",  # triton container
-        "23.06",  # upstream container
-        "1.15.0",  # ORT
-        "2023.0.0",  # ORT OpenVINO
-        "2023.0.0",  # Standalone OpenVINO
-        "2.4.7",  # DCGM version
-        "py310_23.1.0-1",  # Conda version
+        "23.08dev",         # triton container
+        "23.07",            # upstream container
+        "1.15.1",           # ORT
+        "2023.0.0",         # ORT OpenVINO
+        "2023.0.0",         # Standalone OpenVINO
+        "2.4.7",            # DCGM version
+        "py310_23.1.0-1"    # Conda version.
     )
 }
 
