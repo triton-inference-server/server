@@ -31,9 +31,9 @@
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 **LATEST RELEASE: You are currently on the main branch which tracks
-under-development progress towards the next release. The current release is 
+under-development progress towards the next release. The current release is
 version [2.36.0](https://github.com/triton-inference-server/server/tree/r23.07)
-and corresponds to the 23.07 container release on 
+and corresponds to the 23.07 container release on
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ----
@@ -87,7 +87,7 @@ Inference Server with the
 ## Serve a Model in 3 Easy Steps
 
 ```bash
-# Step 1: Create the example model repository 
+# Step 1: Create the example model repository
 git clone -b r23.07 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
