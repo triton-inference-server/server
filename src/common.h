@@ -226,11 +226,13 @@ void LittleEndianToHost(
 /// \param[in] server server with requested model
 /// \param[in] model_name name of model
 /// \param[in] model_version version of model
-/// \return data type of first input or TRITONSERVER_TYPE_INVALID on error.
+/// \param[in, out] datatype datatype of first input for model
+/// \return error status. Failure if datatype can't be determined.
 ///
-TRITONSERVER_DataType GetDataTypeForRawInput(
+TRITONSERVER_Error*
+GetDataTypeForRawInput(
     TRITONSERVER_Server* server, const std::string& model_name,
-    const int64_t model_version);
+    const int64_t model_version, TRITONSERVER_DataType* datatype)
 
 #else
 
