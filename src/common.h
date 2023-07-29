@@ -229,10 +229,9 @@ void LittleEndianToHost(
 /// \param[in, out] datatype datatype of first input for model
 /// \return error status. Failure if datatype can't be determined.
 ///
-TRITONSERVER_Error*
-GetDataTypeForRawInput(
+TRITONSERVER_Error* GetDataTypeForRawInput(
     TRITONSERVER_Server* server, const std::string& model_name,
-    const int64_t model_version, TRITONSERVER_DataType* datatype)
+    const int64_t model_version, TRITONSERVER_DataType* datatype);
 
 #else
 
