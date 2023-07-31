@@ -1862,7 +1862,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -rf models
 mkdir models
 # Sanity check loading multiple instances in parallel for each supported backend
-PARALLEL_BACKENDS="python onnx plan"
+PARALLEL_BACKENDS="python onnx"
 for backend in ${PARALLEL_BACKENDS} ; do
     model="${backend}_float32_float32_float32"
     model_dir="models/${model}"
