@@ -31,7 +31,6 @@ import sys
 sys.path.append("../common")
 
 import concurrent.futures
-import functools
 import json
 import os
 import shutil
@@ -3059,13 +3058,19 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # Test inference on each instance
                 for i in range(1, num_instances + 1):
-                    r = triton_client.infer(
-                        model, inputs, sequence_id=i, sequence_start=True
-                    )
+                    try:
+                        triton_client.infer(
+                            model, inputs, sequence_id=i, sequence_start=True
+                        )
+                    except Exception as ex:
+                        self.assertTrue(
+                            False, "unexpected inference error {}".format(ex)
+                        )
+
                 # Each instance should be busy with until their sequence times out, so
                 # and additional infer call should time out. If it doesn't time out, something
                 # is wrong and the test should fail.
-                callable = functools.partial(
+                callable = partial(
                     triton_client.infer,
                     model,
                     inputs,
@@ -3081,13 +3086,15 @@ class LifeCycleTest(tu.TestResultCollector):
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-                # Allow server to fully unload model
+                # Allow server to fully unload model before next test iteration
                 num_tries = 10
                 for i in range(num_tries):
                     if triton_client.is_server_ready():
                         break
-                    print(f"[Attempt {i}] Server not ready yet, sleeping and retrying.")
-                    time.sleep(5)
+                    print(
+                        f"[Attempt {i}] Server not ready yet, sleeping and retrying. Current repository index: {triton_client.get_model_repository_index()}"
+                    )
+                    time.sleep(6)
                 print(
                     "Model Repository Index after unload:",
                     triton_client.get_model_repository_index(),
