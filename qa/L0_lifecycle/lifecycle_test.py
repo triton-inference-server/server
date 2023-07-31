@@ -2920,8 +2920,6 @@ class LifeCycleTest(tu.TestResultCollector):
     def test_concurrent_model_instance_load_speedup(self):
         # Initialize client
         try:
-            # triton_client = grpcclient.InferenceServerClient(
-            #    "localhost:8001", verbose=True
             triton_client = httpclient.InferenceServerClient(
                 "localhost:8000", verbose=True
             )
