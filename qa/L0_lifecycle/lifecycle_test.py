@@ -3021,85 +3021,87 @@ class LifeCycleTest(tu.TestResultCollector):
             model = tu.get_model_name(backend, np.float32, np.float32, np.float32)
             kinds = backend_kinds.get(backend, default_kinds)
             for kind in kinds:
-                # Setup model config
-                instance_group = {"kind": kind, "count": num_instances}
-                # Disable batching to guarantee 1 request per instance
-                # Configure sequence batching such that each instance cannot accept new requests
-                # while it is busy with an ongoing sequence. This way we can guarantee sending 1 request to each instance.
-                max_batch_size = 0
-                sequence_timeout_secs = 10
-                sequence_batching = {
-                    "direct": {},
-                    "max_sequence_idle_microseconds": sequence_timeout_secs * 1000000,
-                }
-                config = {
-                    "instance_group": instance_group,
-                    "max_batch_size": max_batch_size,
-                    "sequence_batching": sequence_batching,
-                    "input": input_config,
-                    "output": output_config,
-                }
-                print(
-                    f"~~~ Backend: [{backend}], Model: [{model}], Config: [{config}] ~~~"
-                )
-                # Load the model
-                try:
-                    triton_client.load_model(model, config=json.dumps(config))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
-
-                # Make sure the model is loaded
-                self.assertTrue(triton_client.is_server_live())
-                self.assertTrue(triton_client.is_model_ready(model))
-                print(
-                    "Model Repository Index after load:",
-                    triton_client.get_model_repository_index(),
-                )
-
-                # Test inference on each instance
-                for i in range(1, num_instances + 1):
-                    try:
-                        triton_client.infer(
-                            model, inputs, sequence_id=i, sequence_start=True
-                        )
-                    except Exception as ex:
-                        self.assertTrue(
-                            False, "unexpected inference error {}".format(ex)
-                        )
-
-                # Each instance should be busy with until their sequence times out, so
-                # and additional infer call should time out. If it doesn't time out, something
-                # is wrong and the test should fail.
-                callable = partial(
-                    triton_client.infer,
-                    model,
-                    inputs,
-                    sequence_id=num_instances + 1,
-                    sequence_start=True,
-                )
-                timeout_secs = 3
-                self._call_with_expected_timeout(callable, timeout_secs)
-
-                # Unload the model
-                try:
-                    triton_client.unload_model(model)
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
-
-                # Allow server to fully unload model before next test iteration
-                num_tries = 10
-                for i in range(num_tries):
-                    if triton_client.is_server_ready():
-                        break
+                with self.subTest(backend=backend, model=model, kind=kind):
+                    # Setup model config
+                    instance_group = {"kind": kind, "count": num_instances}
+                    # Disable batching to guarantee 1 request per instance
+                    # Configure sequence batching such that each instance cannot accept new requests
+                    # while it is busy with an ongoing sequence. This way we can guarantee sending 1 request to each instance.
+                    max_batch_size = 0
+                    sequence_timeout_secs = 10
+                    sequence_batching = {
+                        "direct": {},
+                        "max_sequence_idle_microseconds": sequence_timeout_secs
+                        * 1000000,
+                    }
+                    config = {
+                        "instance_group": instance_group,
+                        "max_batch_size": max_batch_size,
+                        "sequence_batching": sequence_batching,
+                        "input": input_config,
+                        "output": output_config,
+                    }
                     print(
-                        f"[Attempt {i}] Server not ready yet, sleeping and retrying. Current repository index: {triton_client.get_model_repository_index()}"
+                        f"~~~ Backend: [{backend}], Model: [{model}], Config: [{config}] ~~~"
                     )
-                    time.sleep(6)
-                print(
-                    "Model Repository Index after unload:",
-                    triton_client.get_model_repository_index(),
-                )
-                self.assertTrue(triton_client.is_server_ready())
+                    # Load the model
+                    try:
+                        triton_client.load_model(model, config=json.dumps(config))
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
+
+                    # Make sure the model is loaded
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_model_ready(model))
+                    print(
+                        "Model Repository Index after load:",
+                        triton_client.get_model_repository_index(),
+                    )
+
+                    # Test inference on each instance
+                    for i in range(1, num_instances + 1):
+                        try:
+                            triton_client.infer(
+                                model, inputs, sequence_id=i, sequence_start=True
+                            )
+                        except Exception as ex:
+                            self.assertTrue(
+                                False, "unexpected inference error {}".format(ex)
+                            )
+
+                    # Each instance should be busy with until their sequence times out, so
+                    # and additional infer call should time out. If it doesn't time out, something
+                    # is wrong and the test should fail.
+                    callable = partial(
+                        triton_client.infer,
+                        model,
+                        inputs,
+                        sequence_id=num_instances + 1,
+                        sequence_start=True,
+                    )
+                    timeout_secs = 3
+                    self._call_with_expected_timeout(callable, timeout_secs)
+
+                    # Unload the model
+                    try:
+                        triton_client.unload_model(model)
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
+
+                    # Allow server to fully unload model before next test iteration
+                    num_tries = 10
+                    for i in range(num_tries):
+                        if triton_client.is_server_ready():
+                            break
+                        print(
+                            f"[Attempt {i}] Server not ready yet, sleeping and retrying. Current repository index: {triton_client.get_model_repository_index()}"
+                        )
+                        time.sleep(6)
+                    print(
+                        "Model Repository Index after unload:",
+                        triton_client.get_model_repository_index(),
+                    )
+                    self.assertTrue(triton_client.is_server_ready())
 
 
 if __name__ == "__main__":
