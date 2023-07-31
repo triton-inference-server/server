@@ -1195,6 +1195,14 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 
     # Add dependencies needed for python backend
     if 'python' in backends:
+        if target_machine == 's390x':
+            df += '''
+# gcc, g++ required for numpy installation on s390x
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+'''
         df += '''
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
