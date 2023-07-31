@@ -2981,22 +2981,30 @@ class LifeCycleTest(tu.TestResultCollector):
         else:
             self.assertTrue(False, "unexpected success, call should've timed out.")
 
-    def _get_fp32_io_config(self):
-        name, dtype, shape = ("INPUT0", "TYPE_FP32", [-1, -1])
-        input_config = [{"name": name, "data_type": dtype, "dims": shape}]
-        output_config = [{"name": "OUTPUT0", "data_type": dtype, "dims": shape}]
-        return input_config, output_config
-
-    def _get_fp32_inputs(self, client_type):
-        name, dtype, shape = ("INPUT0", "FP32", [1, 16])
-        inputs = [client_type.InferInput(name, shape, dtype)]
-        inputs[-1].set_data_from_numpy(np.ones(shape, dtype=np.float32))
-        return inputs
+    def _get_fp32_io(self, client_type):
+        # Config
+        input_names = ["INPUT0", "INPUT1"]
+        output_names = ["OUTPUT0", "OUTPUT1"]
+        dtype, dims, shape = ("TYPE_FP32", [-1, 16], [1, 16])
+        input_config = [
+            {"name": name, "data_type": dtype, "dims": dims} for name in input_names
+        ]
+        output_config = [
+            {"name": name, "data_type": dtype, "dims": dims} for name in output_names
+        ]
+        # Inputs
+        inputs = []
+        for name in input_names:
+            inputs.append(
+                client_type.InferInput(name, shape, dtype.replace("TYPE_", ""))
+            )
+            inputs[-1].set_data_from_numpy(np.ones(shape, dtype=np.float32))
+        return input_config, output_config, inputs
 
     def test_concurrent_model_instance_load_sanity(self):
         cpu, gpu = "KIND_CPU", "KIND_GPU"
         default_kinds = [cpu, gpu]
-        backend_kinds = {"plan": [gpu]}
+        backend_kinds = {"plan": [gpu], "openvino": [cpu]}
         try:
             client_type = httpclient
             triton_client = client_type.InferenceServerClient(
@@ -3009,6 +3017,7 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(len(backends) > 0, "PARALLEL_BACKENDS wasn't set")
 
         num_instances = 5
+        input_config, output_config, inputs = self._get_fp32_io(client_type)
         for backend in backends:
             model = tu.get_model_name(backend, np.float32, np.float32, np.float32)
             kinds = backend_kinds.get(backend, default_kinds)
@@ -3024,7 +3033,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     "direct": {},
                     "max_sequence_idle_microseconds": sequence_timeout_secs * 1000000,
                 }
-                input_config, output_config = self._get_fp32_io_config()
                 config = {
                     "instance_group": instance_group,
                     "max_batch_size": max_batch_size,
@@ -3032,8 +3040,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     "input": input_config,
                     "output": output_config,
                 }
-                # TODO: Set python model to be 2 inputs/outputs, consistent with all identity models
-
                 print(
                     f"~~~ Backend: [{backend}], Model: [{model}], Config: [{config}] ~~~"
                 )
@@ -3052,7 +3058,6 @@ class LifeCycleTest(tu.TestResultCollector):
                 )
 
                 # Test inference on each instance
-                inputs = self._get_fp32_inputs(client_type)
                 for i in range(1, num_instances + 1):
                     r = triton_client.infer(
                         model, inputs, sequence_id=i, sequence_start=True
