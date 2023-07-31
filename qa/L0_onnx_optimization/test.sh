@@ -61,8 +61,11 @@ for MODEL in \
        models/${MODEL}_test && \
     rm -fr models/${MODEL}_test/2 && \
     rm -fr models/${MODEL}_test/3 && \
+    # Set instance count > 1 to test parallel instance loading across all EPs
+    INSTANCE_COUNT=5
     (cd models/${MODEL}_test && \
-            sed -i 's/_float32_float32_float32/&_test/' config.pbtxt) && \
+            sed -i 's/_float32_float32_float32/&_test/' config.pbtxt && \
+            echo -e "\ninstance_group { count: ${INSTANCE_COUNT} }" >> config.pbtxt) && \
     # CUDA EP optimization params
     cp -r models/${MODEL}_test models/${MODEL}_cuda_config && \
     (cd models/${MODEL}_cuda_config && \
