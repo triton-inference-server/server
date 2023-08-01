@@ -2966,7 +2966,7 @@ class LifeCycleTest(tu.TestResultCollector):
         result = callable()
         return result
 
-    def _call_with_expected_timeout(self, callable, timeout_secs):
+    def _call_with_expected_timeout(self, callable, timeout_secs=3):
         # Call callable with expectation that it will timeout
         try:
             self._call_with_timeout(callable, timeout_secs)
@@ -3067,8 +3067,8 @@ class LifeCycleTest(tu.TestResultCollector):
                                 False, "unexpected inference error {}".format(ex)
                             )
 
-                    # Each instance should be busy with until their sequence times out, so
-                    # and additional infer call should time out. If it doesn't time out, something
+                    # Each instance should be busy until their sequence times out, so
+                    # an additional infer call should time out. If it doesn't time out, something
                     # is wrong and the test should fail.
                     callable = partial(
                         triton_client.infer,
@@ -3077,8 +3077,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         sequence_id=num_instances + 1,
                         sequence_start=True,
                     )
-                    timeout_secs = 3
-                    self._call_with_expected_timeout(callable, timeout_secs)
+                    self._call_with_expected_timeout(callable, timeout_secs=3)
 
                     # Unload the model
                     try:
@@ -3096,7 +3095,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         )
                         time.sleep(6)
                     print(
-                        "Model Repository Index after unload:",
+                        "Model Repository Index after unload attempts:",
                         triton_client.get_model_repository_index(),
                     )
                     self.assertTrue(triton_client.is_server_ready())
