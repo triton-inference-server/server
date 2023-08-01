@@ -337,7 +337,8 @@ RUN rm -f /usr/bin/python && \
 
 RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil \
-                           awscli six grpcio-channelz prettytable virtualenv
+                           awscli six grpcio-channelz prettytable virtualenv \
+                           check-jsonschema
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
