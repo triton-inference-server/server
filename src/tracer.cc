@@ -36,6 +36,8 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
+#include "opentelemetry/exporters/ostream/span_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
 namespace otlp = opentelemetry::exporter::otlp;
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
@@ -380,6 +382,12 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
     }
   }
   auto exporter = otlp::OtlpHttpExporterFactory::Create(opts);
+  auto test_exporter = triton::server::GetEnvironmentVariableOrDefault(
+      "TRITON_OPENTELEMETRY_TEST", "false");
+  if (test_exporter != "false") {
+    exporter =
+        opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
+  }
   auto processor =
       otel_trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter));
   auto resource = otel_resource::Resource::Create(attributes);

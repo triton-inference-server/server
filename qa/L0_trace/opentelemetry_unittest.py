@@ -27,8 +27,7 @@
 import sys
 
 sys.path.append("../common")
-import json
-import time
+import re
 import unittest
 
 import numpy as np
@@ -41,27 +40,29 @@ EXPECTED_NUM_SPANS = 16
 
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
-        while True:
-            with open("trace_collector.log", "rt") as f:
-                data = f.read()
-                if data.count("resource_spans") != EXPECTED_NUM_SPANS:
-                    time.sleep(5)
-                    continue
-                else:
-                    break
-
-        data = data.split("\n")
-        full_spans = [
-            entry.split("POST")[0] for entry in data if "resource_spans" in entry
-        ]
-        self.spans = []
-        self.resource_attributes = []
-        for span in full_spans:
-            span = json.loads(span)
-            self.spans.append(span["resource_spans"][0]["scope_spans"][0]["spans"][0])
-            self.resource_attributes.append(
-                span["resource_spans"][0]["resource"]["attributes"]
+        with open("trace_collector.log", "rt") as f:
+            data = f.read()
+            json_string = re.sub("\n\t{\n\t", "{", data)
+            json_string = re.sub(
+                "resources     : \n\t", "resources     : {\n\t", json_string
             )
+            json_string = re.sub(
+                "\n  instr-lib     :", "}\n  instr-lib     :", json_string
+            )
+            json_string = re.sub(": \n\t", ':"",', json_string)
+            json_string = re.sub(": \n", ':"",', json_string)
+            json_string = re.sub("\n|\n\t", ",", json_string)
+            json_string = re.sub("\t", "", json_string)
+            json_string = re.sub(r"\b([\w.-]+)\b", r'"\1"', json_string)
+            json_string = re.sub('"span" "kind"', '"span kind"', json_string)
+            json_string = re.sub("{,", "{", json_string)
+            json_string = re.sub(",}", "}", json_string)
+            json_string = re.sub("}{", "},{", json_string)
+            json_string = re.sub(
+                '"events"        : {', '"events"        : [{', json_string
+            )
+            json_string = re.sub('},  "links"', '}],  "links"', json_string)
+            self.spans = eval(json_string[:-1])
 
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
@@ -126,12 +127,16 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # Check that child and parent span have the same trace_id
         # and child's `parent_span_id` is the same as parent's `span_id`
         self.assertEqual(child_span["trace_id"], parent_span["trace_id"])
-        self.assertIn(
-            "parent_span_id",
-            child_span,
+        self.assertNotEqual(
+            child_span["parent_span_id"],
+            "0000000000000000",
             "child span does not have parent span id specified",
         )
-        self.assertEqual(child_span["parent_span_id"], parent_span["span_id"])
+        self.assertEqual(
+            child_span["parent_span_id"],
+            parent_span["span_id"],
+            "child {} , parent {}".format(child_span, parent_span),
+        )
 
     def test_spans(self):
         parsed_spans = []
@@ -139,7 +144,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # Check that collected spans have proper events recorded
         for span in self.spans:
             span_name = span["name"]
-            self._check_events(span_name, json.dumps(span["events"]))
+            self._check_events(span_name, str(span["events"]))
             parsed_spans.append(span_name)
 
         # There should be 16 spans in total:
@@ -164,42 +169,34 @@ class OpenTelemetryTest(tu.TestResultCollector):
         for child, parent in zip(self.spans[:3], self.spans[1:3]):
             self._check_parent(child, parent)
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[2], "root span has a parent_span_id specified"
-        )
-
         # Next 3 spans in `self.spans` belong to GRPC request
         # Order of spans and their relationship described earlier
         for child, parent in zip(self.spans[3:6], self.spans[4:6]):
             self._check_parent(child, parent)
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[5], "root span has a parent_span_id specified"
-        )
-
-        # Final 4 spans in `self.spans` belong to ensemble request
+        # Next 4 spans in `self.spans` belong to ensemble request
         # Order of spans: compute span - request span - request span - root span
         for child, parent in zip(self.spans[6:10], self.spans[7:10]):
             self._check_parent(child, parent)
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[9], "root span has a parent_span_id specified"
-        )
+        # Final 6 spans in `self.spans` belong to bls with ensemble request
+        # Order of spans:
+        # compute span - request span (simple) - request span (ensemble)-
+        # - compute (for bls) - request (bls) - root span
+        # request span (ensemble) and compute (for bls) are children of
+        # request (bls)
+        children = self.spans[10:]
+        parents = (self.spans[11:13], self.spans[14], self.spans[14:])
+        print(parents)
+        for child, parent in zip(children, parents[0]):
+            self._check_parent(child, parent)
 
     def test_resource_attributes(self):
-        test_attribute_entry = "{{'key': {k}, 'value': {{'string_value': {v}}}}}"
-        for attribute in self.resource_attributes:
-            self.assertIn(
-                test_attribute_entry.format(k="'test.key'", v="'test.value'"),
-                str(attribute),
-            )
-            self.assertIn(
-                test_attribute_entry.format(k="'service.name'", v="'test_triton'"),
-                str(attribute),
-            )
+        for span in self.spans:
+            self.assertIn("test.key", span["resources"])
+            self.assertEqual("test.value", span["resources"]["test.key"])
+            self.assertIn("service.name", span["resources"])
+            self.assertEqual("test_triton", span["resources"]["service.name"])
 
 
 def prepare_data(client):

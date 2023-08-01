@@ -690,12 +690,50 @@ fi
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
-# Unittests then check that produced spans have expected format and events
-# FIXME: Redesign this test to remove time sensitivity
+TRITON_OPENTELEMETRY_TEST='false'
 
+# Using netcat as trace collector
+apt-get update && apt-get install -y netcat
+timeout 2m nc -l -k 127.0.0.1 $OTLP_PORT >> trace_collector_http_exporter.log 2>&1 & COLLECTOR_PID=$!
+
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
+                --trace-config=count=100 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+$SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
+
+set +e
+
+wait $COLLECTOR_PID
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+if ! [ -s trace_collector_http_exporter.log ]  && [ `grep -c 'Host: localhost:10000' trace_collector_http_exporter.log` != 3 ] ; then
+    echo -e "\n***\n*** HTTP exporter test failed.\n***"
+    exit 1
+fi
+
+
+# Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
 EXPECTED_NUM_TESTS="3"
+
+TRITON_OPENTELEMETRY_TEST='true'
 
 SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --trace-config=count=100 --trace-config=mode=opentelemetry \
@@ -705,19 +743,12 @@ SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
 
-export OTEL_EXPORTER_OTLP_TIMEOUT=5
-export OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=5
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
 fi
-
-# Using netcat as trace collector
-apt-get update && apt-get install -y netcat
-nc -l -k 127.0.0.1 $OTLP_PORT >> $TRACE_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
 
 set +e
 # Preparing traces for unittest.
@@ -726,6 +757,17 @@ set +e
 # will slow down collection.
 python -c 'import opentelemetry_unittest; \
         opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
+
+sleep 5
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+grep -z -o -P '({\n(?s).*}\n)' inference_server_trace_config.log >> trace_collector.log
 
 # Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
@@ -740,13 +782,5 @@ else
         RET=1
     fi
 fi
-
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 exit $RET
