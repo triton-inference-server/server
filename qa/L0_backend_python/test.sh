@@ -44,6 +44,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 export BACKEND_DIR=${TRITON_DIR}/backends
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
+PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="8 9 10 11"}
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
@@ -145,16 +146,16 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-PYTHON_ENV_VERSION="8 9 10 11"
-for PYTHON_ENV in $PYTHON_ENV_VERSION; do
+for PYTHON_ENV in ${PYTHON_ENV_VERSION}; do
     echo "python environment 3.${PYTHON_ENV}"
     # Set up environment and stub for each test
     add-apt-repository ppa:deadsnakes/ppa -y
     apt-get update && apt-get -y install "python3.${PYTHON_ENV}"
     rm -f /usr/bin/python3 && \
     ln -s "/usr/bin/python3.${PYTHON_ENV}" /usr/bin/python3
-    PYTHON_STUB_LOCATION=/opt/tritonserver/backend/python/3-${PYTHON_ENV}/triton_python_backend_stub
-    cp ${PYTHON_STUB_LOCATION} /opt/tritonserver/backend/python/
+
+    PYTHON_STUB_LOCATION=/opt/tritonserver/backends/python/3-${PYTHON_ENV}/triton_python_backend_stub
+    cp ${PYTHON_STUB_LOCATION} /opt/tritonserver/backends/python/triton_python_backend_stub
 
     # Skip torch install on Jetson since it is already installed.
     if [ "$TEST_JETSON" == "0" ]; then
