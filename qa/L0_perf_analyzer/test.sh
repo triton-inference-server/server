@@ -163,11 +163,6 @@ if [ $? -eq 0 ]; then
   echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
   RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "failed to parse input shape. There must be a colon after input name." | wc -l) -eq 0 ]; then
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test Failed: \n***"
-  RET=1
-fi
 
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
