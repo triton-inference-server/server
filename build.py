@@ -690,9 +690,6 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         if target_platform() == "windows":
-
-            cargs.append("--compile-no-warning-as-error"
-                         )
             if "base" in images:
                 cargs.append(
                     cmake_backend_arg(
