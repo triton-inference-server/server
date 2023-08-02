@@ -160,8 +160,10 @@ class ModelQueueTest(tu.TestResultCollector):
             for t in threads:
                 t.join()
 
-            # Expect at most two exception with exceeding max queue size error
-            for i in range(2):
+            # Expect exactly two exception with exceeding max queue size error
+            expected_exceeded_count = 2
+            exceeded_count = 0
+            for i in range(expected_exceeded_count):
                 try:
                     self.check_deferred_exception()
                 except InferenceServerException as ex:
@@ -171,6 +173,14 @@ class ModelQueueTest(tu.TestResultCollector):
                             ex
                         ),
                     )
+                    exceeded_count = exceeded_count + 1
+            self.assertEqual(
+                exceeded_count,
+                expected_exceeded_count,
+                "expected {} requests to fail with exceeded max queue size error, got {}".format(
+                    expected_exceeded_count, exceeded_count
+                ),
+            )
             try:
                 self.check_deferred_exception()
             except InferenceServerException as ex:
