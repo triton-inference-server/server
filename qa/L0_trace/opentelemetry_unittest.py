@@ -27,6 +27,7 @@
 import sys
 
 sys.path.append("../common")
+import json
 import re
 import unittest
 
@@ -40,29 +41,54 @@ EXPECTED_NUM_SPANS = 16
 
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
+        # Extracted spans are in json-like format, thus data needs to be
+        # post-processed, so that `json` could accept it for further
+        # processing
         with open("trace_collector.log", "rt") as f:
             data = f.read()
+            # Removing new lines and tabs around `{`
             json_string = re.sub("\n\t{\n\t", "{", data)
+            # `resources` field is a dictionary, so adding `{` and`}`
+            # in the next 2 transformations, `instr-lib` is a next field,
+            # so whatever goes before it, belongs to `resources`.
             json_string = re.sub(
                 "resources     : \n\t", "resources     : {\n\t", json_string
             )
             json_string = re.sub(
                 "\n  instr-lib     :", "}\n  instr-lib     :", json_string
             )
+            # `json`` expects "key":"value" format, some fields in the
+            # data have empty string as value, so need to add `"",`
             json_string = re.sub(": \n\t", ':"",', json_string)
             json_string = re.sub(": \n", ':"",', json_string)
+            # Extracted data missing `,' after each key-value pair,
+            # which `json` exppects
             json_string = re.sub("\n|\n\t", ",", json_string)
+            # Removing tabs
             json_string = re.sub("\t", "", json_string)
+            # `json` expects each key and value have `"`'s, so adding them to
+            # every word/number/alpha-numeric entry
             json_string = re.sub(r"\b([\w.-]+)\b", r'"\1"', json_string)
+            # `span kind`` represents one key
             json_string = re.sub('"span" "kind"', '"span kind"', json_string)
+            # Removing extra `,`
             json_string = re.sub("{,", "{", json_string)
             json_string = re.sub(",}", "}", json_string)
+            # Adding `,` between dictionary entries
             json_string = re.sub("}{", "},{", json_string)
+            # `events` is a list of dictionaries, `json` will accept it in the
+            # form of "events" : [{....}, {.....}, ...]
             json_string = re.sub(
                 '"events"        : {', '"events"        : [{', json_string
             )
+            # Closing `events`' list of dictionaries
             json_string = re.sub('},  "links"', '}],  "links"', json_string)
-            self.spans = eval(json_string[:-1])
+            # Last 2 symbols are not needed
+            json_string = json_string[:-2]
+            # Since now `json_string` is a string, which represents dictionaries,
+            # we  put it into one dictionary, so that `json` could read it as one.
+            json_string = '{ "spans" :[' + json_string + "] }"
+            self.spans = json.loads(json_string)["spans"]
 
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
@@ -187,7 +213,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # request (bls)
         children = self.spans[10:]
         parents = (self.spans[11:13], self.spans[14], self.spans[14:])
-        print(parents)
         for child, parent in zip(children, parents[0]):
             self._check_parent(child, parent)
 

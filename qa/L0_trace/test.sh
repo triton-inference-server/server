@@ -34,10 +34,6 @@ CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 EXPECTED_NUM_TESTS="6"
 
-TRACE_COLLECTOR=trace_collector.py
-TRACE_COLLECTOR_LOG="trace_collector.log"
-OTLP_PORT=10000
-
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -667,6 +663,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
+
 $TRACE_SUMMARY -t bls_trace.log > summary_bls.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_bls.log` != "2" ]; then
@@ -690,17 +688,28 @@ fi
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
-TRITON_OPENTELEMETRY_TEST='false'
+export TRITON_OPENTELEMETRY_TEST='false'
+OTLP_PORT=10000
+OTEL_COLLECTOR_DIR=./opentelemetry-collector
+OTEL_COLLECTOR=./opentelemetry-collector/bin/otelcorecol_*
+OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 
-# Using netcat as trace collector
-apt-get update && apt-get install -y netcat
-timeout 2m nc -l -k 127.0.0.1 $OTLP_PORT >> trace_collector_http_exporter.log 2>&1 & COLLECTOR_PID=$!
+# Building the latest version of the OpenTelemetry collector.
+# Ref: https://opentelemetry.io/docs/collector/getting-started/#local
+if [ -d "$OTEL_COLLECTOR_DIR" ]; then rm -Rf $OTEL_COLLECTOR_DIR; fi
+git clone https://github.com/open-telemetry/opentelemetry-collector.git
+cd $OTEL_COLLECTOR_DIR
+make install-tools
+make otelcorecol
+cd ..
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
 
 SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --trace-config=count=100 --trace-config=mode=opentelemetry \
-                --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
                 --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_trace_config.log"
+SERVER_LOG="./inference_server_otel_http_exporter.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -709,21 +718,21 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-$SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-
-set +e
-
-wait $COLLECTOR_PID
+$SIMPLE_HTTP_CLIENT >>$CLIENT_LOG 2>&1
 
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+
 set +e
 
-if ! [ -s trace_collector_http_exporter.log ]  && [ `grep -c 'Host: localhost:10000' trace_collector_http_exporter.log` != 3 ] ; then
+if ! [[ -s $OTEL_COLLECTOR_LOG && `grep -c 'InstrumentationScope triton-server' $OTEL_COLLECTOR_LOG` == 3 ]] ; then
     echo -e "\n***\n*** HTTP exporter test failed.\n***"
+    cat $OTEL_COLLECTOR_LOG
     exit 1
 fi
 
@@ -733,15 +742,14 @@ OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
 EXPECTED_NUM_TESTS="3"
 
-TRITON_OPENTELEMETRY_TEST='true'
+export TRITON_OPENTELEMETRY_TEST='true'
 
 SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --trace-config=count=100 --trace-config=mode=opentelemetry \
-                --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
                 --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_trace_config.log"
+SERVER_LOG="./inference_server_otel_ostream_exporter.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -767,7 +775,12 @@ wait $SERVER_PID
 
 set +e
 
-grep -z -o -P '({\n(?s).*}\n)' inference_server_trace_config.log >> trace_collector.log
+grep -z -o -P '({\n(?s).*}\n)' $SERVER_LOG >> trace_collector.log
+
+if ! [ -s trace_collector.log ] ; then
+    echo -e "\n***\n*** $SERVER_LOG did not contain any OpenTelemetry spans.\n***"
+    exit 1
+fi
 
 # Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
