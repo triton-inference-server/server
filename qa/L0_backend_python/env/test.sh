@@ -108,6 +108,7 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+conda deactivate
 
 # Test conda env without custom Python backend stub This environment should
 # always use the default Python version shipped in the container. For Ubuntu 22.04
@@ -126,6 +127,7 @@ cp python3.10.tar.gz models/python_3_10/python_3_10_environment.tar.gz
           sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_10/1/
+conda deactivate
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -175,6 +177,7 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
 # copy the stub out to /opt/tritonserver/backends/python/3-8
 mkdir -p /opt/tritonserver/backends/python/3-8
 cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-8/triton_python_backend_stub
+conda deactivate
 
 # Create a model with python 3.9 version
 # Successful execution of the Python model indicates that the environment has
@@ -199,6 +202,7 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
 # copy the stub out to /opt/tritonserver/backends/python/3-9
 mkdir -p /opt/tritonserver/backends/python/3-9
 cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-9/triton_python_backend_stub
+conda deactivate
 
 # Create a model with python 3.11 version
 # Successful execution of the Python model indicates that the environment has
@@ -227,6 +231,7 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_11
 # copy the stub out to /opt/tritonserver/backends/python/3-11
 mkdir -p /opt/tritonserver/backends/python/3-11
 cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-11/triton_python_backend_stub
+conda deactivate
 
 # copy the stub out to /opt/tritonserver/backends/python/3-10
 mkdir -p /opt/tritonserver/backends/python/3-10
