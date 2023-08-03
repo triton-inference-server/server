@@ -64,7 +64,7 @@ ADD ${BUILDTOOLS_SOURCE} vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--addProductLang","En-us","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
-LABEL BUILDTOOLS_VERSION=16.11.21
+LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
 WORKDIR /
 
