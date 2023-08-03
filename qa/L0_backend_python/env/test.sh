@@ -174,7 +174,7 @@ cp ../../python_models/python_version/model.py ./models/python_3_8/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
 # copy the stub out to /opt/tritonserver/backends/python/3-8
 mkdir -p /opt/tritonserver/backends/python/3-8
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-8
+cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-8/triton_python_backend_stub
 
 # Create a model with python 3.9 version
 # Successful execution of the Python model indicates that the environment has
@@ -198,7 +198,7 @@ cp ../../python_models/python_version/model.py ./models/python_3_9/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
 # copy the stub out to /opt/tritonserver/backends/python/3-9
 mkdir -p /opt/tritonserver/backends/python/3-9
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-9
+cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-9/triton_python_backend_stub
 
 # Create a model with python 3.11 version
 # Successful execution of the Python model indicates that the environment has
@@ -226,11 +226,11 @@ cp ../../python_models/python_version/model.py ./models/python_3_11/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_11
 # copy the stub out to /opt/tritonserver/backends/python/3-11
 mkdir -p /opt/tritonserver/backends/python/3-11
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-11
+cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-11/triton_python_backend_stub
 
 # copy the stub out to /opt/tritonserver/backends/python/3-10
 mkdir -p /opt/tritonserver/backends/python/3-10
-cp /opt/tritonserver/backends/python/triton_python_backend_stub /opt/tritonserver/backends/python/3-10
+cp /opt/tritonserver/backends/python/triton_python_backend_stub /opt/tritonserver/backends/python/3-10/triton_python_backend_stub
 
 rm -rf ./miniconda
 

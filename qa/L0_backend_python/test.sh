@@ -150,7 +150,9 @@ for PYTHON_ENV in ${PYTHON_ENV_VERSION}; do
     echo "python environment 3.${PYTHON_ENV}"
     # Set up environment and stub for each test
     add-apt-repository ppa:deadsnakes/ppa -y
-    apt-get update && apt-get -y install "python3.${PYTHON_ENV}"
+    apt-get update && apt-get -y install \
+                                "python3.${PYTHON_ENV}-dev" \
+                                "python3.${PYTHON_ENV}-distutils"
     rm -f /usr/bin/python3 && \
     ln -s "/usr/bin/python3.${PYTHON_ENV}" /usr/bin/python3
 
