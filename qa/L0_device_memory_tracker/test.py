@@ -25,18 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
 import time
+import unittest
 from functools import partial
 
-import tritonclient.http as httpclient
-import tritonclient.grpc as grpcclient
-
 import nvidia_smi
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 
 
 class UnifiedClientProxy:
-
     def __init__(self, client):
         self.client_ = client
 
@@ -45,21 +43,19 @@ class UnifiedClientProxy:
         if type(self.client_) == grpcclient.InferenceServerClient:
             if attr == "get_model_config":
                 return lambda *args, **kwargs: forward_attr(
-                    *args, **kwargs, as_json=True)["config"]
+                    *args, **kwargs, as_json=True
+                )["config"]
             elif attr == "get_inference_statistics":
                 return partial(forward_attr, as_json=True)
         return forward_attr
 
 
 class MemoryUsageTest(unittest.TestCase):
-
     def setUp(self):
         nvidia_smi.nvmlInit()
         self.gpu_handle_ = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-        self.http_client_ = httpclient.InferenceServerClient(
-            url="localhost:8000")
-        self.grpc_client_ = grpcclient.InferenceServerClient(
-            url="localhost:8001")
+        self.http_client_ = httpclient.InferenceServerClient(url="localhost:8000")
+        self.grpc_client_ = grpcclient.InferenceServerClient(url="localhost:8001")
 
     def tearDown(self):
         nvidia_smi.nvmlShutdown()
@@ -69,8 +65,7 @@ class MemoryUsageTest(unittest.TestCase):
         return info.used
 
     def is_testing_backend(self, model_name, backend_name):
-        return self.client_.get_model_config(
-            model_name)["backend"] == backend_name
+        return self.client_.get_model_config(model_name)["backend"] == backend_name
 
     def verify_recorded_usage(self, model_stat):
         recorded_gpu_usage = 0
@@ -87,10 +82,13 @@ class MemoryUsageTest(unittest.TestCase):
         # check with tolerance as gpu usage obtained is overall usage
         self.assertTrue(
             usage_delta * 0.9 <= recorded_gpu_usage <= usage_delta * 1.1,
-            msg=
-            "For model {}, expect recorded usage to be in range [{}, {}], got {}"
-            .format(model_stat["name"], usage_delta * 0.9, usage_delta * 1.1,
-                    recorded_gpu_usage))
+            msg="For model {}, expect recorded usage to be in range [{}, {}], got {}".format(
+                model_stat["name"],
+                usage_delta * 0.9,
+                usage_delta * 1.1,
+                recorded_gpu_usage,
+            ),
+        )
 
     def test_onnx_http(self):
         self.client_ = UnifiedClientProxy(self.http_client_)

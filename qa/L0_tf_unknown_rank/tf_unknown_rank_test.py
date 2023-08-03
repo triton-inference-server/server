@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +31,7 @@ import sys
 sys.path.append("../common")
 
 import unittest
+
 import numpy as np
 import test_util as tu
 import tritonhttpclient
@@ -40,18 +43,19 @@ class UnknownRankTest(tu.TestResultCollector):
     def infer_unknown(self, model_name, tensor_shape):
         print("About to run the test")
         input_data = np.random.random_sample(tensor_shape).astype(np.float32)
-        client = tritonhttpclient.InferenceServerClient('localhost:8000')
+        client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = [
-            tritonhttpclient.InferInput("INPUT", input_data.shape,
-                                        np_to_triton_dtype(input_data.dtype))
+            tritonhttpclient.InferInput(
+                "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
         ]
         inputs[0].set_data_from_numpy(input_data)
         results = client.infer(model_name, inputs)
-        self.assertTrue(np.array_equal(results.as_numpy('OUTPUT'), input_data))
+        self.assertTrue(np.array_equal(results.as_numpy("OUTPUT"), input_data))
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1)
+        tensor_shape = 1
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
@@ -63,15 +67,16 @@ class UnknownRankTest(tu.TestResultCollector):
         try:
             self.infer_unknown(model_name, tensor_shape)
             self.fail(
-                "Found success when expected failure with model given " \
+                "Found success when expected failure with model given "
                 "wrong input tensor [1,2] for input [-1,1]."
             )
         except InferenceServerException as ex:
             self.assertIn(
-                "unexpected shape for input \'INPUT\' for model " \
-                "\'unknown_rank_wrong_output\'. Expected [1], got [1,2]",
-                ex.message())
+                "unexpected shape for input 'INPUT' for model "
+                "'unknown_rank_wrong_output'. Expected [1], got [1,2]",
+                ex.message(),
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 /*
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -114,14 +114,14 @@ font-family: NVIDIA Sans, Helvetica, Arial, Sans-serif;
   font-size: 0.85em;
 }
 
-/* colors 
+/* colors
 nv green 118,185,0
 black 0, 0, 0
 light gray 205, 205, 205
 medium gray 140, 140, 140
 dark gray 94, 94, 94
 
-emerald 0, 133, 100 
+emerald 0, 133, 100
 emerald #008564
 amethyst 92, 22, 130
 amethyst #5C1682

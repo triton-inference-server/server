@@ -54,7 +54,7 @@ fi
 set +e
 
 export MODEL_NAME='custom_metrics'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
     cat $CLIENT_LOG

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -409,7 +409,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     set -e
-    
+
     # Binary search for concurrency range mode and make sure it doesn't hang
     $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
     --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
@@ -809,8 +809,8 @@ set -e
 
 # Test with optional inputs missing and invalid
 set +e
-OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of 
-inputs must be specified for each batch. You cannot use different set of 
+OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of
+inputs must be specified for each batch. You cannot use different set of
 optional inputs for each individual batch."
 $PERF_ANALYZER -v -m optional -b 2 --measurement-mode "count_windows" \
     --input-data=${INT_OPTIONAL_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -854,7 +854,7 @@ if [ $(cat $CLIENT_LOG |  grep "Request Rate: 40" | wc -l) -eq 0 ]; then
 fi
 set -e
 
-# Test --serial-sequences mode 
+# Test --serial-sequences mode
 set +e
 $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --serial-sequences \
     --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -880,7 +880,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi    
+fi
 set -e
 
 ## Test perf_analyzer with MPI / multiple models

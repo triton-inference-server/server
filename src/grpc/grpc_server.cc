@@ -1196,7 +1196,7 @@ CommonHandler::RegisterModelStatistics()
 #else
     auto err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport model statistics");
+        "the server does not support model statistics");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -1410,7 +1410,7 @@ CommonHandler::RegisterTrace()
     TRITONSERVER_ErrorDelete(err);
 #else
     auto err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not suppport trace");
+        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not support trace");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -1620,7 +1620,7 @@ CommonHandler::RegisterLogging()
 #else
     auto err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport dynamic logging");
+        "the server does not support dynamic logging");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif

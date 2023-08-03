@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,13 +50,13 @@ if the "sequence_id" parameter supports string types.
 - "sequence_start" : boolean value if set to true in a request
   indicates that the request is the first in a sequence. If not set,
   or set to false the request is not the first in a sequence. If set
-  the "sequence_id" parameter must be set to a non-zero or non-empty string 
+  the "sequence_id" parameter must be set to a non-zero or non-empty string
   value.
 
 - "sequence_end" : boolean value if set to true in a request indicates
   that the request is the last in a sequence. If not set, or set to
   false the request is not the last in a sequence. If set the
-  "sequence_id" parameter must be set to a non-zero or non-empty string 
+  "sequence_id" parameter must be set to a non-zero or non-empty string
   value.
 
 ## HTTP/REST

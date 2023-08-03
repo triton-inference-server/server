@@ -1,5 +1,5 @@
 <!--
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -227,7 +227,7 @@ $duration_stat =
 - “ns” : The total duration for the statistic in nanoseconds.
 
 ```
-$memory_usage = 
+$memory_usage =
 {
   "type" : $string,
   "id" : $number,
@@ -375,7 +375,7 @@ message InferStatistics
   StatisticDuration fail = 2;
 
   // The count and cumulative duration that inference requests wait in
-  // scheduling or other queues. The "queue" count and cumulative 
+  // scheduling or other queues. The "queue" count and cumulative
   // duration includes cache hits.
   StatisticDuration queue = 3;
 
@@ -405,7 +405,7 @@ message InferStatistics
   // and extract output tensor data from the Response Cache on a cache
   // hit. For example, this duration should include the time to copy
   // output tensor data from the Response Cache to the response object.
-  // On cache hits, triton does not need to go to the model/backend 
+  // On cache hits, triton does not need to go to the model/backend
   // for the output tensor data, so the "compute_input", "compute_infer",
   // and "compute_output" fields are not updated. Assuming the response
   // cache is enabled for a given model, a cache hit occurs for a
@@ -419,7 +419,7 @@ message InferStatistics
   // The count of response cache misses and cumulative duration to lookup
   // and insert output tensor data from the computed response to the cache
   // For example, this duration should include the time to copy
-  // output tensor data from the resposne object to the Response Cache.
+  // output tensor data from the response object to the Response Cache.
   // Assuming the response cache is enabled for a given model, a cache
   // miss occurs for a request to that model when the request metadata
   // does NOT hash to an existing entry in the cache. See the response
@@ -452,7 +452,7 @@ message InferBatchStatistics
 }
 
 // Memory usage.
-message MemoryUsage 
+message MemoryUsage
 {
   // The type of memory, the value can be "CPU", "CPU_PINNED", "GPU".
   string type = 1;

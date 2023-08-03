@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Needs to be run in asr_kaldi main directory and must be copied to 
+# Needs to be run in asr_kaldi main directory and must be copied to
 # draco for benchmark test
 TRITON_VERSION="20.05"
 

@@ -71,8 +71,8 @@ function stop_redis() {
 }
 
 function set_redis_auth() {
-  # NOTE: Per-user auth [Access Control List (ACL)] is only supported in 
-  #       Redis >= 6.0 and is more comprehensive in what can be configured. 
+  # NOTE: Per-user auth [Access Control List (ACL)] is only supported in
+  #       Redis >= 6.0 and is more comprehensive in what can be configured.
   #       For simplicity and wider range of Redis version support, use
   #       server-wide password  via "requirepass" for now.
   redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" config set requirepass "${REDIS_PW}"
@@ -88,7 +88,7 @@ function unset_redis_auth() {
 # UNIT TESTS
 set +e
 
-## Unit tests currently run for both Local and Redis cache implementaitons
+## Unit tests currently run for both Local and Redis cache implementations
 ## by default. However, we could break out the unit tests for each
 ## into separate runs gtest filters if needed in the future:
 ## - `${UNIT_TEST} --gtest_filter=*Local*`
@@ -130,7 +130,7 @@ function check_server_expected_failure {
     else
         # Check that server fails with the correct error message
         set +e
-        grep -i "${EXPECTED_MESSAGE}" ${SERVER_LOG} 
+        grep -i "${EXPECTED_MESSAGE}" ${SERVER_LOG}
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Failed: Expected [${EXPECTED_MESSAGE}] error message in output\n***"
             cat $SERVER_LOG

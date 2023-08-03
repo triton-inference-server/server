@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,12 +32,12 @@ SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
 if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
     SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
 else
-    SAGEMAKER_TRITON_PING_MODE="ready" 
+    SAGEMAKER_TRITON_PING_MODE="ready"
 fi
 
 # Note: in Triton on SageMaker, each model url is registered as a separate repository
 # e.g., /opt/ml/models/<hash>/model. Specifying MME model repo path as /opt/ml/models causes Triton
-# to treat it as an additional empty repository and changes 
+# to treat it as an additional empty repository and changes
 # the state of all models to be UNAVAILABLE in the model repository
 # https://github.com/triton-inference-server/core/blob/main/src/model_repository_manager.cc#L914,L922
 # On Triton, this path will be a dummy path as it's mandatory to specify a model repo when starting triton
@@ -53,10 +53,10 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
         if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
             SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
         else
-            SAGEMAKER_TRITON_PING_MODE="live" 
+            SAGEMAKER_TRITON_PING_MODE="live"
         fi
         is_mme_mode=true
-        echo -e "Triton is running in SageMaker MME mode. Using Triton ping mode: \"${SAGEMAKER_TRITON_PING_MODE}\"" 
+        echo -e "Triton is running in SageMaker MME mode. Using Triton ping mode: \"${SAGEMAKER_TRITON_PING_MODE}\""
     fi
 fi
 

@@ -29,11 +29,11 @@
 # **Triton Inference Server Documentation**
 
 | [Installation](README.md#installation) | [Getting Started](README.md#getting-started) | [User Guide](README.md#user-guide) | [API Guide](protocol/README.md) | [Additional Resources](README.md#resources) | [Customization Guide](README.md#customization-guide) |
-| ------------ | --------------- | --------------- | ------------ | --------------- | --------------- | 
+| ------------ | --------------- | --------------- | ------------ | --------------- | --------------- |
 
-**New to Triton Inference Server?** Make use of 
+**New to Triton Inference Server?** Make use of
 [these tutorials](https://github.com/triton-inference-server/tutorials)
- to begin your Triton journey! 
+ to begin your Triton journey!
 
 ## **Installation**
 Before you can use the Triton Docker image you must install
@@ -58,14 +58,14 @@ This guide covers the simplest possible workflow for deploying a model using a T
 - [Launch Triton](getting_started/quickstart.md#launch-triton)
 - [Send an Inference Request](getting_started/quickstart.md#send-an-inference-request)
 
-Triton Inference Server has a considerable list versatile and powerful features. All new users are recommended to explore the [User Guide](README.md#user-guide) and the [additional resources](README.md#resources) sections for features most relevant to their use case. 
+Triton Inference Server has a considerable list versatile and powerful features. All new users are recommended to explore the [User Guide](README.md#user-guide) and the [additional resources](README.md#resources) sections for features most relevant to their use case.
 
 ## **User Guide**
 The User Guide describes how to configure Triton, organize and configure your models, use the C++ and Python clients, etc. This guide includes the following:
 * Creating a Model Repository [[Overview](README.md#model-repository) || [Details](user_guide/model_repository.md)]
 * Writing a Model Configuration [[Overview](README.md#model-configuration) || [Details](user_guide/model_configuration.md)]
 * Buillding a Model Pipeline [[Overview](README.md#model-pipeline)]
-* Managing Model Availablity [[Overview](README.md#model-management) || [Details](user_guide/model_management.md)]
+* Managing Model Availability [[Overview](README.md#model-management) || [Details](user_guide/model_management.md)]
 * Collecting Server Metrics [[Overview](README.md#metrics) || [Details](user_guide/metrics.md)]
 * Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details](user_guide/custom_operations.md)]
 * Using the Client API [[Overview](README.md#client-libraries-and-examples) || [Details](https://github.com/triton-inference-server/client)]
@@ -73,14 +73,14 @@ The User Guide describes how to configure Triton, organize and configure your mo
 * Deploying on edge (Jetson) [[Overview](README.md#jetson-and-jetpack)]
 
 
-### Model Repository 
+### Model Repository
 [Model Repositories](user_guide/model_repository.md) are the organizational hub for using Triton. All models, configuration files, and additional resources needed to serve the models are housed inside a model repository.
 - [Cloud Storage](user_guide/model_repository.md#model-repository-locations)
 - [File Organization](user_guide/model_repository.md#model-files)
 - [Model Versioning](user_guide/model_repository.md#model-versions)
 ### Model Configuration
 
-A [Model Configuration](user_guide/model_configuration.md) file is where you set the model-level options, such as output tensor reshaping and dynamic batch sizing. 
+A [Model Configuration](user_guide/model_configuration.md) file is where you set the model-level options, such as output tensor reshaping and dynamic batch sizing.
 
 #### Required Model Configuration
 
@@ -112,7 +112,7 @@ The Model Configuration ModelOptimizationPolicy property is used to specify opti
 
 #### Scheduling and Batching
 
-Triton supports batching individual inference requests to improve compute resource utilization. This is extremely important as individual requests typically will not saturate GPU resources thus not leveraging the parallelism provided by GPUs to its extent. Learn more about Triton's [Batcher and Scheduler](user_guide/model_configuration.md#scheduling-and-batching).  
+Triton supports batching individual inference requests to improve compute resource utilization. This is extremely important as individual requests typically will not saturate GPU resources thus not leveraging the parallelism provided by GPUs to its extent. Learn more about Triton's [Batcher and Scheduler](user_guide/model_configuration.md#scheduling-and-batching).
 - [Default Scheduler - Non-Batching](user_guide/model_configuration.md#default-scheduler)
 - [Dynamic Batcher](user_guide/model_configuration.md#dynamic-batcher)
   - [How to Configure Dynamic Batcher](user_guide/model_configuration.md#recommended-configuration-process)
@@ -134,21 +134,21 @@ Triton supports batching individual inference requests to improve compute resour
 Rate limiter manages the rate at which requests are scheduled on model instances by Triton. The rate limiter operates across all models loaded in Triton to allow cross-model prioritization. [Learn more](user_guide/rate_limiter.md).
 
 #### Model Warmup
-For a few of the Backends (check [Additional Resources](README.md#resources)) some or all of intialization is deffered till the first inference request is received, the benefit is resource conservation but comes with the downside of the initial requests getting processed slower than expected. Users can pre-"warm up" the model by instructing Triton to intialize the model. [Learn more](user_guide/model_configuration.md#model-warmup). 
+For a few of the Backends (check [Additional Resources](README.md#resources)) some or all of initialization is deferred until the first inference request is received, the benefit is resource conservation but comes with the downside of the initial requests getting processed slower than expected. Users can pre-"warm up" the model by instructing Triton to initialize the model. [Learn more](user_guide/model_configuration.md#model-warmup).
 
 #### Inference Request/Response Cache
 Triton has a feature which allows inference responses to get cached. [Learn More](user_guide/response_cache.md).
 
 ### Model Pipeline
-Building ensembles is as easy as adding an addition configuration file which outlines the specific flow of tensors from one model to another. Any additional changes required by the model ensemble can be made in existing (individual) model configurations. 
+Building ensembles is as easy as adding an addition configuration file which outlines the specific flow of tensors from one model to another. Any additional changes required by the model ensemble can be made in existing (individual) model configurations.
 - [Model Ensemble](user_guide/architecture.md#ensemble-models)
 - [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 ### Model Management
-Users can specify policies in the model configuration for loading and unloading of models. This [section](user_guide/model_management.md) covers user selectable policy details.  
+Users can specify policies in the model configuration for loading and unloading of models. This [section](user_guide/model_management.md) covers user selectable policy details.
 - [Explicit Model Loading and Unloading](user_guide/model_management.md#model-control-mode-explicit)
 - [Modifying the Model Repository](user_guide/model_management.md#modifying-the-model-repository)
 ### Metrics
-Triton provides Prometheus metrics like GPU Utilization, Memory Usage, Latency and more. Learn about [availble metrics](user_guide/metrics.md). 
+Triton provides Prometheus metrics like GPU Utilization, Memory Usage, Latency and more. Learn about [available metrics](user_guide/metrics.md).
 ### Framework Custom Operations
 Some frameworks provide the option of building custom layers/operations. These can be added to specific Triton Backends for the those frameworks. [Learn more](user_guide/custom_operations.md)
 - [TensorRT](user_guide/custom_operations.md#tensorrt)
@@ -164,9 +164,9 @@ Use the [Triton Client](https://github.com/triton-inference-server/client) API t
   - [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
   - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
   - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
-- [Shared Memory Extention](protocol/extension_shared_memory.md)
+- [Shared Memory Extension](protocol/extension_shared_memory.md)
 ### Performance Analysis
-Understanding Inference perfomance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
+Understanding Inference performance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
 - [Performance Tuning Guide](user_guide/performance_tuning.md)
 - [Optimization](user_guide/optimization.md)
 - [Model Analyzer](user_guide/model_analyzer.md)
@@ -189,7 +189,7 @@ The following resources are recommended to explore the full suite of Triton Infe
   - [Model Navigator](https://github.com/triton-inference-server/model_navigator):
   The Triton Model Navigator is a tool that provides the ability to automate the process of moving model from source to optimal format and configuration for deployment on Triton Inference Server. The tool supports export model from source to all possible formats and applies the Triton Inference Server backend optimizations.
 
-- **Backends**: Triton has suports a wide varity of frameworks used to run models. Users can extend this functionality by creating custom backends.
+- **Backends**: Triton supports a wide variety of frameworks used to run models. Users can extend this functionality by creating custom backends.
   - [PyTorch](https://github.com/triton-inference-server/pytorch_backend): Widely used Open Source DL Framework
   - [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend): Widely used Open Source DL Framework
   - [TensorRT](https://github.com/triton-inference-server/tensorrt_backend): NVIDIA [TensorRT](https://developer.nvidia.com/tensorrt) is an inference acceleration SDK that provide a with range of graph optimizations, kernel optimization, use of lower precision, and more.

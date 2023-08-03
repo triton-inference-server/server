@@ -130,7 +130,7 @@ if(EXISTS "/etc/os-release")
     set (LIB_DIR "lib64")
   endif()
 endif()
-  
+
 set(TRITON_CORE_HEADERS_ONLY OFF)
 
 FetchContent_MakeAvailable(repo-third-party repo-core)

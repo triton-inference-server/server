@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -46,9 +48,9 @@ from sphinx import search
 
 # -- Project information -----------------------------------------------------
 
-project = 'NVIDIA Triton Inference Server'
-copyright = '2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved'
-author = 'NVIDIA'
+project = "NVIDIA Triton Inference Server"
+copyright = "2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved"
+author = "NVIDIA"
 
 # The full version, including alpha/beta/rc tags
 # Env only set during riva-release process, otherwise keep as dev for all internal builds
@@ -69,7 +71,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx-prompt",
-    #"sphinxcontrib.bibtex",
+    # "sphinxcontrib.bibtex",
     "sphinx_tabs.tabs",
     "sphinx_sitemap",
 ]
@@ -79,7 +81,9 @@ suppress_warnings = ["myst.domains", "ref.ref"]
 numfig = True
 
 # final location of docs for seo/sitemap
-html_baseurl = 'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/'
+html_baseurl = (
+    "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/"
+)
 
 myst_enable_extensions = [
     "dollarmath",
@@ -96,7 +100,7 @@ myst_enable_extensions = [
 myst_heading_anchors = 5
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -121,7 +125,7 @@ html_additional_files = ["index.html"]
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 
 html_theme_options = {
@@ -150,11 +154,10 @@ version_short = release
 deploy_ngc_org = "nvidia"
 deploy_ngc_team = "triton"
 myst_substitutions = {
-    "VersionNum":
-        version_short,
-    "deploy_ngc_org_team":
-        f"{deploy_ngc_org}/{deploy_ngc_team}"
-        if deploy_ngc_team else deploy_ngc_org,
+    "VersionNum": version_short,
+    "deploy_ngc_org_team": f"{deploy_ngc_org}/{deploy_ngc_team}"
+    if deploy_ngc_team
+    else deploy_ngc_org,
 }
 
 
@@ -167,31 +170,31 @@ def ultimateReplace(app, docname, source):
 
 # this is a necessary hack to allow us to fill in variables that exist in code blocks
 ultimate_replacements = {
-    "{VersionNum}":
-        version_short,
-    "{SamplesVersionNum}":
-        version_short,
-    "{NgcOrgTeam}":
-        f"{deploy_ngc_org}/{deploy_ngc_team}"
-        if deploy_ngc_team else deploy_ngc_org,
+    "{VersionNum}": version_short,
+    "{SamplesVersionNum}": version_short,
+    "{NgcOrgTeam}": f"{deploy_ngc_org}/{deploy_ngc_team}"
+    if deploy_ngc_team
+    else deploy_ngc_org,
 }
 
-#bibtex_bibfiles = ["references.bib"]
+# bibtex_bibfiles = ["references.bib"]
 # To test that style looks good with common bibtex config
-#bibtex_reference_style = "author_year"
-#bibtex_default_style = "plain"
+# bibtex_reference_style = "author_year"
+# bibtex_default_style = "plain"
 
-### We currrently use Myst: https://myst-nb.readthedocs.io/en/latest/use/execute.html
+### We currently use Myst: https://myst-nb.readthedocs.io/en/latest/use/execute.html
 jupyter_execute_notebooks = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
 
 def setup(app):
-    app.add_config_value('ultimate_replacements', {}, True)
-    app.connect('source-read', ultimateReplace)
+    app.add_config_value("ultimate_replacements", {}, True)
+    app.connect("source-read", ultimateReplace)
     app.add_js_file("https://js.hcaptcha.com/1/api.js")
 
-    visitor_script = "//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"
+    visitor_script = (
+        "//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"
+    )
 
     if visitor_script:
         app.add_js_file(visitor_script)
@@ -213,8 +216,9 @@ def setup(app):
 
 # Patch for sphinx.search stemming short terms (i.e. tts -> tt)
 # https://github.com/sphinx-doc/sphinx/blob/4.5.x/sphinx/search/__init__.py#L380
-def sphinxSearchIndexFeed(self, docname: str, filename: str, title: str,
-                          doctree: nodes.document):
+def sphinxSearchIndexFeed(
+    self, docname: str, filename: str, title: str, doctree: nodes.document
+):
     """Feed a doctree to the index."""
     self._titles[docname] = title
     self._filenames[docname] = filename
@@ -242,11 +246,9 @@ def sphinxSearchIndexFeed(self, docname: str, filename: str, title: str,
     for word in visitor.found_words:
         stemmed_word = stem(word)
         # again, stemmer must not remove words from search index
-        if len(stemmed_word) <= 3 or not _filter(stemmed_word) and _filter(
-                word):
+        if len(stemmed_word) <= 3 or not _filter(stemmed_word) and _filter(word):
             stemmed_word = word.lower()
-        already_indexed = docname in self._title_mapping.get(
-            stemmed_word, set())
+        already_indexed = docname in self._title_mapping.get(stemmed_word, set())
         if _filter(stemmed_word) and not already_indexed:
             self._mapping.setdefault(stemmed_word, set()).add(docname)
 
