@@ -79,7 +79,13 @@ def np_to_trt_dtype(np_dtype):
 # based on the request batch size.
 # input_shape is config shape
 def create_data_dependent_modelfile(
-    models_dir, model_name, input_shape, input_dtype=np.int32, min_dim=1, max_dim=32
+    models_dir,
+    model_name,
+    input_shape,
+    input_dtype=np.int32,
+    min_dim=1,
+    max_dim=32,
+    add_shape_layer=False,
 ):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
 
@@ -101,9 +107,22 @@ def create_data_dependent_modelfile(
     non_zero_1 = network.add_non_zero(out0)
     out1 = non_zero_1.get_output(0)
 
-    # configure output
-    out1.name = "OUTPUT"
-    network.mark_output(out1)
+    if add_shape_layer:
+        # configure shape layer
+        shape_layer = network.add_shape(out1)
+        out2 = shape_layer.get_output(0)
+        if shape_layer is None:
+            print("Shape layer is none")
+        if out2 is None:
+            print("Out2 is none")
+        # configure output
+        out2.name = "OUTPUT"
+        network.mark_output(out2)
+        network.mark_output_for_shapes(out2)
+    else:
+        # configure output
+        out1.name = "OUTPUT"
+        network.mark_output(out1)
 
     # optimization profile
     min_shape = []
@@ -126,7 +145,15 @@ def create_data_dependent_modelfile(
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
 
     # serialized model
+    if network is None:
+        print("Network is none")
+    if config is None:
+        print("Config is none")
+
     engine_bytes = builder.build_serialized_network(network, config)
+
+    if engine_bytes is None:
+        print("Engine bytes is none")
 
     model_version_dir = models_dir + "/" + model_name + "/1"
     try:
@@ -139,7 +166,7 @@ def create_data_dependent_modelfile(
 
 
 def create_data_dependent_modelconfig(
-    models_dir, model_name, input_shape, input_dtype=np.int32
+    models_dir, model_name, input_shape, input_dtype=np.int32, add_shape_layer=False
 ):
     config_dir = models_dir + "/" + model_name
     config = """
@@ -198,4 +225,18 @@ if __name__ == "__main__":
     )
     create_data_dependent_modelconfig(
         FLAGS.models_dir, "plan_nobatch_nonzero_dynamic", (-1, -1)
+    )
+
+    # Dynamic input shape with shape layer
+    create_data_dependent_modelfile(
+        FLAGS.models_dir,
+        "plan_nobatch_nonzero_dynamic_shape",
+        (-1, -1),
+        add_shape_layer=True,
+    )
+    create_data_dependent_modelconfig(
+        FLAGS.models_dir,
+        "plan_nobatch_nonzero_dynamic_shape",
+        (-1, -1),
+        add_shape_layer=True,
     )
