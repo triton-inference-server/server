@@ -69,21 +69,6 @@ LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 WORKDIR /
 
 #
-# Installing Vcpkg
-#
-ARG VCPGK_VERSION=2022.11.14
-RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
-WORKDIR /vcpkg
-RUN bootstrap-vcpkg.bat
-RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
-RUN vcpkg.exe integrate install
-
-LABEL VCPGK_VERSION=${VCPGK_VERSION}
-
-WORKDIR /
-
-#
 # Installing CMake
 #
 ARG CMAKE_VERSION=3.26.1
@@ -99,6 +84,22 @@ ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
 
 LABEL CMAKE_VERSION=${CMAKE_VERSION}
+
+#
+# Installing Vcpkg
+#
+ARG VCPGK_VERSION=2022.11.14
+RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
+WORKDIR /vcpkg
+RUN bootstrap-vcpkg.bat
+RUN vcpkg.exe update
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe integrate install
+
+LABEL VCPGK_VERSION=${VCPGK_VERSION}
+
+WORKDIR /
+
 
 #
 # Installing CUDA
