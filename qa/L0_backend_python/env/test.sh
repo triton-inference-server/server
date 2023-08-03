@@ -42,6 +42,125 @@ rm -rf *.tar.gz
 install_build_deps
 install_conda
 
+if [ ${PYTHON_ENV_VERSION} != "10" ]; then
+    # Test other python versions
+    conda update -n base -c defaults conda -y
+    rm $SERVER_LOG
+    # Create a model with python 3.8 version
+    # Successful execution of the Python model indicates that the environment has
+    # been setup correctly.
+
+    create_conda_env "3.8" "python-3-8"
+    conda install -c conda-forge libstdcxx-ng=12 -y
+    conda install numpy=1.23.4 -y
+    conda install tensorflow=2.10.0 -y
+    PY38_VERSION_STRING="Python version is 3.8, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
+
+    create_python_backend_stub
+    conda-pack -o python3.8.tar.gz
+    path_to_conda_pack="$PWD/python-3-8"
+    mkdir -p $path_to_conda_pack
+    tar -xzf python3.8.tar.gz -C $path_to_conda_pack
+    mkdir -p models/python_3_8/1/
+    cp ../../python_models/python_version/config.pbtxt ./models/python_3_8
+    (cd models/python_3_8 && \
+            sed -i "s/^name:.*/name: \"python_3_8\"/" config.pbtxt && \
+            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+    cp ../../python_models/python_version/model.py ./models/python_3_8/1/
+    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
+    # copy the stub out to /opt/tritonserver/backends/python/3-8
+    mkdir -p /opt/tritonserver/backends/python/3-8
+    cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-8/triton_python_backend_stub
+    conda deactivate
+
+    # Create a model with python 3.9 version
+    # Successful execution of the Python model indicates that the environment has
+    # been setup correctly.
+    create_conda_env "3.9" "python-3-9"
+    conda install -c conda-forge libstdcxx-ng=12 -y
+    conda install numpy=1.23.4 -y
+    conda install tensorflow=2.10.0 -y
+    PY39_VERSION_STRING="Python version is 3.9, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
+    create_python_backend_stub
+    conda-pack -o python3.9.tar.gz
+    path_to_conda_pack="$PWD/python-3-9"
+    mkdir -p $path_to_conda_pack
+    tar -xzf python3.9.tar.gz -C $path_to_conda_pack
+    mkdir -p models/python_3_9/1/
+    cp ../../python_models/python_version/config.pbtxt ./models/python_3_9
+    (cd models/python_3_9 && \
+            sed -i "s/^name:.*/name: \"python_3_9\"/" config.pbtxt && \
+            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+    cp ../../python_models/python_version/model.py ./models/python_3_9/1/
+    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
+    # copy the stub out to /opt/tritonserver/backends/python/3-9
+    mkdir -p /opt/tritonserver/backends/python/3-9
+    cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-9/triton_python_backend_stub
+    conda deactivate
+
+    # Create a model with python 3.11 version
+    # Successful execution of the Python model indicates that the environment has
+    # been setup correctly.
+    create_conda_env "3.11" "python-3-11"
+    # tensorflow needs to be installed before numpy so pip does not mess up conda
+    # environment
+    pip install tensorflow==2.12.0
+    conda install -c conda-forge libstdcxx-ng=12 -y
+    conda install numpy=1.23.5 -y
+    PY311_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and Tensorflow version is 2.12.0"
+
+    create_python_backend_stub
+    conda-pack -o python3.11.tar.gz
+    path_to_conda_pack=`pwd`/python3.11.tar.gz
+    path_to_conda_pack="$PWD/python-3-11"
+    mkdir -p $path_to_conda_pack
+    tar -xzf python3.11.tar.gz -C $path_to_conda_pack
+    mkdir -p models/python_3_11/1/
+    cp ../../python_models/python_version/config.pbtxt ./models/python_3_11
+    (cd models/python_3_11 && \
+            sed -i "s/^name:.*/name: \"python_3_11\"/" config.pbtxt && \
+            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+    cp ../../python_models/python_version/model.py ./models/python_3_11/1/
+    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_11
+    # copy the stub out to /opt/tritonserver/backends/python/3-11
+    mkdir -p /opt/tritonserver/backends/python/3-11
+    cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-11/triton_python_backend_stub
+    conda deactivate
+
+    # copy the stub out to /opt/tritonserver/backends/python/3-10
+    mkdir -p /opt/tritonserver/backends/python/3-10
+    cp /opt/tritonserver/backends/python/triton_python_backend_stub /opt/tritonserver/backends/python/3-10/triton_python_backend_stub
+
+    rm -rf ./miniconda
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    for EXPECTED_VERSION_STRING in "$PY38_VERSION_STRING" "$PY39_VERSION_STRING" "$PY311_VERSION_STRING"; do
+        grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+        if [ $? -ne 0 ]; then
+            cat $SERVER_LOG
+            echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+            RET=1
+         fi
+    done
+    if [ $RET -eq 0 ]; then
+        echo -e "\n***\n*** Finished creating environments.\n***"
+    else
+        cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to create python environments.\n***"
+    fi
+
+    exit $RET
+fi
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
 # Create a model with python 3.7 version
@@ -57,8 +176,8 @@ path_to_conda_pack=`pwd`/python3.7.tar.gz
 mkdir -p models/python_3_7/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7
 (cd models/python_3_7 && \
-          sed -i "s/^name:.*/name: \"python_3_7\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+        sed -i "s/^name:.*/name: \"python_3_7\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_7/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
@@ -79,8 +198,8 @@ create_python_backend_stub
 mkdir -p models/python_3_7_1/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7_1
 (cd models/python_3_7_1 && \
-          sed -i "s/^name:.*/name: \"python_3_7_1\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+        sed -i "s/^name:.*/name: \"python_3_7_1\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_7_1/1/
 # Copy activate script to folder
 cp $path_to_conda_pack/lib/python3.7/site-packages/conda_pack/scripts/posix/activate $path_to_conda_pack/bin/.
@@ -104,8 +223,8 @@ mkdir -p models/python_3_6/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_6
 cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
 (cd models/python_3_6 && \
-          sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
+        sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
 conda deactivate
@@ -124,8 +243,8 @@ mkdir -p models/python_3_10/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_10
 cp python3.10.tar.gz models/python_3_10/python_3_10_environment.tar.gz
 (cd models/python_3_10 && \
-          sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
+        sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_10/1/
 conda deactivate
 
@@ -141,116 +260,6 @@ wait $SERVER_PID
 
 set +e
 for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY37_1_VERSION_STRING" "$PY310_VERSION_STRING"; do
-    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-        RET=1
-    fi
-done
-
-# Test other python versions
-conda update -n base -c defaults conda -y
-rm $SERVER_LOG
-# Create a model with python 3.8 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-
-create_conda_env "3.8" "python-3-8"
-conda install -c conda-forge libstdcxx-ng=12 -y
-conda install numpy=1.23.4 -y
-conda install tensorflow=2.10.0 -y
-PY38_VERSION_STRING="Python version is 3.8, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
-
-create_python_backend_stub
-conda-pack -o python3.8.tar.gz
-path_to_conda_pack="$PWD/python-3-8"
-mkdir -p $path_to_conda_pack
-tar -xzf python3.8.tar.gz -C $path_to_conda_pack
-mkdir -p models/python_3_8/1/
-cp ../../python_models/python_version/config.pbtxt ./models/python_3_8
-(cd models/python_3_8 && \
-          sed -i "s/^name:.*/name: \"python_3_8\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-cp ../../python_models/python_version/model.py ./models/python_3_8/1/
-cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
-# copy the stub out to /opt/tritonserver/backends/python/3-8
-mkdir -p /opt/tritonserver/backends/python/3-8
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-8/triton_python_backend_stub
-conda deactivate
-
-# Create a model with python 3.9 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-create_conda_env "3.9" "python-3-9"
-conda install -c conda-forge libstdcxx-ng=12 -y
-conda install numpy=1.23.4 -y
-conda install tensorflow=2.10.0 -y
-PY39_VERSION_STRING="Python version is 3.9, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
-create_python_backend_stub
-conda-pack -o python3.9.tar.gz
-path_to_conda_pack="$PWD/python-3-9"
-mkdir -p $path_to_conda_pack
-tar -xzf python3.9.tar.gz -C $path_to_conda_pack
-mkdir -p models/python_3_9/1/
-cp ../../python_models/python_version/config.pbtxt ./models/python_3_9
-(cd models/python_3_9 && \
-          sed -i "s/^name:.*/name: \"python_3_9\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-cp ../../python_models/python_version/model.py ./models/python_3_9/1/
-cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
-# copy the stub out to /opt/tritonserver/backends/python/3-9
-mkdir -p /opt/tritonserver/backends/python/3-9
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-9/triton_python_backend_stub
-conda deactivate
-
-# Create a model with python 3.11 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-create_conda_env "3.11" "python-3-11"
-# tensorflow needs to be installed before numpy so pip does not mess up conda
-# environment
-pip install tensorflow==2.12.0
-conda install -c conda-forge libstdcxx-ng=12 -y
-conda install numpy=1.23.5 -y
-PY311_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and Tensorflow version is 2.12.0"
-
-create_python_backend_stub
-conda-pack -o python3.11.tar.gz
-path_to_conda_pack=`pwd`/python3.11.tar.gz
-path_to_conda_pack="$PWD/python-3-11"
-mkdir -p $path_to_conda_pack
-tar -xzf python3.11.tar.gz -C $path_to_conda_pack
-mkdir -p models/python_3_11/1/
-cp ../../python_models/python_version/config.pbtxt ./models/python_3_11
-(cd models/python_3_11 && \
-          sed -i "s/^name:.*/name: \"python_3_11\"/" config.pbtxt && \
-          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-cp ../../python_models/python_version/model.py ./models/python_3_11/1/
-cp python_backend/builddir/triton_python_backend_stub ./models/python_3_11
-# copy the stub out to /opt/tritonserver/backends/python/3-11
-mkdir -p /opt/tritonserver/backends/python/3-11
-cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/3-11/triton_python_backend_stub
-conda deactivate
-
-# copy the stub out to /opt/tritonserver/backends/python/3-10
-mkdir -p /opt/tritonserver/backends/python/3-10
-cp /opt/tritonserver/backends/python/triton_python_backend_stub /opt/tritonserver/backends/python/3-10/triton_python_backend_stub
-
-rm -rf ./miniconda
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-for EXPECTED_VERSION_STRING in "$PY38_VERSION_STRING" "$PY39_VERSION_STRING" "$PY311_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
