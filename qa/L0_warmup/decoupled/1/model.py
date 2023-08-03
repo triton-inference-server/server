@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,11 +28,12 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """Test model that always returns 0 response for all requests. """
+    """Test model that always returns 0 response for all requests."""
 
     def execute(self, requests):
         for request in requests:
             request.get_response_sender().send(
-                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+            )
 
         return None

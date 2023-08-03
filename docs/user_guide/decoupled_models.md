@@ -56,7 +56,7 @@ TRITONBACKEND_ModelInstanceExecute until that instance is ready to
 handle another set of requests. If not designed properly the backend
 can be easily over-subscribed. This can also cause under-utilization
 of features like [Dynamic Batching](model_configuration.md#dynamic-batcher)
-as it leads to eager batching. 
+as it leads to eager batching.
 
 ### Python model using Python Backend
 
@@ -91,20 +91,20 @@ for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.p
 how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
-your application should be cognizant that the callback function you registered with 
+your application should be cognizant that the callback function you registered with
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
-each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc)
+each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc)
 
 ### Knowing When a Decoupled Inference Request is Complete
 
 An inference request is considered complete when a response containing the
-`TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag is received from a model/backend. 
+`TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag is received from a model/backend.
 
 1. Client applications using streaming GRPC can access this information by
    checking the response parameters for the `"triton_final_response"` parameter.
    Decoupled models may not send a response for each request depending on how
    the model/backend is designed. In these cases where no response is sent by
-   the backend, the streaming GRPC client can opt-in to receive an empty final 
+   the backend, the streaming GRPC client can opt-in to receive an empty final
    response for each request. By default, empty final responses are not sent to
    save on network traffic.
 

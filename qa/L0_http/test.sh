@@ -251,7 +251,7 @@ fi
 
 # Create a password file with username:password
 echo -n 'username:' > pswd
-echo "password" | openssl passwd -stdin -apr1 >> pswd  
+echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
 python3 $BASIC_AUTH_TEST
@@ -504,7 +504,7 @@ wait $SERVER_PID
 # Run cpp client unit test
 rm -rf unit_test_models && mkdir unit_test_models
 cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
-cp -r ${MODELDIR}/simple unit_test_models/. 
+cp -r ${MODELDIR}/simple unit_test_models/.
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
             --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"

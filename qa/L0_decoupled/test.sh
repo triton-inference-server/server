@@ -74,7 +74,7 @@ for trial in $TRIALS; do
       cat $SERVER_LOG
       exit 1
   fi
-  
+
   for i in \
               test_one_to_none \
               test_one_to_one \
@@ -82,7 +82,7 @@ for trial in $TRIALS; do
               test_no_streaming \
               test_response_order \
 	      test_wrong_shape; do
-  
+
       echo "Test: $i" >>$CLIENT_LOG
       set +e
       python $DECOUPLED_TEST DecoupledTest.$i >>$CLIENT_LOG 2>&1
@@ -100,11 +100,11 @@ for trial in $TRIALS; do
       fi
       set -e
   done
-  
+
   # Will delay the writing of each response by the specified many milliseconds.
   # This will ensure that there are multiple responses available to be written.
   export TRITONSERVER_DELAY_GRPC_RESPONSE=2000
-  
+
   echo "Test: test_one_to_multi_many" >>$CLIENT_LOG
   set +e
   python $DECOUPLED_TEST DecoupledTest.test_one_to_multi_many >>$CLIENT_LOG 2>&1
@@ -120,18 +120,18 @@ for trial in $TRIALS; do
           RET=1
       fi
   fi
-  
+
   set -e
-  
+
   unset TRITONSERVER_DELAY_GRPC_RESPONSE
-  
+
   kill $SERVER_PID
   wait $SERVER_PID
 done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
-else 
+else
   echo -e "\n***\n*** Test Failed\n***"
 fi
 

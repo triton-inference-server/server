@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Deploy Triton Inference Server on PAI-EAS 
+# Deploy Triton Inference Server on PAI-EAS
 * Table Of Contents
    - [Description](https://yuque.alibaba-inc.com/pai/blade/mtptqc#Description)
    - [Prerequisites](https://yuque.alibaba-inc.com/pai/blade/mtptqc#Prerequisites)
@@ -57,11 +57,11 @@ Download the tensorflow inception model via [fetch_model.sh](https://github.com/
 The following is the json we use when creating a Triton Server on EAS.
 ```
 {
-  "name": "<your triton service name>",                          
+  "name": "<your triton service name>",
   "processor": "triton",
   "processor_params": [
-    "--model-repository=oss://triton-model-repo/models", 
-    "--allow-grpc=true", 
+    "--model-repository=oss://triton-model-repo/models",
+    "--allow-grpc=true",
     "--allow-http=true"
   ],
   "metadata": {

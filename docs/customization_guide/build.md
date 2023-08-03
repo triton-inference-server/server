@@ -47,9 +47,9 @@ The Triton source is distributed across multiple GitHub repositories
 that together can be built and installed to create a complete Triton
 installation. Triton server is built using CMake and (optionally)
 Docker. To simplify the build process, Triton provides a
-[build.py](https://github.com/triton-inference-server/server/blob/main/build.py) script. 
-The build.py script will generate the CMake and Docker build steps required to 
-build Triton, and will optionally invoke those steps or leave the invocation to 
+[build.py](https://github.com/triton-inference-server/server/blob/main/build.py) script.
+The build.py script will generate the CMake and Docker build steps required to
+build Triton, and will optionally invoke those steps or leave the invocation to
 you, as described below.
 
 The build.py script currently supports building Triton for the
@@ -197,9 +197,9 @@ To include the TensorFlow2 backend in your CPU-only build, you must
 provide this additional flag to build.py:
 `--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
 
-CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs 
-and runtime dependencies that are not present in the CPU-only base container. 
-These are retrieved from a GPU base container, which can be changed with the 
+CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs
+and runtime dependencies that are not present in the CPU-only base container.
+These are retrieved from a GPU base container, which can be changed with the
 `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
 
 ### Building Without Docker

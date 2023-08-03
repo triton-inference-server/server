@@ -156,7 +156,7 @@ cp $MODELSDIR/libtorch_multi_device/config.pbtxt $MODELSDIR/libtorch_multi_gpu/.
     sed -i "s/name: \"libtorch_multi_device\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
 
 set +e
-python3 gen_libtorch_model.py >> $CLIENT_LOG 2>&1 
+python3 gen_libtorch_model.py >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Error when generating libtorch models. \n***"
     cat $CLIENT_LOG

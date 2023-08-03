@@ -30,7 +30,6 @@ import torch.nn as nn
 
 
 class SumModule(nn.Module):
-
     def __init__(self, device):
         super(SumModule, self).__init__()
         self.device = device
@@ -38,13 +37,15 @@ class SumModule(nn.Module):
     def forward(self, INPUT0, INPUT1):
         INPUT0 = INPUT0.to(self.device)
         INPUT1 = INPUT1.to(self.device)
-        print('SumModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
-            INPUT0.device, INPUT1.device))
+        print(
+            "SumModule - INPUT0 device: {}, INPUT1 device: {}\n".format(
+                INPUT0.device, INPUT1.device
+            )
+        )
         return INPUT0 + INPUT1
 
 
 class DiffModule(nn.Module):
-
     def __init__(self, device):
         super(DiffModule, self).__init__()
         self.device = device
@@ -52,13 +53,15 @@ class DiffModule(nn.Module):
     def forward(self, INPUT0, INPUT1):
         INPUT0 = INPUT0.to(self.device)
         INPUT1 = INPUT1.to(self.device)
-        print('DiffModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
-            INPUT0.device, INPUT1.device))
+        print(
+            "DiffModule - INPUT0 device: {}, INPUT1 device: {}\n".format(
+                INPUT0.device, INPUT1.device
+            )
+        )
         return INPUT0 - INPUT1
 
 
 class TestModel(nn.Module):
-
     def __init__(self, device0, device1):
         super(TestModel, self).__init__()
         self.device0 = device0
@@ -71,6 +74,7 @@ class TestModel(nn.Module):
         op0 = self.layer1(INPUT0, INPUT1)
         op1 = self.layer2(INPUT0, INPUT1)
         return op0, op1
+
 
 if torch.cuda.device_count() < 4:
     print("Need at least 4 GPUs to run this test")

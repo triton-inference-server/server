@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@ from torch.utils.dlpack import to_dlpack
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         pass
 
@@ -46,10 +45,9 @@ class TritonPythonModel:
             pytorch_tensor = pytorch_tensor.to(device)
 
             dlpack_tensor = to_dlpack(pytorch_tensor)
-            pb_tensor = pb_utils.Tensor.from_dlpack('OUTPUT', dlpack_tensor)
+            pb_tensor = pb_utils.Tensor.from_dlpack("OUTPUT", dlpack_tensor)
 
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[pb_tensor])
+            inference_response = pb_utils.InferenceResponse(output_tensors=[pb_tensor])
             responses.append(inference_response)
 
         return responses

@@ -130,7 +130,7 @@ RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensi
 
 RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
 
-LABEL CUDA_VERSION="${CUDA_VERSION}" 
+LABEL CUDA_VERSION="${CUDA_VERSION}"
 
 #
 # Installing Tensorrt
@@ -153,13 +153,13 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing CUDNN
 #
-ARG CUDNN_VERSION=8.9.1.23
+ARG CUDNN_VERSION=8.9.3.28
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 
 ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
 
-RUN unzip /tmp/%CUDNN_ZIP% 
+RUN unzip /tmp/%CUDNN_ZIP%
 RUN move cudnn-* cudnn
 RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
 RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."

@@ -49,4 +49,4 @@ instance_group [
     count: 1
     kind: KIND_CPU
   }
-]
+]  # end instance_group

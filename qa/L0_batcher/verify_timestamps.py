@@ -33,7 +33,7 @@ FLAGS = None
 
 def verify_timestamps(traces, preserve):
     # Order traces by id
-    traces = sorted(traces, key=lambda t: t.get('id', -1))
+    traces = sorted(traces, key=lambda t: t.get("id", -1))
 
     # Filter the trace that is not meaningful and group them by 'id'
     filtered_traces = dict()
@@ -41,7 +41,7 @@ def verify_timestamps(traces, preserve):
     for trace in traces:
         if "id" not in trace:
             continue
-        # Skip GRPC traces as actual traces are not genarated via GRPC,
+        # Skip GRPC traces as actual traces are not generated via GRPC,
         # thus GRPC traces are ill-formed
         if "timestamps" in trace:
             is_grpc = False
@@ -53,16 +53,16 @@ def verify_timestamps(traces, preserve):
                 grpc_id_offset += 1
                 continue
 
-        if (trace['id'] in filtered_traces.keys()):
-            rep_trace = filtered_traces[trace['id']]
-            # Apend the timestamp to the trace representing this 'id'
+        if trace["id"] in filtered_traces.keys():
+            rep_trace = filtered_traces[trace["id"]]
+            # Append the timestamp to the trace representing this 'id'
             if "timestamps" in trace:
                 rep_trace["timestamps"] += trace["timestamps"]
         else:
             # Use this trace to represent this 'id'
             if "timestamps" not in trace:
                 trace["timestamps"] = []
-            filtered_traces[trace['id']] = trace
+            filtered_traces[trace["id"]] = trace
 
     # First find the latest response complete timestamp for the batch with large delay
     large_delay_response_complete = 0
@@ -75,11 +75,11 @@ def verify_timestamps(traces, preserve):
         compute_span = timestamps["COMPUTE_END"] - timestamps["COMPUTE_START"]
         # If the 3rd batch is also processed by large delay instance, we don't
         # want to use its responses as baseline
-        if trace["id"] <= (
-                8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
+        if trace["id"] <= (8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
             response_complete = timestamps["INFER_RESPONSE_COMPLETE"]
-            large_delay_response_complete = max(large_delay_response_complete,
-                                                response_complete)
+            large_delay_response_complete = max(
+                large_delay_response_complete, response_complete
+            )
         else:
             small_delay_traces.append(trace)
 
@@ -93,8 +93,11 @@ def verify_timestamps(traces, preserve):
             response_request_after_large_delay_count += 1
 
     # Hardcoded expected count here
-    print("responses after large delay count: {}".format(
-        response_request_after_large_delay_count))
+    print(
+        "responses after large delay count: {}".format(
+            response_request_after_large_delay_count
+        )
+    )
     if preserve:
         # If preserve ordering, there must be large delay batch followed by
         # small delay batch and thus at least 4 responses are sent after
@@ -105,15 +108,17 @@ def verify_timestamps(traces, preserve):
         return 0 if response_request_after_large_delay_count == 0 else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p',
-                        '--preserve',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Timestamps is collected with preserve ordering')
-    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
+    parser.add_argument(
+        "-p",
+        "--preserve",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Timestamps is collected with preserve ordering",
+    )
+    parser.add_argument("file", type=argparse.FileType("r"), nargs="+")
     FLAGS = parser.parse_args()
 
     for f in FLAGS.file:

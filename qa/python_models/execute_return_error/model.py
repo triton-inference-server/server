@@ -26,7 +26,6 @@
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         self._i = -1
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
 import time
+
+import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def execute(self, requests):
         """
         Mock Model that uses the input data to determine how long to wait
         before returning identity data
         """
-        assert (len(requests) == 1)
+        assert len(requests) == 1
         delay = 0
         request = requests[0]
         responses = []
