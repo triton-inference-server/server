@@ -88,6 +88,33 @@ class TrtDataDependentShapeTest(tu.TestResultCollector):
                 "OUTPUT expected: {}, got {}".format(expected_output_np, output_np),
             )
 
+    def test_shape(self):
+        model_name = "plan_nobatch_nonzero_dynamic_shape"
+
+        input_sizes = [(20, 16), (32, 30)]
+
+        for input_size in input_sizes:
+            x, y = input_size
+            input_data = []
+
+            for i in range(x * y):
+                input_data.append(i if (i % 2) == 0 else 0)
+            input_np = np.array(input_data, dtype=np.int32).reshape((x, y))
+            expected_output_np = np.shape(np.nonzero(np.nonzero(input_np)))
+
+            inputs = []
+            inputs.append(client.InferInput("INPUT", [x, y], "INT32"))
+            inputs[-1].set_data_from_numpy(input_np)
+
+            results = self.triton_client.infer(model_name=model_name, inputs=inputs)
+            # Validate the results by comparing with precomputed values.
+            output_np = results.as_numpy("OUTPUT")
+            np.testing.assert_equal(
+                output_np,
+                expected_output_np,
+                "OUTPUT expected: {}, got {}".format(expected_output_np, output_np),
+            )
+
     def test_dynamic_ensemble(self):
         model_name = "ensemble_plan_nobatch_nonzero_dynamic"
 
