@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import time
 import unittest
 
 import numpy as np
@@ -36,6 +37,10 @@ class PBBLSModelLoadingTest(unittest.TestCase):
 
     def tearDown(self):
         pb_utils.unload_model(self.model_name)
+        # TODO: Improve
+        print("Sleep 30 seconds to make sure model finishes unloading")
+        time.sleep(30)
+        print("Done sleeping.")
 
     def test_load_unload_model(self):
         self.assertFalse(pb_utils.is_model_ready(model_name=self.model_name))
