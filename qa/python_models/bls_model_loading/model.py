@@ -40,9 +40,9 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         # unloaded before returning.
         pb_utils.unload_model(self.model_name)
         # TODO: Improve
-        print("Sleep 30 seconds to make sure model finishes unloading")
-        time.sleep(30)
-        print("Done sleeping.")
+        # print("Sleep 30 seconds to make sure model finishes unloading")
+        # time.sleep(30)
+        # print("Done sleeping.")
 
     def test_load_unload_model(self):
         self.assertFalse(pb_utils.is_model_ready(model_name=self.model_name))
