@@ -36,6 +36,8 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         self.model_name = "onnx_int32_int32_int32"
 
     def tearDown(self):
+        # The unload call does not wait for the requested model to be fully
+        # unloaded before returning.
         pb_utils.unload_model(self.model_name)
         # TODO: Improve
         print("Sleep 30 seconds to make sure model finishes unloading")
