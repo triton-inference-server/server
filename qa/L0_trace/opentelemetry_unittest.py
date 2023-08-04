@@ -37,6 +37,9 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
 EXPECTED_NUM_SPANS = 16
+# OpenTelemetry OStream exporter sets `parent_span_id` to "0000000000000000",
+# if current span is a root span, i.e. there is no parent span.
+# https://github.com/open-telemetry/opentelemetry-cpp/blob/main/exporters/ostream/src/span_exporter.cc#L78C54-L78C68
 NO_PARENT_SPAN = "0000000000000000"
 
 
