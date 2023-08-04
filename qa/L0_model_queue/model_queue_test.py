@@ -140,7 +140,7 @@ class ModelQueueTest(tu.TestResultCollector):
         for trial in self.trials_:
             preceding_thread = threading.Thread(
                 target=self.check_response,
-                args=(8, dtype, shapes, 0, 0, (1999, 1000)),
+                args=(8, dtype, shapes, 0, 0, (5999, 1000)),
             )
             threads = []
             for i in range(10):
