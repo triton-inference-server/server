@@ -685,7 +685,7 @@ if [ `grep -c ^simple summary_bls.log` != "1" ]; then
     RET=1
 fi
 
-if [ `grep -c 'parent id' bls_trace.log` != "2" ]; then
+if [ `grep -o 'parent_id' bls_trace.log | wc -l` != "2" ]; then
     cat bls_trace.log
     echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
     RET=1
