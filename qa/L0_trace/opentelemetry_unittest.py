@@ -37,6 +37,7 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
 EXPECTED_NUM_SPANS = 16
+NO_PARENT_SPAN = "0000000000000000"
 
 
 class OpenTelemetryTest(tu.TestResultCollector):
@@ -155,7 +156,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.assertEqual(child_span["trace_id"], parent_span["trace_id"])
         self.assertNotEqual(
             child_span["parent_span_id"],
-            "0000000000000000",
+            NO_PARENT_SPAN,
             "child span does not have parent span id specified",
         )
         self.assertEqual(
@@ -262,7 +263,7 @@ def send_bls_request(model_name="simple"):
     with httpclient.InferenceServerClient("localhost:8000") as client:
         inputs = prepare_data(httpclient)
         inputs.append(httpclient.InferInput("MODEL_NAME", [1], "BYTES"))
-        inputs[2].set_data_from_numpy(np.array([model_name], dtype=np.object_))
+        inputs[-1].set_data_from_numpy(np.array([model_name], dtype=np.object_))
         client.infer("bls_simple", inputs)
 
 

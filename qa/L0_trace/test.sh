@@ -669,19 +669,25 @@ $TRACE_SUMMARY -t bls_trace.log > summary_bls.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_bls.log` != "2" ]; then
     cat summary_bls.log
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "COMPUTE_INPUT_END" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c ^ensemble_add_sub_int32_int32_int32 summary_bls.log` != "1" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: BLS child ensemble model wasn't traced. \n***"
     RET=1
 fi
 
 if [ `grep -c ^simple summary_bls.log` != "1" ]; then
     cat summary_bls.log
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Test Failed: ensemble's model 'simple' wasn't traced. \n***"
     RET=1
 fi
 
-if [ `grep -c 'parent id' bls_trace.log` == "1" ]; then
-    cat summary_bls.log
-    echo -e "\n***\n*** Test Failed\n***"
+if [ `grep -c 'parent id' bls_trace.log` != "2" ]; then
+    cat bls_trace.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
     RET=1
 fi
 
@@ -760,9 +766,8 @@ fi
 
 set +e
 # Preparing traces for unittest.
-# Note: need to run this separately, to speed up trace collection.
-# Otherwise internal (opentelemetry_unittest.OpenTelemetryTest.setUp) check
-# will slow down collection.
+# Note: running this separately, so that I could extract spans with `grep`
+# from server log later.
 python -c 'import opentelemetry_unittest; \
         opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 

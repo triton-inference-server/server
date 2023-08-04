@@ -61,8 +61,6 @@ TraceManager::Create(
   *manager = new TraceManager(
       level, rate, count, log_frequency, filepath, mode, config_map);
 
-  (*manager)->InitTracer(config_map);
-
   return nullptr;  // success
 }
 
@@ -86,6 +84,8 @@ TraceManager::TraceManager(
       false /*filepath_specified*/, false /*mode_specified*/,
       false /*config_map_specified*/));
   trace_files_.emplace(filepath, file);
+
+  InitTracer(config_map);
 }
 
 TRITONSERVER_Error*
@@ -357,58 +357,76 @@ TraceManager::Trace::CaptureTimestamp(
 void
 TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 {
-  if (global_setting_->mode_ == TRACE_MODE_TRITON) {
-    return;
-  }
+  switch (global_setting_->mode_) {
+    case TRACE_MODE_OPENTELEMETRY: {
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-  otlp::OtlpHttpExporterOptions opts;
-  otel_resource::ResourceAttributes attributes = {};
-  attributes[otel_resource::SemanticConventions::kServiceName] =
-      "triton-inference-server";
-  auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
-  auto otel_options_it = config_map.find(mode_key);
-  if (otel_options_it != config_map.end()) {
-    for (const auto& setting : otel_options_it->second) {
-      // FIXME add more configuration options of OTLP HTTP Exporter
-      if (setting.first == "url") {
-        opts.url = setting.second;
+      otlp::OtlpHttpExporterOptions opts;
+      otel_resource::ResourceAttributes attributes = {};
+      attributes[otel_resource::SemanticConventions::kServiceName] =
+          "triton-inference-server";
+      auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
+      auto otel_options_it = config_map.find(mode_key);
+      if (otel_options_it != config_map.end()) {
+        for (const auto& setting : otel_options_it->second) {
+          // FIXME add more configuration options of OTLP HTTP Exporter
+          if (setting.first == "url") {
+            opts.url = setting.second;
+          }
+          if (setting.first == "resource") {
+            auto pos = setting.second.find('=');
+            auto key = setting.second.substr(0, pos);
+            auto value = setting.second.substr(pos + 1);
+            attributes[key] = value;
+          }
+        }
       }
-      if (setting.first == "resource") {
-        auto pos = setting.second.find('=');
-        auto key = setting.second.substr(0, pos);
-        auto value = setting.second.substr(pos + 1);
-        attributes[key] = value;
+      auto exporter = otlp::OtlpHttpExporterFactory::Create(opts);
+      auto test_exporter = triton::server::GetEnvironmentVariableOrDefault(
+          "TRITON_OPENTELEMETRY_TEST", "false");
+      if (test_exporter != "false") {
+        exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::
+            Create();
       }
-    }
-  }
-  auto exporter = otlp::OtlpHttpExporterFactory::Create(opts);
-  auto test_exporter = triton::server::GetEnvironmentVariableOrDefault(
-      "TRITON_OPENTELEMETRY_TEST", "false");
-  if (test_exporter != "false") {
-    exporter =
-        opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
-  }
-  auto processor =
-      otel_trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter));
-  auto resource = otel_resource::Resource::Create(attributes);
-  std::shared_ptr<otel_trace_api::TracerProvider> provider =
-      otel_trace_sdk::TracerProviderFactory::Create(
-          std::move(processor), resource);
+      auto processor = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
+          std::move(exporter));
+      auto resource = otel_resource::Resource::Create(attributes);
+      std::shared_ptr<otel_trace_api::TracerProvider> provider =
+          otel_trace_sdk::TracerProviderFactory::Create(
+              std::move(processor), resource);
 
-  otel_trace_api::Provider::SetTracerProvider(provider);
+      otel_trace_api::Provider::SetTracerProvider(provider);
+      break;
+#else
+      LOG_ERROR << "Unsupported trace mode: "
+                << TraceManager::InferenceTraceModeString(
+                       global_setting_->mode_);
+      break;
 #endif
+    }
+    default:
+      return;
+  }
 }
 
 void
 TraceManager::CleanupTracer()
 {
-  if (global_setting_->mode_ == TRACE_MODE_TRITON) {
-    return;
-  }
+  switch (global_setting_->mode_) {
+    case TRACE_MODE_OPENTELEMETRY: {
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-  std::shared_ptr<otel_trace_api::TracerProvider> none;
-  otel_trace_api::Provider::SetTracerProvider(none);
+      std::shared_ptr<otel_trace_api::TracerProvider> none;
+      otel_trace_api::Provider::SetTracerProvider(none);
+      break;
+#else
+      LOG_ERROR << "Unsupported trace mode: "
+                << TraceManager::InferenceTraceModeString(
+                       global_setting_->mode_);
+      break;
 #endif
+    }
+    default:
+      return;
+  }
 }
 
 #ifndef _WIN32

@@ -448,11 +448,6 @@ class TritonPythonModel:
       ...
       for request in requests:
         ...
-        # Create an InferenceRequest object. `model_name`,
-        # `requested_output_names`, and `inputs` are the required arguments and
-        # must be provided when constructing an InferenceRequest object. Make
-        # sure to replace `inputs` argument with a list of `pb_utils.Tensor`
-        # objects.
         inference_request = pb_utils.InferenceRequest(
             model_name='model_name',
             requested_output_names=['REQUESTED_OUTPUT_1', 'REQUESTED_OUTPUT_2'],
