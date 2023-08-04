@@ -362,6 +362,11 @@ A minimal model repository for a TorchScript model is:
         model.pt
 ```
 
+### PyTorch Models \[Experimental\]
+
+Refer to
+[this documentation](https://github.com/triton-inference-server/python_backend/blob/main/src/resources/platform_handlers/pytorch/README.md).
+
 ### TensorFlow Models
 
 TensorFlow saves models in one of two formats: *GraphDef* or
