@@ -62,6 +62,8 @@ source ./common.sh
 
 rm -fr *.log ./models
 
+(bash -ex setup_python_enviroment.sh)
+
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
@@ -133,38 +135,12 @@ mkdir -p models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
-# Env test should be run first so we can get the stubs for each of the
-# environments
-# Disable env test for Jetson since cloud storage repos are not supported
-if [ "$TEST_JETSON" == "0" ]; then
-    # In 'env' test we use miniconda for dependency management. No need to run
-    # the test in a virtual environment.
-    (cd env && bash -ex test.sh)
-    if [ $? -ne 0 ]; then
-        echo "Subtest env FAILED"
-        RET=1
-    fi
-fi
-
-echo "python environment 3.${PYTHON_ENV_VERSION}"
-# Set up environment and stub for each test
-add-apt-repository ppa:deadsnakes/ppa -y
-apt-get update && apt-get -y install \
-                            "python3.${PYTHON_ENV_VERSION}-dev" \
-                            "python3.${PYTHON_ENV_VERSION}-distutils" \
-                            numpy
-rm -f /usr/bin/python3 && \
-ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3
-
-PYTHON_STUB_LOCATION=/opt/tritonserver/backends/python/3-${PYTHON_ENV_VERSION}/triton_python_backend_stub
-cp ${PYTHON_STUB_LOCATION} /opt/tritonserver/backends/python/triton_python_backend_stub
-
 # Skip torch install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
-pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
-# GPU tensor tests are disabled on jetson
-EXPECTED_NUM_TESTS=9
+  # GPU tensor tests are disabled on jetson
+  EXPECTED_NUM_TESTS=9
 fi
 
 prev_num_pages=`get_shm_pages`
@@ -239,37 +215,37 @@ set -e
 # Test KIND_GPU
 # Disable env test for Jetson since GPU Tensors are not supported
 if [ "$TEST_JETSON" == "0" ]; then
-rm -rf models/
-mkdir -p models/add_sub_gpu/1/
-cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
-cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
+  rm -rf models/
+  mkdir -p models/add_sub_gpu/1/
+  cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
+  cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
+  prev_num_pages=`get_shm_pages`
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      exit 1
+  fi
 
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** KIND_GPU model test failed \n***"
-    RET=1
-fi
+  if [ $? -ne 0 ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** KIND_GPU model test failed \n***"
+      RET=1
+  fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+  kill $SERVER_PID
+  wait $SERVER_PID
 
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
+  current_num_pages=`get_shm_pages`
+  if [ $current_num_pages -ne $prev_num_pages ]; then
+      cat $CLIENT_LOG
+      ls /dev/shm
+      echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+  Shared memory pages before starting triton equals to $prev_num_pages
+  and shared memory pages after starting triton equals to $current_num_pages \n***"
+      exit 1
+  fi
 fi
 
 # Test Multi file models
@@ -278,7 +254,7 @@ mkdir -p models/multi_file/1/
 cp ../python_models/multi_file/*.py ./models/multi_file/1/
 cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
 (cd models/multi_file && \
-        sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
+          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
 
 prev_num_pages=`get_shm_pages`
 run_server
@@ -402,6 +378,7 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
+# Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
@@ -422,6 +399,16 @@ if [ "$TEST_JETSON" == "0" ]; then
         deactivate
         rm -fr venv
     done
+
+    if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+        # In 'env' test we use miniconda for dependency management. No need to run
+        # the test in a virtual environment.
+        (cd env && bash -ex test.sh)
+        if [ $? -ne 0 ]; then
+            echo "Subtest env FAILED"
+            RET=1
+        fi
+    fi
 fi
 
 SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
@@ -441,7 +428,6 @@ for TEST in ${SUBTESTS}; do
     deactivate
     rm -fr venv
 done
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
