@@ -2885,6 +2885,21 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
         self.assertFalse(triton_client.is_model_ready("identity_zero_1_int32"))
+        # Unload identity_zero_1_int32 and immediately load it
+        # The model can either be loaded or unloaded but server must not crash
+        triton_client.load_model("identity_zero_1_int32")
+        self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            unload_thread = pool.submit(
+                triton_client.unload_model, "identity_zero_1_int32"
+            )
+            load_thread = pool.submit(triton_client.load_model, "identity_zero_1_int32")
+            unload_thread.result()
+            load_thread.result()
+        triton_client.unload_model("identity_zero_1_int32")  # to unload if loaded
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        triton_client.is_model_ready("identity_zero_1_int32")
         # Load ensemble_zero_1_float32 and unload its dependency while loading
         # The unload operation should wait until the load is completed
         with concurrent.futures.ThreadPoolExecutor() as pool:
