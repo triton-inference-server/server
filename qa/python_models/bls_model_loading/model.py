@@ -39,10 +39,10 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         # The unload call does not wait for the requested model to be fully
         # unloaded before returning.
         pb_utils.unload_model(self.model_name)
-        # TODO: Improve
-        # print("Sleep 30 seconds to make sure model finishes unloading")
-        # time.sleep(30)
-        # print("Done sleeping.")
+        # TODO: Make this more robust to wait until fully unloaded
+        print("Sleep 30 seconds to make sure model finishes unloading...")
+        time.sleep(30)
+        print("Done sleeping.")
 
     def test_load_unload_model(self):
         self.assertFalse(pb_utils.is_model_ready(model_name=self.model_name))
