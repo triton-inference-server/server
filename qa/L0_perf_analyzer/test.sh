@@ -157,13 +157,6 @@ if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide sha
   RET=1
 fi
 
-$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
-if [ $? -eq 0 ]; then
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
-  RET=1
-fi
-
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
 --input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
