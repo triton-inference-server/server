@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./bls_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
@@ -35,9 +35,10 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
 
 RET=0
+# This variable is used to print out the correct server log for each sub-test.
+SUB_TEST_RET=0
 rm -fr *.log ./models *.txt
 
 pip3 uninstall -y torch
@@ -104,6 +105,7 @@ cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ .
 
 for TRIAL in non_decoupled decoupled ; do
     export BLS_KIND=$TRIAL
+    SERVER_LOG="./bls_$TRIAL.inference_server.log"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -120,12 +122,14 @@ for TRIAL in non_decoupled decoupled ; do
         echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
         RET=1
+        SUB_TEST_RET=1
     else
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
+            SUB_TEST_RET=1
         fi
     fi
 
@@ -135,12 +139,14 @@ for TRIAL in non_decoupled decoupled ; do
         echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
         RET=1
+        SUB_TEST_RET=1
     else
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
+            SUB_TEST_RET=1
         fi
     fi
 
@@ -150,12 +156,14 @@ for TRIAL in non_decoupled decoupled ; do
         echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
         RET=1
+        SUB_TEST_RET=1
     else
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
+            SUB_TEST_RET=1
         fi
     fi
 
@@ -165,12 +173,14 @@ for TRIAL in non_decoupled decoupled ; do
         echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
         RET=1
+        SUB_TEST_RET=1
     else
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
+            SUB_TEST_RET=1
         fi
     fi
 
@@ -178,6 +188,11 @@ for TRIAL in non_decoupled decoupled ; do
 
     kill $SERVER_PID
     wait $SERVER_PID
+
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 done
 
 # Test error handling when BLS is used in "initialize" or "finalize" function
@@ -188,11 +203,13 @@ mkdir -p models/bls_init_error/1/
 cp ../../python_models/bls_init_error/model.py models/bls_init_error/1/
 cp ../../python_models/bls_init_error/config.pbtxt models/bls_init_error
 SERVER_LOG="./bls_init_error_server.log"
+SUB_TEST_RET=0
 
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
     RET=1
+    SUB_TEST_RET=1
     kill $SERVER_PID
     wait $SERVER_PID
 else
@@ -201,7 +218,13 @@ else
     else
         echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
         RET=1
+        SUB_TEST_RET=1
     fi
+fi
+
+if [ $SUB_TEST_RET -eq 1 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
 fi
 
 rm -fr ./models
@@ -209,6 +232,7 @@ mkdir -p models/bls_finalize_error/1/
 cp ../../python_models/bls_finalize_error/model.py models/bls_finalize_error/1/
 cp ../../python_models/bls_finalize_error/config.pbtxt models/bls_finalize_error/
 SERVER_LOG="./bls_finalize_error_server.log"
+SUB_TEST_RET=0
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -225,9 +249,16 @@ if grep "$ERROR_MESSAGE" $SERVER_LOG; then
 else
     echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
     RET=1
+    SUB_TEST_RET=1
+fi
+
+if [ $SUB_TEST_RET -eq 1 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
 fi
 
 # Test model loading API with BLS
+SUB_TEST_RET=0
 rm -fr ./models
 mkdir -p models/bls_model_loading/1/
 cp ../../python_models/bls_model_loading/model.py models/bls_model_loading/1/
@@ -254,6 +285,7 @@ set -e
 if [ "$code" == "400" ]; then
     echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
+    SUB_TEST_RET=1
 fi
 
 set +e
@@ -263,12 +295,14 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
+    SUB_TEST_RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
+        SUB_TEST_RET=1
     fi
 fi
 
@@ -276,6 +310,11 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+if [ $SUB_TEST_RET -eq 1 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+fi
 
 # Test model loading API with BLS warmup
 (cd models/bls_model_loading && \
@@ -300,6 +339,7 @@ wait $SERVER_PID
         echo "    }" >> config.pbtxt && \
         echo "}]" >> config.pbtxt )
 
+SUB_TEST_RET=0
 SERVER_LOG="./bls_model_loading_server_warmup.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -314,17 +354,25 @@ set -e
 if [ "$code" == "400" ]; then
     echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
+    SUB_TEST_RET=1
 fi
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-if [ $RET -eq 1 ]; then
+if [ $SUB_TEST_RET -eq 1 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
+fi
+
+if [ $RET -eq 1 ]; then
     echo -e "\n***\n*** BLS test FAILED. \n***"
 else
     echo -e "\n***\n*** BLS test PASSED. \n***"
 fi
+
+# Collect all logs and core dumps and copy them to an upper-level directory for
+# proper capture on the CI.
+cp *.*log* core* ../ || true
 
 exit $RET

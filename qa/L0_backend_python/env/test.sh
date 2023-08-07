@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./env_client.log"
 source ../common.sh
 source ../../common/util.sh
 
@@ -33,7 +33,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./env_server.log"
 
 RET=0
 
@@ -314,5 +314,9 @@ else
   cat $SERVER_LOG
   echo -e "\n***\n*** Env Manager Test FAILED.\n***"
 fi
+
+# Collect all logs and core dumps and copy them to an upper-level directory for
+# proper capture on the CI.
+cp *.*log* core* ../ || true
 
 exit $RET

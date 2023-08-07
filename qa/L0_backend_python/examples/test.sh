@@ -32,7 +32,7 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./examples_server.log"
 
 RET=0
 rm -fr *.log python_backend/
@@ -56,7 +56,7 @@ git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_B
 cd python_backend
 
 # Example 1
-CLIENT_LOG="./add_sub_client.log"
+CLIENT_LOG="./examples_add_sub_client.log"
 mkdir -p models/add_sub/1/
 cp examples/add_sub/model.py models/add_sub/1/model.py
 cp examples/add_sub/config.pbtxt models/add_sub/config.pbtxt
@@ -86,7 +86,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Example 2
-CLIENT_LOG="./pytorch_client.log"
+CLIENT_LOG="./examples_pytorch_client.log"
 mkdir -p models/pytorch/1/
 cp examples/pytorch/model.py models/pytorch/1/model.py
 cp examples/pytorch/config.pbtxt models/pytorch/config.pbtxt
@@ -120,7 +120,7 @@ wait $SERVER_PID
 # JAX AddSub
 # JAX is not supported on Jetson
 if [ "$TEST_JETSON" == "0" ]; then
-    CLIENT_LOG="./jax_client.log"
+    CLIENT_LOG="./examples_jax_client.log"
     mkdir -p models/jax/1/
     cp examples/jax/model.py models/jax/1/model.py
     cp examples/jax/config.pbtxt models/jax/config.pbtxt
@@ -153,7 +153,7 @@ fi
 # Example 4
 
 # BLS Sync
-CLIENT_LOG="./sync_client.log"
+CLIENT_LOG="./examples_sync_client.log"
 mkdir -p models/bls_sync/1
 cp examples/bls/sync_model.py models/bls_sync/1/model.py
 cp examples/bls/sync_config.pbtxt models/bls_sync/config.pbtxt
@@ -185,7 +185,7 @@ wait $SERVER_PID
 # Example 5
 
 # Decoupled Repeat
-CLIENT_LOG="./repeat_client.log"
+CLIENT_LOG="./examples_repeat_client.log"
 mkdir -p models/repeat_int32/1/
 cp examples/decoupled/repeat_model.py models/repeat_int32/1/model.py
 cp examples/decoupled/repeat_config.pbtxt models/repeat_int32/config.pbtxt
@@ -217,7 +217,7 @@ wait $SERVER_PID
 # Example 6
 
 # Decoupled Square
-CLIENT_LOG="./square_client.log"
+CLIENT_LOG="./examples_square_client.log"
 mkdir -p models/square_int32/1/
 cp examples/decoupled/square_model.py models/square_int32/1/model.py
 cp examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
@@ -253,7 +253,7 @@ wait $SERVER_PID
 # Having multiple python versions lead to build issues.
 # Anaconda is not officially supported on Jetson.
 if [ "$TEST_JETSON" == "0" ]; then
-    CLIENT_LOG="./async_client.log"
+    CLIENT_LOG="./examples_async_client.log"
     mkdir -p models/bls_async/1
     cp examples/bls/async_model.py models/bls_async/1/model.py
     cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
@@ -285,7 +285,7 @@ if [ "$TEST_JETSON" == "0" ]; then
 fi
 
 # Auto Complete Model Configuration Example
-CLIENT_LOG="./auto_complete_client.log"
+CLIENT_LOG="./examples_auto_complete_client.log"
 mkdir -p models/nobatch_auto_complete/1/
 mkdir -p models/batch_auto_complete/1/
 cp examples/auto_complete/nobatch_model.py models/nobatch_auto_complete/1/model.py
@@ -319,7 +319,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # BLS Decoupled Sync
-CLIENT_LOG="./bls_decoupled_sync_client.log"
+CLIENT_LOG="./examples_bls_decoupled_sync_client.log"
 mkdir -p models/bls_decoupled_sync/1
 cp examples/bls_decoupled/sync_model.py models/bls_decoupled_sync/1/model.py
 cp examples/bls_decoupled/sync_config.pbtxt models/bls_decoupled_sync/config.pbtxt
@@ -350,7 +350,7 @@ wait $SERVER_PID
 
 # BLS Decoupled Async
 if [ "$TEST_JETSON" == "0" ]; then
-    CLIENT_LOG="./bls_decoupled_async_client.log"
+    CLIENT_LOG="./examples_bls_decoupled_async_client.log"
     mkdir -p models/bls_decoupled_async/1
     cp examples/bls_decoupled/async_model.py models/bls_decoupled_async/1/model.py
     cp examples/bls_decoupled/async_config.pbtxt models/bls_decoupled_async/config.pbtxt
@@ -384,7 +384,7 @@ fi
 # Example 7
 
 # Model Instance Kind
-CLIENT_LOG="./model_instance_kind.log"
+CLIENT_LOG="./examples_model_instance_kind.log"
 mkdir -p models/resnet50/1
 cp examples/instance_kind/model.py models/resnet50/1/
 cp examples/instance_kind/config.pbtxt models/resnet50/
@@ -414,7 +414,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Custom Metrics
-CLIENT_LOG="./custom_metrics_client.log"
+CLIENT_LOG="./examples_custom_metrics_client.log"
 mkdir -p models/custom_metrics/1
 cp examples/custom_metrics/model.py models/custom_metrics/1/model.py
 cp examples/custom_metrics/config.pbtxt models/custom_metrics/config.pbtxt
@@ -449,5 +449,9 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** Example verification test FAILED.\n***"
 fi
+
+# Collect all logs and core dumps and copy them to an upper-level directory for
+# proper capture on the CI.
+cp *.*log* core* ../ || true
 
 exit $RET
