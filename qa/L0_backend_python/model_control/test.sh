@@ -78,8 +78,6 @@ else
     echo -e "\n***\n*** model_control_test PASSED. \n***"
 fi
 
-# Collect all logs and core dumps and copy them to an upper-level directory for
-# proper capture on the CI.
-cp *.*log* core* ../ || true
+collect_artifacts_from_subdir
 
 exit $RET
