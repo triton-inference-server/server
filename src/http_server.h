@@ -293,14 +293,15 @@ class HTTPAPIServer : public HTTPServer {
     static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
    protected:
-    TRITONSERVER_Server* server_;
-    evhtp_request_t* req_;
-    evthr_t* thread_;
+    TRITONSERVER_Server* server_{nullptr};
+    evhtp_request_t* req_{nullptr};
+    evthr_t* thread_{nullptr};
 
-    DataCompressor::Type response_compression_type_;
+    DataCompressor::Type response_compression_type_{
+        DataCompressor::Type::IDENTITY};
 
     // Counter to keep track of number of responses generated.
-    std::atomic<uint32_t> response_count_;
+    std::atomic<uint32_t> response_count_{0};
 
     // Event hook for called before request deletion
     static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -128,6 +128,47 @@ for trial in $TRIALS; do
   kill $SERVER_PID
   wait $SERVER_PID
 done
+
+# Test the server frontend can merge the responses of non-decoupled model that
+# sends inference response and COMPLETE flag separately. In other words, from
+# the client's perspective there will still be one response.
+NON_DECOUPLED_DIR=`pwd`/non_decoupled_models
+rm -rf ${NON_DECOUPLED_DIR} && mkdir -p ${NON_DECOUPLED_DIR}
+cp -r `pwd`/models/repeat_int32 ${NON_DECOUPLED_DIR}/. && \
+    (cd ${NON_DECOUPLED_DIR}/repeat_int32 && \
+        sed -i "s/decoupled: True/decoupled: False/" config.pbtxt)
+
+SERVER_ARGS="--model-repository=${NON_DECOUPLED_DIR}"
+SERVER_LOG="./non_decoupled_inference_server.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+CLIENT_LOG=`pwd`/non_decoupled_client.log
+echo "Test: NonDecoupledTest" >>$CLIENT_LOG
+set +e
+python $DECOUPLED_TEST NonDecoupledTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test NonDecoupledTest Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test NonDecoupledTest Failed\n***"
+        RET=1
+else
+    check_test_results $TEST_RESULT_FILE 2
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

@@ -978,19 +978,19 @@ ModelInferHandler::InferResponseComplete(
   // notification.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
-  // Increment the callback index
-  state->cb_count_++;
+  // Increment the callback index if received valid 'iresponse'
+  if (iresponse != nullptr) {
+    state->cb_count_++;
+  }
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
-  // Defer to the callback with the final response
-  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
-    LOG_ERROR << "[INTERNAL] ModelInfer received a response without FINAL flag";
-    return;
+  // Allow sending 1 response and final flag separately, only mark
+  // non-inflight when seeing final flag
+  if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+    state->context_->EraseInflightState(state);
   }
-
-  state->context_->EraseInflightState(state);
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(std::make_pair(
@@ -1005,6 +1005,7 @@ ModelInferHandler::InferResponseComplete(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
 
+    state->context_->EraseInflightState(state);
     state->step_ = Steps::CANCELLED;
 
     LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
@@ -1041,10 +1042,7 @@ ModelInferHandler::InferResponseComplete(
                                          "expected a single response, got " +
                                          std::to_string(state->cb_count_))
                                          .c_str());
-  } else if (iresponse == nullptr) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
-  } else {
+  } else if (iresponse != nullptr) {
     err = InferResponseCompleteCommon<inference::ModelInferResponse>(
         state->tritonserver_, iresponse, *response, state->alloc_payload_);
   }
@@ -1060,6 +1058,12 @@ ModelInferHandler::InferResponseComplete(
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
+
+  // Defer sending the response until FINAL flag is seen or
+  // there is error
+  if (status.ok() && (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    return;
+  }
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(
