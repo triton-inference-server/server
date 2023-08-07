@@ -67,9 +67,9 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.37.0dev": (
-        "23.08dev",  # triton container
-        "23.07",  # upstream container
+    "2.37.0": (
+        "23.08",  # triton container
+        "23.08",  # upstream container
         "1.15.1",  # ORT
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
