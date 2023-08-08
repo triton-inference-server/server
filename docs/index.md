@@ -71,7 +71,7 @@ Major features include:
 - [Concurrent model
   execution](user_guide/architecture.md#concurrent-model-execution)
 - [Dynamic batching](user_guide/model_configuration.md#dynamic-batcher)
-- [Sequence batching](user_guide/model_configuration.md#sequence-batcher) and 
+- [Sequence batching](user_guide/model_configuration.md#sequence-batcher) and
   [implicit state management](user_guide/architecture.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
@@ -90,8 +90,8 @@ Major features include:
 - [Metrics](user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
-Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and stay current on the latest product updates, bug fixes, content, best 
-practices, and more. Need enterprise support? NVIDIA global support is available 
+Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and stay current on the latest product updates, bug fixes, content, best
+practices, and more. Need enterprise support? NVIDIA global support is available
 for Triton Inference Server with the [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
-See the [Lastest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-05.html#rel-23-05) for updates on the newest features and bug fixes.
+See the [Latest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-05.html#rel-23-05) for updates on the newest features and bug fixes.

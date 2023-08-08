@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -298,7 +298,8 @@ additional tensors that have to be transferred.
 
 Implicit state management requires backend support. Currently, only
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
-and [tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend)
+[tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend),
+and [pytorch_backend](https://github.com/triton-inference-server/pytorch_backend)
 support implicit state.
 
 ##### State Initialization
@@ -311,7 +312,7 @@ description of the model contains variable-sized dimensions, Triton will use *1*
 for every variable-sized dimension for the starting request. For other
 non-starting requests in the sequence, the input state is the output state of
 the previous request in the sequence. For an example ONNX model that uses
-implicit state you can refer to this onnx model generated from the 
+implicit state you can refer to this onnx model generated from the
 `create_onnx_modelfile_wo_initial_state()`
 [from this generation script](https://github.com/triton-inference-server/server/blob/main/qa/common/gen_qa_implicit_models.py).
 This is a simple accumulator model that stores the partial sum of the requests
@@ -320,8 +321,8 @@ request is starting, the model sets the "OUTPUT\_STATE" to be equal to the
 "INPUT" tensor. For non-starting requests, it sets the "OUTPUT\_STATE" tensor
 to the sum of "INPUT" and "INPUT\_STATE" tensors.
 
-In addition to the default state initilization discussed above, Triton provides
-two other mechanisms for initilizing state.
+In addition to the default state initialization discussed above, Triton provides
+two other mechanisms for initializing state.
 
 ###### Initializing State from Zero.
 
@@ -353,7 +354,7 @@ converted to fixed size dimensions.
 
 For initializing state from file, you need to create a directory named
 "initial\_state" under the model directory. The file that contains the initial
-state under this directory needs to be provided in the *data_file* field. 
+state under this directory needs to be provided in the *data_file* field.
 The data stored in this file will be used in row-major order as the initial
 state. Below is an example state description initializing state from file.
 
@@ -521,7 +522,7 @@ model. Over time the following happens:
   the sequence scheduler sees them both available in their respective
   batch slots. The scheduler immediately schedules the model instance
   to perform a batch-size 2 inference and uses START and READY to show
-  that both slots have an inference request avaiable but that only
+  that both slots have an inference request available but that only
   slot1 is the start of a new sequence.
 
 * The processing continues in a similar manner for the other inference
@@ -798,7 +799,7 @@ scheduler will:
 #### Additional Resources
 
 You can find additional end-to-end ensemble examples in the links below:
-* [This guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles) 
+* [This guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles)
 explores the concept of ensembles with a running example.
 * [Preprocessing in Python Backend Using
   Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)

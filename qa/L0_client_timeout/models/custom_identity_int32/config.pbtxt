@@ -35,7 +35,7 @@ input [
     name: "INPUT0"
     data_type: TYPE_INT32
     dims: [ -1 ]
-    
+
   }
 ]
 output [

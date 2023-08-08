@@ -1,4 +1,5 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -169,7 +170,7 @@ function gdb_helper () {
   for corefile in $(ls core.* > /dev/null 2>&1); do
     GDB_LOG="${corefile}.log"
     echo -e "=== WARNING: SEGFAULT DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
-    gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true; 
+    gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true;
   done
 }
 
@@ -465,4 +466,10 @@ function kill_servers () {
         kill ${!server_pid[$i]}
         wait ${!server_pid[$i]}
     done
+}
+
+# Collect all logs and core dumps and copy them to an upper-level directory for
+# proper capture on the CI.
+function collect_artifacts_from_subdir () {
+    cp *.*log* core* ../ || true
 }

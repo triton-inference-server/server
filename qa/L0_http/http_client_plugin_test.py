@@ -30,18 +30,18 @@ import sys
 sys.path.append("../common")
 
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
+import tritonclient.http.aio as asynctritonhttpclient
 from tritonclient.http import InferenceServerClientPlugin
 from tritonclient.utils import np_to_triton_dtype
-import tritonclient.http.aio as asynctritonhttpclient
 
 
 # A simple plugin that adds headers to the inference request.
 class TestPlugin(InferenceServerClientPlugin):
-
     def __init__(self, headers):
         self._headers = headers
 
@@ -50,12 +50,10 @@ class TestPlugin(InferenceServerClientPlugin):
 
 
 class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
-
     async def asyncSetUp(self):
-        self._headers = {'MY-KEY': 'MY-VALUE'}
+        self._headers = {"MY-KEY": "MY-VALUE"}
         self._plugin = TestPlugin(self._headers)
-        self._client = asynctritonhttpclient.InferenceServerClient(
-            url='localhost:8001')
+        self._client = asynctritonhttpclient.InferenceServerClient(url="localhost:8001")
 
     async def test_server_is_live(self):
         # We are testing is_server_live as an example API that uses GET method
@@ -65,15 +63,15 @@ class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
         self._client.register_plugin(self._plugin)
         self.assertEqual(self._plugin, self._client.plugin())
         await self._client.is_server_live()
-        self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
-                                                   headers=self._headers)
+        self._client._stub.get.assert_awaited_with(
+            url=unittest.mock.ANY, headers=self._headers
+        )
 
         # Make sure unregistering the plugin would no longer add the headers
         self._client.unregister_plugin()
         self.assertEqual(None, self._client.plugin())
         await self._client.is_server_live()
-        self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
-                                                   headers={})
+        self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY, headers={})
 
     async def test_simple_infer(self):
         # Only the read function must return async
@@ -87,21 +85,22 @@ class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
         # Setup inputs
         inputs = []
         inputs.append(
-            tritonhttpclient.InferInput('INPUT0', np_input.shape,
-                                        np_to_triton_dtype(np_input.dtype)))
+            tritonhttpclient.InferInput(
+                "INPUT0", np_input.shape, np_to_triton_dtype(np_input.dtype)
+            )
+        )
 
         # Set the binary data to False so that 'Inference-Header-Length' is not
         # added to the headers.
         inputs[0].set_data_from_numpy(np_input, binary_data=False)
 
         async def run_infer(headers):
-            with patch('tritonclient.http.aio._raise_if_error'):
-                with patch('tritonclient.http.aio.InferResult'):
+            with patch("tritonclient.http.aio._raise_if_error"):
+                with patch("tritonclient.http.aio.InferResult"):
                     await self._client.infer(model_name=model, inputs=inputs)
                     self._client._stub.post.assert_awaited_with(
-                        url=unittest.mock.ANY,
-                        data=unittest.mock.ANY,
-                        headers=headers)
+                        url=unittest.mock.ANY, data=unittest.mock.ANY, headers=headers
+                    )
 
         self._client.register_plugin(self._plugin)
         await run_infer(self._headers)
@@ -114,12 +113,10 @@ class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
 
 
 class HTTPClientPluginTest(tu.TestResultCollector):
-
     def setUp(self):
-        self._headers = {'MY-KEY': 'MY-VALUE'}
+        self._headers = {"MY-KEY": "MY-VALUE"}
         self._plugin = TestPlugin(self._headers)
-        self._client = tritonhttpclient.InferenceServerClient(
-            url='localhost:8001')
+        self._client = tritonhttpclient.InferenceServerClient(url="localhost:8001")
 
         # Use magic mock for the client stub
         self._client._client_stub = MagicMock()
@@ -129,14 +126,14 @@ class HTTPClientPluginTest(tu.TestResultCollector):
         # for communication with the server.
         self._client.register_plugin(self._plugin)
         self._client.is_server_live()
-        self._client._client_stub.get.assert_called_with(unittest.mock.ANY,
-                                                         headers=self._headers)
+        self._client._client_stub.get.assert_called_with(
+            unittest.mock.ANY, headers=self._headers
+        )
 
         # Make sure unregistering the plugin would no longer add the headers
         self._client.unregister_plugin()
         self._client.is_server_live()
-        self._client._client_stub.get.assert_called_with(unittest.mock.ANY,
-                                                         headers={})
+        self._client._client_stub.get.assert_called_with(unittest.mock.ANY, headers={})
 
     def test_simple_infer(self):
         np_input = np.arange(8, dtype=np.float32).reshape(1, -1)
@@ -145,21 +142,24 @@ class HTTPClientPluginTest(tu.TestResultCollector):
         # Setup inputs
         inputs = []
         inputs.append(
-            tritonhttpclient.InferInput('INPUT0', np_input.shape,
-                                        np_to_triton_dtype(np_input.dtype)))
+            tritonhttpclient.InferInput(
+                "INPUT0", np_input.shape, np_to_triton_dtype(np_input.dtype)
+            )
+        )
 
         # Set the binary data to False so that 'Inference-Header-Length' is not
         # added to the headers.
         inputs[0].set_data_from_numpy(np_input, binary_data=False)
 
         def run_infer(headers):
-            with patch('tritonclient.http._client._raise_if_error'):
-                with patch('tritonclient.http._client.InferResult'):
+            with patch("tritonclient.http._client._raise_if_error"):
+                with patch("tritonclient.http._client.InferResult"):
                     self._client.infer(model_name=model, inputs=inputs)
                     self._client._client_stub.post.assert_called_with(
                         request_uri=unittest.mock.ANY,
                         body=unittest.mock.ANY,
-                        headers=headers)
+                        headers=headers,
+                    )
 
         self._client.register_plugin(self._plugin)
         run_infer(self._headers)
@@ -171,5 +171,5 @@ class HTTPClientPluginTest(tu.TestResultCollector):
         self._client.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

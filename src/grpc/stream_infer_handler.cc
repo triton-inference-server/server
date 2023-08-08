@@ -218,7 +218,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     state->context_->IncrementRequestCounter();
 
     // If the request is not for a model with decoupled transaction policy
-    // then put it in the context queue so thats it's response is sent in
+    // then put it in the context queue so that its response is sent in
     // the same order as the request was received.
     if (!state->is_decoupled_) {
       state->context_->EnqueueForResponse(state);

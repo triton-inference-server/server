@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_PY=./lifecycle_test.py
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./ensemble_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
@@ -36,7 +36,7 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./ensemble_server.log"
 
 RET=0
 rm -rf models/ $CLIENT_LOG
@@ -113,5 +113,7 @@ if [ $RET -eq 1 ]; then
 else
     echo -e "\n***\n*** Ensemble test PASSED. \n***"
 fi
+
+collect_artifacts_from_subdir
 
 exit $RET

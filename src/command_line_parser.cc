@@ -98,7 +98,7 @@ namespace {
 
 // There must be specialization for the types to be parsed into so that
 // the argument is properly validated and parsed. Attempted to use input
-// opeartor (>>) but it will consume inproper argument without error
+// operator (>>) but it will consume improper argument without error
 // (i.e. parse "1.4" to 'int' will return 1 but we want to report error).
 template <typename T>
 T ParseOption(const std::string& arg);
@@ -215,7 +215,7 @@ ParsePairOption(const std::string& arg, const std::string& delim_str)
 }
 
 #ifdef TRITON_ENABLE_GRPC
-// Split 'options' by 'delim_str' and place splitted strings into a vector
+// Split 'options' by 'delim_str' and place split strings into a vector
 std::vector<std::string>
 SplitOptions(std::string options, const std::string& delim_str)
 {
@@ -772,7 +772,7 @@ TritonParser::SetupOptions()
        "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."});
+       "multiple times to trace multiple information. Default is OFF."});
   deprecated_options_.push_back(
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "DEPRECATED: Please use --trace-config rate=<rate value>"

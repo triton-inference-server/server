@@ -65,7 +65,7 @@ fi
 
 RET=0
 
-rm -fr *.log 
+rm -fr *.log
 
 # models
 rm -fr models && mkdir models

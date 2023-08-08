@@ -191,6 +191,9 @@ function get_datatype () {
     if [[ $1 == "onnx" ]]; then
         dtype="object int32 bool"
     fi
+    if [[ $1 == "libtorch" ]]; then
+        dtype="object int32 bool"
+    fi
   fi
   echo $dtype
 }
@@ -238,7 +241,7 @@ for BACKEND in $BACKENDS; do
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
     DTYPES=$(get_datatype $BACKEND)
-    
+
     for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_${DTYPE}"
     done
@@ -253,7 +256,7 @@ for BACKEND in $BACKENDS; do
             MODELS="$MODELS ${TMP//onnx/python}"
           else
             MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
-          fi 
+          fi
         fi
       done
     fi
@@ -268,6 +271,10 @@ fi
 
 for MODEL in $MODELS; do
   if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
+    # Skip libtorch string models
+    if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+        continue
+    fi
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models1"
     else
@@ -277,6 +284,11 @@ for MODEL in $MODELS; do
         sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+
+    # Skip libtorch string models
+    if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+        continue
+    fi
 
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models2"
@@ -443,6 +455,10 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
+  # Skip libtorch string models
+  if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+      continue
+  fi
   if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "modelsv"
   else
@@ -727,7 +743,7 @@ done
 
 # Test request timeout with sequence batcher
 # only run the test outside shared memory setting as
-# shared memory feature is irrelevant 
+# shared memory feature is irrelevant
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 ]; then
     export NO_BATCHING=0
     export MODEL_INSTANCES=1

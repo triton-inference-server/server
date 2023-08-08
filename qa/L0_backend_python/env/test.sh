@@ -25,15 +25,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./env_client.log"
 source ../common.sh
 source ../../common/util.sh
 
 SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --strict-model-config=false"
+BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./env_server.log"
 
 RET=0
 
@@ -63,6 +63,30 @@ cp ../../python_models/python_version/model.py ./models/python_3_7/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
+# Use python-3-7 without conda pack
+# Create a model with python 3.7 version and numpy 1.20.3 to distinguish from
+# previous test.
+# Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
+# the Python model indicates that the environment has been setup correctly.
+path_to_conda_pack="$PWD/python-3-7-1"
+create_conda_env_with_specified_path "3.7" $path_to_conda_pack
+conda install numpy=1.20.3 -y
+conda install tensorflow=2.1.0 -y
+conda install -c conda-forge libstdcxx-ng=12 -y
+
+PY37_1_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.3, and Tensorflow version is 2.1.0"
+create_python_backend_stub
+mkdir -p models/python_3_7_1/1/
+cp ../../python_models/python_version/config.pbtxt ./models/python_3_7_1
+(cd models/python_3_7_1 && \
+          sed -i "s/^name:.*/name: \"python_3_7_1\"/" config.pbtxt && \
+          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+cp ../../python_models/python_version/model.py ./models/python_3_7_1/1/
+# Copy activate script to folder
+cp $path_to_conda_pack/lib/python3.7/site-packages/conda_pack/scripts/posix/activate $path_to_conda_pack/bin/.
+cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7_1
+conda deactivate
+
 # Create a model with python 3.6 version
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
@@ -84,6 +108,7 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+conda deactivate
 
 # Test conda env without custom Python backend stub This environment should
 # always use the default Python version shipped in the container. For Ubuntu 22.04
@@ -102,6 +127,7 @@ cp python3.10.tar.gz models/python_3_10/python_3_10_environment.tar.gz
           sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_10/1/
+conda deactivate
 rm -rf ./miniconda
 
 run_server
@@ -115,7 +141,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY310_VERSION_STRING"; do
+for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY37_1_VERSION_STRING" "$PY310_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
@@ -186,7 +212,7 @@ wait $SERVER_PID
 
 set +e
 
-PY310_ENV_EXTRACTION="Extracting Python execution env" 
+PY310_ENV_EXTRACTION="Extracting Python execution env"
 if [ `grep -c "${PY310_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"
@@ -288,5 +314,7 @@ else
   cat $SERVER_LOG
   echo -e "\n***\n*** Env Manager Test FAILED.\n***"
 fi
+
+collect_artifacts_from_subdir
 
 exit $RET

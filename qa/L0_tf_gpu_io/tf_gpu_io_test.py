@@ -1,4 +1,6 @@
-# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,30 +31,35 @@ import sys
 sys.path.append("../common")
 
 import unittest
-import numpy as np
+
 import infer_util as iu
+import numpy as np
 import test_util as tu
 
 TENSOR_SIZE = 16384
 
 
 class TfGpuIoTest(tu.TestResultCollector):
-
-    def _test_helper(self,
-                     model_name,
-                     shape,
-                     override_input_names=[],
-                     override_output_names=[],
-                     batching_enabled=False):
+    def _test_helper(
+        self,
+        model_name,
+        shape,
+        override_input_names=[],
+        override_output_names=[],
+        batching_enabled=False,
+    ):
         try:
             bs = 1
             if batching_enabled:
-                shape = [[
-                    bs,
-                ] + shape]
+                shape = [
+                    [
+                        bs,
+                    ]
+                    + shape
+                ]
             iu.infer_zero(
                 self,
-                'graphdef',
+                "graphdef",
                 bs,
                 np.float32,
                 shape,
@@ -66,26 +73,33 @@ class TfGpuIoTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_sig_tag0(self):
-        self._test_helper("sig_tag0", [16],
-                          override_input_names=["INPUT"],
-                          override_output_names=["OUTPUT"])
+        self._test_helper(
+            "sig_tag0",
+            [16],
+            override_input_names=["INPUT"],
+            override_output_names=["OUTPUT"],
+        )
 
     def test_graphdef_zero_1_float32_def(self):
-        self._test_helper("graphdef_zero_1_float32_def", [TENSOR_SIZE],
-                          batching_enabled=True)
+        self._test_helper(
+            "graphdef_zero_1_float32_def", [TENSOR_SIZE], batching_enabled=True
+        )
 
     def test_graphdef_zero_1_float32_gpu(self):
-        self._test_helper("graphdef_zero_1_float32_gpu", [TENSOR_SIZE],
-                          batching_enabled=True)
+        self._test_helper(
+            "graphdef_zero_1_float32_gpu", [TENSOR_SIZE], batching_enabled=True
+        )
 
     def test_savedmodel_zero_1_float32_def(self):
-        self._test_helper("savedmodel_zero_1_float32_def", [TENSOR_SIZE],
-                          batching_enabled=True)
+        self._test_helper(
+            "savedmodel_zero_1_float32_def", [TENSOR_SIZE], batching_enabled=True
+        )
 
     def test_savedmodel_zero_1_float32_gpu(self):
-        self._test_helper("savedmodel_zero_1_float32_gpu", [TENSOR_SIZE],
-                          batching_enabled=True)
+        self._test_helper(
+            "savedmodel_zero_1_float32_gpu", [TENSOR_SIZE], batching_enabled=True
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

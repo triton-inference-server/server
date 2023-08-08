@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -103,21 +103,19 @@ proposed change so that the Triton team can provide feedback.
 
 # Coding Convention
 
-Use clang-format to format all source files (\*.h, \*.cc, \*.proto,
-*.py) to a consistent format. You should run clang-format on all
-source files before submitting a pull request:
+All pull requests are checked against the
+[pre-commit hooks](https://github.com/pre-commit/pre-commit-hooks)
+located [in the repository's top-level .pre-commit-config.yaml](https://github.com/NVIDIA/triton-inference-server/blob/master/pre-commit-config.yaml).
+The hooks do some sanity checking like linting and formatting.
+These checks must pass to merge a change.
 
-```
-$ apt-get install clang-format-15
-```
-
-For convenience there is a format.py script in the
-triton-inference-server/common repo in the "tools" directory that can
-be used to clang-format all files within the repo:
-
-```
-$ python3 ../common/tools/format.py *
-```
+To run these locally, you can
+[install pre-commit,](https://pre-commit.com/#install)
+then run `pre-commit install` inside the cloned repo. When you
+commit a change, the pre-commit hooks will run automatically.
+If a fix is implemented by a pre-commit hook, adding the file again
+and running `git commit` a second time will pass and successfully
+commit.
 
 # Contributor License Agreement (CLA)
 

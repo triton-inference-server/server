@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -135,7 +135,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test failure cases for SSL
-# Try without SSL 
+# Try without SSL
 $SIMPLE_INFER_CLIENT_PY -v -u localhost >> ${CLIENT_LOG}.no_ssl_fail_infer 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.no_ssl_fail_infer

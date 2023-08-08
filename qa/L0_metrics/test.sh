@@ -290,7 +290,7 @@ python3 ${PYTHON_TEST} MetricsTest.test_summaries_custom_quantiles 2>&1 | tee ${
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
-   
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
