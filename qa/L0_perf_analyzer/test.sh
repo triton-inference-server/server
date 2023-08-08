@@ -902,7 +902,7 @@ if [ $? -ne 0 ]; then
 fi
 python3 -c "import json ; \
     requests = json.load(open('profile_export.json'))['experiments'][0]['requests'] ; \
-    assert any(len(r['responses_timestamps']) > 1 for r in requests)"
+    assert any(len(r['response_timestamps']) > 1 for r in requests)"
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
