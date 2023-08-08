@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,63 +24,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./custom_metrics_client.log"
-EXPECTED_NUM_TESTS="1"
-TEST_RESULT_FILE='test_results.txt'
-source ../../common/util.sh
+# Simple config file for OpenTelemetry collector.
+# It receives all traces, received on localhost:10000 and prints
+# it into the output stream.
+# Ref: https://opentelemetry.io/docs/collector/configuration/
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:10000
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./custom_metrics_server.log"
+exporters:
+  logging:
+    verbosity: detailed
 
-RET=0
-rm -fr *.log ./models *.txt
-
-mkdir -p models/custom_metrics/1/
-cp ../../python_models/custom_metrics/model.py models/custom_metrics/1/
-cp ../../python_models/custom_metrics/config.pbtxt models/custom_metrics
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-
-export MODEL_NAME='custom_metrics'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-
-if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Custom Metrics test FAILED. \n***"
-else
-    echo -e "\n***\n*** Custom Metrics test PASSED. \n***"
-fi
-
-collect_artifacts_from_subdir
-
-exit $RET
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [logging]

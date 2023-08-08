@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,10 +25,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="client.log"
+CLIENT_LOG="logging_client.log"
 TEST_RESULT_FILE="test_results.txt"
 LOG_TEST="logging_test.py"
-SERVER_LOG="./server.log"
+SERVER_LOG="./logging_server.log"
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -135,8 +135,6 @@ verify_log_counts 4 0
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
-SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
-SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -179,8 +177,6 @@ verify_log_counts 4 3
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
-SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
-SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -232,5 +228,6 @@ else
     echo -e "\n***\n*** Logging test FAILED. \n***"
 fi
 
+collect_artifacts_from_subdir
 
 exit $RET

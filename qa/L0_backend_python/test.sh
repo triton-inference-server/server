@@ -44,6 +44,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 export BACKEND_DIR=${TRITON_DIR}/backends
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
+export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
@@ -60,6 +61,20 @@ source ../common/util.sh
 source ./common.sh
 
 rm -fr *.log ./models
+
+python3 --version | grep "3.10" > /dev/null
+if [ $? -ne 0 ]; then
+    echo -e "Expecting Python default version to be: Python 3.10 but actual version is $(python3 --version)"
+    exit 1
+fi
+
+(bash -ex setup_python_enviroment.sh)
+
+python3 --version | grep "3.${PYTHON_ENV_VERSION}" > /dev/null
+if [ $? -ne 0 ]; then
+    echo -e "Expecting Python version to be: Python 3.${PYTHON_ENV_VERSION} but actual version is $(python3 --version)"
+    exit 1
+fi
 
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
@@ -397,12 +412,14 @@ if [ "$TEST_JETSON" == "0" ]; then
         rm -fr venv
     done
 
-    # In 'env' test we use miniconda for dependency management. No need to run
-    # the test in a virtual environment.
-    (cd env && bash -ex test.sh)
-    if [ $? -ne 0 ]; then
-        echo "Subtest env FAILED"
-        RET=1
+    if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+        # In 'env' test we use miniconda for dependency management. No need to run
+        # the test in a virtual environment.
+        (cd env && bash -ex test.sh)
+        if [ $? -ne 0 ]; then
+            echo "Subtest env FAILED"
+            RET=1
+        fi
     fi
 fi
 

@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 UNITTEST_PY=./io_test.py
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./io_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
@@ -37,7 +37,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./io_server.log"
 
 RET=0
 rm -fr *.log ./models
@@ -171,5 +171,7 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** IO test FAILED.\n***"
 fi
+
+collect_artifacts_from_subdir
 
 exit $RET
