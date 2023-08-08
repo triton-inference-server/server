@@ -46,7 +46,7 @@ devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton Inference
 Server delivers optimized performance for many query types, including real time, 
 batched, ensembles and audio/video streaming. Triton inference Server is part of
 [NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/), 
-an software platform that accelerates the data science pipeline and streamlines 
+a software platform that accelerates the data science pipeline and streamlines 
 the development and deployment of production AI.
 
 Major features include:
