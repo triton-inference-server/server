@@ -2885,21 +2885,6 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
         self.assertFalse(triton_client.is_model_ready("identity_zero_1_int32"))
-        # Unload identity_zero_1_int32 and immediately load it
-        # The model can either be loaded or unloaded but server must not crash
-        triton_client.load_model("identity_zero_1_int32")
-        self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            unload_thread = pool.submit(
-                triton_client.unload_model, "identity_zero_1_int32"
-            )
-            load_thread = pool.submit(triton_client.load_model, "identity_zero_1_int32")
-            unload_thread.result()
-            load_thread.result()
-        triton_client.unload_model("identity_zero_1_int32")  # to unload if loaded
-        self.assertTrue(triton_client.is_server_live())
-        self.assertTrue(triton_client.is_server_ready())
-        triton_client.is_model_ready("identity_zero_1_int32")
         # Load ensemble_zero_1_float32 and unload its dependency while loading
         # The unload operation should wait until the load is completed
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -2930,6 +2915,47 @@ class LifeCycleTest(tu.TestResultCollector):
                     thread.result()
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
+
+    def test_same_model_overlapping_load_unload(self):
+        try:
+            triton_client = grpcclient.InferenceServerClient(
+                "localhost:8001", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        model_name = "python_identity_model"
+        # Success of this test requires the correct order of unload and load
+        # that cannot be reliably controlled, so allowing some retries can
+        # minimize the chance of undetermined test result.
+        max_trials = 2
+        for i in range(max_trials):
+            # Start with model loaded
+            triton_client.load_model(model_name)
+            self.assertTrue(triton_client.is_model_ready(model_name))
+            # Unload the model and then immediately load it
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                unload_thread = pool.submit(triton_client.unload_model, model_name)
+                load_thread = pool.submit(triton_client.load_model, model_name)
+                unload_thread.result()
+                load_thread.result()
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            # Poll for unload, in-case unload happen after load
+            poll_interval = 1  # seconds
+            poll_timeout = 16  # seconds
+            poll_max_steps = poll_timeout / poll_interval
+            poll_steps = 0
+            model_loaded = triton_client.is_model_ready(model_name)
+            while poll_steps < poll_max_steps and model_loaded:
+                time.sleep(poll_interval)
+                poll_steps += 1
+                model_loaded = triton_client.is_model_ready(model_name)
+            # Make sure model is loaded, which implies load happen after unload
+            if model_loaded:
+                # Test passed
+                return
+        # Test result is undetermined
+        self.assertTrue(False, "Cannot overlap a load with an unload in max trails")
 
 
 if __name__ == "__main__":

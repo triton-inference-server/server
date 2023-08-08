@@ -1824,6 +1824,37 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_same_model_overlapping_load_unload
+rm -rf models
+mkdir models
+cp -r ../python_models/identity_fp32 models/python_identity_model && \
+    (cd models/python_identity_model && \
+        mkdir 1 && mv model.py 1 && \
+        sed -i "s/identity_fp32/python_identity_model/" config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_same_model_overlapping_load_unload >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 fi
