@@ -108,6 +108,7 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+conda deactivate
 
 # Test conda env without custom Python backend stub This environment should
 # always use the default Python version shipped in the container. For Ubuntu 22.04
@@ -126,6 +127,7 @@ cp python3.10.tar.gz models/python_3_10/python_3_10_environment.tar.gz
           sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_10/1/
+conda deactivate
 rm -rf ./miniconda
 
 run_server
