@@ -58,9 +58,18 @@ Triton Inference Server is an open source inference serving software that stream
 <iframe width="560" height="315" src="https://www.youtube.com/embed/NQDtfSi5QF4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </div>
 
-# Triton
+# Triton Inference Server
 
-Triton enables teams to deploy any AI model from multiple deep learning and machine learning frameworks, including TensorRT, TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference across cloud, data center,edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton delivers optimized performance for many query types, including real time, batched, ensembles and audio/video streaming.
+Triton Inference Server enables teams to deploy any AI model from multiple deep 
+learning and machine learning frameworks, including TensorRT, TensorFlow, 
+PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference
+across cloud, data center, edge and embedded devices on NVIDIA GPUs, x86 and ARM
+CPU, or AWS Inferentia. Triton Inference Server delivers optimized performance
+for many query types, including real time, batched, ensembles and audio/video 
+streaming. Triton inference Server is part of
+[NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/), 
+a software platform that accelerates the data science pipeline and streamlines 
+the development and deployment of production AI.
 
 Major features include:
 
