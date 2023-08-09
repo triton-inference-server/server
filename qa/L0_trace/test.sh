@@ -481,6 +481,37 @@ if [ -f ./global_trace.log.0 ]; then
     RET=1
 fi
 
+# Check out of range errors
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"10000000000"}' localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_rate":"10000000000"}' localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_frequency":"10000000000"}' localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID

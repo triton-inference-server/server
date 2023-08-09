@@ -78,6 +78,7 @@ getopt_long(
 #endif
 
 #include <algorithm>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -96,6 +97,29 @@ namespace triton { namespace server {
 // [FIXME] expose following parse helpers for other type of parser
 namespace {
 
+// A wrapper around std::stoi, std::stoull, std::stoll, std::stod
+// to catch `invalid argument` and `out of range` exceptions
+template <typename T>
+T
+SafeConvertion(
+    const std::string& arg, std::function<int(const std::string&)> stox)
+{
+  try {
+    return stox(arg);
+  }
+  catch (const std::invalid_argument& ia) {
+    std::stringstream ss;
+    ss << "Invalid option value. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  catch (const std::out_of_range& oor) {
+    std::stringstream ss;
+    ss << "One of provided option values is out of bound. Got " << arg
+       << std::endl;
+    throw ParseException(ss.str());
+  }
+}
+
 // There must be specialization for the types to be parsed into so that
 // the argument is properly validated and parsed. Attempted to use input
 // operator (>>) but it will consume improper argument without error
@@ -107,28 +131,43 @@ template <>
 int
 ParseOption(const std::string& arg)
 {
-  return std::stoi(arg);
+  auto stoi_ = std::bind(
+      static_cast<int (*)(const std::string&, std::size_t*, int)>(&std::stoi),
+      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
+  return SafeConvertion<int>(arg, stoi_);
 }
 
 template <>
 uint64_t
 ParseOption(const std::string& arg)
 {
-  return std::stoull(arg);
+  auto stoull_ = std::bind(
+      static_cast<uint64_t (*)(const std::string&, std::size_t*, int)>(
+          &std::stoull),
+      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
+  return SafeConvertion<uint64_t>(arg, stoull_);
 }
 
 template <>
 int64_t
 ParseOption(const std::string& arg)
 {
-  return std::stoll(arg);
+  auto stoll_ = std::bind(
+      static_cast<int64_t (*)(const std::string&, std::size_t*, int)>(
+          &std::stoll),
+      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
+  return SafeConvertion<int64_t>(arg, stoll_);
 }
 
 template <>
 double
 ParseOption(const std::string& arg)
 {
-  return std::stod(arg);
+  auto stod_ = std::bind(
+      static_cast<int64_t (*)(const std::string&, std::size_t*, int)>(
+          &std::stod),
+      std::placeholders::_1, nullptr /*pos*/);
+  return SafeConvertion<double>(arg, stod_);
 }
 
 template <>
