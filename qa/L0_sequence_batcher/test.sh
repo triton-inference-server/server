@@ -800,6 +800,69 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
     set -e
 fi
 
+### Start Preserve Ordering Tests ###
+
+TEST_CASE=SequenceBatcherPreserveOrderingTest
+MODEL_PATH=preserve_ordering
+BASE_MODEL="../python_models/sequence_py"
+
+NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering"
+mkdir -p ${NO_PRESERVE}/1
+cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
+cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+
+PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering"
+cp -r ${NO_PRESERVE} ${PRESERVE}
+sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+
+SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+
+if [ "$TEST_VALGRIND" -eq 1 ]; then
+    LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+    LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+    run_server_leakcheck
+else
+    run_server
+fi
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
+
+set +e
+python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
+    echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 2
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill_server
+
+set +e
+if [ "$TEST_VALGRIND" -eq 1 ]; then
+    python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+fi
+set -e
+
+### End Preserve Ordering Tests ###
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
