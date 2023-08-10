@@ -1834,8 +1834,9 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
               req,
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
-                  (std::string("Unable to parse 'trace_rate', value is out of "
-                               "range [ ") +
+                  (std::string(
+                       "Unable to parse 'log_frequency', value is out of "
+                       "range [ ") +
                    std::to_string(std::numeric_limits<std::uint32_t>::min()) +
                    ", " +
                    std::to_string(std::numeric_limits<std::uint32_t>::max()) +
