@@ -102,7 +102,7 @@ namespace {
 template <typename T>
 T
 SafeConvertion(
-    const std::string& arg, std::function<int(const std::string&)> stox,
+    const std::string& arg, std::function<T(const std::string&)> stox,
     const std::string& opt_name = "")
 {
   try {
