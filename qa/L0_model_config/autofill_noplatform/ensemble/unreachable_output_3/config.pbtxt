@@ -1,0 +1,94 @@
+name: "unreachable_output_3"
+max_batch_size: 2
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "fp32_dim1_batch4"
+      model_version: -1
+      input_map {
+        key: "input"
+        value: "data"
+      }
+      output_map {
+        key: "output"
+        value: "temp_tensor_4"
+      }
+    },
+    {
+      model_name: "fp32_dim1_batch4"
+      model_version: -1
+      input_map {
+        key: "input"
+        value: "not_written_tensor"
+      }
+      output_map {
+        key: "output"
+        value: "prob_2"
+      }
+    },
+    {
+      model_name: "fp32_dim1_batch4_output3"
+      model_version: -1
+      input_map {
+        key: "input"
+        value: "data"
+      }
+      output_map {
+        key: "output1"
+        value: "temp_tensor_1"
+      }
+      output_map {
+        key: "output2"
+        value: "temp_tensor_2"
+      }
+      output_map {
+        key: "output3"
+        value: "temp_tensor_3"
+      }
+    },
+    {
+      model_name: "fp32_dim1_batch4_input4"
+      model_version: -1
+      input_map {
+        key: "input1"
+        value: "temp_tensor_1"
+      }
+      input_map {
+        key: "input2"
+        value: "temp_tensor_2"
+      }
+      input_map {
+        key: "input3"
+        value: "temp_tensor_3"
+      }
+      input_map {
+        key: "input4"
+        value: "temp_tensor_4"
+      }
+      output_map {
+        key: "output"
+        value: "prob"
+      }
+    }
+  ]
+}
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "prob_2"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
