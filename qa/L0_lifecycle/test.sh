@@ -1713,7 +1713,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load_speedup
+# LifeCycleTest.test_concurrent_model_load_speedup
 rm -rf models
 mkdir models
 MODEL_NAME="identity_zero_1_int32"
@@ -1743,7 +1743,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load_speedup >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load_speedup >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1756,7 +1756,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load
+# LifeCycleTest.test_concurrent_model_load
 rm -rf models models_v1 models_v2
 mkdir models models_v2
 cp -r identity_zero_1_int32 models/identity_model && \
@@ -1778,7 +1778,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1791,7 +1791,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load_unload
+# LifeCycleTest.test_concurrent_model_load_unload
 rm -rf models
 mkdir models
 cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
@@ -1813,7 +1813,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load_unload >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load_unload >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1826,7 +1826,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_load_unload_same_model_stress
+# LifeCycleTest.test_concurrent_same_model_load_unload_stress
 rm -rf models
 mkdir models
 cp -r identity_zero_1_int32 models && \
@@ -1844,7 +1844,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_load_unload_same_model_stress >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_same_model_load_unload_stress >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"

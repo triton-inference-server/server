@@ -2789,7 +2789,7 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_concurrent_load_speedup(self):
+    def test_concurrent_model_load_speedup(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2835,7 +2835,7 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_pair:
                 self.assertTrue(triton_client.is_model_ready(model_name))
 
-    def test_concurrent_load(self):
+    def test_concurrent_model_load(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2864,7 +2864,7 @@ class LifeCycleTest(tu.TestResultCollector):
         model_metadata = triton_client.get_model_metadata("identity_model")
         self.assertEqual(model_metadata.platform, "python")
 
-    def test_concurrent_load_unload(self):
+    def test_concurrent_model_load_unload(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2916,7 +2916,7 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
-    def test_load_unload_same_model_stress(self):
+    def test_concurrent_same_model_load_unload_stress(self):
         model_name = "identity_zero_1_int32"
         num_threads = 16
         num_iterations = 1024
