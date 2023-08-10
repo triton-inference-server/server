@@ -1785,7 +1785,9 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                 req, TRITONSERVER_ErrorNew(
                          TRITONSERVER_ERROR_INVALID_ARG,
                          (std::string("Unable to parse 'trace_count'.") +
-                          " Expecting value >= -1, got:" + count_str)
+                          " Expecting value >= " +
+                          std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) +
+                          ", got:" + count_str)
                              .c_str()));
           }
           new_setting.count_ = &count;
@@ -1804,7 +1806,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
                   (std::string("Unable to parse 'trace_count', value is out of "
-                               "range [ -1, ") +
+                               "range [ ") +
+                   std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) + ", " +
                    std::to_string(std::numeric_limits<std::int32_t>::max()) +
                    " ], got: " + count_str)
                       .c_str()));

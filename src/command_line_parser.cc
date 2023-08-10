@@ -1206,8 +1206,7 @@ TritonParser::Parse(int argc, char** argv)
     }
     auto port = triton::server::GetEnvironmentVariableOrDefault(
         "AIP_HTTP_PORT", "8080");
-    lparams.vertex_ai_port_ =
-        ParseOption<int>(port, long_options[option_index].name);
+    lparams.vertex_ai_port_ = ParseOption<int>(port);
   }
 #endif  // TRITON_ENABLE_VERTEX_AI
 
