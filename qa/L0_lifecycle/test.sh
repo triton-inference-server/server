@@ -1826,15 +1826,15 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_same_model_overlapping_load_unload
+# LifeCycleTest.test_load_unload_same_model_stress
 rm -rf models
 mkdir models
-cp -r ../python_models/identity_fp32 models/python_identity_model && \
-    (cd models/python_identity_model && \
-        mkdir 1 && mv model.py 1 && \
-        sed -i "s/identity_fp32/python_identity_model/" config.pbtxt)
+cp -r identity_zero_1_int32 models && \
+    (cd models/identity_zero_1_int32 && \
+        mkdir 1 && \
+        sed -i "s/string_value: \"10\"/string_value: \"0\"/" config.pbtxt)
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-thread-count=16 --log-verbose=2"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -1844,7 +1844,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_same_model_overlapping_load_unload >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_load_unload_same_model_stress >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"

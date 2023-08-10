@@ -2916,46 +2916,61 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
-    def test_same_model_overlapping_load_unload(self):
+    def test_load_unload_same_model_stress(self):
+        model_name = "identity_zero_1_int32"
+        num_threads = 16
+        num_iterations = 1024
         try:
             triton_client = grpcclient.InferenceServerClient(
                 "localhost:8001", verbose=True
             )
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-        model_name = "python_identity_model"
-        # Success of this test requires the correct order of unload and load
-        # that cannot be reliably controlled, so allowing some retries can
-        # minimize the chance of undetermined test result.
-        max_trials = 2
-        for i in range(max_trials):
-            # Start with model loaded
-            triton_client.load_model(model_name)
-            self.assertTrue(triton_client.is_model_ready(model_name))
-            # Unload the model and then immediately load it
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                unload_thread = pool.submit(triton_client.unload_model, model_name)
-                load_thread = pool.submit(triton_client.load_model, model_name)
-                unload_thread.result()
-                load_thread.result()
-            self.assertTrue(triton_client.is_server_live())
-            self.assertTrue(triton_client.is_server_ready())
-            # Poll for unload, in-case unload happen after load
-            poll_interval = 1  # seconds
-            poll_timeout = 16  # seconds
-            poll_max_steps = poll_timeout / poll_interval
-            poll_steps = 0
-            model_loaded = triton_client.is_model_ready(model_name)
-            while poll_steps < poll_max_steps and model_loaded:
-                time.sleep(poll_interval)
-                poll_steps += 1
-                model_loaded = triton_client.is_model_ready(model_name)
-            # Make sure model is loaded, which implies load happen after unload
-            if model_loaded:
-                # Test passed
-                return
-        # Test result is undetermined
-        self.assertTrue(False, "Cannot overlap a load with an unload in max trails")
+        load_unload_exceptions = {"load_before_unload_finish_count": 0}
+
+        def _load_unload():
+            for i in range(num_iterations):
+                try:
+                    triton_client.load_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for an unload to happen after a load completes, but
+                    # before the load can verify its load state.
+                    fail_reasons = [
+                        "unexpected miss in global map",
+                        "no version is available",
+                        "failed to poll from model repository",
+                    ]
+                    fail_messages = [
+                        ("failed to load '" + model_name + "', " + reason)
+                        for reason in fail_reasons
+                    ]
+                    self.assertIn(ex.message(), fail_messages)
+                try:
+                    triton_client.unload_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for a load to happen during an async unload
+                    self.assertEqual(
+                        ex.message(),
+                        "failed to unload '"
+                        + model_name
+                        + "', versions that are still available: 1",
+                    )
+                    load_unload_exceptions["load_before_unload_finish_count"] += 1
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            threads = []
+            for i in range(num_threads):
+                threads.append(pool.submit(_load_unload))
+            for t in threads:
+                t.result()
+
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertGreater(
+            load_unload_exceptions["load_before_unload_finish_count"],
+            0,
+            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
+        )
 
 
 if __name__ == "__main__":
