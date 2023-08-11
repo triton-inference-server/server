@@ -1163,6 +1163,19 @@ TritonServerParameters::BuildTritonServerOptions()
   return managed_ptr;
 }
 
+std::string
+TritonParser::GetOptionName(const struct option* long_option)
+{
+  if (long_option != nullptr) {
+#ifdef _WIN32
+    return long_option->name_;
+#else
+    return long_option->name;
+#endif
+  }
+  return "";
+}
+
 std::pair<TritonServerParameters, std::vector<char*>>
 TritonParser::Parse(int argc, char** argv)
 {
@@ -1233,8 +1246,8 @@ TritonParser::Parse(int argc, char** argv)
         throw ParseException();
 #ifdef TRITON_ENABLE_LOGGING
       case OPTION_LOG_VERBOSE:
-        lparams.log_verbose_ =
-            ParseIntBoolOption(optarg, long_options[option_index].name);
+        lparams.log_verbose_ = ParseIntBoolOption(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_LOG_INFO:
         lparams.log_info_ = ParseOption<bool>(optarg);
@@ -1289,12 +1302,12 @@ TritonParser::Parse(int argc, char** argv)
         lparams.allow_http_ = ParseOption<bool>(optarg);
         break;
       case OPTION_HTTP_PORT:
-        lparams.http_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.http_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_REUSE_HTTP_PORT:
-        lparams.reuse_http_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.reuse_http_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
@@ -1304,8 +1317,8 @@ TritonParser::Parse(int argc, char** argv)
         break;
         break;
       case OPTION_HTTP_THREAD_COUNT:
-        lparams.http_thread_cnt_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.http_thread_cnt_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
 #endif  // TRITON_ENABLE_HTTP
 
@@ -1314,17 +1327,17 @@ TritonParser::Parse(int argc, char** argv)
         lparams.allow_sagemaker_ = ParseOption<bool>(optarg);
         break;
       case OPTION_SAGEMAKER_PORT:
-        lparams.sagemaker_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.sagemaker_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_SAGEMAKER_SAFE_PORT_RANGE:
         lparams.sagemaker_safe_range_set_ = true;
         lparams.sagemaker_safe_range_ = ParsePairOption<int, int>(
-            optarg, "-", long_options[option_index].name);
+            optarg, "-", GetOptionName(&long_options[option_index]));
         break;
       case OPTION_SAGEMAKER_THREAD_COUNT:
-        lparams.sagemaker_thread_cnt_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.sagemaker_thread_cnt_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
@@ -1333,12 +1346,12 @@ TritonParser::Parse(int argc, char** argv)
         lparams.allow_vertex_ai_ = ParseOption<bool>(optarg);
         break;
       case OPTION_VERTEX_AI_PORT:
-        lparams.vertex_ai_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.vertex_ai_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_VERTEX_AI_THREAD_COUNT:
-        lparams.vertex_ai_thread_cnt_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.vertex_ai_thread_cnt_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_VERTEX_AI_DEFAULT_MODEL:
         lparams.vertex_ai_default_model_ = optarg;
@@ -1350,19 +1363,19 @@ TritonParser::Parse(int argc, char** argv)
         lparams.allow_grpc_ = ParseOption<bool>(optarg);
         break;
       case OPTION_GRPC_PORT:
-        lgrpc_options.socket_.port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.socket_.port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_REUSE_GRPC_PORT:
-        lgrpc_options.socket_.reuse_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.socket_.reuse_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_ADDRESS:
         lgrpc_options.socket_.address_ = optarg;
         break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
-        lgrpc_options.infer_allocation_pool_size_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.infer_allocation_pool_size_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_USE_SSL:
         lgrpc_options.ssl_.use_ssl_ = ParseOption<bool>(optarg);
@@ -1399,12 +1412,12 @@ TritonParser::Parse(int argc, char** argv)
         break;
       }
       case OPTION_GRPC_ARG_KEEPALIVE_TIME_MS:
-        lgrpc_options.keep_alive_.keepalive_time_ms_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.keep_alive_.keepalive_time_ms_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS:
-        lgrpc_options.keep_alive_.keepalive_timeout_ms_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.keep_alive_.keepalive_timeout_ms_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS:
         lgrpc_options.keep_alive_.keepalive_permit_without_calls_ =
@@ -1412,16 +1425,17 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA:
         lgrpc_options.keep_alive_.http2_max_pings_without_data_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+            ParseOption<int>(
+                optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS:
         lgrpc_options.keep_alive_
-            .http2_min_recv_ping_interval_without_data_ms_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+            .http2_min_recv_ping_interval_without_data_ms_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES:
-        lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lgrpc_options.keep_alive_.http2_max_ping_strikes_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_GRPC_RESTRICTED_PROTOCOL: {
         const auto& parsed_tuple = ParseGrpcRestrictedProtocolOption(optarg);
@@ -1455,12 +1469,12 @@ TritonParser::Parse(int argc, char** argv)
         lparams.metrics_address_ = optarg;
         break;
       case OPTION_METRICS_PORT:
-        lparams.metrics_port_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.metrics_port_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_METRICS_INTERVAL_MS:
-        lparams.metrics_interval_ms_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.metrics_interval_ms_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_METRICS_CONFIG:
         lparams.metrics_config_settings_.push_back(
@@ -1497,8 +1511,8 @@ TritonParser::Parse(int argc, char** argv)
                      "'--trace-config rate=<rate value> instead."
                   << std::endl;
         trace_rate_present = true;
-        lparams.trace_rate_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.trace_rate_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
 
       case OPTION_TRACE_COUNT:
@@ -1507,8 +1521,8 @@ TritonParser::Parse(int argc, char** argv)
                      "'--trace-config count=<count value> instead."
                   << std::endl;
         trace_count_present = true;
-        lparams.trace_count_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.trace_count_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_TRACE_LOG_FREQUENCY:
         std::cerr << "Warning: '--trace-log-frequency' has been deprecated and "
@@ -1518,8 +1532,8 @@ TritonParser::Parse(int argc, char** argv)
                      "value> instead."
                   << std::endl;
         trace_log_frequency_present = true;
-        lparams.trace_log_frequency_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.trace_log_frequency_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_TRACE_CONFIG: {
         auto trace_config_setting = ParseTraceConfigOption(optarg);
@@ -1534,8 +1548,8 @@ TritonParser::Parse(int argc, char** argv)
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:
-        lparams.repository_poll_secs_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.repository_poll_secs_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_STARTUP_MODEL:
         lparams.startup_models_.insert(optarg);
@@ -1587,17 +1601,17 @@ TritonParser::Parse(int argc, char** argv)
         break;
       }
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
-        lparams.pinned_memory_pool_byte_size_ =
-            ParseOption<int64_t>(optarg, long_options[option_index].name);
+        lparams.pinned_memory_pool_byte_size_ = ParseOption<int64_t>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
         lparams.cuda_pools_.push_back(ParsePairOption<int, uint64_t>(
-            optarg, ":", long_options[option_index].name));
+            optarg, ":", GetOptionName(&long_options[option_index])));
         break;
       case OPTION_RESPONSE_CACHE_BYTE_SIZE: {
         cache_size_present = true;
-        const auto byte_size = std::to_string(
-            ParseOption<int64_t>(optarg, long_options[option_index].name));
+        const auto byte_size = std::to_string(ParseOption<int64_t>(
+            optarg, GetOptionName(&long_options[option_index])));
         lparams.cache_config_settings_["local"] = {{"size", byte_size}};
         std::cerr
             << "Warning: '--response-cache-byte-size' has been deprecated! "
@@ -1623,12 +1637,12 @@ TritonParser::Parse(int argc, char** argv)
         lparams.cache_dir_ = optarg;
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
-        lparams.min_supported_compute_capability_ =
-            ParseOption<double>(optarg, long_options[option_index].name);
+        lparams.min_supported_compute_capability_ = ParseOption<double>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_EXIT_TIMEOUT_SECS:
-        lparams.exit_timeout_secs_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.exit_timeout_secs_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_BACKEND_DIR:
         lparams.backend_dir_ = optarg;
@@ -1637,12 +1651,12 @@ TritonParser::Parse(int argc, char** argv)
         lparams.repoagent_dir_ = optarg;
         break;
       case OPTION_BUFFER_MANAGER_THREAD_COUNT:
-        lparams.buffer_manager_thread_count_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.buffer_manager_thread_count_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_MODEL_LOAD_THREAD_COUNT:
-        lparams.model_load_thread_count_ =
-            ParseOption<int>(optarg, long_options[option_index].name);
+        lparams.model_load_thread_count_ = ParseOption<int>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
       case OPTION_BACKEND_CONFIG:
         lparams.backend_config_settings_.push_back(
@@ -1653,11 +1667,11 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_MODEL_LOAD_GPU_LIMIT:
         lparams.load_gpu_limit_.emplace(ParsePairOption<int, double>(
-            optarg, ":", long_options[option_index].name));
+            optarg, ":", GetOptionName(&long_options[option_index])));
         break;
       case OPTION_MODEL_NAMESPACING:
-        lparams.enable_model_namespacing_ =
-            ParseOption<bool>(optarg, long_options[option_index].name);
+        lparams.enable_model_namespacing_ = ParseOption<bool>(
+            optarg, GetOptionName(&long_options[option_index]));
         break;
     }
   }

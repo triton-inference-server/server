@@ -315,6 +315,9 @@ class TritonParser {
   // Initialize option group mappings
   void SetupOptionGroups();
 
+  // Retrieve option name
+  std::string GetOptionName(const struct option* long_option);
+
   // Sum of option groups: vector to maintain insertion order for Usage()
   std::vector<std::pair<std::string, std::vector<Option>&>> option_groups_;
   // Individual option groups
