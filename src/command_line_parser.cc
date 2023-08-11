@@ -40,10 +40,23 @@ end_of_long_opts(const struct option* longopts)
       (longopts->flag_ == nullptr) && (longopts->val_ == 0));
 }
 
+/// Implementation of `getopt_long` for Windows.
+/// Linux uses available implementation:
+/// https://github.com/gcc-mirror/gcc/blob/fab08d12b40ad637c5a4ce8e026fb43cd3f0fad1/include/getopt.h
+/// and
+/// https://github.com/gcc-mirror/gcc/blob/fab08d12b40ad637c5a4ce8e026fb43cd3f0fad1/libiberty/getopt.c#L521
+/// Parameters' description is available here:
+/// https://github.com/gcc-mirror/gcc/blob/fab08d12b40ad637c5a4ce8e026fb43cd3f0fad1/libiberty/getopt.c#L464-L518
+/// `optind' is an index to iterate over `argv`, (whose length is `argc`),
+/// and starts from 1, since argv[0] is the program name.
+/// Text in the current `argv`-element, it is returned in `optarg'.
+/// `longind` returns the index in `longopts` of the long-named option found.
+/// In the below implementation, we scan options one by one, until the
+/// terminating option {nullptr, 0, nullptr, 0}, thus longind is optind-1.
 int
 getopt_long(
     int argc, char* const argv[], const char* optstring,
-    const struct option* longopts, int* longindex)
+    const struct option* longopts, int* longind)
 {
   if (optind >= argc) {
     return -1;
@@ -57,7 +70,7 @@ getopt_long(
     if (key == curr_longopt->name_) {
       if (curr_longopt->has_arg_ == required_argument) {
         if (found == std::string::npos) {
-          *longindex = optind - 1;
+          *longind = optind - 1;
           optind++;
           if (optind >= argc) {
             std::cerr << argv[0] << ": option '" << argv_str
@@ -69,7 +82,7 @@ getopt_long(
           optarg = (argv[optind] + found + 1);
         }
       }
-      *longindex = optind - 1;
+      *longind = optind - 1;
       optind++;
       return curr_longopt->val_;
     }
@@ -102,13 +115,46 @@ namespace {
 // A wrapper around std::stoi, std::stoull, std::stoll, std::stod
 // to catch `invalid argument` and `out of range` exceptions
 template <typename T>
+T StoX(const std::string& arg);
+
+template <>
+int
+StoX(const std::string& arg)
+{
+  return std::stoi(arg);
+}
+
+template <>
+uint64_t
+StoX(const std::string& arg)
+{
+  return std::stoull(arg);
+}
+
+template <>
+int64_t
+StoX(const std::string& arg)
+{
+  return std::stoll(arg);
+}
+
+template <>
+double
+StoX(const std::string& arg)
+{
+  return std::stod(arg);
+}
+
+// There must be specialization for the types to be parsed into so that
+// the argument is properly validated and parsed. Attempted to use input
+// operator (>>) but it will consume improper argument without error
+// (i.e. parse "1.4" to 'int' will return 1 but we want to report error).
+template <typename T>
 T
-SafeConvertion(
-    const std::string& arg, std::function<T(const std::string&)> stox,
-    const std::string& opt_name = "")
+ParseOption(const std::string& arg, const std::string& opt_name = "")
 {
   try {
-    return stox(arg);
+    return StoX<T>(arg);
   }
   catch (const std::invalid_argument& ia) {
     std::stringstream ss;
@@ -126,55 +172,6 @@ SafeConvertion(
     ss << "Provided option value is out of bound. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }
-}
-
-// There must be specialization for the types to be parsed into so that
-// the argument is properly validated and parsed. Attempted to use input
-// operator (>>) but it will consume improper argument without error
-// (i.e. parse "1.4" to 'int' will return 1 but we want to report error).
-template <typename T>
-T ParseOption(const std::string& arg, const std::string& opt_name = "");
-
-template <>
-int
-ParseOption(const std::string& arg, const std::string& opt_name)
-{
-  auto stoi_ = std::bind(
-      static_cast<int (*)(const std::string&, std::size_t*, int)>(&std::stoi),
-      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
-  return SafeConvertion<int>(arg, stoi_, opt_name);
-}
-
-template <>
-uint64_t
-ParseOption(const std::string& arg, const std::string& opt_name)
-{
-  auto stoull_ = std::bind(
-      static_cast<unsigned long long (*)(
-          const std::string&, std::size_t*, int)>(&std::stoull),
-      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
-  return SafeConvertion<uint64_t>(arg, stoull_, opt_name);
-}
-
-template <>
-int64_t
-ParseOption(const std::string& arg, const std::string& opt_name)
-{
-  auto stoll_ = std::bind(
-      static_cast<long long (*)(const std::string&, std::size_t*, int)>(
-          &std::stoll),
-      std::placeholders::_1, nullptr /*pos*/, 10 /*base*/);
-  return SafeConvertion<int64_t>(arg, stoll_, opt_name);
-}
-
-template <>
-double
-ParseOption(const std::string& arg, const std::string& opt_name)
-{
-  auto stod_ = std::bind(
-      static_cast<double (*)(const std::string&, std::size_t*)>(&std::stod),
-      std::placeholders::_1, nullptr /*pos*/);
-  return SafeConvertion<double>(arg, stod_, opt_name);
 }
 
 template <>
