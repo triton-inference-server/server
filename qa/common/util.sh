@@ -473,3 +473,28 @@ function kill_servers () {
 function collect_artifacts_from_subdir () {
     cp *.*log* core* ../ || true
 }
+
+# Sort an array
+# Call with sort_array <array_name>
+# Example: remove_array_outliers array
+sort_array() {
+    local -n arr=$1
+    IFS=$'\n' sorted_arr=($(sort -n <<<"${arr[*]}"))
+    unset IFS
+    arr=("${sorted_arr[@]:$start_index:$end_index}")
+}
+
+# Remove an array's outliers
+# Call with remove_array_outliers <array_name> <percent to trim from both sides>
+# Example: remove_array_outliers array 5
+remove_array_outliers() {
+    local -n arr=$1
+    local percent=$2
+
+    local length=${#arr[@]}
+    local trim_count=$((length * percent / 100))
+    local start_index=$trim_count
+    local end_index=$((length - trim_count))
+
+    arr=("${arr[@]:$start_index:$end_index}")
+}
