@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import gc
 import os
 import sys
 import threading
@@ -450,7 +451,9 @@ class PBBLSTest(unittest.TestCase):
 
             if index > 1:
                 self.assertEqual(
-                    free_memory, recorded_memory, "GPU memory lifecycle test failed."
+                    free_memory,
+                    recorded_memory,
+                    "GPU memory lifecycle test failed at index: " + str(index),
                 )
 
             input0 = torch.ones([1, input_size], dtype=torch.float32).to("cuda")
@@ -482,6 +485,13 @@ class PBBLSTest(unittest.TestCase):
                 torch.all(output0_pytorch == input0),
                 f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model.",
             )
+
+            # We are seeing intermittent failures in the GPU memory lifecycle
+            # test where the free memory is not the same as the recorded memory.
+            # It is suspected that this is due to the Python garbage collector
+            # not releasing the memory immediately. Calling the garbage
+            # collector here as experiment to see if it fixes the issue.
+            collected = gc.collect()
 
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_decoupled=False):
         input0 = torch.rand(16)
