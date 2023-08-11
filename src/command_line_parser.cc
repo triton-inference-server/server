@@ -45,7 +45,7 @@ getopt_long(
     int argc, char* const argv[], const char* optstring,
     const struct option* longopts, int* longindex)
 {
-  if ((longindex != NULL) || (optind >= argc)) {
+  if (optind >= argc) {
     return -1;
   }
   const struct option* curr_longopt = longopts;
@@ -57,6 +57,7 @@ getopt_long(
     if (key == curr_longopt->name_) {
       if (curr_longopt->has_arg_ == required_argument) {
         if (found == std::string::npos) {
+          *longindex = optind - 1;
           optind++;
           if (optind >= argc) {
             std::cerr << argv[0] << ": option '" << argv_str
@@ -68,6 +69,7 @@ getopt_long(
           optarg = (argv[optind] + found + 1);
         }
       }
+      *longindex = optind - 1;
       optind++;
       return curr_longopt->val_;
     }
