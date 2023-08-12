@@ -1849,6 +1849,8 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    cat ./test_concurrent_same_model_load_unload_stress.statistics.log
 fi
 set -e
 
