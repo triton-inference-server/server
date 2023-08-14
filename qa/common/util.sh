@@ -479,9 +479,15 @@ function collect_artifacts_from_subdir () {
 # Example: remove_array_outliers array
 sort_array() {
     local -n arr=$1
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
     IFS=$'\n' sorted_arr=($(sort -n <<<"${arr[*]}"))
     unset IFS
-    arr=("${sorted_arr[@]:$start_index:$end_index}")
+    arr=("${sorted_arr[@]}")
 }
 
 # Remove an array's outliers
@@ -490,11 +496,15 @@ sort_array() {
 remove_array_outliers() {
     local -n arr=$1
     local percent=$2
-
     local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
     local trim_count=$((length * percent / 100))
     local start_index=$trim_count
-    local end_index=$((length - trim_count))
+    local end_index=$((length - (trim_count*2)))
 
     arr=("${arr[@]:$start_index:$end_index}")
 }
