@@ -2917,6 +2917,81 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
+    def test_concurrent_same_model_load_unload_stress(self):
+        model_name = "identity_zero_1_int32"
+        num_threads = 16
+        num_iterations = 1024
+        try:
+            triton_client = grpcclient.InferenceServerClient(
+                "localhost:8001", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        load_fail_reasons = [
+            "unexpected miss in global map",
+            "no version is available",
+            "failed to poll from model repository",
+        ]
+        unload_fail_reasons = ["versions that are still available: 1"]
+        load_fail_messages = [
+            ("failed to load '" + model_name + "', " + reason)
+            for reason in load_fail_reasons
+        ]
+        unload_fail_messages = [
+            ("failed to unload '" + model_name + "', " + reason)
+            for reason in unload_fail_reasons
+        ]
+        global_exception_stats = {}  # { "exception message": number of occurrence }
+        load_before_unload_finish = [False]  # use list to access by reference
+
+        def _load_unload():
+            exception_stats = {}  # { "exception message": number of occurrence }
+            for i in range(num_iterations):
+                try:
+                    triton_client.load_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for an unload to happen after a load completes, but
+                    # before the load can verify its load state.
+                    error_message = ex.message()
+                    self.assertIn(error_message, load_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                try:
+                    triton_client.unload_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for a load to happen during an async unload
+                    error_message = ex.message()
+                    self.assertIn(error_message, unload_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                    load_before_unload_finish[0] = True
+            return exception_stats
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            threads = []
+            for i in range(num_threads):
+                threads.append(pool.submit(_load_unload))
+            for t in threads:
+                exception_stats = t.result()
+                for key, count in exception_stats.items():
+                    if key not in global_exception_stats:
+                        global_exception_stats[key] = 0
+                    global_exception_stats[key] += count
+
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(
+            load_before_unload_finish[0],
+            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
+        )
+
+        stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
+        with open(stats_path, mode="w", encoding="utf-8") as f:
+            f.write(str(global_exception_stats) + "\n")
+
     def test_concurrent_model_instance_load_speedup(self):
         # Initialize client
         try:
