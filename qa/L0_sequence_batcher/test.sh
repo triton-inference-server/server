@@ -806,7 +806,7 @@ fi
 TEST_CASE=SequenceBatcherPreserveOrderingTest
 MODEL_PATH=preserve_ordering_models
 BASE_MODEL="../python_models/sequence_py"
-rm -r ${MODEL_PATH}
+rm -rf ${MODEL_PATH}
 
 # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
 # stream are done out of order in server, so decoupled tests are disabled.
