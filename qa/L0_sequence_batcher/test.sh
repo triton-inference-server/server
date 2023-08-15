@@ -90,12 +90,14 @@ TF_VERSION=${TF_VERSION:=2}
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
+WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER:TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    WINDOWS=1
 else
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -802,77 +804,80 @@ fi
 
 ### Start Preserve Ordering Tests ###
 
-# Test preserve ordering true/false and decoupled/non-decoupled
-TEST_CASE=SequenceBatcherPreserveOrderingTest
-MODEL_PATH=preserve_ordering_models
-BASE_MODEL="../python_models/sequence_py"
-rm -rf ${MODEL_PATH}
+# Test only supported on windows currently due to use of python backend models
+if [ ${WINDOWS} -ne 1 ]; then
+    # Test preserve ordering true/false and decoupled/non-decoupled
+    TEST_CASE=SequenceBatcherPreserveOrderingTest
+    MODEL_PATH=preserve_ordering_models
+    BASE_MODEL="../python_models/sequence_py"
+    rm -rf ${MODEL_PATH}
 
-# FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
-# stream are done out of order in server, so decoupled tests are disabled.
-MODES="decoupled nondecoupled"
-for mode in $MODES; do
-    NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
-    mkdir -p ${NO_PRESERVE}/1
-    cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
-    cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+    # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
+    # stream are done out of order in server, so decoupled tests are disabled.
+    MODES="decoupled nondecoupled"
+    for mode in $MODES; do
+        NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
+        mkdir -p ${NO_PRESERVE}/1
+        cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
+        cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
 
-    PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
-    cp -r ${NO_PRESERVE} ${PRESERVE}
-    sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+        PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
+        cp -r ${NO_PRESERVE} ${PRESERVE}
+        sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
 
-    if [ ${mode} == "decoupled" ]; then
-      echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
-      echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
+        if [ ${mode} == "decoupled" ]; then
+          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
+          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
+        fi
+    done
+
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else
+        run_server
     fi
-done
 
-SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-if [ "$TEST_VALGRIND" -eq 1 ]; then
-    LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-    LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-    run_server_leakcheck
-else
-    run_server
-fi
+    echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
 
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
-
-set +e
-python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
-    echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
-    RET=1
-else
-    # 2 for preserve_ordering = True/False
-    check_test_results $TEST_RESULT_FILE 2
+    set +e
+    python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
         RET=1
+    else
+        # 2 for preserve_ordering = True/False
+        check_test_results $TEST_RESULT_FILE 2
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
-set -e
+    set -e
 
-kill_server
+    kill_server
 
-set +e
-if [ "$TEST_VALGRIND" -eq 1 ]; then
-    python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-    if [ $? -ne 0 ]; then
-        RET=1
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
     fi
+    set -e
 fi
-set -e
 
 ### End Preserve Ordering Tests ###
 
