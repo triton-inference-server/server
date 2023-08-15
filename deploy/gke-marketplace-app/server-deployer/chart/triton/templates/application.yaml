@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,14 +41,14 @@ spec:
     type: Triton
     version: "{{ .Values.publishedVersion }}"
     description: |-
-      Triton Inference Server provides a cloud and edge inferencing solution 
-      optimized for both CPUs and GPUs. Triton supports an HTTP/REST and GRPC 
-      protocol that allows remote clients to request inferencing for any model 
+      Triton Inference Server provides a cloud and edge inferencing solution
+      optimized for both CPUs and GPUs. Triton supports an HTTP/REST and GRPC
+      protocol that allows remote clients to request inferencing for any model
       being managed by the server.
 
     notes: |-
 
-      Send request to Triton server by using IP address "ingress-triton", 
+      Send request to Triton server by using IP address "ingress-triton",
       send to IP:80/v2/models/{}/infer
 
       Links:

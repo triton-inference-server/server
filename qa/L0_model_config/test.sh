@@ -291,14 +291,14 @@ cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 
-# Run tests for logs which do not have a timestamp on them 
+# Run tests for logs which do not have a timestamp on them
 for TARGET in `ls cli_messages`; do
     case $TARGET in
         "cli_override")
             EXTRA_ARGS="--disable-auto-complete-config --strict-model-config=false" ;;
-        "cli_deprecation") 
+        "cli_deprecation")
             EXTRA_ARGS="--strict-model-config=true" ;;
-        *) 
+        *)
             EXTRA_ARGS="" ;;
     esac
 

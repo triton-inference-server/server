@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -229,6 +229,13 @@ for i in \
     fi
 done
 
+# Test with json input and output data
+$SIMPLE_STRING_INFER_CLIENT --json-input-data --json-output-data >> ${CLIENT_LOG}.c++.json 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.json
+    RET=1
+fi
+
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
 if [ $? -ne 0 ]; then
@@ -244,7 +251,7 @@ fi
 
 # Create a password file with username:password
 echo -n 'username:' > pswd
-echo "password" | openssl passwd -stdin -apr1 >> pswd  
+echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
 python3 $BASIC_AUTH_TEST
@@ -497,7 +504,7 @@ wait $SERVER_PID
 # Run cpp client unit test
 rm -rf unit_test_models && mkdir unit_test_models
 cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
-cp -r ${MODELDIR}/simple unit_test_models/. 
+cp -r ${MODELDIR}/simple unit_test_models/.
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
             --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"

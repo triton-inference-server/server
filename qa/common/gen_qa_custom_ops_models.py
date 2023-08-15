@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -37,9 +39,13 @@ def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
 
     # Create the model that uses custom operator.
     tf.compat.v1.reset_default_graph()
-    zin = tf.compat.v1.placeholder(tf.int32, [
-        None,
-    ], "to_zero")
+    zin = tf.compat.v1.placeholder(
+        tf.int32,
+        [
+            None,
+        ],
+        "to_zero",
+    )
     zout = zero_out(zin, name="zeroed")
 
     model_name = "savedmodel_zeroout" if create_savedmodel else "graphdef_zeroout"
@@ -55,30 +61,35 @@ def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
             input_name = "to_zero"
             output_name = "zeroed"
             input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                input_name + ":0")
+                input_name + ":0"
+            )
             output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                output_name + ":0")
+                output_name + ":0"
+            )
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.compat.v1.saved_model.simple_save(sess,
-                                                 model_version_dir +
-                                                 "/model.savedmodel",
-                                                 inputs=input_dict,
-                                                 outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(
+                sess,
+                model_version_dir + "/model.savedmodel",
+                inputs=input_dict,
+                outputs=output_dict,
+            )
     else:
         with tf.compat.v1.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(),
-                                 model_version_dir,
-                                 "model.graphdef",
-                                 as_text=False)
+            graph_io.write_graph(
+                sess.graph.as_graph_def(),
+                model_version_dir,
+                "model.graphdef",
+                as_text=False,
+            )
 
 
 def create_zeroout_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_zeroout" if create_savedmodel else "graphdef_zeroout"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "{}"
 max_batch_size: 0
@@ -96,9 +107,10 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(
+""".format(
         model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -116,9 +128,13 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
 
     # Create the model that uses custom operator.
     tf.compat.v1.reset_default_graph()
-    zin = tf.compat.v1.placeholder(tf.int32, [
-        None,
-    ], "in")
+    zin = tf.compat.v1.placeholder(
+        tf.int32,
+        [
+            None,
+        ],
+        "in",
+    )
     zout = add_one(zin, name="out")
 
     model_name = "savedmodel_cudaop" if create_savedmodel else "graphdef_cudaop"
@@ -134,30 +150,35 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
             input_name = "in"
             output_name = "out"
             input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                input_name + ":0")
+                input_name + ":0"
+            )
             output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                output_name + ":0")
+                output_name + ":0"
+            )
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.compat.v1.saved_model.simple_save(sess,
-                                                 model_version_dir +
-                                                 "/model.savedmodel",
-                                                 inputs=input_dict,
-                                                 outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(
+                sess,
+                model_version_dir + "/model.savedmodel",
+                inputs=input_dict,
+                outputs=output_dict,
+            )
     else:
         with tf.compat.v1.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(),
-                                 model_version_dir,
-                                 "model.graphdef",
-                                 as_text=False)
+            graph_io.write_graph(
+                sess.graph.as_graph_def(),
+                model_version_dir,
+                "model.graphdef",
+                as_text=False,
+            )
 
 
 def create_cudaop_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_cudaop" if create_savedmodel else "graphdef_cudaop"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "{}"
 max_batch_size: 0
@@ -175,9 +196,10 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(
+""".format(
         model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -195,9 +217,13 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
 
     # Create the model that uses custom operator.
     tf.compat.v1.reset_default_graph()
-    zin = tf.compat.v1.placeholder(tf.int32, [
-        None,
-    ], "in")
+    zin = tf.compat.v1.placeholder(
+        tf.int32,
+        [
+            None,
+        ],
+        "in",
+    )
     zout = busy_loop(zin, name="out")
 
     model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
@@ -213,30 +239,35 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
             input_name = "in"
             output_name = "out"
             input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                input_name + ":0")
+                input_name + ":0"
+            )
             output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                output_name + ":0")
+                output_name + ":0"
+            )
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.compat.v1.saved_model.simple_save(sess,
-                                                 model_version_dir +
-                                                 "/model.savedmodel",
-                                                 inputs=input_dict,
-                                                 outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(
+                sess,
+                model_version_dir + "/model.savedmodel",
+                inputs=input_dict,
+                outputs=output_dict,
+            )
     else:
         with tf.compat.v1.Session() as sess:
-            graph_io.write_graph(sess.graph.as_graph_def(),
-                                 model_version_dir,
-                                 "model.graphdef",
-                                 as_text=False)
+            graph_io.write_graph(
+                sess.graph.as_graph_def(),
+                model_version_dir,
+                "model.graphdef",
+                as_text=False,
+            )
 
 
 def create_busyop_modelconfig(create_savedmodel, models_dir, model_version):
     model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "{}"
 max_batch_size: 0
@@ -254,9 +285,10 @@ output [
     dims: [ -1 ]
   }}
 ]
-'''.format(
+""".format(
         model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -288,7 +320,6 @@ def create_moduloop_modelfile(models_dir, model_version):
     )
 
     class ModuloCustomNet(nn.Module):
-
         def __init__(self):
             super(ModuloCustomNet, self).__init__()
 
@@ -298,8 +329,7 @@ def create_moduloop_modelfile(models_dir, model_version):
     moduloCustomModel = ModuloCustomNet()
     example_input0 = torch.arange(1, 11, dtype=torch.float32)
     example_input1 = torch.tensor([2] * 10, dtype=torch.float32)
-    traced = torch.jit.trace(moduloCustomModel,
-                             (example_input0, example_input1))
+    traced = torch.jit.trace(moduloCustomModel, (example_input0, example_input1))
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -314,7 +344,7 @@ def create_moduloop_modelfile(models_dir, model_version):
 def create_moduloop_modelconfig(models_dir, model_version):
     model_name = "libtorch_modulo"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "pytorch_libtorch"
 max_batch_size: 0
@@ -337,7 +367,9 @@ output [
     dims: [ 10 ]
   }}
 ]
-'''.format(model_name)
+""".format(
+        model_name
+    )
 
     try:
         os.makedirs(config_dir)
@@ -353,20 +385,17 @@ def create_visionop_modelfile(models_dir, model_version):
     model_name = "libtorch_visionop"
 
     class CustomVisionNet(nn.Module):
-
         def __init__(self):
             super(CustomVisionNet, self).__init__()
 
         def forward(self, input, boxes):
-            return torchvision.ops.roi_align(input, boxes, [5, 5], 1.0, -1,
-                                             False)
+            return torchvision.ops.roi_align(input, boxes, [5, 5], 1.0, -1, False)
 
     visionCustomModel = CustomVisionNet()
     visionCustomModel.eval()
     scripted = torch.jit.script(visionCustomModel)
 
-    model_version_dir = models_dir + "/" + \
-        model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
         os.makedirs(model_version_dir)
@@ -379,7 +408,7 @@ def create_visionop_modelfile(models_dir, model_version):
 def create_visionop_modelconfig(models_dir, model_version):
     model_name = "libtorch_visionop"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "pytorch_libtorch"
 max_batch_size: 0
@@ -402,7 +431,9 @@ output [
     dims: [1, 3, 5, 5]
   }}
 ]
-'''.format(model_name)
+""".format(
+        model_name
+    )
 
     try:
         os.makedirs(config_dir)
@@ -465,55 +496,69 @@ def create_vision_op_models(models_dir):
         create_visionop_modelfile(models_dir, model_version)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir',
-                        type=str,
-                        required=True,
-                        help='Top-level model directory')
-    parser.add_argument('--zero_out_lib_path',
-                        type=str,
-                        required=False,
-                        default="./libzeroout.so",
-                        help='Fullpath to libzeroout.so')
-    parser.add_argument('--cuda_op_lib_path',
-                        type=str,
-                        required=False,
-                        default="./libcudaop.so",
-                        help='Fullpath to libcudaop.so')
-    parser.add_argument('--busy_op_lib_path',
-                        type=str,
-                        required=False,
-                        default="./libbusyop.so",
-                        help='Fullpath to libbusyop.so')
-    parser.add_argument('--graphdef',
-                        required=False,
-                        action='store_true',
-                        help='Generate GraphDef models')
-    parser.add_argument('--savedmodel',
-                        required=False,
-                        action='store_true',
-                        help='Generate SavedModel models')
-    parser.add_argument('--libtorch',
-                        required=False,
-                        action='store_true',
-                        help='Generate Pytorch LibTorch models')
+    parser.add_argument(
+        "--models_dir", type=str, required=True, help="Top-level model directory"
+    )
+    parser.add_argument(
+        "--zero_out_lib_path",
+        type=str,
+        required=False,
+        default="./libzeroout.so",
+        help="Fullpath to libzeroout.so",
+    )
+    parser.add_argument(
+        "--cuda_op_lib_path",
+        type=str,
+        required=False,
+        default="./libcudaop.so",
+        help="Fullpath to libcudaop.so",
+    )
+    parser.add_argument(
+        "--busy_op_lib_path",
+        type=str,
+        required=False,
+        default="./libbusyop.so",
+        help="Fullpath to libbusyop.so",
+    )
+    parser.add_argument(
+        "--graphdef",
+        required=False,
+        action="store_true",
+        help="Generate GraphDef models",
+    )
+    parser.add_argument(
+        "--savedmodel",
+        required=False,
+        action="store_true",
+        help="Generate SavedModel models",
+    )
+    parser.add_argument(
+        "--libtorch",
+        required=False,
+        action="store_true",
+        help="Generate Pytorch LibTorch models",
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         # Use Tensorflow 2 as default. Need to disable the v2 behavior for
         # model generation scripts.
         import tensorflow as tf
+
         tf.compat.v1.disable_eager_execution()
         from tensorflow.python.framework import graph_io
+
         create_zero_out_models(FLAGS.models_dir)
         create_cuda_op_models(FLAGS.models_dir)
         create_busy_op_models(FLAGS.models_dir)
 
     if FLAGS.libtorch:
         import torch
-        from torch import nn
-        import torchvision
         import torch.utils.cpp_extension
+        import torchvision
+        from torch import nn
+
         create_modulo_op_models(FLAGS.models_dir)
         create_vision_op_models(FLAGS.models_dir)

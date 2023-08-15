@@ -27,6 +27,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <unistd.h>
+
 #include <chrono>
 #include <cstring>
 #include <future>
@@ -35,6 +36,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
 #include "common.h"
 #include "triton/core/tritonserver.h"
 
@@ -836,7 +838,7 @@ main(int argc, char** argv)
       "assigning INPUT1 data");
 
   // Perform inference by calling TRITONSERVER_ServerInferAsync. This
-  // call is asychronous and therefore returns immediately. The
+  // call is asynchronous and therefore returns immediately. The
   // completion of the inference and delivery of the response is done
   // by triton by calling the "response complete" callback functions
   // (InferResponseComplete in this case).

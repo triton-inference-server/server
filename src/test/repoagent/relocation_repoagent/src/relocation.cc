@@ -24,14 +24,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "triton/core/tritonrepoagent.h"
-#include "triton/core/tritonserver.h"
-
 #include <cctype>
 #include <cstring>
 #include <iomanip>
 #include <stdexcept>
 #include <string>
+
+#include "triton/core/tritonrepoagent.h"
+#include "triton/core/tritonserver.h"
 
 //
 // Relocation Repository Agent that is for test only.

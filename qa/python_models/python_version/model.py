@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
+import locale
 import os
+import sys
+
+import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
-        input = {'name': 'INPUT', 'data_type': 'TYPE_FP32', 'dims': [1]}
-        output = {'name': 'OUTPUT', 'data_type': 'TYPE_FP32', 'dims': [1]}
+        input = {"name": "INPUT", "data_type": "TYPE_FP32", "dims": [1]}
+        output = {"name": "OUTPUT", "data_type": "TYPE_FP32", "dims": [1]}
 
         auto_complete_model_config.set_max_batch_size(0)
         auto_complete_model_config.add_input(input)
@@ -45,19 +46,21 @@ class TritonPythonModel:
 
     def initialize(self, args):
         import tensorflow
-        self.model_config = args['model_config']
+
+        self.model_config = args["model_config"]
         # This is to make sure that /bin/bash is not picking up
         # the wrong shared libraries after installing Tensorflow.
         # Tensorflow uses a shared library which is common with
         # bash.
-        os.system('/bin/bash --help')
+        os.system("/bin/bash --help")
         print(
-            f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}',
-            flush=True)
+            f"Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}",
+            flush=True,
+        )
+        print(f"Locale is {locale.getlocale()}", flush=True)
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
+        """This function is called on inference request."""
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")

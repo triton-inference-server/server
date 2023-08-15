@@ -66,7 +66,7 @@ POSITIVE_TEST_ARGS=("--backend-config=tensorflow,default-max-batch-size=5 $COMMO
                     "--backend-config=default-max-batch-size=7 --backend-config=tensorflow,default-max-batch-size=8 $COMMON_ARGS" \
 )
 
-# These integers correspond to the expected default-max-batch-size which gets set 
+# These integers correspond to the expected default-max-batch-size which gets set
 # in the POSITIVE_TEST_ARGS
 POSITIVE_TEST_ANSWERS=(5 6 8)
 
@@ -86,12 +86,12 @@ else
 
     RESULT_LOG_LINE=$(grep -a "Adding default backend config setting:" $SERVER_LOG)
     if [ "$RESULT_LOG_LINE" != "" ]; then
-        
+
         # Pick out the logged value of the default-max-batch-size which gets passed into model creation
         RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(awk -v line="$RESULT_LOG_LINE" 'BEGIN {split(line, a, "]"); split(a[2], b, ": "); split(b[2], c, ","); print c[2]}')
 
         if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "4" ]; then
-            echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: default-max-batch-size,4, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n" 
+            echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: default-max-batch-size,4, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n"
             RET=1
         fi
     else
@@ -104,7 +104,7 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
     SERVER_ARGS=${POSITIVE_TEST_ARGS[$i]}
     SERVER_LOG=$SERVER_LOG_BASE.backend_config_positive_$i.log
     run_server
-    
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "*** FAILED: Server failed to start $SERVER\n"
         RET=1
@@ -115,12 +115,12 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
 
         RESULT_LOG_LINE=$(grep -a "Found overwritten default setting:" $SERVER_LOG)
         if [ "$RESULT_LOG_LINE" != "" ]; then
-            
+
             # Pick out the logged value of the default-max-batch-size which gets passed into model creation
             RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(awk -v line="$RESULT_LOG_LINE" 'BEGIN {split(line, a, "]"); split(a[2], b, ": "); split(b[2], c, ","); print c[2]}')
 
             if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "${POSITIVE_TEST_ANSWERS[$i]}" ]; then
-                echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: ${POSITIVE_TEST_ANSWERS[$i]}, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n" 
+                echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: ${POSITIVE_TEST_ANSWERS[$i]}, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n"
                 RET=1
             fi
         else
@@ -152,11 +152,11 @@ done
 
 
 #
-# Sepcific backend tests
-# 
+# Specific backend tests
+#
 
-# While inference server is running, save the 
-# config of the 'no_config' model to the TRIAL 
+# While inference server is running, save the
+# config of the 'no_config' model to the TRIAL
 # file.
 function save_model_config() {
     CODE=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/no_config/config`
@@ -192,13 +192,13 @@ else
         RET=1
     fi
 
-    # Assert we are also turning on the dynamic_batcher    
+    # Assert we are also turning on the dynamic_batcher
     DYNAMIC_BATCHING_LOG_LINE=$(grep -a "Starting dynamic-batcher thread" $SERVER_LOG)
     if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
         RET=1
     fi
-    
+
     kill $SERVER_PID
     wait $SERVER_PID
 
@@ -225,7 +225,7 @@ else
         RET=1
     fi
 
-    # Assert batching disabled    
+    # Assert batching disabled
     if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
         echo "*** FAILED: Found dynamic batching enabled in configuration when none expected.\n"
         RET=1
@@ -252,7 +252,7 @@ if [ "$SERVER_PID" == "0" ]; then
 
 else
     save_model_config
-    
+
     # Assert the max-batch-size is the command line value
     MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
@@ -260,13 +260,13 @@ else
         RET=1
     fi
 
-    # Assert we are also turning on the dynamic_batcher    
+    # Assert we are also turning on the dynamic_batcher
     DYNAMIC_BATCHING_LOG_LINE=$(grep -a "Starting dynamic-batcher thread" $SERVER_LOG)
     if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
         RET=1
     fi
-    
+
     kill $SERVER_PID
     wait $SERVER_PID
 fi
@@ -296,7 +296,7 @@ else
         RET=1
     fi
 
-    # Assert batching disabled    
+    # Assert batching disabled
     if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
         echo "*** FAILED: Found dynamic batching in configuration when none expected.\n"
         RET=1
@@ -309,17 +309,17 @@ fi
 
 #
 # General backend tests
-# 
+#
 
-# We want to make sure that backend configurations 
+# We want to make sure that backend configurations
 # are not lost. For this purpose we are using only onnx backend
 
 rm -rf ./models/
 mkdir -p ./models/no_config/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
 
-# First getting a baseline for the number of default configs 
-# added during a server set up 
+# First getting a baseline for the number of default configs
+# added during a server set up
 SERVER_ARGS="$COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.default_configs.log
 run_server
@@ -345,11 +345,11 @@ fi
 # Now make sure that when setting specific backend configs
 # default ones are not lost.
 # Current logic for backend config resolution reads default configs first,
-# then specific configs and overrides defaults if needed. 
-# We would like to make sure that none of configs are lost and 
-# defaults are properly overriden.
+# then specific configs and overrides defaults if needed.
+# We would like to make sure that none of configs are lost and
+# defaults are properly overridden.
 # One of defaultconfigs is `min-compute-capability`. This test
-# checks if it is properlly overriden.
+# checks if it is properlly overridden.
 MIN_COMPUTE_CAPABILITY=XX
 SERVER_ARGS="--backend-config=onnxruntime,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.global_configs.log

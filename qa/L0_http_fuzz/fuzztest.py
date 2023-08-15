@@ -1,4 +1,6 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,28 +30,29 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-import test_util as tu
-import sqlite3
-from boofuzz import *
 import glob
 import os
+import sqlite3
+import unittest
+
+import test_util as tu
+from boofuzz import *
 
 
 class FuzzTest(tu.TestResultCollector):
-
     def _run_fuzz(self, url, logger):
         session = Session(
             target=Target(connection=TCPSocketConnection("127.0.0.1", 8000)),
             fuzz_loggers=logger,
-            keep_web_open=False)
+            keep_web_open=False,
+        )
 
         s_initialize(name="Request" + url)
         with s_block("Request-Line"):
-            s_group("Method", [
-                "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS",
-                "TRACE"
-            ])
+            s_group(
+                "Method",
+                ["GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE"],
+            )
             s_delim(" ", name="space-1")
             s_string(url, name="Request-URI")
             s_delim(" ", name="space-2")
@@ -62,28 +65,36 @@ class FuzzTest(tu.TestResultCollector):
 
     def test_failures_from_db(self):
         url_list = [
-            "/v2", "/v2/models/simple", "/v2/models/simple/infer",
-            "/v2/models/simple/versions/v1", "/v2/models/simple/config",
-            "/v2/models/simple/stats", "/v2/models/simple/ready",
-            "/v2/health/ready", "/v2/health/live", "/v2/repository/index",
+            "/v2",
+            "/v2/models/simple",
+            "/v2/models/simple/infer",
+            "/v2/models/simple/versions/v1",
+            "/v2/models/simple/config",
+            "/v2/models/simple/stats",
+            "/v2/models/simple/ready",
+            "/v2/health/ready",
+            "/v2/health/live",
+            "/v2/repository/index",
             "/v2/repository/models/simple/unload",
             "/v2/repository/models/simple/load",
-            "/v2/systemsharedmemory/status", "/v2/systemsharedmemory/register",
+            "/v2/systemsharedmemory/status",
+            "/v2/systemsharedmemory/register",
             "/v2/systemsharedmemory/unregister",
             "/v2/systemsharedmemory/region/xx/status",
-            "/v2/cudasharedmemory/status", "/v2/cudasharedmemory/register",
+            "/v2/cudasharedmemory/status",
+            "/v2/cudasharedmemory/register",
             "/v2/cudasharedmemory/unregister",
-            "/v2/cudasharedmemory/region/xx/status"
+            "/v2/cudasharedmemory/region/xx/status",
         ]
 
-        csv_log = open('fuzz_results.csv', 'w')
+        csv_log = open("fuzz_results.csv", "w")
         logger = [FuzzLoggerCsv(file_handle=csv_log)]
 
         for url in url_list:
             self._run_fuzz(url, logger)
 
             # Get latest db file
-            files = glob.glob('boofuzz-results/*')
+            files = glob.glob("boofuzz-results/*")
             dbfile = max(files, key=os.path.getctime)
 
             conn = sqlite3.connect(dbfile)
@@ -91,10 +102,8 @@ class FuzzTest(tu.TestResultCollector):
 
             # Get number of failures, should be 0
             self.assertEqual(
-                len([
-                    x for x in c.execute(
-                        "SELECT * FROM steps WHERE type=\"fail\"")
-                ]), 0)
+                len([x for x in c.execute('SELECT * FROM steps WHERE type="fail"')]), 0
+            )
 
 
 if __name__ == "__main__":

@@ -144,7 +144,7 @@ apt update && apt install -y gpg wget && \
       echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
       tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
       apt-get update && \
-      apt-get install -y --no-install-recommends cmake cmake-data 
+      apt-get install -y --no-install-recommends cmake cmake-data
 ```
 
 ### Runtime Dependencies for Triton
@@ -178,7 +178,7 @@ pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools numpy attrdict pillow
 ```
 
-The PyTorch runtime depenencies are the same as the build dependencies listed above.
+The PyTorch runtime dependencies are the same as the build dependencies listed above.
 
 ### Usage
 
@@ -191,8 +191,8 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
-`--backend-directory` flag. Starting from 23.05, Triton no longer supports
-TensorFlow 1.x. If you'd like to use TensorFlow 1.x with Triton prior to 23.05,
+`--backend-directory` flag. Starting from 23.04, Triton no longer supports
+TensorFlow 1.x. If you'd like to use TensorFlow 1.x with Triton prior to 23.04,
 a version string is required to use TensorFlow 1.x.
 
 ```

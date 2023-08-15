@@ -63,7 +63,7 @@ if [ "$ARCH" == "aarch64" ]; then
     fi
 fi
 
-# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Server will be run in-process with C API

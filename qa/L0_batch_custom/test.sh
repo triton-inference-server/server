@@ -125,7 +125,7 @@ for i in "${!test_setups[@]}"; do
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
-        exit 1  
+        exit 1
     fi
     if [ `grep -c "Loading custom batching strategy" $SERVER_LOG` != "1" ]; then
         cat $SERVER_LOG
@@ -157,7 +157,7 @@ done
 FILE_PATH="backend/examples/batching_strategies/volume_batching/src/volume_batching.cc"
 OLD_STRING="\/\/ Batcher will point to an unsigned integer representing the maximum"
 NEW_STRING="return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_NOT_FOUND,\"Failure test case\");"
- 
+
 sed -i "s/${OLD_STRING}/${NEW_STRING}/g" ${FILE_PATH}
 
 (cd backend/examples/batching_strategies/volume_batching &&

@@ -24,14 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 import unittest
-import triton_python_backend_utils as pb_utils
+
+import numpy as np
 import requests
+import triton_python_backend_utils as pb_utils
 
 
 class PBCustomMetricsTest(unittest.TestCase):
-
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
         r = requests.get(metrics_url)
@@ -54,7 +54,7 @@ class PBCustomMetricsTest(unittest.TestCase):
 
         # Test increment negative value
         decrement = -23.5
-        if kind == 'counter':
+        if kind == "counter":
             # Counter should not accept negative values
             with self.assertRaises(pb_utils.TritonModelException):
                 metric.increment(decrement)
@@ -65,7 +65,7 @@ class PBCustomMetricsTest(unittest.TestCase):
 
         # Test set value
         value = 999.9
-        if kind == 'counter':
+        if kind == "counter":
             # Counter does not support set
             with self.assertRaises(pb_utils.TritonModelException):
                 metric.set(value)
@@ -83,7 +83,8 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family = pb_utils.MetricFamily(
             name="test_dup_metric",
             description=description,
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
 
         # Verify dupe metrics reference same underlying metric
         metric1 = metric_family.Metric(labels=labels)
@@ -109,12 +110,15 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family = pb_utils.MetricFamily(
             name="test_counter_e2e",
             description="test metric counter kind end to end",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
         labels = {"example1": "counter_label1", "example2": "counter_label2"}
         metric = metric_family.Metric(labels=labels)
-        self._metric_api_helper(metric, 'counter')
+        self._metric_api_helper(metric, "counter")
 
-        pattern = 'test_counter_e2e{example1="counter_label1",example2="counter_label2"}'
+        pattern = (
+            'test_counter_e2e{example1="counter_label1",example2="counter_label2"}'
+        )
         metrics = self._get_metrics()
         self.assertIn(pattern, metrics)
 
@@ -122,10 +126,11 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family = pb_utils.MetricFamily(
             name="test_gauge_e2e",
             description="test metric gauge kind end to end",
-            kind=pb_utils.MetricFamily.GAUGE)
+            kind=pb_utils.MetricFamily.GAUGE,
+        )
         labels = {"example1": "counter_label1", "example2": "counter_label2"}
         metric = metric_family.Metric(labels=labels)
-        self._metric_api_helper(metric, 'gauge')
+        self._metric_api_helper(metric, "gauge")
 
         pattern = 'test_gauge_e2e{example1="counter_label1",example2="counter_label2"}'
         metrics = self._get_metrics()
@@ -136,13 +141,14 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family1 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_kind",
             description="test metric family with same name but different kind",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
         with self.assertRaises(pb_utils.TritonModelException):
             metric_family2 = pb_utils.MetricFamily(
                 name="test_dup_metric_family_diff_kind",
-                description=
-                "test metric family with same name but different kind",
-                kind=pb_utils.MetricFamily.GAUGE)
+                description="test metric family with same name but different kind",
+                kind=pb_utils.MetricFamily.GAUGE,
+            )
             self.assertIsNone(metric_family2)
 
         self.assertIsNotNone(metric_family1)
@@ -153,24 +159,26 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family1 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_description",
             description="first description",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
         metric_family2 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_description",
             description="second description",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
 
         metric2 = metric_family2.Metric()
         self.assertEqual(metric2.value(), 0)
 
         # Delete metric_family1 and check if metric_family2 still references it
         del metric_family1
-        pattern = 'test_dup_metric_family_diff_description first description'
+        pattern = "test_dup_metric_family_diff_description first description"
         metrics = self._get_metrics()
         self.assertIn(pattern, metrics)
 
         # The first description will be kept if adding a duplicate metric
         # family name with a different description
-        pattern = 'test_dup_metric_family_diff_description second description'
+        pattern = "test_dup_metric_family_diff_description second description"
         self.assertNotIn(pattern, metrics)
 
     def test_dup_metric_family(self):
@@ -179,11 +187,13 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family1 = pb_utils.MetricFamily(
             name="test_dup_metric_family",
             description="dup description",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
         metric_family2 = pb_utils.MetricFamily(
             name="test_dup_metric_family",
             description="dup description",
-            kind=pb_utils.MetricFamily.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
 
         metric_key = "custom_metric_key"
         metric1 = metric_family1.Metric(labels={metric_key: "label1"})
@@ -193,10 +203,10 @@ class PBCustomMetricsTest(unittest.TestCase):
         self.assertEqual(metric2.value(), 0)
 
         patterns = [
-            '# HELP test_dup_metric_family dup description',
-            '# TYPE test_dup_metric_family counter',
+            "# HELP test_dup_metric_family dup description",
+            "# TYPE test_dup_metric_family counter",
             'test_dup_metric_family{custom_metric_key="label2"} 0',
-            'test_dup_metric_family{custom_metric_key="label1"} 0'
+            'test_dup_metric_family{custom_metric_key="label1"} 0',
         ]
         metrics = self._get_metrics()
         for pattern in patterns:
@@ -213,19 +223,56 @@ class PBCustomMetricsTest(unittest.TestCase):
         # underlying metric, and all instances will be updated
         self._dup_metric_helper()
 
+    def test_metric_lifetime_error(self):
+        # Test the error handling when the corresponding 'MetricFamily' is
+        # deleted before the 'Metric' is deleted, and the 'Metric' is still
+        # being used for metric operations
+        kinds = [pb_utils.MetricFamily.COUNTER, pb_utils.MetricFamily.GAUGE]
+        metric_family_names = [
+            "test_metric_lifetime_error_counter",
+            "test_metric_lifetime_error_gauge",
+        ]
+        for kind, name in zip(kinds, metric_family_names):
+            metric_family = pb_utils.MetricFamily(
+                name=name, description="test metric lifetime error", kind=kind
+            )
+            labels = {"example1": "counter_label1", "example2": "counter_label2"}
+            metric = metric_family.Metric(labels=labels)
+
+            # Intentionally delete the 'MetricFamily' before the 'Metric' being deleted
+            del metric_family
+
+            error_msg = "Invalid metric operation as the corresponding 'MetricFamily' has been deleted."
+
+            # Counter does not support set
+            if kind is not pb_utils.MetricFamily.COUNTER:
+                with self.assertRaises(pb_utils.TritonModelException) as ex:
+                    metric.set(10)
+                self.assertIn(error_msg, str(ex.exception))
+
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.increment(10)
+            self.assertIn(error_msg, str(ex.exception))
+
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.value()
+            self.assertIn(error_msg, str(ex.exception))
+
 
 class TritonPythonModel:
-
     def execute(self, requests):
         responses = []
         for _ in requests:
             # Run the unittest and store the results in InferenceResponse.
-            test = unittest.main('model', exit=False)
+            test = unittest.main("model", exit=False)
             responses.append(
-                pb_utils.InferenceResponse([
-                    pb_utils.Tensor(
-                        'OUTPUT0',
-                        np.array([test.result.wasSuccessful()],
-                                 dtype=np.float16))
-                ]))
+                pb_utils.InferenceResponse(
+                    [
+                        pb_utils.Tensor(
+                            "OUTPUT0",
+                            np.array([test.result.wasSuccessful()], dtype=np.float16),
+                        )
+                    ]
+                )
+            )
         return responses

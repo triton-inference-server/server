@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,76 +30,95 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-import numpy as np
 import os
-import test_util as tu
+import unittest
 
+import numpy as np
+import test_util as tu
 import tritonclient.http as httpclient
 
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
-_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class PluginModelTest(tu.TestResultCollector):
-
     def _full_exact(self, model_name, plugin_name, shape):
         print(f"{_tritonserver_ipaddr}:8000")
-        triton_client = httpclient.InferenceServerClient(
-            f"{_tritonserver_ipaddr}:8000")
+        triton_client = httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000")
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT0', list(shape), "FP32"))
+        inputs.append(httpclient.InferInput("INPUT0", list(shape), "FP32"))
 
         input0_data = np.ones(shape=shape).astype(np.float32)
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)
 
-        outputs.append(
-            httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+        outputs.append(httpclient.InferRequestedOutput("OUTPUT0", binary_data=True))
 
-        results = triton_client.infer(model_name + '_' + plugin_name,
-                                      inputs,
-                                      outputs=outputs)
+        results = triton_client.infer(
+            model_name + "_" + plugin_name, inputs, outputs=outputs
+        )
 
-        output0_data = results.as_numpy('OUTPUT0')
+        output0_data = results.as_numpy("OUTPUT0")
+        tolerance_relative = 1e-6
+        tolerance_absolute = 1e-7
 
         # Verify values of Clip, GELU, and Normalize
-        if plugin_name == 'CustomClipPlugin':
+        if plugin_name == "CustomClipPlugin":
             # Clip data to minimum of .1, maximum of .5
             test_output = np.clip(input0_data, 0.1, 0.5)
-            self.assertTrue(np.isclose(output0_data, test_output).all())
-        elif plugin_name == 'CustomGeluPluginDynamic':
+            np.testing.assert_allclose(
+                output0_data,
+                test_output,
+                rtol=tolerance_relative,
+                atol=tolerance_absolute,
+            )
+        elif plugin_name == "CustomGeluPluginDynamic":
             # Add bias
             input0_data += 1
             # Calculate Gelu activation
-            test_output = (input0_data *
-                           0.5) * (1 + np.tanh((0.797885 * input0_data) +
-                                               (0.035677 * (input0_data**3))))
-            self.assertTrue(np.isclose(output0_data, test_output).all())
-        elif plugin_name == 'Normalize_TRT':
+            test_output = (input0_data * 0.5) * (
+                1 + np.tanh((0.797885 * input0_data) + (0.035677 * (input0_data**3)))
+            )
+            np.testing.assert_allclose(
+                output0_data,
+                test_output,
+                rtol=tolerance_relative,
+                atol=tolerance_absolute,
+            )
+        elif plugin_name == "Normalize_TRT":
             # L2 norm is sqrt(sum([1]*16)))
             test_output = input0_data / np.sqrt(sum([1] * 16))
-            self.assertTrue(np.isclose(output0_data, test_output).all())
+            np.testing.assert_allclose(
+                output0_data,
+                test_output,
+                rtol=tolerance_relative,
+                atol=tolerance_absolute,
+            )
         else:
-            self.assertTrue(False, "Unexpected plugin: " + plugin_name)
+            self.fail("Unexpected plugin: " + plugin_name)
 
     def test_raw_fff_clip(self):
         for bs in (1, 8):
-            self._full_exact('plan_float32_float32_float32', 'CustomClipPlugin',
-                             (bs, 16))
+            self._full_exact(
+                "plan_float32_float32_float32", "CustomClipPlugin", (bs, 16)
+            )
 
     def test_raw_fff_gelu(self):
-        self._full_exact('plan_nobatch_float32_float32_float32',
-                         'CustomGeluPluginDynamic', (16, 1, 1))
+        self._full_exact(
+            "plan_nobatch_float32_float32_float32",
+            "CustomGeluPluginDynamic",
+            (16, 1, 1),
+        )
 
     def test_raw_fff_norm(self):
         # model that supports batching
         for bs in (1, 8):
-            self._full_exact('plan_float32_float32_float32', 'Normalize_TRT',
-                             (bs, 16, 16, 16))
+            self._full_exact(
+                "plan_float32_float32_float32", "Normalize_TRT", (bs, 16, 16, 16)
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

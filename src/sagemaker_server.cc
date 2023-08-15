@@ -904,7 +904,8 @@ SagemakerAPIServer::SageMakerMMECheckOOMError(TRITONSERVER_Error* err)
       "CUBLAS_STATUS_ALLOC_FAILED",
       "CUBLAS_STATUS_NOT_INITIALIZED",
       "Failed to allocate memory",
-      "failed to allocate memory"};
+      "failed to allocate memory",
+      "No space left on device"};
 
   /*
     TODO: Improve the search to do pattern match on whole words only

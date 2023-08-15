@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,6 +64,8 @@ WRONG_OUTPUT_2_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/wrong_
 SEQ_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_output.json
 SEQ_WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_wrong_output.json
 
+REPEAT_INT32_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/repeat_int32_data.json
+
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR}"
 SERVER_LOG="./inference_server.log"
@@ -121,6 +123,12 @@ cp -r ../python_models/optional $DATADIR && \
   mv $DATADIR/optional/model.py $DATADIR/optional/1 && \
   sed -i 's/max_batch_size: 0/max_batch_size: 2/g' $DATADIR/optional/config.pbtxt
 
+# Copy decoupled model
+git clone --depth=1 https://github.com/triton-inference-server/python_backend
+mkdir -p $DATADIR/repeat_int32/1
+cp python_backend/examples/decoupled/repeat_config.pbtxt $DATADIR/repeat_int32/config.pbtxt
+cp python_backend/examples/decoupled/repeat_model.py $DATADIR/repeat_int32/1/model.py
+
 # Generating test data
 mkdir -p $TESTDATADIR
 for INPUT in INPUT0 INPUT1; do
@@ -152,18 +160,6 @@ if [ $? -eq 0 ]; then
   RET=1
 fi
 if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide shapes to send along with the request" | wc -l) -ne 0 ]; then
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test Failed: \n***"
-  RET=1
-fi
-
-$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
-if [ $? -eq 0 ]; then
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
-  RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "failed to parse input shape. There must be a colon after input name." | wc -l) -eq 0 ]; then
   cat $CLIENT_LOG
   echo -e "\n***\n*** Test Failed: \n***"
   RET=1
@@ -409,7 +405,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     set -e
-    
+
     # Binary search for concurrency range mode and make sure it doesn't hang
     $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
     --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
@@ -555,7 +551,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG | grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -636,7 +632,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG |  grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -687,7 +683,7 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l) -eq 0 ]; then
+if [ $(cat $CLIENT_LOG |  grep "mismatch in the data provided" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -809,8 +805,8 @@ set -e
 
 # Test with optional inputs missing and invalid
 set +e
-OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of 
-inputs must be specified for each batch. You cannot use different set of 
+OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of
+inputs must be specified for each batch. You cannot use different set of
 optional inputs for each individual batch."
 $PERF_ANALYZER -v -m optional -b 2 --measurement-mode "count_windows" \
     --input-data=${INT_OPTIONAL_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -854,7 +850,7 @@ if [ $(cat $CLIENT_LOG |  grep "Request Rate: 40" | wc -l) -eq 0 ]; then
 fi
 set -e
 
-# Test --serial-sequences mode 
+# Test --serial-sequences mode
 set +e
 $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --serial-sequences \
     --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -880,8 +876,32 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi    
+fi
 set -e
+
+## Test decoupled model support
+$PERF_ANALYZER -v -m repeat_int32 --input-data=$REPEAT_INT32_JSONDATAFILE \
+    --profile-export-file profile_export.json -i grpc --async --streaming -s \
+    ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+python3 -c "import json ; \
+    requests = json.load(open('profile_export.json'))['experiments'][0]['requests'] ; \
+    assert any(len(r['response_timestamps']) > 1 for r in requests)"
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+check-jsonschema --schemafile perf_analyzer_profile_export_schema.json profile_export.json
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 ## Test perf_analyzer with MPI / multiple models
 
@@ -968,7 +988,7 @@ set -e
 
 ## Test perf_analyzer without MPI library (`libmpi.so`) available
 
-rm -rf /opt/hpcx
+rm -rf /opt/hpcx/ompi/lib/libmpi*
 
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1

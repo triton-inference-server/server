@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,16 +30,16 @@ import sys
 
 sys.path.append("../../common")
 
-import test_util as tu
-import shm_util
+import os
 import unittest
+
+import shm_util
+import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
-import os
 
 
 class PythonUnittest(tu.TestResultCollector):
-
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
@@ -45,15 +47,15 @@ class PythonUnittest(tu.TestResultCollector):
         with grpcclient.InferenceServerClient("localhost:8001") as client:
             # No input is required
             result = client.infer(model_name, [], client_timeout=240)
-            output0 = result.as_numpy('OUTPUT0')
+            output0 = result.as_numpy("OUTPUT0")
 
-            # The model returns 1 if the tests were sucessfully passed.
+            # The model returns 1 if the tests were successfully passed.
             # Otherwise, it will return 0.
             self.assertEqual(output0, [1])
 
     def test_python_unittest(self):
-        model_name = os.environ['MODEL_NAME']
-        bls_kind =  os.environ.get('BLS_KIND', 'non_decoupled')
+        model_name = os.environ["MODEL_NAME"]
+        bls_kind = os.environ.get("BLS_KIND", "non_decoupled")
 
         if bls_kind == "decoupled":
             # Skip the shared memory probe for decoupled models for now as
@@ -62,7 +64,11 @@ class PythonUnittest(tu.TestResultCollector):
             # is bounded.
             self._run_unittest(model_name)
         else:
-            if model_name == 'bls' or model_name == 'bls_memory' or model_name == 'bls_memory_async':
+            if (
+                model_name == "bls"
+                or model_name == "bls_memory"
+                or model_name == "bls_memory_async"
+            ):
                 # For these tests, the memory region size will be grown. Because of
                 # this we need to use the shared memory probe only on the later
                 # call so that the probe can detect the leak correctly.
@@ -77,5 +83,5 @@ class PythonUnittest(tu.TestResultCollector):
                     self._run_unittest(model_name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -152,8 +152,10 @@ else
     RET=1
 fi
 
-# Check wheels
-WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
+# Check wheels, note that even TRITON_VERSION is passed as version field for
+# wheel generation. The version number will be normalized by setuptools, so
+# we need to replace the text here as well to match the normalized version.
+WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev\./\.dev/'`
 if [[ "aarch64" != $(uname -m) ]] ; then
     WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
           tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"

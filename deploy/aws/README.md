@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,10 +39,10 @@ This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resourses to support these services. 
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
-must be configured to contain the desired number of GPU nodes (EC2 G4 instances recommended) 
+must be configured to contain the desired number of GPU nodes (EC2 G4 instances recommended)
 with support for the NVIDIA driver and CUDA version required by the version
 of the inference server you are using.
 
@@ -67,7 +67,7 @@ please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migr
 
 > **NOTE**: Moving forward this chart will only be tested and maintained for Helm v3.
 
-Below are example instructions for installing Helm v2. 
+Below are example instructions for installing Helm v2.
 
 ```
 $ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get | bash

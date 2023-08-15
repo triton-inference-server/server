@@ -570,7 +570,7 @@ else
 fi
 
 
-# check deprecation warnings 
+# check deprecation warnings
 SERVER_ARGS=" --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS \
               --trace-log-frequency=50 --trace-count=100 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config_flag.log"

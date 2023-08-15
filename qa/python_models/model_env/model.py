@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,17 +25,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         # Make sure that environment variables are correctly propagated
         # to the Python models
-        if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != 'MY_ENV':
+        if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != "MY_ENV":
             raise pb_utils.TritonModelException(
-                "MY_ENV doesn't exists or contains incorrect value")
+                "MY_ENV doesn't exists or contains incorrect value"
+            )
 
     def execute(self, requests):
         pass

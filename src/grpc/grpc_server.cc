@@ -28,6 +28,7 @@
 
 #include <google/protobuf/arena.h>
 #include <grpc++/alarm.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -38,6 +39,7 @@
 #include <queue>
 #include <sstream>
 #include <thread>
+
 #include "../classification.h"
 #include "../common.h"
 #include "grpc++/grpc++.h"
@@ -301,8 +303,8 @@ class CommonHandler : public HandlerBase {
   static std::pair<std::string, std::string> empty_restricted_key_;
 };
 
-std::pair<std::string, std::string> CommonHandler::empty_restricted_key_{"",
-                                                                         ""};
+std::pair<std::string, std::string> CommonHandler::empty_restricted_key_{
+    "", ""};
 
 CommonHandler::CommonHandler(
     const std::string& name,
@@ -1194,7 +1196,7 @@ CommonHandler::RegisterModelStatistics()
 #else
     auto err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport model statistics");
+        "the server does not support model statistics");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -1408,7 +1410,7 @@ CommonHandler::RegisterTrace()
     TRITONSERVER_ErrorDelete(err);
 #else
     auto err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not suppport trace");
+        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not support trace");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -1618,7 +1620,7 @@ CommonHandler::RegisterLogging()
 #else
     auto err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport dynamic logging");
+        "the server does not support dynamic logging");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -2315,16 +2317,19 @@ Server::Server(
         std::to_string(keepalive_options.keepalive_time_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"keepalive_timeout_ms",
-           std::to_string(keepalive_options.keepalive_timeout_ms_)};
+    row = {
+        "keepalive_timeout_ms",
+        std::to_string(keepalive_options.keepalive_timeout_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"keepalive_permit_without_calls",
-           std::to_string(keepalive_options.keepalive_permit_without_calls_)};
+    row = {
+        "keepalive_permit_without_calls",
+        std::to_string(keepalive_options.keepalive_permit_without_calls_)};
     table_printer.InsertRow(row);
 
-    row = {"http2_max_pings_without_data",
-           std::to_string(keepalive_options.http2_max_pings_without_data_)};
+    row = {
+        "http2_max_pings_without_data",
+        std::to_string(keepalive_options.http2_max_pings_without_data_)};
     table_printer.InsertRow(row);
 
     row = {
@@ -2333,8 +2338,9 @@ Server::Server(
             keepalive_options.http2_min_recv_ping_interval_without_data_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"http2_max_ping_strikes",
-           std::to_string(keepalive_options.http2_max_ping_strikes_)};
+    row = {
+        "http2_max_ping_strikes",
+        std::to_string(keepalive_options.http2_max_ping_strikes_)};
     table_printer.InsertRow(row);
     LOG_VERBOSE(1) << table_printer.PrintTable();
   }

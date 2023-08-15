@@ -47,9 +47,9 @@ The Triton source is distributed across multiple GitHub repositories
 that together can be built and installed to create a complete Triton
 installation. Triton server is built using CMake and (optionally)
 Docker. To simplify the build process, Triton provides a
-[build.py](https://github.com/triton-inference-server/server/blob/main/build.py) script. 
-The build.py script will generate the CMake and Docker build steps required to 
-build Triton, and will optionally invoke those steps or leave the invocation to 
+[build.py](https://github.com/triton-inference-server/server/blob/main/build.py) script.
+The build.py script will generate the CMake and Docker build steps required to
+build Triton, and will optionally invoke those steps or leave the invocation to
 you, as described below.
 
 The build.py script currently supports building Triton for the
@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r23.05 branch, `<container tag>` will default to r23.05. If you are
+r23.06 branch, `<container tag>` will default to r23.06. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -197,9 +197,9 @@ To include the TensorFlow2 backend in your CPU-only build, you must
 provide this additional flag to build.py:
 `--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
 
-CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs 
-and runtime dependencies that are not present in the CPU-only base container. 
-These are retrieved from a GPU base container, which can be changed with the 
+CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs
+and runtime dependencies that are not present in the CPU-only base container.
+These are retrieved from a GPU base container, which can be changed with the
 `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
 
 ### Building Without Docker
@@ -334,8 +334,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r23.05 branch, '<container tag>' will default to
-r23.05. Therefore, you typically do not need to provide '<container
+are building on the r23.06 branch, '<container tag>' will default to
+r23.06. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called

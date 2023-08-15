@@ -53,15 +53,15 @@ FUZZ_LOG=`pwd`/fuzz.log
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
-source ../common/util.sh 
+source ../common/util.sh
 
 # Remove this once foobuzz and tornado packages upgrade to work with python 3.10
-# This test tests the server's ability to handle poor input and not the compatibility 
+# This test tests the server's ability to handle poor input and not the compatibility
 # with python 3.10. Python 3.8 is ok to use here.
 function_install_python38() {
     source ../L0_backend_python/common.sh
     install_conda
-    create_conda_env "3.8" "python-3-8" 
+    create_conda_env "3.8" "python-3-8"
 
     # Install test script dependencies
     pip3 install --upgrade wheel setuptools boofuzz==0.3.0 numpy pillow attrdict future grpcio requests gsutil \

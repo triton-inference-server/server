@@ -98,7 +98,7 @@ namespace {
 
 // There must be specialization for the types to be parsed into so that
 // the argument is properly validated and parsed. Attempted to use input
-// opeartor (>>) but it will consume inproper argument without error
+// operator (>>) but it will consume improper argument without error
 // (i.e. parse "1.4" to 'int' will return 1 but we want to report error).
 template <typename T>
 T ParseOption(const std::string& arg);
@@ -215,7 +215,7 @@ ParsePairOption(const std::string& arg, const std::string& delim_str)
 }
 
 #ifdef TRITON_ENABLE_GRPC
-// Split 'options' by 'delim_str' and place splitted strings into a vector
+// Split 'options' by 'delim_str' and place split strings into a vector
 std::vector<std::string>
 SplitOptions(std::string options, const std::string& delim_str)
 {
@@ -345,9 +345,9 @@ TritonParser::SetupOptions()
        "finish. After the timeout expires the server exits even if inferences "
        "are still in flight."});
 
-  model_repo_options_.push_back({OPTION_MODEL_REPOSITORY, "model-store",
-                                 Option::ArgStr,
-                                 "Equivalent to --model-repository."});
+  model_repo_options_.push_back(
+      {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
+       "Equivalent to --model-repository."});
   model_repo_options_.push_back(
       {OPTION_MODEL_REPOSITORY, "model-repository", Option::ArgStr,
        "Path to model repository directory. It may be specified multiple times "
@@ -407,14 +407,16 @@ TritonParser::SetupOptions()
        "same name can be served if they are in different namespace."});
 
 #if defined(TRITON_ENABLE_HTTP)
-  http_options_.push_back({OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
-                           "Allow the server to listen for HTTP requests."});
+  http_options_.push_back(
+      {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
+       "Allow the server to listen for HTTP requests."});
   http_options_.push_back(
       {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
        "The address for the http server to bind to. Default is 0.0.0.0"});
-  http_options_.push_back({OPTION_HTTP_PORT, "http-port", Option::ArgInt,
-                           "The port for the server to listen on for HTTP "
-                           "requests. Default is 8000."});
+  http_options_.push_back(
+      {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
+       "The port for the server to listen on for HTTP "
+       "requests. Default is 8000."});
   http_options_.push_back(
       {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
        "Allow multiple servers to listen on the same HTTP port when every "
@@ -426,19 +428,22 @@ TritonParser::SetupOptions()
        Option::ArgStr,
        "The regular expression pattern that will be used for forwarding HTTP "
        "headers as inference request parameters."});
-  http_options_.push_back({OPTION_HTTP_THREAD_COUNT, "http-thread-count",
-                           Option::ArgInt,
-                           "Number of threads handling HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
+       "Number of threads handling HTTP requests."});
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
-  grpc_options_.push_back({OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
-                           "Allow the server to listen for GRPC requests."});
-  grpc_options_.push_back({OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
-                           "The address for the grpc server to binds to. Default is 0.0.0.0"});
-  grpc_options_.push_back({OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
-                           "The port for the server to listen on for GRPC "
-                           "requests. Default is 8001."});
+  grpc_options_.push_back(
+      {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
+       "Allow the server to listen for GRPC requests."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
+       "The address for the grpc server to binds to. Default is 0.0.0.0"});
+  grpc_options_.push_back(
+      {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
+       "The port for the server to listen on for GRPC "
+       "requests. Default is 8001."});
   grpc_options_.push_back(
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
        "Allow multiple servers to listen on the same GRPC port when every "
@@ -536,13 +541,15 @@ TritonParser::SetupOptions()
       {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
        "Set verbose logging level. Zero (0) disables verbose logging and "
        "values >= 1 enable verbose logging."});
-  logging_options_.push_back({OPTION_LOG_INFO, "log-info", Option::ArgBool,
-                              "Enable/disable info-level logging."});
-  logging_options_.push_back({OPTION_LOG_WARNING, "log-warning",
-                              Option::ArgBool,
-                              "Enable/disable warning-level logging."});
-  logging_options_.push_back({OPTION_LOG_ERROR, "log-error", Option::ArgBool,
-                              "Enable/disable error-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_INFO, "log-info", Option::ArgBool,
+       "Enable/disable info-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
+       "Enable/disable warning-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
+       "Enable/disable error-level logging."});
   logging_options_.push_back(
       {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
        "Set the logging format. Options are \"default\" and \"ISO8601\". "
@@ -765,7 +772,7 @@ TritonParser::SetupOptions()
        "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."});
+       "multiple times to trace multiple information. Default is OFF."});
   deprecated_options_.push_back(
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "DEPRECATED: Please use --trace-config rate=<rate value>"

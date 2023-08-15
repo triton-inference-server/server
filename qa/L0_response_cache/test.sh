@@ -35,6 +35,7 @@ export CUDA_VISIBLE_DEVICES=0
 # use of a persistent remote redis server, or similarly use --replicaof arg.
 export TRITON_REDIS_HOST="localhost"
 export TRITON_REDIS_PORT="6379"
+REDIS_LOG="./redis-server.unit_tests.log"
 
 rm -fr *.log
 
@@ -47,7 +48,11 @@ function install_redis() {
 
 function start_redis() {
   # Run redis server in background
-  redis-server --daemonize yes --port "${TRITON_REDIS_PORT}"
+  redis-server                    \
+    --daemonize yes               \
+    --port "${TRITON_REDIS_PORT}" \
+    --logfile "${REDIS_LOG}"      \
+    --loglevel debug
 
   # Check redis server is running
   REDIS_PING_RESPONSE=$(redis-cli -h ${TRITON_REDIS_HOST} -p ${TRITON_REDIS_PORT} ping)
@@ -66,8 +71,8 @@ function stop_redis() {
 }
 
 function set_redis_auth() {
-  # NOTE: Per-user auth [Access Control List (ACL)] is only supported in 
-  #       Redis >= 6.0 and is more comprehensive in what can be configured. 
+  # NOTE: Per-user auth [Access Control List (ACL)] is only supported in
+  #       Redis >= 6.0 and is more comprehensive in what can be configured.
   #       For simplicity and wider range of Redis version support, use
   #       server-wide password  via "requirepass" for now.
   redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" config set requirepass "${REDIS_PW}"
@@ -83,7 +88,7 @@ function unset_redis_auth() {
 # UNIT TESTS
 set +e
 
-## Unit tests currently run for both Local and Redis cache implementaitons
+## Unit tests currently run for both Local and Redis cache implementations
 ## by default. However, we could break out the unit tests for each
 ## into separate runs gtest filters if needed in the future:
 ## - `${UNIT_TEST} --gtest_filter=*Local*`
@@ -98,6 +103,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Response Cache Unit Test Failed\n***"
     RET=1
 fi
+stop_redis
 set -e
 
 # SERVER TESTS
@@ -124,7 +130,7 @@ function check_server_expected_failure {
     else
         # Check that server fails with the correct error message
         set +e
-        grep -i "${EXPECTED_MESSAGE}" ${SERVER_LOG} 
+        grep -i "${EXPECTED_MESSAGE}" ${SERVER_LOG}
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Failed: Expected [${EXPECTED_MESSAGE}] error message in output\n***"
             cat $SERVER_LOG
@@ -191,6 +197,8 @@ check_server_expected_failure "incompatible flags"
 
 ## Redis Cache CLI tests
 REDIS_ENDPOINT="--cache-config redis,host=${TRITON_REDIS_HOST} --cache-config redis,port=${TRITON_REDIS_PORT}"
+REDIS_LOG="./redis-server.cli_tests.log"
+start_redis
 
 # Test simple redis cache config succeeds
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
@@ -221,6 +229,8 @@ check_server_expected_failure "Must at a minimum specify"
 REDIS_PW="redis123!"
 set_redis_auth
 
+### Credentials via command-line
+
 # Test simple redis authentication succeeds with correct credentials
 REDIS_CACHE_AUTH="--cache-config redis,password=${REDIS_PW}"
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUTH} ${EXTRA_ARGS}"
@@ -233,11 +243,35 @@ SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUT
 run_server
 check_server_expected_failure "WRONGPASS"
 
-
 # Test simple redis authentication fails with no credentials
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "NOAUTH Authentication required"
+
+### Credentials via environment variables
+
+# Test simple redis authentication succeeds with password-only via env vars
+# No username means use "default" as the username
+unset TRITONCACHE_REDIS_USERNAME
+export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication succeeds with correct user and password via env vars
+export TRITONCACHE_REDIS_USERNAME="default"
+export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication fails with wrong credentials via env vars
+export TRITONCACHE_REDIS_PASSWORD="wrong"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "WRONGPASS"
+unset TRITONCACHE_REDIS_USERNAME
+unset TRITONCACHE_REDIS_PASSWORD
 
 # Clean up redis server before exiting test
 unset_redis_auth

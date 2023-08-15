@@ -121,6 +121,7 @@ SharedMemoryManager::UnregisterHelper(
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
 #include "common.h"
 #include "triton/common/logging.h"
 
@@ -346,8 +347,8 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    *shm_mapped_addr =
-        (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
+    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
+                               it->second->offset_ + offset);
   } else {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
   }

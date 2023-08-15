@@ -33,7 +33,7 @@ input [
     name: "INPUT0"
     data_type: TYPE_INT32
     dims: [ 16 ]
-    
+
   }
 ]
 input [
@@ -41,7 +41,7 @@ input [
     name: "INPUT1"
     data_type: TYPE_INT32
     dims: [ 16 ]
-    
+
   }
 ]
 output [
@@ -49,8 +49,8 @@ output [
     name: "OUTPUT0"
     data_type: TYPE_INT32
     dims: [ 16 ]
-    
-    
+
+
   }
 ]
 output [
@@ -58,8 +58,8 @@ output [
     name: "OUTPUT1"
     data_type: TYPE_INT32
     dims: [ 16 ]
-    
-    
+
+
   }
 ]
 ensemble_scheduling {
