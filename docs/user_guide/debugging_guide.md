@@ -77,7 +77,7 @@ If you want the server to start up even when models fail, use the `exit-on-error
 
 ### Deadlock
 
-Some useful steps for debugging a dealock with `gdb`:
+Some useful steps for debugging a deadlock with `gdb`:
 1. Use $info threads to see which threads are waiting.
 2. Go to a thread: $thread 4.
 3. Print the backtrace: $bt.
