@@ -75,6 +75,16 @@ This is going to be one of the hardest things to debug. If possible, you want to
 
 If you want the server to start up even when models fail, use the `exit-on-error=false` option. If you want the server health endpoint to show ready even when specific models fail, use the `--strict-readiness=false` flag.
 
+### Deadlock
+
+Some useful steps for debugging a deadlock with `gdb`:
+1. Use `$info threads` to see which threads are waiting.
+2. Go to a thread: `$thread 4`.
+3. Print the backtrace: `$bt`.
+4. Go to the frame with the lock: `$f 1`.
+5. Print the memory of the mutex being held: `$p *mutex`.
+6. You can now see the owner of the mutex under `owner`.
+
 ## Client Issues
 
 For working with different client cases, the best resources are the [client repo’s](https://github.com/triton-inference-server/client) examples. You can see clients written in Python, Java, and C++ with running examples across many common use cases. You can review the main functions of these clients to get a sense of the flow of the code.
