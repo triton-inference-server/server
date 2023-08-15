@@ -3581,12 +3581,16 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         # Block until all requests are completed
         self.triton_client.stop_stream()
 
+        # Make sure some inferences occurred and metadata was collected
+        self.assertTrue(len(sequence_dict) > 0)
+        self.assertTrue(len(sequence_list) > 0)
+
         # Validate model results are sorted per sequence ID (model specific logic)
-        print(f"{sequence_dict=}")
         for seq_id, sequence in sequence_dict.items():
             seq_outputs = [
                 result.as_numpy("OUTPUT0").flatten().tolist() for result in sequence
             ]
+            print(f"{seq_id}: {seq_outputs}")
             self.assertEqual(seq_outputs, sorted(seq_outputs))
 
         # Validate request/response IDs for each response in a sequence is sorted
@@ -3596,7 +3600,7 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
             self.assertEqual(request_ids, sorted(request_ids))
 
         # Validate results are sorted in request order if preserve_ordering is True
-        config = self.triton_client.get_model_config(self.model_name_, as_json=True)
+        config = self.triton_client.get_model_config(self.model_name_)
         print(config)
         if config.config.sequence_batching.oldest.preserve_ordering:
             request_ids = [s.request_id for s in sequence_list]
@@ -3607,9 +3611,7 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         stats = self.triton_client.get_inference_statistics(
             model_name=self.model_name_, headers={}, as_json=True
         )
-        print(stats)
         model_stats = stats["model_stats"][0]
-        print(model_stats)
         self.assertEqual(model_stats["name"], self.model_name_)
         self.assertLess(
             int(model_stats["execution_count"]), int(model_stats["inference_count"])
