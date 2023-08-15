@@ -119,47 +119,6 @@ def is_ensemble(model_name):
     return False
 
 
-def send_sequence(
-    seq_id,
-    callback,
-    model_name,
-    url,
-    inputs,
-    timeout_us=None,
-    request_pause_sec=0,
-    request_id=0,
-):
-    with grpcclient.InferenceServerClient(url) as triton_client:
-        triton_client.start_stream(callback=callback)
-        triton_client.async_stream_infer(
-            model_name,
-            inputs,
-            sequence_id=seq_id,
-            sequence_start=True,
-            timeout=timeout_us,
-            request_id=str(request_id),
-        )
-        if request_pause_sec != 0:
-            time.sleep(request_pause_sec)
-        triton_client.async_stream_infer(
-            model_name,
-            inputs,
-            sequence_id=seq_id,
-            timeout=timeout_us,
-            request_id=str(request_id + 1),
-        )
-        if request_pause_sec != 0:
-            time.sleep(request_pause_sec)
-        triton_client.async_stream_infer(
-            model_name,
-            inputs,
-            sequence_id=seq_id,
-            sequence_end=True,
-            timeout=timeout_us,
-            request_id=str(request_id + 2),
-        )
-
-
 class SequenceBatcherTest(su.SequenceBatcherTestUtil):
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
@@ -3340,15 +3299,29 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
     def send_sequence_with_timeout(
         self, seq_id, callback, timeout_us=3000000, request_pause_sec=0
     ):
-        send_sequence(
-            seq_id,
-            callback,
-            self.model_name_,
-            self.server_address_,
-            self.inputs_,
-            timeout_us=timeout_us,
-            request_pause_sec=request_pause_sec,
-        )
+        with grpcclient.InferenceServerClient(self.server_address_) as triton_client:
+            triton_client.start_stream(callback=callback)
+            triton_client.async_stream_infer(
+                self.model_name_,
+                self.inputs_,
+                sequence_id=seq_id,
+                sequence_start=True,
+                timeout=timeout_us,
+            )
+            if request_pause_sec != 0:
+                time.sleep(request_pause_sec)
+            triton_client.async_stream_infer(
+                self.model_name_, self.inputs_, sequence_id=seq_id, timeout=timeout_us
+            )
+            if request_pause_sec != 0:
+                time.sleep(request_pause_sec)
+            triton_client.async_stream_infer(
+                self.model_name_,
+                self.inputs_,
+                sequence_id=seq_id,
+                sequence_end=True,
+                timeout=timeout_us,
+            )
 
     def test_request_timeout(self):
         # Test long running model that receives requests with shorter timeout,
@@ -3581,12 +3554,16 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         # Block until all requests are completed
         self.triton_client.stop_stream()
 
+        # Make sure some inferences occurred and metadata was collected
+        self.assertTrue(len(sequence_dict) > 0)
+        self.assertTrue(len(sequence_list) > 0)
+
         # Validate model results are sorted per sequence ID (model specific logic)
-        print(f"{sequence_dict=}")
         for seq_id, sequence in sequence_dict.items():
             seq_outputs = [
                 result.as_numpy("OUTPUT0").flatten().tolist() for result in sequence
             ]
+            print(f"{seq_id}: {seq_outputs}")
             self.assertEqual(seq_outputs, sorted(seq_outputs))
 
         # Validate request/response IDs for each response in a sequence is sorted
@@ -3596,7 +3573,7 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
             self.assertEqual(request_ids, sorted(request_ids))
 
         # Validate results are sorted in request order if preserve_ordering is True
-        config = self.triton_client.get_model_config(self.model_name_, as_json=True)
+        config = self.triton_client.get_model_config(self.model_name_)
         print(config)
         if config.config.sequence_batching.oldest.preserve_ordering:
             request_ids = [s.request_id for s in sequence_list]
@@ -3607,9 +3584,7 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         stats = self.triton_client.get_inference_statistics(
             model_name=self.model_name_, headers={}, as_json=True
         )
-        print(stats)
         model_stats = stats["model_stats"][0]
-        print(model_stats)
         self.assertEqual(model_stats["name"], self.model_name_)
         self.assertLess(
             int(model_stats["execution_count"]), int(model_stats["inference_count"])
