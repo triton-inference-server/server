@@ -3555,8 +3555,8 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         self.triton_client.stop_stream()
 
         # Make sure some inferences occurred and metadata was collected
-        self.assertTrue(len(sequence_dict) > 0)
-        self.assertTrue(len(sequence_list) > 0)
+        self.assertGreater(len(sequence_dict), 0)
+        self.assertGreater(len(sequence_list), 0)
 
         # Validate model results are sorted per sequence ID (model specific logic)
         for seq_id, sequence in sequence_dict.items():
@@ -3564,6 +3564,8 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
                 result.as_numpy("OUTPUT0").flatten().tolist() for result in sequence
             ]
             print(f"{seq_id}: {seq_outputs}")
+            # FIXME [DLIS-5280]: This may fail for decoupled models with preserve_ordering=False
+            # if writes to grpc stream are done out of order in server.
             self.assertEqual(seq_outputs, sorted(seq_outputs))
 
         # Validate request/response IDs for each response in a sequence is sorted
@@ -3591,20 +3593,20 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         )
 
     def test_sequence_with_preserve_ordering(self):
-        self.model_name_ = "seqpy_preserve_ordering"
+        self.model_name_ = "seqpy_preserve_ordering_nondecoupled"
         self._test_sequence_ordering()
 
     def test_sequence_without_preserve_ordering(self):
-        self.model_name_ = "seqpy_no_preserve_ordering"
+        self.model_name_ = "seqpy_no_preserve_ordering_nondecoupled"
         self._test_sequence_ordering()
 
-    # def test_sequence_with_preserve_ordering_decoupled(self):
-    #    self.model_name_ = "seqpy_preserve_ordering_decoupled"
-    #    self._test_sequence_ordering()
+    def test_sequence_with_preserve_ordering_decoupled(self):
+        self.model_name_ = "seqpy_preserve_ordering_decoupled"
+        self._test_sequence_ordering()
 
-    # def test_sequence_without_preserve_ordering_decoupled(self):
-    #    self.model_name_ = "seqpy_no_preserve_ordering_decoupled"
-    #    self._test_sequence_ordering()
+    def test_sequence_without_preserve_ordering_decoupled(self):
+        self.model_name_ = "seqpy_no_preserve_ordering_decoupled"
+        self._test_sequence_ordering()
 
 
 if __name__ == "__main__":

@@ -802,18 +802,28 @@ fi
 
 ### Start Preserve Ordering Tests ###
 
+# Test preserve ordering true/false and decoupled/non-decoupled
 TEST_CASE=SequenceBatcherPreserveOrderingTest
-MODEL_PATH=preserve_ordering
+MODEL_PATH=preserve_ordering_models
 BASE_MODEL="../python_models/sequence_py"
+rm -r ${MODEL_PATH}
 
-NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering"
-mkdir -p ${NO_PRESERVE}/1
-cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
-cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+MODES="decoupled nondecoupled"
+for mode in $MODES; do
+    NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
+    mkdir -p ${NO_PRESERVE}/1
+    cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
+    cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
 
-PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering"
-cp -r ${NO_PRESERVE} ${PRESERVE}
-sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+    PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
+    cp -r ${NO_PRESERVE} ${PRESERVE}
+    sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+
+    if [ ${mode} == "decoupled" ]; then
+      echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
+      echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
+    fi
+done
 
 SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
 SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
@@ -841,7 +851,8 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 2
+    # 2 for preserve_ordering = True/False, 2 for decoupled = True/False
+    check_test_results $TEST_RESULT_FILE 4
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
