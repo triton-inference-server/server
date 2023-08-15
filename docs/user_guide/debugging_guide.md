@@ -1,4 +1,4 @@
-# Debugging Guide 
+# Debugging Guide
 This guide goes over first-step troubleshooting for common scenarios in which Triton is behaving unexpectedly or failing. Below, we break down the issues into these categories:
 
 - **[Configuration](#configuration-issues)**: Triton reports an error with your configuration file.
@@ -29,7 +29,7 @@ Before proceeding, please see if the model configuration documentation [here](./
 
 - The server [qa folder](https://github.com/triton-inference-server/server/tree/main/qa). You can find test scripts covering most features, including some which update the model config files to do so.
     - [Custom_models](https://github.com/triton-inference-server/server/tree/main/qa/custom_models), [ensemble_models](https://github.com/triton-inference-server/server/tree/main/qa/ensemble_models), and [python_models](https://github.com/triton-inference-server/server/tree/main/qa/python_models) include examples of configs for their respective use cases.
-    - [L0_model_config](https://github.com/triton-inference-server/server/tree/main/qa/L0_model_config) tests many types of incomplete model configs. 
+    - [L0_model_config](https://github.com/triton-inference-server/server/tree/main/qa/L0_model_config) tests many types of incomplete model configs.
 
 Note that if you are running into an issue with [perf_analyzer](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md) or [Model Analyzer](https://github.com/triton-inference-server/model_analyzer), try loading the model onto Triton directly. This checks if the configuration is incorrect or the perf_analyzer or Model Analyzer options need to be updated.
 
