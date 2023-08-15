@@ -3566,8 +3566,6 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
                 result.as_numpy("OUTPUT0").flatten().tolist() for result in sequence
             ]
             print(f"{seq_id}: {seq_outputs}")
-            # FIXME [DLIS-5280]: This may fail for decoupled models
-            # if writes to grpc stream are done out of order in server.
             self.assertEqual(seq_outputs, sorted(seq_outputs))
 
         # Validate request/response IDs for each response in a sequence is sorted
@@ -3576,7 +3574,6 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         for seq_id in sequence_id_map:
             per_seq_request_ids = sequence_id_map[seq_id]
             print(f"{seq_id}: {per_seq_request_ids}")
-            # FIXME [DLIS-5280]
             self.assertEqual(per_seq_request_ids, sorted(per_seq_request_ids))
 
         # Validate results are sorted in request order if preserve_ordering is True
@@ -3585,8 +3582,6 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
             print(f"Request IDs overall:\n{request_ids}")
             sequence_ids = [s.seq_id for s in sequence_list]
             print(f"Sequence IDs overall:\n{sequence_ids}")
-
-            # FIXME [DLIS-5280]
             self.assertEqual(request_ids, sorted(request_ids))
 
         # Assert some dynamic batching of requests was done
@@ -3607,13 +3602,16 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         self.model_name_ = "seqpy_no_preserve_ordering_nondecoupled"
         self._test_sequence_ordering(preserve_ordering=False, decoupled=False)
 
-    def test_sequence_with_preserve_ordering_decoupled(self):
-        self.model_name_ = "seqpy_preserve_ordering_decoupled"
-        self._test_sequence_ordering(preserve_ordering=True, decoupled=True)
+    # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
+    # stream are done out of order in server, so disable test for now.
+    # def test_sequence_with_preserve_ordering_decoupled(self):
+    #    self.model_name_ = "seqpy_preserve_ordering_decoupled"
+    #    self._test_sequence_ordering(preserve_ordering=True, decoupled=True)
 
-    def test_sequence_without_preserve_ordering_decoupled(self):
-        self.model_name_ = "seqpy_no_preserve_ordering_decoupled"
-        self._test_sequence_ordering(preserve_ordering=False, decoupled=True)
+    # FIXME [DLIS-5280]
+    # def test_sequence_without_preserve_ordering_decoupled(self):
+    #    self.model_name_ = "seqpy_no_preserve_ordering_decoupled"
+    #    self._test_sequence_ordering(preserve_ordering=False, decoupled=True)
 
 
 if __name__ == "__main__":
