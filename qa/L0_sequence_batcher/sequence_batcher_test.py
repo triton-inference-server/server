@@ -3583,6 +3583,9 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         if preserve_ordering:
             request_ids = [s.request_id for s in sequence_list]
             print(f"Request IDs overall:\n{request_ids}")
+            sequence_ids = [s.seq_id for s in sequence_list]
+            print(f"Sequence IDs overall:\n{sequence_ids}")
+
             # FIXME [DLIS-5280]
             self.assertEqual(request_ids, sorted(request_ids))
 

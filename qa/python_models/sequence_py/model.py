@@ -37,7 +37,6 @@ class TritonPythonModel:
         self.decoupled = self.model_config.get("model_transaction_policy", {}).get(
             "decoupled"
         )
-        print(f"{self.decoupled=}")
 
     def get_next_sequence_output_tensor(self, request):
         sid = request.correlation_id()
@@ -80,15 +79,15 @@ class TritonPythonModel:
         for request in requests:
             sender = request.get_response_sender()
             output_tensor = self.get_next_sequence_output_tensor(request)
+
             # Send 3 responses per request
             for _ in range(3):
                 response = pb_utils.InferenceResponse([output_tensor])
-                print(
-                    f"[DEBUG] Sending output {output_tensor.as_numpy()=} for {request.request_id()=}",
-                    flush=True,
-                )
                 sender.send(response)
 
             sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
         return None
+
+    def finalize(self):
+        print(f"Cleaning up. Final sequences stored: {self.sequences}")
