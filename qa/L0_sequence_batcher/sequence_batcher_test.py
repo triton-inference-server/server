@@ -3486,7 +3486,7 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
                     request_id=str(req_id),
                 )
 
-    def _test_sequence_ordering(self):
+    def _test_sequence_ordering(self, preserve_ordering, decoupled):
         # 1. Send a few grpc streaming sequence requests to the model.
         # 2. With grpc streaming, the model should receive the requests in
         #    the same order they are sent from client, and the client should
@@ -3559,27 +3559,31 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
         self.assertGreater(len(sequence_list), 0)
 
         # Validate model results are sorted per sequence ID (model specific logic)
+        print(f"=== {preserve_ordering=} {decoupled=} ===")
+        print("Outputs per Sequence:")
         for seq_id, sequence in sequence_dict.items():
             seq_outputs = [
                 result.as_numpy("OUTPUT0").flatten().tolist() for result in sequence
             ]
             print(f"{seq_id}: {seq_outputs}")
-            # FIXME [DLIS-5280]: This may fail for decoupled models with preserve_ordering=False
+            # FIXME [DLIS-5280]: This may fail for decoupled models
             # if writes to grpc stream are done out of order in server.
             self.assertEqual(seq_outputs, sorted(seq_outputs))
 
         # Validate request/response IDs for each response in a sequence is sorted
         # This should be true regardless of preserve_ordering or not
+        print("Request IDs per Sequence:")
         for seq_id in sequence_id_map:
-            request_ids = sequence_id_map[seq_id]
-            self.assertEqual(request_ids, sorted(request_ids))
+            per_seq_request_ids = sequence_id_map[seq_id]
+            print(f"{seq_id}: {per_seq_request_ids}")
+            # FIXME [DLIS-5280]
+            self.assertEqual(per_seq_request_ids, sorted(per_seq_request_ids))
 
         # Validate results are sorted in request order if preserve_ordering is True
-        config = self.triton_client.get_model_config(self.model_name_)
-        print(config)
-        if config.config.sequence_batching.oldest.preserve_ordering:
+        if preserve_ordering:
             request_ids = [s.request_id for s in sequence_list]
-            print(request_ids)
+            print(f"Request IDs overall:\n{request_ids}")
+            # FIXME [DLIS-5280]
             self.assertEqual(request_ids, sorted(request_ids))
 
         # Assert some dynamic batching of requests was done
@@ -3594,19 +3598,19 @@ class SequenceBatcherPreserveOrderingTest(su.SequenceBatcherTestUtil):
 
     def test_sequence_with_preserve_ordering(self):
         self.model_name_ = "seqpy_preserve_ordering_nondecoupled"
-        self._test_sequence_ordering()
+        self._test_sequence_ordering(preserve_ordering=True, decoupled=False)
 
     def test_sequence_without_preserve_ordering(self):
         self.model_name_ = "seqpy_no_preserve_ordering_nondecoupled"
-        self._test_sequence_ordering()
+        self._test_sequence_ordering(preserve_ordering=False, decoupled=False)
 
     def test_sequence_with_preserve_ordering_decoupled(self):
         self.model_name_ = "seqpy_preserve_ordering_decoupled"
-        self._test_sequence_ordering()
+        self._test_sequence_ordering(preserve_ordering=True, decoupled=True)
 
     def test_sequence_without_preserve_ordering_decoupled(self):
         self.model_name_ = "seqpy_no_preserve_ordering_decoupled"
-        self._test_sequence_ordering()
+        self._test_sequence_ordering(preserve_ordering=False, decoupled=True)
 
 
 if __name__ == "__main__":
