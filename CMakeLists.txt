@@ -118,8 +118,8 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
   repo-third-party
-  GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
-  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
+  GIT_REPOSITORY https://github.com/HennerM/third_party.git
+  GIT_TAG HennerM-patch-1
 )
 
 # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead

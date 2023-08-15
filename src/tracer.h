@@ -126,7 +126,7 @@ class TraceManager {
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
-  std::shared_ptr<Trace> SampleTrace(const std::string& model_name);
+  std::shared_ptr<Trace> SampleTrace(const std::string& model_name, otel_trace_api::SpanContext *span_context = nullptr);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -223,6 +223,10 @@ class TraceManager {
     opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartSpan(
         std::string display_name, const uint64_t& raw_timestamp_ns,
         std::string parent_span_key = "");
+
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartServerSpan(
+        std::string display_name, const uint64_t& raw_timestamp_ns,
+        const opentelemetry::trace::SpanContext &span_context);
 
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
@@ -397,7 +401,7 @@ class TraceManager {
         const std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>>&
             streams);
 
-    std::shared_ptr<Trace> SampleTrace();
+    std::shared_ptr<Trace> SampleTrace(otel_trace_api::SpanContext *span_context = nullptr);
 
     const TRITONSERVER_InferenceTraceLevel level_;
     const uint32_t rate_;
