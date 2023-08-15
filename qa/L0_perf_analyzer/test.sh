@@ -64,6 +64,8 @@ WRONG_OUTPUT_2_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/wrong_
 SEQ_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_output.json
 SEQ_WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_wrong_output.json
 
+REPEAT_INT32_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/repeat_int32_data.json
+
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR}"
 SERVER_LOG="./inference_server.log"
@@ -120,6 +122,12 @@ cp -r ../python_models/optional $DATADIR && \
   mkdir $DATADIR/optional/1 && \
   mv $DATADIR/optional/model.py $DATADIR/optional/1 && \
   sed -i 's/max_batch_size: 0/max_batch_size: 2/g' $DATADIR/optional/config.pbtxt
+
+# Copy decoupled model
+git clone --depth=1 https://github.com/triton-inference-server/python_backend
+mkdir -p $DATADIR/repeat_int32/1
+cp python_backend/examples/decoupled/repeat_config.pbtxt $DATADIR/repeat_int32/config.pbtxt
+cp python_backend/examples/decoupled/repeat_model.py $DATADIR/repeat_int32/1/model.py
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -870,6 +878,30 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     RET=1
 fi
 set -e
+
+## Test decoupled model support
+$PERF_ANALYZER -v -m repeat_int32 --input-data=$REPEAT_INT32_JSONDATAFILE \
+    --profile-export-file profile_export.json -i grpc --async --streaming -s \
+    ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+python3 -c "import json ; \
+    requests = json.load(open('profile_export.json'))['experiments'][0]['requests'] ; \
+    assert any(len(r['response_timestamps']) > 1 for r in requests)"
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+check-jsonschema --schemafile perf_analyzer_profile_export_schema.json profile_export.json
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 ## Test perf_analyzer with MPI / multiple models
 

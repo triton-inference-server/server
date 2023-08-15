@@ -1824,6 +1824,41 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_same_model_load_unload_stress
+rm -rf models
+mkdir models
+cp -r identity_zero_1_int32 models && \
+    (cd models/identity_zero_1_int32 && \
+        mkdir 1 && \
+        sed -i "s/string_value: \"10\"/string_value: \"0\"/" config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-thread-count=16 --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_same_model_load_unload_stress >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    cat ./test_concurrent_same_model_load_unload_stress.statistics.log
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_concurrent_model_instance_load_speedup
 rm -rf models
 mkdir models
@@ -1896,9 +1931,6 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-LOG_IDX=$((LOG_IDX+1))
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
