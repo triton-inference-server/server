@@ -31,6 +31,7 @@ import sys
 sys.path.append("../common")
 
 import concurrent.futures
+import json
 import os
 import shutil
 import signal
@@ -2789,7 +2790,7 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_concurrent_load_speedup(self):
+    def test_concurrent_model_load_speedup(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2835,7 +2836,7 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_pair:
                 self.assertTrue(triton_client.is_model_ready(model_name))
 
-    def test_concurrent_load(self):
+    def test_concurrent_model_load(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2864,7 +2865,7 @@ class LifeCycleTest(tu.TestResultCollector):
         model_metadata = triton_client.get_model_metadata("identity_model")
         self.assertEqual(model_metadata.platform, "python")
 
-    def test_concurrent_load_unload(self):
+    def test_concurrent_model_load_unload(self):
         # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2915,6 +2916,264 @@ class LifeCycleTest(tu.TestResultCollector):
                     thread.result()
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
+
+    def test_concurrent_same_model_load_unload_stress(self):
+        model_name = "identity_zero_1_int32"
+        num_threads = 16
+        num_iterations = 1024
+        try:
+            triton_client = grpcclient.InferenceServerClient(
+                "localhost:8001", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        load_fail_reasons = [
+            "unexpected miss in global map",
+            "no version is available",
+            "failed to poll from model repository",
+        ]
+        unload_fail_reasons = ["versions that are still available: 1"]
+        load_fail_messages = [
+            ("failed to load '" + model_name + "', " + reason)
+            for reason in load_fail_reasons
+        ]
+        unload_fail_messages = [
+            ("failed to unload '" + model_name + "', " + reason)
+            for reason in unload_fail_reasons
+        ]
+        global_exception_stats = {}  # { "exception message": number of occurrence }
+        load_before_unload_finish = [False]  # use list to access by reference
+
+        def _load_unload():
+            exception_stats = {}  # { "exception message": number of occurrence }
+            for i in range(num_iterations):
+                try:
+                    triton_client.load_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for an unload to happen after a load completes, but
+                    # before the load can verify its load state.
+                    error_message = ex.message()
+                    self.assertIn(error_message, load_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                try:
+                    triton_client.unload_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for a load to happen during an async unload
+                    error_message = ex.message()
+                    self.assertIn(error_message, unload_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                    load_before_unload_finish[0] = True
+            return exception_stats
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            threads = []
+            for i in range(num_threads):
+                threads.append(pool.submit(_load_unload))
+            for t in threads:
+                exception_stats = t.result()
+                for key, count in exception_stats.items():
+                    if key not in global_exception_stats:
+                        global_exception_stats[key] = 0
+                    global_exception_stats[key] += count
+
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(
+            load_before_unload_finish[0],
+            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
+        )
+
+        stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
+        with open(stats_path, mode="w", encoding="utf-8") as f:
+            f.write(str(global_exception_stats) + "\n")
+
+    def test_concurrent_model_instance_load_speedup(self):
+        # Initialize client
+        try:
+            triton_client = httpclient.InferenceServerClient(
+                "localhost:8000", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        models = ["identity_fp32"]
+        # Create 2 instances which each have a delay time of 10 seconds.
+        num_instances = 2
+        instance_group = [{"kind": "KIND_CPU", "count": num_instances}]
+        config = {"instance_group": instance_group}
+        for model in models:
+            # Instances should be loaded concurrently for supported backends
+            start_time = time.time()
+            try:
+                triton_client.load_model(model, config=json.dumps(config))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            end_time = time.time()
+            loading_time = end_time - start_time
+            print(f"Time to load {num_instances} instances: {loading_time}")
+
+            # Each of the two models has a minimum loading delay of 10 seconds
+            # Speedup is observed when the concurrent loading time < 20 seconds
+            # but use a tighter bound of 15 seconds
+            self.assertLess(
+                loading_time, 15.0, "Concurrent loading speedup not observed"
+            )
+            # Concurrent loading time cannot be < 10 seconds
+            self.assertGreaterEqual(
+                loading_time, 10.0, "Invalid concurrent loading time"
+            )
+            # Make sure the models are loaded
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model))
+
+    def _call_with_timeout(self, callable, timeout_secs):
+        # Setup handler for timing out call
+        def timeout_handler(sig, frame):
+            raise TimeoutError()
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_secs)
+        result = callable()
+        return result
+
+    def _call_with_expected_timeout(self, callable, timeout_secs=3):
+        # Call callable with expectation that it will timeout
+        try:
+            self._call_with_timeout(callable, timeout_secs)
+        except TimeoutError:
+            print("Inference timed out as expected.")
+            return
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        else:
+            self.assertTrue(False, "unexpected success, call should've timed out.")
+
+    def _get_fp32_io(self, client_type):
+        # Config
+        input_names = ["INPUT0", "INPUT1"]
+        output_names = ["OUTPUT0", "OUTPUT1"]
+        dtype, dims, shape = ("TYPE_FP32", [-1, 16], [1, 16])
+        input_config = [
+            {"name": name, "data_type": dtype, "dims": dims} for name in input_names
+        ]
+        output_config = [
+            {"name": name, "data_type": dtype, "dims": dims} for name in output_names
+        ]
+        # Inputs
+        inputs = []
+        for name in input_names:
+            inputs.append(
+                client_type.InferInput(name, shape, dtype.replace("TYPE_", ""))
+            )
+            inputs[-1].set_data_from_numpy(np.ones(shape, dtype=np.float32))
+        return input_config, output_config, inputs
+
+    def test_concurrent_model_instance_load_sanity(self):
+        cpu, gpu = "KIND_CPU", "KIND_GPU"
+        default_kinds = [cpu, gpu]
+        backend_kinds = {"plan": [gpu], "openvino": [cpu]}
+        try:
+            client_type = httpclient
+            triton_client = client_type.InferenceServerClient(
+                "localhost:8000", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        backends = os.environ.get("PARALLEL_BACKENDS", "").split()
+        self.assertTrue(len(backends) > 0, "PARALLEL_BACKENDS wasn't set")
+
+        num_instances = 5
+        input_config, output_config, inputs = self._get_fp32_io(client_type)
+        for backend in backends:
+            model = tu.get_model_name(backend, np.float32, np.float32, np.float32)
+            kinds = backend_kinds.get(backend, default_kinds)
+            for kind in kinds:
+                with self.subTest(backend=backend, model=model, kind=kind):
+                    # Setup model config
+                    instance_group = {"kind": kind, "count": num_instances}
+                    # Disable batching to guarantee 1 request per instance
+                    # Configure sequence batching such that each instance cannot accept new requests
+                    # while it is busy with an ongoing sequence. This way we can guarantee sending 1 request to each instance.
+                    max_batch_size = 0
+                    sequence_timeout_secs = 10
+                    sequence_batching = {
+                        "direct": {},
+                        "max_sequence_idle_microseconds": sequence_timeout_secs
+                        * 1000000,
+                    }
+                    config = {
+                        "instance_group": instance_group,
+                        "max_batch_size": max_batch_size,
+                        "sequence_batching": sequence_batching,
+                        "input": input_config,
+                        "output": output_config,
+                    }
+                    print(
+                        f"~~~ Backend: [{backend}], Model: [{model}], Config: [{config}] ~~~"
+                    )
+                    # Load the model
+                    try:
+                        triton_client.load_model(model, config=json.dumps(config))
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
+
+                    # Make sure the model is loaded
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_model_ready(model))
+                    print(
+                        "Model Repository Index after load:",
+                        triton_client.get_model_repository_index(),
+                    )
+
+                    # Test inference on each instance
+                    for i in range(1, num_instances + 1):
+                        try:
+                            triton_client.infer(
+                                model, inputs, sequence_id=i, sequence_start=True
+                            )
+                        except Exception as ex:
+                            self.assertTrue(
+                                False, "unexpected inference error {}".format(ex)
+                            )
+
+                    # Each instance should be busy until their sequence times out, so
+                    # an additional infer call should time out. If it doesn't time out, something
+                    # is wrong and the test should fail.
+                    callable = partial(
+                        triton_client.infer,
+                        model,
+                        inputs,
+                        sequence_id=num_instances + 1,
+                        sequence_start=True,
+                    )
+                    self._call_with_expected_timeout(callable, timeout_secs=3)
+
+                    # Unload the model
+                    try:
+                        triton_client.unload_model(model)
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
+
+                    # Allow server to fully unload model before next test iteration
+                    num_tries = 10
+                    for i in range(num_tries):
+                        if triton_client.is_server_ready():
+                            break
+                        print(
+                            f"[Attempt {i}] Server not ready yet, sleeping and retrying. Current repository index: {triton_client.get_model_repository_index()}"
+                        )
+                        time.sleep(6)
+                    print(
+                        "Model Repository Index after unload attempts:",
+                        triton_client.get_model_repository_index(),
+                    )
+                    self.assertTrue(triton_client.is_server_ready())
 
 
 if __name__ == "__main__":
