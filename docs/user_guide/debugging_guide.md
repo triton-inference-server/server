@@ -78,12 +78,12 @@ If you want the server to start up even when models fail, use the `exit-on-error
 ### Deadlock
 
 Some useful steps for debugging a deadlock with `gdb`:
-1. Use $info threads to see which threads are waiting.
-2. Go to a thread: $thread 4.
-3. Print the backtrace: $bt.
-4. Go to the frame with the lock: $f 1.
-5. Print the memory of the mutex being held: $p *mutex.
-6. You can now see the owner of the mutex under owner.
+1. Use `$info threads` to see which threads are waiting.
+2. Go to a thread: `$thread 4`.
+3. Print the backtrace: `$bt`.
+4. Go to the frame with the lock: `$f 1`.
+5. Print the memory of the mutex being held: `$p *mutex`.
+6. You can now see the owner of the mutex under `owner`.
 
 ## Client Issues
 
