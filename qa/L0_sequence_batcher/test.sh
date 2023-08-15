@@ -853,8 +853,8 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
     RET=1
 else
-    # 2 for preserve_ordering = True/False, 2 for decoupled = True/False
-    check_test_results $TEST_RESULT_FILE 4
+    # 2 for preserve_ordering = True/False
+    check_test_results $TEST_RESULT_FILE 2
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
