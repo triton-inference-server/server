@@ -28,6 +28,33 @@
 
 #include <regex>
 
+#include "opentelemetry/context/propagation/global_propagator.h"
+#include "opentelemetry/context/propagation/text_map_propagator.h"
+class GrpcServerCarrier : public opentelemetry::context::propagation::TextMapCarrier
+{
+public:
+  GrpcServerCarrier(::grpc::ServerContext *context) : context_(context) {}
+  GrpcServerCarrier() = default;
+  virtual opentelemetry::nostd::string_view Get(
+      opentelemetry::nostd::string_view key) const noexcept override
+  {
+    auto it = context_->client_metadata().find({key.data(), key.size()});
+    if (it != context_->client_metadata().end())
+    {
+      return it->second.data();
+    }
+    return "";
+  }
+
+  virtual void Set(opentelemetry::nostd::string_view /* key */,
+                   opentelemetry::nostd::string_view /* value */) noexcept override
+  {
+    // Not required for server
+  }
+
+  ::grpc::ServerContext *context_;
+};
+
 namespace triton { namespace server { namespace grpc {
 
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
@@ -274,11 +301,19 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           StreamInferResponseComplete, reinterpret_cast<void*>(state));
     }
 
+  LOG_VERBOSE(1) << "Process for " << Name() << ", extract otel context";
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
+      auto prop = opentelemetry::context::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+
+      GrpcServerCarrier carrier(state->context_->ctx_.get());
+
+      auto current_ctx = opentelemetry::context::RuntimeContext::GetCurrent();
+      auto new_context = prop->Extract(carrier, current_ctx);
+      auto parent_context = opentelemetry::trace::GetSpan(new_context)->GetContext();
       state->trace_ =
-          std::move(trace_manager_->SampleTrace(request.model_name()));
+          std::move(trace_manager_->SampleTrace(request.model_name(), &parent_context));
       if (state->trace_ != nullptr) {
         triton_trace = state->trace_->trace_;
       }
