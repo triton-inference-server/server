@@ -147,7 +147,7 @@ applied.
 This convention will be used to specify the override model directory to load
 the model from. For instance, if the user wants to specify a model directory
 that contains an ONNX model as version 2, then the user will specify the
-parameter to "file:2/model.onnx" : "<base64-encoded-file-content>". Note that
+parameter to "file:2/model.onnx" : "\<base64-encoded-file-content\>". Note that
 "config" parameter must be provided to serve as the model configuration of the
 override model directory.
 
@@ -361,7 +361,7 @@ applied.
 file content. This convention will be used to specify the override model
 directory to load the model from. For instance, if the user wants to specify a
 model directory that contains an ONNX model as version 2, then the user will
-specify the parameter to "file:2/model.onnx" : "<file-content>". Note that
+specify the parameter to "file:2/model.onnx" : "\<file-content\>". Note that
 "config" parameter must be provided to serve as the model configuration of the
 override model directory.
 
