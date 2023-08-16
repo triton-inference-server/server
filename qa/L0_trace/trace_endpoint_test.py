@@ -42,7 +42,6 @@ from google.protobuf import json_format
 
 # Similar set up as dynamic batcher tests
 class TraceEndpointTest(tu.TestResultCollector):
-
     def tearDown(self):
         # Clear all trace settings to initial state.
         # Note that the tearDown function uses HTTP client so the pass/fail
@@ -57,10 +56,10 @@ class TraceEndpointTest(tu.TestResultCollector):
             "log_frequency": None,
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        triton_client.update_trace_settings(model_name="simple",
-                                            settings=clear_settings)
-        triton_client.update_trace_settings(model_name=None,
-                                            settings=clear_settings)
+        triton_client.update_trace_settings(
+            model_name="simple", settings=clear_settings
+        )
+        triton_client.update_trace_settings(model_name=None, settings=clear_settings)
 
     def check_server_initial_state(self):
         # Helper function to make sure the trace setting is properly
@@ -76,8 +75,9 @@ class TraceEndpointTest(tu.TestResultCollector):
             "log_frequency": "0",
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        self.assertEqual(initial_settings,
-                         triton_client.get_trace_settings(model_name="simple"))
+        self.assertEqual(
+            initial_settings, triton_client.get_trace_settings(model_name="simple")
+        )
         self.assertEqual(initial_settings, triton_client.get_trace_settings())
 
     def test_http_get_settings(self):
@@ -114,25 +114,17 @@ class TraceEndpointTest(tu.TestResultCollector):
         # no update has been made.
         initial_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["global_unittest.log"]
-                    },
-                    "trace_level": {
-                        "value": ["TIMESTAMPS"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["0"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["global_unittest.log"]},
+                        "trace_level": {"value": ["TIMESTAMPS"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["0"]},
+                    }
                 }
-            }),
+            ),
             initial_settings,
         )
 
@@ -192,8 +184,9 @@ class TraceEndpointTest(tu.TestResultCollector):
         triton_client = httpclient.InferenceServerClient("localhost:8000")
         self.assertEqual(
             expected_first_model_settings,
-            triton_client.update_trace_settings(model_name="simple",
-                                                settings=model_update_settings),
+            triton_client.update_trace_settings(
+                model_name="simple", settings=model_update_settings
+            ),
             "Unexpected updated model trace settings",
         )
         # Note that 'trace_level' may be mismatch due to the order of
@@ -202,8 +195,7 @@ class TraceEndpointTest(tu.TestResultCollector):
         # needs to be improved when this kind of failure is reported
         self.assertEqual(
             expected_global_settings,
-            triton_client.update_trace_settings(
-                settings=global_update_settings),
+            triton_client.update_trace_settings(settings=global_update_settings),
             "Unexpected updated global settings",
         )
         self.assertEqual(
@@ -212,8 +204,9 @@ class TraceEndpointTest(tu.TestResultCollector):
             "Unexpected model trace settings after global update",
         )
         try:
-            triton_client.update_trace_settings(model_name="does-not-exist",
-                                                settings=model_update_settings)
+            triton_client.update_trace_settings(
+                model_name="does-not-exist", settings=model_update_settings
+            )
         except Exception as ex:
             self.assertIn(
                 "Request for unknown model : does-not-exist",
@@ -226,77 +219,51 @@ class TraceEndpointTest(tu.TestResultCollector):
         # the model setting fields that haven't been specified.
         self.check_server_initial_state()
 
-        expected_first_model_settings = grpcclient.service_pb2.TraceSettingResponse(
-        )
+        expected_first_model_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["model.log"]
-                    },
-                    "trace_level": {
-                        "value": ["TIMESTAMPS"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["0"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["model.log"]},
+                        "trace_level": {"value": ["TIMESTAMPS"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["0"]},
+                    }
                 }
-            }),
+            ),
             expected_first_model_settings,
         )
 
-        expected_second_model_settings = grpcclient.service_pb2.TraceSettingResponse(
-        )
+        expected_second_model_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["model.log"]
-                    },
-                    "trace_level": {
-                        "value": ["TIMESTAMPS", "TENSORS"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["0"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["model.log"]},
+                        "trace_level": {"value": ["TIMESTAMPS", "TENSORS"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["0"]},
+                    }
                 }
-            }),
+            ),
             expected_second_model_settings,
         )
 
         expected_global_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["another.log"]
-                    },
-                    "trace_level": {
-                        "value": ["TIMESTAMPS", "TENSORS"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["0"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["another.log"]},
+                        "trace_level": {"value": ["TIMESTAMPS", "TENSORS"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["0"]},
+                    }
                 }
-            }),
+            ),
             expected_global_settings,
         )
 
@@ -309,8 +276,9 @@ class TraceEndpointTest(tu.TestResultCollector):
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
         self.assertEqual(
             expected_first_model_settings,
-            triton_client.update_trace_settings(model_name="simple",
-                                                settings=model_update_settings),
+            triton_client.update_trace_settings(
+                model_name="simple", settings=model_update_settings
+            ),
             "Unexpected updated model trace settings",
         )
         # Note that 'trace_level' may be mismatch due to the order of
@@ -319,8 +287,7 @@ class TraceEndpointTest(tu.TestResultCollector):
         # needs to be improved when this kind of failure is reported
         self.assertEqual(
             expected_global_settings,
-            triton_client.update_trace_settings(
-                settings=global_update_settings),
+            triton_client.update_trace_settings(settings=global_update_settings),
             "Unexpected updated global settings",
         )
         self.assertEqual(
@@ -329,8 +296,9 @@ class TraceEndpointTest(tu.TestResultCollector):
             "Unexpected model trace settings after global update",
         )
         try:
-            triton_client.update_trace_settings(model_name="does-not-exist",
-                                                settings=model_update_settings)
+            triton_client.update_trace_settings(
+                model_name="does-not-exist", settings=model_update_settings
+            )
         except Exception as ex:
             self.assertIn(
                 "Request for unknown model : does-not-exist",
@@ -347,16 +315,12 @@ class TraceEndpointTest(tu.TestResultCollector):
         # model 'simple' has 'trace_rate' and 'log_frequency' specified
         # global has 'trace_level', 'trace_count' and 'trace_rate' specified
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        triton_client.update_trace_settings(model_name="simple",
-                                            settings={
-                                                "trace_rate": "12",
-                                                "log_frequency": "34"
-                                            })
-        triton_client.update_trace_settings(settings={
-            "trace_rate": "56",
-            "trace_count": "78",
-            "trace_level": ["OFF"]
-        })
+        triton_client.update_trace_settings(
+            model_name="simple", settings={"trace_rate": "12", "log_frequency": "34"}
+        )
+        triton_client.update_trace_settings(
+            settings={"trace_rate": "56", "trace_count": "78", "trace_level": ["OFF"]}
+        )
 
         expected_global_settings = {
             "trace_file": "global_unittest.log",
@@ -395,8 +359,9 @@ class TraceEndpointTest(tu.TestResultCollector):
         )
         self.assertEqual(
             expected_second_model_settings,
-            triton_client.update_trace_settings(model_name="simple",
-                                                settings=model_clear_settings),
+            triton_client.update_trace_settings(
+                model_name="simple", settings=model_clear_settings
+            ),
             "Unexpected model trace settings after model clear",
         )
         self.assertEqual(
@@ -415,86 +380,56 @@ class TraceEndpointTest(tu.TestResultCollector):
         # model 'simple' has 'trace_rate' and 'log_frequency' specified
         # global has 'trace_level', 'trace_count' and 'trace_rate' specified
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
-        triton_client.update_trace_settings(model_name="simple",
-                                            settings={
-                                                "trace_rate": "12",
-                                                "log_frequency": "34"
-                                            })
-        triton_client.update_trace_settings(settings={
-            "trace_rate": "56",
-            "trace_count": "78",
-            "trace_level": ["OFF"]
-        })
+        triton_client.update_trace_settings(
+            model_name="simple", settings={"trace_rate": "12", "log_frequency": "34"}
+        )
+        triton_client.update_trace_settings(
+            settings={"trace_rate": "56", "trace_count": "78", "trace_level": ["OFF"]}
+        )
 
         expected_global_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["global_unittest.log"]
-                    },
-                    "trace_level": {
-                        "value": ["OFF"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["0"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["global_unittest.log"]},
+                        "trace_level": {"value": ["OFF"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["0"]},
+                    }
                 }
-            }),
+            ),
             expected_global_settings,
         )
-        expected_first_model_settings = grpcclient.service_pb2.TraceSettingResponse(
-        )
+        expected_first_model_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["global_unittest.log"]
-                    },
-                    "trace_level": {
-                        "value": ["OFF"]
-                    },
-                    "trace_rate": {
-                        "value": ["12"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["34"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["global_unittest.log"]},
+                        "trace_level": {"value": ["OFF"]},
+                        "trace_rate": {"value": ["12"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["34"]},
+                    }
                 }
-            }),
+            ),
             expected_first_model_settings,
         )
-        expected_second_model_settings = grpcclient.service_pb2.TraceSettingResponse(
-        )
+        expected_second_model_settings = grpcclient.service_pb2.TraceSettingResponse()
         json_format.Parse(
-            json.dumps({
-                "settings": {
-                    "trace_file": {
-                        "value": ["global_unittest.log"]
-                    },
-                    "trace_level": {
-                        "value": ["OFF"]
-                    },
-                    "trace_rate": {
-                        "value": ["1"]
-                    },
-                    "trace_count": {
-                        "value": ["-1"]
-                    },
-                    "log_frequency": {
-                        "value": ["34"]
-                    },
+            json.dumps(
+                {
+                    "settings": {
+                        "trace_file": {"value": ["global_unittest.log"]},
+                        "trace_level": {"value": ["OFF"]},
+                        "trace_rate": {"value": ["1"]},
+                        "trace_count": {"value": ["-1"]},
+                        "log_frequency": {"value": ["34"]},
+                    }
                 }
-            }),
+            ),
             expected_second_model_settings,
         )
 
@@ -514,8 +449,9 @@ class TraceEndpointTest(tu.TestResultCollector):
         )
         self.assertEqual(
             expected_second_model_settings,
-            triton_client.update_trace_settings(model_name="simple",
-                                                settings=model_clear_settings),
+            triton_client.update_trace_settings(
+                model_name="simple", settings=model_clear_settings
+            ),
             "Unexpected model trace settings after model clear",
         )
         self.assertEqual(
