@@ -691,6 +691,132 @@ if [ `grep -o 'parent_id' bls_trace.log | wc -l` != "2" ]; then
     RET=1
 fi
 
+# Attempt to trace non-existent model
+SERVER_ARGS="--trace-file=trace_off_to_min.log --trace-level=OFF --trace-rate=1 --model-control-mode=explicit --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_off.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Explicitly load model
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Non-existent model (get)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/does-not-exist/trace/setting`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Non-existent model (post)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/does-not-exist/trace/setting -d '{"log_frequency": "1"}'`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Local model
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/simple/trace/setting -d '{"log_frequency": "1"}'`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Local model (unload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/unload`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/simple/trace/setting -d '{"log_frequency": "1"}'`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Local model (reload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/simple/trace/setting -d '{"log_frequency": "1"}'`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.

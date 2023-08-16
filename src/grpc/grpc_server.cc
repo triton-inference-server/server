@@ -1236,6 +1236,21 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
+
+    if (!request.model_name().empty()) {
+      TRITONSERVER_Message* config_message = nullptr;
+      err = TRITONSERVER_ServerModelConfig(
+          tritonserver_.get(), request.model_name().c_str(),
+          -1 /* model version */, 1 /* config_version */, &config_message);
+      if (err != nullptr) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Request for unknown model : ") + request.model_name())
+                .c_str());
+        GOTO_IF_ERR(err, earlyexit);
+      }
+    }
+
     // Update trace setting
     if (!request.settings().empty()) {
       TraceManager::NewSetting new_setting;
