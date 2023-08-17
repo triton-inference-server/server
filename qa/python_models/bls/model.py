@@ -490,7 +490,7 @@ class PBBLSTest(unittest.TestCase):
             # test where the free memory is not the same as the recorded memory.
             # It is suspected that this is due to the Python garbage collector
             # not releasing the memory immediately. Calling the garbage
-            # collector here as experiment to see if it fixes the issue.
+            # collector here to make sure that the memory is cleaned up.
             collected = gc.collect()
 
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_decoupled=False):
