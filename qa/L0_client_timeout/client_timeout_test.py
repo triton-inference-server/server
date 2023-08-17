@@ -59,6 +59,130 @@ class ClientTimeoutTest(tu.TestResultCollector):
         self.model_name_ = "custom_identity_int32"
         self.input0_data_ = np.array([[10]], dtype=np.int32)
 
+    def test_server_live(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.is_server_ready(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_model_ready(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.is_model_ready(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_server_metadata(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_server_metadata(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_model_config(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_model_config(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_model_repository_index(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_model_repository_index(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_load_model(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.load_model(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_unload_model(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.unload_model(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_inference_statistics(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_inference_statistics(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_update_trace_settings(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.update_trace_settings(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_get_trace_settings(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_trace_settings(
+                model_name=self.model_name_, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_update_log_settings(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.update_log_settings(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_get_log_settings(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_log_settings(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_get_system_shared_memory(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_system_shared_memory_status(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_register_system_shared_memory(self):
+        input_data_serialized = utils.serialize_byte_tensor(self.input0_data_)
+        input_byte_size = utils.serialized_byte_size(input_data_serialized)
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.register_system_shared_memory(
+                "input_data", "/input_simple", input_byte_size, client_timeout=0.2
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_unregister_system_shared_memory(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.unregister_system_shared_memory(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_get_cuda_shared_memory_status(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.get_cuda_shared_memory_status(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
+    def test_register_cuda_shared_memory(self):
+        import tritonshmutils.cuda_shared_memory as cshm
+
+        input_data = np.array([[10]], dtype=np.int32)
+        byteSize = input_data.itemsize * input_data.size
+        shm_op0_handle = cshm.create_shared_memory_region(
+            "dummy_data", byte_size=byteSize, device_id=0
+        )
+        cshm.set_shared_memory_region(shm_op0_handle, [input_data])
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.register_cuda_shared_memory(
+                "dummy_data",
+                cshm.get_raw_handle(shm_op0_handle),
+                device_id=0,
+                byte_size=byteSize,
+                client_timeout=0.2,
+            )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+        triton_client.unregister_cuda_shared_memory()
+        cshm.destroy_shared_memory_region(shm_op0_handle)
+
+    def test_uregister_cuda_shared_memory(self):
+        with self.assertRaises(InferenceServerException) as cm:
+            _ = triton_client.unregister_cuda_shared_memory(client_timeout=0.2)
+        self.assertIn("Deadline Exceeded", str(cm.exception))
+
     def _prepare_request(self, protocol):
         if protocol == "grpc":
             self.inputs_ = []
