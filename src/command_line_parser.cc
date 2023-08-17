@@ -114,32 +114,32 @@ namespace {
 // A wrapper around std::stoi, std::stoull, std::stoll, std::stod
 // to catch `invalid argument` and `out of range` exceptions
 template <typename T>
-T StoX(const std::string& arg);
+T StringTo(const std::string& arg);
 
 template <>
 int
-StoX(const std::string& arg)
+StringTo(const std::string& arg)
 {
   return std::stoi(arg);
 }
 
 template <>
 uint64_t
-StoX(const std::string& arg)
+StringTo(const std::string& arg)
 {
   return std::stoull(arg);
 }
 
 template <>
 int64_t
-StoX(const std::string& arg)
+StringTo(const std::string& arg)
 {
   return std::stoll(arg);
 }
 
 template <>
 double
-StoX(const std::string& arg)
+StringTo(const std::string& arg)
 {
   return std::stod(arg);
 }
@@ -153,7 +153,7 @@ T
 ParseOption(const std::string& arg, const std::string& opt_name = "")
 {
   try {
-    return StoX<T>(arg);
+    return StringTo<T>(arg);
   }
   catch (const std::invalid_argument& ia) {
     std::stringstream ss;
