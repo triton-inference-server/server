@@ -1057,6 +1057,12 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+# check server log for the error messages to make sure they're printed
+if [ `grep -c "model not found in any model repository" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not print model load failure for non-existent model\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 LOG_IDX=$((LOG_IDX+1))
 
