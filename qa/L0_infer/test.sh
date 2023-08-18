@@ -78,8 +78,8 @@ TF_VERSION=${TF_VERSION:=2}
 TEST_JETSON=${TEST_JETSON:=0}
 
 # Default size (in MB) of shared memory to be used by each python model
-# instance (Default is 64MB)
-DEFAULT_SHM_SIZE_MB=${DEFAULT_SHM_SIZE_MB:=64}
+# instance (Default is 1MB)
+DEFAULT_SHM_SIZE_MB=${DEFAULT_SHM_SIZE_MB:=1}
 DEFAULT_SHM_SIZE_BYTES=$((1024*1024*$DEFAULT_SHM_SIZE_MB))
 
 # On windows the paths invoked by the script (running in WSL) must use
