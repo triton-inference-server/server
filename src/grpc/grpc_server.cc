@@ -1238,11 +1238,11 @@ CommonHandler::RegisterTrace()
     std::string filepath;
 
     if (!request.model_name().empty()) {
-      TRITONSERVER_Message* config_message = nullptr;
-      err = TRITONSERVER_ServerModelConfig(
+      bool ready = false;
+      err = TRITONSERVER_ServerModelIsReady(
           tritonserver_.get(), request.model_name().c_str(),
-          -1 /* model version */, 1 /* config_version */, &config_message);
-      if (err != nullptr) {
+          -1 /* model version */, &ready);
+      if (!ready || err != nullptr) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("Request for unknown model : ") + request.model_name())

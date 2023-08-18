@@ -625,7 +625,7 @@ fi
 
 # Attempt to trace non-existent model
 SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_off.log"
+SERVER_LOG="./inference_server_nonexistent_model.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -798,4 +798,3 @@ else
 fi
 
 exit $RET
-
