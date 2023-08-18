@@ -1239,10 +1239,12 @@ CommonHandler::RegisterTrace()
 
     if (!request.model_name().empty()) {
       bool ready = false;
-      err = TRITONSERVER_ServerModelIsReady(
-          tritonserver_.get(), request.model_name().c_str(),
-          -1 /* model version */, &ready);
-      if (!ready || err != nullptr) {
+      GOTO_IF_ERR(
+          TRITONSERVER_ServerModelIsReady(
+              tritonserver_.get(), request.model_name().c_str(),
+              -1 /* model version */, &ready),
+          earlyexit);
+      if (!ready) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("Request for unknown model : ") + request.model_name())

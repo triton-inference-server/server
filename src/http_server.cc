@@ -1663,9 +1663,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   std::string filepath;
   if (!model_name.empty()) {
     bool ready = false;
-    auto err = TRITONSERVER_ServerModelIsReady(
-        server_.get(), model_name.c_str(), -1 /* model version */, &ready);
-    if (!ready || err != nullptr) {
+    HTTP_RESPOND_IF_ERR(
+        req,
+        TRITONSERVER_ServerModelIsReady(
+            server_.get(), model_name.c_str(), -1 /* model version */, &ready));
+    if (!ready) {
       HTTP_RESPOND_IF_ERR(
           req, TRITONSERVER_ErrorNew(
                    TRITONSERVER_ERROR_INVALID_ARG,
