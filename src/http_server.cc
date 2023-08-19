@@ -1280,7 +1280,7 @@ HTTPAPIServer::HandleRepositoryIndex(
     }
 
     TRITONSERVER_Message* message = nullptr;
-    auto err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
+    err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
     if (err == nullptr) {
       const char* buffer;
       size_t byte_size;
