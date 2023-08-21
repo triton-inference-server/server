@@ -62,13 +62,13 @@
 #define no_argument 2
 struct option {
   option(const char* name, int has_arg, int* flag, int val)
-      : name_(name), has_arg_(has_arg), flag_(flag), val_(val)
+      : name(name), has_arg(has_arg), flag(flag), val(val)
   {
   }
-  const char* name_;
-  int has_arg_;
-  int* flag_;
-  int val_;
+  const char* name;
+  int has_arg;
+  int* flag;
+  int val;
 };
 #endif
 #ifdef TRITON_ENABLE_TRACING
@@ -314,9 +314,6 @@ class TritonParser {
   void SetupOptions();
   // Initialize option group mappings
   void SetupOptionGroups();
-
-  // Retrieve option name
-  std::string GetOptionName(const struct option* long_option);
 
   // Sum of option groups: vector to maintain insertion order for Usage()
   std::vector<std::pair<std::string, std::vector<Option>&>> option_groups_;
