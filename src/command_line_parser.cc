@@ -36,8 +36,8 @@ bool
 end_of_long_opts(const struct option* longopts)
 {
   return (
-      (longopts->name_ == nullptr) && (longopts->has_arg_ == 0) &&
-      (longopts->flag_ == nullptr) && (longopts->val_ == 0));
+      (longopts->name == nullptr) && (longopts->has_arg == 0) &&
+      (longopts->flag == nullptr) && (longopts->val == 0));
 }
 
 /// Implementation of `getopt_long` for Windows.
@@ -67,8 +67,8 @@ getopt_long(
   std::string key = argv_str.substr(
       2, (found == std::string::npos) ? std::string::npos : (found - 2));
   while (!end_of_long_opts(curr_longopt)) {
-    if (key == curr_longopt->name_) {
-      if (curr_longopt->has_arg_ == required_argument) {
+    if (key == curr_longopt->name) {
+      if (curr_longopt->has_arg == required_argument) {
         if (found == std::string::npos) {
           if (longind != NULL) {
             *longind = optind - 1;
@@ -88,7 +88,7 @@ getopt_long(
         *longind = optind - 1;
       }
       optind++;
-      return curr_longopt->val_;
+      return curr_longopt->val;
     }
     curr_longopt++;
   }
