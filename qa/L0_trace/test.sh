@@ -80,8 +80,77 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
 
 RET=0
 
+# Helpers =======================================
+function assert_curl_success {
+  message="${1}"
+  if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+
+function assert_curl_failure {
+  message="${1}"
+  if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+
+function get_global_trace_setting {
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/trace/setting`
+  set -e
+}
+
+function get_trace_setting {
+  model_name="${1}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/${model_name}/trace/setting`
+  set -e
+}
+
+function update_global_trace_setting {
+  settings="${1}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/trace/setting -d ${settings}`
+  set -e
+}
+
+function update_trace_setting {
+  model_name="${1}"
+  settings="${2}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${model_name}/trace/setting -d ${settings}`
+  set -e
+}
+
+function send_inference_requests {
+    log_file="${1}"
+    upper_bound="${2}"
+    for (( p = 1; p <= $upper_bound; p++ )) do
+        $SIMPLE_HTTP_CLIENT >> ${log_file} 2>&1
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+
+        $SIMPLE_GRPC_CLIENT >> ${log_file} 2>&1
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    done
+}
+
+#=======================================
+
 # start with trace-level=OFF
-SERVER_ARGS="--trace-file=trace_off_to_min.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=trace_off_to_min.log --trace-config level=OFF --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -92,28 +161,10 @@ fi
 
 set +e
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_off.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_off.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
-
 # Enable via trace API and send again
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_level":["TIMESTAMPS"]}' localhost:8000/v2/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_global_trace_setting '{"trace_level":["TIMESTAMPS"]}'
+assert_curl_success "Failed to modify global trace settings"
+
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
@@ -128,17 +179,7 @@ if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; th
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_min.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_min.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_min.log" 10
 
 set -e
 
@@ -165,7 +206,7 @@ fi
 set -e
 
 # Add model specific setting
-SERVER_ARGS="--trace-file=global_trace.log --trace-level=TIMESTAMPS --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TIMESTAMPS --trace-config rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -177,15 +218,9 @@ fi
 set +e
 
 # Add trace setting for 'simple' via trace API, first use the same trace file
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"global_trace.log"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"global_trace.log"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
+
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
@@ -201,15 +236,8 @@ if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Use a different name
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"simple_trace.log","log_frequency":"2"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"simple_trace.log","log_frequency":"2"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -228,17 +256,7 @@ if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_simple.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_simple.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_simple.log" 10
 
 set -e
 
@@ -283,7 +301,7 @@ fi
 set -e
 
 # Update and clear model specific setting
-SERVER_ARGS="--trace-file=global_trace.log --trace-level=TIMESTAMPS --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TIMESTAMPS --trace-config rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -295,25 +313,11 @@ fi
 set +e
 
 # Add model setting and update it
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_rate":"1"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_rate":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_level":["OFF"]}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_level":["OFF"]}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"OFF\"\]" ./curl.out` != "1" ]; then
@@ -333,31 +337,14 @@ if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where trace is explicitly disabled
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 rm -f ./curl.out
 set +e
 
 # Clear trace setting by explicitly asking removal for every field except 'trace_rate'
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":null,"trace_level":null}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting (global) is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -377,17 +364,7 @@ if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where now uses global setting
-for p in {1..5}; do
-    $SIMPLE_HTTP_CLIENT >> client_clear.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_clear.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_clear.log" 5
 
 set -e
 
@@ -418,7 +395,7 @@ fi
 set -e
 
 # Update trace count
-SERVER_ARGS="--trace-file=global_count.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_count.log --trace-config level=TIMESTAMPS --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -430,30 +407,14 @@ fi
 set +e
 
 # Send requests without trace count
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 set -e
 
 # Check the current setting
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -471,15 +432,8 @@ if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Set trace count
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"5"}' localhost:8000/v2/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_global_trace_setting '{"trace_count":"5"}'
+assert_curl_success "Failed to modify global trace settings"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -499,28 +453,12 @@ if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where trace is explicitly disabled
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 # Check the current setting again and expect 'trace_count' becomes 0
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -583,7 +521,7 @@ fi
 set -e
 
 # Test Python client library
-SERVER_ARGS="--trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_unittest.log --trace-config level=TIMESTAMPS --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_unittest.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -626,15 +564,9 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -690,6 +622,70 @@ if [ `grep -o 'parent_id' bls_trace.log | wc -l` != "2" ]; then
     echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
     RET=1
 fi
+
+# Attempt to trace non-existent model
+SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_nonexistent_model.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Explicitly load model
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+assert_curl_success "Failed to load 'simple' model"
+
+# Non-existent model (get)
+get_trace_setting "does-not-exist"
+assert_curl_failure "Server returned trace settings for a non-existent model"
+
+# Non-existent model (post)
+update_trace_setting "does-not-exist" '{"log_frequency":"1"}'
+assert_curl_failure "Server modified trace settings for a non-existent model"
+
+# Local model (get)
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+# Local model (post)
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
+
+# Local model (unload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/unload`
+set -e
+assert_curl_success "Failed to unload 'simple' model"
+
+get_trace_setting "simple"
+assert_curl_failure "Server returned trace settings for an unloaded model"
+
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_failure "Server modified trace settings for an unloaded model"
+
+# Local model (reload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+assert_curl_success "Failed to load 'simple' model"
+
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
 
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where

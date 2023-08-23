@@ -1280,7 +1280,7 @@ HTTPAPIServer::HandleRepositoryIndex(
     }
 
     TRITONSERVER_Message* message = nullptr;
-    auto err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
+    err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
     if (err == nullptr) {
       const char* buffer;
       size_t byte_size;
@@ -1661,6 +1661,19 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   int32_t count;
   uint32_t log_frequency;
   std::string filepath;
+  if (!model_name.empty()) {
+    bool ready = false;
+    HTTP_RESPOND_IF_ERR(
+        req,
+        TRITONSERVER_ServerModelIsReady(
+            server_.get(), model_name.c_str(), -1 /* model version */, &ready));
+    if (!ready) {
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_INVALID_ARG,
+                   ("Request for unknown model : " + model_name).c_str()));
+    }
+  }
 
   // Perform trace setting update if requested
   if (req->method == htp_method_POST) {
