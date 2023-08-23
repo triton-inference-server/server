@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -110,7 +110,7 @@ class HttpTest(tu.TestResultCollector):
             ),
         )
         self.assertIn(
-            "For BYTE datatype raw input, the model must have input shape [1]",
+            "For BYTE datatype raw input 'INPUT0', the model must have input shape [1]",
             r.content.decode(),
         )
 
