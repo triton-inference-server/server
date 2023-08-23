@@ -101,6 +101,13 @@ class TraceEndpointTest(tu.TestResultCollector):
             triton_client.get_trace_settings(),
             "Unexpected initial global settings",
         )
+        try:
+            triton_client.get_trace_settings(model_name="does-not-exist")
+        except Exception as ex:
+            self.assertIn(
+                "Request for unknown model : does-not-exist",
+                ex.message(),
+            )
 
     def test_grpc_get_settings(self):
         # Model trace settings will be the same as global trace settings since
@@ -132,6 +139,13 @@ class TraceEndpointTest(tu.TestResultCollector):
             triton_client.get_trace_settings(),
             "Unexpected initial global settings",
         )
+        try:
+            triton_client.get_trace_settings(model_name="does-not-exist")
+        except Exception as ex:
+            self.assertIn(
+                "Request for unknown model : does-not-exist",
+                ex.message(),
+            )
 
     def test_http_update_settings(self):
         # Update model and global trace settings in order,
@@ -189,6 +203,15 @@ class TraceEndpointTest(tu.TestResultCollector):
             triton_client.get_trace_settings(model_name="simple"),
             "Unexpected model trace settings after global update",
         )
+        try:
+            triton_client.update_trace_settings(
+                model_name="does-not-exist", settings=model_update_settings
+            )
+        except Exception as ex:
+            self.assertIn(
+                "Request for unknown model : does-not-exist",
+                ex.message(),
+            )
 
     def test_grpc_update_settings(self):
         # Update model and global trace settings in order,
@@ -272,6 +295,15 @@ class TraceEndpointTest(tu.TestResultCollector):
             triton_client.get_trace_settings(model_name="simple"),
             "Unexpected model trace settings after global update",
         )
+        try:
+            triton_client.update_trace_settings(
+                model_name="does-not-exist", settings=model_update_settings
+            )
+        except Exception as ex:
+            self.assertIn(
+                "Request for unknown model : does-not-exist",
+                ex.message(),
+            )
 
     def test_http_clear_settings(self):
         # Clear global and model trace settings in order,
