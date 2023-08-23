@@ -179,7 +179,7 @@ RUN apt-get update && \
             python3-pdfkit \
             maven \
             default-jdk && \
-    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade wheel setuptools auditwheel && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
 
