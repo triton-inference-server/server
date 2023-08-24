@@ -58,6 +58,27 @@ class LifecycleTest(tu.TestResultCollector):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
+    def test_error_code(self):
+        model_name = "error_code"
+        shape = [1, 1]
+        error = "TRITONSERVER_ERROR_INVALID_ARG"
+        expected_grpc_error = "StatusCode.INVALID_ARGUMENT"
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                input_data = np.array([[error]], dtype=np.object_)
+                inputs = [
+                    grpcclient.InferInput(
+                        "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                with self.assertRaises(InferenceServerException) as e:
+                    client.infer(model_name, inputs)
+                self.assertEqual(
+                    str(e.exception),
+                    "[" + expected_grpc_error + "] Provided error code: " + error,
+                )
+
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
         # request and successfully processes the second request. This is making
