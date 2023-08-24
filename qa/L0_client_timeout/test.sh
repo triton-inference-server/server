@@ -204,6 +204,42 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+for i in test_grpc_server_live \
+    test_grpc_model_ready \
+    test_grpc_server_metadata \
+    test_grpc_model_config \
+    test_grpc_model_repository_index \
+    test_grpc_load_model \
+    test_grpc_unload_model \
+    test_grpc_inference_statistics \
+    test_grpc_update_trace_settings \
+    test_grpc_get_trace_settings \
+    test_grpc_update_log_settings \
+    test_grpc_get_log_settings \
+    test_grpc_register_system_shared_memory \
+    test_grpc_get_system_shared_memory \
+    test_grpc_unregister_system_shared_memory \
+    test_grpc_register_cuda_shared_memory \
+    test_grpc_get_cuda_shared_memory_status \
+    test_grpc_uregister_cuda_shared_memory \
+    ; do
+    SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model custom_identity_int32"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
+            RET=1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
