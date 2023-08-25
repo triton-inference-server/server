@@ -32,14 +32,6 @@ constexpr const char* GLOBAL_OPTION_GROUP = "";
 int optind = 1;
 const char* optarg = nullptr;
 
-bool
-end_of_long_opts(const struct option* longopts)
-{
-  return (
-      (longopts->name == nullptr) && (longopts->has_arg == 0) &&
-      (longopts->flag == nullptr) && (longopts->val == 0));
-}
-
 /// Implementation of `getopt_long` for Windows.
 /// Linux uses available implementation:
 /// https://github.com/gcc-mirror/gcc/blob/fab08d12b40ad637c5a4ce8e026fb43cd3f0fad1/include/getopt.h
@@ -49,10 +41,13 @@ end_of_long_opts(const struct option* longopts)
 /// https://github.com/gcc-mirror/gcc/blob/fab08d12b40ad637c5a4ce8e026fb43cd3f0fad1/libiberty/getopt.c#L464-L518
 /// `optind' is an index to iterate over `argv`, (whose length is `argc`),
 /// and starts from 1, since argv[0] is the program name.
-/// Text in the current `argv`-element, it is returned in `optarg'.
+/// Text in the current `argv`-element is returned in `optarg'.
+/// Note: if option was provided in the form of --<key>=<value>, then
+/// optarg is (argv[optind] + found + 1), i.e. everything after `=`.
+/// Alternatively, option can be provided as --<key> <value>.
+/// In this case, <value> is storred as a separate parameter in `argv`.
 /// `longind` returns the index in `longopts` of the long-named option found.
-/// In the below implementation, we scan options one by one, until the
-/// terminating option {nullptr, 0, nullptr, 0}, thus longind is optind-1.
+
 int
 getopt_long(
     int argc, char* const argv[], const char* optstring,
@@ -66,13 +61,14 @@ getopt_long(
   size_t found = argv_str.find_first_of("=");
   std::string key = argv_str.substr(
       2, (found == std::string::npos) ? std::string::npos : (found - 2));
-  while (!end_of_long_opts(curr_longopt)) {
+  int option_index = 0;
+  for (curr_longopt, option_index; curr_longopt->name;
+       curr_longopt++, option_index++) {
     if (key == curr_longopt->name) {
+      if (longind != NULL)
+        (*longind) = option_index;
       if (curr_longopt->has_arg == required_argument) {
         if (found == std::string::npos) {
-          if (longind != NULL) {
-            *longind = optind - 1;
-          }
           optind++;
           if (optind >= argc) {
             std::cerr << argv[0] << ": option '" << argv_str
@@ -84,13 +80,9 @@ getopt_long(
           optarg = (argv[optind] + found + 1);
         }
       }
-      if (longind != NULL) {
-        *longind = optind - 1;
-      }
       optind++;
       return curr_longopt->val;
     }
-    curr_longopt++;
   }
   return -1;
 }
