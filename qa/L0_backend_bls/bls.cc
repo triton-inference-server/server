@@ -258,19 +258,21 @@ BLSExecutor::ConstructFinalResponse(
     // 'addsub_tf' model to form the final inference response object.
     // Get all the information about the output tensor.
     RESPOND_AND_SET_NULL_IF_ERROR(
-        response,
-        TRITONSERVER_InferenceResponseOutput(
-            completed_responses[icount], icount, &output_name_server, &output_datatype_server,
-            &output_shape_server, &dims_count_server, &output_base_server, &output_byte_size_server,
-            &output_memory_type_server, &output_memory_id_server, &userp_server));
+        response, TRITONSERVER_InferenceResponseOutput(
+                      completed_responses[icount], icount, &output_name_server,
+                      &output_datatype_server, &output_shape_server,
+                      &dims_count_server, &output_base_server,
+                      &output_byte_size_server, &output_memory_type_server,
+                      &output_memory_id_server, &userp_server));
 
     // Create an output tensor in the final response with
     // the information retrieved above.
     TRITONBACKEND_Output* output;
     RESPOND_AND_SET_NULL_IF_ERROR(
-        response, TRITONBACKEND_ResponseOutput(
-                      *response, &output, output_name_server, output_datatype_server,
-                      output_shape_server, dims_count_server));
+        response,
+        TRITONBACKEND_ResponseOutput(
+            *response, &output, output_name_server, output_datatype_server,
+            output_shape_server, dims_count_server));
 
     // Get a buffer that holds the tensor data for the output.
     // We request a buffer in CPU memory but we have to handle any returned
@@ -287,34 +289,51 @@ BLSExecutor::ConstructFinalResponse(
                         TRITONSERVER_ERROR_INTERNAL,
                         "failed to create output buffer in CPU memory"));
     }
-    // Validate new backen APIs, ensuring that the retrieved values match those retrieved by the server
+    // Validate new backen APIs, ensuring that the retrieved values match those
+    // retrieved by the server
     RESPOND_AND_SET_NULL_IF_ERROR(
         response,
         TRITONBACKEND_InferenceResponseOutput(
             *response, icount, &output_name_backend, &output_datatype_backend,
-            &output_shape_backend, &dims_count_backend, &output_base_backend, &output_byte_size_backend,
-            &output_memory_type_backend, &output_memory_id_backend, &userp_backend));
+            &output_shape_backend, &dims_count_backend, &output_base_backend,
+            &output_byte_size_backend, &output_memory_type_backend,
+            &output_memory_id_backend, &userp_backend));
 
-  
-    if((*output_name_server != *output_name_backend) || (output_datatype_server != output_datatype_backend) || (*output_shape_server != *output_shape_backend) || (dims_count_server != dims_count_backend) ||
-    (output_byte_size_server != output_byte_size_backend) || (output_memory_type_server != output_memory_type_backend) || (output_memory_id_server != output_memory_id_backend)) {
-      RESPOND_AND_SET_NULL_IF_ERROR(response, TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "Returned values do not match when using TRITONBACKEND_InferenceResponseOutput API"));
+
+    if ((*output_name_server != *output_name_backend) ||
+        (output_datatype_server != output_datatype_backend) ||
+        (*output_shape_server != *output_shape_backend) ||
+        (dims_count_server != dims_count_backend) ||
+        (output_byte_size_server != output_byte_size_backend) ||
+        (output_memory_type_server != output_memory_type_backend) ||
+        (output_memory_id_server != output_memory_id_backend)) {
+      RESPOND_AND_SET_NULL_IF_ERROR(
+          response, TRITONSERVER_ErrorNew(
+                        TRITONSERVER_ERROR_INVALID_ARG,
+                        "Returned values do not match when using "
+                        "TRITONBACKEND_InferenceResponseOutput API"));
     }
 
     RESPOND_AND_SET_NULL_IF_ERROR(
         response,
         TRITONBACKEND_InferenceResponseOutputByName(
             *response, output_name_backend, &output_datatype_backend,
-            &output_shape_backend, &dims_count_backend, &output_base_backend, &output_byte_size_backend,
-            &output_memory_type_backend, &output_memory_id_backend, &userp_backend));
+            &output_shape_backend, &dims_count_backend, &output_base_backend,
+            &output_byte_size_backend, &output_memory_type_backend,
+            &output_memory_id_backend, &userp_backend));
 
-    if((*output_name_server != *output_name_backend) || (output_datatype_server != output_datatype_backend) || (*output_shape_server != *output_shape_backend) || (dims_count_server != dims_count_backend) ||
-    (output_byte_size_server != output_byte_size_backend) || (output_memory_type_server != output_memory_type_backend) || (output_memory_id_server != output_memory_id_backend)) {
-      RESPOND_AND_SET_NULL_IF_ERROR(response, TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "Returned values do not match when using TRITONBACKEND_InferenceResponseOutputByName API"));
+    if ((*output_name_server != *output_name_backend) ||
+        (output_datatype_server != output_datatype_backend) ||
+        (*output_shape_server != *output_shape_backend) ||
+        (dims_count_server != dims_count_backend) ||
+        (output_byte_size_server != output_byte_size_backend) ||
+        (output_memory_type_server != output_memory_type_backend) ||
+        (output_memory_id_server != output_memory_id_backend)) {
+      RESPOND_AND_SET_NULL_IF_ERROR(
+          response, TRITONSERVER_ErrorNew(
+                        TRITONSERVER_ERROR_INVALID_ARG,
+                        "Returned values do not match when using "
+                        "TRITONBACKEND_InferenceResponseOutputByName API"));
     }
 
     // Fill the BLS output buffer with output data returned by internal
