@@ -55,7 +55,7 @@ function check_unit_test() {
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else
-	EXPECTED_NUM_TESTS=1
+        EXPECTED_NUM_TESTS="${1:-1}"
         check_test_results ${TEST_RESULT_FILE} ${EXPECTED_NUM_TESTS}
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
@@ -76,6 +76,12 @@ function run_and_check_server() {
 
 rm -f $SERVER_LOG
 RET=0
+
+if [ `ps | grep -c "tritonserver"` != "0" ]; then
+    echo -e "Tritonserver already running"
+    echo -e `ps | grep tritonserver`
+    exit 1
+fi
 
 ### UNIT TESTS
 
@@ -221,7 +227,7 @@ MODELDIR="${PWD}/unit_test_models"
 mkdir -p "${MODELDIR}/identity_cache_on/1"
 mkdir -p "${MODELDIR}/identity_cache_off/1"
 BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
-PYTHON_TEST="metrics_test.py"
+PYTHON_TEST="metrics_config_test.py"
 
 # Check default settings: Counters should be enabled, summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
@@ -290,6 +296,54 @@ python3 ${PYTHON_TEST} MetricsTest.test_summaries_custom_quantiles 2>&1 | tee ${
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
+
+### Pending Request Count (Queue Size) Metric Behavioral Tests ###
+MODELDIR="${PWD}/queue_size_models"
+SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
+PYTHON_TEST="metrics_queue_size_test.py"
+rm -rf "${MODELDIR}"
+mkdir -p "${MODELDIR}"
+
+# Re-use an identity model that sleeps during execution for N seconds for the
+# batch of requests. Then we can confirm queue size behaviors for various
+# scheduling/batching strategies.
+BASE_MODEL="identity_delay"
+# Don't use special debug env var for this, just set sufficient parameters for
+# each scheduler to let them fill batches when possible.
+unset TRITONSERVER_DELAY_SCHEDULER
+export MAX_BATCH_SIZE=4
+# Delay up to 100ms to form batches up to MAX_BATCH_SIZE
+export MAX_QUEUE_DELAY=100000
+
+# Create a model per scheduler type
+DEFAULT_MODEL="${MODELDIR}/default"
+cp -r "${BASE_MODEL}" "${DEFAULT_MODEL}"
+mkdir -p "${DEFAULT_MODEL}/1"
+sed -i "s/^max_batch_size.*/max_batch_size: ${MAX_BATCH_SIZE}/" "${DEFAULT_MODEL}/config.pbtxt"
+
+DYNAMIC_MODEL="${MODELDIR}/dynamic"
+cp -r "${DEFAULT_MODEL}" "${DYNAMIC_MODEL}"
+echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY} }\n" >> "${DYNAMIC_MODEL}/config.pbtxt"
+
+SEQUENCE_DIRECT_MODEL="${MODELDIR}/sequence_direct"
+cp -r "${DEFAULT_MODEL}" "${SEQUENCE_DIRECT_MODEL}"
+echo -e "\nsequence_batching { direct { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY}, minimum_slot_utilization: 1.0 } }\n" >> "${SEQUENCE_DIRECT_MODEL}/config.pbtxt"
+
+SEQUENCE_OLDEST_MODEL="${MODELDIR}/sequence_oldest"
+cp -r "${DEFAULT_MODEL}" "${SEQUENCE_OLDEST_MODEL}"
+echo -e "\nsequence_batching { oldest { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY}, max_candidate_sequences: ${MAX_BATCH_SIZE} } }\n" >> "${SEQUENCE_OLDEST_MODEL}/config.pbtxt"
+
+# TODO
+#ENSEMBLE_MODEL="${MODELDIR}/ensemble"
+#mkdir -p "${ENSEMBLE_MODEL}/1"
+
+run_and_check_server
+python3 ${PYTHON_TEST} 2>&1 | tee ${CLIENT_LOG}
+kill $SERVER_PID
+wait $SERVER_PID
+# TODO: Set to 5 with ensemble test
+expected_tests=4
+check_unit_test "${expected_tests}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
