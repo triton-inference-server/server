@@ -61,23 +61,35 @@ class LifecycleTest(tu.TestResultCollector):
     def test_error_code(self):
         model_name = "error_code"
         shape = [1, 1]
-        error = "TRITONSERVER_ERROR_INVALID_ARG"
-        expected_grpc_error = "StatusCode.INVALID_ARGUMENT"
+        # [(Triton error, expected gRPC error message starting), ...]
+        errors = [
+            ("TRITONSERVER_ERROR_UNKNOWN", "[StatusCode.UNKNOWN]"),
+            ("TRITONSERVER_ERROR_INTERNAL", "[StatusCode.INTERNAL]"),
+            ("TRITONSERVER_ERROR_NOT_FOUND", "[StatusCode.NOT_FOUND]"),
+            ("TRITONSERVER_ERROR_INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
+            ("TRITONSERVER_ERROR_UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
+            ("TRITONSERVER_ERROR_UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
+            ("TRITONSERVER_ERROR_ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("(default)", "[StatusCode.INTERNAL] unrecognized"),
+        ]
         with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
-                input_data = np.array([[error]], dtype=np.object_)
-                inputs = [
-                    grpcclient.InferInput(
-                        "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                for error, expected_grpc_error_start in errors:
+                    input_data = np.array([[error]], dtype=np.object_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    with self.assertRaises(InferenceServerException) as e:
+                        client.infer(model_name, inputs)
+                    # e.g. [StatusCode.UNKNOWN] error code: TRITONSERVER_ERROR_UNKNOWN
+                    # e.g. [StatusCode.INTERNAL] unrecognized error code: (default)
+                    self.assertEqual(
+                        str(e.exception),
+                        expected_grpc_error_start + " error code: " + error,
                     )
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                with self.assertRaises(InferenceServerException) as e:
-                    client.infer(model_name, inputs)
-                self.assertEqual(
-                    str(e.exception),
-                    "[" + expected_grpc_error + "] Provided error code: " + error,
-                )
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third

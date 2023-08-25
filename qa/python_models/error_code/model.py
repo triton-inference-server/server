@@ -48,13 +48,11 @@ class TritonPythonModel:
             err_code_str = str(err_code_tensor[0][0], encoding="utf-8")
             if err_code_str in error_code_map:
                 error = pb_utils.TritonError(
-                    message=("Provided error code: " + err_code_str),
+                    message=("error code: " + err_code_str),
                     code=error_code_map[err_code_str],
                 )
             else:
-                error = pb_utils.TritonError(
-                    "On default error code, provided error code: " + err_code_str
-                )
+                error = pb_utils.TritonError("unrecognized error code: " + err_code_str)
             responses.append(pb_utils.InferenceResponse(error=error))
 
         return responses
