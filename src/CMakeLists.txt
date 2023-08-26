@@ -773,6 +773,8 @@ if (NOT WIN32)
 endif() # NOT WIN32
 
 # Currently unit tests do not build for windows...
-if ( NOT WIN32 OR NOT EXISTS "/usr/lib/aarch64-linux-gnu/tegra/" )
-  add_subdirectory(test test)
+if ( NOT WIN32)
+  if ( NOT EXISTS "/usr/lib/aarch64-linux-gnu/tegra/" )
+    add_subdirectory(test test)
+  endif()
 endif() # NOT WIN32
