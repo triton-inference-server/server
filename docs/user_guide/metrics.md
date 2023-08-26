@@ -97,6 +97,71 @@ Count*. The count metrics are illustrated by the following examples:
 |              |Failure Count   |`nv_inference_request_failure` |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Inference Count |`nv_inference_count` |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
 |              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Inference Request Metrics](#inference-request-metrics), does not include cached requests)|Per model|Per request|
+|              |Pending Request Count |`nv_inference_pending_request_count` |Number of inference requests awaiting execution by a backend. This number is incremented when a request is enqueued to the server (`TRITONSERVER_ServerInferAsync`) and is decremented when a backend is about to start executing the request. More details can be found below. |Per model|Per request|
+
+#### Pending Request Count (Queue Size) Per-Model
+
+The *Pending Request Count* reflects the number of requests that have been
+received by Triton core via `TRITONSERVER_InferAsync`, but have not yet
+started execution by a backend model instance
+(`TRITONBACKEND_ModelInstanceExecute`).
+
+For all intents and purposes, the
+"pending request count" and "queue size" per-model can be used
+interchangeably, and the number reflected in the metric should
+intuitively represent the number of requests that are not currently
+being executed by any model instances. In simple terms, if you send a 100
+requests to a model that can only handle 5 requests concurrently, then you
+should see a pending count of 95 for that model in most cases.
+
+For those interested in more technical details, the term "pending request count"
+is a bit more accurate than "queue size" because Triton is highly configurable,
+and there are many places in Triton that a request be considered pending rather
+than a single queue. Some of the most common will be called out below:
+- Default Scheduler backlogs any requests not currently executing.
+  - Assuming 1 available model instance with the default scheduler settings,
+    and 10 requests are sent in rapid succession.
+  - The 1st request should be picked up for
+    execution immediately, and the remaining 9 requests should be considered
+    pending for this model, until the 1st request is finished. Afterwards, the
+    next request should be picked up and the pending count should be decremented
+    to 8, and so on until all requests are finished and the pending count is 0.
+- Dynamic Batcher queue for dynamically  creating batches from requests
+  - Assuming 1 available model instance with the dynamic batch scheduler
+    configured with `max_batch_size: 4` and a sufficiently large
+    `max_queue_delay_microseconds` (or queue of requests),
+    and 10 requests are sent in rapid succession.
+  - The first 4 requests, or as large of a batch the scheduler could form,
+    should be picked up for execution immediately, and the remaining 6 requests
+    should be considered pending. After the batch finishes, the next batch
+    should be picked up, decrementing the pending count again to 2 pending.
+    Then finally since only 2 requests remain, the final 2 requests will be
+    batched and picked up by the backend, decrementing the pending count to 0.
+- Sequence Batcher queues and backlogs for ongoing sequence requests, some may
+  be assigned sequence slots, some may not.
+  - Sequence Batchers of both strategies (direct and oldest) will have pending
+    counts that generally follow the same trend as the dynamic batching
+    description above. The sequence batchers will immediately execute as many
+    requests in a batch as it can based on the model/scheduler config settings,
+    and any further requests will be considered pending until the previous batch
+    finishes and the next batch can start.
+- Rate Limiter queues
+  - When rate limiting is enabled, requests can be held back from execution
+    to satisfy the rate limit constraints that were configured.
+
+There are some places where a request would not be considered pending:
+- Ensemble Scheduler
+  - The Ensemble Scheduler almost immediately enqueues any requests it receives
+    into the composing model schedulers at the first step in the ensemble.
+    Therefore, the requests could be considered pending by the composing model
+    scheduler's, however from the ensemble's perspective, these requests have been
+    scheduled.
+- Frontends (HTTP/GRPC Servers)
+  - Any requests sent from a client to a frontend server in-front of Triton
+    may spend some time in the corresponding server's code mapping
+    protocol-specific metadata to Triton metadata. Though this time is
+    generally brief, it will not be considered pending from Triton's
+    perspective until Triton core has received the request from the frontend.
 
 ### Latencies
 
