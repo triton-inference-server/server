@@ -312,8 +312,8 @@ BASE_MODEL="identity_delay"
 # each scheduler to let them fill batches when possible.
 unset TRITONSERVER_DELAY_SCHEDULER
 export MAX_BATCH_SIZE=4
-# Delay up to 100ms to form batches
-export MAX_QUEUE_DELAY=100000
+# Delay up to 100ms to form batches up to MAX_BATCH_SIZE
+export MAX_QUEUE_DELAY_US=100000
 
 # Create a model per scheduler type
 DEFAULT_MODEL="${MODELDIR}/default"
@@ -323,17 +323,15 @@ sed -i "s/^max_batch_size.*/max_batch_size: ${MAX_BATCH_SIZE}/" "${DEFAULT_MODEL
 
 DYNAMIC_MODEL="${MODELDIR}/dynamic"
 cp -r "${DEFAULT_MODEL}" "${DYNAMIC_MODEL}"
-# Wait up to 100ms to form batches
-echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY} }\n" >> "${DYNAMIC_MODEL}/config.pbtxt"
+echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US} }\n" >> "${DYNAMIC_MODEL}/config.pbtxt"
 
 SEQUENCE_DIRECT_MODEL="${MODELDIR}/sequence_direct"
 cp -r "${DEFAULT_MODEL}" "${SEQUENCE_DIRECT_MODEL}"
-echo -e "\nsequence_batching { direct { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY}, minimum_slot_utilization: 1.0 } }\n" >> "${SEQUENCE_DIRECT_MODEL}/config.pbtxt"
+echo -e "\nsequence_batching { direct { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US}, minimum_slot_utilization: 1.0 } }\n" >> "${SEQUENCE_DIRECT_MODEL}/config.pbtxt"
 
 SEQUENCE_OLDEST_MODEL="${MODELDIR}/sequence_oldest"
 cp -r "${DEFAULT_MODEL}" "${SEQUENCE_OLDEST_MODEL}"
-# Wait up to 100ms to form batches
-echo -e "\nsequence_batching { oldest { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY}, max_candidate_sequences: ${MAX_BATCH_SIZE} } }\n" >> "${SEQUENCE_OLDEST_MODEL}/config.pbtxt"
+echo -e "\nsequence_batching { oldest { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US}, max_candidate_sequences: ${MAX_BATCH_SIZE} } }\n" >> "${SEQUENCE_OLDEST_MODEL}/config.pbtxt"
 
 BASE_ENSEMBLE="ensemble_delay"
 ENSEMBLE_MODEL="${MODELDIR}/ensemble"
@@ -343,6 +341,7 @@ mkdir -p "${ENSEMBLE_MODEL}/1"
 # metric values with individual and ensemble tests.
 cp -r "${DEFAULT_MODEL}" "${MODELDIR}/default_composing"
 cp -r "${DYNAMIC_MODEL}" "${MODELDIR}/dynamic_composing"
+
 
 run_and_check_server
 python3 ${PYTHON_TEST} 2>&1 | tee ${CLIENT_LOG}
