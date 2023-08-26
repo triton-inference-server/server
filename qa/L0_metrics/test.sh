@@ -232,13 +232,13 @@ PYTHON_TEST="metrics_config_test.py"
 # Check default settings: Counters should be enabled, summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -246,13 +246,13 @@ wait $SERVER_PID
 # Enable summaries, counters still enabled by default
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -260,13 +260,13 @@ wait $SERVER_PID
 # Enable summaries, disable counters
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config counter_latencies=false"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -275,15 +275,15 @@ wait $SERVER_PID
 CACHE_ARGS="--cache-config local,size=1048576"
 SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=true --metrics-config counter_latencies=true"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 # DLIS-4762: Asserts that request summary is not published when cache is
 # enabled for a model, until this if fixed.
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -292,7 +292,7 @@ wait $SERVER_PID
 export SUMMARY_QUANTILES="0.1:0.0.1,0.7:0.01,0.75:0.01"
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config summary_quantiles=${SUMMARY_QUANTILES}"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
