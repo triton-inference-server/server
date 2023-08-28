@@ -193,8 +193,8 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_GPU` CMake build flag can
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
-|GPU Utilization |Power Usage   |`nv_gpu_power_usage` |GPU instantaneous power in Watts       |Per GPU    |Per interval   |
-|              |Power Limit     |`nv_gpu_power_limit` |Maximum GPU power limit                |Per GPU    |Per interval   |
+|GPU Utilization |Power Usage   |`nv_gpu_power_usage` |GPU instantaneous power, in Watts      |Per GPU    |Per interval   |
+|              |Power Limit     |`nv_gpu_power_limit` |Maximum GPU power limit, in Watts      |Per GPU    |Per interval   |
 |              |Energy Consumption|`nv_energy_consumption` |GPU energy consumption in joules since Triton started|Per GPU|Per interval|
 |              |GPU Utilization |`nv_gpu_utilization` |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per interval   |
 |GPU Memory    |GPU Total Memory|`nv_gpu_memory_total_bytes` |Total GPU memory, in bytes             |Per GPU    |Per interval   |
