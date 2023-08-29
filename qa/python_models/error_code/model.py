@@ -30,13 +30,13 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     def execute(self, requests):
         error_code_map = {
-            "TRITONSERVER_ERROR_UNKNOWN": pb_utils.ErrorCode.TRITONSERVER_ERROR_UNKNOWN,
-            "TRITONSERVER_ERROR_INTERNAL": pb_utils.ErrorCode.TRITONSERVER_ERROR_INTERNAL,
-            "TRITONSERVER_ERROR_NOT_FOUND": pb_utils.ErrorCode.TRITONSERVER_ERROR_NOT_FOUND,
-            "TRITONSERVER_ERROR_INVALID_ARG": pb_utils.ErrorCode.TRITONSERVER_ERROR_INVALID_ARG,
-            "TRITONSERVER_ERROR_UNAVAILABLE": pb_utils.ErrorCode.TRITONSERVER_ERROR_UNAVAILABLE,
-            "TRITONSERVER_ERROR_UNSUPPORTED": pb_utils.ErrorCode.TRITONSERVER_ERROR_UNSUPPORTED,
-            "TRITONSERVER_ERROR_ALREADY_EXISTS": pb_utils.ErrorCode.TRITONSERVER_ERROR_ALREADY_EXISTS,
+            "UNKNOWN": pb_utils.TritonError.ErrorCode.UNKNOWN,
+            "INTERNAL": pb_utils.TritonError.ErrorCode.INTERNAL,
+            "NOT_FOUND": pb_utils.TritonError.ErrorCode.NOT_FOUND,
+            "INVALID_ARG": pb_utils.TritonError.ErrorCode.INVALID_ARG,
+            "UNAVAILABLE": pb_utils.TritonError.ErrorCode.UNAVAILABLE,
+            "UNSUPPORTED": pb_utils.TritonError.ErrorCode.UNSUPPORTED,
+            "ALREADY_EXISTS": pb_utils.TritonError.ErrorCode.ALREADY_EXISTS,
         }
 
         responses = []

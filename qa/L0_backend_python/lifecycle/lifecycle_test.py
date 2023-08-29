@@ -63,13 +63,13 @@ class LifecycleTest(tu.TestResultCollector):
         shape = [1, 1]
         # [(Triton error, expected gRPC error message starting), ...]
         errors = [
-            ("TRITONSERVER_ERROR_UNKNOWN", "[StatusCode.UNKNOWN]"),
-            ("TRITONSERVER_ERROR_INTERNAL", "[StatusCode.INTERNAL]"),
-            ("TRITONSERVER_ERROR_NOT_FOUND", "[StatusCode.NOT_FOUND]"),
-            ("TRITONSERVER_ERROR_INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
-            ("TRITONSERVER_ERROR_UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
-            ("TRITONSERVER_ERROR_UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
-            ("TRITONSERVER_ERROR_ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("UNKNOWN", "[StatusCode.UNKNOWN]"),
+            ("INTERNAL", "[StatusCode.INTERNAL]"),
+            ("NOT_FOUND", "[StatusCode.NOT_FOUND]"),
+            ("INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
+            ("UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
+            ("UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
+            ("ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
             ("(default)", "[StatusCode.INTERNAL] unrecognized"),
         ]
         with self._shm_leak_detector.Probe() as shm_probe:
