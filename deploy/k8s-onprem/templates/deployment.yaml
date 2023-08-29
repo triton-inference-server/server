@@ -54,23 +54,38 @@ spec:
       volumes:
         - name: models
           nfs:
-            server: {{ .Values.image.modelRepositoryServer }}
-            path: {{ .Values.image.modelRepositoryPath }}
+            server: {{ .Values.server.modelRepositoryServer }}
+            path: {{ .Values.server.modelRepositoryPath }}
             readOnly: false
+      {{- if .Values.server.extraVolumes }}
+{{ toYaml .Values.server.extraVolumes | indent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.imageName }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.server.imageName }}"
+          imagePullPolicy: {{ .Values.server.pullPolicy }}
           volumeMounts:
             - mountPath: /models
               name: models
-
+          {{- if .Values.server.extraVolumeMounts }}
+{{ toYaml .Values.server.extraVolumeMounts | indent 12 }}
+          {{- end }}
           resources:
-            limits:
-              nvidia.com/gpu: {{ .Values.image.numGpus }}
+            limits: {{- toYaml .Values.server.gpus | nindent 14 }}
 
-          args: ["tritonserver", "--model-repository=/models"]
+          args:
+            - "tritonserver"
+          {{-  range .Values.server.args }}
+            - "{{ . }}"
+          {{- end }}
 
+          {{- if .Values.server.env }}
+          env:
+          {{- range $key, $value := .Values.server.env }}
+            - name: {{ $key }}
+              value: {{ $value }}
+          {{- end }}
+          {{- end }}
           ports:
             - containerPort: 8000
               name: http
