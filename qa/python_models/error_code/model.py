@@ -30,13 +30,13 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     def execute(self, requests):
         error_code_map = {
-            "UNKNOWN": pb_utils.TritonError.ErrorCode.UNKNOWN,
-            "INTERNAL": pb_utils.TritonError.ErrorCode.INTERNAL,
-            "NOT_FOUND": pb_utils.TritonError.ErrorCode.NOT_FOUND,
-            "INVALID_ARG": pb_utils.TritonError.ErrorCode.INVALID_ARG,
-            "UNAVAILABLE": pb_utils.TritonError.ErrorCode.UNAVAILABLE,
-            "UNSUPPORTED": pb_utils.TritonError.ErrorCode.UNSUPPORTED,
-            "ALREADY_EXISTS": pb_utils.TritonError.ErrorCode.ALREADY_EXISTS,
+            "UNKNOWN": pb_utils.TritonError.UNKNOWN,
+            "INTERNAL": pb_utils.TritonError.INTERNAL,
+            "NOT_FOUND": pb_utils.TritonError.NOT_FOUND,
+            "INVALID_ARG": pb_utils.TritonError.INVALID_ARG,
+            "UNAVAILABLE": pb_utils.TritonError.UNAVAILABLE,
+            "UNSUPPORTED": pb_utils.TritonError.UNSUPPORTED,
+            "ALREADY_EXISTS": pb_utils.TritonError.ALREADY_EXISTS,
         }
 
         responses = []
