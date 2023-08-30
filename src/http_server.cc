@@ -1757,6 +1757,19 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                         rate_str)
                            .c_str()));
         }
+        catch (const std::out_of_range& oor) {
+          HTTP_RESPOND_IF_ERR(
+              req,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse 'trace_rate', value is out of "
+                               "range [ ") +
+                   std::to_string(std::numeric_limits<std::uint32_t>::min()) +
+                   ", " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::max()) +
+                   " ], got: " + rate_str)
+                      .c_str()));
+        }
       }
     }
     if (request.Find("trace_count", &setting_json)) {
@@ -1767,6 +1780,16 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&count_str));
         try {
           count = std::stoi(count_str);
+          if (count < TraceManager::MIN_TRACE_COUNT_VALUE) {
+            HTTP_RESPOND_IF_ERR(
+                req, TRITONSERVER_ErrorNew(
+                         TRITONSERVER_ERROR_INVALID_ARG,
+                         (std::string("Unable to parse 'trace_count'.") +
+                          " Expecting value >= " +
+                          std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) +
+                          ", got:" + count_str)
+                             .c_str()));
+          }
           new_setting.count_ = &count;
         }
         catch (const std::invalid_argument& ia) {
@@ -1776,6 +1799,18 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                        (std::string("Unable to parse 'trace_count', got: ") +
                         count_str)
                            .c_str()));
+        }
+        catch (const std::out_of_range& oor) {
+          HTTP_RESPOND_IF_ERR(
+              req,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse 'trace_count', value is out of "
+                               "range [ ") +
+                   std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) + ", " +
+                   std::to_string(std::numeric_limits<std::int32_t>::max()) +
+                   " ], got: " + count_str)
+                      .c_str()));
         }
       }
     }
@@ -1796,6 +1831,20 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                        (std::string("Unable to parse 'log_frequency', got: ") +
                         frequency_str)
                            .c_str()));
+        }
+        catch (const std::out_of_range& oor) {
+          HTTP_RESPOND_IF_ERR(
+              req,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string(
+                       "Unable to parse 'log_frequency', value is out of "
+                       "range [ ") +
+                   std::to_string(std::numeric_limits<std::uint32_t>::min()) +
+                   ", " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::max()) +
+                   " ], got: " + frequency_str)
+                      .c_str()));
         }
       }
     }

@@ -79,6 +79,7 @@ class TraceManager {
   class TraceSetting;
 
  public:
+  static constexpr int32_t MIN_TRACE_COUNT_VALUE{-1};
   // The new field values for a setting, 'clear_xxx_' indicates
   // whether to clear the previously specified filed value.
   // If false, 'xxx_' will be used as the new field value.

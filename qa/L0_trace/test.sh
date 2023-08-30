@@ -481,6 +481,14 @@ if [ -f ./global_trace.log.0 ]; then
     RET=1
 fi
 
+SETTINGS="trace_count trace_rate log_frequency"
+
+for SETTING in $SETTINGS; do
+    # Check `out of range` errors
+    update_trace_setting "simple" '{"'${SETTING}'":"10000000000"}'
+    assert_curl_failure "Server modified '${SETTING}' with an out of range value."
+done
+
 set -e
 
 kill $SERVER_PID
@@ -699,7 +707,7 @@ OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 # Building the latest version of the OpenTelemetry collector.
 # Ref: https://opentelemetry.io/docs/collector/getting-started/#local
 if [ -d "$OTEL_COLLECTOR_DIR" ]; then rm -Rf $OTEL_COLLECTOR_DIR; fi
-git clone https://github.com/open-telemetry/opentelemetry-collector.git
+git clone --depth 1 --branch v0.82.0 https://github.com/open-telemetry/opentelemetry-collector.git
 cd $OTEL_COLLECTOR_DIR
 make install-tools
 make otelcorecol
