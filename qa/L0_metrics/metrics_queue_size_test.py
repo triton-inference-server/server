@@ -76,8 +76,9 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
         # Verify values for filling request queues
         self.num_requests = 10
         self.concurrency = 10
+        # Concurrency must be at least as high as number of async requests we intend
+        # to send N requests to fill request queues before blocking on any results.
         self.assertGreaterEqual(self.concurrency, self.num_requests)
-        # Concurrency must be at least as high as number of async requests we intend to send at once
         self.client = tritonclient.http.InferenceServerClient(
             url=self.server_url, concurrency=self.concurrency
         )

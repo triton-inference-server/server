@@ -126,7 +126,7 @@ than a single queue. Some of the most common will be called out below:
     pending for this model, until the 1st request is finished. Afterwards, the
     next request should be picked up and the pending count should be decremented
     to 8, and so on until all requests are finished and the pending count is 0.
-- Dynamic Batcher queue for dynamically  creating batches from requests
+- Dynamic Batcher queue for dynamically creating batches from requests.
   - Assuming 1 available model instance with the dynamic batch scheduler
     configured with `max_batch_size: 4` and a sufficiently large
     `max_queue_delay_microseconds` (or queue of requests),
@@ -145,7 +145,7 @@ than a single queue. Some of the most common will be called out below:
     requests in a batch as it can based on the model/scheduler config settings,
     and any further requests will be considered pending until the previous batch
     finishes and the next batch can start.
-- Rate Limiter queues
+- Rate Limiter queues for prepared batches of requests.
   - When rate limiting is enabled, requests can be held back from execution
     to satisfy the rate limit constraints that were configured.
 

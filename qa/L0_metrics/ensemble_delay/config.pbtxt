@@ -54,13 +54,13 @@ ensemble_scheduling
     {
       model_name: "dynamic_composing"
       model_version: -1
-      input_map { key: "INPUT0", value: "ENSEMBLE_INPUT0"}
+      input_map { key: "INPUT0", value: "ENSEMBLE_INPUT0" }
       output_map { key: "OUTPUT0", value: "ENSEMBLE_OUTPUT0" }
     },
     {
       model_name: "default_composing"
       model_version: -1
-      input_map { key: "INPUT0", value: "ENSEMBLE_INPUT0"}
+      input_map { key: "INPUT0", value: "ENSEMBLE_INPUT0" }
       output_map { key: "OUTPUT0", value: "ENSEMBLE_OUTPUT1" }
     }
   ]
