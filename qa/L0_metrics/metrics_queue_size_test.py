@@ -134,7 +134,9 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
             # We don't care about finishing any sequences, just need to queue up
             # requests for each sequence until num_requests is hit.
             seq_id = (num_sent % num_seq_slots) + 1
+            # Toggle start flag to False after first request per sequence ID
             start = True if seq_id not in started_seqs else False
+            started_seqs[seq_id] = True
             futures.append(
                 self.client.async_infer(
                     model_name,
