@@ -58,7 +58,7 @@ CACHE_COUNTER_PATTERNS = [
 CACHE_SUMMARY_PATTERNS = ["nv_cache_hit_summary", "nv_cache_miss_summary"]
 
 
-class MetricsTest(tu.TestResultCollector):
+class MetricsConfigTest(tu.TestResultCollector):
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
         r = requests.get(metrics_url)
