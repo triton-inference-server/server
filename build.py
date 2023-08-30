@@ -69,7 +69,7 @@ from inspect import getsourcefile
 TRITON_VERSION_MAP = {
     "2.38.0dev": (
         "23.09dev",  # triton container
-        "23.07",  # upstream container
+        "23.08",  # upstream container
         "1.15.1",  # ORT
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
@@ -1312,10 +1312,10 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.2/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.2/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.2/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.2/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
