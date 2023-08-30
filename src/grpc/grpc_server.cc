@@ -1324,6 +1324,18 @@ CommonHandler::RegisterTrace()
                       .c_str());
               GOTO_IF_ERR(err, earlyexit);
             }
+            catch (const std::out_of_range& oor) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', value is out of range [ " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::min()) +
+                   ", " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::max()) +
+                   " ], got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
           } else {
             err = TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
@@ -1342,6 +1354,16 @@ CommonHandler::RegisterTrace()
           } else if (it->second.value().size() == 1) {
             try {
               count = std::stoi(it->second.value()[0]);
+              if (count < TraceManager::MIN_TRACE_COUNT_VALUE) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    (std::string("Unable to parse '") + setting_name +
+                     "'. Expecting value >= " +
+                     std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) +
+                     ", got: " + it->second.value()[0])
+                        .c_str());
+                GOTO_IF_ERR(err, earlyexit);
+              }
               new_setting.count_ = &count;
             }
             catch (const std::invalid_argument& ia) {
@@ -1349,6 +1371,17 @@ CommonHandler::RegisterTrace()
                   TRITONSERVER_ERROR_INVALID_ARG,
                   (std::string("Unable to parse '") + setting_name +
                    "', got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+            catch (const std::out_of_range& oor) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', value is out of range [ " +
+                   std::to_string(TraceManager::MIN_TRACE_COUNT_VALUE) + ", " +
+                   std::to_string(std::numeric_limits<std::int32_t>::max()) +
+                   " ], got: " + it->second.value()[0])
                       .c_str());
               GOTO_IF_ERR(err, earlyexit);
             }
@@ -1377,6 +1410,18 @@ CommonHandler::RegisterTrace()
                   TRITONSERVER_ERROR_INVALID_ARG,
                   (std::string("Unable to parse '") + setting_name +
                    "', got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+            catch (const std::out_of_range& oor) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', value is out of range [ " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::min()) +
+                   ", " +
+                   std::to_string(std::numeric_limits<std::uint32_t>::max()) +
+                   " ], got: " + it->second.value()[0])
                       .c_str());
               GOTO_IF_ERR(err, earlyexit);
             }
