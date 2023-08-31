@@ -130,6 +130,241 @@ ModelStreamInferHandler::StartNewRequest()
 }
 
 bool
+ModelStreamInferHandler::RequestStartStep(
+    InferHandler::State* state, bool rpc_ok)
+{
+  // A new stream connection... If RPC failed on a new request then
+  // the server is shutting down and so we should do nothing.
+  if (!rpc_ok) {
+    state->step_ = Steps::FINISH;
+    return true;
+  }
+
+  // Start a new request to replace this one...
+  StartNewRequest();
+
+  if (ExecutePrecondition(state)) {
+    // Since this is the start of a connection, 'state' hasn't been
+    // used yet so use it to read a request off the connection.
+    state->context_->step_ = Steps::READ;
+    state->step_ = Steps::READ;
+    state->context_->responder_->Read(&state->request_, state);
+  } else {
+    // Precondition is not satisfied, cancel the stream
+    state->context_->step_ = Steps::COMPLETE;
+    state->step_ = Steps::COMPLETE;
+    ::grpc::Status status = ::grpc::Status(
+        ::grpc::StatusCode::UNAVAILABLE,
+        std::string("This protocol is restricted, expecting header '") +
+            restricted_kv_.first + "'");
+    state->context_->responder_->Finish(status, state);
+    // Request finished due to error.
+    return true;
+  }
+
+  // Not finished with a request on the start step unless an error occurs above.
+  return false;
+}
+
+bool
+ModelStreamInferHandler::RequestReadStep(
+    InferHandler::State* state, bool rpc_ok)
+{
+  bool finished = false;
+  TRITONSERVER_Error* err = nullptr;
+  const inference::ModelInferRequest& request = state->request_;
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+  // If done reading and no in-flight requests then can finish the
+  // entire stream. Otherwise just finish this state.
+  if (!rpc_ok) {
+    state->context_->step_ = Steps::WRITEREADY;
+    if (state->context_->IsRequestsCompleted()) {
+      state->context_->step_ = Steps::COMPLETE;
+      state->step_ = Steps::COMPLETE;
+      state->context_->responder_->Finish(
+          state->context_->finish_ok_ ? ::grpc::Status::OK
+                                      : ::grpc::Status::CANCELLED,
+          state);
+      finished = false;
+    } else {
+      state->step_ = Steps::FINISH;
+      finished = true;
+    }
+
+    return finished;
+  }
+
+  int64_t requested_model_version;
+  err = GetModelVersionFromString(
+      request.model_version(), &requested_model_version);
+
+  // Record the transaction policy of the model into the current state
+  // object.
+  if (err == nullptr) {
+    uint32_t txn_flags;
+    err = TRITONSERVER_ServerModelTransactionProperties(
+        tritonserver_.get(), request.model_name().c_str(),
+        requested_model_version, &txn_flags, nullptr /* voidp */);
+    if (err == nullptr) {
+      state->is_decoupled_ = ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0);
+    }
+  }
+
+  // Request has been successfully read, increment the context request
+  // counter.
+  state->context_->IncrementRequestCounter();
+
+  // If the request is not for a model with decoupled transaction policy
+  // then put it in the context queue so that its response is sent in
+  // the same order as the request was received.
+  if (!state->is_decoupled_) {
+    state->context_->EnqueueForResponse(state);
+  }
+
+  // Need to get context here as it is needed below. 'state' can
+  // complete inference, write response, and finish (which releases
+  // context) before we make any forward progress.... so need to
+  // hold onto context here while we know it is good.
+  std::shared_ptr<StateContext> context = state->context_;
+
+  // Issue the inference request into server...
+  auto response_queue_ = state->response_queue_;
+
+  // Create the inference request which contains all the
+  // input information needed for an inference.
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestNew(
+        &irequest, tritonserver_.get(), request.model_name().c_str(),
+        requested_model_version);
+  }
+
+  if (err == nullptr) {
+    err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
+  }
+
+  if (err == nullptr) {
+    err = ForwardHeadersAsParameters(irequest, state);
+  }
+
+  // Will be used to hold the serialized data in case explicit string
+  // tensors are present in the request.
+  std::list<std::string> serialized_data;
+
+  if (err == nullptr) {
+    err = InferGRPCToInput(
+        tritonserver_, shm_manager_, request, &serialized_data, irequest);
+  }
+  if (err == nullptr) {
+    err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
+        tritonserver_, shm_manager_, request, std::move(serialized_data),
+        response_queue_, &state->alloc_payload_);
+  }
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+        irequest, InferRequestComplete, nullptr /* request_release_userp */);
+  }
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetResponseCallback(
+        irequest, allocator_,
+        &state->alloc_payload_ /* response_allocator_userp */,
+        StreamInferResponseComplete, reinterpret_cast<void*>(state));
+  }
+
+  if (err == nullptr) {
+    TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+#ifdef TRITON_ENABLE_TRACING
+    state->trace_ =
+        std::move(trace_manager_->SampleTrace(request.model_name()));
+    if (state->trace_ != nullptr) {
+      triton_trace = state->trace_->trace_;
+    }
+#endif  // TRITON_ENABLE_TRACING
+
+    state->step_ = ISSUED;
+    err = TRITONSERVER_ServerInferAsync(
+        tritonserver_.get(), irequest, triton_trace);
+  }
+
+  // If there was not an error in issuing the 'state' request then
+  // state->step_ == ISSUED and inference request has
+  // initiated... the completion callback will transition to
+  // WRITEREADY or WRITTEN. If there was an error then enqueue the
+  // error response and show it to be ready for writing.
+  if (err != nullptr) {
+    inference::ModelStreamInferResponse* response;
+    if (state->is_decoupled_) {
+      state->response_queue_->AllocateResponse();
+      response = state->response_queue_->GetLastAllocatedResponse();
+    } else {
+      response = state->response_queue_->GetNonDecoupledResponse();
+    }
+
+    // Get request ID for logging in case of error.
+    std::string log_request_id = request.id();
+    if (log_request_id.empty()) {
+      log_request_id = "<id_unknown>";
+    }
+    LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
+                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting GRPC inference request");
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    response->set_error_message(status.error_message());
+
+    response->mutable_infer_response()->Clear();
+    // repopulate the id so that client knows which request failed.
+    response->mutable_infer_response()->set_id(request.id());
+    state->step_ = Steps::WRITEREADY;
+    if (!state->is_decoupled_) {
+      state->context_->WriteResponseIfReady(state);
+    } else {
+      state->response_queue_->MarkNextResponseComplete();
+      state->complete_ = true;
+      state->context_->PutTaskBackToQueue(state);
+    }
+  }
+
+  // Now that the inference request is in flight, create a copy of
+  // 'state' and use it to attempt another read from the connection
+  // (i.e the next request in the stream).
+  State* next_read_state = StateNew(tritonserver_.get(), context, Steps::READ);
+
+#ifdef TRITON_ENABLE_TRACING
+  // Capture a timestamp for the time when we start waiting for this
+  // next request to read.
+  // Can't create trace as we don't know the model to be requested,
+  // track timestamps in 'state'
+  next_read_state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_WAITREAD_START", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+  next_read_state->context_->responder_->Read(
+      &next_read_state->request_, next_read_state);
+
+  // Not finished with a request on the read step unless an error occurs above.
+  return false;
+}
+
+bool
+ModelStreamInferHandler::RequestCompleteStep(InferHandler::State* state)
+{
+  state->step_ = Steps::FINISH;
+  // Finished with the request.
+  return true;
+}
+
+
+bool
 ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
@@ -142,218 +377,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   bool finished = false;
 
   if (state->step_ == Steps::START) {
-    // A new stream connection... If RPC failed on a new request then
-    // the server is shutting down and so we should do nothing.
-    if (!rpc_ok) {
-      state->step_ = Steps::FINISH;
-      return false;
-    }
-
-    // Start a new request to replace this one...
-    StartNewRequest();
-
-    if (ExecutePrecondition(state)) {
-      // Since this is the start of a connection, 'state' hasn't been
-      // used yet so use it to read a request off the connection.
-      state->context_->step_ = Steps::READ;
-      state->step_ = Steps::READ;
-      state->context_->responder_->Read(&state->request_, state);
-    } else {
-      // Precondition is not satisfied, cancel the stream
-      state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
-      ::grpc::Status status = ::grpc::Status(
-          ::grpc::StatusCode::UNAVAILABLE,
-          std::string("This protocol is restricted, expecting header '") +
-              restricted_kv_.first + "'");
-      state->context_->responder_->Finish(status, state);
-      return !finished;
-    }
-
+    return RequestStartStep(state, rpc_ok);
   } else if (state->step_ == Steps::READ) {
-    TRITONSERVER_Error* err = nullptr;
-    const inference::ModelInferRequest& request = state->request_;
-#ifdef TRITON_ENABLE_TRACING
-    state->trace_timestamps_.emplace_back(
-        std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
-    // If done reading and no in-flight requests then can finish the
-    // entire stream. Otherwise just finish this state.
-    if (!rpc_ok) {
-      state->context_->step_ = Steps::WRITEREADY;
-      if (state->context_->IsRequestsCompleted()) {
-        state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::COMPLETE;
-        state->context_->responder_->Finish(
-            state->context_->finish_ok_ ? ::grpc::Status::OK
-                                        : ::grpc::Status::CANCELLED,
-            state);
-      } else {
-        state->step_ = Steps::FINISH;
-        finished = true;
-      }
-
-      return !finished;
-    }
-
-    int64_t requested_model_version;
-    err = GetModelVersionFromString(
-        request.model_version(), &requested_model_version);
-
-    // Record the transaction policy of the model into the current state
-    // object.
-    if (err == nullptr) {
-      uint32_t txn_flags;
-      err = TRITONSERVER_ServerModelTransactionProperties(
-          tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version, &txn_flags, nullptr /* voidp */);
-      if (err == nullptr) {
-        state->is_decoupled_ = ((txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0);
-      }
-    }
-
-    // Request has been successfully read, increment the context request
-    // counter.
-    state->context_->IncrementRequestCounter();
-
-    // If the request is not for a model with decoupled transaction policy
-    // then put it in the context queue so that its response is sent in
-    // the same order as the request was received.
-    if (!state->is_decoupled_) {
-      state->context_->EnqueueForResponse(state);
-    }
-
-    // Need to get context here as it is needed below. 'state' can
-    // complete inference, write response, and finish (which releases
-    // context) before we make any forward progress.... so need to
-    // hold onto context here while we know it is good.
-    std::shared_ptr<StateContext> context = state->context_;
-
-    // Issue the inference request into server...
-    auto response_queue_ = state->response_queue_;
-
-    // Create the inference request which contains all the
-    // input information needed for an inference.
-    TRITONSERVER_InferenceRequest* irequest = nullptr;
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestNew(
-          &irequest, tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version);
-    }
-
-    if (err == nullptr) {
-      err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
-    }
-
-    if (err == nullptr) {
-      err = ForwardHeadersAsParameters(irequest, state);
-    }
-
-    // Will be used to hold the serialized data in case explicit string
-    // tensors are present in the request.
-    std::list<std::string> serialized_data;
-
-    if (err == nullptr) {
-      err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, &serialized_data, irequest);
-    }
-    if (err == nullptr) {
-      err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
-          tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue_, &state->alloc_payload_);
-    }
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */);
-    }
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestSetResponseCallback(
-          irequest, allocator_,
-          &state->alloc_payload_ /* response_allocator_userp */,
-          StreamInferResponseComplete, reinterpret_cast<void*>(state));
-    }
-
-    if (err == nullptr) {
-      TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-      state->trace_ =
-          std::move(trace_manager_->SampleTrace(request.model_name()));
-      if (state->trace_ != nullptr) {
-        triton_trace = state->trace_->trace_;
-      }
-#endif  // TRITON_ENABLE_TRACING
-
-      state->step_ = ISSUED;
-      err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, triton_trace);
-    }
-
-    // If there was not an error in issuing the 'state' request then
-    // state->step_ == ISSUED and inference request has
-    // initiated... the completion callback will transition to
-    // WRITEREADY or WRITTEN. If there was an error then enqueue the
-    // error response and show it to be ready for writing.
-    if (err != nullptr) {
-      inference::ModelStreamInferResponse* response;
-      if (state->is_decoupled_) {
-        state->response_queue_->AllocateResponse();
-        response = state->response_queue_->GetLastAllocatedResponse();
-      } else {
-        response = state->response_queue_->GetNonDecoupledResponse();
-      }
-
-      // Get request ID for logging in case of error.
-      std::string log_request_id = request.id();
-      if (log_request_id.empty()) {
-        log_request_id = "<id_unknown>";
-      }
-      LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
-                     << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
-
-      ::grpc::Status status;
-      GrpcStatusUtil::Create(&status, err);
-      TRITONSERVER_ErrorDelete(err);
-      response->set_error_message(status.error_message());
-
-      response->mutable_infer_response()->Clear();
-      // repopulate the id so that client knows which request failed.
-      response->mutable_infer_response()->set_id(request.id());
-      state->step_ = Steps::WRITEREADY;
-      if (!state->is_decoupled_) {
-        state->context_->WriteResponseIfReady(state);
-      } else {
-        state->response_queue_->MarkNextResponseComplete();
-        state->complete_ = true;
-        state->context_->PutTaskBackToQueue(state);
-      }
-    }
-
-    // Now that the inference request is in flight, create a copy of
-    // 'state' and use it to attempt another read from the connection
-    // (i.e the next request in the stream).
-    State* next_read_state =
-        StateNew(tritonserver_.get(), context, Steps::READ);
-
-#ifdef TRITON_ENABLE_TRACING
-    // Capture a timestamp for the time when we start waiting for this
-    // next request to read.
-    // Can't create trace as we don't know the model to be requested,
-    // track timestamps in 'state'
-    next_read_state->trace_timestamps_.emplace_back(std::make_pair(
-        "GRPC_WAITREAD_START", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
-    next_read_state->context_->responder_->Read(
-        &next_read_state->request_, next_read_state);
-
+    return RequestReadStep(state, rpc_ok);
   } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-    finished = true;
+    // NOTE: Complete step doesn't care about rpc_ok value?
+    return RequestCompleteStep(state);
   } else if (!state->is_decoupled_) {
     // We handle the WRITTEN and WRITEREADY states little
     // differently depending whether the inference request
@@ -406,7 +435,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->DecrementRequestCounter();
       finished = Finish(state);
 
-    } else if (state->step_ == Steps::COMPLETE) {
+    }
+    // FIXME/NOTE/TODO: I think this is dead code, unreachable due to previous
+    // else-if on COMPLETE state.
+    else if (state->step_ == Steps::COMPLETE) {
       state->step_ = Steps::FINISH;
       finished = true;
     }
@@ -485,7 +517,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
   }
 
-  return !finished;
+  return finished;
 }
 
 bool
@@ -558,7 +590,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (response) {
       inference::ModelInferResponse& infer_response =
           *(response->mutable_infer_response());
-      // Validate Triton iresponse and set grpc/protobuf response fields from it
+      // Validate Triton iresponse and set grpc/protobuf response fields from
+      // it
       err = InferResponseCompleteCommon<inference::ModelStreamInferResponse>(
           state->tritonserver_, iresponse, infer_response,
           state->alloc_payload_);
@@ -633,5 +666,4 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     state->context_->WriteResponseIfReady(state);
   }
 }
-
 }}}  // namespace triton::server::grpc

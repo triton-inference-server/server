@@ -338,7 +338,8 @@ CommonHandler::Start()
 
     while (cq_->Next(&tag, &ok)) {
       ICallData* call_data = static_cast<ICallData*>(tag);
-      if (!call_data->Process(ok)) {
+      const bool tag_finished = call_data->Process(ok);
+      if (tag_finished) {
         LOG_VERBOSE(1) << "Done for " << call_data->Name() << ", "
                        << call_data->Id();
         delete call_data;

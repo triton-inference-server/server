@@ -106,6 +106,7 @@ class ModelStreamInferHandler
 
  protected:
   void StartNewRequest() override;
+  // Returns whether the request is finished being processed or not.
   bool Process(State* state, bool rpc_ok) override;
 
  private:
@@ -113,6 +114,11 @@ class ModelStreamInferHandler
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
   bool Finish(State* state);
+
+  // Step helpers
+  bool RequestStartStep(State* state, bool rpc_ok);
+  bool RequestReadStep(State* state, bool rpc_ok);
+  bool RequestCompleteStep(State* state);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
