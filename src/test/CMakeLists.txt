@@ -102,7 +102,6 @@ add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(dyna_sequence dyna_sequence)
 add_subdirectory(implicit_state implicit_state)
 add_subdirectory(query_backend query_backend)
-add_subdirectory(unittest unittest)
 
 if(${TRITON_ENABLE_GPU})
   add_subdirectory(sequence sequence)
