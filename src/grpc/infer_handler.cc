@@ -767,7 +767,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     finished = true;
   }
 
-  return !finished;
+  return finished;
 }
 
 TRITONSERVER_Error*

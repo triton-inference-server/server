@@ -958,6 +958,7 @@ class InferHandler : public HandlerBase {
   }
 
   virtual void StartNewRequest() = 0;
+  // Returns whether the request is finished being processed or not.
   virtual bool Process(State* state, bool rpc_ok) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
 
