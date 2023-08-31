@@ -1149,6 +1149,9 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
+# Remove once https://github.com/openucx/ucx/pull/9148 is available
+# in the min container.
+ENV UCX_MEM_EVENTS no
 """
 
     # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
