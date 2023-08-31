@@ -1027,6 +1027,8 @@ def create_plan_dynamic_modelfile(
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
+    if FLAGS.tensorrt_compat:
+        config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -1034,9 +1036,13 @@ def create_plan_dynamic_modelfile(
         engine_bytes = engine.serialize()
         del engine
 
-    model_name = tu.get_zero_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype
-    )
+    model_name_base = "plan"
+    if max_batch == 0:
+        model_name_base += "_nobatch"
+    if FLAGS.tensorrt_compat:
+        model_name_base += "_compatible"
+
+    model_name = tu.get_zero_model_name(model_name_base, io_cnt, dtype)
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
     os.makedirs(model_version_dir, exist_ok=True)
 
@@ -1228,7 +1234,7 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
                 True, models_dir, model_version, io_cnt, 0, dtype, shape
             )
 
-    if FLAGS.tensorrt:
+    if FLAGS.tensorrt or FLAGS.tensorrt_compat:
         create_plan_modelconfig(
             True, models_dir, model_version, io_cnt, 8, dtype, shape
         )
@@ -1337,6 +1343,12 @@ if __name__ == "__main__":
         help="Generate TensorRT PLAN models w/ opt profile with large max",
     )
     parser.add_argument(
+        "--tensorrt-compat",
+        required=False,
+        action="store_true",
+        help="Generate TensorRT version-compatible models",
+    )
+    parser.add_argument(
         "--tensorrt-shape-io",
         required=False,
         action="store_true",
@@ -1360,7 +1372,12 @@ if __name__ == "__main__":
     if FLAGS.libtorch:
         import torch
         from torch import nn
-    if FLAGS.tensorrt or FLAGS.tensorrt_big or FLAGS.tensorrt_shape_io:
+    if (
+        FLAGS.tensorrt
+        or FLAGS.tensorrt_big
+        or FLAGS.tensorrt_compat
+        or FLAGS.tensorrt_shape_io
+    ):
         import tensorrt as trt
     if FLAGS.openvino:
         from openvino.inference_engine import IENetwork
@@ -1369,10 +1386,12 @@ if __name__ == "__main__":
     import test_util as tu
 
     # Create models with variable-sized input and output. For big
-    # TensorRT models only create the one needed for performance
-    # testing
+    # and version-compatible TensorRT models, only create the one
+    # needed for testing.
     if FLAGS.tensorrt_big:
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
+    elif FLAGS.tensorrt_compat:
+        create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1, no_batch=False)
     elif FLAGS.tensorrt_shape_io:
         create_shape_tensor_models(FLAGS.models_dir, np.float32, [-1, -1], io_cnt=1)
     else:
