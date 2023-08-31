@@ -43,7 +43,6 @@ source ../common/util.sh
 
 rm -fr models && mkdir models
 cp -r $DATADIR/qa_identity_model_repository/plan_compatible_zero_1_float32 models/.
-rm -f *.log
 
 if [ `ps | grep -c "tritonserver"` != "0" ]; then
     echo -e "Tritonserver already running"
