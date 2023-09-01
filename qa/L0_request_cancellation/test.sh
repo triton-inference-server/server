@@ -45,7 +45,7 @@ mkdir -p models/
 cp -r $DATADIR/qa_identity_model_repository/libtorch_nobatch_zero_1_bool models/model
 sed -i 's/name:.*/name: "model"/' models/model/config.pbtxt
 
-LOG_FILE=server.log
+SERVER_LOG=server.log
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
