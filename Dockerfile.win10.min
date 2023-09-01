@@ -64,22 +64,7 @@ ADD ${BUILDTOOLS_SOURCE} vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--addProductLang","En-us","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
-LABEL BUILDTOOLS_VERSION=16.11.21
-
-WORKDIR /
-
-#
-# Installing Vcpkg
-#
-ARG VCPGK_VERSION=2022.11.14
-RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
-WORKDIR /vcpkg
-RUN bootstrap-vcpkg.bat
-RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
-RUN vcpkg.exe integrate install
-
-LABEL VCPGK_VERSION=${VCPGK_VERSION}
+LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
 WORKDIR /
 
@@ -101,11 +86,27 @@ ENV VCPKG_TARGET_TRIPLET x64-windows
 LABEL CMAKE_VERSION=${CMAKE_VERSION}
 
 #
+# Installing Vcpkg
+#
+ARG VCPGK_VERSION=2022.11.14
+RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
+WORKDIR /vcpkg
+RUN bootstrap-vcpkg.bat
+RUN vcpkg.exe update
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe integrate install
+
+LABEL VCPGK_VERSION=${VCPGK_VERSION}
+
+WORKDIR /
+
+
+#
 # Installing CUDA
 #
 ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=1
-ARG CUDA_PATCH=1
+ARG CUDA_MINOR=2
+ARG CUDA_PATCH=0
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -153,7 +154,7 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing CUDNN
 #
-ARG CUDNN_VERSION=8.9.3.28
+ARG CUDNN_VERSION=8.9.4.25
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 
