@@ -57,7 +57,7 @@ rm -fr *.log
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    echo -e "\n***\n*** Backend Output Detail Unit Test Failed\n***"
     RET=1
 fi
 set -e
