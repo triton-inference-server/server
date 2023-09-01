@@ -558,8 +558,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     finished = RequestWrittenStep(state, rpc_ok);
   } else if (state->step_ == Steps::WRITEREADY) {
     finished = RequestWriteReadyStep(state);
-  } else {
-    LOG_WARNING << "IN ELSE STATE OF PROCESS()";
   }
 
   return finished;
