@@ -166,38 +166,11 @@ ModelStreamInferHandler::RequestStartStep(
   return false;
 }
 
-bool
-ModelStreamInferHandler::RequestReadStep(
-    InferHandler::State* state, bool rpc_ok)
+void
+ModelStreamInferHandler::PrepareAndSendTritonRequest(InferHandler::State* state)
 {
-  bool finished = false;
   TRITONSERVER_Error* err = nullptr;
   const inference::ModelInferRequest& request = state->request_;
-#ifdef TRITON_ENABLE_TRACING
-  state->trace_timestamps_.emplace_back(
-      std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
-  // If done reading and no in-flight requests then can finish the
-  // entire stream. Otherwise just finish this state.
-  if (!rpc_ok) {
-    state->context_->step_ = Steps::WRITEREADY;
-    if (state->context_->IsRequestsCompleted()) {
-      state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
-      state->context_->responder_->Finish(
-          state->context_->finish_ok_ ? ::grpc::Status::OK
-                                      : ::grpc::Status::CANCELLED,
-          state);
-      finished = false;
-    } else {
-      state->step_ = Steps::FINISH;
-      finished = true;
-    }
-
-    return finished;
-  }
-
   int64_t requested_model_version;
   err = GetModelVersionFromString(
       request.model_version(), &requested_model_version);
@@ -224,15 +197,6 @@ ModelStreamInferHandler::RequestReadStep(
   if (!state->is_decoupled_) {
     state->context_->EnqueueForResponse(state);
   }
-
-  // Need to get context here as it is needed below. 'state' can
-  // complete inference, write response, and finish (which releases
-  // context) before we make any forward progress.... so need to
-  // hold onto context here while we know it is good.
-  std::shared_ptr<StateContext> context = state->context_;
-
-  // Issue the inference request into server...
-  auto response_queue_ = state->response_queue_;
 
   // Create the inference request which contains all the
   // input information needed for an inference.
@@ -262,7 +226,7 @@ ModelStreamInferHandler::RequestReadStep(
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
         tritonserver_, shm_manager_, request, std::move(serialized_data),
-        response_queue_, &state->alloc_payload_);
+        state->response_queue_, &state->alloc_payload_);
   }
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -296,43 +260,93 @@ ModelStreamInferHandler::RequestReadStep(
   // WRITEREADY or WRITTEN. If there was an error then enqueue the
   // error response and show it to be ready for writing.
   if (err != nullptr) {
-    inference::ModelStreamInferResponse* response;
-    if (state->is_decoupled_) {
-      state->response_queue_->AllocateResponse();
-      response = state->response_queue_->GetLastAllocatedResponse();
-    } else {
-      response = state->response_queue_->GetNonDecoupledResponse();
-    }
-
-    // Get request ID for logging in case of error.
-    std::string log_request_id = request.id();
-    if (log_request_id.empty()) {
-      log_request_id = "<id_unknown>";
-    }
-    LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
-                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(irequest),
-        "deleting GRPC inference request");
-
-    ::grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-    response->set_error_message(status.error_message());
-
-    response->mutable_infer_response()->Clear();
-    // repopulate the id so that client knows which request failed.
-    response->mutable_infer_response()->set_id(request.id());
-    state->step_ = Steps::WRITEREADY;
-    if (!state->is_decoupled_) {
-      state->context_->WriteResponseIfReady(state);
-    } else {
-      state->response_queue_->MarkNextResponseComplete();
-      state->complete_ = true;
-      state->context_->PutTaskBackToQueue(state);
-    }
+    EnqueueErrorResponse(state, irequest, err);
   }
+}
+
+void
+ModelStreamInferHandler::EnqueueErrorResponse(
+    InferHandler::State* state, TRITONSERVER_InferenceRequest* irequest,
+    TRITONSERVER_Error* err)
+{
+  const inference::ModelInferRequest& request = state->request_;
+  inference::ModelStreamInferResponse* response;
+  if (state->is_decoupled_) {
+    state->response_queue_->AllocateResponse();
+    response = state->response_queue_->GetLastAllocatedResponse();
+  } else {
+    response = state->response_queue_->GetNonDecoupledResponse();
+  }
+
+  // Get request ID for logging in case of error.
+  std::string log_request_id = request.id();
+  if (log_request_id.empty()) {
+    log_request_id = "<id_unknown>";
+  }
+  LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
+                 << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestDelete(irequest),
+      "deleting GRPC inference request");
+
+  ::grpc::Status status;
+  GrpcStatusUtil::Create(&status, err);
+  TRITONSERVER_ErrorDelete(err);
+  response->set_error_message(status.error_message());
+
+  response->mutable_infer_response()->Clear();
+  // repopulate the id so that client knows which request failed.
+  response->mutable_infer_response()->set_id(request.id());
+  state->step_ = Steps::WRITEREADY;
+  if (!state->is_decoupled_) {
+    state->context_->WriteResponseIfReady(state);
+  } else {
+    state->response_queue_->MarkNextResponseComplete();
+    state->complete_ = true;
+    state->context_->PutTaskBackToQueue(state);
+  }
+}
+
+bool
+ModelStreamInferHandler::RequestReadStep(
+    InferHandler::State* state, bool rpc_ok)
+{
+  bool finished = false;
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+  // If done reading and no in-flight requests then can finish the
+  // entire stream. Otherwise just finish this state.
+  if (!rpc_ok) {
+    state->context_->step_ = Steps::WRITEREADY;
+    if (state->context_->IsRequestsCompleted()) {
+      state->context_->step_ = Steps::COMPLETE;
+      state->step_ = Steps::COMPLETE;
+      state->context_->responder_->Finish(
+          state->context_->finish_ok_ ? ::grpc::Status::OK
+                                      : ::grpc::Status::CANCELLED,
+          state);
+    } else {
+      state->step_ = Steps::FINISH;
+      finished = true;
+    }
+
+    return finished;
+  }
+
+  // Need to get context here as it is needed below. 'state' can
+  // complete inference, write response, and finish (which releases
+  // context) before we make any forward progress.... so need to
+  // hold onto context here while we know it is good.
+  std::shared_ptr<StateContext> context = state->context_;
+
+  // Read protobuf request, convert it into a Triton request, and execute it.
+  // Update any related state metadata, such as if model is decoupled or not.
+  // Send an error response if any error occurs.
+  PrepareAndSendTritonRequest(state);
 
   // Now that the inference request is in flight, create a copy of
   // 'state' and use it to attempt another read from the connection
@@ -363,6 +377,164 @@ ModelStreamInferHandler::RequestCompleteStep(InferHandler::State* state)
   return true;
 }
 
+bool
+ModelStreamInferHandler::RequestWrittenStep(
+    InferHandler::State* state, bool rpc_ok)
+{
+  // We handle the WRITTEN and WRITEREADY states little
+  // differently depending whether the inference request
+  // is for a decoupled model or not. This is because the
+  // grpc contract requires us to call Write() only once
+  // on a task. Hence, for decoupled writes, we call only
+  // one write and then wait for another notification from
+  // the completion queue to execute pending Write()'s, if
+  // any.
+  if (state->is_decoupled_) {
+    return RequestWrittenStepDecoupled(state, rpc_ok);
+  }
+
+  return RequestWrittenStepNonDecoupled(state, rpc_ok);
+}
+
+bool
+ModelStreamInferHandler::RequestWrittenStepDecoupled(
+    InferHandler::State* state, bool rpc_ok)
+{
+  bool finished = false;
+  state->context_->ongoing_write_ = false;
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+  // If the write failed (for example, client closed the stream)
+  // mark that the stream did not complete successfully but don't
+  // cancel right away... need to wait for any pending reads,
+  // inferences and writes to complete.
+  if (!rpc_ok) {
+    LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+                   << ", context " << state->context_->unique_id_ << ", "
+                   << state->unique_id_ << " step " << state->step_
+                   << ", failed";
+    state->context_->finish_ok_ = false;
+  }
+
+  // Finish the state if all the transactions associated with
+  // the state have completed.
+  if (state->IsComplete()) {
+    state->context_->DecrementRequestCounter();
+    finished = Finish(state);
+  } else {
+    std::lock_guard<std::mutex> lock(state->step_mtx_);
+
+    // If there is an available response to be written
+    // to the stream, then transition directly to WRITEREADY
+    // state and enqueue itself to the completion queue to be
+    // taken up later. Otherwise, go to ISSUED state and wait
+    // for the callback to make a response available.
+    if (state->response_queue_->HasReadyResponse()) {
+      state->step_ = Steps::WRITEREADY;
+      state->context_->PutTaskBackToQueue(state);
+    } else {
+      state->step_ = Steps::ISSUED;
+    }
+  }
+
+  return finished;
+}
+
+bool
+ModelStreamInferHandler::RequestWrittenStepNonDecoupled(
+    InferHandler::State* state, bool rpc_ok)
+{
+  bool finished = false;
+  state->context_->ongoing_write_ = false;
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+  // If the write failed (for example, client closed the stream)
+  // mark that the stream did not complete successfully but don't
+  // cancel right away... need to wait for any pending reads,
+  // inferences and writes to complete.
+  if (!rpc_ok) {
+    LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+                   << ", context " << state->context_->unique_id_ << ", "
+                   << state->unique_id_ << " step " << state->step_
+                   << ", failed";
+    state->context_->finish_ok_ = false;
+  }
+
+  // Log an error if 'state' is not the expected next response. Mark
+  // that the stream did not complete successfully but don't cancel
+  // right away... need to wait for any pending reads, inferences
+  // and writes to complete.
+  if (!state->context_->PopCompletedResponse(state)) {
+    LOG_ERROR << "Unexpected response for " << Name() << ", rpc_ok=" << rpc_ok
+              << ", context " << state->context_->unique_id_ << ", "
+              << state->unique_id_ << " step " << state->step_;
+    state->context_->finish_ok_ = false;
+  }
+
+  // Write the next response if it is ready...
+  state->context_->WriteResponseIfReady(nullptr);
+
+  // The response for the request has been written completely.
+  // The counter can be safely decremented.
+  state->context_->DecrementRequestCounter();
+  finished = Finish(state);
+  return finished;
+}
+
+bool
+ModelStreamInferHandler::RequestWriteReadyStep(InferHandler::State* state)
+{
+  if (state->is_decoupled_) {
+    return RequestWriteReadyStepDecoupled(state);
+  }
+  // Currently don't expect WRITEREADY state for non-decoupled model, as other
+  // other steps will call WriteResponseIfReady and quickly transition to
+  // WRITTEN state.
+  return false;
+}
+
+bool
+ModelStreamInferHandler::RequestWriteReadyStepDecoupled(
+    InferHandler::State* state)
+{
+  bool finished = false;
+  if (state->delay_response_ms_ != 0) {
+    // Will delay the write of the response by the specified time.
+    // This can be used to test the flow where there are other
+    // responses available to be written.
+    LOG_INFO << "Delaying the write of the response by "
+             << state->delay_response_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_response_ms_));
+  }
+
+  // Finish the state if all the transactions associated with
+  // the state have completed.
+  if (state->IsComplete()) {
+    state->context_->DecrementRequestCounter();
+    finished = Finish(state);
+  } else {
+    // GRPC doesn't allow to issue another write till
+    // the notification from previous write has been
+    // delivered. If there is an ongoing write then
+    // defer writing and place the task at the back
+    // of the completion queue to be taken up later.
+    if (!state->context_->ongoing_write_) {
+      state->context_->ongoing_write_ = true;
+      state->context_->DecoupledWriteResponse(state);
+    } else {
+      state->context_->PutTaskBackToQueue(state);
+    }
+  }
+
+  return finished;
+}
 
 bool
 ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
@@ -377,144 +549,17 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   bool finished = false;
 
   if (state->step_ == Steps::START) {
-    return RequestStartStep(state, rpc_ok);
+    finished = RequestStartStep(state, rpc_ok);
   } else if (state->step_ == Steps::READ) {
-    return RequestReadStep(state, rpc_ok);
+    finished = RequestReadStep(state, rpc_ok);
   } else if (state->step_ == Steps::COMPLETE) {
-    // NOTE: Complete step doesn't care about rpc_ok value?
-    return RequestCompleteStep(state);
-  } else if (!state->is_decoupled_) {
-    // We handle the WRITTEN and WRITEREADY states little
-    // differently depending whether the inference request
-    // is for a decoupled model or not. This is because the
-    // grpc contract requires us to call Write() only once
-    // on a task. Hence, for decoupled writes, we call only
-    // one write and then wait for another notification from
-    // the completion queue to execute pending Write()'s, if
-    // any.
-
-    //
-    // Non-Decoupled state transitions
-    //
-    if (state->step_ == Steps::WRITTEN) {
-      state->context_->ongoing_write_ = false;
-#ifdef TRITON_ENABLE_TRACING
-      state->trace_timestamps_.emplace_back(
-          std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
-      // If the write failed (for example, client closed the stream)
-      // mark that the stream did not complete successfully but don't
-      // cancel right away... need to wait for any pending reads,
-      // inferences and writes to complete.
-      if (!rpc_ok) {
-        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
-                       << ", context " << state->context_->unique_id_ << ", "
-                       << state->unique_id_ << " step " << state->step_
-                       << ", failed";
-        state->context_->finish_ok_ = false;
-      }
-
-      // Log an error if 'state' is not the expected next response. Mark
-      // that the stream did not complete successfully but don't cancel
-      // right away... need to wait for any pending reads, inferences
-      // and writes to complete.
-      if (!state->context_->PopCompletedResponse(state)) {
-        LOG_ERROR << "Unexpected response for " << Name()
-                  << ", rpc_ok=" << rpc_ok << ", context "
-                  << state->context_->unique_id_ << ", " << state->unique_id_
-                  << " step " << state->step_;
-        state->context_->finish_ok_ = false;
-      }
-
-      // Write the next response if it is ready...
-      state->context_->WriteResponseIfReady(nullptr);
-
-      // The response for the request has been written completely.
-      // The counter can be safely decremented.
-      state->context_->DecrementRequestCounter();
-      finished = Finish(state);
-
-    }
-    // FIXME/NOTE/TODO: I think this is dead code, unreachable due to previous
-    // else-if on COMPLETE state.
-    else if (state->step_ == Steps::COMPLETE) {
-      state->step_ = Steps::FINISH;
-      finished = true;
-    }
+    finished = RequestCompleteStep(state);
+  } else if (state->step_ == Steps::WRITTEN) {
+    finished = RequestWrittenStep(state, rpc_ok);
+  } else if (state->step_ == Steps::WRITEREADY) {
+    finished = RequestWriteReadyStep(state);
   } else {
-    //
-    //  Decoupled state transitions
-    //
-    if (state->step_ == Steps::WRITTEN) {
-      state->context_->ongoing_write_ = false;
-#ifdef TRITON_ENABLE_TRACING
-      state->trace_timestamps_.emplace_back(
-          std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
-      // If the write failed (for example, client closed the stream)
-      // mark that the stream did not complete successfully but don't
-      // cancel right away... need to wait for any pending reads,
-      // inferences and writes to complete.
-      if (!rpc_ok) {
-        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
-                       << ", context " << state->context_->unique_id_ << ", "
-                       << state->unique_id_ << " step " << state->step_
-                       << ", failed";
-        state->context_->finish_ok_ = false;
-      }
-
-      // Finish the state if all the transactions associated with
-      // the state have completed.
-      if (state->IsComplete()) {
-        state->context_->DecrementRequestCounter();
-        finished = Finish(state);
-      } else {
-        std::lock_guard<std::mutex> lock(state->step_mtx_);
-
-        // If there is an available response to be written
-        // to the stream, then transition directly to WRITEREADY
-        // state and enqueue itself to the completion queue to be
-        // taken up later. Otherwise, go to ISSUED state and wait
-        // for the callback to make a response available.
-        if (state->response_queue_->HasReadyResponse()) {
-          state->step_ = Steps::WRITEREADY;
-          state->context_->PutTaskBackToQueue(state);
-        } else {
-          state->step_ = Steps::ISSUED;
-        }
-      }
-    } else if (state->step_ == Steps::WRITEREADY) {
-      if (state->delay_response_ms_ != 0) {
-        // Will delay the write of the response by the specified time.
-        // This can be used to test the flow where there are other
-        // responses available to be written.
-        LOG_INFO << "Delaying the write of the response by "
-                 << state->delay_response_ms_ << " ms...";
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(state->delay_response_ms_));
-      }
-
-      // Finish the state if all the transactions associated with
-      // the state have completed.
-      if (state->IsComplete()) {
-        state->context_->DecrementRequestCounter();
-        finished = Finish(state);
-      } else {
-        // GRPC doesn't allow to issue another write till
-        // the notification from previous write has been
-        // delivered. If there is an ongoing write then
-        // defer writing and place the task at the back
-        // of the completion queue to be taken up later.
-        if (!state->context_->ongoing_write_) {
-          state->context_->ongoing_write_ = true;
-          state->context_->DecoupledWriteResponse(state);
-        } else {
-          state->context_->PutTaskBackToQueue(state);
-        }
-      }
-    }
+    LOG_WARNING << "IN ELSE STATE OF PROCESS()";
   }
 
   return finished;
