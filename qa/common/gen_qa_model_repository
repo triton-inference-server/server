@@ -462,6 +462,7 @@ chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
 chmod -R 777 $IDENTITYBIGDESTDIR
