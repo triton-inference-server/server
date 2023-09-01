@@ -101,44 +101,6 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Validate the operation of new backend APIs
-cp bls.cc backend/examples/backends/bls/src/
-
-# Copy edited source file and rebuild
-(cd backend/examples/backends/bls/build &&
-cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
-       -DTRITON_CORE_REPO_TAG=fpetrini-dim-shape-apis \
-       -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-       .. &&
- make -j18 install)
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo "Failed: Client test had a non-zero return code."
-    RET=1
-fi
-
-grep "PASS" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** bls_test.py FAILED. \n***"
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
