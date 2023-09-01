@@ -735,7 +735,7 @@ def infer_shape_tensor(
         import tritonclient.utils.shared_memory as shm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
-    tester.assertTrue(pf.startsWith("plan"))
+    tester.assertTrue(pf.startswith("plan"))
     tester.assertEqual(len(input_shape_values), len(dummy_input_shapes))
 
     configs = []
