@@ -35,6 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+TEST_RESULT_FILE='test_results.txt'
+COMPATABILITY_TEST_PY=trt_compatibility_test.py
+CLIENT_LOG="client.log"
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120"
@@ -43,6 +46,8 @@ source ../common/util.sh
 
 rm -fr models && mkdir models
 cp -r $DATADIR/qa_identity_model_repository/plan_compatible_zero_1_float32 models/.
+
+RET=0
 
 if [ `ps | grep -c "tritonserver"` != "0" ]; then
     echo -e "Tritonserver already running"
@@ -68,4 +73,31 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-echo -e "\n***\n*** Test Passed\n***"
+set +e
+
+python $COMPATABILITY_TEST_PY TrtCompatabilityTest >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
