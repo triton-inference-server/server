@@ -1038,7 +1038,8 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
-      if (!Process(state, ok)) {
+      const bool tag_finished = Process(state, ok);
+      if (tag_finished) {
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         StateRelease(state);
       }

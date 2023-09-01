@@ -186,7 +186,7 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
     step_ = Steps::FINISH;
   }
 
-  return step_ != Steps::FINISH;
+  return step_ == Steps::FINISH;
 }
 
 template <typename ResponderType, typename RequestType, typename ResponseType>

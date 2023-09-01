@@ -119,6 +119,15 @@ class ModelStreamInferHandler
   bool RequestStartStep(State* state, bool rpc_ok);
   bool RequestReadStep(State* state, bool rpc_ok);
   bool RequestCompleteStep(State* state);
+  bool RequestWrittenStep(State* state, bool rpc_ok);
+  bool RequestWrittenStepDecoupled(State* state, bool rpc_ok);
+  bool RequestWrittenStepNonDecoupled(State* state, bool rpc_ok);
+  bool RequestWriteReadyStep(State* state);
+  bool RequestWriteReadyStepDecoupled(State* state);
+  void PrepareAndSendTritonRequest(State* state);
+  void EnqueueErrorResponse(
+      State* state, TRITONSERVER_InferenceRequest* irequest,
+      TRITONSERVER_Error* err);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
