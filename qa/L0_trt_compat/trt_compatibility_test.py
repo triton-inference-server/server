@@ -35,8 +35,6 @@ import unittest
 import infer_util as iu
 import numpy as np
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
 from tritonclient.utils import np_to_triton_dtype
 
 
@@ -46,7 +44,7 @@ class TrtCompatabilityTest(tu.TestResultCollector):
 
     def test_plan(self):
         # plan_compatible_zero_1_float32 is an identity model with input shape [-1]
-        iu.infer_zero(self, "plan_compatible", 1, self._data_type, [[2, 4]], [[2, 4]])
+        iu.infer_zero(self, "plan_compatible", 2, self._data_type, [[2, 4]], [[2, 4]])
 
 
 if __name__ == "__main__":
