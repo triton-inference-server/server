@@ -1058,9 +1058,12 @@ def create_plan_modelconfig(
 
     shape_str = tu.shape_to_dims_str(shape)
 
-    model_name = tu.get_zero_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype
-    )
+    model_name_base = "plan"
+    if max_batch == 0:
+        model_name_base += "_nobatch"
+    if FLAGS.tensorrt_compat:
+        model_name_base += "_compatible"
+    model_name = tu.get_zero_model_name(model_name_base, io_cnt, dtype)
     config_dir = os.path.join(models_dir, model_name)
 
     if FLAGS.tensorrt_shape_io:
