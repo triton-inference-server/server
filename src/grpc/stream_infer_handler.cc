@@ -158,8 +158,6 @@ ModelStreamInferHandler::RequestStartStep(
         std::string("This protocol is restricted, expecting header '") +
             restricted_kv_.first + "'");
     state->context_->responder_->Finish(status, state);
-    // Request finished due to error.
-    return true;
   }
 
   // Not finished with a request on the start step unless an error occurs above.
@@ -322,18 +320,7 @@ ModelStreamInferHandler::RequestReadStep(
   // entire stream. Otherwise just finish this state.
   if (!rpc_ok) {
     state->context_->step_ = Steps::WRITEREADY;
-    if (state->context_->IsRequestsCompleted()) {
-      state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
-      state->context_->responder_->Finish(
-          state->context_->finish_ok_ ? ::grpc::Status::OK
-                                      : ::grpc::Status::CANCELLED,
-          state);
-    } else {
-      state->step_ = Steps::FINISH;
-      finished = true;
-    }
-
+    finished = Finish(state);
     return finished;
   }
 
