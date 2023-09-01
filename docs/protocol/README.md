@@ -64,7 +64,7 @@ to [protocol customization guide](https://github.com/triton-inference-server/ser
 ## IPv6
 
 Assuming your host or [docker config](https://docs.docker.com/config/daemon/ipv6/)
-supports IPv6 connections, `tritonserver ` can be configured to use IPv6
+supports IPv6 connections, `tritonserver` can be configured to use IPv6
 HTTP endpoints as follows:
 ```
 $ tritonserver ... --http-address ipv6:[::1]&
