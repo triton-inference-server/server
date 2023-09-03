@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./lifecycle_client.log"
-EXPECTED_NUM_TESTS="3"
+EXPECTED_NUM_TESTS="4"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -39,6 +39,10 @@ SERVER_LOG="./lifecycle_server.log"
 
 RET=0
 rm -fr *.log ./models
+
+mkdir -p models/error_code/1/
+cp ../../python_models/error_code/model.py ./models/error_code/1/
+cp ../../python_models/error_code/config.pbtxt ./models/error_code/
 
 mkdir -p models/execute_error/1/
 cp ../../python_models/execute_error/model.py ./models/execute_error/1/
