@@ -40,7 +40,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 rm -f *.log
 MODELSDIR=`pwd`/models
-# set up simple repository MODELBASE
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR/add_sub/1 && \
     cp  ../python_models/add_sub/config.pbtxt $MODELSDIR/add_sub && \
     cp  ../python_models/add_sub/model.py $MODELSDIR/add_sub/1 && \
@@ -51,8 +50,6 @@ RET=0
 
 TEST_LOG="./backend_output_detail_test.log"
 TEST_EXEC=./backend_output_detail_test
-
-rm -fr *.log
 
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
@@ -66,8 +63,6 @@ if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     cat $TEST_LOG
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
