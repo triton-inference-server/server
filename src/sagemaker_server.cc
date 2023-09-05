@@ -231,14 +231,14 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
           /* Extract targetModel to log the associated archive */
           const char* target_model =
               evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-          LOG_INFO << "Invoking SageMaker TargetModel: " << target_model
-                   << std::endl;
 
           /* If target_model is not available (e.g., in local testing) use
            * model_name_hash as target_model) */
-          if (strlen(target_model) == 0) {
+          if (target_model == nullptr) {
             target_model = multi_model_name.c_str();
           }
+
+          LOG_INFO << "Invoking SageMaker TargetModel: " << target_model;
 
           SageMakerMMEHandleInfer(req, target_model, model_version_str_);
           return;
@@ -342,19 +342,22 @@ SagemakerAPIServer::ParseSageMakerRequest(
   if (action == "load") {
     (*parse_map)["url"] = url_string.c_str();
   }
-  (*parse_map)["model_name"] = model_name_string.c_str();
+  (*parse_map)["model_name_hash"] = model_name_string.c_str();
 
   /* Extract target_model, specified in header, to log the associated archive */
   const char* target_model =
       evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
+
+
   /* If target_model is not available (e.g., in local testing) use
    * model_name_hash as target_model) */
-  if (strlen(target_model) != 0) {
+  if (target_model != nullptr) {
     (*parse_map)["target_model"] = target_model;
-    LOG_INFO << "Loading SageMaker TargetModel: " << target_model;
   } else {
     (*parse_map)["target_model"] = model_name_string.c_str();
   }
+
+  LOG_INFO << "Loading SageMaker TargetModel: " << target_model;
 
   return;
 }
@@ -717,7 +720,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   /* If target_model is not available (e.g., in local testing) use
    * model_name_hash as target_model) */
-  if (strlen(target_model) == 0) {
+  if (target_model == nullptr) {
     target_model = model_name_hash;
   }
 
@@ -963,7 +966,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     const std::unordered_map<std::string, std::string> parse_map)
 {
   std::string repo_path = parse_map.at("url");
-  std::string model_name_hash = parse_map.at("model_name");
+  std::string model_name_hash = parse_map.at("model_name_hash");
   std::string target_model = parse_map.at("target_model");
 
   /* Check subdirs for models and find ensemble model within the repo_path
