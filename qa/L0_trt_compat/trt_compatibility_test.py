@@ -37,7 +37,7 @@ import numpy as np
 import test_util as tu
 
 
-class TrtCompatabilityTest(tu.TestResultCollector):
+class TrtCompatibilityTest(tu.TestResultCollector):
     def setUp(self):
         self._data_type = np.float32
 

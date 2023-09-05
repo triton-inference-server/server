@@ -36,7 +36,7 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 TEST_RESULT_FILE='test_results.txt'
-COMPATABILITY_TEST_PY=trt_compatibility_test.py
+COMPATIBILITY_TEST_PY=trt_compatibility_test.py
 CLIENT_LOG="client.log"
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -64,6 +64,13 @@ if [ "$SERVER_PID" != "0" ]; then
     exit 1
 fi
 
+EXPECTED_ERR="Internal Error (Cannot deserialize engine with lean runtime"
+if ! grep "$EXPECTED_ERR" $SERVER_LOG; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to find expected error: ${EXPECTED_ERR} \n***"
+    RET=1
+fi
+
 SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120 --backend-config=tensorrt,version-compatible=true"
 
 run_server
@@ -75,7 +82,7 @@ fi
 
 set +e
 
-python $COMPATABILITY_TEST_PY TrtCompatabilityTest >$CLIENT_LOG 2>&1
+python $COMPATIBILITY_TEST_PY >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
