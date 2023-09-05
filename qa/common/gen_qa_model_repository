@@ -386,6 +386,10 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 set -x
+# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
+# Upgrade protobuf version to fix the issue.
+pip3 install "protobuf>4.24.0"
+
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
