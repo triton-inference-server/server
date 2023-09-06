@@ -58,6 +58,39 @@ class LifecycleTest(tu.TestResultCollector):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
+    def test_error_code(self):
+        model_name = "error_code"
+        shape = [1, 1]
+        # [(Triton error, expected gRPC error message starting), ...]
+        errors = [
+            ("UNKNOWN", "[StatusCode.UNKNOWN]"),
+            ("INTERNAL", "[StatusCode.INTERNAL]"),
+            ("NOT_FOUND", "[StatusCode.NOT_FOUND]"),
+            ("INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
+            ("UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
+            ("UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
+            ("ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("(default)", "[StatusCode.INTERNAL] unrecognized"),
+        ]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                for error, expected_grpc_error_start in errors:
+                    input_data = np.array([[error]], dtype=np.object_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    with self.assertRaises(InferenceServerException) as e:
+                        client.infer(model_name, inputs)
+                    # e.g. [StatusCode.UNKNOWN] error code: TRITONSERVER_ERROR_UNKNOWN
+                    # e.g. [StatusCode.INTERNAL] unrecognized error code: (default)
+                    self.assertEqual(
+                        str(e.exception),
+                        expected_grpc_error_start + " error code: " + error,
+                    )
+
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
         # request and successfully processes the second request. This is making
