@@ -107,6 +107,68 @@ StreamOutputBufferAttributes(
 //  RPC. This implementation is tuned towards performance and reducing latency.
 //=============================================================================
 
+bool
+ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
+{
+  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
+                 << ", context " << state->context_->unique_id_ << ", "
+                 << state->unique_id_ << " step " << state->step_;
+
+  // We need an explicit finish indicator. Can't use 'state->step_'
+  // because we launch an async thread that could update 'state's
+  // step_ to be FINISH before this thread exits this function.
+  bool finished = false;
+
+  if (state->step_ == Steps::START) {
+    // Transitions to READ state on success, or COMPLETE/FINISH on errors.
+    finished = RequestStartStep(state, rpc_ok);
+  } else if (state->step_ == Steps::READ) {
+    // Transitions to ISSUED state on successfully sending inference request to
+    // Triton, or COMPLETE/FINISH on errors. The ISSUED state is checked in the
+    // request's response callback to handle transitioning to writing responses.
+    finished = RequestReadStep(state, rpc_ok);
+  }
+  // We handle the WRITTEN and WRITEREADY states little
+  // differently depending whether the inference request
+  // is for a decoupled model or not. This is because the
+  // grpc contract requires us to call Write() only once
+  // on a task. Hence, for decoupled writes, we call only
+  // one write and then wait for another notification from
+  // the completion queue to execute pending Write()'s, if
+  // any.
+  else if (state->step_ == Steps::WRITEREADY) {
+    // The non-decoupled transition to WRITEREADY state immediately attempts to
+    // WriteResponseIfReady() and go to WRITTEN state, so only handle the
+    // decoupled case here.
+    if (state->is_decoupled_) {
+      // Transitions to WRITTEN state if no other writes are ongoing, otherwise
+      // remains in WRITEREADY state and is moved to the back of the task queue.
+      // If there are no responses left to write, then this transitions to
+      // COMPLETE/FINISH states.
+      finished = RequestWriteReadyStepDecoupled(state);
+    }
+  } else if (state->step_ == Steps::WRITTEN) {
+    if (state->is_decoupled_) {
+      // Transitions to COMPLETE/FINISH state if all responses have been
+      // written. Otherwise, transitions to WRITEREADY or ISSUED depending on
+      // whether additional responses are ready to write or not.
+      finished = RequestWrittenStepDecoupled(state, rpc_ok);
+    } else {
+      // Transitions to COMPLETE/FINISH state from WRITTEN state here, because
+      // there is only one response per-request in the non-decoupled case.
+      finished = RequestWrittenStepNonDecoupled(state, rpc_ok);
+    }
+  }
+  // COMPLETE step simply marks that we're finished with the request.
+  else if (state->step_ == Steps::COMPLETE) {
+    finished = RequestCompleteStep(state);
+  }
+  // No special handling currently needed here for remaining states like
+  // ISSUED and FINISH.
+
+  return finished;
+}
+
 void
 ModelStreamInferHandler::StartNewRequest()
 {
@@ -319,6 +381,8 @@ ModelStreamInferHandler::RequestReadStep(
   // If done reading and no in-flight requests then can finish the
   // entire stream. Otherwise just finish this state.
   if (!rpc_ok) {
+    // Mark as WRITEREADY to indicate that there are no reads being processed
+    // for checking IsRequestsCompleted().
     state->context_->step_ = Steps::WRITEREADY;
     finished = Finish(state);
     return finished;
@@ -354,33 +418,6 @@ ModelStreamInferHandler::RequestReadStep(
 
   // Not finished with a request on the read step unless an error occurs above.
   return false;
-}
-
-bool
-ModelStreamInferHandler::RequestCompleteStep(InferHandler::State* state)
-{
-  state->step_ = Steps::FINISH;
-  // Finished with the request.
-  return true;
-}
-
-bool
-ModelStreamInferHandler::RequestWrittenStep(
-    InferHandler::State* state, bool rpc_ok)
-{
-  // We handle the WRITTEN and WRITEREADY states little
-  // differently depending whether the inference request
-  // is for a decoupled model or not. This is because the
-  // grpc contract requires us to call Write() only once
-  // on a task. Hence, for decoupled writes, we call only
-  // one write and then wait for another notification from
-  // the completion queue to execute pending Write()'s, if
-  // any.
-  if (state->is_decoupled_) {
-    return RequestWrittenStepDecoupled(state, rpc_ok);
-  }
-
-  return RequestWrittenStepNonDecoupled(state, rpc_ok);
 }
 
 bool
@@ -475,18 +512,6 @@ ModelStreamInferHandler::RequestWrittenStepNonDecoupled(
 }
 
 bool
-ModelStreamInferHandler::RequestWriteReadyStep(InferHandler::State* state)
-{
-  if (state->is_decoupled_) {
-    return RequestWriteReadyStepDecoupled(state);
-  }
-  // Currently don't expect WRITEREADY state for non-decoupled model, as other
-  // other steps will call WriteResponseIfReady and quickly transition to
-  // WRITTEN state.
-  return false;
-}
-
-bool
 ModelStreamInferHandler::RequestWriteReadyStepDecoupled(
     InferHandler::State* state)
 {
@@ -524,30 +549,10 @@ ModelStreamInferHandler::RequestWriteReadyStepDecoupled(
 }
 
 bool
-ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
+ModelStreamInferHandler::RequestCompleteStep(InferHandler::State* state)
 {
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
-                 << ", context " << state->context_->unique_id_ << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // We need an explicit finish indicator. Can't use 'state->step_'
-  // because we launch an async thread that could update 'state's
-  // step_ to be FINISH before this thread exits this function.
-  bool finished = false;
-
-  if (state->step_ == Steps::START) {
-    finished = RequestStartStep(state, rpc_ok);
-  } else if (state->step_ == Steps::READ) {
-    finished = RequestReadStep(state, rpc_ok);
-  } else if (state->step_ == Steps::COMPLETE) {
-    finished = RequestCompleteStep(state);
-  } else if (state->step_ == Steps::WRITTEN) {
-    finished = RequestWrittenStep(state, rpc_ok);
-  } else if (state->step_ == Steps::WRITEREADY) {
-    finished = RequestWriteReadyStep(state);
-  }
-
-  return finished;
+  state->step_ = Steps::FINISH;
+  return true;
 }
 
 bool
