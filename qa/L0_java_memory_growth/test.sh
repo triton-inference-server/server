@@ -25,6 +25,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Pre-requisites
+apt-get update && apt-get install -y \
+    cmake \
+    rapidjson-dev
+
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set +e
