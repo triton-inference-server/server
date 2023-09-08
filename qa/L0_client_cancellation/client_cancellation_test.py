@@ -32,7 +32,6 @@ sys.path.append("../common")
 
 import asyncio
 import queue
-import socket
 import unittest
 from functools import partial
 import time
@@ -115,7 +114,7 @@ class ClientCancellationTest(tu.TestResultCollector):
 
         # Wait until the results is captured via callback
         data_item = user_data._completed_requests.get()
-        self.assertTrue(type(data_item) == grpcclient.CancelledError)
+        self.assertEqual(type(data_item), grpcclient.CancelledError)
         
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
@@ -148,7 +147,7 @@ class ClientCancellationTest(tu.TestResultCollector):
         triton_client.stop_stream(cancel_requests=True)
 
         data_item = user_data._completed_requests.get()
-        self.assertTrue(type(data_item) == grpcclient.CancelledError)
+        self.assertEqual(type(data_item), grpcclient.CancelledError)
         
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
@@ -166,7 +165,7 @@ class ClientCancellationTest(tu.TestResultCollector):
 
         async def handle_response(call):
             with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
-                response = await call
+                await call
 
         async def test_aio_infer(self):
             triton_client = aiogrpcclient.InferenceServerClient(
@@ -182,10 +181,8 @@ class ClientCancellationTest(tu.TestResultCollector):
                 outputs=self.outputs_,
                 get_call_obj=True,
             )
-            task1 = asyncio.create_task(handle_response(call))
-            task2 = asyncio.create_task(cancel_request(call))
-            await task1
-            await task2
+            asyncio.create_task(handle_response(call))
+            asyncio.create_task(cancel_request(call))
 
             self._record_end_time_ms()
             self._test_runtime_duration(5000)
@@ -223,10 +220,8 @@ class ClientCancellationTest(tu.TestResultCollector):
                         async for response in response_iterator:
                             self.assertTrue(False, "Received an unexpected response!")
 
-                task1 = asyncio.create_task(handle_response(response_iterator))
-                task2 = asyncio.create_task(cancel_streaming(streaming_call))
-                await task1
-                await task2
+                asyncio.create_task(handle_response(response_iterator))
+                asyncio.create_task(cancel_streaming(streaming_call))
 
                 self._record_end_time_ms()
                 self._test_runtime_duration(5000)
