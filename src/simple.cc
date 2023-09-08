@@ -28,7 +28,6 @@
 #include <rapidjson/error/en.h>
 #include <unistd.h>
 
-#include <barrier>
 #include <chrono>
 #include <cstring>
 #include <future>
@@ -248,7 +247,7 @@ ResponseRelease(
 }
 
 void
-InferRequestComplete(
+InferRequestRelease(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   std::promise<void>* barrier = reinterpret_cast<std::promise<void>*>(userp);
@@ -730,7 +729,7 @@ main(int argc, char** argv)
       std::make_unique<std::promise<void>>();
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete,
+          irequest, InferRequestRelease,
           reinterpret_cast<void*>(barrier.get())),
       "setting request release callback");
   std::future<void> request_release_future = barrier->get_future();
@@ -908,7 +907,7 @@ main(int argc, char** argv)
         "setting response callback");
 
     // When re-using the requests, we need to make sure that the request
-    // complete callback has been called for the previous request before
+    // release callback has been called for the previous request before
     // proceeding to schedule a new request.
     request_release_future.get();
 
@@ -917,7 +916,7 @@ main(int argc, char** argv)
     request_release_future = barrier->get_future();
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetReleaseCallback(
-            irequest, InferRequestComplete,
+            irequest, InferRequestRelease,
             reinterpret_cast<void*>(barrier.get())),
         "setting request release callback");
 
@@ -973,7 +972,7 @@ main(int argc, char** argv)
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetReleaseCallback(
-            irequest, InferRequestComplete,
+            irequest, InferRequestRelease,
             reinterpret_cast<void*>(barrier.get())),
         "setting request release callback");
 
