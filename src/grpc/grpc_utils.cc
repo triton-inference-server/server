@@ -60,6 +60,8 @@ GrpcStatusUtil::CodeToStatus(TRITONSERVER_Error_Code code)
       return ::grpc::StatusCode::UNIMPLEMENTED;
     case TRITONSERVER_ERROR_ALREADY_EXISTS:
       return ::grpc::StatusCode::ALREADY_EXISTS;
+    case TRITONSERVER_ERROR_CANCELLED:
+      return ::grpc::StatusCode::CANCELLED;
   }
 
   return ::grpc::StatusCode::UNKNOWN;
