@@ -1,4 +1,4 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 #include <rapidjson/error/en.h>
 #include <unistd.h>
 
+#include <barrier>
 #include <chrono>
 #include <cstring>
 #include <future>
@@ -250,7 +251,8 @@ void
 InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  // We reuse the request so we don't delete it here.
+  std::promise<void>* barrier = reinterpret_cast<std::promise<void>*>(userp);
+  barrier->set_value();
 }
 
 void
@@ -724,10 +726,14 @@ main(int argc, char** argv)
       TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
       "setting ID for the request");
 
+  std::unique_ptr<std::promise<void>> barrier =
+      std::make_unique<std::promise<void>>();
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */),
+          irequest, InferRequestComplete,
+          reinterpret_cast<void*>(barrier.get())),
       "setting request release callback");
+  std::future<void> request_release_future = barrier->get_future();
 
   // Add the 2 input tensors to the request...
   auto input0 = "INPUT0";
@@ -860,7 +866,6 @@ main(int argc, char** argv)
     // The InferResponseComplete function sets the std::promise so
     // that this thread will block until the response is returned.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
-
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),
         "response status");
@@ -901,6 +906,20 @@ main(int argc, char** argv)
             irequest, allocator, nullptr /* response_allocator_userp */,
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
+
+    // When re-using the requests, we need to make sure that the request
+    // complete callback has been called for the previous request before
+    // proceeding to schedule a new request.
+    request_release_future.get();
+
+    // Register a new promise for the request callback barrier.
+    barrier = std::make_unique<std::promise<void>>();
+    request_release_future = barrier->get_future();
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestSetReleaseCallback(
+            irequest, InferRequestComplete,
+            reinterpret_cast<void*>(barrier.get())),
+        "setting request release callback");
 
     FAIL_IF_ERR(
         TRITONSERVER_ServerInferAsync(
@@ -947,6 +966,16 @@ main(int argc, char** argv)
             irequest, allocator, nullptr /* response_allocator_userp */,
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
+
+    // Register a new promise for the request callback barrier.
+    barrier = std::make_unique<std::promise<void>>();
+    request_release_future.get();
+
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestSetReleaseCallback(
+            irequest, InferRequestComplete,
+            reinterpret_cast<void*>(barrier.get())),
+        "setting request release callback");
 
     FAIL_IF_ERR(
         TRITONSERVER_ServerInferAsync(
