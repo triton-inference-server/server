@@ -116,14 +116,14 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             if is_async:
                 if should_error:
                     with self.assertRaises(InferenceServerException):
-                        result = await infer_callable()
+                        await infer_callable()
                     return
                 else:
                     result = await infer_callable()
             else:
                 if should_error:
                     with self.assertRaises(InferenceServerException):
-                        result = infer_callable()
+                        infer_callable()
                     return
                 else:
                     result = infer_callable()
