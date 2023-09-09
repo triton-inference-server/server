@@ -45,6 +45,9 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+MODELDIR="model_repository"
+mkdir -p "${MODELDIR}/ensemble/1"
+
 # TODO: Add support and testing for C++ client parameters:
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
@@ -54,9 +57,9 @@ for i in {0..1}; do
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   if [ $i == 1 ]; then
-    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
   else
-    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
   fi
   run_server
   if [ "$SERVER_PID" == "0" ]; then
