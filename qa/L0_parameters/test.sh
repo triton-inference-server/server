@@ -46,6 +46,8 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 MODELDIR="model_repository"
+# Use identity model as dummy step to ensure parameters pass through each step
+mkdir -p "${MODELDIR}/identity/1"
 mkdir -p "${MODELDIR}/ensemble/1"
 
 # TODO: Add support and testing for C++ client parameters:
