@@ -50,6 +50,7 @@ rm -f *.log
 rm -f *.log.*
 
 CLIENT_LOG=`pwd`/client.log
+CLIENT_GRPC_TIMEOUTS_LOG=`pwd`/client.log.grpc
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
@@ -174,6 +175,14 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# test all other grpc apis
+echo "TEST:  GRPC other APIs" >> ${CLIENT_LOG}
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -a >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed: HTTP Asynchronous\n***"
+    RET=1
+fi
+
 
 echo "TEST:  Python Library" >> ${CLIENT_LOG}
 
@@ -204,6 +213,15 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test all APIs
+SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model custom_identity_int32"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
 for i in test_grpc_server_live \
     test_grpc_model_ready \
     test_grpc_server_metadata \
@@ -223,22 +241,16 @@ for i in test_grpc_server_live \
     test_grpc_get_cuda_shared_memory_status \
     test_grpc_uregister_cuda_shared_memory \
     ; do
-    SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model custom_identity_int32"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
     python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
     fi
-    kill $SERVER_PID
-    wait $SERVER_PID
 done
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
@@ -247,4 +259,5 @@ else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
+set +e
 exit $RET

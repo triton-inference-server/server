@@ -60,7 +60,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
         self.model_name_ = "custom_identity_int32"
         self.input0_data_ = np.array([[10]], dtype=np.int32)
         self.input0_data_byte_size_ = 32
-        self.SMALL_INTERVAL = 0.0001  # seconds
+        self.SMALL_INTERVAL = sys.float_info.min  # guarantees a timeout
         self.NORMAL_INTERVAL = 5  # seconds for server to load then receive request
 
     def test_grpc_server_live(self):
@@ -97,6 +97,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
         with self.assertRaises(InferenceServerException) as cm:
             _ = triton_client.get_server_metadata(client_timeout=self.SMALL_INTERVAL)
         self.assertIn("Deadline Exceeded", str(cm.exception))
+
         triton_client.get_server_metadata(client_timeout=self.NORMAL_INTERVAL)
 
     def test_grpc_model_config(self):
@@ -194,24 +195,34 @@ class ClientTimeoutTest(tu.TestResultCollector):
         triton_client = grpcclient.InferenceServerClient(
             url="localhost:8001", verbose=True
         )
+        settings = {}
         with self.assertRaises(InferenceServerException) as cm:
-            _ = triton_client.update_log_settings(client_timeout=self.SMALL_INTERVAL)
+            _ = triton_client.update_log_settings(
+                settings=settings, client_timeout=self.SMALL_INTERVAL
+            )
         self.assertIn("Deadline Exceeded", str(cm.exception))
-        triton_client.update_log_settings(client_timeout=self.NORMAL_INTERVAL)
+        triton_client.update_log_settings(
+            settings=settings, client_timeout=self.NORMAL_INTERVAL
+        )
 
     def test_grpc_get_log_settings(self):
         triton_client = grpcclient.InferenceServerClient(
             url="localhost:8001", verbose=True
         )
         with self.assertRaises(InferenceServerException) as cm:
-            _ = triton_client.get_log_settings(client_timeout=self.SMALL_INTERVAL)
+            _ = triton_client.get_log_settings(
+                as_json=True, client_timeout=self.SMALL_INTERVAL
+            )
         self.assertIn("Deadline Exceeded", str(cm.exception))
-        triton_client.get_log_settings(client_timeout=self.NORMAL_INTERVAL)
+        triton_client.get_log_settings(
+            as_json=True, client_timeout=self.NORMAL_INTERVAL
+        )
 
     def test_grpc_register_system_shared_memory(self):
         triton_client = grpcclient.InferenceServerClient(
             url="localhost:8001", verbose=True
         )
+
         with self.assertRaises(InferenceServerException) as cm:
             _ = triton_client.register_system_shared_memory(
                 "input_data",
@@ -219,14 +230,13 @@ class ClientTimeoutTest(tu.TestResultCollector):
                 self.input0_data_byte_size_,
                 client_timeout=self.SMALL_INTERVAL,
             )
-        self.assertIn("Deadline Exceeded", str(cm.exception))
-        triton_client.unregister_system_shared_memory()
         triton_client.register_system_shared_memory(
             "input_data",
             "/input_simple",
             self.input0_data_byte_size_,
             client_timeout=self.NORMAL_INTERVAL,
         )
+        self.assertIn("Deadline Exceeded", str(cm.exception))
 
     def test_grpc_get_system_shared_memory(self):
         triton_client = grpcclient.InferenceServerClient(
@@ -258,7 +268,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
         triton_client = grpcclient.InferenceServerClient(
             url="localhost:8001", verbose=True
         )
-        import tritonshmutils.cuda_shared_memory as cshm
+        import tritonclient.utils.cuda_shared_memory as cshm
 
         input_data = np.array([[10]], dtype=np.int32)
         byteSize = input_data.itemsize * input_data.size
