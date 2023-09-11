@@ -83,14 +83,14 @@ ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
-RUN vs_buildtools.exe --quiet --wait --norestart --nocache install --installPath %VS_INSTALL_PATH_WP% --channelUri "C:\tmp\VisualStudio.chman" --installChannelUri "C:\tmp\VisualStudio.chman" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --locale "En-us"  
+RUN vs_buildtools.exe --quiet --wait --norestart --nocache install --installPath %VS_INSTALL_PATH_WP% --channelUri "C:\tmp\VisualStudio.chman" --installChannelUri "C:\tmp\VisualStudio.chman" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --locale "En-us"
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
 WORKDIR /
 
 #
-# Installing Vcpkg 
+# Installing Vcpkg
 #
 ARG VCPGK_VERSION=2023.07.21
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
@@ -105,7 +105,7 @@ LABEL VCPGK_VERSION=${VCPGK_VERSION}
 WORKDIR /
 
 #
-# Installing CUDA 
+# Installing CUDA
 #
 ARG CUDA_MAJOR=12
 ARG CUDA_MINOR=2
