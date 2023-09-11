@@ -57,7 +57,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/* model
 
 # Remove version-compatible TensorRT models, as they require version-compatibility
 # mode to be turned on when starting the server.
-rm -r models/plan_compatible*
+rm -rf models/plan_compatible*
 
 create_nop_version_dir `pwd`/models
 
