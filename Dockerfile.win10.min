@@ -48,7 +48,7 @@ ARG CMAKE_SOURCE=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VER
 
 ADD ${CMAKE_SOURCE} ${CMAKE_FILE}.zip
 RUN unzip %CMAKE_FILE%.zip
-RUN move %CMAKE_FILE% "c:\CMake" 
+RUN move %CMAKE_FILE% "c:\CMake"
 RUN setx PATH "c:\CMake\bin;%PATH%"
 
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -69,7 +69,7 @@ RUN pip install grpcio-tools
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
 
 #
-# Installing Visual Studio BuildTools: VS17 2022 
+# Installing Visual Studio BuildTools: VS17 2022
 #
 ARG BUILDTOOLS_VERSION
 # Download collect.exe in case of an install failure.
