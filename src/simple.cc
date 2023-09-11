@@ -906,9 +906,8 @@ main(int argc, char** argv)
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
 
-    // When re-using the requests, we need to make sure that the request
-    // release callback has been called for the previous request before
-    // proceeding to schedule a new request.
+    // We need to make sure that the previous request was released before
+    // reusing it.
     request_release_future.get();
 
     // Register a new promise for the request callback barrier.
