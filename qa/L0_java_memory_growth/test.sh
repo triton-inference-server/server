@@ -28,6 +28,7 @@
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set +e
+export INCLUDE_DEVELOPER_TOOLS_SERVER=1
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets

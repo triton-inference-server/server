@@ -39,6 +39,7 @@ fi
 
 set +e
 rm -r javacpp-presets
+export INCLUDE_DEVELOPER_TOOLS_SERVER=1
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
