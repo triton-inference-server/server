@@ -741,11 +741,12 @@ class InferHandlerState {
         InferHandlerStateType* state, bool rpc_ok, const std::string& name)
     {
       if (!IsCancelled()) {
-        LOG_ERROR << "[INTERNAL] HandleCancellation called even when the context was "
-                     "not cancelled for "
-                  << name << ", rpc_ok=" << rpc_ok << ", context "
-                  << state->context_->unique_id_ << ", " << state->unique_id_
-                  << " step " << state->step_;
+        LOG_ERROR
+            << "[INTERNAL] HandleCancellation called even when the context was "
+               "not cancelled for "
+            << name << ", rpc_ok=" << rpc_ok << ", context "
+            << state->context_->unique_id_ << ", " << state->unique_id_
+            << " step " << state->step_;
         return true;
       }
       if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
