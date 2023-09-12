@@ -42,6 +42,23 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RET=0
 
 mkdir -p models/model/1
+mkdir -p $DATADIR/custom_identity_int32/1
+
+export CUDA_VISIBLE_DEVICES=0
+
+RET=0
+
+CLIENT_CANCELLATION_TEST=client_cancellation_test.py
+TEST_RESULT_FILE='test_results.txt'
+
+rm -f *.log
+rm -f *.log.*
+
+CLIENT_LOG=`pwd`/client.log
+DATADIR=`pwd`/models
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
+source ../common/util.sh
 
 SERVER_LOG=server.log
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
@@ -49,6 +66,41 @@ if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     RET=1
 fi
+
+# gRPC client-side cancellation tests...
+for i in test_grpc_async_infer \
+    test_grpc_stream_infer \
+    test_aio_grpc_async_infer \
+    test_aio_grpc_stream_infer \
+   ; do
+
+    SERVER_LOG=${i}.server.log
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python $CLIENT_CANCELLATION_TEST ClientCancellationTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
+            RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+
+    set -e
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
