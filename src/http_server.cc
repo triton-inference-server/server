@@ -67,7 +67,7 @@ namespace triton { namespace server {
     }                                                 \
   } while (false)
 
-#define HTTP_RESPOND_WITH_CODE(REQ, CODE, MSG)    \
+#define HTTP_RESPOND_WITH_ERROR(REQ, CODE, MSG)   \
   do {                                            \
     EVBufferAddErrorJson((REQ)->buffer_out, MSG); \
     evhtp_send_reply((REQ), CODE);                \
@@ -180,7 +180,7 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
                  << req->uri->path->full;
 
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_res res = EVHTP_RES_BADREQ;
@@ -1230,7 +1230,7 @@ void
 HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -1253,7 +1253,7 @@ HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
   if (req->method != htp_method_POST) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -1322,7 +1322,7 @@ HTTPAPIServer::HandleRepositoryControl(
     const std::string& model_name, const std::string& action)
 {
   if (req->method != htp_method_POST) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -1477,11 +1477,11 @@ HTTPAPIServer::HandleModelReady(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    HTTP_RESPOND_WITH_CODE(
+    HTTP_RESPOND_WITH_ERROR(
         req, EVHTP_RES_BADREQ, "Missing model name in ModelReady request");
   }
 
@@ -1496,7 +1496,7 @@ HTTPAPIServer::HandleModelReady(
   }
 
   if (!ready && !err) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_BADREQ, "Model version not ready");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_BADREQ, "Model version not ready");
   }
 
   HTTP_RESPOND_IF_ERR(req, err);
@@ -1509,11 +1509,11 @@ HTTPAPIServer::HandleModelMetadata(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    HTTP_RESPOND_WITH_CODE(
+    HTTP_RESPOND_WITH_ERROR(
         req, EVHTP_RES_BADREQ, "Missing model name in ModelMetadata request");
   }
 
@@ -1550,11 +1550,11 @@ HTTPAPIServer::HandleModelConfig(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    HTTP_RESPOND_WITH_CODE(
+    HTTP_RESPOND_WITH_ERROR(
         req, EVHTP_RES_BADREQ, "Missing model name in ModelConfig request");
   }
 
@@ -1592,7 +1592,7 @@ HTTPAPIServer::HandleModelStats(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -1636,7 +1636,7 @@ void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
     return;
   }
 
@@ -1889,7 +1889,7 @@ void
 HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 {
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
   evhtp_headers_add_header(
       req->headers_out,
@@ -2038,7 +2038,7 @@ void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2061,9 +2061,9 @@ HTTPAPIServer::HandleSystemSharedMemory(
     const std::string& action)
 {
   if ((action == "status") && (req->method != htp_method_GET)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   } else if ((action != "status") && (req->method != htp_method_POST)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2165,9 +2165,9 @@ HTTPAPIServer::HandleCudaSharedMemory(
     const std::string& action)
 {
   if ((action == "status") && (req->method != htp_method_GET)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   } else if ((action != "status") && (req->method != htp_method_POST)) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2878,7 +2878,7 @@ HTTPAPIServer::HandleInfer(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_POST) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+    HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   bool connection_paused = false;
@@ -2944,7 +2944,7 @@ HTTPAPIServer::HandleInfer(
         evhtp_headers_add_header(
             req->headers_out,
             evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
-        HTTP_RESPOND_WITH_CODE(
+        HTTP_RESPOND_WITH_ERROR(
             req, EVHTP_RES_UNSUPPORTED, "Unsupported compression type");
         return;
       }
@@ -3605,7 +3605,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 
   LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
                  << " - " << static_cast<int>(EVHTP_RES_NOTFOUND);
-  HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_NOTFOUND, "Not Found");
+  HTTP_RESPOND_WITH_ERROR(req, EVHTP_RES_NOTFOUND, "Not Found");
 }
 
 TRITONSERVER_Error*
