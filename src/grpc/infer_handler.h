@@ -667,9 +667,11 @@ class InferHandlerState {
 
     // Inserts the state to a set tracking active requests
     // within the server core.
-    void InsertInflightState(InferHandlerStateType* state)
+    void InsertInflightState(
+        InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
     {
       std::lock_guard<std::mutex> lock(mu_);
+      state->irequest_ptr_ = irequest;
       inflight_states_.insert(state);
     }
 
@@ -692,6 +694,9 @@ class InferHandlerState {
         // Issues the request cancellation to the core.
         for (auto state : inflight_states_) {
           LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
+          if (state->irequest_ptr_ == nullptr) {
+            continue;
+          }
           bool is_cancelled = false;
           err = TRITONSERVER_InferenceRequestIsCancelled(
               state->irequest_ptr_, &is_cancelled);
@@ -946,6 +951,7 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
+    irequest_ptr_ = nullptr;
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;

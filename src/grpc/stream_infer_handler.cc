@@ -349,7 +349,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->PutTaskBackToQueue(state);
       }
     } else {
-      state->context_->InsertInflightState(state);
+      state->context_->InsertInflightState(state, irequest);
     }
 
     // Now that the inference request is in flight, create a copy of
@@ -534,6 +534,11 @@ ModelStreamInferHandler::StreamInferRequestComplete(
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferRequestComplete";
 
   State* state = reinterpret_cast<State*>(userp);
+  if (state->irequest_ptr_ != request) {
+    LOG_ERROR
+        << "[INTERNAL] ModelStreamInferHandler::StreamInferRequestComplete: "
+           "TRITONSERVER_InferenceRequest ptr mismatch detected";
+  }
 
   state->context_->EraseInflightState(state);
 

@@ -965,7 +965,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     state->step_ = COMPLETE;
     state->context_->responder_->Finish(error_response, status, state);
   } else {
-    state->context_->InsertInflightState(state);
+    state->context_->InsertInflightState(state, irequest);
   }
 }
 
@@ -976,6 +976,11 @@ ModelInferHandler::InferRequestComplete(
   LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
 
   State* state = reinterpret_cast<State*>(userp);
+
+  if (state->irequest_ptr_ != request) {
+    LOG_ERROR << "[INTERNAL] ModelInferHandler::InferRequestComplete: "
+                 "TRITONSERVER_InferenceRequest ptr mismatch detected";
+  }
   state->context_->EraseInflightState(state);
 
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
