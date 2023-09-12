@@ -2155,11 +2155,8 @@ HTTPAPIServer::HandleSystemSharedMemory(
     }
   }
 
-  if (err == nullptr) {
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    HTTP_RESPOND_IF_ERR(req, err);
-  }
+  HTTP_RESPOND_IF_ERR(req, err);
+  evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
 void
@@ -2277,10 +2274,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
     }
   }
 
-  if (err != nullptr) {
-    HTTP_RESPOND_IF_ERR(req, err);
-  }
-
+  HTTP_RESPOND_IF_ERR(req, err);
   evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
