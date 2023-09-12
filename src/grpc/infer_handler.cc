@@ -943,12 +943,11 @@ ModelInferHandler::Execute(InferHandler::State* state)
   // If not error then state->step_ == ISSUED and inference request
   // has initiated... completion callback will transition to
   // COMPLETE or CANCELLED. Recording the state and the irequest
-  // to handle gRPC stream cancellation. If error go immediately to
-  // COMPLETE.
+  // to handle gRPC stream cancellation.
   if (err == nullptr) {
     state->context_->InsertInflightState(state, irequest);
   } else {
-    // Handling error...
+    // If error go immediately to COMPLETE.
     LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 

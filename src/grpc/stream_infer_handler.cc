@@ -310,12 +310,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // state->step_ == ISSUED and inference request has
     // initiated... the completion callback will transition to
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
-    // irequest to handle gRPC stream cancellation. If there was an
-    // error then enqueue the error response and show it to be ready
-    // for writing.
+    // irequest to handle gRPC stream cancellation. 
     if (err == nullptr) {
       state->context_->InsertInflightState(state, irequest);
     } else {
+      // If there was an error then enqueue the error response and show
+      // it to be ready for writing.
       inference::ModelStreamInferResponse* response;
       if (state->is_decoupled_) {
         state->response_queue_->AllocateResponse();
