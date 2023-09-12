@@ -75,6 +75,160 @@ namespace triton { namespace server {
   } while (false)
 
 namespace {
+void
+EVBufferAddErrorJsonInternal(evbuffer* buffer, const char* message)
+{
+  triton::common::TritonJson::Value response(
+      triton::common::TritonJson::ValueType::OBJECT);
+  response.AddStringRef("error", message, strlen(message));
+
+  triton::common::TritonJson::WriteBuffer buffer_json;
+  response.Write(&buffer_json);
+
+  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
+}
+
+void
+EVBufferAddErrorJson(evbuffer* buffer, const std::string& error_str)
+{
+  const char* message = error_str.c_str();
+  EVBufferAddErrorJsonInternal(buffer, message);
+}
+
+void
+EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
+{
+  const char* message = TRITONSERVER_ErrorMessage(err);
+  EVBufferAddErrorJsonInternal(buffer, message);
+}
+
+
+}  // namespace
+
+TRITONSERVER_Error*
+HTTPServer::Start()
+{
+  if (!worker_.joinable()) {
+    evbase_ = event_base_new();
+    htp_ = evhtp_new(evbase_, NULL);
+    evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
+    if (reuse_port_) {
+      evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
+    }
+    evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
+    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
+    if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNAVAILABLE,
+          (std::string("Socket '") + address_ + ":" + std::to_string(port_) +
+           "' already in use ")
+              .c_str());
+    }
+
+    // Set listening event for breaking event loop
+    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
+    break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
+    event_add(break_ev_, NULL);
+    worker_ = std::thread(event_base_loop, evbase_, 0);
+
+    return nullptr;
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_ALREADY_EXISTS, "HTTP server is already running.");
+}
+
+TRITONSERVER_Error*
+HTTPServer::Stop()
+{
+  if (worker_.joinable()) {
+    // Notify event loop to break via fd write
+    send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
+    worker_.join();
+    event_free(break_ev_);
+    evutil_closesocket(fds_[0]);
+    evutil_closesocket(fds_[1]);
+    evhtp_unbind_socket(htp_);
+    evhtp_free(htp_);
+    event_base_free(evbase_);
+    return nullptr;
+  }
+
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
+}
+
+void
+HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
+{
+  struct event_base* base = (struct event_base*)arg;
+  event_base_loopbreak(base);
+}
+
+void
+HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
+{
+  (static_cast<HTTPServer*>(arg))->Handle(req);
+}
+
+#ifdef TRITON_ENABLE_METRICS
+
+void
+HTTPMetricsServer::Handle(evhtp_request_t* req)
+{
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
+                 << req->uri->path->full;
+
+  if (req->method != htp_method_GET) {
+    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+  }
+
+  evhtp_res res = EVHTP_RES_BADREQ;
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(kContentTypeHeader, "text/plain; charset=utf-8", 1, 1));
+
+  // Call to metric endpoint should not have any trailing string
+  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
+    TRITONSERVER_Metrics* metrics = nullptr;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerMetrics(server_.get(), &metrics);
+    if (err == nullptr) {
+      const char* base;
+      size_t byte_size;
+      err = TRITONSERVER_MetricsFormatted(
+          metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
+      if (err == nullptr) {
+        res = EVHTP_RES_OK;
+        evbuffer_add(req->buffer_out, base, byte_size);
+      }
+    }
+
+    TRITONSERVER_MetricsDelete(metrics);
+    TRITONSERVER_ErrorDelete(err);
+  }
+
+  evhtp_send_reply(req, res);
+}
+
+TRITONSERVER_Error*
+HTTPMetricsServer::Create(
+    const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
+    std::string address, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* metrics_server)
+{
+  metrics_server->reset(
+      new HTTPMetricsServer(server, port, address, thread_cnt));
+
+  const std::string addr = address + ":" + std::to_string(port);
+  LOG_INFO << "Started Metrics Service at " << addr;
+
+  return nullptr;
+}
+
+#endif  // TRITON_ENABLE_METRICS
+
+namespace {
 
 // Allocate an evbuffer of size 'byte_size'. Return the 'evb' and
 // the 'base' address of the buffer contents.
@@ -559,33 +713,6 @@ WriteDataToJson(
   return nullptr;  // success
 }
 
-void
-EVBufferAddErrorJsonInternal(evbuffer* buffer, const char* message)
-{
-  triton::common::TritonJson::Value response(
-      triton::common::TritonJson::ValueType::OBJECT);
-  response.AddStringRef("error", message, strlen(message));
-
-  triton::common::TritonJson::WriteBuffer buffer_json;
-  response.Write(&buffer_json);
-
-  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
-}
-
-void
-EVBufferAddErrorJson(evbuffer* buffer, const std::string& error_str)
-{
-  const char* message = error_str.c_str();
-  EVBufferAddErrorJsonInternal(buffer, message);
-}
-
-void
-EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
-{
-  const char* message = TRITONSERVER_ErrorMessage(err);
-  EVBufferAddErrorJsonInternal(buffer, message);
-}
-
 TRITONSERVER_Error*
 CheckBinaryInputData(
     triton::common::TritonJson::Value& request_input, bool* is_binary,
@@ -865,129 +992,6 @@ CompressionTypeUsed(const std::string accept_encoding)
 }
 
 }  // namespace
-
-TRITONSERVER_Error*
-HTTPServer::Start()
-{
-  if (!worker_.joinable()) {
-    evbase_ = event_base_new();
-    htp_ = evhtp_new(evbase_, NULL);
-    evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    if (reuse_port_) {
-      evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
-    }
-    evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
-    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
-    if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNAVAILABLE,
-          (std::string("Socket '") + address_ + ":" + std::to_string(port_) +
-           "' already in use ")
-              .c_str());
-    }
-
-    // Set listening event for breaking event loop
-    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
-    break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
-    event_add(break_ev_, NULL);
-    worker_ = std::thread(event_base_loop, evbase_, 0);
-
-    return nullptr;
-  }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_ALREADY_EXISTS, "HTTP server is already running.");
-}
-
-TRITONSERVER_Error*
-HTTPServer::Stop()
-{
-  if (worker_.joinable()) {
-    // Notify event loop to break via fd write
-    send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
-    worker_.join();
-    event_free(break_ev_);
-    evutil_closesocket(fds_[0]);
-    evutil_closesocket(fds_[1]);
-    evhtp_unbind_socket(htp_);
-    evhtp_free(htp_);
-    event_base_free(evbase_);
-    return nullptr;
-  }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
-}
-
-void
-HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
-{
-  struct event_base* base = (struct event_base*)arg;
-  event_base_loopbreak(base);
-}
-
-void
-HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
-{
-  (static_cast<HTTPServer*>(arg))->Handle(req);
-}
-
-#ifdef TRITON_ENABLE_METRICS
-
-void
-HTTPMetricsServer::Handle(evhtp_request_t* req)
-{
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
-
-  if (req->method != htp_method_GET) {
-    HTTP_RESPOND_WITH_CODE(req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
-  }
-
-  evhtp_res res = EVHTP_RES_BADREQ;
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "text/plain; charset=utf-8", 1, 1));
-
-  // Call to metric endpoint should not have any trailing string
-  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    TRITONSERVER_Metrics* metrics = nullptr;
-    TRITONSERVER_Error* err =
-        TRITONSERVER_ServerMetrics(server_.get(), &metrics);
-    if (err == nullptr) {
-      const char* base;
-      size_t byte_size;
-      err = TRITONSERVER_MetricsFormatted(
-          metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
-      if (err == nullptr) {
-        res = EVHTP_RES_OK;
-        evbuffer_add(req->buffer_out, base, byte_size);
-      }
-    }
-
-    TRITONSERVER_MetricsDelete(metrics);
-    TRITONSERVER_ErrorDelete(err);
-  }
-
-  evhtp_send_reply(req, res);
-}
-
-TRITONSERVER_Error*
-HTTPMetricsServer::Create(
-    const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
-    std::string address, const int thread_cnt,
-    std::unique_ptr<HTTPServer>* metrics_server)
-{
-  metrics_server->reset(
-      new HTTPMetricsServer(server, port, address, thread_cnt));
-
-  const std::string addr = address + ":" + std::to_string(port);
-  LOG_INFO << "Started Metrics Service at " << addr;
-
-  return nullptr;
-}
-
-#endif  // TRITON_ENABLE_METRICS
 
 HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
