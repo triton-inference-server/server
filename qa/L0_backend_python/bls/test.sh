@@ -196,6 +196,14 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
             cat $CLIENT_LOG
             cat $SERVER_LOG
         fi
+
+        if [ $CUDA_MEMOY_POOL_SIZE_MB -eq 128 ]; then
+            if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
+                echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
+                cat $SERVER_LOG
+                RET=1
+            fi
+        fi
     done
 done
 
