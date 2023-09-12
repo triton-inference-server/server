@@ -950,6 +950,19 @@ SHELL ["cmd", "/S", "/C"]
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Install docker docker buildx
+RUN apt-get update \
+        && apt-get install -y ca-certificates curl gnupg \
+        && install -m 0755 -d /etc/apt/keyrings \
+        && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+        && chmod a+r /etc/apt/keyrings/docker.gpg \
+        && echo \
+            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null \
+        && apt-get update \
+        && apt-get install -y docker.io docker-buildx-plugin
+
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
@@ -961,7 +974,6 @@ RUN apt-get update && \
             autoconf \
             automake \
             build-essential \
-            docker.io \
             git \
             gperf \
             libre2-dev \
