@@ -961,7 +961,7 @@ RUN apt-get update \
             "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
             tee /etc/apt/sources.list.d/docker.list > /dev/null \
         && apt-get update \
-        && apt-get install -y docker.io docker-buildx-plugin 
+        && apt-get install -y docker.io docker-buildx-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
