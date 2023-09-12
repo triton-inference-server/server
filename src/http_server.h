@@ -313,6 +313,21 @@ class HTTPAPIServer : public HTTPServer {
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
       evbuffer* input_buffer, InferRequestClass* infer_req);
 
+
+  // Helpers for parsing JSON requests for Triton-specific fields
+  TRITONSERVER_Error* ParseJsonTritonIO(
+      triton::common::TritonJson::Value& request_json,
+      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
+      const std::string& model_name, evbuffer_iovec* v, int* v_idx_ptr,
+      size_t header_length, int n);
+  TRITONSERVER_Error* ParseJsonTritonParams(
+      triton::common::TritonJson::Value& request_json,
+      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
+  TRITONSERVER_Error* ParseJsonTritonRequestID(
+      triton::common::TritonJson::Value& request_json,
+      TRITONSERVER_InferenceRequest* irequest);
+
+
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
