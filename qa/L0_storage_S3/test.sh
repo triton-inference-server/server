@@ -292,6 +292,45 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test localization to a specified location
+export TRITON_AWS_MOUNT_DIRECTORY=`pwd`/aws_localization_test
+
+if [ -d "$TRITON_AWS_MOUNT_DIRECTORY" ]; then
+  rm -rf $TRITON_AWS_MOUNT_DIRECTORY
+fi
+
+mkdir -p $TRITON_AWS_MOUNT_DIRECTORY
+
+SERVER_LOG=$SERVER_LOG_BASE.custom_localization.log
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+if [ -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AWS_MOUNT_DIRECTORY is empty \n***"
+    ls -A $TRITON_AWS_MOUNT_DIRECTORY
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [! -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AWS_MOUNT_DIRECTORY was not cleared properly. \n***"
+    ls -A $TRITON_AWS_MOUNT_DIRECTORY
+    exit 1
+fi
+
+rm -rf $TRITON_AWS_MOUNT_DIRECTORY
+unset TRITON_AWS_MOUNT_DIRECTORY
+
 # Save models for AWS_SESSION_TOKEN test
 rm -rf tmp_cred_test_models
 mv models tmp_cred_test_models
