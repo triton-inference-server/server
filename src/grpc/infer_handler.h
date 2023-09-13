@@ -416,6 +416,9 @@ TRITONSERVER_Error* SetStateParameterFromTritonParameter(
     StateParameters& state_params,
     const std::pair<std::string, inference::InferParameter>& param);
 
+void InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp);
+
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error* OutputBufferQuery(
     TRITONSERVER_ResponseAllocator* allocator, void* userp,
@@ -685,51 +688,33 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    TRITONSERVER_Error* IssueRequestCancellation()
+    void IssueRequestCancellation()
     {
-      TRITONSERVER_Error* err = nullptr;
       {
         std::lock_guard<std::mutex> lock(mu_);
 
         // Issues the request cancellation to the core.
         for (auto state : inflight_states_) {
-          LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
-          if (state->irequest_ptr_ == nullptr) {
-            continue;
-          }
-          bool is_cancelled = false;
-          err = TRITONSERVER_InferenceRequestIsCancelled(
-              state->irequest_ptr_, &is_cancelled);
-          if ((err == nullptr) && (!is_cancelled)) {
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          if (state->step_ != Steps::CANCELLED) {
+            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
+            if (state->irequest_ptr_ == nullptr) {
+              continue;
+            }
+            // Note that request may or may not be valid at this point.
+            // Assuming if RequestComplete callback is run asynchronously
+            // before this point.
+            TRITONSERVER_Error* err = nullptr;
             err = TRITONSERVER_InferenceRequestCancel(state->irequest_ptr_);
-          }
-          if (err != nullptr) {
-            const char* request_id = "";
-            TRITONSERVER_Error* tmp_err = TRITONSERVER_InferenceRequestId(
-                state->irequest_ptr_, &request_id);
-            if (tmp_err != nullptr) {
-              // Ignore if failed to get request id.
-              TRITONSERVER_ErrorDelete(tmp_err);
+            // TODO: Add request id to the message
+            if (err != nullptr) {
+              LOG_INFO << "Failed to cancel the request: "
+                       << TRITONSERVER_ErrorMessage(err);
             }
-            TRITONSERVER_Error* wrapped_err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL,
-                std::string(
-                    std::string("[request id:") + request_id +
-                    "]: " + TRITONSERVER_ErrorMessage(err))
-                    .c_str());
-            TRITONSERVER_ErrorDelete(err);
-            return wrapped_err;
-          }
-
-          {
-            std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-            if (state->step_ != Steps::CANCELLED) {
-              state->step_ = Steps::CANCELLATION_ISSUED;
-            }
+            state->step_ = Steps::CANCELLATION_ISSUED;
           }
         }
       }
-      return nullptr;
     }
 
 
@@ -760,13 +745,7 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          TRITONSERVER_Error* err = nullptr;
-          err = IssueRequestCancellation();
-          if (err != nullptr) {
-            LOG_VERBOSE(1) << "Failed to cancel request: "
-                           << TRITONSERVER_ErrorMessage(err);
-            TRITONSERVER_ErrorDelete(err);
-          }
+          IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
 
@@ -1305,9 +1284,6 @@ class ModelInferHandler
 
  private:
   void Execute(State* state);
-  static void InferRequestComplete(
-      TRITONSERVER_InferenceRequest* request, const uint32_t flags,
-      void* userp);
   static void InferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);

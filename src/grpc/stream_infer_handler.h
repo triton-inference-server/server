@@ -109,9 +109,6 @@ class ModelStreamInferHandler
   bool Process(State* state, bool rpc_ok) override;
 
  private:
-  static void StreamInferRequestComplete(
-      TRITONSERVER_InferenceRequest* request, const uint32_t flags,
-      void* userp);
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);

@@ -281,8 +281,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, StreamInferRequestComplete,
-          reinterpret_cast<void*>(state) /* request_release_userp */);
+          irequest, InferRequestComplete, nullptr /* request_release_userp */);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -310,7 +309,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // state->step_ == ISSUED and inference request has
     // initiated... the completion callback will transition to
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
-    // irequest to handle gRPC stream cancellation. 
+    // irequest to handle gRPC stream cancellation.
     if (err == nullptr) {
       state->context_->InsertInflightState(state, irequest);
     } else {
@@ -530,28 +529,6 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
 }
 
 void
-ModelStreamInferHandler::StreamInferRequestComplete(
-    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
-{
-  LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferRequestComplete";
-
-  State* state = reinterpret_cast<State*>(userp);
-  if (state->irequest_ptr_ != request) {
-    LOG_ERROR
-        << "[INTERNAL] ModelStreamInferHandler::StreamInferRequestComplete: "
-           "TRITONSERVER_InferenceRequest ptr mismatch detected";
-  }
-
-  state->context_->EraseInflightState(state);
-
-  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting GRPC inference request");
-  }
-}
-
-void
 ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
@@ -603,6 +580,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (state->complete_) {
       state->step_ = Steps::CANCELLED;
+      state->context_->EraseInflightState(state);
+
       state->context_->PutTaskBackToQueue(state);
     }
 
@@ -701,6 +680,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       // that state object can be released.
       if (state->complete_) {
         state->step_ = Steps::CANCELLED;
+        state->context_->EraseInflightState(state);
         state->context_->PutTaskBackToQueue(state);
       }
 

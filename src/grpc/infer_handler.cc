@@ -670,6 +670,19 @@ InferGRPCToInput(
   return nullptr;  // success
 }
 
+void
+InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
+{
+  LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
+
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting GRPC inference request");
+  }
+}
+
 //===========================================================================
 //  The following section contains the handling mechanism for ModelInfer RPC.
 //  This implementation is tuned towards performance and reducing latency.
@@ -905,8 +918,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
   }
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-        irequest, InferRequestComplete,
-        reinterpret_cast<void*>(state) /* request_release_userp */);
+        irequest, InferRequestComplete, nullptr /* request_release_userp */);
   }
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -972,26 +984,6 @@ ModelInferHandler::Execute(InferHandler::State* state)
 }
 
 void
-ModelInferHandler::InferRequestComplete(
-    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
-{
-  LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
-
-  State* state = reinterpret_cast<State*>(userp);
-  if (state->irequest_ptr_ != request) {
-    LOG_ERROR << "[INTERNAL] ModelInferHandler::InferRequestComplete: "
-                 "TRITONSERVER_InferenceRequest ptr mismatch detected";
-  }
-  state->context_->EraseInflightState(state);
-
-  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting GRPC inference request");
-  }
-}
-
-void
 ModelInferHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
@@ -1030,6 +1022,7 @@ ModelInferHandler::InferResponseComplete(
         "deleting GRPC inference response");
 
     state->step_ = Steps::CANCELLED;
+    state->context_->EraseInflightState(state);
 
     LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                    << state->unique_id_
