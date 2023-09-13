@@ -37,15 +37,10 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-set +e
-rm -r javacpp-presets
-export INCLUDE_DEVELOPER_TOOLS_SERVER=1
-git clone https://github.com/bytedeco/javacpp-presets.git
-cd javacpp-presets
-mvn clean install --projects .,tritonserver
-mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
-cd ..
 set -e
+git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} https://github.com/triton-inference-server/client.git
+source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh -b $PWD --keep-build-dependencies
+cd ..
 
 CLIENT_LOG="client_cpu_only.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
