@@ -101,20 +101,20 @@ class ClientCancellationTest(tu.TestResultCollector):
 
         self._record_start_time_ms()
 
-        # Expect inference to pass successfully for a large timeout
-        # value
-        future = triton_client.async_infer(
-            model_name=self.model_name_,
-            inputs=self.inputs_,
-            callback=partial(callback, user_data),
-            outputs=self.outputs_,
-        )
-        time.sleep(2)
-        future.cancel()
+        with self.assertRaises(InferenceServerException) as cm:
+            future = triton_client.async_infer(
+                model_name=self.model_name_,
+                inputs=self.inputs_,
+                callback=partial(callback, user_data),
+                outputs=self.outputs_,
+            )
+            time.sleep(2)
+            future.cancel()
 
-        # Wait until the results is captured via callback
-        data_item = user_data._completed_requests.get()
-        self.assertEqual(type(data_item), grpcclient.CancelledError)
+            data_item = user_data._completed_requests.get()
+            if type(data_item) == InferenceServerException:
+                raise data_item
+        self.assertIn("Locally cancelled by application!", str(cm.exception))
 
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
@@ -132,20 +132,22 @@ class ClientCancellationTest(tu.TestResultCollector):
         self._prepare_request()
         user_data = UserData()
 
-        # The model is configured to take three seconds to send the
-        # response. Expect an exception for small timeout values.
         triton_client.start_stream(callback=partial(callback, user_data))
         self._record_start_time_ms()
-        for i in range(1):
-            triton_client.async_stream_infer(
-                model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
-            )
 
-        time.sleep(2)
-        triton_client.stop_stream(cancel_requests=True)
-
-        data_item = user_data._completed_requests.get()
-        self.assertEqual(type(data_item), grpcclient.CancelledError)
+        with self.assertRaises(InferenceServerException) as cm:
+            for i in range(1):
+                triton_client.async_stream_infer(
+                    model_name=self.model_name_,
+                    inputs=self.inputs_,
+                    outputs=self.outputs_,
+                )
+                time.sleep(2)
+            triton_client.stop_stream(cancel_requests=True)
+            data_item = user_data._completed_requests.get()
+            if type(data_item) == InferenceServerException:
+                raise data_item
+        self.assertIn("Locally cancelled by application!", str(cm.exception))
 
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
@@ -160,9 +162,9 @@ class ClientCancellationTest(tu.TestResultCollector):
             await asyncio.sleep(2)
             self.assertTrue(call.cancel())
 
-        async def handle_response(call):
+        async def handle_response(generator):
             with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
-                await call
+                _ = await anext(generator)
 
         async def test_aio_infer(self):
             triton_client = aiogrpcclient.InferenceServerClient(
@@ -170,16 +172,21 @@ class ClientCancellationTest(tu.TestResultCollector):
             )
             self._prepare_request()
             self._record_start_time_ms()
-            # Expect inference to pass successfully for a large timeout
-            # value
-            call = await triton_client.infer(
+
+            generator = triton_client.infer(
                 model_name=self.model_name_,
                 inputs=self.inputs_,
                 outputs=self.outputs_,
                 get_call_obj=True,
             )
-            asyncio.create_task(handle_response(call))
-            asyncio.create_task(cancel_request(call))
+            grpc_call = await anext(generator)
+
+            tasks = []
+            tasks.append(asyncio.create_task(handle_response(generator)))
+            tasks.append(asyncio.create_task(cancel_request(grpc_call)))
+
+            for task in tasks:
+                await task
 
             self._record_end_time_ms()
             self._test_runtime_duration(5000)
@@ -211,7 +218,7 @@ class ClientCancellationTest(tu.TestResultCollector):
                 response_iterator = triton_client.stream_infer(
                     inputs_iterator=async_request_iterator(), get_call_obj=True
                 )
-                streaming_call = await response_iterator.__anext__()
+                streaming_call = await anext(response_iterator)
 
                 async def cancel_streaming(streaming_call):
                     await asyncio.sleep(2)
@@ -222,8 +229,12 @@ class ClientCancellationTest(tu.TestResultCollector):
                         async for response in response_iterator:
                             self.assertTrue(False, "Received an unexpected response!")
 
-                asyncio.create_task(handle_response(response_iterator))
-                asyncio.create_task(cancel_streaming(streaming_call))
+                tasks = []
+                tasks.append(asyncio.create_task(handle_response(response_iterator)))
+                tasks.append(asyncio.create_task(cancel_streaming(streaming_call)))
+
+                for task in tasks:
+                    await task
 
                 self._record_end_time_ms()
                 self._test_runtime_duration(5000)
