@@ -476,14 +476,12 @@ JavaCPP-presets. You can do this using the following steps:
 
 1. Create the JNI binaries in your local repository (`/root/.m2/repository`)
    with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver)
-   a. For In-Process C-API Java bindings, you can disable the C-API wrapper build by setting
-   ```bash export INCLUDE_DEVELOPER_TOOLS_SERVER=1 ```
-   b. For C-API Wrapper Java bindings, you need to install some build specific dependencies like cmake. You can either do this with:
+   For C-API Wrapper Java bindings, you need to install some build specific dependencies like cmake. You can either do this with:
    ```bash
     $ git clone https://github.com/triton-inference-server/developer_tools.git
     $ bash -x ../install_test_dependencies_and_build.sh
    ```
-    or refer to [developer_tools/server installation script](https://github.com/triton-inference-server/developer_tools/blob/main/qa/install_test_dependencies_and_build.sh) for dependencies and install them yourself.
+    Please refer to [server installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh) for dependencies you need to install and modifications you need to make for your container.
 After installing dependencies, you can build the tritonserver project on javacpp-presets:
 ```bash
  $ git clone https://github.com/bytedeco/javacpp-presets.git
