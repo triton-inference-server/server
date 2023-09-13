@@ -321,7 +321,7 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-if [ ! -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
+if [ -d "$TRITON_AWS_MOUNT_DIRECTORY" ] && [ ! -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
     echo -e "\n***\n*** Test localization to a specified location failed. \n***"
     echo -e "\n***\n*** Specified mount folder $TRITON_AWS_MOUNT_DIRECTORY was not cleared properly. \n***"
     ls -A $TRITON_AWS_MOUNT_DIRECTORY

@@ -142,18 +142,18 @@ $ gsutil iam ch allUsers:objectViewer "${BUCKET_URL}"
 $ gsutil iam ch allUsers:legacyBucketReader "${BUCKET_URL}"
 ```
 
-By default, Triton makes a local copy of a remote model repository in a temporary folder, which is deleted after Triton server is shut down.
-If you would like to control where remote model repository is copied to, you may set the
-`TRITON_GCS_MOUNT_DIRECTORY` environment variable to a path pointing to the existing folder
-on your local machine.
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_GCS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
 
 ```bash
 export TRITON_GCS_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
-Make sure, that `TRITON_GCS_MOUNT_DIRECTORY` exists on your local machine.
-We recommend to provide an empty folder, otherwise make sure that the content of this folder
-is different from the content of your GCS bucket.
+**Make sure, that `TRITON_GCS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty**
 
 #### S3
 
@@ -190,18 +190,18 @@ If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
 
-By default, Triton makes a local copy of a remote model repository in a temporary folder, which is deleted after Triton server is shut down.
-If you would like to control where remote model repository is copied to, you may set the
-`TRITON_AWS_MOUNT_DIRECTORY` environment variable to a path pointing to the existing folder
-on your local machine.
+By default, Triton makes a local copy of a remote model repository
+in a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AWS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
 
 ```bash
 export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
-Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine.
-We recommend to provide an empty folder, otherwise make sure that the content of this folder
-is different from the content of your S3 bucket.
+**Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty**
 
 #### Azure Storage
 
@@ -222,18 +222,19 @@ here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCO
 $ export AZURE_STORAGE_ACCOUNT="account_name"
 $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
 ```
-By default, Triton makes a local copy of a remote model repository in a temporary folder, which is deleted after Triton server is shut down.
-If you would like to control where remote model repository is copied to, you may set the
-`TRITON_AZURE_MOUNT_DIRECTORY` environment variable to a path pointing to the existing folder
-on your local machine.
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AZURE_MOUNT_DIRECTORY` environment variable to a path
+pointing to the existing folder on your local machine.
 
 ```bash
 export TRITON_AZURE_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
-Make sure, that `TRITON_AZURE_MOUNT_DIRECTORY` exists on your local machine.
-We recommend to provide an empty folder, otherwise make sure that the content of this folder
-is different from the content of your remote AZURE model repository.
+**Make sure, that `TRITON_AZURE_MOUNT_DIRECTORY` exists on your local machine
+and it is empty**
+
 
 ### Cloud Storage with Credential file (Beta)
 
