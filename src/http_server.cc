@@ -56,7 +56,7 @@ extern "C" {
 
 namespace triton { namespace server {
 
-#define HTTP_RESPOND_IF_ERR(REQ, X)                   \
+#define RETURN_AND_RESPOND_IF_ERR(REQ, X)             \
   do {                                                \
     TRITONSERVER_Error* err__ = (X);                  \
     if (err__ != nullptr) {                           \
@@ -66,6 +66,37 @@ namespace triton { namespace server {
       return;                                         \
     }                                                 \
   } while (false)
+
+#define RETURN_AND_RESPOND_WITH_ERR(REQ, CODE, MSG) \
+  do {                                              \
+    EVBufferAddErrorJson((REQ)->buffer_out, MSG);   \
+    evhtp_send_reply((REQ), CODE);                  \
+    return;                                         \
+  } while (false)
+
+namespace {
+void
+EVBufferAddErrorJson(evbuffer* buffer, const char* message)
+{
+  triton::common::TritonJson::Value response(
+      triton::common::TritonJson::ValueType::OBJECT);
+  response.AddStringRef("error", message, strlen(message));
+
+  triton::common::TritonJson::WriteBuffer buffer_json;
+  response.Write(&buffer_json);
+
+  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
+}
+
+void
+EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
+{
+  const char* message = TRITONSERVER_ErrorMessage(err);
+  EVBufferAddErrorJson(buffer, message);
+}
+
+
+}  // namespace
 
 TRITONSERVER_Error*
 HTTPServer::Start()
@@ -142,8 +173,8 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
                  << req->uri->path->full;
 
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_res res = EVHTP_RES_BADREQ;
@@ -190,7 +221,6 @@ HTTPMetricsServer::Create(
 }
 
 #endif  // TRITON_ENABLE_METRICS
-
 
 namespace {
 
@@ -675,21 +705,6 @@ WriteDataToJson(
   }
 
   return nullptr;  // success
-}
-
-void
-EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
-{
-  const char* message = TRITONSERVER_ErrorMessage(err);
-
-  triton::common::TritonJson::Value response(
-      triton::common::TritonJson::ValueType::OBJECT);
-  response.AddStringRef("error", message, strlen(message));
-
-  triton::common::TritonJson::WriteBuffer buffer_json;
-  response.Write(&buffer_json);
-
-  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
 }
 
 TRITONSERVER_Error*
@@ -1209,8 +1224,8 @@ void
 HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -1233,8 +1248,8 @@ HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
   if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -1294,11 +1309,7 @@ HTTPAPIServer::HandleRepositoryIndex(
     }
   }
 
-  if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
 }
 
 void
@@ -1307,8 +1318,8 @@ HTTPAPIServer::HandleRepositoryControl(
     const std::string& model_name, const std::string& action)
 {
   if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -1329,7 +1340,7 @@ HTTPAPIServer::HandleRepositoryControl(
         v = static_cast<struct evbuffer_iovec*>(
             alloca(sizeof(struct evbuffer_iovec) * n));
         if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_INTERNAL,
                        "unexpected error getting load model request buffers"));
@@ -1355,7 +1366,7 @@ HTTPAPIServer::HandleRepositoryControl(
       size_t buffer_len = evbuffer_get_length(req->buffer_in);
       if (buffer_len > 0) {
         triton::common::TritonJson::Value request;
-        HTTP_RESPOND_IF_ERR(
+        RETURN_AND_RESPOND_IF_ERR(
             req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
 
         // Parse request body for parameters
@@ -1363,11 +1374,11 @@ HTTPAPIServer::HandleRepositoryControl(
         if (request.Find("parameters", &param_json)) {
           // Iterate over each member in 'param_json'
           std::vector<std::string> members;
-          HTTP_RESPOND_IF_ERR(req, param_json.Members(&members));
+          RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&members));
           for (const auto& m : members) {
             const char* param_str = nullptr;
             size_t param_len = 0;
-            HTTP_RESPOND_IF_ERR(
+            RETURN_AND_RESPOND_IF_ERR(
                 req,
                 param_json.MemberAsString(m.c_str(), &param_str, &param_len));
 
@@ -1392,7 +1403,7 @@ HTTPAPIServer::HandleRepositoryControl(
               params->emplace_back(param);
               const_params.emplace_back(param);
             } else {
-              HTTP_RESPOND_IF_ERR(
+              RETURN_AND_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
                            TRITONSERVER_ERROR_INTERNAL,
                            "unexpected error on creating Triton parameter"));
@@ -1400,7 +1411,7 @@ HTTPAPIServer::HandleRepositoryControl(
           }
         }
       }
-      HTTP_RESPOND_IF_ERR(
+      RETURN_AND_RESPOND_IF_ERR(
           req, TRITONSERVER_ServerLoadModelWithParameters(
                    server_.get(), model_name.c_str(), const_params.data(),
                    const_params.size()));
@@ -1453,13 +1464,8 @@ HTTPAPIServer::HandleRepositoryControl(
     }
   }
 
-  if (err == nullptr) {
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
+  evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
 void
@@ -1468,13 +1474,13 @@ HTTPAPIServer::HandleModelReady(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_BADREQ, "Missing model name in ModelReady request");
   }
 
   bool ready = false;
@@ -1487,10 +1493,13 @@ HTTPAPIServer::HandleModelReady(
         server_.get(), model_name.c_str(), requested_model_version, &ready);
   }
 
-  evhtp_send_reply(
-      req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  if (!ready && !err) {
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_BADREQ, "Model version not ready");
+  }
 
-  TRITONSERVER_ErrorDelete(err);
+  RETURN_AND_RESPOND_IF_ERR(req, err);
+  evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
 void
@@ -1499,16 +1508,13 @@ HTTPAPIServer::HandleModelMetadata(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    std::string message_json =
-        "{ \"error\" : \"missing model name in ModelMetadata request\" }";
-    evbuffer_add(req->buffer_out, message_json.c_str(), message_json.size());
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_BADREQ, "Missing model name in ModelMetadata request");
   }
 
   evhtp_headers_add_header(
@@ -1535,11 +1541,7 @@ HTTPAPIServer::HandleModelMetadata(
     }
   }
 
-  if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
 }
 
 void
@@ -1548,16 +1550,13 @@ HTTPAPIServer::HandleModelConfig(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   if (model_name.empty()) {
-    std::string message_json =
-        "{ \"error\" : \"missing model name in ModelConfig request\" }";
-    evbuffer_add(req->buffer_out, message_json.c_str(), message_json.size());
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_BADREQ, "Missing model name in ModelConfig request");
   }
 
   evhtp_headers_add_header(
@@ -1585,11 +1584,7 @@ HTTPAPIServer::HandleModelConfig(
     }
   }
 
-  if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
 }
 
 void
@@ -1598,8 +1593,8 @@ HTTPAPIServer::HandleModelStats(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -1636,18 +1631,15 @@ HTTPAPIServer::HandleModelStats(
       "the server does not support model statistics");
 #endif
 
-  if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
 }
 
 void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
     return;
   }
 
@@ -1663,12 +1655,12 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   std::string filepath;
   if (!model_name.empty()) {
     bool ready = false;
-    HTTP_RESPOND_IF_ERR(
+    RETURN_AND_RESPOND_IF_ERR(
         req,
         TRITONSERVER_ServerModelIsReady(
             server_.get(), model_name.c_str(), -1 /* model version */, &ready));
     if (!ready) {
-      HTTP_RESPOND_IF_ERR(
+      RETURN_AND_RESPOND_IF_ERR(
           req, TRITONSERVER_ErrorNew(
                    TRITONSERVER_ERROR_INVALID_ARG,
                    ("Request for unknown model : " + model_name).c_str()));
@@ -1684,7 +1676,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       v = static_cast<struct evbuffer_iovec*>(
           alloca(sizeof(struct evbuffer_iovec) * n));
       if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
-        HTTP_RESPOND_IF_ERR(
+        RETURN_AND_RESPOND_IF_ERR(
             req, TRITONSERVER_ErrorNew(
                      TRITONSERVER_ERROR_INTERNAL,
                      "unexpected error getting trace request buffers"));
@@ -1693,7 +1685,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
     triton::common::TritonJson::Value request;
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
-    HTTP_RESPOND_IF_ERR(
+    RETURN_AND_RESPOND_IF_ERR(
         req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
 
     TraceManager::NewSetting new_setting;
@@ -1703,7 +1695,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       if (setting_json.IsNull()) {
         new_setting.clear_filepath_ = true;
       } else {
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
         new_setting.filepath_ = &filepath;
       }
     }
@@ -1712,17 +1704,18 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         new_setting.clear_level_ = true;
       } else {
         triton::common::TritonJson::Value level_array;
-        HTTP_RESPOND_IF_ERR(
+        RETURN_AND_RESPOND_IF_ERR(
             req, request.MemberAsArray("trace_level", &level_array));
         for (size_t i = 0; i < level_array.ArraySize(); ++i) {
           std::string level_str;
-          HTTP_RESPOND_IF_ERR(req, level_array.IndexAsString(i, &level_str));
+          RETURN_AND_RESPOND_IF_ERR(
+              req, level_array.IndexAsString(i, &level_str));
           if (level_str == "OFF") {
             if (level_array.ArraySize() == 1) {
               level = TRITONSERVER_TRACE_LEVEL_DISABLED;
               new_setting.level_ = &level;
             } else {
-              HTTP_RESPOND_IF_ERR(
+              RETURN_AND_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
                            TRITONSERVER_ERROR_INVALID_ARG,
                            "Expect only one trace level 'OFF' is specified"));
@@ -1744,13 +1737,13 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         new_setting.clear_rate_ = true;
       } else {
         std::string rate_str;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&rate_str));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&rate_str));
         try {
           rate = std::stoi(rate_str);
           new_setting.rate_ = &rate;
         }
         catch (const std::invalid_argument& ia) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_INVALID_ARG,
                        (std::string("Unable to parse 'trace_rate', got: ") +
@@ -1758,7 +1751,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                            .c_str()));
         }
         catch (const std::out_of_range& oor) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req,
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
@@ -1777,11 +1770,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         new_setting.clear_count_ = true;
       } else {
         std::string count_str;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&count_str));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&count_str));
         try {
           count = std::stoi(count_str);
           if (count < TraceManager::MIN_TRACE_COUNT_VALUE) {
-            HTTP_RESPOND_IF_ERR(
+            RETURN_AND_RESPOND_IF_ERR(
                 req, TRITONSERVER_ErrorNew(
                          TRITONSERVER_ERROR_INVALID_ARG,
                          (std::string("Unable to parse 'trace_count'.") +
@@ -1793,7 +1786,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
           new_setting.count_ = &count;
         }
         catch (const std::invalid_argument& ia) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_INVALID_ARG,
                        (std::string("Unable to parse 'trace_count', got: ") +
@@ -1801,7 +1794,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                            .c_str()));
         }
         catch (const std::out_of_range& oor) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req,
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
@@ -1819,13 +1812,13 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         new_setting.clear_log_frequency_ = true;
       } else {
         std::string frequency_str;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&frequency_str));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&frequency_str));
         try {
           log_frequency = std::stoi(frequency_str);
           new_setting.log_frequency_ = &log_frequency;
         }
         catch (const std::invalid_argument& ia) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_INVALID_ARG,
                        (std::string("Unable to parse 'log_frequency', got: ") +
@@ -1833,7 +1826,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                            .c_str()));
         }
         catch (const std::out_of_range& oor) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req,
               TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
@@ -1848,7 +1841,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         }
       }
     }
-    HTTP_RESPOND_IF_ERR(
+    RETURN_AND_RESPOND_IF_ERR(
         req, trace_manager_->UpdateTraceSetting(model_name, new_setting));
   }
 
@@ -1863,33 +1856,34 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     triton::common::TritonJson::Value level_array(
         triton::common::TritonJson::ValueType::ARRAY);
     if (level == TRITONSERVER_TRACE_LEVEL_DISABLED) {
-      HTTP_RESPOND_IF_ERR(req, level_array.AppendString("OFF"));
+      RETURN_AND_RESPOND_IF_ERR(req, level_array.AppendString("OFF"));
     } else {
       if (level & TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) {
-        HTTP_RESPOND_IF_ERR(req, level_array.AppendString("TIMESTAMPS"));
+        RETURN_AND_RESPOND_IF_ERR(req, level_array.AppendString("TIMESTAMPS"));
       }
       if (level & TRITONSERVER_TRACE_LEVEL_TENSORS) {
-        HTTP_RESPOND_IF_ERR(req, level_array.AppendString("TENSORS"));
+        RETURN_AND_RESPOND_IF_ERR(req, level_array.AppendString("TENSORS"));
       }
     }
-    HTTP_RESPOND_IF_ERR(
+    RETURN_AND_RESPOND_IF_ERR(
         req, trace_response.Add("trace_level", std::move(level_array)));
   }
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_rate", std::to_string(rate)));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_count", std::to_string(count)));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req,
       trace_response.AddString("log_frequency", std::to_string(log_frequency)));
-  HTTP_RESPOND_IF_ERR(req, trace_response.AddString("trace_file", filepath));
+  RETURN_AND_RESPOND_IF_ERR(
+      req, trace_response.AddString("trace_file", filepath));
 
   triton::common::TritonJson::WriteBuffer buffer;
-  HTTP_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
+  RETURN_AND_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
   evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
   evhtp_send_reply(req, EVHTP_RES_OK);
 #else
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, TRITONSERVER_ErrorNew(
                TRITONSERVER_ERROR_UNAVAILABLE,
                "the server does not support tracing"));
@@ -1900,8 +1894,8 @@ void
 HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 {
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
   evhtp_headers_add_header(
       req->headers_out,
@@ -1917,7 +1911,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       v = static_cast<struct evbuffer_iovec*>(
           alloca(sizeof(struct evbuffer_iovec) * n));
       if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
-        HTTP_RESPOND_IF_ERR(
+        RETURN_AND_RESPOND_IF_ERR(
             req,
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
@@ -1927,7 +1921,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     TRITONSERVER_Error* err = nullptr;
     triton::common::TritonJson::Value request;
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
-    HTTP_RESPOND_IF_ERR(
+    RETURN_AND_RESPOND_IF_ERR(
         req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
     // Server and Core repos do not have the same Logger object
     // Each update must be applied to both server and core repo versions
@@ -1936,10 +1930,10 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       if (!setting_json.IsNull()) {
         // Set new settings in server then in core
         std::string log_file_path;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
         const std::string& error = LOG_SET_OUT_FILE(log_file_path);
         if (!error.empty()) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_UNAVAILABLE, (error).c_str()));
         }
@@ -1948,7 +1942,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         err = TRITONSERVER_ServerOptionsSetLogFile(
             nullptr, log_file_path.c_str());
         if (err != nullptr) {
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_UNAVAILABLE,
                        (TRITONSERVER_ErrorMessage(err))));
@@ -1958,7 +1952,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_info", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_info_status;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
         LOG_ENABLE_INFO(log_info_status);
         TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status);
       }
@@ -1966,7 +1960,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_warning", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_warn_status;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
         LOG_ENABLE_WARNING(log_warn_status);
         TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status);
       }
@@ -1974,7 +1968,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_error", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_error_status;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
         LOG_ENABLE_ERROR(log_error_status);
         TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status);
       }
@@ -1982,7 +1976,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_verbose_level", &setting_json)) {
       if (!setting_json.IsNull()) {
         uint64_t verbose_level;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
         LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
         TRITONSERVER_ServerOptionsSetLogVerbose(
             nullptr, static_cast<int32_t>(verbose_level));
@@ -1991,14 +1985,15 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_format", &setting_json)) {
       if (!setting_json.IsNull()) {
         std::string log_format_parse;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_format_parse));
+        RETURN_AND_RESPOND_IF_ERR(
+            req, setting_json.AsString(&log_format_parse));
         triton::common::Logger::Format log_format_final =
             triton::common::Logger::Format::kDEFAULT;
         if (log_format_parse == "ISO8601") {
           log_format_final = triton::common::Logger::Format::kISO8601;
         } else if (log_format_parse != "default") {
           // Returns from function
-          HTTP_RESPOND_IF_ERR(
+          RETURN_AND_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
                        TRITONSERVER_ERROR_UNAVAILABLE,
                        ("invalid argument for --log_format, got: " +
@@ -2021,25 +2016,25 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   }
   triton::common::TritonJson::Value log_setting_response(
       triton::common::TritonJson::ValueType::OBJECT);
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddString("log_file", LOG_FILE));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_info", LOG_INFO_IS_ON));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_warning", LOG_WARNING_IS_ON));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_error", LOG_ERROR_IS_ON));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddInt(
                "log_verbose_level", static_cast<uint64_t>(LOG_VERBOSE_LEVEL)));
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, log_setting_response.AddString("log_format", LOG_FORMAT_STRING));
   triton::common::TritonJson::WriteBuffer buffer;
-  HTTP_RESPOND_IF_ERR(req, log_setting_response.Write(&buffer));
+  RETURN_AND_RESPOND_IF_ERR(req, log_setting_response.Write(&buffer));
   evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
   evhtp_send_reply(req, EVHTP_RES_OK);
 #else
-  HTTP_RESPOND_IF_ERR(
+  RETURN_AND_RESPOND_IF_ERR(
       req, TRITONSERVER_ErrorNew(
                TRITONSERVER_ERROR_UNAVAILABLE,
                "the server does not support dynamic logging"));
@@ -2050,8 +2045,8 @@ void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2074,11 +2069,11 @@ HTTPAPIServer::HandleSystemSharedMemory(
     const std::string& action)
 {
   if ((action == "status") && (req->method != htp_method_GET)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   } else if ((action != "status") && (req->method != htp_method_POST)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2170,13 +2165,8 @@ HTTPAPIServer::HandleSystemSharedMemory(
     }
   }
 
-  if (err == nullptr) {
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
+  evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
 void
@@ -2185,11 +2175,11 @@ HTTPAPIServer::HandleCudaSharedMemory(
     const std::string& action)
 {
   if ((action == "status") && (req->method != htp_method_GET)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   } else if ((action != "status") && (req->method != htp_method_POST)) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   evhtp_headers_add_header(
@@ -2296,13 +2286,8 @@ HTTPAPIServer::HandleCudaSharedMemory(
     }
   }
 
-  if (err == nullptr) {
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(err);
-  }
+  RETURN_AND_RESPOND_IF_ERR(req, err);
+  evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
 TRITONSERVER_Error*
@@ -2375,158 +2360,14 @@ HTTPAPIServer::GetResponseCompressionType(evhtp_request_t* req)
   return DataCompressor::Type::IDENTITY;
 }
 
+// Helpers for parsing JSON requests for Triton-specific fields
 TRITONSERVER_Error*
-HTTPAPIServer::EVBufferToInput(
-    const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
-    evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
+HTTPAPIServer::ParseJsonTritonIO(
+    triton::common::TritonJson::Value& request_json,
+    TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
+    const std::string& model_name, evbuffer_iovec* v, int* v_idx_ptr,
+    size_t header_length, int n)
 {
-  // Extract individual input data from HTTP body and register in
-  // 'irequest'. The HTTP body is not necessarily stored in contiguous
-  // memory.
-  //
-  // Get the addr and size of each chunk of memory holding the HTTP
-  // body.
-  struct evbuffer_iovec* v = nullptr;
-  int v_idx = 0;
-
-  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          "unexpected error getting input buffers");
-    }
-  }
-
-  // Extract just the json header from the HTTP body. 'header_length == 0' means
-  // that the entire HTTP body should be input data for a raw binary request.
-  triton::common::TritonJson::Value request_json;
-
-  RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, header_length, n));
-
-  // Set InferenceRequest request_id
-  triton::common::TritonJson::Value id_json;
-  if (request_json.Find("id", &id_json)) {
-    const char* id;
-    size_t id_len;
-    RETURN_MSG_IF_ERR(id_json.AsString(&id, &id_len), "Unable to parse 'id'");
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
-  }
-
-  // The default setting for returned outputs (JSON or BINARY). This
-  // is needed for the case when outputs are not explicitly specified.
-  AllocPayload::OutputInfo::Kind default_output_kind =
-      AllocPayload::OutputInfo::JSON;
-
-  triton::common::TritonJson::Value params_json;
-  if (request_json.Find("parameters", &params_json)) {
-    std::vector<std::string> parameters;
-    RETURN_MSG_IF_ERR(
-        params_json.Members(&parameters), "failed to get request params.");
-
-    uint32_t flags = 0;
-    for (auto& parameter : parameters) {
-      if (parameter == "sequence_id") {
-        uint64_t seq_id;
-        // Try to parse sequence_id as uint64_t
-        TRITONSERVER_Error* err;
-        if ((err = params_json.MemberAsUInt(parameter.c_str(), &seq_id)) !=
-            nullptr) {
-          TRITONSERVER_ErrorDelete(err);
-          // On failure try to parse as a string
-          std::string seq_id;
-          RETURN_MSG_IF_ERR(
-              params_json.MemberAsString(parameter.c_str(), &seq_id),
-              "Unable to parse 'sequence_id'");
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
-              irequest, seq_id.c_str()));
-        } else {
-          RETURN_IF_ERR(
-              TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
-        }
-      } else if (parameter == "sequence_start") {
-        bool start;
-        RETURN_MSG_IF_ERR(
-            params_json.MemberAsBool(parameter.c_str(), &start),
-            "Unable to parse 'sequence_start'");
-        if (start) {
-          flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
-        }
-      } else if (parameter == "sequence_end") {
-        bool end;
-        RETURN_MSG_IF_ERR(
-            params_json.MemberAsBool(parameter.c_str(), &end),
-            "Unable to parse 'sequence_end'");
-        if (end) {
-          flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
-        }
-      } else if (parameter == "priority") {
-        uint64_t p;
-        RETURN_MSG_IF_ERR(
-            params_json.MemberAsUInt(parameter.c_str(), &p),
-            "Unable to parse 'priority'");
-        RETURN_IF_ERR(
-            TRITONSERVER_InferenceRequestSetPriorityUInt64(irequest, p));
-      } else if (parameter == "timeout") {
-        uint64_t t;
-        RETURN_MSG_IF_ERR(
-            params_json.MemberAsUInt(parameter.c_str(), &t),
-            "Unable to parse 'timeout'");
-        RETURN_IF_ERR(
-            TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
-      } else if (parameter == "binary_data_output") {
-        bool bdo;
-        RETURN_MSG_IF_ERR(
-            params_json.MemberAsBool(parameter.c_str(), &bdo),
-            "Unable to parse 'binary_data_output'");
-        default_output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
-                                    : AllocPayload::OutputInfo::JSON;
-      } else if (parameter.rfind("triton_", 0) == 0) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage "
-             "and should not be specified."));
-      } else {
-        triton::common::TritonJson::Value value;
-        if (!params_json.Find(parameter.c_str(), &value)) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              ("parameter key '" + parameter + "' was not found in the JSON")
-                  .c_str());
-        }
-
-        if (value.IsString()) {
-          std::string string_value;
-          RETURN_IF_ERR(value.AsString(&string_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
-              irequest, parameter.c_str(), string_value.c_str()));
-        } else if (value.IsInt()) {
-          int64_t int_value;
-          RETURN_IF_ERR(value.AsInt(&int_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
-              irequest, parameter.c_str(), int_value));
-        } else if (value.IsBool()) {
-          bool bool_value;
-          RETURN_IF_ERR(value.AsBool(&bool_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
-              irequest, parameter.c_str(), bool_value));
-        } else {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              ("parameter '" + parameter +
-               "' has invalid type. It should be either "
-               "'int', 'bool', or 'string'.")
-                  .c_str());
-        }
-      }
-    }
-
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
-  }
-
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   triton::common::TritonJson::Value inputs_json;
@@ -2534,6 +2375,7 @@ HTTPAPIServer::EVBufferToInput(
       request_json.MemberAsArray("inputs", &inputs_json),
       "Unable to parse 'inputs'");
 
+  int& v_idx = *v_idx_ptr;
   for (size_t i = 0; i < inputs_json.ArraySize(); i++) {
     triton::common::TritonJson::Value request_input;
     RETURN_IF_ERR(inputs_json.At(i, &request_input));
@@ -2772,8 +2614,184 @@ HTTPAPIServer::EVBufferToInput(
       }
     }
   }
+  return nullptr;  // success
+}
 
-  infer_req->alloc_payload_.default_output_kind_ = default_output_kind;
+TRITONSERVER_Error*
+HTTPAPIServer::ParseJsonTritonParams(
+    triton::common::TritonJson::Value& request_json,
+    TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req)
+{
+  // The default setting for returned outputs (JSON or BINARY). This
+  // is needed for the case when outputs are not explicitly specified.
+  AllocPayload::OutputInfo::Kind output_kind = AllocPayload::OutputInfo::JSON;
+
+
+  triton::common::TritonJson::Value params_json;
+  if (request_json.Find("parameters", &params_json)) {
+    std::vector<std::string> parameters;
+    RETURN_MSG_IF_ERR(
+        params_json.Members(&parameters), "failed to get request params.");
+
+    uint32_t flags = 0;
+    for (auto& parameter : parameters) {
+      if (parameter == "sequence_id") {
+        uint64_t seq_id;
+        // Try to parse sequence_id as uint64_t
+        TRITONSERVER_Error* err;
+        if ((err = params_json.MemberAsUInt(parameter.c_str(), &seq_id)) !=
+            nullptr) {
+          TRITONSERVER_ErrorDelete(err);
+          // On failure try to parse as a string
+          std::string seq_id;
+          RETURN_MSG_IF_ERR(
+              params_json.MemberAsString(parameter.c_str(), &seq_id),
+              "Unable to parse 'sequence_id'");
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
+              irequest, seq_id.c_str()));
+        } else {
+          RETURN_IF_ERR(
+              TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
+        }
+      } else if (parameter == "sequence_start") {
+        bool start;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsBool(parameter.c_str(), &start),
+            "Unable to parse 'sequence_start'");
+        if (start) {
+          flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+        }
+      } else if (parameter == "sequence_end") {
+        bool end;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsBool(parameter.c_str(), &end),
+            "Unable to parse 'sequence_end'");
+        if (end) {
+          flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+        }
+      } else if (parameter == "priority") {
+        uint64_t p;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsUInt(parameter.c_str(), &p),
+            "Unable to parse 'priority'");
+        RETURN_IF_ERR(
+            TRITONSERVER_InferenceRequestSetPriorityUInt64(irequest, p));
+      } else if (parameter == "timeout") {
+        uint64_t t;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsUInt(parameter.c_str(), &t),
+            "Unable to parse 'timeout'");
+        RETURN_IF_ERR(
+            TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
+      } else if (parameter == "binary_data_output") {
+        bool bdo;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsBool(parameter.c_str(), &bdo),
+            "Unable to parse 'binary_data_output'");
+        output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
+                            : AllocPayload::OutputInfo::JSON;
+      } else if (parameter.rfind("triton_", 0) == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            ("parameter keys starting with 'triton_' are reserved for Triton "
+             "usage "
+             "and should not be specified."));
+      } else {
+        triton::common::TritonJson::Value value;
+        if (!params_json.Find(parameter.c_str(), &value)) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              ("parameter key '" + parameter + "' was not found in the JSON")
+                  .c_str());
+        }
+
+        if (value.IsString()) {
+          std::string string_value;
+          RETURN_IF_ERR(value.AsString(&string_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
+              irequest, parameter.c_str(), string_value.c_str()));
+        } else if (value.IsInt()) {
+          int64_t int_value;
+          RETURN_IF_ERR(value.AsInt(&int_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
+              irequest, parameter.c_str(), int_value));
+        } else if (value.IsBool()) {
+          bool bool_value;
+          RETURN_IF_ERR(value.AsBool(&bool_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
+              irequest, parameter.c_str(), bool_value));
+        } else {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              ("parameter '" + parameter +
+               "' has invalid type. It should be either "
+               "'int', 'bool', or 'string'.")
+                  .c_str());
+        }
+      }
+    }
+
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
+  }
+
+  // Set output kind to JSON by default, or BINARY if specified in parameters.
+  infer_req->alloc_payload_.default_output_kind_ = output_kind;
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+HTTPAPIServer::ParseJsonTritonRequestID(
+    triton::common::TritonJson::Value& request_json,
+    TRITONSERVER_InferenceRequest* irequest)
+{
+  // Set InferenceRequest request_id
+  triton::common::TritonJson::Value id_json;
+  if (request_json.Find("id", &id_json)) {
+    const char* id;
+    size_t id_len;
+    RETURN_MSG_IF_ERR(id_json.AsString(&id, &id_len), "Unable to parse 'id'");
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
+  }
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+HTTPAPIServer::EVBufferToInput(
+    const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
+    evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
+{
+  // Extract individual input data from HTTP body and register in
+  // 'irequest'. The HTTP body is not necessarily stored in contiguous
+  // memory.
+  //
+  // Get the addr and size of each chunk of memory holding the HTTP
+  // body.
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+
+  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unexpected error getting input buffers");
+    }
+  }
+
+  // Extract just the json header from the HTTP body. 'header_length == 0' means
+  // that the entire HTTP body should be input data for a raw binary request.
+  triton::common::TritonJson::Value request_json;
+  RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, header_length, n));
+
+  // Parse request JSON and fill related Triton fields
+  RETURN_IF_ERR(ParseJsonTritonRequestID(request_json, irequest));
+  RETURN_IF_ERR(ParseJsonTritonParams(request_json, irequest, infer_req));
+  RETURN_IF_ERR(ParseJsonTritonIO(
+      request_json, irequest, infer_req, model_name, v, &v_idx, header_length,
+      n));
 
   return nullptr;  // success
 }
@@ -2872,8 +2890,8 @@ HTTPAPIServer::HandleInfer(
     const std::string& model_version_str)
 {
   if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
   bool connection_paused = false;
@@ -2939,7 +2957,8 @@ HTTPAPIServer::HandleInfer(
         evhtp_headers_add_header(
             req->headers_out,
             evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
-        evhtp_send_reply(req, EVHTP_RES_UNSUPPORTED);
+        RETURN_AND_RESPOND_WITH_ERR(
+            req, EVHTP_RES_UNSUPPORTED, "Unsupported compression type");
         return;
       }
       case DataCompressor::Type::IDENTITY:
@@ -3598,9 +3617,8 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   }
 
   LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
-                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
-
-  evhtp_send_reply(req, EVHTP_RES_BADREQ);
+                 << " - " << static_cast<int>(EVHTP_RES_NOTFOUND);
+  RETURN_AND_RESPOND_WITH_ERR(req, EVHTP_RES_NOTFOUND, "Not Found");
 }
 
 TRITONSERVER_Error*
