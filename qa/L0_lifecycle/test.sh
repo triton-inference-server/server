@@ -1451,7 +1451,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/notapi/v2`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1459,7 +1459,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/notapi`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1467,7 +1467,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/notapi/foo`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1940,6 +1940,8 @@ wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET
