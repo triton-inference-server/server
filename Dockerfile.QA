@@ -141,7 +141,8 @@ RUN mkdir -p qa/common && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
     cp bin/triton_json_test qa/L0_json/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
-    cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
+    cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
+    cp python/test_binding.py qa/L0_python_api/. && \
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f bin/caffe2plan ]; then \
