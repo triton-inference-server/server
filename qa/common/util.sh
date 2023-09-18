@@ -476,7 +476,7 @@ function collect_artifacts_from_subdir () {
 
 # Sort an array
 # Call with sort_array <array_name>
-# Example: remove_array_outliers array
+# Example: sort_array array
 sort_array() {
     local -n arr=$1
     local length=${#arr[@]}
