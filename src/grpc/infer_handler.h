@@ -669,11 +669,16 @@ class InferHandlerState {
 
 
     // Inserts the state to a set tracking active requests
-    // within the server core.
+    // within the server core. Should only be called when
+    // the request was successfully enqueued on Triton.
     void InsertInflightState(
         InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
     {
       std::lock_guard<std::mutex> lock(mu_);
+      // The irequest_ptr_ will get populated when it is
+      // marked as active which means the request has been
+      // successfully enqueued to Triton core using
+      // TRITONSERVER_ServerInferAsync.
       state->irequest_ptr_ = irequest;
       inflight_states_.insert(state);
     }
@@ -699,6 +704,9 @@ class InferHandlerState {
           if (state->step_ != Steps::CANCELLED) {
             LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
             if (state->irequest_ptr_ == nullptr) {
+              // The context might be holding some states that have
+              // not been issued to Triton core. Need to skip calling
+              // issuing cancellation for such requests.
               continue;
             }
             // Note that request may or may not be valid at this point.
