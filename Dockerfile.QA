@@ -143,6 +143,7 @@ RUN mkdir -p qa/common && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
     cp python/test_binding.py qa/L0_python_api/. && \
+    cp python/triton*.whl qa/pkgs/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f bin/caffe2plan ]; then \
@@ -369,6 +370,10 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     find qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
+
+# Install Triton Python API
+RUN find qa/pkgs/ -maxdepth 1 -type f -name \
+    "tritonserver-*.whl" | xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
