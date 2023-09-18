@@ -527,6 +527,5 @@ main(int argc, char** argv)
   // useful since there are many objects that are not yet destructed.
   //  __lsan_do_leak_check();
 #endif  // TRITON_ENABLE_ASAN
-
   return 0;
 }
