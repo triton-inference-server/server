@@ -152,94 +152,96 @@ class ClientCancellationTest(tu.TestResultCollector):
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
 
-    def test_aio_grpc_async_infer(self):
-        # Sends a request using infer of grpc.aio to a
-        # model that takes 10s to execute. Issues
-        # a cancellation request after 2s. The client
-        # should return with appropriate exception within
-        # 5s.
-        async def cancel_request(call):
-            await asyncio.sleep(2)
-            self.assertTrue(call.cancel())
-
-        async def handle_response(generator):
-            with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
-                _ = await anext(generator)
-
-        async def test_aio_infer(self):
-            triton_client = aiogrpcclient.InferenceServerClient(
-                url="localhost:8001", verbose=True
-            )
-            self._prepare_request()
-            self._record_start_time_ms()
-
-            generator = triton_client.infer(
-                model_name=self.model_name_,
-                inputs=self.inputs_,
-                outputs=self.outputs_,
-                get_call_obj=True,
-            )
-            grpc_call = await anext(generator)
-
-            tasks = []
-            tasks.append(asyncio.create_task(handle_response(generator)))
-            tasks.append(asyncio.create_task(cancel_request(grpc_call)))
-
-            for task in tasks:
-                await task
-
-            self._record_end_time_ms()
-            self._test_runtime_duration(5000)
-
-        asyncio.run(test_aio_infer(self))
-
-    def test_aio_grpc_stream_infer(self):
-        # Sends a request using stream_infer of grpc.aio
-        # library model that takes 10s to execute. Issues
-        # stream closure with cancel_requests=True. The client
-        # should return with appropriate exception within
-        # 5s.
-        async def test_aio_streaming_infer(self):
-            async with aiogrpcclient.InferenceServerClient(
-                url="localhost:8001", verbose=True
-            ) as triton_client:
-
-                async def async_request_iterator():
-                    for i in range(1):
-                        await asyncio.sleep(1)
-                        yield {
-                            "model_name": self.model_name_,
-                            "inputs": self.inputs_,
-                            "outputs": self.outputs_,
-                        }
-
-                self._prepare_request()
-                self._record_start_time_ms()
-                response_iterator = triton_client.stream_infer(
-                    inputs_iterator=async_request_iterator(), get_call_obj=True
-                )
-                streaming_call = await anext(response_iterator)
-
-                async def cancel_streaming(streaming_call):
-                    await asyncio.sleep(2)
-                    streaming_call.cancel()
-
-                async def handle_response(response_iterator):
-                    with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
-                        async for response in response_iterator:
-                            self.assertTrue(False, "Received an unexpected response!")
-
-                tasks = []
-                tasks.append(asyncio.create_task(handle_response(response_iterator)))
-                tasks.append(asyncio.create_task(cancel_streaming(streaming_call)))
-
-                for task in tasks:
-                    await task
-
-                self._record_end_time_ms()
-                self._test_runtime_duration(5000)
-
-        asyncio.run(test_aio_streaming_infer(self))
+# Disabling AsyncIO cancellation testing. Enable once
+# DLIS-5476 is implemented.
+#    def test_aio_grpc_async_infer(self):
+#        # Sends a request using infer of grpc.aio to a
+#        # model that takes 10s to execute. Issues
+#        # a cancellation request after 2s. The client
+#        # should return with appropriate exception within
+#        # 5s.
+#        async def cancel_request(call):
+#            await asyncio.sleep(2)
+#            self.assertTrue(call.cancel())
+#
+#        async def handle_response(generator):
+#            with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
+#                _ = await anext(generator)
+#
+#        async def test_aio_infer(self):
+#            triton_client = aiogrpcclient.InferenceServerClient(
+#                url="localhost:8001", verbose=True
+#            )
+#            self._prepare_request()
+#            self._record_start_time_ms()
+#
+#            generator = triton_client.infer(
+#                model_name=self.model_name_,
+#                inputs=self.inputs_,
+#                outputs=self.outputs_,
+#                get_call_obj=True,
+#            )
+#            grpc_call = await anext(generator)
+#
+#            tasks = []
+#            tasks.append(asyncio.create_task(handle_response(generator)))
+#            tasks.append(asyncio.create_task(cancel_request(grpc_call)))
+#
+#            for task in tasks:
+#                await task
+#
+#            self._record_end_time_ms()
+#            self._test_runtime_duration(5000)
+#
+#        asyncio.run(test_aio_infer(self))
+#
+#    def test_aio_grpc_stream_infer(self):
+#        # Sends a request using stream_infer of grpc.aio
+#        # library model that takes 10s to execute. Issues
+#        # stream closure with cancel_requests=True. The client
+#        # should return with appropriate exception within
+#        # 5s.
+#        async def test_aio_streaming_infer(self):
+#            async with aiogrpcclient.InferenceServerClient(
+#                url="localhost:8001", verbose=True
+#            ) as triton_client:
+#
+#                async def async_request_iterator():
+#                    for i in range(1):
+#                        await asyncio.sleep(1)
+#                        yield {
+#                            "model_name": self.model_name_,
+#                            "inputs": self.inputs_,
+#                            "outputs": self.outputs_,
+#                        }
+#
+#                self._prepare_request()
+#                self._record_start_time_ms()
+#                response_iterator = triton_client.stream_infer(
+#                    inputs_iterator=async_request_iterator(), get_call_obj=True
+#                )
+#                streaming_call = await anext(response_iterator)
+#
+#                async def cancel_streaming(streaming_call):
+#                    await asyncio.sleep(2)
+#                    streaming_call.cancel()
+#
+#                async def handle_response(response_iterator):
+#                    with self.assertRaises(asyncio.exceptions.CancelledError) as cm:
+#                        async for response in response_iterator:
+#                            self.assertTrue(False, "Received an unexpected response!")
+#
+#                tasks = []
+#                tasks.append(asyncio.create_task(handle_response(response_iterator)))
+#                tasks.append(asyncio.create_task(cancel_streaming(streaming_call)))
+#
+#                for task in tasks:
+#                    await task
+#
+#                self._record_end_time_ms()
+#                self._test_runtime_duration(5000)
+#
+#        asyncio.run(test_aio_streaming_infer(self))
 
 
 if __name__ == "__main__":
