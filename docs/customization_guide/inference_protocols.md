@@ -447,8 +447,8 @@ Java program with the Java bindings with the following steps:
       # Run build script
       ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
-      ## For C-API Wrapper Java Bindings
-      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server`
+      ## For C-API Wrapper (Triton with C++ bindings) Java Bindings
+      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server
       ```
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
 
@@ -472,16 +472,15 @@ If you want to make changes to the Java bindings, then you can use Maven to
 build yourself. You can refer to part 1.a of [Run Java program with Java
 bindings Jar](#run-java-program-with-java-bindings-jar) to also build the jar
 yourself without any modifications to the Tritonserver bindings in
-JavaCPP-presets. You can do this using the following steps:
+JavaCPP-presets.
+You can do this using the following steps:
 
 1. Create the JNI binaries in your local repository (`/root/.m2/repository`)
-   with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver)
-   For C-API Wrapper Java bindings, you need to install some build specific dependencies like cmake. You can either do this with:
-   ```bash
-    $ git clone https://github.com/triton-inference-server/developer_tools.git
-    $ bash -x developer_tools/server/install_dependencies_and_build.sh
-   ```
-    Please refer to [server installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh) for dependencies you need to install and modifications you need to make for your container.
+   with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver).
+   For C-API Wrapper Java bindings (Triton with C++ bindings), you need to
+   install some build specific dependencies including cmake and rapidjson.
+   Refer to [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
+   for dependencies you need to install and modifications you need to make for your container.
 After installing dependencies, you can build the tritonserver project on javacpp-presets:
 ```bash
  $ git clone https://github.com/bytedeco/javacpp-presets.git
