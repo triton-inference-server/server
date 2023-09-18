@@ -152,6 +152,7 @@ class ClientCancellationTest(tu.TestResultCollector):
         self._record_end_time_ms()
         self._test_runtime_duration(5000)
 
+
 # Disabling AsyncIO cancellation testing. Enable once
 # DLIS-5476 is implemented.
 #    def test_aio_grpc_async_infer(self):
