@@ -479,7 +479,7 @@ JavaCPP-presets. You can do this using the following steps:
    For C-API Wrapper Java bindings, you need to install some build specific dependencies like cmake. You can either do this with:
    ```bash
     $ git clone https://github.com/triton-inference-server/developer_tools.git
-    $ bash -x ../install_test_dependencies_and_build.sh
+    $ bash -x developer_tools/server/install_dependencies_and_build.sh
    ```
     Please refer to [server installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh) for dependencies you need to install and modifications you need to make for your container.
 After installing dependencies, you can build the tritonserver project on javacpp-presets:
