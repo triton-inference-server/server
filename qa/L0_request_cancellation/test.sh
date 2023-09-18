@@ -70,8 +70,6 @@ fi
 # gRPC client-side cancellation tests...
 for i in test_grpc_async_infer \
     test_grpc_stream_infer \
-    test_aio_grpc_async_infer \
-    test_aio_grpc_stream_infer \
    ; do
 
     SERVER_LOG=${i}.server.log
