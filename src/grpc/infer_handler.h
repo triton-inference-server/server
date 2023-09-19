@@ -61,7 +61,9 @@ typedef enum {
   ISSUED,
   READ,
   WRITEREADY,
-  WRITTEN
+  WRITTEN,
+  CANCELLATION_ISSUED,
+  CANCELLED
 } Steps;
 
 // Debugging helper
@@ -652,11 +654,126 @@ class InferHandlerState {
       ctx_->set_compression_level(compression_level);
     }
 
+    void GrpcContextAsyncNotifyWhenDone(InferHandlerStateType* state)
+    {
+      ctx_->AsyncNotifyWhenDone(state);
+    }
+
+    bool IsCancelled() { return ctx_->IsCancelled(); }
+
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
 
     // Decrements the ongoing request counter
     void DecrementRequestCounter() { ongoing_requests_--; }
+
+
+    // Inserts the state to a set tracking active requests
+    // within the server core. Should only be called when
+    // the request was successfully enqueued on Triton.
+    void InsertInflightState(
+        InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      // The irequest_ptr_ will get populated when it is
+      // marked as active which means the request has been
+      // successfully enqueued to Triton core using
+      // TRITONSERVER_ServerInferAsync.
+      state->irequest_ptr_ = irequest;
+      inflight_states_.insert(state);
+    }
+
+    // Erases the state to a set tracking active requests
+    // within the server core.
+    void EraseInflightState(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      inflight_states_.erase(state);
+    }
+
+    // Issues the cancellation for all inflight requests
+    // being tracked by this context.
+    void IssueRequestCancellation()
+    {
+      {
+        std::lock_guard<std::mutex> lock(mu_);
+
+        // Issues the request cancellation to the core.
+        for (auto state : inflight_states_) {
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          if (state->step_ != Steps::CANCELLED) {
+            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
+            if (state->irequest_ptr_ == nullptr) {
+              // The context might be holding some states that have
+              // not been issued to Triton core. Need to skip calling
+              // issuing cancellation for such requests.
+              continue;
+            }
+            // Note that request may or may not be valid at this point.
+            // Assuming if RequestComplete callback is run asynchronously
+            // before this point.
+            TRITONSERVER_Error* err = nullptr;
+            err = TRITONSERVER_InferenceRequestCancel(state->irequest_ptr_);
+            // TODO: Add request id to the message
+            if (err != nullptr) {
+              LOG_INFO << "Failed to cancel the request: "
+                       << TRITONSERVER_ErrorMessage(err);
+            }
+            state->step_ = Steps::CANCELLATION_ISSUED;
+          }
+        }
+      }
+    }
+
+
+    // Handles the gRPC context cancellation. This function can be called
+    // multiple times and is supposed to be re-entrant.
+    // Returns whether or not to continue cycling through the gRPC
+    // completion queue or not.
+    bool HandleCancellation(
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+    {
+      if (!IsCancelled()) {
+        LOG_ERROR
+            << "[INTERNAL] HandleCancellation called even when the context was "
+               "not cancelled for "
+            << name << ", rpc_ok=" << rpc_ok << ", context "
+            << state->context_->unique_id_ << ", " << state->unique_id_
+            << " step " << state->step_;
+        return true;
+      }
+      if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
+          (state->step_ != Steps::CANCELLED)) {
+        LOG_VERBOSE(1) << "Cancellation notification received for " << name
+                       << ", rpc_ok=" << rpc_ok << ", context "
+                       << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_;
+
+        // If the context has not been cancelled then
+        // issue cancellation request to all the inflight
+        // states belonging to the context.
+        if (state->context_->step_ != Steps::CANCELLED) {
+          IssueRequestCancellation();
+          // Mark the context as cancelled
+          state->context_->step_ = Steps::CANCELLED;
+
+          // The state returns true because the CancelExecution
+          // call above would have raised alarm objects on all
+          // pending inflight states objects. This state will
+          // be taken up along with all the other states in the
+          // next iteration from the completion queue which
+          // would release the state.
+          return true;
+        }
+      }
+
+      LOG_VERBOSE(1) << "Completing cancellation for " << name
+                     << ", rpc_ok=" << rpc_ok << ", context "
+                     << state->context_->unique_id_ << ", " << state->unique_id_
+                     << " step " << state->step_;
+
+      return false;
+    }
 
     // Enqueue 'state' so that its response is delivered in the
     // correct order.
@@ -781,6 +898,11 @@ class InferHandlerState {
     std::queue<InferHandlerStateType*> states_;
     std::atomic<uint32_t> ongoing_requests_;
 
+    // Tracks the inflight requests sent to Triton core via this
+    // context. We will use this structure to issue cancellations
+    // on these requests.
+    std::set<InferHandlerStateType*> inflight_states_;
+
     // The step of the entire context.
     Steps step_;
 
@@ -809,12 +931,15 @@ class InferHandlerState {
 
   ~InferHandlerState() { ClearTraceTimestamps(); }
 
+  bool IsGrpcContextCancelled() { return context_->IsCancelled(); }
+
   void Reset(
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
   {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
+    irequest_ptr_ = nullptr;
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
@@ -859,7 +984,9 @@ class InferHandlerState {
 
   std::shared_ptr<Context> context_;
   Steps step_;
-  std::mutex step_mtx_;
+  std::recursive_mutex step_mtx_;
+
+  TRITONSERVER_InferenceRequest* irequest_ptr_;
 
 #ifdef TRITON_ENABLE_TRACING
   std::shared_ptr<TraceManager::Trace> trace_;
@@ -938,6 +1065,10 @@ class InferHandler : public HandlerBase {
     if (state == nullptr) {
       state = new State(tritonserver, context, start_step);
     }
+
+    // Need to be called to receive an asynchronous notification
+    // when the transaction is cancelled.
+    context->GrpcContextAsyncNotifyWhenDone(state);
 
     return state;
   }
