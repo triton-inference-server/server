@@ -153,7 +153,7 @@ export TRITON_GCS_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
 **Make sure, that `TRITON_GCS_MOUNT_DIRECTORY` exists on your local machine
-and it is empty**
+and it is empty.**
 
 #### S3
 
@@ -201,7 +201,7 @@ export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
 **Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine
-and it is empty**
+and it is empty.**
 
 #### Azure Storage
 
@@ -233,7 +233,7 @@ export TRITON_AZURE_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
 
 **Make sure, that `TRITON_AZURE_MOUNT_DIRECTORY` exists on your local machine
-and it is empty**
+and it is empty.**
 
 
 ### Cloud Storage with Credential file (Beta)
@@ -297,6 +297,13 @@ If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the
 [Cloud Storage with Environment variables](#cloud-storage-with-environment-variables)
 will be used.
 
+### Caching of Cloud Storage
+
+Triton currently doesn't perform file caching for cloud storage.
+However, this functionality can be implemented through
+[repository agent API](https://github.com/triton-inference-server/server/blob/bbbcad7d87adc9596f99e3685da5d6b73380514f/docs/customization_guide/repository_agents.md) by injecting a proxy, which checks a specific local directory for caching
+given the cloud storage (original path) of the model,
+and then decides if cached files may be used.
 
 ## Model Versions
 
