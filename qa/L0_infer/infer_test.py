@@ -56,6 +56,9 @@ BATCH = bool(int(os.environ.get("BATCH", 1)))
 
 np_dtype_string = np.dtype(object)
 
+# 60 sec is the default value
+NETWORK_TIMEOUT = 300.0 if TEST_VALGRIND else 60.0
+
 
 class InferTest(tu.TestResultCollector):
     def _full_exact(
@@ -66,8 +69,7 @@ class InferTest(tu.TestResultCollector):
         output0_raw,
         output1_raw,
         swap,
-        # 60 sec is the default value
-        network_timeout=60.0,
+        network_timeout=NETWORK_TIMEOUT,
     ):
         def _infer_exact_helper(
             tester,
@@ -88,7 +90,7 @@ class InferTest(tu.TestResultCollector):
             skip_request_id_check=True,
             use_streaming=True,
             correlation_id=0,
-            network_timeout=60.0,
+            network_timeout=NETWORK_TIMEOUT,
         ):
             for bs in (1, batch_size):
                 # model that does not support batching
@@ -550,9 +552,6 @@ class InferTest(tu.TestResultCollector):
                 output0_raw=False,
                 output1_raw=False,
                 swap=True,
-                # Increase network_timeout for TensorFlow models for
-                # valgrind test.
-                network_timeout=100.0 if TEST_VALGRIND else 60.0,
             )
 
         def test_class_sss(self):
