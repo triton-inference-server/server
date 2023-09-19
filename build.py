@@ -1683,6 +1683,13 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
+    # [FIXME] Placing the Triton server wheel file in 'python' for now, should
+    # have been upload to pip registry and be able to install directly
+    cmake_script.mkdir(os.path.join(install_dir, "python"))
+    cmake_script.cp(
+        os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+        os.path.join(install_dir, "python"),
+    )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
@@ -1854,7 +1861,7 @@ def cibase_build(
         os.path.join(repo_dir, "src", "test", "models"),
         os.path.join(ci_dir, "src", "test"),
     )
-    # Skip copying the artifacts in the bin and lib as those directories will
+    # Skip copying the artifacts in the bin, lib, and python as those directories will
     # be missing when the core build is not enabled.
     if not FLAGS.no_core_build:
         cmake_script.cpdir(os.path.join(repo_install_dir, "bin"), ci_dir)
@@ -1863,6 +1870,7 @@ def cibase_build(
             os.path.join(repo_install_dir, "lib", "libtritonrepoagent_relocation.so"),
             os.path.join(ci_dir, "lib"),
         )
+        cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, "backends"))
