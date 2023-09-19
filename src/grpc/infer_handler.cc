@@ -62,6 +62,12 @@ operator<<(std::ostream& out, const Steps& step)
     case WRITTEN:
       out << "WRITTEN";
       break;
+    case CANCELLATION_ISSUED:
+      out << "CANCELLATION_ISSUED";
+      break;
+    case CANCELLED:
+      out << "CANCELLED";
+      break;
   }
 
   return out;
@@ -707,6 +713,21 @@ ModelInferHandler::StartNewRequest()
 bool
 ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
+  // There are multiple handlers registered in the gRPC service.
+  // Hence, there we can have a case where a handler thread is
+  // making progress in the state machine for a request and the
+  // other thread is issuing cancellation on the same request.
+  // Need to protect the state transitions for these cases.
+  std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+
+  // Handle notification for cancellation which can be raised
+  // asynchronously if detected on the network.
+  if (state->IsGrpcContextCancelled()) {
+    bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+    return resume;
+  }
+
+
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
                  << state->unique_id_ << " step " << state->step_;
 
@@ -933,8 +954,12 @@ ModelInferHandler::Execute(InferHandler::State* state)
 
   // If not error then state->step_ == ISSUED and inference request
   // has initiated... completion callback will transition to
-  // COMPLETE. If error go immediately to COMPLETE.
-  if (err != nullptr) {
+  // COMPLETE or CANCELLED. Recording the state and the irequest
+  // to handle gRPC stream cancellation.
+  if (err == nullptr) {
+    state->context_->InsertInflightState(state, irequest);
+  } else {
+    // If error go immediately to COMPLETE.
     LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
@@ -965,6 +990,12 @@ ModelInferHandler::InferResponseComplete(
 {
   State* state = reinterpret_cast<State*>(userp);
 
+  // There are multiple handlers registered in the gRPC service
+  // Hence, we would need to properly synchronize this thread
+  // and the handler thread handling async cancellation
+  // notification.
+  std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+
   // Increment the callback index
   state->cb_count_++;
 
@@ -981,6 +1012,29 @@ ModelInferHandler::InferResponseComplete(
   state->trace_timestamps_.emplace_back(std::make_pair(
       "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
+
+  // If gRPC Stream is cancelled then no need of forming and returning
+  // a response.
+  if (state->IsGrpcContextCancelled()) {
+    // Clean-up the received response object.
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting GRPC inference response");
+
+    state->step_ = Steps::CANCELLED;
+    state->context_->EraseInflightState(state);
+
+    LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
+                   << state->unique_id_
+                   << ", skipping response generation as grpc transaction was "
+                      "cancelled... ";
+
+    // Send state back to the queue so that state can be released
+    // in the next cycle.
+    state->context_->PutTaskBackToQueue(state);
+
+    return;
+  }
 
   TRITONSERVER_Error* err = nullptr;
   // This callback is expected to be called exactly once for each request.
