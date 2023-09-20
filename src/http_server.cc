@@ -2310,11 +2310,10 @@ HTTPAPIServer::GetContentLength(
 
 TRITONSERVER_Error*
 HTTPAPIServer::GetInferenceHeaderLength(
-    evhtp_request_t* req, evbuffer* decompressed_buffer, size_t* header_length)
+    evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
-  // Get content length as a default header_length if no header specified
-  int32_t content_length = 0;
-  RETURN_IF_ERR(GetContentLength(req, decompressed_buffer, &content_length));
+  // Find Inference-Header-Content-Length in header.
+  // Set to content length in case that the header is not specified
   *header_length = content_length;
 
   // Find Inference-Header-Content-Length in header.
@@ -3049,10 +3048,16 @@ HTTPAPIServer::HandleInfer(
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
   RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
+
+  // Get content length as a default header_length if no header specified
+  int32_t content_length = 0;
+  RETURN_AND_RESPOND_IF_ERR(
+      req, GetContentLength(req, decompressed_buffer, &content_length));
+
   // Get the header length
   size_t header_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
-      req, GetInferenceHeaderLength(req, decompressed_buffer, &header_length));
+      req, GetInferenceHeaderLength(req, content_length, &header_length));
 
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
