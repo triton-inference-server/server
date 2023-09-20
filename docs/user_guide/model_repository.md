@@ -142,6 +142,19 @@ $ gsutil iam ch allUsers:objectViewer "${BUCKET_URL}"
 $ gsutil iam ch allUsers:legacyBucketReader "${BUCKET_URL}"
 ```
 
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_GCS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_GCS_MOUNT_DIRECTORY=/path/to/your/local/directory
+```
+
+**Make sure, that `TRITON_GCS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
+
 #### S3
 
 For a model repository residing in Amazon S3, the path must be
@@ -177,6 +190,19 @@ If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
 
+By default, Triton makes a local copy of a remote model repository
+in a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AWS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
+```
+
+**Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
+
 #### Azure Storage
 
 For a model repository residing in Azure Storage, the repository path
@@ -196,6 +222,19 @@ here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCO
 $ export AZURE_STORAGE_ACCOUNT="account_name"
 $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
 ```
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AZURE_MOUNT_DIRECTORY` environment variable to a path
+pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_AZURE_MOUNT_DIRECTORY=/path/to/your/local/directory
+```
+
+**Make sure, that `TRITON_AZURE_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
+
 
 ### Cloud Storage with Credential file (Beta)
 
@@ -258,6 +297,13 @@ If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the
 [Cloud Storage with Environment variables](#cloud-storage-with-environment-variables)
 will be used.
 
+### Caching of Cloud Storage
+
+Triton currently doesn't perform file caching for cloud storage.
+However, this functionality can be implemented through
+[repository agent API](https://github.com/triton-inference-server/server/blob/bbbcad7d87adc9596f99e3685da5d6b73380514f/docs/customization_guide/repository_agents.md) by injecting a proxy, which checks a specific local directory for caching
+given the cloud storage (original path) of the model,
+and then decides if cached files may be used.
 
 ## Model Versions
 
