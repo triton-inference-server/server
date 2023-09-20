@@ -50,6 +50,7 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.DOUBLE
     elif np_dtype == np_dtype_string:
         return onnx.TensorProto.STRING
+    return None
 
 
 def np_to_model_dtype(np_dtype):
