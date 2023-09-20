@@ -153,6 +153,8 @@ CUDA_DEVICE=${RUNNER_ID:=0}
 # cp ./gen_qa_trt_format_models.py $SRCDIR/.
 # cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
 # cp ./test_util.py $SRCDIR/.
+
+
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
 HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
@@ -312,6 +314,12 @@ TORCHTRTDESTDIR=/tmp/torchtrtmodels
 # chmod -R 777 $FORMATDESTDIR
 # python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 # chmod -R 777 $DATADEPENDENTDIR
+
+if [ -d "$HOST_SRCDIR"]; then
+    echo "$HOST_SRCDIR does exist"
+else
+    echo "$HOST_SRCDIR does NOT exist"
+fi
 
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 # TensorRT
