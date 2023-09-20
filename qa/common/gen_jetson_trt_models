@@ -315,7 +315,7 @@ TORCHTRTDESTDIR=/tmp/torchtrtmodels
 # python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 # chmod -R 777 $DATADEPENDENTDIR
 
-if [ -d "$HOST_SRCDIR"]; then
+if [ -d "$HOST_SRCDIR" ]; then
     echo "$HOST_SRCDIR does exist"
 else
     echo "$HOST_SRCDIR does NOT exist"
