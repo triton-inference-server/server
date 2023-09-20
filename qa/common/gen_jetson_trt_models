@@ -370,6 +370,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+DOCKER_GPU_ARGS="--runtime=nvidia --device /dev/dri"
 docker pull $TENSORRT_IMAGE
 docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
