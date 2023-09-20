@@ -124,6 +124,8 @@ cp ./gen_qa_trt_format_models.py $SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
 cp ./test_util.py $SRCDIR/.
 
+pip3 install --upgrade numpy
+
 # TensorRT
 set -e
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
