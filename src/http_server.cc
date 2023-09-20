@@ -3036,14 +3036,6 @@ HTTPAPIServer::HandleInfer(
   std::shared_ptr<TraceManager::Trace> trace =
       StartTrace(req, model_name, &triton_trace);
 
-  // Create the inference request object which provides all information needed
-  // for an inference.
-  TRITONSERVER_InferenceRequest* irequest = nullptr;
-  RETURN_AND_RESPOND_IF_ERR(
-      req, TRITONSERVER_InferenceRequestNew(
-               &irequest, server_.get(), model_name.c_str(),
-               requested_model_version));
-
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
   RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
@@ -3057,6 +3049,14 @@ HTTPAPIServer::HandleInfer(
   size_t header_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
       req, GetInferenceHeaderLength(req, content_length, &header_length));
+
+  // Create the inference request object which provides all information needed
+  // for an inference. Make sure it is cleaned up on early error.
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  RETURN_AND_RESPOND_IF_ERR(
+      req, TRITONSERVER_InferenceRequestNew(
+               &irequest, server_.get(), model_name.c_str(),
+               requested_model_version));
 
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
@@ -3102,6 +3102,10 @@ HTTPAPIServer::HandleInfer(
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceRequestId(irequest, &request_id),
       "unable to retrieve request ID string");
+  // Reset id to unknown if empty in core.
+  if (!strncmp(request_id, "", 1)) {
+    request_id = "<id_unknown>";
+  }
 
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
