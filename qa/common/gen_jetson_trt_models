@@ -56,6 +56,103 @@ CUDA_DEVICE=${RUNNER_ID:=0}
 # HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
 # TMP_DIR=$HOST_BUILD_DIR/${TRITON_VERSION}
 
+# ###
+# HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
+# HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+# HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_model_repository
+# HOST_VARDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
+# HOST_IDENTITYDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
+# HOST_SIGDEFDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
+# HOST_IDENTITYBIGDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+# HOST_TFPARAMETERSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
+# HOST_SHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+# HOST_RESHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+# HOST_SEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+# HOST_DYNASEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+# HOST_DYNASEQIMPLICITDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+# HOST_VARSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+# HOST_ENSEMBLEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+# HOST_NOSHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+# HOST_PLGDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+# HOST_RAGGEDDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+# HOST_FORMATDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+# HOST_DATADEPENDENTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+# HOST_IMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+# HOST_VARIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+# HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+# HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+# HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
+
+# SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+# DESTDIR=$TMP_DIR/qa_model_repository
+
+# DATADEPENDENTDIR=$TMP_DIR/qa_trt_data_dependent_model_repository
+# DYNASEQDESTDIR=$TMP_DIR/qa_dyna_sequence_model_repository
+# DYNASEQIMPLICITDESTDIR=$TMP_DIR/qa_dyna_sequence_implicit_model_repository
+# FORMATDESTDIR=$TMP_DIR/qa_trt_format_model_repository
+# IDENTITYBIGDESTDIR=$TMP_DIR/qa_identity_big_model_repository
+# IDENTITYDESTDIR=$TMP_DIR/qa_identity_model_repository
+# IMPLICITSEQDESTDIR=$TMP_DIR/qa_sequence_implicit_model_repository
+# RAGGEDDESTDIR=$TMP_DIR/qa_ragged_model_repository
+# RESHAPEDESTDIR=$TMP_DIR/qa_reshape_model_repository
+# SEQDESTDIR=$TMP_DIR/qa_sequence_model_repository
+# SHAPEDESTDIR=$TMP_DIR/qa_shapetensor_model_repository
+# VARDESTDIR=$TMP_DIR/qa_variable_model_repository
+# VARIMPLICITSEQDESTDIR=$TMP_DIR/qa_variable_sequence_implicit_model_repository
+# VARSEQDESTDIR=$TMP_DIR/qa_variable_sequence_model_repository
+
+
+# rm -fr $DESTDIR
+# rm -fr $DATADEPENDENTDIR
+# rm -fr $DYNASEQDESTDIR
+# rm -fr $DYNASEQIMPLICITDESTDIR
+# rm -fr $FORMATDESTDIR
+# rm -fr $IDENTITYBIGDESTDIR
+# rm -fr $IDENTITYDESTDIR
+# rm -fr $IMPLICITSEQDESTDIR
+# rm -fr $RAGGEDDESTDIR
+# rm -fr $RESHAPEDESTDIR
+# rm -fr $SEQDESTDIR
+# rm -fr $SHAPEDESTDIR
+# rm -fr $VARDESTDIR
+# rm -fr $VARIMPLICITSEQDESTDIR
+# rm -fr $VARSEQDESTDIR
+
+# rm -fr $HOST_SRCDIR
+# mkdir -p $HOST_SRCDIR
+
+# mkdir -p $SRCDIR
+# mkdir -p $DESTDIR
+
+# mkdir -p $DATADEPENDENTDIR
+# mkdir -p $DYNASEQDESTDIR
+# mkdir -p $DYNASEQIMPLICITDESTDIR
+# mkdir -p $FORMATDESTDIR
+# mkdir -p $IDENTITYBIGDESTDIR
+# mkdir -p $IDENTITYDESTDIR
+# mkdir -p $IMPLICITSEQDESTDIR
+# mkdir -p $RAGGEDDESTDIR
+# mkdir -p $RESHAPEDESTDIR
+# mkdir -p $SEQDESTDIR
+# mkdir -p $SHAPEDESTDIR
+# mkdir -p $VARDESTDIR
+# mkdir -p $VARIMPLICITSEQDESTDIR
+# mkdir -p $VARSEQDESTDIR
+
+# cp ./gen_ensemble_model_utils.py $SRCDIR/.
+# cp ./gen_qa_dyna_sequence_implicit_models.py $SRCDIR/.
+# cp ./gen_qa_dyna_sequence_models.py $SRCDIR/.
+# cp ./gen_qa_identity_models.py $SRCDIR/.
+# cp ./gen_qa_implicit_models.py $SRCDIR/.
+# cp ./gen_qa_models.py $SRCDIR/.
+# cp ./gen_qa_noshape_models.py $SRCDIR/.
+# cp ./gen_qa_ragged_models.py $SRCDIR/.
+# cp ./gen_qa_reshape_models.py $SRCDIR/.
+# cp ./gen_qa_sequence_models.py $SRCDIR/.
+# cp ./gen_qa_trt_data_dependent_shape.py $SRCDIR/.
+# cp ./gen_qa_trt_format_models.py $SRCDIR/.
+# cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
+# cp ./test_util.py $SRCDIR/.
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
 HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
@@ -83,76 +180,99 @@ HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_
 HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 
-SRCDIR=$HOST_BUILD_DIR/gen_srcdir
-DESTDIR=$TMP_DIR/qa_model_repository
+rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
+rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
+rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
+rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
+rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
+rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
+mkdir -p $HOST_SRCDIR
+mkdir -p $HOST_DESTDIR
+mkdir -p $HOST_VARDESTDIR
+mkdir -p $HOST_IDENTITYDESTDIR
+mkdir -p $HOST_SIGDEFDESTDIR
+mkdir -p $HOST_TFPARAMETERSDESTDIR
+mkdir -p $HOST_IDENTITYBIGDESTDIR
+mkdir -p $HOST_SHAPEDESTDIR
+mkdir -p $HOST_RESHAPEDESTDIR
+mkdir -p $HOST_SEQDESTDIR
+mkdir -p $HOST_DYNASEQDESTDIR
+mkdir -p $HOST_DYNASEQIMPLICITDESTDIR
+mkdir -p $HOST_VARSEQDESTDIR
+mkdir -p $HOST_ENSEMBLEDESTDIR
+mkdir -p $HOST_NOSHAPEDESTDIR
+mkdir -p $HOST_PLGDESTDIR
+mkdir -p $HOST_RAGGEDDESTDIR
+mkdir -p $HOST_FORMATDESTDIR
+mkdir -p $HOST_DATADEPENDENTDIR
+mkdir -p $HOST_IMPLICITSEQDESTDIR
+mkdir -p $HOST_VARIMPLICITSEQDESTDIR
+mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
+mkdir -p $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR
+mkdir -p $HOST_TORCHTRTDESTDIR
 
-DATADEPENDENTDIR=$TMP_DIR/qa_trt_data_dependent_model_repository
-DYNASEQDESTDIR=$TMP_DIR/qa_dyna_sequence_model_repository
-DYNASEQIMPLICITDESTDIR=$TMP_DIR/qa_dyna_sequence_implicit_model_repository
-FORMATDESTDIR=$TMP_DIR/qa_trt_format_model_repository
-IDENTITYBIGDESTDIR=$TMP_DIR/qa_identity_big_model_repository
-IDENTITYDESTDIR=$TMP_DIR/qa_identity_model_repository
-IMPLICITSEQDESTDIR=$TMP_DIR/qa_sequence_implicit_model_repository
-RAGGEDDESTDIR=$TMP_DIR/qa_ragged_model_repository
-RESHAPEDESTDIR=$TMP_DIR/qa_reshape_model_repository
-SEQDESTDIR=$TMP_DIR/qa_sequence_model_repository
-SHAPEDESTDIR=$TMP_DIR/qa_shapetensor_model_repository
-VARDESTDIR=$TMP_DIR/qa_variable_model_repository
-VARIMPLICITSEQDESTDIR=$TMP_DIR/qa_variable_sequence_implicit_model_repository
-VARSEQDESTDIR=$TMP_DIR/qa_variable_sequence_model_repository
-
-
-rm -fr $DESTDIR
-rm -fr $DATADEPENDENTDIR
-rm -fr $DYNASEQDESTDIR
-rm -fr $DYNASEQIMPLICITDESTDIR
-rm -fr $FORMATDESTDIR
-rm -fr $IDENTITYBIGDESTDIR
-rm -fr $IDENTITYDESTDIR
-rm -fr $IMPLICITSEQDESTDIR
-rm -fr $RAGGEDDESTDIR
-rm -fr $RESHAPEDESTDIR
-rm -fr $SEQDESTDIR
-rm -fr $SHAPEDESTDIR
-rm -fr $VARDESTDIR
-rm -fr $VARIMPLICITSEQDESTDIR
-rm -fr $VARSEQDESTDIR
+# Since the models required by ensemble models may not be available
+# at this point, storing ensemble models separately so that other qa directories
+# are proper model repositories
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_identity_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_reshape_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_sequence_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
-mkdir -p $SRCDIR
-mkdir -p $DESTDIR
+cp ./gen_qa_models.py $HOST_SRCDIR/.
+cp ./gen_qa_identity_models.py $HOST_SRCDIR/.
+cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
+cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
+cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_implicit_models.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SRCDIR/.
+cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_data_dependent_shape.py $HOST_SRCDIR/.
+cp ./gen_qa_torchtrt_models.py $HOST_SRCDIR/.
+cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
+cp ./test_util.py $HOST_SRCDIR/.
+cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
+cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
 
-mkdir -p $DATADEPENDENTDIR
-mkdir -p $DYNASEQDESTDIR
-mkdir -p $DYNASEQIMPLICITDESTDIR
-mkdir -p $FORMATDESTDIR
-mkdir -p $IDENTITYBIGDESTDIR
-mkdir -p $IDENTITYDESTDIR
-mkdir -p $IMPLICITSEQDESTDIR
-mkdir -p $RAGGEDDESTDIR
-mkdir -p $RESHAPEDESTDIR
-mkdir -p $SEQDESTDIR
-mkdir -p $SHAPEDESTDIR
-mkdir -p $VARDESTDIR
-mkdir -p $VARIMPLICITSEQDESTDIR
-mkdir -p $VARSEQDESTDIR
+ONNXSCRIPT=onnx_gen.cmds
+OPENVINOSCRIPT=openvino_gen.cmds
+TORCHSCRIPT=torch_gen.cmds
+TFSCRIPT=tf_gen.cmds
+TRTSCRIPT=trt_gen.cmds
 
-cp ./gen_ensemble_model_utils.py $SRCDIR/.
-cp ./gen_qa_dyna_sequence_implicit_models.py $SRCDIR/.
-cp ./gen_qa_dyna_sequence_models.py $SRCDIR/.
-cp ./gen_qa_identity_models.py $SRCDIR/.
-cp ./gen_qa_implicit_models.py $SRCDIR/.
-cp ./gen_qa_models.py $SRCDIR/.
-cp ./gen_qa_noshape_models.py $SRCDIR/.
-cp ./gen_qa_ragged_models.py $SRCDIR/.
-cp ./gen_qa_reshape_models.py $SRCDIR/.
-cp ./gen_qa_sequence_models.py $SRCDIR/.
-cp ./gen_qa_trt_data_dependent_shape.py $SRCDIR/.
-cp ./gen_qa_trt_format_models.py $SRCDIR/.
-cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
-cp ./test_util.py $SRCDIR/.
+SRCDIR=/tmp/src
+DESTDIR=/tmp/models
+VARDESTDIR=/tmp/varmodels
+IDENTITYDESTDIR=/tmp/zeromodels
+SIGDEFDESTDIR=/tmp/sigdefmodels
+TFPARAMETERSDIR=/tmp/tfparameters
+IDENTITYBIGDESTDIR=/tmp/zerobigmodels
+SHAPEDESTDIR=/tmp/shapetensormodels
+RESHAPEDESTDIR=/tmp/reshapemodels
+SEQDESTDIR=/tmp/seqmodels
+IMPLICITSEQDESTDIR=/tmp/implicitseqmodels
+INITIALSTATEIMPLICITSEQDESTDIR=/tmp/initialstateimplicitseqmodels
+VARIMPLICITSEQDESTDIR=/tmp/varimplicitseqmodels
+VARINITIALSTATEIMPLICITSEQDESTDIR=/tmp/varinitialstateimplicitseqmodels
+DYNASEQDESTDIR=/tmp/dynaseqmodels
+DYNASEQIMPLICITDESTDIR=/tmp/dynaseqimplicitmodels
+VARSEQDESTDIR=/tmp/varseqmodels
+ENSEMBLEDESTDIR=/tmp/ensemblemodels
+NOSHAPEDESTDIR=/tmp/noshapemodels
+PLGDESTDIR=/tmp/pluginmodels
+RAGGEDDESTDIR=/tmp/raggedmodels
+FORMATDESTDIR=/tmp/formatmodels
+DATADEPENDENTDIR=/tmp/datadependentmodels
+TORCHTRTDESTDIR=/tmp/torchtrtmodels
 
 
 # # TensorRT
