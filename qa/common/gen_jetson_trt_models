@@ -118,6 +118,9 @@ rm -fr $VARDESTDIR
 rm -fr $VARIMPLICITSEQDESTDIR
 rm -fr $VARSEQDESTDIR
 
+rm -fr $HOST_SRCDIR
+mkdir -p $HOST_SRCDIR
+
 mkdir -p $SRCDIR
 mkdir -p $DESTDIR
 
