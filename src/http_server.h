@@ -302,9 +302,6 @@ class HTTPAPIServer : public HTTPServer {
   void HandleInfer(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
-  void HandleGenerate(
-      evhtp_request_t* req, const std::string& model_name,
-      const std::string& model_version_str);
   void HandleModelStats(
       evhtp_request_t* req, const std::string& model_name = "",
       const std::string& model_version_str = "");

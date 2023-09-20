@@ -1009,7 +1009,7 @@ HTTPAPIServer::HTTPAPIServer(
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|generate|ready|config|stats|trace/setting))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
@@ -3160,19 +3160,6 @@ HTTPAPIServer::HandleInfer(
 }
 
 void
-HTTPAPIServer::HandleGenerate(
-    evhtp_request_t* req, const std::string& model_name,
-    const std::string& model_version_str)
-{
-  if (req->method != htp_method_POST) {
-    RETURN_AND_RESPOND_WITH_ERR(
-        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
-  }
-
-  RETURN_AND_RESPOND_WITH_ERR(req, EVHTP_RES_BADREQ, "Not Implemented Yet");
-}
-
-void
 HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   HTTPAPIServer::InferRequestClass* infer_request =
@@ -3636,10 +3623,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     } else if (kind == "infer") {
       // model infer
       HandleInfer(req, model_name, version);
-      return;
-    } else if (kind == "generate") {
-      // LLM infer format converter
-      HandleGenerate(req, model_name, version);
       return;
     } else if (kind == "config") {
       // model configuration
