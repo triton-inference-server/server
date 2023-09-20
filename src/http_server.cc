@@ -50,10 +50,6 @@ extern "C" {
 #include <b64/cdecode.h>
 }
 
-#ifdef TRITON_ENABLE_TRACING
-#include "tracer.h"
-#endif  // TRITON_ENABLE_TRACING
-
 namespace triton { namespace server {
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
@@ -3012,7 +3008,7 @@ HTTPAPIServer::DecompressBuffer(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::EVBufferToTritonInput(
+HTTPAPIServer::EVBufferToTritonRequest(
     evhtp_request_t* req, const std::string& model_name,
     TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
     InferRequestClass* infer_req, size_t header_length)
@@ -3068,9 +3064,8 @@ HTTPAPIServer::HandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-  auto trace = StartTrace(req, model_name, &triton_trace);
-#endif  // TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace =
+      StartTrace(req, model_name, &triton_trace);
 
   // Create the inference request object which provides all information needed
   // for an inference.
@@ -3092,11 +3087,9 @@ HTTPAPIServer::HandleInfer(
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req);
-#ifdef TRITON_ENABLE_TRACING
   infer_request->trace_ = trace;
-#endif  // TRITON_ENABLE_TRACING
 
-  const char* request_id = "";
+  const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
   // by reference to capture local updates, except for shared pointers which
   // should be captured by value in case of ref count issues.
@@ -3125,11 +3118,17 @@ HTTPAPIServer::HandleInfer(
     }
   };
 
+  // Parse EV buffer and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
-      EVBufferToTritonInput(
+      EVBufferToTritonRequest(
           req, model_name, irequest, decompressed_buffer, infer_request.get(),
           header_length),
       error_callback);
+
+  // Get request ID for logging in case of error.
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestId(irequest, &request_id),
+      "unable to retrieve request ID string");
 
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
@@ -3145,13 +3144,7 @@ HTTPAPIServer::HandleInfer(
           InferRequestClass::InferResponseComplete,
           reinterpret_cast<void*>(infer_request.get())),
       error_callback);
-  // Get request ID for logging in case of error.
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestId(irequest, &request_id),
-      "unable to retrieve request ID string");
-  if (!strncmp(request_id, "", 1)) {
-    request_id = "<id_unknown>";
-  }
+
   auto err =
       TRITONSERVER_ServerInferAsync(server_.get(), irequest, triton_trace);
 #ifdef TRITON_ENABLE_TRACING
@@ -3161,6 +3154,7 @@ HTTPAPIServer::HandleInfer(
     trace->trace_ = nullptr;
   }
 #endif  // TRITON_ENABLE_TRACING
+
   RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
   infer_request.release();
 }
