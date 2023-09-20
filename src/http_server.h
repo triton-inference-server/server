@@ -317,6 +317,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::string& action);
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
+  // OpenAI-compatible format
+  void HandleGenerate(evhtp_request_t* req);
 
   TRITONSERVER_Error* EVBufferToTritonRequest(
       evhtp_request_t* req, const std::string& model_name,

@@ -3133,6 +3133,102 @@ HTTPAPIServer::HandleInfer(
 }
 
 void
+HTTPAPIServer::HandleGenerate(evhtp_request_t* req)
+{
+  AddContentTypeHeader(req, "application/json");
+  if (req->method != htp_method_POST) {
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+  }
+
+  // Parsing request..
+  // This endpoint contains all info within request body, so parse adn
+  // dispatch to different response handling accordingly.
+  // standard evbuffer to JSON...
+  triton::common::TritonJson::Value request;
+  {
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+        RETURN_AND_RESPOND_IF_ERR(
+            req, TRITONSERVER_ErrorNew(
+                     TRITONSERVER_ERROR_INTERNAL,
+                     "[POC] unexpected error getting request buffers"));
+      }
+    }
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    RETURN_AND_RESPOND_IF_ERR(
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+  }
+  // only look for 'stream' in this POC
+  triton::common::TritonJson::Value stream_json;
+  bool can_continue = request.Find("stream", &stream_json);
+  if (can_continue) {
+    RETURN_AND_RESPOND_IF_ERR(req, stream_json.AsBool(&can_continue));
+  }
+  if (!can_continue) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INTERNAL,
+                 "[POC] expect 'stream: true' in request body"));
+  }
+
+  // [skip] HTTP request -> Triton request -> inference
+
+  // header for SSE
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kContentTypeHeader, "text/event-stream; charset=utf-8", 1, 1));
+
+  // indicate start of sending responses, assuming model iteratively generates
+  // responses
+  evhtp_send_reply_chunk_start(req, EVHTP_RES_OK);
+
+  std::vector<std::string> model_res{" these", " are", " generated", " tokens"};
+  for (const auto& res : model_res) {
+    // in response callback
+    // model res -> API expected response
+    std::string api_res =
+        std::string(
+            "{\"id\": \"req-id\", \"object\": \"text_completion\", "
+            "\"created\": 12345, \"model\": \"a_model\","
+            "\"choices\": [{\"index\": 0, \"text\": \"") +
+        res + "\", \"logprobs\": null, \"finish_reason\": ";
+    // end?
+    if (res != "tokens") {
+      api_res += "null}]}";
+    } else {
+      api_res += "\"length\"}]}";
+    }
+
+    // API expected response -> SSE format
+    api_res = std::string("data: ") + api_res + "\n\n";
+
+    // send (use 'buffer_out' in request, different from example that
+    // creates new evbuffer)
+    evbuffer_add(req->buffer_out, api_res.c_str(), api_res.length());
+    evhtp_send_reply_chunk(req, req->buffer_out);
+    evbuffer_drain(req->buffer_out, -1);
+  }
+  // send "data: [DONE]\n\n" expected by the API
+  {
+    std::string api_res{"data: [DONE]\n\n"};
+
+    // send (use 'buffer_out' in request, different from example that
+    // creates new evbuffer)
+    evbuffer_add(req->buffer_out, api_res.c_str(), api_res.length());
+    evhtp_send_reply_chunk(req, req->buffer_out);
+    evbuffer_drain(req->buffer_out, -1);
+  }
+  evhtp_send_reply_chunk_end(req);
+}
+
+void
 HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   HTTPAPIServer::InferRequestClass* infer_request =
@@ -3570,6 +3666,12 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
+
+  // OpenAI-compatible frontend
+  if (std::string(req->uri->path->full) == "/v2/completions") {
+    HandleGenerate(req);
+    return;
+  }
 
   if (std::string(req->uri->path->full) == "/v2/models/stats") {
     // model statistics
