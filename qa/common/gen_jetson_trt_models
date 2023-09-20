@@ -226,6 +226,7 @@ mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
+chmod -R 777 $HOST_SRCDIR
 
 cp ./gen_qa_models.py $HOST_SRCDIR/.
 cp ./gen_qa_identity_models.py $HOST_SRCDIR/.
