@@ -124,13 +124,52 @@ cp ./gen_qa_trt_format_models.py $SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
 cp ./test_util.py $SRCDIR/.
 
-pip3 install --upgrade numpy \
-    tensorrt
 
+# # TensorRT
+# set -e
+# export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
+# cd $SRCDIR
+# # Models using shape tensor i/o
+# python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+# python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+# python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+# chmod -R 777 $SHAPEDESTDIR
+# python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
+# chmod -R 777 $DESTDIR
+# python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
+# chmod -R 777 $VARDESTDIR
+# python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
+# chmod -R 777 $IDENTITYDESTDIR
+# python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
+# chmod -R 777 $IDENTITYBIGDESTDIR
+# python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
+# chmod -R 777 $RESHAPEDESTDIR
+# python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
+# chmod -R 777 $SEQDESTDIR
+# python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$IMPLICITSEQDESTDIR
+# chmod -R 777 $IMPLICITSEQDESTDIR
+# python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VARIMPLICITSEQDESTDIR
+# chmod -R 777 $VARIMPLICITSEQDESTDIR
+# python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
+# chmod -R 777 $DYNASEQDESTDIR
+# python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
+# chmod -R 777 $VARSEQDESTDIR
+# python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$DYNASEQIMPLICITDESTDIR
+# chmod -R 777 $DYNASEQIMPLICITDESTDIR
+# python3 $SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$RAGGEDDESTDIR
+# chmod -R 777 $RAGGEDDESTDIR
+# python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
+# chmod -R 777 $FORMATDESTDIR
+# python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
+# chmod -R 777 $DATADEPENDENTDIR
+
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 # TensorRT
+cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
+#!/bin/bash
 set -e
+set -x
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
-cd $SRCDIR
 # Models using shape tensor i/o
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
@@ -164,3 +203,35 @@ python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
 chmod -R 777 $FORMATDESTDIR
 python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 chmod -R 777 $DATADEPENDENTDIR
+EOF
+
+chmod a+x $HOST_SRCDIR/$TRTSCRIPT
+if [ $? -ne 0 ]; then
+    echo -e "Failed: chmod"
+    exit 1
+fi
+
+docker pull $TENSORRT_IMAGE
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+       --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
+       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
+       --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
+       --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
+       --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
+       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+       --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+       --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+       --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
+       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
+       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
+       $TENSORRT_IMAGE
+if [ $? -ne 0 ]; then
+    echo -e "Failed"
+    exit 1
+fi
