@@ -62,28 +62,22 @@ namespace triton { namespace server {
     }                                           \
   } while (false)
 
-#define RETURN_AND_RESPOND_IF_ERR(REQ, X)                                  \
-  do {                                                                     \
-    TRITONSERVER_Error* err__ = (X);                                       \
-    if (err__ != nullptr) {                                                \
-      evhtp_headers_add_header(                                            \
-          req->headers_out,                                                \
-          evhtp_header_new(kContentTypeHeader, "application/json", 1, 1)); \
-      EVBufferAddErrorJson((REQ)->buffer_out, err__);                      \
-      evhtp_send_reply((REQ), EVHTP_RES_BADREQ);                           \
-      TRITONSERVER_ErrorDelete(err__);                                     \
-      return;                                                              \
-    }                                                                      \
+#define RETURN_AND_RESPOND_IF_ERR(REQ, X)             \
+  do {                                                \
+    TRITONSERVER_Error* err__ = (X);                  \
+    if (err__ != nullptr) {                           \
+      EVBufferAddErrorJson((REQ)->buffer_out, err__); \
+      evhtp_send_reply((REQ), EVHTP_RES_BADREQ);      \
+      TRITONSERVER_ErrorDelete(err__);                \
+      return;                                         \
+    }                                                 \
   } while (false)
 
-#define RETURN_AND_RESPOND_WITH_ERR(REQ, CODE, MSG)                      \
-  do {                                                                   \
-    evhtp_headers_add_header(                                            \
-        req->headers_out,                                                \
-        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1)); \
-    EVBufferAddErrorJson((REQ)->buffer_out, MSG);                        \
-    evhtp_send_reply((REQ), CODE);                                       \
-    return;                                                              \
+#define RETURN_AND_RESPOND_WITH_ERR(REQ, CODE, MSG) \
+  do {                                              \
+    EVBufferAddErrorJson((REQ)->buffer_out, MSG);   \
+    evhtp_send_reply((REQ), CODE);                  \
+    return;                                         \
   } while (false)
 
 namespace {
@@ -107,6 +101,12 @@ EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
   EVBufferAddErrorJson(buffer, message);
 }
 
+void
+AddContentTypeHeader(evhtp_request_t* req, const char* type)
+{
+  evhtp_headers_add_header(
+      req->headers_out, evhtp_header_new(kContentTypeHeader, type, 1, 1));
+}
 
 }  // namespace
 
@@ -1259,6 +1259,7 @@ void
 HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -1296,10 +1297,6 @@ HTTPAPIServer::HandleRepositoryIndex(
     }
   }
 
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
-
   if (err == nullptr) {
     uint32_t flags = 0;
     if (ready) {
@@ -1329,14 +1326,11 @@ HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
     const std::string& model_name, const std::string& action)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (!repository_name.empty()) {
@@ -1519,6 +1513,7 @@ HTTPAPIServer::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -1528,10 +1523,6 @@ HTTPAPIServer::HandleModelMetadata(
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_BADREQ, "Missing model name in ModelMetadata request");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Message* message = nullptr;
 
@@ -1561,6 +1552,7 @@ HTTPAPIServer::HandleModelConfig(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -1570,10 +1562,6 @@ HTTPAPIServer::HandleModelConfig(
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_BADREQ, "Missing model name in ModelConfig request");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Message* message = nullptr;
 
@@ -1604,14 +1592,11 @@ HTTPAPIServer::HandleModelStats(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_STATS
   TRITONSERVER_Message* model_stats_message = nullptr;
@@ -1649,15 +1634,12 @@ HTTPAPIServer::HandleModelStats(
 void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
+  AddContentTypeHeader(req, "application/json");
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
     return;
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
@@ -1905,13 +1887,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 void
 HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 {
+  AddContentTypeHeader(req, "application/json");
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_LOGGING
   // Perform log setting update if requested
@@ -2056,14 +2036,11 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
+  AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   if (server_metadata_err_ == nullptr) {
     evbuffer_add(
@@ -2080,6 +2057,7 @@ HTTPAPIServer::HandleSystemSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
+  AddContentTypeHeader(req, "application/json");
   if ((action == "status") && (req->method != htp_method_GET)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -2087,10 +2065,6 @@ HTTPAPIServer::HandleSystemSharedMemory(
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
@@ -2186,6 +2160,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
+  AddContentTypeHeader(req, "application/json");
   if ((action == "status") && (req->method != htp_method_GET)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -2193,10 +2168,6 @@ HTTPAPIServer::HandleCudaSharedMemory(
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
@@ -3097,9 +3068,7 @@ HTTPAPIServer::HandleInfer(
     if (error != nullptr) {
       LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(error);
-      evhtp_headers_add_header(
-          req->headers_out,
-          evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+      AddContentTypeHeader(req, "application/json");
       EVBufferAddErrorJson(req->buffer_out, error);
       evhtp_send_reply(req, EVHTP_RES_BADREQ);
       if (connection_paused) {
@@ -3559,17 +3528,13 @@ HTTPAPIServer::InferRequestClass::SetResponseHeader(
     bool has_binary_data, size_t header_length)
 {
   if (has_binary_data) {
-    evhtp_headers_add_header(
-        req_->headers_out,
-        evhtp_header_new(kContentTypeHeader, "application/octet-stream", 1, 1));
+    AddContentTypeHeader(req_, "application/octet-stream");
     evhtp_headers_add_header(
         req_->headers_out, evhtp_header_new(
                                kInferHeaderContentLengthHTTPHeader,
                                std::to_string(header_length).c_str(), 1, 1));
   } else {
-    evhtp_headers_add_header(
-        req_->headers_out,
-        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+    AddContentTypeHeader(req_, "application/json");
   }
 
   switch (response_compression_type_) {
