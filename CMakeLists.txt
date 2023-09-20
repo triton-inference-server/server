@@ -32,6 +32,8 @@ include(CMakeDependentOption)
 
 set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
 
+option(TRITON_IGPU_BUILD "Server build for iGPU device" OFF)
+
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
@@ -232,6 +234,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+    -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
