@@ -305,6 +305,8 @@ class HTTPAPIServer : public HTTPServer {
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
 
+  void HandleUniversalGenerate(evhtp_request_t* req);
+
   TRITONSERVER_Error* EVBufferToInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
       evbuffer* input_buffer, InferRequestClass* infer_req,
