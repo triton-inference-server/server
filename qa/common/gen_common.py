@@ -95,6 +95,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
+    elif np_dtype == np.uint8:
+        return trt.uint8
     elif np_dtype == np.float16:
         return trt.float16
     elif np_dtype == np.float32:
