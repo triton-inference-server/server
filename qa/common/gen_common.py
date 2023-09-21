@@ -25,9 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Common utilities for model generation scripts
+import numpy as np
+
+np_dtype_string = np.dtype(object)
 
 
 def np_to_onnx_dtype(np_dtype):
+    import onnx
+
     if np_dtype == bool:
         return onnx.TensorProto.BOOL
     elif np_dtype == np.int8:
@@ -54,6 +59,8 @@ def np_to_onnx_dtype(np_dtype):
 
 
 def np_to_model_dtype(np_dtype):
+    import numpy as np
+
     if np_dtype == bool:
         return "TYPE_BOOL"
     elif np_dtype == np.int8:
@@ -80,6 +87,8 @@ def np_to_model_dtype(np_dtype):
 
 
 def np_to_trt_dtype(np_dtype):
+    import tensorrt as trt
+
     if np_dtype == bool:
         return trt.bool
     elif np_dtype == np.int8:
@@ -94,6 +103,8 @@ def np_to_trt_dtype(np_dtype):
 
 
 def np_to_tf_dtype(np_dtype):
+    import tensorflow as tf
+
     if np_dtype == bool:
         return tf.bool
     elif np_dtype == np.int8:
@@ -120,6 +131,8 @@ def np_to_tf_dtype(np_dtype):
 
 
 def np_to_torch_dtype(np_dtype):
+    import torch
+
     if np_dtype == bool:
         return torch.bool
     elif np_dtype == np.int8:
