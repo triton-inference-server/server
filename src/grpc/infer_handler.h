@@ -62,6 +62,7 @@ typedef enum {
   READ,
   WRITEREADY,
   WRITTEN,
+  WAITING_NOTIFICATION,
   CANCELLATION_ISSUED,
   CANCELLED
 } Steps;
@@ -643,7 +644,8 @@ class InferHandlerState {
     explicit Context(
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
-          step_(Steps::START), finish_ok_(true), ongoing_write_(false)
+          step_(Steps::START), finish_ok_(true), ongoing_write_(false),
+          received_notification_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -656,10 +658,17 @@ class InferHandlerState {
 
     void GrpcContextAsyncNotifyWhenDone(InferHandlerStateType* state)
     {
-      ctx_->AsyncNotifyWhenDone(state);
+      InferHandlerStateType* wrapped_state =
+          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
+      ctx_->AsyncNotifyWhenDone(wrapped_state);
     }
 
-    bool IsCancelled() { return ctx_->IsCancelled(); }
+    void SetReceivedNotification(bool value) { received_notification_ = true; }
+
+    bool IsCancelled()
+    {
+      return received_notification_ ? ctx_->IsCancelled() : false;
+    }
 
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
@@ -912,7 +921,16 @@ class InferHandlerState {
 
     // True if there is an ongoing write to the grpc stream
     std::atomic<bool> ongoing_write_;
+
+    // Tracks whether the async notification has been delivered by
+    // completion queue.
+    bool received_notification_;
   };
+
+  explicit InferHandlerState(Steps start_step, InferHandlerState* state)
+      : step_(start_step), state_ptr_(state)
+  {
+  }
 
   explicit InferHandlerState(
       TRITONSERVER_Server* tritonserver,
@@ -949,6 +967,7 @@ class InferHandlerState {
     // Clear trace_timestamps_ here so they do not grow indefinitely since
     // states are re-used for performance.
     ClearTraceTimestamps();
+    state_ptr_ = nullptr;
   }
 
   void Release()
@@ -1011,6 +1030,11 @@ class InferHandlerState {
   // For inference requests the allocator payload, unused for other
   // requests.
   AllocPayload<ResponseType> alloc_payload_;
+
+  // The below pointer is only set when the state object is being
+  // fed to the completion queue using AsyncNotifyWhenDone function.
+  // Otherwise it is nullptr.
+  InferHandlerState* state_ptr_;
 };
 
 
@@ -1168,6 +1192,14 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
+      if (state->step_ == Steps::WAITING_NOTIFICATION) {
+        State* state_wrapper = state;
+        state = state_wrapper->state_ptr_;
+        state->context_->SetReceivedNotification(true);
+        LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
+                       << state->unique_id_;
+        delete state_wrapper;
+      }
       if (!Process(state, ok)) {
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         StateRelease(state);
