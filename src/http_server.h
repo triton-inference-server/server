@@ -209,9 +209,8 @@ class HTTPAPIServer : public HTTPServer {
 
     uint32_t IncrementResponseCount();
 
-#ifdef TRITON_ENABLE_TRACING
+    // Only used if tracing enabled
     std::shared_ptr<TraceManager::Trace> trace_;
-#endif  // TRITON_ENABLE_TRACING
 
     AllocPayload alloc_payload_;
 
@@ -255,6 +254,20 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, int32_t content_length, size_t* header_length);
   virtual DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req);
   virtual DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req);
+
+  TRITONSERVER_Error* GetContentLength(
+      evhtp_request_t* req, evbuffer* decompressed_buffer,
+      int32_t* content_length);
+  TRITONSERVER_Error* DecompressBuffer(
+      evhtp_request_t* req, evbuffer** decompressed_buffer);
+  TRITONSERVER_Error* CheckTransactionPolicy(
+      evhtp_request_t* req, const std::string& model_name,
+      int64_t requested_model_version);
+  std::shared_ptr<TraceManager::Trace> StartTrace(
+      evhtp_request_t* req, const std::string& model_name,
+      TRITONSERVER_InferenceTrace** triton_trace);
+  TRITONSERVER_Error* ForwardHeaders(
+      evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest);
 
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -305,6 +318,10 @@ class HTTPAPIServer : public HTTPServer {
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
 
+  TRITONSERVER_Error* EVBufferToTritonRequest(
+      evhtp_request_t* req, const std::string& model_name,
+      TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
+      InferRequestClass* infer_req, size_t header_length);
   TRITONSERVER_Error* EVBufferToInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
       evbuffer* input_buffer, InferRequestClass* infer_req,
