@@ -62,6 +62,9 @@ operator<<(std::ostream& out, const Steps& step)
     case WRITTEN:
       out << "WRITTEN";
       break;
+    case WAITING_NOTIFICATION:
+      out << "WAITING_NOTIFICATION";
+      break;
     case CANCELLATION_ISSUED:
       out << "CANCELLATION_ISSUED";
       break;
@@ -785,6 +788,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #endif  // TRITON_ENABLE_TRACING
 
     state->step_ = Steps::FINISH;
+  } else if (state->step_ == Steps::FINISH) {
     finished = true;
   }
 

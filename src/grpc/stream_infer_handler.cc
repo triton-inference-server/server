@@ -373,6 +373,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
   } else if (state->step_ == Steps::COMPLETE) {
     state->step_ = Steps::FINISH;
+  } else if (state->step_ == Steps::FINISH) {
+    // The RPC execution is finished hence the state
+    // can be released.
     finished = true;
   } else if (!state->is_decoupled_) {
     // We handle the WRITTEN and WRITEREADY states little
@@ -424,11 +427,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // The response for the request has been written completely.
       // The counter can be safely decremented.
       state->context_->DecrementRequestCounter();
-      finished = Finish(state);
-
-    } else if (state->step_ == Steps::COMPLETE) {
-      state->step_ = Steps::FINISH;
-      finished = true;
+      Finish(state);
     }
   } else {
     //
@@ -457,7 +456,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // the state have completed.
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
-        finished = Finish(state);
+        Finish(state);
       } else {
         std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
@@ -488,7 +487,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // the state have completed.
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
-        finished = Finish(state);
+        Finish(state);
       } else {
         // GRPC doesn't allow to issue another write till
         // the notification from previous write has been
@@ -508,7 +507,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   return !finished;
 }
 
-bool
+void
 ModelStreamInferHandler::Finish(InferHandler::State* state)
 {
   // If done reading and no in-flight requests then can finish the
@@ -522,10 +521,7 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
         state);
   } else {
     state->step_ = Steps::FINISH;
-    return true;
   }
-
-  return false;
 }
 
 void
