@@ -32,8 +32,7 @@ import os
 import numpy as np
 import tensorrt as trt
 import test_util as tu
-
-from .gen_common import np_to_model_dtype, np_to_trt_dtype
+from gen_common import np_to_model_dtype, np_to_trt_dtype
 
 
 # The 'nonzero' model that we use for data dependent shape is naturally

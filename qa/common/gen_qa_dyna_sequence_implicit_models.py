@@ -30,8 +30,7 @@ import argparse
 import os
 
 import numpy as np
-
-from .gen_common import np_to_model_dtype, np_to_onnx_dtype, np_to_trt_dtype
+from gen_common import np_to_model_dtype, np_to_onnx_dtype, np_to_trt_dtype
 
 FLAGS = None
 np_dtype_string = np.dtype(object)

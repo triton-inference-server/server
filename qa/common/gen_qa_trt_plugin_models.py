@@ -31,8 +31,7 @@ import os
 
 import numpy as np
 import tensorrt as trt
-
-from .gen_common import np_to_model_dtype, np_to_trt_dtype
+from gen_common import np_to_model_dtype, np_to_trt_dtype
 
 np_dtype_string = np.dtype(object)
 

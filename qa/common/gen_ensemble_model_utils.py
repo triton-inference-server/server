@@ -30,8 +30,7 @@ import os
 
 import numpy as np
 import test_util as tu
-
-from .gen_common import np_to_model_dtype
+from gen_common import np_to_model_dtype
 
 BASIC_ENSEMBLE_TYPES = ["simple", "sequence", "fan"]
 

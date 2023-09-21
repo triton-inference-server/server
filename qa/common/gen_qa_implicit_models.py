@@ -32,8 +32,7 @@ from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
 import numpy as np
-
-from .gen_common import (
+from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,

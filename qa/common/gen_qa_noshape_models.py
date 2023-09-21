@@ -31,8 +31,7 @@ import os
 from builtins import range
 
 import numpy as np
-
-from .gen_common import np_to_model_dtype, np_to_tf_dtype
+from gen_common import np_to_model_dtype, np_to_tf_dtype
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
