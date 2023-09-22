@@ -184,7 +184,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     } else {
       // Precondition is not satisfied, cancel the stream
       state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
+      state->step_ = Steps::PARTIAL_COMPLETION;
       ::grpc::Status status = ::grpc::Status(
           ::grpc::StatusCode::UNAVAILABLE,
           std::string("This protocol is restricted, expecting header '") +
@@ -207,7 +207,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::WRITEREADY;
       if (state->context_->IsRequestsCompleted()) {
         state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::FINISH;
+        state->step_ = Steps::PARTIAL_COMPLETION;
         LOG_VERBOSE(2) << "Finishing responder from state "
                        << state->unique_id_;
         state->context_->responder_->Finish(
@@ -379,7 +379,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
-
+  } else if (state->step_ == Steps::PARTIAL_COMPLETION) {
+    state->step_ = Steps::COMPLETE;
   } else if (state->step_ == Steps::COMPLETE) {
     state->step_ = Steps::FINISH;
   } else if (state->step_ == Steps::FINISH) {
@@ -523,8 +524,8 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
   // entire stream. Otherwise just finish this state.
   if (state->context_->IsRequestsCompleted()) {
     state->context_->step_ = Steps::COMPLETE;
-    state->step_ = Steps::FINISH;
-    LOG_VERBOSE(1) << "Finishing responder from state " << state->unique_id_;
+    state->step_ = Steps::PARTIAL_COMPLETION;
+    LOG_VERBOSE(2) << "Finishing responder from state " << state->unique_id_;
     state->context_->responder_->Finish(
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
