@@ -79,8 +79,9 @@ LABEL PYTHON_VERSION=${PYTHON_VERSION}
 ARG BUILDTOOLS_VERSION=16.11.21
 ARG BUILDTOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/8f1eb024-006a-43f6-a372-0721f71058b3/cc5cc690ac094fbfa78dfb8e40089ba52056026579e8d8dc31e95e8ea5466df5/vs_BuildTools.exe
 ADD ${BUILDTOOLS_SOURCE} vs_buildtools.exe
+ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 
-RUN vs_buildtools.exe --quiet --wait --norestart --nocache install --installPath %VS_INSTALL_PATH_WP% --channelUri "C:\tmp\VisualStudio.chman" --installChannelUri "C:\tmp\VisualStudio.chman" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --locale "En-us"
+RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--addProductLang","En-us","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
