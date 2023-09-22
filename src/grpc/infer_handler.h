@@ -665,6 +665,8 @@ class InferHandlerState {
 
     void SetReceivedNotification(bool value) { received_notification_ = true; }
 
+    bool ReceivedNotification() { return received_notification_; }
+
     bool IsCancelled()
     {
       return received_notification_ ? ctx_->IsCancelled() : false;
@@ -676,6 +678,47 @@ class InferHandlerState {
     // Decrements the ongoing request counter
     void DecrementRequestCounter() { ongoing_requests_--; }
 
+    // Adds the state object created on this context
+    void InsertState(InferHandlerStateType* state)
+    {
+      all_states_.insert(state);
+    }
+
+    // Adds the state object created on this context
+    void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
+
+    bool HandleCompletion()
+    {
+      if (step_ != Steps::FINISH) {
+        for (auto state : all_states_) {
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          // Finished states are already cleaned.
+          if (state->step_ != Steps::FINISH) {
+            state->step_ = Steps::FINISH;
+            PutTaskBackToQueue(state);
+          }
+        }
+        step_ = Steps::FINISH;
+        return true;
+      }
+      return false;
+    }
+
+    std::string DebugString(InferHandlerStateType* state)
+    {
+      std::string debug_string("");
+      debug_string.append(
+          "Running state_id " + std::to_string(state->unique_id_) + "\n");
+      debug_string.append(
+          "\tContext step " + std::to_string(state->context_->step_) + "\n");
+      for (auto new_state : all_states_) {
+        debug_string.append(
+            "\t\t State id " + std::to_string(new_state->unique_id_) +
+            ": State step " + std::to_string(new_state->step_) + "\n");
+      }
+
+      return debug_string;
+    }
 
     // Inserts the state to a set tracking active requests
     // within the server core. Should only be called when
@@ -912,6 +955,9 @@ class InferHandlerState {
     // on these requests.
     std::set<InferHandlerStateType*> inflight_states_;
 
+    // Tracks all the states that have been created on this context.
+    std::set<InferHandlerStateType*> all_states_;
+
     // The step of the entire context.
     Steps step_;
 
@@ -1090,15 +1136,23 @@ class InferHandler : public HandlerBase {
       state = new State(tritonserver, context, start_step);
     }
 
-    // Need to be called to receive an asynchronous notification
-    // when the transaction is cancelled.
-    context->GrpcContextAsyncNotifyWhenDone(state);
+    if (start_step == Steps::START) {
+      // Need to be called to receive an asynchronous notification
+      // when the transaction is cancelled.
+      context->GrpcContextAsyncNotifyWhenDone(state);
+    }
+    context->InsertState(state);
+
+    LOG_VERBOSE(2) << "StateNew, " << state->unique_id_ << " Step "
+                   << state->step_;
 
     return state;
   }
 
   void StateRelease(State* state)
   {
+    LOG_VERBOSE(2) << "StateRelease, " << state->unique_id_ << " Step "
+                   << state->step_;
     if (max_state_bucket_count_ > 0) {
       std::lock_guard<std::mutex> lock(alloc_mu_);
 
@@ -1200,9 +1254,15 @@ InferHandler<
                        << state->unique_id_;
         delete state_wrapper;
       }
+      LOG_VERBOSE(2) << "Grpc::CQ::Next() "
+                     << state->context_->DebugString(state);
       if (!Process(state, ok)) {
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+        state->context_->EraseState(state);
         StateRelease(state);
+      } else {
+        LOG_VERBOSE(2) << "Returning from " << Name() << ", "
+                       << state->unique_id_ << ", " << state->step_;
       }
     }
   }));

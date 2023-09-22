@@ -142,9 +142,16 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // threads.
   {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-    if (state->IsGrpcContextCancelled()) {
-      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
-      return resume;
+    if (state->context_->ReceivedNotification()) {
+      if (state->IsGrpcContextCancelled()) {
+        bool resume =
+            state->context_->HandleCancellation(state, rpc_ok, Name());
+        return resume;
+      } else {
+        if (state->context_->HandleCompletion()) {
+          return true;
+        }
+      }
     }
   }
 
@@ -200,7 +207,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::WRITEREADY;
       if (state->context_->IsRequestsCompleted()) {
         state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::COMPLETE;
+        state->step_ = Steps::FINISH;
+        LOG_VERBOSE(2) << "Finishing responder from state "
+                       << state->unique_id_;
         state->context_->responder_->Finish(
             state->context_->finish_ok_ ? ::grpc::Status::OK
                                         : ::grpc::Status::CANCELLED,
@@ -514,13 +523,14 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
   // entire stream. Otherwise just finish this state.
   if (state->context_->IsRequestsCompleted()) {
     state->context_->step_ = Steps::COMPLETE;
-    state->step_ = Steps::COMPLETE;
+    state->step_ = Steps::FINISH;
+    LOG_VERBOSE(1) << "Finishing responder from state " << state->unique_id_;
     state->context_->responder_->Finish(
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
         state);
   } else {
-    state->step_ = Steps::FINISH;
+    state->step_ = Steps::COMPLETE;
   }
 }
 
