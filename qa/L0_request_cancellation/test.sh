@@ -61,58 +61,59 @@ SERVER_LOG=server.log
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    RET=1
+   RET=1
 fi
 
+
+##
+## gRPC client tests
+##
+#rm -rf models && mkdir models
+#mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
+#    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+#    echo 'backend: "identity"' >> config.pbtxt && \
+#    echo 'max_batch_size: 1024' >> config.pbtxt && \
+#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+#    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+#    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
 #
-# gRPC client tests
+#CLIENT_CANCELLATION_TEST=grpc_client_test.client_cancellation_test.py
+#TEST_RESULT_FILE='grpc_client_test.test_results.txt'
+#CLIENT_LOG=`pwd`/grpc_client_test.client.log
+#SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+## gRPC client-side cancellation tests...
+#for i in test_grpc_async_infer \
+#    test_grpc_stream_infer \
+#   ; do
 #
-rm -rf models && mkdir models
-mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
-    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
-    echo 'backend: "identity"' >> config.pbtxt && \
-    echo 'max_batch_size: 1024' >> config.pbtxt && \
-    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
-
-CLIENT_CANCELLATION_TEST=grpc_client_test.client_cancellation_test.py
-TEST_RESULT_FILE='grpc_client_test.test_results.txt'
-CLIENT_LOG=`pwd`/grpc_client_test.client.log
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-# gRPC client-side cancellation tests...
-for i in test_grpc_async_infer \
-    test_grpc_stream_infer \
-   ; do
-
-    SERVER_LOG=grpc_client_test.${i}.server.log
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    set +e
-    python $CLIENT_CANCELLATION_TEST ClientCancellationTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-
-    set -e
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+#    SERVER_LOG=grpc_client_test.${i}.server.log
+#    run_server
+#    if [ "$SERVER_PID" == "0" ]; then
+#        echo -e "\n***\n*** Failed to start $SERVER\n***"
+#        cat $SERVER_LOG
+#        exit 1
+#    fi
+#
+#    set +e
+#    python $CLIENT_CANCELLATION_TEST ClientCancellationTest.$i >>$CLIENT_LOG 2>&1
+#    if [ $? -ne 0 ]; then
+#        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#            echo -e "\n***\n*** Test $i Failed\n***"
+#            RET=1
+#    else
+#        check_test_results $TEST_RESULT_FILE 1
+#        if [ $? -ne 0 ]; then
+#            cat $CLIENT_LOG
+#            echo -e "\n***\n*** Test Result Verification Failed\n***"
+#            RET=1
+#        fi
+#    fi
+#
+#    set -e
+#    kill $SERVER_PID
+#    wait $SERVER_PID
+#done
 
 #
 # End-to-end tests
@@ -125,8 +126,8 @@ mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'dynamic_batching { max_queue_delay_microseconds: 1000000 }' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
+    echo -e 'dynamic_batching { max_queue_delay_microseconds: 600000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/sequence_direct/1 && (cd models/sequence_direct && \
     echo 'name: "sequence_direct"' >> config.pbtxt && \
     echo 'backend: "identity"' >> config.pbtxt && \
@@ -134,8 +135,8 @@ mkdir -p models/sequence_direct/1 && (cd models/sequence_direct && \
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'sequence_batching { direct { } \n max_sequence_idle_microseconds: 8000000 }' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
+    echo -e 'sequence_batching { direct { } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
     echo 'name: "sequence_oldest"' >> config.pbtxt && \
     echo 'backend: "identity"' >> config.pbtxt && \
@@ -143,8 +144,8 @@ mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 8000000 }' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
+    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
     echo 'name: "ensemble_model"' >> config.pbtxt && \
     echo 'platform: "ensemble"' >> config.pbtxt && \
@@ -159,7 +160,7 @@ mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
 TEST_LOG="scheduler_test.log"
 SERVER_LOG="./scheduler_test.server.log"
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

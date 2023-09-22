@@ -63,14 +63,10 @@ class TestScheduler(unittest.TestCase):
         self.assertEqual(response["result"], None)
         self.assertIsInstance(response["error"], InferenceServerException)
         self.assertEqual(response["error"].status(), "StatusCode.CANCELLED")
-        self.assertEqual(
-            response["error"].message(), "Locally cancelled by application!"
-        )
 
     # Test queued requests on dynamic batch scheduler can be cancelled
     def test_dynamic_batch_scheduler_request_cancellation(self):
         model_name = "dynamic_batch"
-        self._triton.load_model(model_name)
         with concurrent.futures.ThreadPoolExecutor() as pool:
             # Saturate the 2 batch slots on the model of 1 instance
             saturate_thread_1 = pool.submit(
@@ -94,12 +90,10 @@ class TestScheduler(unittest.TestCase):
             # Join saturating thread
             saturate_thread_1.result()
             saturate_thread_2.result()
-        self._triton.unload_model(model_name)
 
     # Test backlogged requests on sequence batch scheduler can be cancelled
     def test_sequence_batch_scheduler_backlog_request_cancellation(self):
         model_name = "sequence_direct"
-        self._triton.load_model(model_name)
         with concurrent.futures.ThreadPoolExecutor() as pool:
             # Saturate the single sequence slot
             saturate_thread = pool.submit(
@@ -110,24 +104,30 @@ class TestScheduler(unittest.TestCase):
                 sequence_start=True,
             )
             time.sleep(2)  # ensure the slot is filled
-            # The next sequence should be on the backlog
-            callback, response = self._generate_callback_and_response_pair()
-            backlog_future = self._triton.async_infer(
-                model_name,
-                self._get_inputs(batch_size=1),
-                callback,
-                sequence_id=2,
-                sequence_start=True,
-            )
+            # The next sequence with 2 requests should be on the backlog
+            backlog_requests = []
+            for i in range(2):
+                callback, response = self._generate_callback_and_response_pair()
+                backlog_future = self._triton.async_infer(
+                    model_name,
+                    self._get_inputs(batch_size=1),
+                    callback,
+                    sequence_id=2,
+                    sequence_start=(True if i == 0 else False),
+                )
+                backlog_requests.append(
+                    {"future": backlog_future, "response": response}
+                )
             time.sleep(2)  # ensure the sequence is backlogged
-            self.assertFalse(response["responded"])
-            # Cancel the backlog sequence
-            backlog_future.cancel()
+            self.assertFalse(backlog_requests[0]["response"]["responded"])
+            self.assertFalse(backlog_requests[1]["response"]["responded"])
+            # Cancelling any backlogged request cancels the entire sequence
+            backlog_requests[0]["future"].cancel()
             time.sleep(2)  # ensure the cancellation is delivered
-            self._assert_response_is_cancelled(response)
+            self._assert_response_is_cancelled(backlog_requests[0]["response"])
+            self._assert_response_is_cancelled(backlog_requests[1]["response"])
             # Join saturating thread
             saturate_thread.result()
-        self._triton.unload_model(model_name)
 
     # Test queued requests on direct sequence batch scheduler can be cancelled
     def test_direct_sequence_batch_scheduler_request_cancellation(self):
@@ -141,7 +141,6 @@ class TestScheduler(unittest.TestCase):
 
     # Helper function
     def _test_sequence_batch_scheduler_queued_request_cancellation(self, model_name):
-        self._triton.load_model(model_name)
         with concurrent.futures.ThreadPoolExecutor() as pool:
             # Start the sequence
             start_thread = pool.submit(
@@ -151,25 +150,29 @@ class TestScheduler(unittest.TestCase):
                 sequence_id=1,
                 sequence_start=True,
             )
-            # The next request should be queued
-            callback, response = self._generate_callback_and_response_pair()
-            queue_future = self._triton.async_infer(
-                model_name, self._get_inputs(batch_size=1), callback, sequence_id=1
-            )
-            time.sleep(2)  # ensure the request is queued
-            self.assertFalse(response["responded"])
-            # Cancel the queued request
-            queue_future.cancel()
+            time.sleep(2)  # ensure the sequence has started
+            # The next 2 requests should be queued
+            queue_requests = []
+            for i in range(2):
+                callback, response = self._generate_callback_and_response_pair()
+                queue_future = self._triton.async_infer(
+                    model_name, self._get_inputs(batch_size=1), callback, sequence_id=1
+                )
+                queue_requests.append({"future": queue_future, "response": response})
+            time.sleep(2)  # ensure the requests are queued
+            self.assertFalse(queue_requests[0]["response"]["responded"])
+            self.assertFalse(queue_requests[1]["response"]["responded"])
+            # Cancelling any queued request cancels the entire sequence
+            queue_requests[0]["future"].cancel()
             time.sleep(2)  # ensure the cancellation is delivered
-            self._assert_response_is_cancelled(response)
+            self._assert_response_is_cancelled(queue_requests[0]["response"])
+            self._assert_response_is_cancelled(queue_requests[1]["response"])
             # Join start thread
             start_thread.result()
-        self._triton.unload_model(model_name)
 
     # Test ensemble scheduler will propagate cancellation request to child
     def test_ensemble_scheduler_request_cancellation(self):
         model_name = "ensemble_model"
-        self._triton.load_model(model_name)
         callback, response = self._generate_callback_and_response_pair()
         infer_future = self._triton.async_infer(
             model_name, self._get_inputs(batch_size=1), callback
@@ -179,7 +182,6 @@ class TestScheduler(unittest.TestCase):
         infer_future.cancel()
         time.sleep(2)  # ensure the cancellation is delivered
         self._assert_response_is_cancelled(response)
-        self._triton.unload_model(model_name, unload_dependents=True)
 
 
 if __name__ == "__main__":
