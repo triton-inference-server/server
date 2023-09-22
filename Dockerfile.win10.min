@@ -68,21 +68,18 @@ RUN pip install grpcio-tools
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
 
-#
-# Installing Visual Studio BuildTools: VS17 2022
-#
-ARG BUILDTOOLS_VERSION
-# Download collect.exe in case of an install failure.
-ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
-# Use the latest release channel. For more control, specify the location of an internal layout.
-ARG CHANNEL_URL=https://aka.ms/vs/17/release/channel
-ADD ${CHANNEL_URL} "C:\tmp\VisualStudio.chman"
-# Download the Build Tools bootstrapper.
-ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
-ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
-# Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
-ARG VS_INSTALL_PATH_WP="C:\BuildTools"
+# Download and install Build Tools for Visual Studio. The use of
+# powershell for the install seems to be required to make the command
+# wait for the install to complete before continuing. To avoid failures
+# caused by VS regressions we want to stick with a working
+# compiler. Currently this is 16.11.21. This page contains download
+# links for buildtools.
+# https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
+ARG BUILDTOOLS_VERSION=16.11.21
+ARG BUILDTOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/8f1eb024-006a-43f6-a372-0721f71058b3/cc5cc690ac094fbfa78dfb8e40089ba52056026579e8d8dc31e95e8ea5466df5/vs_BuildTools.exe
+ADD ${BUILDTOOLS_SOURCE} vs_buildtools.exe
+
 RUN vs_buildtools.exe --quiet --wait --norestart --nocache install --installPath %VS_INSTALL_PATH_WP% --channelUri "C:\tmp\VisualStudio.chman" --installChannelUri "C:\tmp\VisualStudio.chman" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --locale "En-us"
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
