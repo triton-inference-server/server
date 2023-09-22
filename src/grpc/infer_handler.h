@@ -52,24 +52,6 @@ uint64_t NextUniqueId();
 
 namespace triton { namespace server { namespace grpc {
 
-// The step of processing that the state is in. Every state must
-// recognize START, COMPLETE and FINISH and the others are optional.
-typedef enum {
-  START,
-  COMPLETE,
-  FINISH,
-  ISSUED,
-  READ,
-  WRITEREADY,
-  WRITTEN,
-  WAITING_NOTIFICATION,
-  CANCELLATION_ISSUED,
-  CANCELLED
-} Steps;
-
-// Debugging helper
-std::ostream& operator<<(std::ostream& out, const Steps& step);
-
 // Options used in InferHandler/StreamInferHandler states that are set from
 // request parameters
 struct StateParameters {
@@ -692,11 +674,16 @@ class InferHandlerState {
       if (step_ != Steps::FINISH) {
         for (auto state : all_states_) {
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-          // Finished states are already cleaned.
-          if (state->step_ != Steps::FINISH) {
+          // There is no order guarantee on when the AsyncNotifyWhenDone
+          // event is placed on the completion queue vs when the actual
+          // state RPC is processed. Need to transition through two steps
+          // to preserve the lifetime of the state object.
+          if (state->step_ == Steps::PARTIAL_COMPLETION) {
+            state->step_ = Steps::COMPLETE;
+          } else {
             state->step_ = Steps::FINISH;
-            PutTaskBackToQueue(state);
           }
+          PutTaskBackToQueue(state);
         }
         step_ = Steps::FINISH;
         return true;
@@ -704,7 +691,7 @@ class InferHandlerState {
       return false;
     }
 
-    std::string DebugString(InferHandlerStateType* state)
+    const std::string DebugString(InferHandlerStateType* state)
     {
       std::string debug_string("");
       debug_string.append(
@@ -819,12 +806,25 @@ class InferHandlerState {
         }
       }
 
-      LOG_VERBOSE(1) << "Completing cancellation for " << name
-                     << ", rpc_ok=" << rpc_ok << ", context "
-                     << state->context_->unique_id_ << ", " << state->unique_id_
-                     << " step " << state->step_;
+      if (state->step_ != Steps::CANCELLATION_ISSUED) {
+        // The cancellation has not been issued hence the state can
+        // be released.
+        LOG_VERBOSE(1) << "Completing cancellation for " << name
+                       << ", rpc_ok=" << rpc_ok << ", context "
+                       << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_;
 
-      return false;
+        return false;
+      } else {
+        // Should wait for the ResponseComplete callbacks to be invoked.
+        LOG_VERBOSE(1)
+            << "Waiting for the callback to retrieve cancellation for " << name
+            << ", rpc_ok=" << rpc_ok << ", context "
+            << state->context_->unique_id_ << ", " << state->unique_id_
+            << " step " << state->step_;
+
+        return true;
+      }
     }
 
     // Enqueue 'state' so that its response is delivered in the

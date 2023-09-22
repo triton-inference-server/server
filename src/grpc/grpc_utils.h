@@ -38,6 +38,25 @@
 
 namespace triton { namespace server { namespace grpc {
 
+// The step of processing that the state is in. Every state must
+// recognize START, COMPLETE and FINISH and the others are optional.
+typedef enum {
+  START,
+  COMPLETE,
+  FINISH,
+  ISSUED,
+  READ,
+  WRITEREADY,
+  WRITTEN,
+  WAITING_NOTIFICATION,
+  CANCELLATION_ISSUED,
+  CANCELLED,
+  PARTIAL_COMPLETION
+} Steps;
+
+// Debugging helper
+std::ostream& operator<<(std::ostream& out, const Steps& step);
+
 //
 // GrpcStatusUtil
 //
