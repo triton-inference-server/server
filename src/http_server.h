@@ -317,10 +317,16 @@ class HTTPAPIServer : public HTTPServer {
       const std::string& action);
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
-  // OpenAI-compatible format
-  void HandleGenerate(evhtp_request_t* req);
+  // Text Generation / LLM format
+  void HandleGenerate(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
 
-  TRITONSERVER_Error* EVBufferToTritonRequest(
+  // Parses full evhtp request and its evbuffers into JSON.
+  TRITONSERVER_Error* EVRequestToJson(
+      evhtp_request_t* req, triton::common::TritonJson::Value* request_json);
+  // Parses evhtp request buffers into Triton Inference Request.
+  TRITONSERVER_Error* EVRequestToTritonRequest(
       evhtp_request_t* req, const std::string& model_name,
       TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
       InferRequestClass* infer_req, size_t header_length);

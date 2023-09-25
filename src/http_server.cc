@@ -108,6 +108,47 @@ AddContentTypeHeader(evhtp_request_t* req, const char* type)
       req->headers_out, evhtp_header_new(kContentTypeHeader, type, 1, 1));
 }
 
+
+TRITONSERVER_Error*
+SetTritonParameterFromJsonParameter(
+    const std::string& parameter,
+    triton::common::TritonJson::Value& params_json,
+    TRITONSERVER_InferenceRequest* irequest)
+{
+  triton::common::TritonJson::Value value;
+  if (!params_json.Find(parameter.c_str(), &value)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        ("parameter key '" + parameter + "' was not found in the JSON")
+            .c_str());
+  }
+
+  if (value.IsString()) {
+    std::string string_value;
+    RETURN_IF_ERR(value.AsString(&string_value));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
+        irequest, parameter.c_str(), string_value.c_str()));
+  } else if (value.IsInt()) {
+    int64_t int_value;
+    RETURN_IF_ERR(value.AsInt(&int_value));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
+        irequest, parameter.c_str(), int_value));
+  } else if (value.IsBool()) {
+    bool bool_value;
+    RETURN_IF_ERR(value.AsBool(&bool_value));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
+        irequest, parameter.c_str(), bool_value));
+  } else {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("parameter '" + parameter +
+         "' has invalid type. It should be either "
+         "'int', 'bool', or 'string'.")
+            .c_str());
+  }
+  return nullptr;  // success
+}
+
 }  // namespace
 
 TRITONSERVER_Error*
@@ -1009,7 +1050,7 @@ HTTPAPIServer::HTTPAPIServer(
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|generate|ready|config|stats|trace/setting))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
@@ -2636,6 +2677,7 @@ HTTPAPIServer::ParseJsonTritonIO(
   return nullptr;  // success
 }
 
+
 TRITONSERVER_Error*
 HTTPAPIServer::ParseJsonTritonParams(
     triton::common::TritonJson::Value& request_json,
@@ -2716,37 +2758,8 @@ HTTPAPIServer::ParseJsonTritonParams(
              "usage "
              "and should not be specified."));
       } else {
-        triton::common::TritonJson::Value value;
-        if (!params_json.Find(parameter.c_str(), &value)) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              ("parameter key '" + parameter + "' was not found in the JSON")
-                  .c_str());
-        }
-
-        if (value.IsString()) {
-          std::string string_value;
-          RETURN_IF_ERR(value.AsString(&string_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
-              irequest, parameter.c_str(), string_value.c_str()));
-        } else if (value.IsInt()) {
-          int64_t int_value;
-          RETURN_IF_ERR(value.AsInt(&int_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
-              irequest, parameter.c_str(), int_value));
-        } else if (value.IsBool()) {
-          bool bool_value;
-          RETURN_IF_ERR(value.AsBool(&bool_value));
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
-              irequest, parameter.c_str(), bool_value));
-        } else {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              ("parameter '" + parameter +
-               "' has invalid type. It should be either "
-               "'int', 'bool', or 'string'.")
-                  .c_str());
-        }
+        RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
+            parameter, params_json, irequest));
       }
     }
 
@@ -2977,7 +2990,7 @@ HTTPAPIServer::DecompressBuffer(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::EVBufferToTritonRequest(
+HTTPAPIServer::EVRequestToTritonRequest(
     evhtp_request_t* req, const std::string& model_name,
     TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
     InferRequestClass* infer_req, size_t header_length)
@@ -3093,7 +3106,7 @@ HTTPAPIServer::HandleInfer(
 
   // Parse EV buffer and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
-      EVBufferToTritonRequest(
+      EVRequestToTritonRequest(
           req, model_name, irequest, decompressed_buffer, infer_request.get(),
           header_length),
       error_callback);
@@ -3136,8 +3149,32 @@ HTTPAPIServer::HandleInfer(
   infer_request.release();
 }
 
+// TODO: Can refactor other non-inference routes to re-use this helper instead.
+TRITONSERVER_Error*
+HTTPAPIServer::EVRequestToJson(
+    evhtp_request_t* req, triton::common::TritonJson::Value* request_json_ptr)
+{
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "[POC] unexpected error getting request buffers");
+    }
+  }
+  size_t buffer_len = evbuffer_get_length(req->buffer_in);
+  RETURN_IF_ERR(EVBufferToJson(request_json_ptr, v, &v_idx, buffer_len, n));
+  return nullptr;  // success
+}
+
 void
-HTTPAPIServer::HandleGenerate(evhtp_request_t* req)
+HTTPAPIServer::HandleGenerate(
+    evhtp_request_t* req, const std::string& model_name,
+    const std::string& model_version_str)
 {
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -3150,36 +3187,75 @@ HTTPAPIServer::HandleGenerate(evhtp_request_t* req)
   // dispatch to different response handling accordingly.
   // standard evbuffer to JSON...
   triton::common::TritonJson::Value request;
-  {
-    struct evbuffer_iovec* v = nullptr;
-    int v_idx = 0;
-    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
-    if (n > 0) {
-      v = static_cast<struct evbuffer_iovec*>(
-          alloca(sizeof(struct evbuffer_iovec) * n));
-      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
-        RETURN_AND_RESPOND_IF_ERR(
-            req, TRITONSERVER_ErrorNew(
-                     TRITONSERVER_ERROR_INTERNAL,
-                     "[POC] unexpected error getting request buffers"));
+  RETURN_AND_RESPOND_IF_ERR(req, EVRequestToJson(req, &request));
+  // First find all top-level keys in JSON
+  std::vector<std::string> members;
+  RETURN_AND_RESPOND_IF_ERR(req, request.Members(&members));
+  LOG_INFO << "PARSING REQUEST JSON KEYS";
+  for (const auto& m : members) {
+    if (m == "prompt") {
+      std::string prompt;
+      RETURN_AND_RESPOND_IF_ERR(
+          req, request.MemberAsString(m.c_str(), &prompt));
+      LOG_INFO << "FOUND PROMPT: " << prompt;
+    } else if (m == "parameters") {
+      // (a) Get JSON from Find
+      triton::common::TritonJson::Value param_json;
+      request.Find(m.c_str(), &param_json);
+      // Use members/keys to iterate
+      std::vector<std::string> param_keys;
+      RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&param_keys));
+      LOG_INFO << "FOUND PARAMETERS";
+      for (const auto& pk : param_keys) {
+        LOG_INFO << "FOUND PARAMETER KEY: " << pk;
       }
+      // (b) Get JSON from MemberAsObject
+      triton::common::TritonJson::Value param_obj_json;
+      RETURN_AND_RESPOND_IF_ERR(
+          req, request.MemberAsObject(m.c_str(), &param_obj_json));
+      // Use members/keys to iterate
+      std::vector<std::string> param_obj_keys;
+      RETURN_AND_RESPOND_IF_ERR(req, param_obj_json.Members(&param_obj_keys));
+      LOG_INFO << "FOUND PARAMETERS";
+      for (const auto& pk : param_obj_keys) {
+        LOG_INFO << "FOUND PARAMETER KEY: " << pk;
+      }
+
+    } else {
+      LOG_INFO << "FOUND UNEXPECTED KEY: " << m;
     }
-    size_t buffer_len = evbuffer_get_length(req->buffer_in);
-    RETURN_AND_RESPOND_IF_ERR(
-        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
   }
-  // only look for 'stream' in this POC
-  triton::common::TritonJson::Value stream_json;
-  bool can_continue = request.Find("stream", &stream_json);
-  if (can_continue) {
-    RETURN_AND_RESPOND_IF_ERR(req, stream_json.AsBool(&can_continue));
+
+  // Only look for 'prompt' and 'parameters' in this POC
+  std::string prompt;
+  triton::common::TritonJson::Value prompt_json;
+  bool found = request.Find("prompt", &prompt_json);
+  if (found) {
+    RETURN_AND_RESPOND_IF_ERR(req, prompt_json.AsString(&prompt));
+    LOG_INFO << "[DEBUG] prompt: " << prompt;
+  } else {
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_BADREQ, "'prompt' not provided in request JSON.");
   }
-  if (!can_continue) {
-    RETURN_AND_RESPOND_IF_ERR(
-        req, TRITONSERVER_ErrorNew(
-                 TRITONSERVER_ERROR_INTERNAL,
-                 "[POC] expect 'stream: true' in request body"));
+
+  // Parse request body for parameters
+  triton::common::TritonJson::Value param_json;
+  if (request.Find("parameters", &param_json)) {
+    // Iterate over each member in 'param_json'
+    std::vector<std::string> members;
+    RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&members));
+    // TODO
+    for (const auto& m : members) {
+      const char* param_str = nullptr;
+      size_t param_len = 0;
+      RETURN_AND_RESPOND_IF_ERR(
+          req, param_json.MemberAsString(m.c_str(), &param_str, &param_len));
+      LOG_INFO << "[DEBUG] [parameters] param: " << param_str;
+    }
+  } else {
+    LOG_INFO << "[DEBUG] No parameters provided.";
   }
+
 
   // [skip] HTTP request -> Triton request -> inference
 
@@ -3673,8 +3749,9 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 
   // OpenAI-compatible frontend
   if (std::string(req->uri->path->full) == "/v2/completions") {
-    HandleGenerate(req);
-    return;
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_NOTIMPL,
+        "/completions not implemented yet. See /generate instead.");
   }
 
   if (std::string(req->uri->path->full) == "/v2/models/stats") {
@@ -3698,6 +3775,10 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     } else if (kind == "infer") {
       // model infer
       HandleInfer(req, model_name, version);
+      return;
+    } else if (kind == "generate") {
+      // text generation
+      HandleGenerate(req, model_name, version);
       return;
     } else if (kind == "config") {
       // model configuration
