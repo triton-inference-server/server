@@ -64,6 +64,26 @@ class TestScheduler(unittest.TestCase):
         self.assertIsInstance(response["error"], InferenceServerException)
         self.assertEqual(response["error"].status(), "StatusCode.CANCELLED")
 
+    def _generate_streaming_callback_and_response_pair(self):
+        response = []  # [{"result": result, "error": error}, ...]
+
+        def callback(result, error):
+            response.append({"result": result, "error": error})
+
+        return callback, response
+
+    def _assert_streaming_response_is_cancelled(self, response):
+        self.assertGreater(len(response), 0)
+        cancelled_count = 0
+        for res in response:
+            result, error = res["result"], res["error"]
+            if error:
+                self.assertEqual(result, None)
+                self.assertIsInstance(error, InferenceServerException)
+                if error.status() == "StatusCode.CANCELLED":
+                    cancelled_count += 1
+        self.assertEqual(cancelled_count, 1)
+
     # Test queued requests on dynamic batch scheduler can be cancelled
     def test_dynamic_batch_scheduler_request_cancellation(self):
         model_name = "dynamic_batch"
@@ -124,6 +144,7 @@ class TestScheduler(unittest.TestCase):
             # Cancelling any backlogged request cancels the entire sequence
             backlog_requests[0]["future"].cancel()
             time.sleep(2)  # ensure the cancellation is delivered
+            time.sleep(2)  # ensure reaper thread has responded
             self._assert_response_is_cancelled(backlog_requests[0]["response"])
             self._assert_response_is_cancelled(backlog_requests[1]["response"])
             # Join saturating thread
@@ -165,6 +186,7 @@ class TestScheduler(unittest.TestCase):
             # Cancelling any queued request cancels the entire sequence
             queue_requests[0]["future"].cancel()
             time.sleep(2)  # ensure the cancellation is delivered
+            time.sleep(2)  # ensure reaper thread has responded
             self._assert_response_is_cancelled(queue_requests[0]["response"])
             self._assert_response_is_cancelled(queue_requests[1]["response"])
             # Join start thread
@@ -182,6 +204,29 @@ class TestScheduler(unittest.TestCase):
         infer_future.cancel()
         time.sleep(2)  # ensure the cancellation is delivered
         self._assert_response_is_cancelled(response)
+
+    # Test cancellation on multiple gRPC streaming sequences
+    def test_scheduler_streaming_request_cancellation(self):
+        model_name = "sequence_oldest"
+        # Start 2 sequences with many requests
+        callback, response = self._generate_streaming_callback_and_response_pair()
+        self._triton.start_stream(callback)
+        for sequence_id in [1, 2]:
+            sequence_start = True
+            for request_id in range(16):
+                self._triton.async_stream_infer(
+                    model_name,
+                    self._get_inputs(batch_size=1),
+                    sequence_id=sequence_id,
+                    sequence_start=sequence_start,
+                )
+                sequence_start = False
+        time.sleep(2)  # ensure the requests are delivered
+        # Cancelling the stream cancels all requests on the stream
+        self._triton.stop_stream(cancel_requests=True)
+        time.sleep(2)  # ensure the cancellation is delivered
+        time.sleep(2)  # ensure reaper thread has responded
+        self._assert_streaming_response_is_cancelled(response)
 
 
 if __name__ == "__main__":
