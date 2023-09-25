@@ -299,7 +299,7 @@ python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONN
 chmod -R 777 $DYNASEQIMPLICITDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
-python3 $SRCDIR/gen_qa_ort_scalar_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$SCALARMODELSDESTDIR
+python3 $SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$SCALARMODELSDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
 EOF
 

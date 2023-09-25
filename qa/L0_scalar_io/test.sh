@@ -43,7 +43,7 @@ TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-rm -rf models/*
+rm -rf models
 mkdir models
 cp -r $DATADIR/scalar_models/* models/
 
@@ -84,7 +84,7 @@ if [ "$SERVER_PID" != "0" ]; then
 fi
 
 if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
