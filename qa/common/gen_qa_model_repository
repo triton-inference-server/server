@@ -154,6 +154,7 @@ cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
+cp ./gen_common.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
