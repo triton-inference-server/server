@@ -59,8 +59,6 @@ def np_to_onnx_dtype(np_dtype):
 
 
 def np_to_model_dtype(np_dtype):
-    import numpy as np
-
     if np_dtype == bool:
         return "TYPE_BOOL"
     elif np_dtype == np.int8:
