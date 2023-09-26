@@ -255,6 +255,10 @@ class HTTPAPIServer : public HTTPServer {
   virtual DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req);
   virtual DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req);
 
+
+  TRITONSERVER_Error* GetModelConfig(
+      const std::string& model_name, int64_t requested_model_version,
+      std::string* config_json);
   TRITONSERVER_Error* GetContentLength(
       evhtp_request_t* req, evbuffer* decompressed_buffer,
       int32_t* content_length);
@@ -318,7 +322,16 @@ class HTTPAPIServer : public HTTPServer {
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
 
-  TRITONSERVER_Error* EVBufferToTritonRequest(
+  // Text Generation / LLM format
+  void HandleGenerate(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
+
+  // Parses full evhtp request and its evbuffers into JSON.
+  TRITONSERVER_Error* EVRequestToJson(
+      evhtp_request_t* req, triton::common::TritonJson::Value* request_json);
+  // Parses evhtp request buffers into Triton Inference Request.
+  TRITONSERVER_Error* EVRequestToTritonRequest(
       evhtp_request_t* req, const std::string& model_name,
       TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
       InferRequestClass* infer_req, size_t header_length);
