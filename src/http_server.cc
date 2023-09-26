@@ -3078,11 +3078,6 @@ HTTPAPIServer::HandleGenerate(
       req,
       GetModelVersionFromString(model_version_str, &requested_model_version));
 
-  // If tracing is enabled see if this request should be traced.
-  TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
-
   std::string config_json_str = "";
   RETURN_AND_RESPOND_IF_ERR(
       req,
@@ -3127,7 +3122,8 @@ HTTPAPIServer::HandleGenerate(
   triton::common::TritonJson::Value triton_json(
       triton::common::TritonJson::ValueType::OBJECT);
 
-  // Parse Model Config for candidate input names/keys to compare and populate
+  // TODO: Parse Model Config for candidate input names/keys to compare and
+  // populate
   triton::common::TritonJson::Value config_json;
   RETURN_AND_RESPOND_IF_ERR(
       req, config_json.Parse(config_json_str.c_str(), config_json_str.size()));
