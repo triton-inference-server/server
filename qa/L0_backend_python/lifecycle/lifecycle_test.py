@@ -70,6 +70,7 @@ class LifecycleTest(tu.TestResultCollector):
             ("UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
             ("UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
             ("ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("CANCELLED", "[StatusCode.CANCELLED]"),
             ("(default)", "[StatusCode.INTERNAL] unrecognized"),
         ]
         with self._shm_leak_detector.Probe() as shm_probe:

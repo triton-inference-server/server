@@ -37,6 +37,7 @@ class TritonPythonModel:
             "UNAVAILABLE": pb_utils.TritonError.UNAVAILABLE,
             "UNSUPPORTED": pb_utils.TritonError.UNSUPPORTED,
             "ALREADY_EXISTS": pb_utils.TritonError.ALREADY_EXISTS,
+            "CANCELLED": pb_utils.TritonError.CANCELLED,
         }
 
         responses = []
