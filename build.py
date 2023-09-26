@@ -564,6 +564,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = fastertransformer_cmake_args()
     elif be == "tensorrt":
         args = tensorrt_cmake_args()
+    elif be == "tensorrtllm":
+        args = tensorrtllm_cmake_args()
     else:
         args = []
 
@@ -858,6 +860,20 @@ def fastertransformer_cmake_args():
     ]
     return cargs
 
+def tensorrtllm_cmake_args():
+    cargs = [
+        cmake_backend_arg(
+            "tensorrtllm", "TRT_LIB_DIR", None, "${TRT_ROOT}/targets/x86_64-linux-gnu/lib"
+        ),
+        cmake_backend_arg("tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TRITON_BUILD_CONTAINER_VERSION",
+            None,
+            FLAGS.container_version,
+        )
+    ]
+    return cargs
 
 def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == "":
@@ -1276,6 +1292,13 @@ RUN apt-get update && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \
+    rm -rf /var/lib/apt/lists/*
+"""
+    # Add dependencies needed for tensorrtllm backend
+    if "tensorrtllm" in backends:
+        df += """
+# python3, python3-pip and some pip installs required for the tensorrtllm backend
+RUN pip3 install https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/9.0.1/tars/polygraphy-0.48.1-py2.py3-none-any.whl && \
     rm -rf /var/lib/apt/lists/*
 """
 
@@ -1725,6 +1748,9 @@ def core_build(
     cmake_script.commentln(8)
     cmake_script.blankln()
 
+def tensorrtllm_prebuild(cmake_script):
+    # Update submodule
+    cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
 
 def backend_build(
     be,
@@ -1737,8 +1763,13 @@ def backend_build(
     components,
     library_paths,
 ):
-    repo_build_dir = os.path.join(build_dir, be, "build")
-    repo_install_dir = os.path.join(build_dir, be, "install")
+    
+    if be == "tensorrtllm":
+        repo_build_dir = os.path.join(build_dir, be, "inflight_batcher_llm", "build")
+        repo_install_dir = os.path.join(build_dir, be, "inflight_batcher_llm", "install")
+    else:
+        repo_build_dir = os.path.join(build_dir, be, "build")
+        repo_install_dir = os.path.join(build_dir, be, "install")
 
     cmake_script.commentln(8)
     cmake_script.comment(f"'{be}' backend")
@@ -1746,7 +1777,14 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    # FIXME: Use regular repo
+    if be == "tensorrtllm":
+        cmake_script.gitclone(backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish")
+    else:
+        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+
+    if be == "tensorrtllm":
+        tensorrtllm_prebuild(cmake_script)
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
