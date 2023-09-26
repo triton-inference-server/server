@@ -40,12 +40,13 @@ fi
 
 RET=0
 TEST_RESULT_FILE='test_results.txt'
+BACKENDS="onnx"
 export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 rm -rf models
 mkdir models
-cp -r $DATADIR/scalar_models/* models/
+cp -r $DATADIR/qa_scalar_models/* models/
 
 CLIENT_LOG="./client.log"
 SCALAR_TEST=scalar_test.py
