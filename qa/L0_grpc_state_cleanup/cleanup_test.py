@@ -312,7 +312,7 @@ class CleanUpTest(tu.TestResultCollector):
     ###
     def test_decoupled_infer(self):
         # Sanity test to check whether all the state objects
-        # are correclty released. Sends 10 requests in a single
+        # are correctly released. Sends 10 requests in a single
         # gRPC bidirectional stream and expects each of these
         # requests to generate 10 responses.
         self._decoupled_infer(request_count=10, repeat_count=10)
