@@ -1305,11 +1305,21 @@ RUN apt-get update && \
 """
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
-        df += """
-# Required for TRT-LLM python tests
-RUN pip3 install https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/9.0.1/tars/polygraphy-0.48.1-py2.py3-none-any.whl && \
-    rm -rf /var/lib/apt/lists/*
-"""
+        be = "tensorrtllm"
+        import importlib.util
+        import requests
+
+        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+            backends[be]
+        )
+
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader(
+            "trtllm_buildscript", loader=None, origin=url
+        )
+        trtllm_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, trtllm_buildscript.__dict__)
+        df += trtllm_buildscript.create_postbuild()
 
     df += """
 WORKDIR /opt/tritonserver
