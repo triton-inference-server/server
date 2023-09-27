@@ -1923,7 +1923,8 @@ def cibase_build(
             os.path.join(repo_install_dir, "lib", "libtritonrepoagent_relocation.so"),
             os.path.join(ci_dir, "lib"),
         )
-        cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
+        # FIXME: Uncomment this part when using the latest branch
+        # cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, "backends"))
