@@ -1714,13 +1714,14 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
+    # FIXME: Uncomment this part when using the latest branch
     # [FIXME] Placing the Triton server wheel file in 'python' for now, should
     # have been upload to pip registry and be able to install directly
-    cmake_script.mkdir(os.path.join(install_dir, "python"))
-    cmake_script.cp(
-        os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
-        os.path.join(install_dir, "python"),
-    )
+    # cmake_script.mkdir(os.path.join(install_dir, "python"))
+    # cmake_script.cp(
+    #     os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+    #     os.path.join(install_dir, "python"),
+    # )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
@@ -1803,6 +1804,11 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
+    
+    # FIXME: Align the backend name
+    if be == "tensorrtllm":
+        be = "inflight_batcher_llm"
+
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
         os.path.join(install_dir, "backends"),
