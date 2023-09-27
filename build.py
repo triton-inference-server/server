@@ -76,6 +76,7 @@ TRITON_VERSION_MAP = {
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version.
     ),
+    # FIXME: Remove this section after using the latest branch
     '2.36.0': (
         '23.07',  # triton container
         '23.07',  # upstream container
@@ -1305,7 +1306,7 @@ RUN apt-get update && \
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
         df += """
-# python3, python3-pip and some pip installs required for the tensorrtllm backend
+# Required for TRT-LLM python tests
 RUN pip3 install https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/9.0.1/tars/polygraphy-0.48.1-py2.py3-none-any.whl && \
     rm -rf /var/lib/apt/lists/*
 """
@@ -1758,7 +1759,7 @@ def core_build(
     cmake_script.blankln()
 
 def tensorrtllm_prebuild(cmake_script):
-    # Update submodule
+    # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
 
 def backend_build(
@@ -1786,7 +1787,7 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    # FIXME: Use regular repo
+    # FIXME: Use GitHub repo
     if be == "tensorrtllm":
         cmake_script.gitclone(backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish")
     else:
