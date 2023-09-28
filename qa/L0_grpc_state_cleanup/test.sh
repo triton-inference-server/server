@@ -64,8 +64,24 @@ function check_state_release() {
   return 0
 }
 
+rm -fr ./models/custom_zero_1_float32 && \
+        cp -r ../custom_models/custom_zero_1_float32 ./models/. && \
+        mkdir -p ./models/custom_zero_1_float32/1
 
-for i in test_decoupled_infer \
+(cd models/custom_zero_1_float32 && \
+    echo "parameters [" >> config.pbtxt && \
+    echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
+    echo "]" >> config.pbtxt)
+
+# FIXME: These two tests are failing the state cleanup.
+# test_streaming_timeout
+# test_streaming_cancellation
+for i in test_simple_infer \
+            test_simple_infer_cancellation \
+            test_simple_infer_timeout \
+            test_streaming_infer \
+            test_streaming_cancellation \
+            test_decoupled_infer \
             test_decoupled_cancellation \
             test_decoupled_timeout; do
   SERVER_LOG="./inference_server.$i.log"
@@ -93,14 +109,16 @@ for i in test_decoupled_infer \
   check_state_release $SERVER_LOG
   if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed\n***"
+    echo -e "\n***\n*** State Verification Failed for $i\n***"
       RET=1
   fi
   set -e
 done
 
 
-for i in test_decoupled_error_status; do
+for i in test_simple_infer_error_status \
+                test_streaming_error_status \
+                test_decoupled_error_status; do
   SERVER_LOG="./inference_server.$i.log"
   SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --grpc-restricted-protocol=inference,health:infer-key=infer-value"
   run_server
@@ -126,14 +144,16 @@ for i in test_decoupled_error_status; do
   check_state_release $SERVER_LOG
   if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed\n***"
+    echo -e "\n***\n*** State Verification Failed for $i\n***"
       RET=1
   fi
 
   set -e
 done
 
-for i in test_decoupled_infer_shutdownserver \
+for i in test_simple_infer_shutdownserver \
+         test_streaming_infer_shutdownserver \
+         test_decoupled_infer_shutdownserver \
          test_decoupled_infer_with_params_shutdownserver; do
   SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
   SERVER_LOG="./inference_server.$i.log"
@@ -159,7 +179,7 @@ for i in test_decoupled_infer_shutdownserver \
   check_state_release $SERVER_LOG
   if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed\n***"
+    echo -e "\n***\n*** State Verification Failed for $i\n***"
       RET=1
   fi
 

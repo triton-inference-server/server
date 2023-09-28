@@ -110,7 +110,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_string qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
     mkdir qa/L0_grpc_state_cleanup/models && \
-    cp -r /workspace/src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/repeat_int32 qa/L0_grpc_state_cleanup/models/ && \
+    mkdir -p qa/L0_backend_identity/models/identity_fp32/1 && \
     mkdir qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_dyna_sequence qa/L0_http/models && \
