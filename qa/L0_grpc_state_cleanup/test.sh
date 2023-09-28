@@ -73,13 +73,11 @@ rm -fr ./models/custom_zero_1_float32 && \
     echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
     echo "]" >> config.pbtxt)
 
-# FIXME: These two tests are failing the state cleanup.
-# test_streaming_timeout
-# test_streaming_cancellation
 for i in test_simple_infer \
             test_simple_infer_cancellation \
             test_simple_infer_timeout \
             test_streaming_infer \
+            test_streaming_timeout \
             test_streaming_cancellation \
             test_decoupled_infer \
             test_decoupled_cancellation \
