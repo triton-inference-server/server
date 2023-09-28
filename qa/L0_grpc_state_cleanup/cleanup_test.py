@@ -54,10 +54,11 @@ def callback(user_data, result, error):
     else:
         user_data._response_queue.put(result)
 
+
 # These state cleanup tests relies on the test.sh
 # to check whether all the created request objects
-# were properly deleted by the sever. 
-# The purpose on these unittest is to exercise 
+# were properly deleted by the sever.
+# The purpose on these unittest is to exercise
 # different portions of the gRPC frontend and
 # and track the state objects.
 class CleanUpTest(tu.TestResultCollector):
@@ -88,7 +89,9 @@ class CleanUpTest(tu.TestResultCollector):
         else:
             raise ValueError("Unspported kind specified to prepare inputs/outputs")
 
-    def _simple_infer(self, request_count,
+    def _simple_infer(
+        self,
+        request_count,
         cancel_response_idx=None,
         client_timeout_pair=None,
         kill_server=None,
@@ -97,7 +100,7 @@ class CleanUpTest(tu.TestResultCollector):
             url="localhost:8001", verbose=True
         ) as triton_client:
             self._prepare_inputs_and_outputs("simple")
-            
+
             input_data = np.array([[1.0]], dtype=np.float32)
             self.inputs_[0].set_data_from_numpy(input_data)
 
@@ -107,22 +110,24 @@ class CleanUpTest(tu.TestResultCollector):
             timeout_idx = None
             timeout_value = None
             if client_timeout_pair:
-                    timeout_idx, timeout_value = client_timeout_pair
+                timeout_idx, timeout_value = client_timeout_pair
             for i in range(request_count):
                 if kill_server == i:
                     os.kill(int(self.SERVER_PID), signal.SIGINT)
                 this_timeout = None
                 if timeout_idx == i:
                     this_timeout = timeout_value
-                futures.append(triton_client.async_infer(
-                    model_name=self.identity_model_name_,
-                    inputs=self.inputs_,
-                    request_id=str(i),
-                    callback=partial(callback, user_data),
-                    outputs=self.requested_outputs_,
-                    client_timeout=this_timeout,
-                ))
-            
+                futures.append(
+                    triton_client.async_infer(
+                        model_name=self.identity_model_name_,
+                        inputs=self.inputs_,
+                        request_id=str(i),
+                        callback=partial(callback, user_data),
+                        outputs=self.requested_outputs_,
+                        client_timeout=this_timeout,
+                    )
+                )
+
             if cancel_response_idx is not None:
                 futures[cancel_response_idx].cancel()
 
@@ -133,7 +138,7 @@ class CleanUpTest(tu.TestResultCollector):
                     raise data_item
                 else:
                     responses.append(data_item)
-            
+
             for response in responses:
                 output0_data = response.as_numpy("OUTPUT0")
                 self.assertTrue(np.array_equal(input_data, output0_data))
@@ -263,13 +268,13 @@ class CleanUpTest(tu.TestResultCollector):
                 recv_count += 1
 
     def _streaming_infer(
-            self,
-            request_count,
-            request_delay=0,
-            cancel_response_idx=None,
-            stream_timeout=None,
-            kill_server=None,
-            should_error=True,
+        self,
+        request_count,
+        request_delay=0,
+        cancel_response_idx=None,
+        stream_timeout=None,
+        kill_server=None,
+        should_error=True,
     ):
         self._prepare_inputs_and_outputs("streaming")
 
@@ -282,18 +287,18 @@ class CleanUpTest(tu.TestResultCollector):
         try:
             expected_count = request_count
             self._stream_infer(
-                    request_count,
-                    request_delay,
-                    expected_count,
-                    user_data,
-                    result_dict,
-                    cancel_response_idx=cancel_response_idx,
-                    stream_timeout=stream_timeout,
-                    kill_server=kill_server,
-                )
+                request_count,
+                request_delay,
+                expected_count,
+                user_data,
+                result_dict,
+                cancel_response_idx=cancel_response_idx,
+                stream_timeout=stream_timeout,
+                kill_server=kill_server,
+            )
         except Exception as ex:
             if cancel_response_idx or stream_timeout or should_error:
-                    raise ex
+                raise ex
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Validate the results..
@@ -395,7 +400,7 @@ class CleanUpTest(tu.TestResultCollector):
                         self.assertEqual(len(this_idx), 1)
                         self.assertEqual(this_idx[0], j)
                         expected_data += 1
-    
+
     ###
     ### Streaming Tests
     ###
@@ -403,26 +408,22 @@ class CleanUpTest(tu.TestResultCollector):
         # Thist test case sends 10 asynchronous requests and validates
         # the response.
         self._simple_infer(request_count=10)
-    
+
     def test_simple_infer_cancellation(self):
         # This test case is used to check whether all the states are
         # correctly released when one of the request is cancelled from
         # the client side.
         with self.assertRaises(InferenceServerException) as cm:
-            self._simple_infer(
-                request_count=10, cancel_response_idx=5
-            )
+            self._simple_infer(request_count=10, cancel_response_idx=5)
         self.assertIn("Locally cancelled by application!", str(cm.exception))
-    
+
     def test_simple_infer_timeout(self):
         # This test case is used to check whether all the states are
         # correctly released when the request gets timed-out on the client.
         with self.assertRaises(InferenceServerException) as cm:
-            self._simple_infer(
-                request_count=10, client_timeout_pair=[5, 0.1]
-            )
+            self._simple_infer(request_count=10, client_timeout_pair=[5, 0.1])
         self.assertIn("Deadline Exceeded", str(cm.exception))
-    
+
     def test_simple_infer_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
@@ -432,18 +433,14 @@ class CleanUpTest(tu.TestResultCollector):
             "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
             str(cm.exception),
         )
-    
+
     def test_simple_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
         # released when the server is interrupted to shutdown in middle of
         # inference run with final parameters being returned.
         with self.assertRaises(InferenceServerException) as cm:
-            self._simple_infer(
-                request_count=10,
-                kill_server=5
-            )
+            self._simple_infer(request_count=10, kill_server=5)
         self.assertIn("Request for unknown model", str(cm.exception))
-
 
     ###
     ### Streaming Tests
@@ -459,18 +456,14 @@ class CleanUpTest(tu.TestResultCollector):
         # correctly released when the stream is closed when fifth
         # response is received.
         with self.assertRaises(InferenceServerException) as cm:
-            self._streaming_infer(
-                request_count=10, cancel_response_idx=5
-            )
+            self._streaming_infer(request_count=10, cancel_response_idx=5)
         self.assertIn("Locally cancelled by application!", str(cm.exception))
 
     def test_streaming_timeout(self):
         # This test case is used to check whether all the states are
         # released when some of the requests timeouts.
         with self.assertRaises(InferenceServerException) as cm:
-            self._streaming_infer(
-                request_count=10, request_delay=1, stream_timeout=2
-            )
+            self._streaming_infer(request_count=10, request_delay=1, stream_timeout=2)
         self.assertIn("Deadline Exceeded", str(cm.exception))
 
     def test_streaming_error_status(self):
@@ -495,7 +488,6 @@ class CleanUpTest(tu.TestResultCollector):
                 should_error=True,
             )
         self.assertIn("Request for unknown model", str(cm.exception))
-
 
     ###
     ### Decoupled Streaming Tests
