@@ -1308,7 +1308,7 @@ RUN apt-get update && \
         be = "tensorrtllm"
         import importlib.util
         import requests
-
+        # FIXME: Update the url
         url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
         )
@@ -1784,12 +1784,8 @@ def backend_build(
     library_paths,
 ):
     
-    if be == "tensorrtllm":
-        repo_build_dir = os.path.join(build_dir, be, "inflight_batcher_llm", "build")
-        repo_install_dir = os.path.join(build_dir, be, "inflight_batcher_llm", "install")
-    else:
-        repo_build_dir = os.path.join(build_dir, be, "build")
-        repo_install_dir = os.path.join(build_dir, be, "install")
+    repo_build_dir = os.path.join(build_dir, be, "build")
+    repo_install_dir = os.path.join(build_dir, be, "install")
 
     cmake_script.commentln(8)
     cmake_script.comment(f"'{be}' backend")
@@ -1815,10 +1811,6 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-    
-    # FIXME: Align the backend name
-    if be == "tensorrtllm":
-        be = "inflight_batcher_llm"
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
