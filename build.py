@@ -574,7 +574,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == "tensorrt":
         args = tensorrt_cmake_args()
     elif be == "tensorrtllm":
-        args = tensorrtllm_cmake_args()
+        args = tensorrtllm_cmake_args(images)
     else:
         args = []
 
@@ -869,7 +869,7 @@ def fastertransformer_cmake_args():
     ]
     return cargs
 
-def tensorrtllm_cmake_args():
+def tensorrtllm_cmake_args(images):
     cargs = [
         cmake_backend_arg(
             "tensorrtllm", "TRT_LIB_DIR", None, "${TRT_ROOT}/targets/x86_64-linux-gnu/lib"
@@ -877,9 +877,9 @@ def tensorrtllm_cmake_args():
         cmake_backend_arg("tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"),
         cmake_backend_arg(
             "tensorrtllm",
-            "TRITON_BUILD_CONTAINER_VERSION",
+            "TRTLLM_BUILD_CONTAINER",
             None,
-            FLAGS.container_version,
+            images["base"],
         )
     ]
     return cargs
