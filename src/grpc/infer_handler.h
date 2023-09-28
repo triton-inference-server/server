@@ -713,7 +713,7 @@ class InferHandlerState {
     void InsertInflightState(
         InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       // The irequest_ptr_ will get populated when it is
       // marked as active which means the request has been
       // successfully enqueued to Triton core using
@@ -726,7 +726,7 @@ class InferHandlerState {
     // within the server core.
     void EraseInflightState(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       inflight_states_.erase(state);
     }
 
@@ -735,12 +735,13 @@ class InferHandlerState {
     void IssueRequestCancellation()
     {
       {
-        std::lock_guard<std::mutex> lock(mu_);
+        std::lock_guard<std::recursive_mutex> lock(mu_);
 
         // Issues the request cancellation to the core.
         for (auto state : inflight_states_) {
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-          if (state->step_ != Steps::CANCELLED) {
+          if (state->step_ != Steps::CANCELLED &&
+              state->step_ != Steps::COMPLETE) {
             LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
             if (state->irequest_ptr_ == nullptr) {
               // The context might be holding some states that have
@@ -759,6 +760,11 @@ class InferHandlerState {
                        << TRITONSERVER_ErrorMessage(err);
             }
             state->step_ = Steps::CANCELLATION_ISSUED;
+          } else if (state->step_ == Steps::COMPLETE) {
+            // The RPC is complete and no callback will be invoked to retrieve
+            // the object. Hence, need to explicitly place the state on the
+            // completion queue.
+            PutTaskBackToQueue(state);
           }
         }
       }
@@ -831,7 +837,7 @@ class InferHandlerState {
     // correct order.
     void EnqueueForResponse(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       states_.push(state);
     }
 
@@ -857,7 +863,7 @@ class InferHandlerState {
     // that it can be processed later
     void PutTaskBackToQueue(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       // FIXME: Is there a better way to put task on the
       // completion queue rather than using alarm object?
       // The alarm object will add a new task to the back of the
@@ -875,7 +881,7 @@ class InferHandlerState {
     InferHandlerStateType* WriteResponseIfReady(
         InferHandlerStateType* required_state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       if (states_.empty()) {
         return nullptr;
       }
@@ -906,7 +912,7 @@ class InferHandlerState {
     // return true. Other return false.
     bool PopCompletedResponse(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       if (states_.empty()) {
         return false;
       }
@@ -923,7 +929,7 @@ class InferHandlerState {
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       return (
           (step_ == Steps::WRITEREADY) && states_.empty() &&
           (ongoing_requests_ == 0));
@@ -946,7 +952,7 @@ class InferHandlerState {
     // active. Used by stream handlers to maintain request / response
     // orders. A state enters this queue when it has successfully read
     // a request and exits the queue when it is written.
-    std::mutex mu_;
+    std::recursive_mutex mu_;
     std::queue<InferHandlerStateType*> states_;
     std::atomic<uint32_t> ongoing_requests_;
 
