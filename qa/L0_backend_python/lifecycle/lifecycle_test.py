@@ -31,6 +31,7 @@ import sys
 sys.path.append("../../common")
 
 import queue
+import time
 import unittest
 from functools import partial
 
@@ -91,6 +92,42 @@ class LifecycleTest(tu.TestResultCollector):
                         str(e.exception),
                         expected_grpc_error_start + " error code: " + error,
                     )
+
+    def test_execute_cancel(self):
+        model_name = "execute_cancel"
+        log_path = "lifecycle_server.log"
+        execute_delay = 4.0  # seconds
+        shape = [1, 1]
+        response = {"responded": False, "result": None, "error": None}
+
+        def callback(result, error):
+            response["responded"] = True
+            response["result"] = result
+            response["error"] = error
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                input_data = np.array([[execute_delay]], dtype=np.float32)
+                inputs = [
+                    grpcclient.InferInput(
+                        "EXECUTE_DELAY", shape, np_to_triton_dtype(input_data.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                exec_future = client.async_infer(model_name, inputs, callback)
+                time.sleep(2)  # ensure the request is executing
+                self.assertFalse(response["responded"])
+                exec_future.cancel()
+                time.sleep(2)  # ensure the cancellation is delivered
+                self.assertTrue(response["responded"])
+
+        self.assertEqual(response["result"], None)
+        self.assertIsInstance(response["error"], InferenceServerException)
+        self.assertEqual(response["error"].status(), "StatusCode.CANCELLED")
+        with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
+            log_text = f.read()
+            self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
+            self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
