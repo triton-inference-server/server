@@ -258,6 +258,10 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
         qa/L0_decoupled/python_models/square_int32/.
 
+RUN mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1 && \
+    cp backends/repeat/libtriton_repeat.so \
+        qa/L0_grpc_state_cleanup/models/repeat_int32/1/.
+
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
         qa/L0_repoagent_checksum/models/identity_int32/1/.
