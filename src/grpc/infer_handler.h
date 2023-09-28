@@ -979,6 +979,10 @@ class InferHandlerState {
     bool received_notification_;
   };
 
+  // This constructor is used to build a wrapper state object
+  // pointing to the actual state object. The wrapper state
+  // object is used to distinguish a tag from AsyncNotifyWhenDone()
+  // signal.
   explicit InferHandlerState(Steps start_step, InferHandlerState* state)
       : step_(start_step), state_ptr_(state)
   {
@@ -1019,6 +1023,8 @@ class InferHandlerState {
     // Clear trace_timestamps_ here so they do not grow indefinitely since
     // states are re-used for performance.
     ClearTraceTimestamps();
+    // The pointer should be nullptr for all state objects instead of
+    // wrapper state object in WAITING_NOTIFICATION step.
     state_ptr_ = nullptr;
   }
 
@@ -1083,9 +1089,9 @@ class InferHandlerState {
   // requests.
   AllocPayload<ResponseType> alloc_payload_;
 
-  // The below pointer is only set when the state object is being
-  // fed to the completion queue using AsyncNotifyWhenDone function.
-  // Otherwise it is nullptr.
+  // The below pointer is only set when using this state object as a
+  // wrapper over actual state when being sent to completion queue
+  // using AsyncNotifyWhenDone function. Otherwise it is nullptr.
   InferHandlerState* state_ptr_;
 };
 

@@ -140,17 +140,14 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // This means that we only need to take care of
   // synchronizing this thread and the ResponseComplete
   // threads.
-  {
+  if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-    if (state->context_->ReceivedNotification()) {
-      if (state->IsGrpcContextCancelled()) {
-        bool resume =
-            state->context_->HandleCancellation(state, rpc_ok, Name());
-        return resume;
-      } else {
-        if (state->context_->HandleCompletion()) {
-          return true;
-        }
+    if (state->IsGrpcContextCancelled()) {
+      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+      return resume;
+    } else {
+      if (state->context_->HandleCompletion()) {
+        return true;
       }
     }
   }
