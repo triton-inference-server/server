@@ -508,3 +508,25 @@ remove_array_outliers() {
 
     arr=("${arr[@]:$start_index:$end_index}")
 }
+
+# Curl helpers:
+# 1. Assumes http return code is returned in "code" variable.
+# 2. Assumes output written to "curl.out"
+function assert_curl_success {
+  message="${1}"
+  if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+
+function assert_curl_failure {
+  message="${1}"
+  if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+

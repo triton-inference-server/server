@@ -81,24 +81,6 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
 RET=0
 
 # Helpers =======================================
-function assert_curl_success {
-  message="${1}"
-  if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
-    RET=1
-  fi
-}
-
-function assert_curl_failure {
-  message="${1}"
-  if [ "$code" != "400" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
-    RET=1
-  fi
-}
-
 function get_global_trace_setting {
   rm -f ./curl.out
   set +e

@@ -629,6 +629,66 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+### LLM REST API Endpoint Tests ###
+
+# Helper library to parse SSE events
+# https://github.com/mpetazzoni/sseclient
+pip install sseclient-py
+
+# Setup model repository
+rm -r ${MODELDIR}/*
+# TODO: Replace identity model with vllm model
+MODEL_NAME="onnx_zero_1_object"
+cp -r $DATADIR/qa_identity_model_repository/${MODEL_NAME} ${MODELDIR}/vllm
+
+SERVER_ARGS="-model-repository=${MODELDIR}"
+SERVER_LOG="./inference_server_llm_test.log"
+CLIENT_LOG="./llm_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+## Curl Tests
+# Test that direct curl infer request returns success, more detailed checking
+# will be done via python requests in unit tests.
+# TODO: Use /generate and /generate_stream routes instead.
+curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${MODEL_NAME}/infer -d '{"inputs": [{"name":"INPUT0","datatype":"BYTES","shape":[1,1],"data":["hello"]}]}'
+assert_curl_success "Unexpected infer failure"
+
+# TODO: /generate
+#curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${MODEL_NAME}/generate -d '{"prompt": "hello", "stream": false}'
+#assert_curl_success "Unexpected generate failure"
+
+curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${MODEL_NAME}/generate_stream -d '{"prompt": "hello", "stream": true}'
+assert_curl_success "Unexpected generate_stream failure"
+
+## Python Unit Tests
+TEST_RESULT_FILE='test_results_llm.txt'
+PYTHON_TEST=llm_test.py
+EXPECTED_NUM_TESTS=2
+set +e
+python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+###
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
