@@ -50,7 +50,7 @@ typedef enum {
   FINISH,
   // This stage means that RPC has been issued to Triton for inference
   // and is waiting for the server callbacks or cancellation to be
-  // invokded.
+  // invoked.
   ISSUED,
   // This stage means the request has been read from the network and
   // can be sent to Triton for execution.
