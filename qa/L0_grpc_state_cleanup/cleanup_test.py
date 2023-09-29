@@ -87,7 +87,7 @@ class CleanUpTest(tu.TestResultCollector):
             self.outputs_.append(grpcclient.InferRequestedOutput("OUTPUT0"))
             self.requested_outputs_ = self.outputs_
         else:
-            raise ValueError("Unspported kind specified to prepare inputs/outputs")
+            raise ValueError("Unsupported kind specified to prepare inputs/outputs")
 
     def _simple_infer(
         self,
@@ -405,7 +405,7 @@ class CleanUpTest(tu.TestResultCollector):
     ### Streaming Tests
     ###
     def test_simple_infer(self):
-        # Thist test case sends 10 asynchronous requests and validates
+        # This test case sends 10 asynchronous requests and validates
         # the response.
         self._simple_infer(request_count=10)
 
