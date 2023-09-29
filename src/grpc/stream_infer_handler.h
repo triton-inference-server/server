@@ -112,7 +112,7 @@ class ModelStreamInferHandler
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
-  void Finish(State* state);
+  bool Finish(State* state);
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;

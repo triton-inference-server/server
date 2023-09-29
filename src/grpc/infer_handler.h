@@ -627,7 +627,7 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false)
+          received_notification_(false), notify_state_(nullptr)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -642,6 +642,7 @@ class InferHandlerState {
     {
       InferHandlerStateType* wrapped_state =
           new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
+      notify_state_ = state;
       ctx_->AsyncNotifyWhenDone(wrapped_state);
     }
 
@@ -668,6 +669,8 @@ class InferHandlerState {
 
     // Adds the state object created on this context
     void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
+
+    InferHandlerStateType* GetNotifyState() { return notify_state_; }
 
     bool HandleCompletion()
     {
@@ -697,12 +700,15 @@ class InferHandlerState {
       debug_string.append(
           "Running state_id " + std::to_string(state->unique_id_) + "\n");
       debug_string.append(
-          "\tContext step " + std::to_string(state->context_->step_) + "\n");
+          "\tContext step " + std::to_string(state->context_->step_) + " id " +
+          std::to_string(state->context_->unique_id_) + "\n");
       for (auto new_state : all_states_) {
         debug_string.append(
             "\t\t State id " + std::to_string(new_state->unique_id_) +
             ": State step " + std::to_string(new_state->step_) + "\n");
       }
+      debug_string.append(
+          "\t\t Notify State id " + std::to_string(notify_state_->unique_id_));
 
       return debug_string;
     }
@@ -977,6 +983,9 @@ class InferHandlerState {
     // Tracks whether the async notification has been delivered by
     // completion queue.
     bool received_notification_;
+
+    // Tracks the state that has been registered to be notified.
+    InferHandlerStateType* notify_state_;
   };
 
   // This constructor is used to build a wrapper state object

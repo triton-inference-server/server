@@ -434,7 +434,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // The response for the request has been written completely.
       // The counter can be safely decremented.
       state->context_->DecrementRequestCounter();
-      Finish(state);
+      finished = Finish(state);
     }
   } else {
     //
@@ -463,7 +463,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // the state have completed.
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
-        Finish(state);
+        finished = Finish(state);
       } else {
         std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
@@ -494,7 +494,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // the state have completed.
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
-        Finish(state);
+        finished = Finish(state);
       } else {
         // GRPC doesn't allow to issue another write till
         // the notification from previous write has been
@@ -514,7 +514,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   return !finished;
 }
 
-void
+bool
 ModelStreamInferHandler::Finish(InferHandler::State* state)
 {
   // If done reading and no in-flight requests then can finish the
@@ -527,9 +527,14 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
         state);
+  } else if (state != state->context_->GetNotifyState()) {
+    state->step_ = Steps::FINISH;
+    return true;
   } else {
     state->step_ = Steps::COMPLETE;
   }
+
+  return false;
 }
 
 void
@@ -585,7 +590,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (state->complete_) {
       state->step_ = Steps::CANCELLED;
       state->context_->EraseInflightState(state);
-
       state->context_->PutTaskBackToQueue(state);
     }
 
