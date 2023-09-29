@@ -872,7 +872,7 @@ def fastertransformer_cmake_args():
 def tensorrtllm_cmake_args(images):
     cargs = [
         cmake_backend_arg(
-            "tensorrtllm", "TRT_LIB_DIR", None, "${TRT_ROOT}/targets/x86_64-linux-gnu/lib"
+            "tensorrtllm", "TRT_LIB_DIR", None, "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib"
         ),
         cmake_backend_arg("tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"),
         cmake_backend_arg(
@@ -1771,6 +1771,7 @@ def core_build(
 def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
+    cmake_script.cmd("export ARCH=$(uname -m)")
 
 def backend_build(
     be,
