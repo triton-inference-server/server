@@ -75,16 +75,7 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version.
-    ),
-    # FIXME: Remove this section after using the latest branch
-    '2.36.0': (
-        '23.07',  # triton container
-        '23.07',  # upstream container
-        '1.15.1',  # ORT
-        '2023.0.0',  # ORT OpenVINO
-        '2023.0.0',  # Standalone OpenVINO
-        '2.4.7',  # DCGM version
-        'py310_23.1.0-1')  # Conda version.
+    )
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -869,20 +860,27 @@ def fastertransformer_cmake_args():
     ]
     return cargs
 
+
 def tensorrtllm_cmake_args(images):
     cargs = [
         cmake_backend_arg(
-            "tensorrtllm", "TRT_LIB_DIR", None, "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib"
+            "tensorrtllm",
+            "TRT_LIB_DIR",
+            None,
+            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
         ),
-        cmake_backend_arg("tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"),
+        cmake_backend_arg(
+            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
+        ),
         cmake_backend_arg(
             "tensorrtllm",
             "TRTLLM_BUILD_CONTAINER",
             None,
             images["base"],
-        )
+        ),
     ]
     return cargs
+
 
 def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == "":
@@ -1307,7 +1305,9 @@ RUN apt-get update && \
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
         import importlib.util
+
         import requests
+
         # FIXME: Update the url
         url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
@@ -1725,14 +1725,13 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
-    # FIXME: Uncomment this part when using the latest branch
     # [FIXME] Placing the Triton server wheel file in 'python' for now, should
     # have been upload to pip registry and be able to install directly
-    # cmake_script.mkdir(os.path.join(install_dir, "python"))
-    # cmake_script.cp(
-    #     os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
-    #     os.path.join(install_dir, "python"),
-    # )
+    cmake_script.mkdir(os.path.join(install_dir, "python"))
+    cmake_script.cp(
+        os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+        os.path.join(install_dir, "python"),
+    )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
@@ -1768,10 +1767,12 @@ def core_build(
     cmake_script.commentln(8)
     cmake_script.blankln()
 
+
 def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
     cmake_script.cmd("export ARCH=$(uname -m)")
+
 
 def backend_build(
     be,
@@ -1784,7 +1785,6 @@ def backend_build(
     components,
     library_paths,
 ):
-    
     repo_build_dir = os.path.join(build_dir, be, "build")
     repo_install_dir = os.path.join(build_dir, be, "install")
 
@@ -1796,7 +1796,9 @@ def backend_build(
     cmake_script.cwd(build_dir)
     # FIXME: Use GitHub repo
     if be == "tensorrtllm":
-        cmake_script.gitclone(backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish")
+        cmake_script.gitclone(
+            backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish"
+        )
     else:
         cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
@@ -1926,8 +1928,7 @@ def cibase_build(
             os.path.join(repo_install_dir, "lib", "libtritonrepoagent_relocation.so"),
             os.path.join(ci_dir, "lib"),
         )
-        # FIXME: Uncomment this part when using the latest branch
-        # cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
+        cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, "backends"))
