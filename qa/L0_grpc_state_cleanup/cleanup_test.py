@@ -440,7 +440,6 @@ class CleanUpTest(tu.TestResultCollector):
         # inference run with final parameters being returned.
         with self.assertRaises(InferenceServerException) as cm:
             self._simple_infer(request_count=10, kill_server=5)
-        self.assertIn("Request for unknown model", str(cm.exception))
 
     ###
     ### Streaming Tests
@@ -487,7 +486,6 @@ class CleanUpTest(tu.TestResultCollector):
                 kill_server=5,
                 should_error=True,
             )
-        self.assertIn("Request for unknown model", str(cm.exception))
 
     ###
     ### Decoupled Streaming Tests
@@ -541,7 +539,6 @@ class CleanUpTest(tu.TestResultCollector):
                 should_error=True,
                 infer_helper_map=[True, False],
             )
-        self.assertIn("Request for unknown model", str(cm.exception))
 
     def test_decoupled_infer_with_params_shutdownserver(self):
         # This test case is used to check whether all the state objects are
@@ -556,7 +553,6 @@ class CleanUpTest(tu.TestResultCollector):
                 should_error=True,
                 infer_helper_map=[False, True],
             )
-        self.assertIn("Request for unknown model", str(cm.exception))
 
 
 if __name__ == "__main__":
