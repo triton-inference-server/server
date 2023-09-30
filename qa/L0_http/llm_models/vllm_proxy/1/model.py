@@ -52,7 +52,9 @@ class TritonPythonModel:
             if stream:
                 responses.append(
                     pb_utils.InferenceResponse(
-                        pb_utils.TritonError("STREAM only supported in decoupled mode")
+                        error=pb_utils.TritonError(
+                            "STREAM only supported in decoupled mode"
+                        )
                     )
                 )
             else:
