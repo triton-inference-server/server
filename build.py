@@ -2610,6 +2610,19 @@ if __name__ == "__main__":
 
         # Commands to build each backend...
         for be in backends:
+            script_name = be + "cmake_build"
+            if target_platform() == "windows":
+                script_name += ".ps1"
+
+            # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
+            pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
+            cmake_script = BuildScript(
+                os.path.join(FLAGS.build_dir, script_name),
+                verbose=FLAGS.verbose,
+                desc=("Build script for Triton Inference Server"),
+            ) 
+
+
             # Core backends are not built separately from core so skip...
             if be in CORE_BACKENDS:
                 continue
