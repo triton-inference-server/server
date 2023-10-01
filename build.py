@@ -2023,6 +2023,15 @@ def enable_all():
         if ep not in FLAGS.endpoint:
             FLAGS.endpoint += [ep]
 
+def split_cmake_script(script_name):
+    if target_platform() == "windows":
+        script_name += ".ps1"
+    return BuildScript(
+        os.path.join(FLAGS.build_dir, script_name),
+        verbose=FLAGS.verbose,
+        desc=("Build script for Triton Inference Server"),
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -2314,6 +2323,12 @@ if __name__ == "__main__":
         action="append",
         required=False,
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
+    )
+    parser.add_argument(
+        "--ci-split",
+        action="store_true",
+        required=False,
+        help="Requires to split CI build into multiple builds. Will generate cmake build script separatelly for each backend",
     )
 
     FLAGS = parser.parse_args()
@@ -2607,21 +2622,11 @@ if __name__ == "__main__":
                 components,
                 backends,
             )
-        # TODO: Move function above script ininitalization
-        #       Add flag to use split_cmake_script function
-        def split_cmake_script(script_name):
-            if target_platform() == "windows":
-                script_name += ".ps1"
-            return BuildScript(
-                os.path.join(FLAGS.build_dir, script_name),
-                verbose=FLAGS.verbose,
-                desc=("Build script for Triton Inference Server"),
-            )
         # Commands to build each backend...
         for be in backends:
-
             # Define fucntion to create cmake_script with backend name as suffix
-            cmake_script = split_cmake_script("cmake_build_backend_" + be)
+            if FLAGS.ci_split:
+                cmake_script = split_cmake_script("cmake_build_backend_" + be)
 
             # Core backends are not built separately from core so skip...
             if be in CORE_BACKENDS:
@@ -2647,7 +2652,8 @@ if __name__ == "__main__":
 
         # Commands to build each repo agent...
         for ra in repoagents:
-            cmake_script = split_cmake_script("cmake_build_agent_" + ra)
+            if FLAGS.ci_split:
+                cmake_script = split_cmake_script("cmake_build_agent_" + ra)
             repo_agent_build(
                 ra,
                 cmake_script,
@@ -2659,7 +2665,8 @@ if __name__ == "__main__":
 
         # Commands to build each cache...
         for cache in caches:
-            cmake_script = split_cmake_script("cmake_build_cache_" + cache)
+            if FLAGS.ci_split:
+                cmake_script = split_cmake_script("cmake_build_cache_" + cache)
             cache_build(
                 cache,
                 cmake_script,
