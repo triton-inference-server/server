@@ -453,8 +453,13 @@ ReadDataFromJsonHelper(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+          size_t cstr_len = __builtin_bswap64(len);
+#else
+          size_t cstr_len = len;
+#endif
           memcpy(
-              base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
+              base + *counter, reinterpret_cast<char*>(&cstr_len), sizeof(uint32_t));
           std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
           *counter += len + sizeof(uint32_t);
           break;
@@ -689,10 +694,16 @@ WriteDataToJson(
                   .c_str());
         }
 
-        const size_t len = *(reinterpret_cast<const uint32_t*>(cbase + offset));
+        const uint32_t len = *(reinterpret_cast< const uint32_t*>(cbase + offset));
+
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+        uint32_t str_len = __builtin_bswap32(len);
+#else
+        uint32_t str_len = len;
+#endif
         offset += sizeof(uint32_t);
 
-        if ((offset + len) > byte_size) {
+        if ((offset + str_len) > byte_size) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               std::string(
@@ -704,8 +715,8 @@ WriteDataToJson(
         // Can use stringref because 'base' buffer is not deleted
         // until response is deleted and that happens after this json
         // is serialized.
-        RETURN_IF_ERR(data_json->AppendStringRef(cbase + offset, len));
-        offset += len;
+        RETURN_IF_ERR(data_json->AppendStringRef(cbase + offset, str_len));
+        offset += str_len;
       }
       break;
     }
