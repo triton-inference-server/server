@@ -2607,7 +2607,8 @@ if __name__ == "__main__":
                 components,
                 backends,
             )
-
+        # TODO: Move function above script ininitalization
+        #       Add flag to use split_cmake_script function
         def split_cmake_script(script_name):
             if target_platform() == "windows":
                 script_name += ".ps1"
