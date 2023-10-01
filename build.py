@@ -2608,20 +2608,19 @@ if __name__ == "__main__":
                 backends,
             )
 
-        # Commands to build each backend...
-        for be in backends:
-            script_name = be + "cmake_build"
+        def split_cmake_script(script_name):
             if target_platform() == "windows":
                 script_name += ".ps1"
-
-            # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
-            pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
-            cmake_script = BuildScript(
+            return BuildScript(
                 os.path.join(FLAGS.build_dir, script_name),
                 verbose=FLAGS.verbose,
                 desc=("Build script for Triton Inference Server"),
-            ) 
+            )
+        # Commands to build each backend...
+        for be in backends:
 
+            # Define fucntion to create cmake_script with backend name as suffix
+            cmake_script = split_cmake_script("cmake_build_backend_" + be)
 
             # Core backends are not built separately from core so skip...
             if be in CORE_BACKENDS:
@@ -2647,6 +2646,7 @@ if __name__ == "__main__":
 
         # Commands to build each repo agent...
         for ra in repoagents:
+            cmake_script = split_cmake_script("cmake_build_agent_" + ra)
             repo_agent_build(
                 ra,
                 cmake_script,
@@ -2658,6 +2658,7 @@ if __name__ == "__main__":
 
         # Commands to build each cache...
         for cache in caches:
+            cmake_script = split_cmake_script("cmake_build_cache_" + cache)
             cache_build(
                 cache,
                 cmake_script,
