@@ -89,10 +89,19 @@ for BACKEND in $BACKENDS; do
     fi
 done
 
+cp -r $DATADIR/qa_variable_sequence_initial_state_implicit_model_repository/onnx_sequence_float32/ models/
+sed -i 's/dims: 1/dims: 5/g' models/onnx_sequence_float32/config.pbtxt
+sed -i 's/zero_data:.*/data_file:\ "INPUT_STATE_0"/g' models/onnx_sequence_float32/config.pbtxt
+mkdir -p models/onnx_sequence_float32/initial_state
+
+# It would generate the initial state data in a file named INPUT0
+python3 generate_initial_state_data.py
+mv INPUT0 models/onnx_sequence_float32/initial_state/INPUT_STATE_0
+
 CLIENT_LOG=`pwd`/client.log
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 IMPLICIT_STATE_CLIENT='implicit_state.py'
-EXPECTED_TEST_NUM=5
+EXPECTED_TEST_NUM=6
 rm -rf $CLIENT_LOG
 
 run_server
@@ -134,4 +143,3 @@ else
 fi
 
 exit $RET
-
