@@ -3063,7 +3063,8 @@ HTTPAPIServer::ForwardHeaders(
 void
 HTTPAPIServer::HandleGenerate(
     evhtp_request_t* req, const std::string& model_name,
-    const std::string& model_version_str)
+    const std::string& model_version_str,
+    bool streaming)
 {
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -3097,7 +3098,7 @@ HTTPAPIServer::HandleGenerate(
   std::unique_ptr<GenerateRequestClass> generate_request{
           new GenerateRequestClass(server_.get(), req, GetResponseCompressionType(req),
           generate_response_schema_.get(),
-          false /* server-sent events */, irequest)};
+          streaming /* server-sent events */, irequest)};
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
@@ -4250,7 +4251,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       return;
     } else if (kind == "generate") {
       // text generation
-      HandleGenerate(req, model_name, version);
+      HandleGenerate(req, model_name, version, false /* streaming */);
+      return;
+    } else if (kind == "generate_stream") {
+      // text generation (streaming)
+      HandleGenerate(req, model_name, version, true /* streaming */);
       return;
     } else if (kind == "config") {
       // model configuration

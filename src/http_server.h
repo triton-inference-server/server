@@ -419,7 +419,8 @@ class HTTPAPIServer : public HTTPServer {
   // Text Generation / LLM format
   void HandleGenerate(
       evhtp_request_t* req, const std::string& model_name,
-      const std::string& model_version_str);
+      const std::string& model_version_str,
+      bool streaming);
   TRITONSERVER_Error* ModelInputMetadata(const std::string& model_name, const int64_t model_version,
       std::map<std::string, triton::common::TritonJson::Value>* input_metadata);
 
