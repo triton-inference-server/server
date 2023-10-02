@@ -76,7 +76,7 @@ ARG BUILDTOOLS_VERSION
 ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
 # Use the latest release channel. For more control, specify the location of an internal layout.
-ARG CHANNEL_URL=https://aka.ms/vs/17/release/channel
+ARG CHANNEL_URL=https://aka.ms/vs/17/release.ltsc.17.6/channel
 ADD ${CHANNEL_URL} "C:\tmp\VisualStudio.chman"
 # Download the Build Tools bootstrapper.
 ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release.ltsc.17.6/vs_buildtools.exe
