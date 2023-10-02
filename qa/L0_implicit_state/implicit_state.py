@@ -185,6 +185,25 @@ class ImplicitStateTest(tu.TestResultCollector):
                 self.assertTrue(result.as_numpy("OUTPUT_STATE")[0], 1)
                 self.assertTrue(result.as_numpy("OUTPUT")[0], 1)
 
+    def test_initial_state(self):
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1, 5], "FP32"))
+        inputs[0].set_data_from_numpy(np.asarray([[1, 2, 3, 4, 5]], dtype=np.float32))
+
+        outputs = []
+        outputs.append(tritonhttpclient.InferRequestedOutput("OUTPUT"))
+
+        result = triton_client.infer(
+            model_name="onnx_sequence_float32",
+            inputs=inputs,
+            outputs=outputs,
+            sequence_id=1,
+            sequence_start=True,
+            sequence_end=True,
+        )
+        np.testing.assert_equal(result.as_numpy("OUTPUT"), [[2, 4, 6, 8, 10]])
+
 
 if __name__ == "__main__":
     unittest.main()
