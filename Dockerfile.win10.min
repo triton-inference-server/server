@@ -79,7 +79,7 @@ ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 ARG CHANNEL_URL=https://aka.ms/vs/17/release/channel
 ADD ${CHANNEL_URL} "C:\tmp\VisualStudio.chman"
 # Download the Build Tools bootstrapper.
-ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
+ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release.ltsc.17.6/vs_buildtools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
@@ -109,7 +109,7 @@ WORKDIR /
 #
 ARG CUDA_MAJOR=12
 ARG CUDA_MINOR=2
-ARG CUDA_PATCH=1
+ARG CUDA_PATCH=2
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -157,7 +157,7 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing cuDNN
 #
-ARG CUDNN_VERSION=8.9.5.27
+ARG CUDNN_VERSION=8.9.5.29
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 
