@@ -44,7 +44,7 @@ class HttpTest(tu.TestResultCollector):
         model_name = "vllm_proxy"
         # Setup text-based input
         text = "hello world"
-        inputs = {"PROMPT": [text], "STREAM": False}
+        inputs = {"PROMPT": text, "STREAM": False}
 
         url = self._get_infer_url(model_name, "generate")
         # stream=True used to indicate response can be iterated over
@@ -56,7 +56,7 @@ class HttpTest(tu.TestResultCollector):
         self.assertIn("application/json", r.headers["Content-Type"])
 
         data = r.json()
-        self.assertTrue("TEXT" in data)
+        self.assertIn("TEXT", data)
         self.assertEqual(text, data["TEXT"])
 
     def test_generate_stream(self):
@@ -85,8 +85,7 @@ class HttpTest(tu.TestResultCollector):
         for i, event in enumerate(client.events()):
             # Parse event data, join events into a single response
             data = json.loads(event.data)
-            print(f"Event {i}:", data)
-            self.assertTrue("TEXT" in data)
+            self.assertIn("TEXT", data)
             self.assertEqual(text, data["TEXT"])
             res_count += 1
         self.assertTrue(rep_count, res_count)
