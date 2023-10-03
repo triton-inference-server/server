@@ -422,7 +422,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::string& model_version_str,
       bool streaming);
   TRITONSERVER_Error* ModelInputMetadata(const std::string& model_name, const int64_t model_version,
-      std::map<std::string, triton::common::TritonJson::Value>* input_metadata);
+      std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
+      triton::common::TritonJson::Value* meta_data_root);
 
   // Parses full evhtp request and its evbuffers into JSON.
   TRITONSERVER_Error* EVRequestToJson(

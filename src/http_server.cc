@@ -3078,8 +3078,9 @@ HTTPAPIServer::HandleGenerate(
       GetModelVersionFromString(model_version_str, &requested_model_version));
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
-  RETURN_AND_RESPOND_IF_ERR(req, ModelInputMetadata(model_name, requested_model_version,
-      &input_metadata));
+  triton::common::TritonJson::Value meta_data_root;
+    RETURN_AND_RESPOND_IF_ERR(req, ModelInputMetadata(model_name, requested_model_version,
+      &input_metadata, &meta_data_root));
 
 
   // [FIXME] decompression should have been done here. before parsing request body
@@ -3121,9 +3122,10 @@ HTTPAPIServer::HandleGenerate(
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestDelete(irequest),
           "deleting HTTP/REST inference request");
-
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, error);
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
       evhtp_request_resume(req);
-      RETURN_AND_RESPOND_IF_ERR(req, error);
     }
   };
 
@@ -3168,13 +3170,13 @@ HTTPAPIServer::HandleGenerate(
   RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
   generate_request.release();
 }
-
+  
 TRITONSERVER_Error*
 HTTPAPIServer::ModelInputMetadata(
   const std::string& model_name, const int64_t model_version,
-  std::map<std::string, triton::common::TritonJson::Value>* input_metadata)
+  std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
+  triton::common::TritonJson::Value* metadata_root)
 {
-  triton::common::TritonJson::Value metadata_json;
   {
     if (model_name.empty()) {
       return TRITONSERVER_ErrorNew(
@@ -3184,22 +3186,22 @@ HTTPAPIServer::ModelInputMetadata(
 
     TRITONSERVER_Message* message = nullptr;
     RETURN_IF_ERR(TRITONSERVER_ServerModelMetadata(
-        server_.get(), model_name.c_str(), model_version, &message));
+      server_.get(), model_name.c_str(), model_version, &message));
     const char* buffer;
     size_t byte_size;
     TRITONSERVER_Error* err = nullptr;
     err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
     if (err == nullptr) {
-      RETURN_IF_ERR(metadata_json.Parse(buffer, byte_size));
+      RETURN_IF_ERR(metadata_root->Parse(buffer, byte_size));
     }
     if (message) {
-      TRITONSERVER_MessageDelete(message);
+  TRITONSERVER_MessageDelete(message);
     }
   }
-
+  
   // input
   triton::common::TritonJson::Value inputs;
-  RETURN_IF_ERR(metadata_json.MemberAsArray("inputs", &inputs));
+  RETURN_IF_ERR(metadata_root->MemberAsArray("inputs", &inputs));
   for (size_t i = 0; i < inputs.ArraySize(); ++i) {
     triton::common::TritonJson::Value input;
     RETURN_IF_ERR(inputs.At(i, &input));
