@@ -1047,7 +1047,7 @@ HTTPAPIServer::HTTPAPIServer(
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|generate|ready|config|stats|trace/setting))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|generate|generate_stream|ready|config|stats|trace/setting))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
