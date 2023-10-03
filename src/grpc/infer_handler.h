@@ -627,7 +627,7 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false), notify_state_(nullptr)
+          received_notification_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -642,7 +642,6 @@ class InferHandlerState {
     {
       InferHandlerStateType* wrapped_state =
           new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
-      notify_state_ = state;
       ctx_->AsyncNotifyWhenDone(wrapped_state);
     }
 
@@ -669,8 +668,6 @@ class InferHandlerState {
 
     // Adds the state object created on this context
     void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
-
-    InferHandlerStateType* GetNotifyState() { return notify_state_; }
 
     bool HandleCompletion()
     {
@@ -707,8 +704,6 @@ class InferHandlerState {
             "\t\t State id " + std::to_string(new_state->unique_id_) +
             ": State step " + std::to_string(new_state->step_) + "\n");
       }
-      debug_string.append(
-          "\t\t Notify State id " + std::to_string(notify_state_->unique_id_));
 
       return debug_string;
     }
@@ -983,9 +978,6 @@ class InferHandlerState {
     // Tracks whether the async notification has been delivered by
     // completion queue.
     bool received_notification_;
-
-    // Tracks the state that has been registered to be notified.
-    InferHandlerStateType* notify_state_;
   };
 
   // This constructor is used to build a wrapper state object
@@ -993,14 +985,15 @@ class InferHandlerState {
   // object is used to distinguish a tag from AsyncNotifyWhenDone()
   // signal.
   explicit InferHandlerState(Steps start_step, InferHandlerState* state)
-      : step_(start_step), state_ptr_(state)
+      : step_(start_step), state_ptr_(state), async_notify_state_(false)
   {
+    state->MarkAsAsyncNotifyState();
   }
 
   explicit InferHandlerState(
       TRITONSERVER_Server* tritonserver,
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
-      : tritonserver_(tritonserver)
+      : tritonserver_(tritonserver), async_notify_state_(false)
   {
     // For debugging and testing,
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
@@ -1035,6 +1028,7 @@ class InferHandlerState {
     // The pointer should be nullptr for all state objects instead of
     // wrapper state object in WAITING_NOTIFICATION step.
     state_ptr_ = nullptr;
+    async_notify_state_ = false;
   }
 
   void Release()
@@ -1060,6 +1054,9 @@ class InferHandlerState {
   // are delivered and successfully written on the
   // stream.
   bool IsComplete() { return (complete_ && response_queue_->IsEmpty()); }
+
+  void MarkAsAsyncNotifyState() { async_notify_state_ = true; }
+  bool IsAsyncNotifyState() { return async_notify_state_; }
 
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
@@ -1102,6 +1099,10 @@ class InferHandlerState {
   // wrapper over actual state when being sent to completion queue
   // using AsyncNotifyWhenDone function. Otherwise it is nullptr.
   InferHandlerState* state_ptr_;
+
+  // Tracks whether this state object has been wrapped and send to
+  // AsyncNotifyWhenDone() function as a tag.
+  bool async_notify_state_;
 };
 
 

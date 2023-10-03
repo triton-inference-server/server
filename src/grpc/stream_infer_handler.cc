@@ -518,7 +518,7 @@ bool
 ModelStreamInferHandler::Finish(InferHandler::State* state)
 {
   // If done reading and no in-flight requests then can finish the
-  // entire stream. Otherwise just finish this state.
+  // entire stream.
   if (state->context_->IsRequestsCompleted()) {
     state->context_->step_ = Steps::COMPLETE;
     state->step_ = Steps::PARTIAL_COMPLETION;
@@ -527,11 +527,15 @@ ModelStreamInferHandler::Finish(InferHandler::State* state)
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
         state);
-  } else if (state != state->context_->GetNotifyState()) {
+  } else if (state->IsAsyncNotifyState()) {
+    // Should only mark the state complete as the state has been sent
+    // to AsyncNotifyWhenDone() tag and the completion event should take
+    // care of finally releasing the state object.
+    state->step_ = Steps::COMPLETE;
+  } else {
+    // Can finish this state.
     state->step_ = Steps::FINISH;
     return true;
-  } else {
-    state->step_ = Steps::COMPLETE;
   }
 
   return false;
