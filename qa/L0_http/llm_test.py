@@ -40,20 +40,101 @@ class HttpTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name, route):
         return f"http://localhost:8000/v2/models/{model_name}/{route}"
 
-    def _simple_infer(self, model_name, inputs, expected_outputs):
-        headers = {"Content-Type": "application/json"}
-        url = self._get_infer_url(model_name, "infer")
-        r = requests.post(url, data=json.dumps(inputs), headers=headers)
+    # def _simple_infer(self, model_name, inputs, expected_outputs):
+    #     headers = {"Content-Type": "application/json"}
+    #     url = self._get_infer_url(model_name, "infer")
+    #     r = requests.post(url, data=json.dumps(inputs), headers=headers)
+    #     r.raise_for_status()
+
+    #     content = r.json()
+    #     print(content)
+
+    #     self.assertEqual(content["model_name"], model_name)
+    #     self.assertIn("outputs", content)
+    #     self.assertEqual(content["outputs"], expected_outputs)
+
+    # def _simple_generate_stream(self, model_name, inputs, expected_outputs):
+    #     import sseclient
+
+    #     headers = {"Accept": "text/event-stream"}
+    #     url = self._get_infer_url(model_name, "generate_stream")
+    #     # stream=True used to indicate response can be iterated over
+    #     r = requests.post(url, data=json.dumps(inputs), headers=headers, stream=True)
+
+    #     # Validate SSE format
+    #     print(r.headers)
+    #     self.assertIn("Content-Type", r.headers)
+    #     # FIXME: Clarify correct header here.
+    #     # self.assertEqual(r.headers['Content-Type'], 'text/event-stream')
+    #     self.assertEqual(r.headers["Content-Type"], "text/event-stream; charset=utf-8")
+
+    #     # SSE format (data: []) is hard to parse, use helper library for simplicity
+    #     client = sseclient.SSEClient(r)
+    #     tokens = []
+    #     for i, event in enumerate(client.events()):
+    #         # End of event stream
+    #         if event.data == "[DONE]":
+    #             continue
+
+    #         # Parse event data, join events into a single response
+    #         data = json.loads(event.data)
+    #         print(f"Event {i}:", data)
+    #         if "TEXT" not in data:
+    #             print("FIXME: EXPECTED OUTPUT FIELD NOT FOUND")
+    #         else:
+    #             tokens.append(data["TEXT"])
+    #     print("TOKENS:", tokens)
+
+    # def test_infer(self):
+    #     model_name = "onnx_zero_1_object"
+    #     parameters = {}
+
+    #     # Setup text-based input
+    #     input0_data = ["hello"]
+    #     input0 = {
+    #         "name": "INPUT0",
+    #         "datatype": "BYTES",
+    #         "shape": [1, 1],
+    #         "data": input0_data,
+    #     }
+    #     inputs = {"inputs": [input0], "parameters": parameters}
+    #     # Identity model, output should match input
+    #     expected_outputs = [
+    #         {
+    #             "name": "OUTPUT0",
+    #             "datatype": "BYTES",
+    #             "shape": [1, 1],
+    #             "data": input0_data,
+    #         }
+    #     ]
+    #     self._simple_infer(model_name, inputs, expected_outputs)
+
+    def test_generate(self):
+        model_name = "vllm_proxy"
+        # Setup text-based input
+        text = "hello world"
+        inputs = {"PROMPT": [text], "STREAM": False}
+
+        url = self._get_infer_url(model_name, "generate")
+        # stream=True used to indicate response can be iterated over
+        r = requests.post(url, data=json.dumps(inputs))
+
         r.raise_for_status()
 
-        content = r.json()
-        print(content)
+        self.assertIn("Content-Type", r.headers)
+        self.assertIn("application/json", r.headers["Content-Type"])
 
-        self.assertEqual(content["model_name"], model_name)
-        self.assertIn("outputs", content)
-        self.assertEqual(content["outputs"], expected_outputs)
+        data = r.json()
+        self.assertTrue("TEXT" in data)
+        self.assertEqual(text, data["TEXT"])
 
-    def _simple_generate_stream(self, model_name, inputs, expected_outputs):
+    def test_generate_stream(self):
+        model_name = "vllm_proxy"
+        # Setup text-based input
+        text = "hello world"
+        rep_count = 3
+        inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": rep_count}
+
         import sseclient
 
         headers = {"Accept": "text/event-stream"}
@@ -61,74 +142,23 @@ class HttpTest(tu.TestResultCollector):
         # stream=True used to indicate response can be iterated over
         r = requests.post(url, data=json.dumps(inputs), headers=headers, stream=True)
 
+        r.raise_for_status()
+
         # Validate SSE format
-        print(r.headers)
         self.assertIn("Content-Type", r.headers)
-        # FIXME: Clarify correct header here.
-        # self.assertEqual(r.headers['Content-Type'], 'text/event-stream')
-        self.assertEqual(r.headers["Content-Type"], "text/event-stream; charset=utf-8")
+        self.assertIn("text/event-stream", r.headers["Content-Type"])
 
         # SSE format (data: []) is hard to parse, use helper library for simplicity
         client = sseclient.SSEClient(r)
-        tokens = []
+        res_count = 0
         for i, event in enumerate(client.events()):
-            # End of event stream
-            if event.data == "[DONE]":
-                continue
-
             # Parse event data, join events into a single response
             data = json.loads(event.data)
             print(f"Event {i}:", data)
-            if "TEXT" not in data:
-                print("FIXME: EXPECTED OUTPUT FIELD NOT FOUND")
-            else:
-                tokens.append(data["TEXT"])
-        print("TOKENS:", tokens)
-
-    def test_infer(self):
-        model_name = "onnx_zero_1_object"
-        parameters = {}
-
-        # Setup text-based input
-        input0_data = ["hello"]
-        input0 = {
-            "name": "INPUT0",
-            "datatype": "BYTES",
-            "shape": [1, 1],
-            "data": input0_data,
-        }
-        inputs = {"inputs": [input0], "parameters": parameters}
-        # Identity model, output should match input
-        expected_outputs = [
-            {
-                "name": "OUTPUT0",
-                "datatype": "BYTES",
-                "shape": [1, 1],
-                "data": input0_data,
-            }
-        ]
-        self._simple_infer(model_name, inputs, expected_outputs)
-
-    # def test_generate(self):
-    #    pass
-
-    def test_generate_stream(self):
-        # TODO: vllm
-        model_name = "onnx_zero_1_object"
-        parameters = {}
-        # Setup text-based input
-        input0_data = ["hello"]
-        inputs = {"prompt": input0_data, "stream": True, "parameters": parameters}
-        # Identity model, output should match input
-        expected_outputs = [
-            {
-                "name": "OUTPUT0",
-                "datatype": "BYTES",
-                "shape": [1, 1],
-                "data": input0_data,
-            }
-        ]
-        self._simple_generate_stream(model_name, inputs, expected_outputs)
+            self.assertTrue("TEXT" in data)
+            self.assertEqual(text, data["TEXT"])
+            res_count += 1
+        self.assertTrue(rep_count, res_count)
 
 
 if __name__ == "__main__":

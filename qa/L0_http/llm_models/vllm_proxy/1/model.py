@@ -27,6 +27,7 @@
 import json
 
 import triton_python_backend_utils as pb_utils
+import numpy as np
 
 
 class TritonPythonModel:
@@ -46,6 +47,9 @@ class TritonPythonModel:
     def exec(self, requests):
         responses = []
         for request in requests:
+            params = json.loads(request.parameters())
+            rep_count = params["REPETITION"] if "REPETITION" in params else 1
+
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
             stream_np = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()
             stream = stream_np.flatten()[0]
@@ -58,12 +62,15 @@ class TritonPythonModel:
                     )
                 )
             else:
-                out_tensor = pb_utils.Tensor("TEXT", input_np)
+                out_tensor = pb_utils.Tensor("TEXT", np.repeat(input_np, rep_count, axis=1))
                 responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
     def exec_decoupled(self, requests):
         for request in requests:
+            params = json.loads(request.parameters())
+            rep_count = params["REPETITION"] if "REPETITION" in params else 1
+
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
             stream_np = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()
@@ -73,7 +80,7 @@ class TritonPythonModel:
             # FIXME: Could split up response string into tokens, but this is simpler for now.
             stream = stream_np.flatten()[0]
             if stream:
-                for _ in range(3):
+                for _ in range(rep_count):
                     sender.send(response)
                 sender.send(None, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
             # If stream disabled, just send one response
