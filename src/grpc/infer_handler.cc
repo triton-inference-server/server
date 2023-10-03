@@ -37,42 +37,6 @@ NextUniqueId()
 
 namespace triton { namespace server { namespace grpc {
 
-std::ostream&
-operator<<(std::ostream& out, const Steps& step)
-{
-  switch (step) {
-    case START:
-      out << "START";
-      break;
-    case COMPLETE:
-      out << "COMPLETE";
-      break;
-    case FINISH:
-      out << "FINISH";
-      break;
-    case ISSUED:
-      out << "ISSUED";
-      break;
-    case READ:
-      out << "READ";
-      break;
-    case WRITEREADY:
-      out << "WRITEREADY";
-      break;
-    case WRITTEN:
-      out << "WRITTEN";
-      break;
-    case CANCELLATION_ISSUED:
-      out << "CANCELLATION_ISSUED";
-      break;
-    case CANCELLED:
-      out << "CANCELLED";
-      break;
-  }
-
-  return out;
-}
-
 TRITONSERVER_Error*
 OutputBufferAttributesHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -785,6 +749,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #endif  // TRITON_ENABLE_TRACING
 
     state->step_ = Steps::FINISH;
+  } else if (state->step_ == Steps::FINISH) {
     finished = true;
   }
 

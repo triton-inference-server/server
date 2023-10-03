@@ -52,23 +52,6 @@ uint64_t NextUniqueId();
 
 namespace triton { namespace server { namespace grpc {
 
-// The step of processing that the state is in. Every state must
-// recognize START, COMPLETE and FINISH and the others are optional.
-typedef enum {
-  START,
-  COMPLETE,
-  FINISH,
-  ISSUED,
-  READ,
-  WRITEREADY,
-  WRITTEN,
-  CANCELLATION_ISSUED,
-  CANCELLED
-} Steps;
-
-// Debugging helper
-std::ostream& operator<<(std::ostream& out, const Steps& step);
-
 // Options used in InferHandler/StreamInferHandler states that are set from
 // request parameters
 struct StateParameters {
@@ -643,7 +626,8 @@ class InferHandlerState {
     explicit Context(
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
-          step_(Steps::START), finish_ok_(true), ongoing_write_(false)
+          step_(Steps::START), finish_ok_(true), ongoing_write_(false),
+          received_notification_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -656,10 +640,19 @@ class InferHandlerState {
 
     void GrpcContextAsyncNotifyWhenDone(InferHandlerStateType* state)
     {
-      ctx_->AsyncNotifyWhenDone(state);
+      InferHandlerStateType* wrapped_state =
+          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
+      ctx_->AsyncNotifyWhenDone(wrapped_state);
     }
 
-    bool IsCancelled() { return ctx_->IsCancelled(); }
+    void SetReceivedNotification(bool value) { received_notification_ = true; }
+
+    bool ReceivedNotification() { return received_notification_; }
+
+    bool IsCancelled()
+    {
+      return received_notification_ ? ctx_->IsCancelled() : false;
+    }
 
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
@@ -667,6 +660,53 @@ class InferHandlerState {
     // Decrements the ongoing request counter
     void DecrementRequestCounter() { ongoing_requests_--; }
 
+    // Adds the state object created on this context
+    void InsertState(InferHandlerStateType* state)
+    {
+      all_states_.insert(state);
+    }
+
+    // Adds the state object created on this context
+    void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
+
+    bool HandleCompletion()
+    {
+      if (step_ != Steps::FINISH) {
+        for (auto state : all_states_) {
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          // There is no order guarantee on when the AsyncNotifyWhenDone
+          // event is placed on the completion queue vs when the actual
+          // state RPC is processed. Need to transition through two steps
+          // to preserve the lifetime of the state object.
+          if (state->step_ == Steps::PARTIAL_COMPLETION) {
+            state->step_ = Steps::COMPLETE;
+          } else {
+            state->step_ = Steps::FINISH;
+          }
+          PutTaskBackToQueue(state);
+        }
+        step_ = Steps::FINISH;
+        return true;
+      }
+      return false;
+    }
+
+    const std::string DebugString(InferHandlerStateType* state)
+    {
+      std::string debug_string("");
+      debug_string.append(
+          "Running state_id " + std::to_string(state->unique_id_) + "\n");
+      debug_string.append(
+          "\tContext step " + std::to_string(state->context_->step_) + " id " +
+          std::to_string(state->context_->unique_id_) + "\n");
+      for (auto new_state : all_states_) {
+        debug_string.append(
+            "\t\t State id " + std::to_string(new_state->unique_id_) +
+            ": State step " + std::to_string(new_state->step_) + "\n");
+      }
+
+      return debug_string;
+    }
 
     // Inserts the state to a set tracking active requests
     // within the server core. Should only be called when
@@ -674,7 +714,7 @@ class InferHandlerState {
     void InsertInflightState(
         InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       // The irequest_ptr_ will get populated when it is
       // marked as active which means the request has been
       // successfully enqueued to Triton core using
@@ -687,7 +727,7 @@ class InferHandlerState {
     // within the server core.
     void EraseInflightState(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       inflight_states_.erase(state);
     }
 
@@ -696,12 +736,13 @@ class InferHandlerState {
     void IssueRequestCancellation()
     {
       {
-        std::lock_guard<std::mutex> lock(mu_);
+        std::lock_guard<std::recursive_mutex> lock(mu_);
 
         // Issues the request cancellation to the core.
         for (auto state : inflight_states_) {
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-          if (state->step_ != Steps::CANCELLED) {
+          if (state->step_ != Steps::CANCELLED &&
+              state->step_ != Steps::COMPLETE) {
             LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
             if (state->irequest_ptr_ == nullptr) {
               // The context might be holding some states that have
@@ -720,6 +761,11 @@ class InferHandlerState {
                        << TRITONSERVER_ErrorMessage(err);
             }
             state->step_ = Steps::CANCELLATION_ISSUED;
+          } else if (state->step_ == Steps::COMPLETE) {
+            // The RPC is complete and no callback will be invoked to retrieve
+            // the object. Hence, need to explicitly place the state on the
+            // completion queue.
+            PutTaskBackToQueue(state);
           }
         }
       }
@@ -767,19 +813,32 @@ class InferHandlerState {
         }
       }
 
-      LOG_VERBOSE(1) << "Completing cancellation for " << name
-                     << ", rpc_ok=" << rpc_ok << ", context "
-                     << state->context_->unique_id_ << ", " << state->unique_id_
-                     << " step " << state->step_;
+      if (state->step_ != Steps::CANCELLATION_ISSUED) {
+        // The cancellation has not been issued hence the state can
+        // be released.
+        LOG_VERBOSE(1) << "Completing cancellation for " << name
+                       << ", rpc_ok=" << rpc_ok << ", context "
+                       << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_;
 
-      return false;
+        return false;
+      } else {
+        // Should wait for the ResponseComplete callbacks to be invoked.
+        LOG_VERBOSE(1)
+            << "Waiting for the callback to retrieve cancellation for " << name
+            << ", rpc_ok=" << rpc_ok << ", context "
+            << state->context_->unique_id_ << ", " << state->unique_id_
+            << " step " << state->step_;
+
+        return true;
+      }
     }
 
     // Enqueue 'state' so that its response is delivered in the
     // correct order.
     void EnqueueForResponse(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       states_.push(state);
     }
 
@@ -805,7 +864,7 @@ class InferHandlerState {
     // that it can be processed later
     void PutTaskBackToQueue(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       // FIXME: Is there a better way to put task on the
       // completion queue rather than using alarm object?
       // The alarm object will add a new task to the back of the
@@ -823,7 +882,7 @@ class InferHandlerState {
     InferHandlerStateType* WriteResponseIfReady(
         InferHandlerStateType* required_state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       if (states_.empty()) {
         return nullptr;
       }
@@ -854,7 +913,7 @@ class InferHandlerState {
     // return true. Other return false.
     bool PopCompletedResponse(InferHandlerStateType* state)
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       if (states_.empty()) {
         return false;
       }
@@ -871,7 +930,7 @@ class InferHandlerState {
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       return (
           (step_ == Steps::WRITEREADY) && states_.empty() &&
           (ongoing_requests_ == 0));
@@ -894,7 +953,7 @@ class InferHandlerState {
     // active. Used by stream handlers to maintain request / response
     // orders. A state enters this queue when it has successfully read
     // a request and exits the queue when it is written.
-    std::mutex mu_;
+    std::recursive_mutex mu_;
     std::queue<InferHandlerStateType*> states_;
     std::atomic<uint32_t> ongoing_requests_;
 
@@ -902,6 +961,9 @@ class InferHandlerState {
     // context. We will use this structure to issue cancellations
     // on these requests.
     std::set<InferHandlerStateType*> inflight_states_;
+
+    // Tracks all the states that have been created on this context.
+    std::set<InferHandlerStateType*> all_states_;
 
     // The step of the entire context.
     Steps step_;
@@ -912,12 +974,26 @@ class InferHandlerState {
 
     // True if there is an ongoing write to the grpc stream
     std::atomic<bool> ongoing_write_;
+
+    // Tracks whether the async notification has been delivered by
+    // completion queue.
+    bool received_notification_;
   };
+
+  // This constructor is used to build a wrapper state object
+  // pointing to the actual state object. The wrapper state
+  // object is used to distinguish a tag from AsyncNotifyWhenDone()
+  // signal.
+  explicit InferHandlerState(Steps start_step, InferHandlerState* state)
+      : step_(start_step), state_ptr_(state), async_notify_state_(false)
+  {
+    state->MarkAsAsyncNotifyState();
+  }
 
   explicit InferHandlerState(
       TRITONSERVER_Server* tritonserver,
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
-      : tritonserver_(tritonserver)
+      : tritonserver_(tritonserver), async_notify_state_(false)
   {
     // For debugging and testing,
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
@@ -949,6 +1025,10 @@ class InferHandlerState {
     // Clear trace_timestamps_ here so they do not grow indefinitely since
     // states are re-used for performance.
     ClearTraceTimestamps();
+    // The pointer should be nullptr for all state objects instead of
+    // wrapper state object in WAITING_NOTIFICATION step.
+    state_ptr_ = nullptr;
+    async_notify_state_ = false;
   }
 
   void Release()
@@ -974,6 +1054,9 @@ class InferHandlerState {
   // are delivered and successfully written on the
   // stream.
   bool IsComplete() { return (complete_ && response_queue_->IsEmpty()); }
+
+  void MarkAsAsyncNotifyState() { async_notify_state_ = true; }
+  bool IsAsyncNotifyState() { return async_notify_state_; }
 
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
@@ -1011,6 +1094,15 @@ class InferHandlerState {
   // For inference requests the allocator payload, unused for other
   // requests.
   AllocPayload<ResponseType> alloc_payload_;
+
+  // The below pointer is only set when using this state object as a
+  // wrapper over actual state when being sent to completion queue
+  // using AsyncNotifyWhenDone function. Otherwise it is nullptr.
+  InferHandlerState* state_ptr_;
+
+  // Tracks whether this state object has been wrapped and send to
+  // AsyncNotifyWhenDone() function as a tag.
+  bool async_notify_state_;
 };
 
 
@@ -1066,15 +1158,23 @@ class InferHandler : public HandlerBase {
       state = new State(tritonserver, context, start_step);
     }
 
-    // Need to be called to receive an asynchronous notification
-    // when the transaction is cancelled.
-    context->GrpcContextAsyncNotifyWhenDone(state);
+    if (start_step == Steps::START) {
+      // Need to be called to receive an asynchronous notification
+      // when the transaction is cancelled.
+      context->GrpcContextAsyncNotifyWhenDone(state);
+    }
+    context->InsertState(state);
+
+    LOG_VERBOSE(2) << "StateNew, " << state->unique_id_ << " Step "
+                   << state->step_;
 
     return state;
   }
 
   void StateRelease(State* state)
   {
+    LOG_VERBOSE(2) << "StateRelease, " << state->unique_id_ << " Step "
+                   << state->step_;
     if (max_state_bucket_count_ > 0) {
       std::lock_guard<std::mutex> lock(alloc_mu_);
 
@@ -1168,9 +1268,23 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
+      if (state->step_ == Steps::WAITING_NOTIFICATION) {
+        State* state_wrapper = state;
+        state = state_wrapper->state_ptr_;
+        state->context_->SetReceivedNotification(true);
+        LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
+                       << state->unique_id_;
+        delete state_wrapper;
+      }
+      LOG_VERBOSE(2) << "Grpc::CQ::Next() "
+                     << state->context_->DebugString(state);
       if (!Process(state, ok)) {
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+        state->context_->EraseState(state);
         StateRelease(state);
+      } else {
+        LOG_VERBOSE(2) << "Returning from " << Name() << ", "
+                       << state->unique_id_ << ", " << state->step_;
       }
     }
   }));

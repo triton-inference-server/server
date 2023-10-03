@@ -140,11 +140,15 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // This means that we only need to take care of
   // synchronizing this thread and the ResponseComplete
   // threads.
-  {
+  if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
       bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
       return resume;
+    } else {
+      if (state->context_->HandleCompletion()) {
+        return true;
+      }
     }
   }
 
@@ -177,7 +181,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     } else {
       // Precondition is not satisfied, cancel the stream
       state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
+      state->step_ = Steps::PARTIAL_COMPLETION;
       ::grpc::Status status = ::grpc::Status(
           ::grpc::StatusCode::UNAVAILABLE,
           std::string("This protocol is restricted, expecting header '") +
@@ -200,7 +204,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::WRITEREADY;
       if (state->context_->IsRequestsCompleted()) {
         state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::COMPLETE;
+        state->step_ = Steps::PARTIAL_COMPLETION;
+        LOG_VERBOSE(2) << "Finishing responder from state "
+                       << state->unique_id_;
         state->context_->responder_->Finish(
             state->context_->finish_ok_ ? ::grpc::Status::OK
                                         : ::grpc::Status::CANCELLED,
@@ -370,9 +376,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
-
+  } else if (state->step_ == Steps::PARTIAL_COMPLETION) {
+    state->step_ = Steps::COMPLETE;
   } else if (state->step_ == Steps::COMPLETE) {
     state->step_ = Steps::FINISH;
+  } else if (state->step_ == Steps::FINISH) {
+    // The RPC execution is finished hence the state
+    // can be released.
     finished = true;
   } else if (!state->is_decoupled_) {
     // We handle the WRITTEN and WRITEREADY states little
@@ -425,10 +435,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // The counter can be safely decremented.
       state->context_->DecrementRequestCounter();
       finished = Finish(state);
-
-    } else if (state->step_ == Steps::COMPLETE) {
-      state->step_ = Steps::FINISH;
-      finished = true;
     }
   } else {
     //
@@ -512,15 +518,22 @@ bool
 ModelStreamInferHandler::Finish(InferHandler::State* state)
 {
   // If done reading and no in-flight requests then can finish the
-  // entire stream. Otherwise just finish this state.
+  // entire stream.
   if (state->context_->IsRequestsCompleted()) {
     state->context_->step_ = Steps::COMPLETE;
-    state->step_ = Steps::COMPLETE;
+    state->step_ = Steps::PARTIAL_COMPLETION;
+    LOG_VERBOSE(2) << "Finishing responder from state " << state->unique_id_;
     state->context_->responder_->Finish(
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
         state);
+  } else if (state->IsAsyncNotifyState()) {
+    // Should only mark the state complete as the state has been sent
+    // to AsyncNotifyWhenDone() tag and the completion event should take
+    // care of finally releasing the state object.
+    state->step_ = Steps::COMPLETE;
   } else {
+    // Can finish this state.
     state->step_ = Steps::FINISH;
     return true;
   }
@@ -581,7 +594,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (state->complete_) {
       state->step_ = Steps::CANCELLED;
       state->context_->EraseInflightState(state);
-
       state->context_->PutTaskBackToQueue(state);
     }
 
