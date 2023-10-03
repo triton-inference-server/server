@@ -257,11 +257,12 @@ class HTTPAPIServer : public HTTPServer {
     explicit GenerateRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
-        MappingSchema* response_schema, bool server_sent_events,
+        const MappingSchema* request_schema,
+        const MappingSchema* response_schema, bool server_sent_events,
         TRITONSERVER_InferenceRequest* triton_request)
         : InferRequestClass(server, req, response_compression_type),
-          response_schema_(response_schema), sse_(server_sent_events),
-          triton_request_(triton_request)
+          request_schema_(request_schema), response_schema_(response_schema),
+          sse_(server_sent_events), triton_request_(triton_request)
     {
     }
     virtual ~GenerateRequestClass() = default;
@@ -284,6 +285,9 @@ class HTTPAPIServer : public HTTPServer {
             input_metadata,
         const MappingSchema* schema,
         triton::common::TritonJson::Value& generate_request);
+
+    const MappingSchema* RequestSchema() { return request_schema_; }
+    const MappingSchema* ResponseSchema() { return response_schema_; }
 
    private:
     struct TritonOutput {
@@ -312,7 +316,8 @@ class HTTPAPIServer : public HTTPServer {
         triton::common::TritonJson::Value* generate_response,
         std::set<std::string>* mapped_outputs);
 
-    MappingSchema* response_schema_{nullptr};
+    const MappingSchema* request_schema_{nullptr};
+    const MappingSchema* response_schema_{nullptr};
     const bool sse_{false};
     // Pointer to associated Triton request, this class does not own the
     // request and must not reference it after a successful
@@ -418,9 +423,16 @@ class HTTPAPIServer : public HTTPServer {
   void HandleLogging(evhtp_request_t* req);
 
   // Text Generation / LLM format
+  //'streaming' selects the schema pair to convert request / response.
+  // 'streaming' also controls the response convention, if true,
+  // Server-Sent Events format will be used to send responses.
   void HandleGenerate(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str, bool streaming);
+
+  // 'meta_data_root' is the root JSON document for 'input_metadata'.
+  // In TritonJson, the Value objects are references to the root document.
+  // Therefore the document must stay valid.
   TRITONSERVER_Error* ModelInputMetadata(
       const std::string& model_name, const int64_t model_version,
       std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
@@ -480,7 +492,7 @@ class HTTPAPIServer : public HTTPServer {
   re2::RE2 cudasharedmemory_regex_;
   re2::RE2 trace_regex_;
 
-  // [TODO] currently always perform basic conversion
+  // [DLIS-5551] currently always perform basic conversion
   std::unique_ptr<MappingSchema> generate_request_schema_{new MappingSchema()};
   std::unique_ptr<MappingSchema> generate_response_schema_{new MappingSchema()};
   std::unique_ptr<MappingSchema> generate_stream_response_schema_{

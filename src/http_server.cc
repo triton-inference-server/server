@@ -3098,16 +3098,24 @@ HTTPAPIServer::HandleGenerate(
 
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
-  std::unique_ptr<GenerateRequestClass> generate_request{
-      new GenerateRequestClass(
-          server_.get(), req, GetResponseCompressionType(req),
-          generate_response_schema_.get(), streaming /* server-sent events */,
-          irequest)};
+  std::unique_ptr<GenerateRequestClass> generate_request;
+  if (streaming) {
+    generate_request.reset(new GenerateRequestClass(
+        server_.get(), req, GetResponseCompressionType(req),
+        generate_stream_request_schema_.get(),
+        generate_stream_response_schema_.get(),
+        streaming /* server-sent events */, irequest));
+  } else {
+    generate_request.reset(new GenerateRequestClass(
+        server_.get(), req, GetResponseCompressionType(req),
+        generate_request_schema_.get(), generate_response_schema_.get(),
+        streaming /* server-sent events */, irequest));
+  }
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
-  // by reference to capture local updates, except for shared pointers which
-  // should be captured by value in case of ref count issues.
+  // by reference to capture local updates. The callback does not own the
+  // error object.
   auto error_callback = [&](TRITONSERVER_Error* error) {
     if (error != nullptr) {
       // Get request ID for logging in case of error.
@@ -3152,7 +3160,7 @@ HTTPAPIServer::HandleGenerate(
 
   RETURN_AND_CALLBACK_IF_ERR(
       generate_request->ConvertGenerateRequest(
-          input_metadata, generate_request_schema_.get(), request),
+          input_metadata, generate_request->RequestSchema(), request),
       error_callback);
 
   // [FIXME] decompression..
@@ -3168,9 +3176,9 @@ HTTPAPIServer::HandleGenerate(
           reinterpret_cast<void*>(generate_request.get())),
       error_callback);
 
-  auto err = TRITONSERVER_ServerInferAsync(server_.get(), irequest, nullptr);
-
-  RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
+  RETURN_AND_CALLBACK_IF_ERR(
+      TRITONSERVER_ServerInferAsync(server_.get(), irequest, nullptr),
+      error_callback);
   generate_request.release();
 }
 
@@ -3279,8 +3287,14 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     // Perform shape validation, assume the value must be either
     // primitive type or 1-D array.
     triton::common::TritonJson::Value tensor_data;
-    // [FIXME] check return value
-    generate_request.Find(name.c_str(), &tensor_data);
+    if (!generate_request.Find(name.c_str(), &tensor_data)) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("unexpected key not found in generate request, "
+                       "expecting key '") +
+           name + "'")
+              .c_str());
+    }
 
     auto assert_err =
         tensor_data.AssertType(triton::common::TritonJson::ValueType::ARRAY);
@@ -3297,26 +3311,35 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     std::vector<int64_t> shape_vec;
     {
       triton::common::TritonJson::Value value;
-      it->second.Find("shape", &value);
+      if (!it->second.Find("shape", &value)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "unexpected 'shape' not found in model metadata");
+      }
       for (size_t i = 0; i < value.ArraySize(); ++i) {
         int64_t d = 0;
         RETURN_IF_ERR(value.IndexAsInt(i, &d));
         shape_vec.push_back(d);
       }
-      // Pad the request value to match input shape.
-      // Set most inner dynamic shape to the element count, other dynamic shape
-      // to be 1.
+      // Because generate request don't carry too much shape information, using
+      // a two-pass process to pad the request value to match input shape.
+      // 1. iterate shape for fixed dimension to distribute 'element_cnt'.
+      // 2. Set most inner dynamic shape to the remaining element count,
+      //    other dynamic shape to be 1.
       for (auto rit = shape_vec.rbegin(); rit != shape_vec.rend(); ++rit) {
-        if (*rit == -1) {
-          *rit = element_cnt;
-          element_cnt = 1;
-        } else {
+        if (*rit != -1) {
           if (element_cnt % *rit) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
                 "The schema can not convert input to tensor with proper shape");
           }
           element_cnt /= *rit;
+        }
+      }
+      for (auto rit = shape_vec.rbegin(); rit != shape_vec.rend(); ++rit) {
+        if (*rit == -1) {
+          *rit = element_cnt;
+          element_cnt = 1;
         }
       }
       if (element_cnt != 1) {
