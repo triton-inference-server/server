@@ -3063,8 +3063,7 @@ HTTPAPIServer::ForwardHeaders(
 void
 HTTPAPIServer::HandleGenerate(
     evhtp_request_t* req, const std::string& model_name,
-    const std::string& model_version_str,
-    bool streaming)
+    const std::string& model_version_str, bool streaming)
 {
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -3079,11 +3078,14 @@ HTTPAPIServer::HandleGenerate(
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
-    RETURN_AND_RESPOND_IF_ERR(req, ModelInputMetadata(model_name, requested_model_version,
-      &input_metadata, &meta_data_root));
+  RETURN_AND_RESPOND_IF_ERR(
+      req, ModelInputMetadata(
+               model_name, requested_model_version, &input_metadata,
+               &meta_data_root));
 
 
-  // [FIXME] decompression should have been done here. before parsing request body
+  // [FIXME] decompression should have been done here. before parsing request
+  // body
 
   // Create the inference request object which provides all information needed
   // for an inference. Make sure it is cleaned up on early error.
@@ -3097,9 +3099,10 @@ HTTPAPIServer::HandleGenerate(
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   std::unique_ptr<GenerateRequestClass> generate_request{
-          new GenerateRequestClass(server_.get(), req, GetResponseCompressionType(req),
-          generate_response_schema_.get(),
-          streaming /* server-sent events */, irequest)};
+      new GenerateRequestClass(
+          server_.get(), req, GetResponseCompressionType(req),
+          generate_response_schema_.get(), streaming /* server-sent events */,
+          irequest)};
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
@@ -3147,14 +3150,15 @@ HTTPAPIServer::HandleGenerate(
   triton::common::TritonJson::Value request;
   RETURN_AND_CALLBACK_IF_ERR(EVRequestToJson(req, &request), error_callback);
 
-  RETURN_AND_CALLBACK_IF_ERR(generate_request->ConvertGenerateRequest(
-    input_metadata, generate_request_schema_.get(), request), error_callback);
+  RETURN_AND_CALLBACK_IF_ERR(
+      generate_request->ConvertGenerateRequest(
+          input_metadata, generate_request_schema_.get(), request),
+      error_callback);
 
   // [FIXME] decompression..
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestClass::InferRequestComplete,
-          nullptr),
+          irequest, InferRequestClass::InferRequestComplete, nullptr),
       error_callback);
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -3164,18 +3168,17 @@ HTTPAPIServer::HandleGenerate(
           reinterpret_cast<void*>(generate_request.get())),
       error_callback);
 
-  auto err =
-      TRITONSERVER_ServerInferAsync(server_.get(), irequest, nullptr);
+  auto err = TRITONSERVER_ServerInferAsync(server_.get(), irequest, nullptr);
 
   RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
   generate_request.release();
 }
-  
+
 TRITONSERVER_Error*
 HTTPAPIServer::ModelInputMetadata(
-  const std::string& model_name, const int64_t model_version,
-  std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
-  triton::common::TritonJson::Value* metadata_root)
+    const std::string& model_name, const int64_t model_version,
+    std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
+    triton::common::TritonJson::Value* metadata_root)
 {
   {
     if (model_name.empty()) {
@@ -3186,7 +3189,7 @@ HTTPAPIServer::ModelInputMetadata(
 
     TRITONSERVER_Message* message = nullptr;
     RETURN_IF_ERR(TRITONSERVER_ServerModelMetadata(
-      server_.get(), model_name.c_str(), model_version, &message));
+        server_.get(), model_name.c_str(), model_version, &message));
     const char* buffer;
     size_t byte_size;
     TRITONSERVER_Error* err = nullptr;
@@ -3195,10 +3198,10 @@ HTTPAPIServer::ModelInputMetadata(
       RETURN_IF_ERR(metadata_root->Parse(buffer, byte_size));
     }
     if (message) {
-  TRITONSERVER_MessageDelete(message);
+      TRITONSERVER_MessageDelete(message);
     }
   }
-  
+
   // input
   triton::common::TritonJson::Value inputs;
   RETURN_IF_ERR(metadata_root->MemberAsArray("inputs", &inputs));
@@ -3215,10 +3218,11 @@ HTTPAPIServer::ModelInputMetadata(
 
 TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
-      std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
-      const MappingSchema* schema, triton::common::TritonJson::Value& generate_request)
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
+    const MappingSchema* schema,
+    triton::common::TritonJson::Value& generate_request)
 {
-// First find all top-level keys in JSON
+  // First find all top-level keys in JSON
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
 
@@ -3234,15 +3238,15 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
         case MappingSchema::Kind::MAPPING_SCHEMA: {
           // The key is nested schema
           triton::common::TritonJson::Value nested_generate_request;
-          RETURN_IF_ERR(generate_request.MemberAsObject(m.c_str(), &nested_generate_request));
-          RETURN_IF_ERR(ConvertGenerateRequest(input_metadata, it->second.get(),
-            nested_generate_request));
+          RETURN_IF_ERR(generate_request.MemberAsObject(
+              m.c_str(), &nested_generate_request));
+          RETURN_IF_ERR(ConvertGenerateRequest(
+              input_metadata, it->second.get(), nested_generate_request));
           break;
         }
         default:
           return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          "Unsupported schema kind");
+              TRITONSERVER_ERROR_UNSUPPORTED, "Unsupported schema kind");
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
@@ -3257,13 +3261,15 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::GenerateRequestClass::ExactMappingInput(const std::string& name,
-      triton::common::TritonJson::Value& generate_request,
-      std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
+HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
+    const std::string& name,
+    triton::common::TritonJson::Value& generate_request,
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
 {
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
-    RETURN_IF_ERR(SetTritonParameterFromJsonParameter(name, generate_request, triton_request_));
+    RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
+        name, generate_request, triton_request_));
   } else {
     // Parse data type and shape
     std::string value;
@@ -3307,18 +3313,17 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(const std::string& name,
         } else {
           if (element_cnt % *rit) {
             return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "The schema can not convert input to tensor with proper shape");
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "The schema can not convert input to tensor with proper shape");
           }
           element_cnt /= *rit;
         }
       }
       if (element_cnt != 1) {
         return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "The schema can not convert input to tensor with proper shape");
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "The schema can not convert input to tensor with proper shape");
       }
-
     }
 
     serialized_data_.emplace_back();
@@ -3923,17 +3928,18 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
     err = infer_request->FinalizeResponse(response);
   }
 
-// #ifdef TRITON_ENABLE_TRACING
-//   if (infer_request->trace_ != nullptr) {
-//     infer_request->trace_->CaptureTimestamp(
-//         "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
-//   }
-// #endif  // TRITON_ENABLE_TRACING
+  // #ifdef TRITON_ENABLE_TRACING
+  //   if (infer_request->trace_ != nullptr) {
+  //     infer_request->trace_->CaptureTimestamp(
+  //         "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+  //   }
+  // #endif  // TRITON_ENABLE_TRACING
 
   // First response starts the chunked response, the response code is set here
   // so user should check response body in case of error at later time.
   if (infer_request->IncrementResponseCount() == 0) {
-    infer_request->StartResponse((err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+    infer_request->StartResponse(
+        (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
   }
 
   // Final flag indicates there is no more responses, ending chunked response.
@@ -3964,7 +3970,8 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(evhtp_res code)
 }
 
 void
-HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
+    evthr_t* thr, void* arg, void* shared)
 {
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
@@ -3974,14 +3981,14 @@ HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(evthr_t* thr, void* a
   evbuffer_drain(request->buffer_out, -1);
   evhtp_request_resume(request);
 
-// #ifdef TRITON_ENABLE_TRACING
-//   if (infer_request->trace_ != nullptr) {
-//     infer_request->trace_->CaptureTimestamp(
-//         "HTTP_SEND_START", request->send_start_ns);
-//     infer_request->trace_->CaptureTimestamp(
-//         "HTTP_SEND_END", request->send_end_ns);
-//   }
-// #endif  // TRITON_ENABLE_TRACING
+  // #ifdef TRITON_ENABLE_TRACING
+  //   if (infer_request->trace_ != nullptr) {
+  //     infer_request->trace_->CaptureTimestamp(
+  //         "HTTP_SEND_START", request->send_start_ns);
+  //     infer_request->trace_->CaptureTimestamp(
+  //         "HTTP_SEND_END", request->send_end_ns);
+  //   }
+  // #endif  // TRITON_ENABLE_TRACING
 
   if (infer_request->end_) {
     evhtp_send_reply_chunk_end(request);
@@ -4006,14 +4013,19 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
   const char* request_id = "";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &request_id));
   if (strncmp(request_id, "", 1)) {
-    triton_outputs.emplace("response_id", TritonOutput(TritonOutput::Type::RESERVED, request_id));
+    triton_outputs.emplace(
+        "response_id", TritonOutput(TritonOutput::Type::RESERVED, request_id));
   }
   const char* model_name;
   int64_t model_version;
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseModel(
       response, &model_name, &model_version));
-  triton_outputs.emplace("model_name", TritonOutput(TritonOutput::Type::RESERVED, model_name));
-  triton_outputs.emplace("model_version", TritonOutput(TritonOutput::Type::RESERVED, std::to_string(model_version)));
+  triton_outputs.emplace(
+      "model_name", TritonOutput(TritonOutput::Type::RESERVED, model_name));
+  triton_outputs.emplace(
+      "model_version",
+      TritonOutput(
+          TritonOutput::Type::RESERVED, std::to_string(model_version)));
 
   // If the response has any parameters, convert them to JSON.
   uint32_t parameter_count;
@@ -4030,7 +4042,8 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
         case TRITONSERVER_PARAMETER_BOOL:
         case TRITONSERVER_PARAMETER_INT:
         case TRITONSERVER_PARAMETER_STRING:
-          triton_outputs.emplace(name, TritonOutput(TritonOutput::Type::PARAMETER, pidx));
+          triton_outputs.emplace(
+              name, TritonOutput(TritonOutput::Type::PARAMETER, pidx));
           break;
         case TRITONSERVER_PARAMETER_BYTES:
           return TRITONSERVER_ErrorNew(
@@ -4061,15 +4074,18 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
         response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
         &memory_type, &memory_type_id, &userp));
-    triton_outputs.emplace(cname, TritonOutput(TritonOutput::Type::TENSOR, idx));
+    triton_outputs.emplace(
+        cname, TritonOutput(TritonOutput::Type::TENSOR, idx));
   }
 
   std::set<std::string> mapped_outputs;
-  RETURN_IF_ERR(ConvertGenerateResponse(triton_outputs, response_schema_, &response_json, &mapped_outputs));
+  RETURN_IF_ERR(ConvertGenerateResponse(
+      triton_outputs, response_schema_, &response_json, &mapped_outputs));
   if (response_schema_->allow_unspecified_) {
     for (const auto& to : triton_outputs) {
       if (mapped_outputs.find(to.first) == mapped_outputs.end()) {
-        RETURN_IF_ERR(ExactMappingOutput(to.first, to.second, &response_json, &mapped_outputs));
+        RETURN_IF_ERR(ExactMappingOutput(
+            to.first, to.second, &response_json, &mapped_outputs));
       }
     }
   }
@@ -4098,55 +4114,62 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
 
 TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ConvertGenerateResponse(
-      const std::map<std::string, HTTPAPIServer::GenerateRequestClass::TritonOutput>& output_metadata,
-      const MappingSchema* schema,
-      triton::common::TritonJson::Value* generate_response,
-      std::set<std::string>* mapped_outputs)
+    const std::map<
+        std::string, HTTPAPIServer::GenerateRequestClass::TritonOutput>&
+        output_metadata,
+    const MappingSchema* schema,
+    triton::common::TritonJson::Value* generate_response,
+    std::set<std::string>* mapped_outputs)
 {
   for (auto& nested : schema->children_) {
-    switch (nested.second->kind_)
-    {
-    case MappingSchema::Kind::MAPPING_SCHEMA: {
-      triton::common::TritonJson::Value nested_response(
-          *generate_response, triton::common::TritonJson::ValueType::OBJECT);
-      RETURN_IF_ERR(ConvertGenerateResponse(output_metadata, nested.second.get(), &nested_response, mapped_outputs));
-      RETURN_IF_ERR(generate_response->Add(nested.first.c_str(), std::move(nested_response)));
-      break;
-    }
-    case MappingSchema::Kind::EXACT_MAPPING: {
-      auto it = output_metadata.find(nested.first);
-      if (it == output_metadata.end()) {
-        if (!nested.second->allow_unspecified_) {
-          return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          (std::string("Schema requires output '") + nested.first +
-          "' to be produced by the model.").c_str());
-        }
-      } else {
-        RETURN_IF_ERR(ExactMappingOutput(nested.first, it->second, generate_response, mapped_outputs));
+    switch (nested.second->kind_) {
+      case MappingSchema::Kind::MAPPING_SCHEMA: {
+        triton::common::TritonJson::Value nested_response(
+            *generate_response, triton::common::TritonJson::ValueType::OBJECT);
+        RETURN_IF_ERR(ConvertGenerateResponse(
+            output_metadata, nested.second.get(), &nested_response,
+            mapped_outputs));
+        RETURN_IF_ERR(generate_response->Add(
+            nested.first.c_str(), std::move(nested_response)));
+        break;
       }
-      break;
-    }
-    default:
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          "Unsupported schema kind");
+      case MappingSchema::Kind::EXACT_MAPPING: {
+        auto it = output_metadata.find(nested.first);
+        if (it == output_metadata.end()) {
+          if (!nested.second->allow_unspecified_) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                (std::string("Schema requires output '") + nested.first +
+                 "' to be produced by the model.")
+                    .c_str());
+          }
+        } else {
+          RETURN_IF_ERR(ExactMappingOutput(
+              nested.first, it->second, generate_response, mapped_outputs));
+        }
+        break;
+      }
+      default:
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNSUPPORTED, "Unsupported schema kind");
     }
   }
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(const std::string& name,
-      const HTTPAPIServer::GenerateRequestClass::TritonOutput& triton_output,
-      triton::common::TritonJson::Value* generate_response,
-      std::set<std::string>* mapped_outputs)
+HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
+    const std::string& name,
+    const HTTPAPIServer::GenerateRequestClass::TritonOutput& triton_output,
+    triton::common::TritonJson::Value* generate_response,
+    std::set<std::string>* mapped_outputs)
 {
   mapped_outputs->emplace(name);
 
-  switch(triton_output.type) {
+  switch (triton_output.type) {
     case TritonOutput::Type::RESERVED: {
-      generate_response->AddStringRef(name.c_str(), triton_output.value.c_str());
+      generate_response->AddStringRef(
+          name.c_str(), triton_output.value.c_str());
       break;
     }
     case TritonOutput::Type::PARAMETER: {
@@ -4189,15 +4212,15 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(const std::string& name,
       void* userp;
 
       RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-          triton_response_, triton_output.index, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
-          &memory_type, &memory_type_id, &userp));
+          triton_response_, triton_output.index, &cname, &datatype, &shape,
+          &dim_count, &base, &byte_size, &memory_type, &memory_type_id,
+          &userp));
 
       auto info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
       // sanity check
       if (info->kind_ != AllocPayload::OutputInfo::JSON) {
         return TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INTERNAL,
-                  "Unexpected output response type");
+            TRITONSERVER_ERROR_INTERNAL, "Unexpected output response type");
       }
 
       size_t element_count = 1;
