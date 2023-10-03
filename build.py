@@ -74,7 +74,9 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
-        "py310_23.1.0-1",  # Conda version.
+        "py310_23.1.0-1",  # Conda version
+        "9.1.0.1",  # TRT version for building TRT-LLM backend
+        "12.2",  # CUDA version for building TRT-LLM backend
     )
 }
 
@@ -878,6 +880,18 @@ def tensorrtllm_cmake_args(images):
             None,
             images["base"],
         ),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TENSORRT_VERSION",
+            None,
+            TRITON_VERSION_MAP[FLAGS.version][7],
+        ),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "CUDA_VERSION",
+            None,
+            TRITON_VERSION_MAP[FLAGS.version][8],
+        ),
     ]
     return cargs
 
@@ -1319,7 +1333,9 @@ RUN apt-get update && \
         )
         trtllm_buildscript = importlib.util.module_from_spec(spec)
         exec(response.content, trtllm_buildscript.__dict__)
-        df += trtllm_buildscript.create_postbuild()
+        df += trtllm_buildscript.create_postbuild(
+            argmap["TRT_LLM_TRT_VERSION"], argmap["TRT_LLM_CUDA_VERSION"]
+        )
 
     df += """
 WORKDIR /opt/tritonserver
@@ -1483,6 +1499,8 @@ def create_build_dockerfiles(
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][6],
     }
+    dockerfileargmap["TRT_LLM_TRT_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][7]
+    dockerfileargmap["TRT_LLM_CUDA_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][8]
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
     # since we are using PyTorch and TensorFlow containers that
