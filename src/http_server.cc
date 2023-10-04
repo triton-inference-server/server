@@ -3944,10 +3944,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   // Assuming responses of the same request is sent in sequence.
 
   TRITONSERVER_Error* err = nullptr;
-  if (response == nullptr) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
-  } else {
+  if (response != nullptr) {
     err = infer_request->FinalizeResponse(response);
   }
 
