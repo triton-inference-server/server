@@ -132,6 +132,26 @@ ModelStreamInferHandler::StartNewRequest()
 bool
 ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 {
+  // Because gRPC doesn't allow concurrent writes on the
+  // the stream we only have a single handler thread that
+  // reads from the completion queue. Hence, cancellation
+  // notification will be received on the same handler
+  // thread.
+  // This means that we only need to take care of
+  // synchronizing this thread and the ResponseComplete
+  // threads.
+  if (state->context_->ReceivedNotification()) {
+    std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+    if (state->IsGrpcContextCancelled()) {
+      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+      return resume;
+    } else {
+      if (state->context_->HandleCompletion()) {
+        return true;
+      }
+    }
+  }
+
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -161,7 +181,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     } else {
       // Precondition is not satisfied, cancel the stream
       state->context_->step_ = Steps::COMPLETE;
-      state->step_ = Steps::COMPLETE;
+      state->step_ = Steps::PARTIAL_COMPLETION;
       ::grpc::Status status = ::grpc::Status(
           ::grpc::StatusCode::UNAVAILABLE,
           std::string("This protocol is restricted, expecting header '") +
@@ -184,7 +204,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::WRITEREADY;
       if (state->context_->IsRequestsCompleted()) {
         state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::COMPLETE;
+        state->step_ = Steps::PARTIAL_COMPLETION;
+        LOG_VERBOSE(2) << "Finishing responder from state "
+                       << state->unique_id_;
         state->context_->responder_->Finish(
             state->context_->finish_ok_ ? ::grpc::Status::OK
                                         : ::grpc::Status::CANCELLED,
@@ -292,9 +314,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // If there was not an error in issuing the 'state' request then
     // state->step_ == ISSUED and inference request has
     // initiated... the completion callback will transition to
-    // WRITEREADY or WRITTEN. If there was an error then enqueue the
-    // error response and show it to be ready for writing.
-    if (err != nullptr) {
+    // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
+    // irequest to handle gRPC stream cancellation.
+    if (err == nullptr) {
+      state->context_->InsertInflightState(state, irequest);
+    } else {
+      // If there was an error then enqueue the error response and show
+      // it to be ready for writing.
       inference::ModelStreamInferResponse* response;
       if (state->is_decoupled_) {
         state->response_queue_->AllocateResponse();
@@ -350,9 +376,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
-
+  } else if (state->step_ == Steps::PARTIAL_COMPLETION) {
+    state->step_ = Steps::COMPLETE;
   } else if (state->step_ == Steps::COMPLETE) {
     state->step_ = Steps::FINISH;
+  } else if (state->step_ == Steps::FINISH) {
+    // The RPC execution is finished hence the state
+    // can be released.
     finished = true;
   } else if (!state->is_decoupled_) {
     // We handle the WRITTEN and WRITEREADY states little
@@ -405,10 +435,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // The counter can be safely decremented.
       state->context_->DecrementRequestCounter();
       finished = Finish(state);
-
-    } else if (state->step_ == Steps::COMPLETE) {
-      state->step_ = Steps::FINISH;
-      finished = true;
     }
   } else {
     //
@@ -439,7 +465,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
       } else {
-        std::lock_guard<std::mutex> lock(state->step_mtx_);
+        std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
         // If there is an available response to be written
         // to the stream, then transition directly to WRITEREADY
@@ -492,15 +518,22 @@ bool
 ModelStreamInferHandler::Finish(InferHandler::State* state)
 {
   // If done reading and no in-flight requests then can finish the
-  // entire stream. Otherwise just finish this state.
+  // entire stream.
   if (state->context_->IsRequestsCompleted()) {
     state->context_->step_ = Steps::COMPLETE;
-    state->step_ = Steps::COMPLETE;
+    state->step_ = Steps::PARTIAL_COMPLETION;
+    LOG_VERBOSE(2) << "Finishing responder from state " << state->unique_id_;
     state->context_->responder_->Finish(
         state->context_->finish_ok_ ? ::grpc::Status::OK
                                     : ::grpc::Status::CANCELLED,
         state);
+  } else if (state->IsAsyncNotifyState()) {
+    // Should only mark the state complete as the state has been sent
+    // to AsyncNotifyWhenDone() tag and the completion event should take
+    // care of finally releasing the state object.
+    state->step_ = Steps::COMPLETE;
   } else {
+    // Can finish this state.
     state->step_ = Steps::FINISH;
     return true;
   }
@@ -541,6 +574,30 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       LOG_ERROR << "[INTERNAL] ModelStreamInfer received a null response for a "
                    "model with one-to-one transaction";
     }
+  }
+
+  if (state->IsGrpcContextCancelled()) {
+    std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+    // Clean-up the received response object.
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(iresponse),
+        "deleting GRPC inference response");
+
+    LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferResponseComplete, "
+                   << state->unique_id_
+                   << ", skipping response generation as grpc transaction was "
+                      "cancelled... ";
+
+    // If this was the final callback for the state
+    // then cycle through the completion queue so
+    // that state object can be released.
+    if (state->complete_) {
+      state->step_ = Steps::CANCELLED;
+      state->context_->EraseInflightState(state);
+      state->context_->PutTaskBackToQueue(state);
+    }
+
+    return;
   }
 
   auto& response_queue = state->response_queue_;
@@ -619,18 +676,41 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   // Update states to signal that response/error is ready to write to stream
-  if (state->is_decoupled_) {
-    std::lock_guard<std::mutex> lock(state->step_mtx_);
-    if (response) {
-      state->response_queue_->MarkNextResponseComplete();
+  {
+    // Need to hold lock because the handler thread processing context
+    // cancellation might have cancelled or marked the state for cancellation.
+    std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+
+    if (state->IsGrpcContextCancelled()) {
+      LOG_VERBOSE(1)
+          << "ModelStreamInferHandler::StreamInferResponseComplete, "
+          << state->unique_id_
+          << ", skipping writing response because of transaction was cancelled";
+
+      // If this was the final callback for the state
+      // then cycle through the completion queue so
+      // that state object can be released.
+      if (state->complete_) {
+        state->step_ = Steps::CANCELLED;
+        state->context_->EraseInflightState(state);
+        state->context_->PutTaskBackToQueue(state);
+      }
+
+      return;
     }
-    if (state->step_ == Steps::ISSUED) {
+
+    if (state->is_decoupled_) {
+      if (response) {
+        state->response_queue_->MarkNextResponseComplete();
+      }
+      if (state->step_ == Steps::ISSUED) {
+        state->step_ = Steps::WRITEREADY;
+        state->context_->PutTaskBackToQueue(state);
+      }
+    } else {
       state->step_ = Steps::WRITEREADY;
-      state->context_->PutTaskBackToQueue(state);
+      state->context_->WriteResponseIfReady(state);
     }
-  } else {
-    state->step_ = Steps::WRITEREADY;
-    state->context_->WriteResponseIfReady(state);
   }
 }
 
