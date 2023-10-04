@@ -38,23 +38,25 @@ import sseclient
 import test_util as tu
 
 
-class HttpTest(tu.TestResultCollector):
+class GenerateEndpointTest(tu.TestResultCollector):
     def setUp(self):
-        self._model_name = "vllm_proxy"
+        self._model_name = "mock_llm"
 
     def _get_infer_url(self, model_name, route):
         return f"http://localhost:8000/v2/models/{model_name}/{route}"
 
-    def generate_stream(self, model_name, inputs):
+    def generate_stream(self, model_name, inputs, stream=False):
         headers = {"Accept": "text/event-stream"}
         url = self._get_infer_url(model_name, "generate_stream")
-        # stream=True used to indicate response can be iterated over
-        # r = requests.post(url, data=json.dumps(inputs), headers=headers, stream=True)
+        # stream=True used to indicate response can be iterated over, which
+        # should be the common setting for generate_stream.
+        # For correctness test case, stream=False so that we can re-examine
+        # the response content.
         return requests.post(
             url,
             data=inputs if isinstance(inputs, str) else json.dumps(inputs),
             headers=headers,
-            stream=False,
+            stream=stream,
         )
 
     def generate(self, model_name, inputs):
@@ -228,8 +230,12 @@ class HttpTest(tu.TestResultCollector):
         self.check_sse_responses(r, [{"TEXT": text}, {"error": "An Error Occurred"}])
 
     def test_race_condition(self):
+        # HTTP response send logic and Triton response complete logic are
+        # performed in different threads, both have shared access to the same
+        # generate request object, and thus send sufficient load to the endpoint
+        # in case of race condition. 
         input1 = {"PROMPT": "hello", "STREAM": False, "param": "segfault"}
-        input2 = {"PROMPT": "hello", "STREAM": True, "param": "segfault"}
+        input2 = {"PROMPT": "hello", "STREAM": True, "REPETITION": 3, "param": "segfault"}
         threads = []
 
         def thread_func(model_name, input):
@@ -247,7 +253,6 @@ class HttpTest(tu.TestResultCollector):
         for thread in threads:
             thread.join()
 
-    # TODO
     def test_one_response(self):
         # "STREAM" controls response behavior,
         # True sends two responses, one with infer response and one with flag
