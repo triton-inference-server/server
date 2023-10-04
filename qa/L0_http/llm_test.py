@@ -46,31 +46,33 @@ class HttpTest(tu.TestResultCollector):
         url = self._get_infer_url(model_name, "generate_stream")
         # stream=True used to indicate response can be iterated over
         # r = requests.post(url, data=json.dumps(inputs), headers=headers, stream=True)
-        r = requests.post(url, data=json.dumps(inputs), headers=headers, stream=False)
-        return r
+        return requests.post(
+            url,
+            data=inputs if isinstance(inputs, str) else json.dumps(inputs),
+            headers=headers,
+            stream=False,
+        )
 
     def generate_expect_failure(self, model_name, inputs, msg):
         url = self._get_infer_url(model_name, "generate")
-        r = requests.post(url, data=json.dumps(inputs))
+        r = requests.post(
+            url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
+        )
         # FIXME: This is returning "'400 client error: bad request for url"
         # instead of the expected error message it seems.
         try:
             r.raise_for_status()
-        except Exception as e:
-            print(e)
-            self.assertIn(msg, str(e).lower())
-
-        self.assertTrue(False, "Expected failure, got none")
+            self.assertTrue(False, f"Expected failure, success for {inputs}")
+        except requests.exceptions.HTTPError as e:
+            self.assertIn(msg, r.json()["error"])
 
     def generate_stream_expect_failure(self, model_name, inputs, msg):
         r = self.generate_stream(model_name, inputs)
         try:
             r.raise_for_status()
-        except Exception as e:
-            print(e)
-            self.assertIn(msg, str(e).lower())
-
-        self.assertTrue(False, "Expected failure, got none")
+            self.assertTrue(False, f"Expected failure, success for {inputs}")
+        except requests.exceptions.HTTPError as e:
+            self.assertIn(msg, r.json()["error"])
 
     def generate_stream_expect_success(
         self, model_name, inputs, expected_output, rep_count
@@ -92,6 +94,16 @@ class HttpTest(tu.TestResultCollector):
             self.assertEqual(expected_output, data["TEXT"])
             res_count += 1
         self.assertTrue(rep_count, res_count)
+        # Make sure there is no message in the wrong form
+        for remaining in client._read():
+            self.assertTrue(
+                remaining.startswith(b"data:"),
+                f"SSE response not formed properly, got: {remaining}",
+            )
+            self.assertTrue(
+                remaining.endswith(b"\n\n"),
+                f"SSE response not formed properly, got: {remaining}",
+            )
 
     def test_generate(self):
         model_name = "vllm_proxy"
@@ -170,27 +182,21 @@ class HttpTest(tu.TestResultCollector):
         model_name = "vllm_proxy"
         dupe_prompt = "input 'PROMPT' already exists in request"
         dupe_stream = "input 'STREAM' already exists in request"
+        # Use JSON string directly as Python Dict doesn't support duplicate keys
         invalid_type_inputs = [
             # One duplicate
-            ({"PROMPT": "hello", "STREAM": False, "PROMPT": "duplicate"}, dupe_prompt),
-            ({"PROMPT": "hello", "STREAM": False, "STREAM": False}, dupe_stream),
+            (
+                '{"PROMPT": "hello", "STREAM": false, "PROMPT": "duplicate"}',
+                dupe_prompt,
+            ),
+            ('{"PROMPT": "hello", "STREAM": false, "STREAM": false}', dupe_stream),
             # Multiple duplicates, parsed in order
             (
-                {
-                    "PROMPT": "hello",
-                    "STREAM": False,
-                    "PROMPT": "duplicate",
-                    "STREAM": True,
-                },
+                '{"PROMPT": "hello", "STREAM": false, "PROMPT": "duplicate", "STREAM": true}',
                 dupe_prompt,
             ),
             (
-                {
-                    "PROMPT": "hello",
-                    "STREAM": False,
-                    "STREAM": True,
-                    "PROMPT": "duplicate",
-                },
+                '{"PROMPT": "hello", "STREAM": false, "STREAM": true, "PROMPT": "duplicate"}',
                 dupe_stream,
             ),
         ]
@@ -201,10 +207,10 @@ class HttpTest(tu.TestResultCollector):
     # NOTE: The below is to reproduce a current segfault, not the real test.
     """
     # First call /generate_stream Stream=False
-    $ curl -s -w "\n%{http_code}\n" -X POST localhost:8000/v2/models/vllm_proxy/generate_stream -d '{"PROMPT": "hi there", "STREAM": false}'
+    curl -s -w "\n%{http_code}\n" -X POST localhost:8000/v2/models/vllm_proxy/generate_stream -d '{"PROMPT": "hi there", "STREAM": false}'
 
     # Then call /generate_stream Stream=True
-    $ curl -s -w "\n%{http_code}\n" -X POST localhost:8000/v2/models/vllm_proxy/generate_stream -d '{"PROMPT": "hi there", "STREAM": true}'
+    curl -s -w "\n%{http_code}\n" -X POST localhost:8000/v2/models/vllm_proxy/generate_stream -d '{"PROMPT": "hi there", "STREAM": true}'
 
     Thread 53 "tritonserver" received signal SIGSEGV, Segmentation fault.
     [Switching to Thread 0x7fd11e7fc000 (LWP 3456520)]
