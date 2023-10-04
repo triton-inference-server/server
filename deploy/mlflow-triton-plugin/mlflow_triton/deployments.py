@@ -185,8 +185,6 @@ class TritonPlugin(BaseDeploymentClient):
         self._copy_files_to_triton_repo(path, name, flavor)
 
         self._generate_mlflow_meta_file(name, flavor, model_uri)
-
-        self._verify_version_dir(name)
         
         try:
             self.triton_client.load_model(name)
