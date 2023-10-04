@@ -31,6 +31,7 @@ sys.path.append("../common")
 
 import json
 import threading
+import time
 import unittest
 
 import requests
@@ -138,6 +139,19 @@ class GenerateEndpointTest(tu.TestResultCollector):
         inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": rep_count}
         self.generate_stream_expect_success(self._model_name, inputs, text, rep_count)
 
+    def test_streaming(self):
+        # verify the responses are streamed as soon as it is generated
+        text = "hello world"
+        rep_count = 3
+        inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": rep_count, "DELAY": 2}
+        past = time.time()
+        res = self.generate_stream(self._model_name, inputs, stream=True)
+        client = sseclient.SSEClient(res)
+        for event in client.events():
+            now = time.time()
+            self.assertTrue(1 < (now - past) < 3)
+            past = now
+
     def test_missing_inputs(self):
         missing_all_inputs = [
             # Missing all inputs
@@ -233,9 +247,14 @@ class GenerateEndpointTest(tu.TestResultCollector):
         # HTTP response send logic and Triton response complete logic are
         # performed in different threads, both have shared access to the same
         # generate request object, and thus send sufficient load to the endpoint
-        # in case of race condition. 
+        # in case of race condition.
         input1 = {"PROMPT": "hello", "STREAM": False, "param": "segfault"}
-        input2 = {"PROMPT": "hello", "STREAM": True, "REPETITION": 3, "param": "segfault"}
+        input2 = {
+            "PROMPT": "hello",
+            "STREAM": True,
+            "REPETITION": 3,
+            "param": "segfault",
+        }
         threads = []
 
         def thread_func(model_name, input):

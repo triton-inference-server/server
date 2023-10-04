@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import time
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
@@ -72,6 +73,7 @@ class TritonPythonModel:
             params = json.loads(request.parameters())
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
             fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
+            delay = params["DELAY"] if "DELAY" in params else None
 
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
@@ -83,6 +85,8 @@ class TritonPythonModel:
             stream = stream_np.flatten()[0]
             if stream:
                 for _ in range(rep_count):
+                    if delay is not None:
+                        time.sleep(delay)
                     sender.send(response)
                 sender.send(
                     None
