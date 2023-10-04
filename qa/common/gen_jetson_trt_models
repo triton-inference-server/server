@@ -95,6 +95,7 @@ mkdir -p $HOST_VARSEQDESTDIR
 
 # Copy the executable source file to the host genereate models source directory
 cp ./gen_ensemble_model_utils.py $HOST_SOURCE_DIR/.
+cp ./gen_common.py $HOST_SOURCE_DIR/.
 cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SOURCE_DIR/.
 cp ./gen_qa_dyna_sequence_models.py $HOST_SOURCE_DIR/.
 cp ./gen_qa_identity_models.py $HOST_SOURCE_DIR/.
