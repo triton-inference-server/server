@@ -38,6 +38,47 @@
 
 namespace triton { namespace server { namespace grpc {
 
+// The step of processing that the state is in. Every state must
+// recognize START, COMPLETE and FINISH and the others are optional.
+typedef enum {
+  // This marks the starting stage of the RPC
+  START,
+  // This marks that RPC is complete.
+  COMPLETE,
+  // This marks the stage where all the notifications from the gRPC
+  // completion queue is received and state can be safely released.
+  FINISH,
+  // This stage means that RPC has been issued to Triton for inference
+  // and is waiting for the server callbacks or cancellation to be
+  // invoked.
+  ISSUED,
+  // This stage means the request has been read from the network and
+  // can be sent to Triton for execution.
+  READ,
+  // This stage means that the response is ready to be written back to
+  // the network.
+  WRITEREADY,
+  // This stage means that response has been written completely to the
+  // network.
+  WRITTEN,
+  // This marks the special stage for the state object to differentiate
+  // the tag delivered from AsyncNotifyWhenDone() method.
+  WAITING_NOTIFICATION,
+  // This stage means that the cancellation for the RPC has been issued
+  // to the server.
+  CANCELLATION_ISSUED,
+  // This stage marks that the state has been successfully cancelled.
+  CANCELLED,
+  // This is intermediary stage where the state has been been partially
+  // completed by grpc responder Finish call or AsyncNotifyWhenDone()
+  // notification. The other next call will move the stage to fully
+  // complete.
+  PARTIAL_COMPLETION
+} Steps;
+
+// Debugging helper
+std::ostream& operator<<(std::ostream& out, const Steps& step);
+
 //
 // GrpcStatusUtil
 //
