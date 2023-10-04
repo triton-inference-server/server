@@ -147,7 +147,8 @@ class GenerateEndpointTest(tu.TestResultCollector):
         past = time.time()
         res = self.generate_stream(self._model_name, inputs, stream=True)
         client = sseclient.SSEClient(res)
-        for event in client.events():
+        # This test does not focus on event content
+        for _ in client.events():
             now = time.time()
             self.assertTrue(1 < (now - past) < 3)
             past = now
