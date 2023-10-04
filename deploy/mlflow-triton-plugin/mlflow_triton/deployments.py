@@ -86,6 +86,18 @@ class TritonPlugin(BaseDeploymentClient):
 
         return triton_url, triton_model_repo
 
+    def _verify_version_dir(self, name):
+        triton_version_dir = os.path.join(self.triton_model_repo, name, "1")
+        
+        if 's3' in self.server.config:
+            self.server_config['s3'].put_object(
+                Bucket=self.server_config["s3_bucket"],
+                Key=os.path.join(self.server_config['s3_prefix'], name, "1/"),
+            )
+        else:
+            if not os.path.exists(triton_version_dir):
+                os.makedirs(triton_version_dir)
+    
     def create_deployment(self, name, model_uri, flavor=None, config=None):
         """
         Deploy the model at the model_uri to the Triton model repo. Associated config.pbtxt and *labels* files will be deployed.
@@ -110,7 +122,8 @@ class TritonPlugin(BaseDeploymentClient):
         path = Path(_download_artifact_from_uri(model_uri))
         self._copy_files_to_triton_repo(path, name, flavor)
         self._generate_mlflow_meta_file(name, flavor, model_uri)
-
+        self._verify_version_dir(name)
+        
         try:
             self.triton_client.load_model(name)
         except InferenceServerException as ex:
@@ -173,6 +186,8 @@ class TritonPlugin(BaseDeploymentClient):
 
         self._generate_mlflow_meta_file(name, flavor, model_uri)
 
+        self._verify_version_dir(name)
+        
         try:
             self.triton_client.load_model(name)
         except InferenceServerException as ex:
