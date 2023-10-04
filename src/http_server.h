@@ -31,6 +31,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -265,7 +266,7 @@ class HTTPAPIServer : public HTTPServer {
           sse_(server_sent_events), triton_request_(triton_request)
     {
     }
-    virtual ~GenerateRequestClass() = default;
+    virtual ~GenerateRequestClass();
 
     // [FIXME] Specialize response complete function for now, should have
     // been a dispatcher and call into object specific response function.
@@ -273,13 +274,15 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_InferenceResponse* response, const uint32_t flags,
         void* userp);
     static void ChunkResponseCallback(evthr_t* thr, void* arg, void* shared);
+    static void EndResponseCallback(evthr_t* thr, void* arg, void* shared);
+    // Return whether the response is ending
+    void SendChunkResponse(bool end);
 
     // Response preparation
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response) override;
     void AddErrorJson(TRITONSERVER_Error* error);
     void StartResponse(evhtp_res code);
-    void EndResponse() { end_ = true; }
 
     TRITONSERVER_Error* ConvertGenerateRequest(
         std::map<std::string, triton::common::TritonJson::Value>&
@@ -327,6 +330,11 @@ class HTTPAPIServer : public HTTPServer {
     // Placeholder to completing response, this class does not own
     // the response.
     TRITONSERVER_InferenceResponse* triton_response_{nullptr};
+    // As InferResponseComplete and ChunkResponseCallback are called in
+    // different threads, need to have dedicated buffers for each response and
+    // ensure mutual exclusive access.
+    std::mutex res_mtx_;
+    std::queue<evbuffer*> pending_http_responses_;
     bool end_{false};
   };
 

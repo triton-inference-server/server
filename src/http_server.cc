@@ -3924,6 +3924,13 @@ HTTPAPIServer::InferRequestClass::IncrementResponseCount()
   return response_count_++;
 }
 
+HTTPAPIServer::GenerateRequestClass::~GenerateRequestClass()
+{
+  while (!pending_http_responses_.empty()) {
+    evbuffer_free(pending_http_responses_.front());
+    pending_http_responses_.pop();
+  }
+}
 
 void
 HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
@@ -3947,6 +3954,9 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   if (response != nullptr) {
     err = infer_request->FinalizeResponse(response);
   }
+  if (err != nullptr) {
+    infer_request->AddErrorJson(err);
+  }
 
   // #ifdef TRITON_ENABLE_TRACING
   //   if (infer_request->trace_ != nullptr) {
@@ -3962,15 +3972,13 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
         (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
   }
 
+
   // Final flag indicates there is no more responses, ending chunked response.
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0) {
-    infer_request->EndResponse();
+    evthr_defer(infer_request->thread_, EndResponseCallback, infer_request);
+  } else {
+    evthr_defer(infer_request->thread_, ChunkResponseCallback, infer_request);
   }
-
-  if (err != nullptr) {
-    infer_request->AddErrorJson(err);
-  }
-  evthr_defer(infer_request->thread_, ChunkResponseCallback, infer_request);
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
@@ -3986,6 +3994,7 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(evhtp_res code)
     AddContentTypeHeader(req_, "application/json");
   }
   evhtp_send_reply_chunk_start(req_, code);
+  evhtp_request_resume(req_);
 }
 
 void
@@ -3994,11 +4003,56 @@ HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
 {
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
+  infer_request->SendChunkResponse(false /* end */);
+}
 
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply_chunk(request, request->buffer_out);
-  evbuffer_drain(request->buffer_out, -1);
-  evhtp_request_resume(request);
+void
+HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
+    evthr_t* thr, void* arg, void* shared)
+{
+  auto infer_request =
+      reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
+
+  infer_request->SendChunkResponse(true /* end */);
+  evhtp_send_reply_chunk_end(infer_request->EvHtpRequest());
+  delete infer_request;
+}
+
+void
+HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
+{
+  // check if response count in the case of non-streaming
+  if (!sse_) {
+    std::lock_guard<std::mutex> lk(res_mtx_);
+    // For non-streaming, wait until end
+    if (!end) {
+      return;
+    }
+    if (pending_http_responses_.size() != 1) {
+      EVBufferAddErrorJson(
+          req_->buffer_out, TRITONSERVER_ErrorNew(
+                                TRITONSERVER_ERROR_INTERNAL,
+                                "generate expects model to produce exactly 1 "
+                                "response, use generate stream for model that "
+                                "generates various number of responses"));
+      evhtp_send_reply_chunk(req_, req_->buffer_out);
+      return;
+    }
+  }
+
+  evbuffer* buffer = nullptr;
+  {
+    std::lock_guard<std::mutex> lk(res_mtx_);
+    // This function may be called with no pending responses when
+    // response complete callback is invoked with flag-only
+    if (pending_http_responses_.empty()) {
+      return;
+    }
+    buffer = pending_http_responses_.front();
+    pending_http_responses_.pop();
+  }
+  evhtp_send_reply_chunk(req_, buffer);
+  evbuffer_free(buffer);
 
   // #ifdef TRITON_ENABLE_TRACING
   //   if (infer_request->trace_ != nullptr) {
@@ -4008,11 +4062,6 @@ HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
   //         "HTTP_SEND_END", request->send_end_ns);
   //   }
   // #endif  // TRITON_ENABLE_TRACING
-
-  if (infer_request->end_) {
-    evhtp_send_reply_chunk_end(request);
-    delete infer_request;
-  }
 }
 
 TRITONSERVER_Error*
@@ -4111,22 +4160,23 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
 
   // [FIXME] compression
   evbuffer* response_body = evbuffer_new();
+  if (sse_) {
+    static std::string sse_prefix = "data: ";
+    evbuffer_add(response_body, sse_prefix.c_str(), sse_prefix.length());
+  }
   // Write json metadata into response evbuffer
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
   evbuffer_add(response_body, buffer.Base(), buffer.Size());
   if (sse_) {
-    static std::string sse_prefix = "data: ";
-    evbuffer_add(req_->buffer_out, sse_prefix.c_str(), sse_prefix.length());
-  }
-  evbuffer_add_buffer(req_->buffer_out, response_body);
-  if (sse_) {
     static std::string sse_suffix = "\n\n";
-    evbuffer_add(req_->buffer_out, sse_suffix.c_str(), sse_suffix.length());
+    evbuffer_add(response_body, sse_suffix.c_str(), sse_suffix.length());
   }
-  // Destroy the evbuffer object as the data has been MOVED
-  // to HTTP response buffer
-  evbuffer_free(response_body);
+
+  {
+    std::lock_guard<std::mutex> lk(res_mtx_);
+    pending_http_responses_.emplace(response_body);
+  }
 
   return nullptr;  // success
 }
@@ -4134,16 +4184,21 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
 void
 HTTPAPIServer::GenerateRequestClass::AddErrorJson(TRITONSERVER_Error* error)
 {
+  evbuffer* buffer = evbuffer_new();
   if (sse_) {
     static std::string sse_prefix = "data: ";
-    evbuffer_add(req_->buffer_out, sse_prefix.c_str(), sse_prefix.length());
+    evbuffer_add(buffer, sse_prefix.c_str(), sse_prefix.length());
   }
-  EVBufferAddErrorJson(req_->buffer_out, error);
+  EVBufferAddErrorJson(buffer, error);
   if (sse_) {
     static std::string sse_suffix = "\n\n";
-    evbuffer_add(req_->buffer_out, sse_suffix.c_str(), sse_suffix.length());
+    evbuffer_add(buffer, sse_suffix.c_str(), sse_suffix.length());
   }
   TRITONSERVER_ErrorDelete(error);
+  {
+    std::lock_guard<std::mutex> lk(res_mtx_);
+    pending_http_responses_.emplace(buffer);
+  }
 }
 
 TRITONSERVER_Error*
