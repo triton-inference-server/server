@@ -286,8 +286,8 @@ class DecoupledTest(tu.TestResultCollector):
 
         with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
             log_text = f.read()
-            self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
-            self.assertIn("[execute_cancel] Request cancelled at ", log_text)
+        self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
+        self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
 
 if __name__ == "__main__":

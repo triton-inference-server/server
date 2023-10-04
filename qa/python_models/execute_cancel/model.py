@@ -28,6 +28,7 @@ import json
 import threading
 import time
 
+import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
@@ -93,13 +94,34 @@ class TritonPythonModel:
             time.sleep(2)  # execute after requests are released
             responses = execute_processed_requests(processed_requests)
             for i in range(len(responses)):  # len(responses) == len(processed_requests)
+                response_sender = processed_requests[i]["response_sender"]
                 response = responses[i]
                 if response != None:
-                    response_sender = processed_requests[i]["response_sender"]
                     response_sender.send(response)
                     response_sender.send(
                         flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
                     )
+                else:
+                    # test response_sender.send() after it is closed upon checking for
+                    # confirmed request cancelled
+                    dummy_tensor = pb_utils.Tensor(
+                        "DUMMY_OUT", np.array([[1]], np.single)
+                    )
+                    dummy_response = pb_utils.InferenceResponse([dummy_tensor])
+                    raised_exception = False
+                    try:
+                        response_sender.send(dummy_response)
+                    except pb_utils.TritonModelException as e:
+                        if (
+                            "Unable to send response. Response sender has been closed."
+                            not in str(e)
+                        ):
+                            raise e
+                        raised_exception = True
+                    if not raised_exception:
+                        raise pb_utils.TritonModelException(
+                            "response_sender did not raise an exception on send after closed"
+                        )
 
         thread = threading.Thread(
             target=response_thread,
