@@ -3078,6 +3078,11 @@ HTTPAPIServer::HandleGenerate(
       req,
       GetModelVersionFromString(model_version_str, &requested_model_version));
 
+  // If tracing is enabled see if this request should be traced.
+  TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+  std::shared_ptr<TraceManager::Trace> trace =
+      StartTrace(req, model_name, &triton_trace);
+
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
   RETURN_AND_RESPOND_IF_ERR(
@@ -3097,7 +3102,6 @@ HTTPAPIServer::HandleGenerate(
                &irequest, server_.get(), model_name.c_str(),
                requested_model_version));
 
-
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   std::unique_ptr<GenerateRequestClass> generate_request;
@@ -3112,12 +3116,14 @@ HTTPAPIServer::HandleGenerate(
         generate_request_schema_.get(), generate_response_schema_.get(),
         streaming, irequest));
   }
+  generate_request->trace_ = trace;
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
-  // by reference to capture local updates. The callback does not own the
-  // error object.
-  auto error_callback = [&](TRITONSERVER_Error* error) {
+  // by reference to capture local updates, except for shared pointers which
+  // should be captured by value in case of ref count issues.
+  // The callback does not own the error object.
+  auto error_callback = [&, trace](TRITONSERVER_Error* error) {
     if (error != nullptr) {
       // Get request ID for logging in case of error.
       if (irequest != nullptr) {
@@ -3138,6 +3144,13 @@ HTTPAPIServer::HandleGenerate(
       EVBufferAddErrorJson(req->buffer_out, error);
       evhtp_send_reply(req, EVHTP_RES_BADREQ);
       evhtp_request_resume(req);
+
+#ifdef TRITON_ENABLE_TRACING
+      // If HTTP server still owns Triton trace
+      if ((trace != nullptr) && (trace->trace_ != nullptr)) {
+        TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
+      }
+#endif  // TRITON_ENABLE_TRACING
     }
   };
 
@@ -3178,8 +3191,16 @@ HTTPAPIServer::HandleGenerate(
       error_callback);
 
   RETURN_AND_CALLBACK_IF_ERR(
-      TRITONSERVER_ServerInferAsync(server_.get(), irequest, nullptr),
+      TRITONSERVER_ServerInferAsync(server_.get(), irequest, triton_trace),
       error_callback);
+
+#ifdef TRITON_ENABLE_TRACING
+  // Ownership of trace passed to Triton core, set trace to null to mark it
+  // as no longer owned here.
+  if (trace != nullptr) {
+    trace->trace_ = nullptr;
+  }
+#endif  // TRITON_ENABLE_TRACING
   generate_request.release();
 }
 
@@ -3954,12 +3975,6 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
     infer_request->AddErrorJson(err);
   }
 
-  // #ifdef TRITON_ENABLE_TRACING
-  //   if (infer_request->trace_ != nullptr) {
-  //     infer_request->trace_->CaptureTimestamp(
-  //         "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
-  //   }
-  // #endif  // TRITON_ENABLE_TRACING
 
   // First response starts the chunked response, the response code is set here
   // so user should check response body in case of error at later time.
@@ -3968,6 +3983,12 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
         (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
   }
 
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+  }
+#endif  // TRITON_ENABLE_TRACING
 
   // Final flag indicates there is no more responses, ending chunked response.
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0) {
@@ -4047,17 +4068,22 @@ HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
     buffer = pending_http_responses_.front();
     pending_http_responses_.pop();
   }
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "HTTP_SEND_START", request->send_start_ns);
+  }
+#endif  // TRITON_ENABLE_TRACING
+
   evhtp_send_reply_chunk(req_, buffer);
   evbuffer_free(buffer);
 
-  // #ifdef TRITON_ENABLE_TRACING
-  //   if (infer_request->trace_ != nullptr) {
-  //     infer_request->trace_->CaptureTimestamp(
-  //         "HTTP_SEND_START", request->send_start_ns);
-  //     infer_request->trace_->CaptureTimestamp(
-  //         "HTTP_SEND_END", request->send_end_ns);
-  //   }
-  // #endif  // TRITON_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "HTTP_SEND_END", request->send_end_ns);
+  }
+#endif  // TRITON_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
