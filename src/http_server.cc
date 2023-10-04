@@ -3971,8 +3971,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   }
 
   if (err != nullptr) {
-    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-    TRITONSERVER_ErrorDelete(err);
+    infer_request->AddErrorJson(err);
   }
   evthr_defer(infer_request->thread_, ChunkResponseCallback, infer_request);
 
@@ -4133,6 +4132,21 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
   evbuffer_free(response_body);
 
   return nullptr;  // success
+}
+
+void
+HTTPAPIServer::GenerateRequestClass::AddErrorJson(TRITONSERVER_Error* error)
+{
+  if (sse_) {
+    static std::string sse_prefix = "data: ";
+    evbuffer_add(req_->buffer_out, sse_prefix.c_str(), sse_prefix.length());
+  }
+  EVBufferAddErrorJson(req_->buffer_out, error);
+  if (sse_) {
+    static std::string sse_suffix = "\n\n";
+    evbuffer_add(req_->buffer_out, sse_suffix.c_str(), sse_suffix.length());
+  }
+  TRITONSERVER_ErrorDelete(error);
 }
 
 TRITONSERVER_Error*

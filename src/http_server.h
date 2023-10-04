@@ -277,6 +277,7 @@ class HTTPAPIServer : public HTTPServer {
     // Response preparation
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response) override;
+    void AddErrorJson(TRITONSERVER_Error* error);
     void StartResponse(evhtp_res code);
     void EndResponse() { end_ = true; }
 
