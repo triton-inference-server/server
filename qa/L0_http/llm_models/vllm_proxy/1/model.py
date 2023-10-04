@@ -72,6 +72,7 @@ class TritonPythonModel:
         for request in requests:
             params = json.loads(request.parameters())
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
+            fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
 
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
@@ -84,7 +85,14 @@ class TritonPythonModel:
             if stream:
                 for _ in range(rep_count):
                     sender.send(response)
-                sender.send(None, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                sender.send(
+                    None
+                    if not fail_last
+                    else pb_utils.InferenceResponse(
+                        error=pb_utils.TritonError("An Error Occurred")
+                    ),
+                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                )
             # If stream disabled, just send one response
             else:
                 sender.send(

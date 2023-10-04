@@ -58,8 +58,6 @@ class HttpTest(tu.TestResultCollector):
         r = requests.post(
             url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
         )
-        # FIXME: This is returning "'400 client error: bad request for url"
-        # instead of the expected error message it seems.
         try:
             r.raise_for_status()
             self.assertTrue(False, f"Expected failure, success for {inputs}")
@@ -79,21 +77,24 @@ class HttpTest(tu.TestResultCollector):
     ):
         r = self.generate_stream(model_name, inputs)
         r.raise_for_status()
+        self.check_sse_responses(r, [{"TEXT": expected_output}] * rep_count)
 
+    def check_sse_responses(self, res, expected_res):
         # Validate SSE format
-        self.assertIn("Content-Type", r.headers)
-        self.assertIn("text/event-stream", r.headers["Content-Type"])
+        self.assertIn("Content-Type", res.headers)
+        self.assertIn("text/event-stream", res.headers["Content-Type"])
 
         # SSE format (data: []) is hard to parse, use helper library for simplicity
-        client = sseclient.SSEClient(r)
+        client = sseclient.SSEClient(res)
         res_count = 0
         for event in client.events():
             # Parse event data, join events into a single response
             data = json.loads(event.data)
-            self.assertIn("TEXT", data)
-            self.assertEqual(expected_output, data["TEXT"])
+            for key, value in expected_res[res_count].items():
+                self.assertIn(key, data)
+                self.assertEqual(value, data[key])
             res_count += 1
-        self.assertTrue(rep_count, res_count)
+        self.assertTrue(len(expected_res), res_count)
         # Make sure there is no message in the wrong form
         for remaining in client._read():
             self.assertTrue(
@@ -203,6 +204,28 @@ class HttpTest(tu.TestResultCollector):
         for inputs, error_msg in invalid_type_inputs:
             self.generate_expect_failure(model_name, inputs, error_msg)
             self.generate_stream_expect_failure(model_name, inputs, error_msg)
+
+    def test_generate_stream_response_error(self):
+        model_name = "vllm_proxy"
+        # Setup text-based input
+        text = "hello world"
+        inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": 0, "FAIL_LAST": True}
+        r = self.generate_stream(model_name, inputs)
+
+        # With "REPETITION": 0, error will be first response and the HTTP code
+        # will be set properly
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            self.check_sse_responses(r, [{"error": "An Error Occurred"}])
+
+        # With "REPETITION" > 0, the first response is valid response and set
+        # HTTP code to success, so user must validate each response
+        inputs["REPETITION"] = 1
+        r = self.generate_stream(model_name, inputs)
+        r.raise_for_status()
+
+        self.check_sse_responses(r, [{"TEXT": text}, {"error": "An Error Occurred"}])
 
     # NOTE: The below is to reproduce a current segfault, not the real test.
     """
