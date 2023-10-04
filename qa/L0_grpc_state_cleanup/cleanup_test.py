@@ -402,7 +402,7 @@ class CleanUpTest(tu.TestResultCollector):
                         expected_data += 1
 
     ###
-    ### Streaming Tests
+    ### Non-Streaming Tests
     ###
     def test_simple_infer(self):
         # This test case sends 10 asynchronous requests and validates

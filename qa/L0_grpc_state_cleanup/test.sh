@@ -118,7 +118,7 @@ for i in test_simple_infer_error_status \
                 test_streaming_error_status \
                 test_decoupled_error_status; do
   SERVER_LOG="./inference_server.$i.log"
-  SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --grpc-restricted-protocol=inference,health:infer-key=infer-value"
+  SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --grpc-restricted-protocol=inference:infer-key=infer-value"
   run_server
   if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
