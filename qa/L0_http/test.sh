@@ -243,7 +243,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+python $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin
     RET=1
@@ -254,7 +254,7 @@ echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
-python3 $BASIC_AUTH_TEST
+python $BASIC_AUTH_TEST
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
@@ -612,7 +612,7 @@ TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
 EXPECTED_NUM_TESTS=8
 set +e
-python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
+python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
@@ -629,15 +629,15 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-### LLM REST API Endpoint Tests ###
+### LLM / Generate REST API Endpoint Tests ###
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/llm_models"
-SERVER_LOG="./inference_server_llm_test.log"
-CLIENT_LOG="./llm_test.log"
+SERVER_ARGS="--model-repository=`pwd`/generate_models"
+SERVER_LOG="./inference_server_generate_endpoint_test.log"
+CLIENT_LOG="./generate_endpoint_test.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -647,10 +647,10 @@ fi
 
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
-PYTHON_TEST=llm_test.py
-EXPECTED_NUM_TESTS=2
+PYTHON_TEST=generate_endpoint_test.py
+EXPECTED_NUM_TESTS=11
 set +e
-python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
+python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1

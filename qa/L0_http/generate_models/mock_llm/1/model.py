@@ -1,4 +1,4 @@
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import time
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
@@ -36,7 +37,6 @@ class TritonPythonModel:
         self.decoupled = self.model_config.get("model_transaction_policy", {}).get(
             "decoupled"
         )
-        print(f"{self.decoupled=}")
 
     def execute(self, requests):
         if self.decoupled:
@@ -72,6 +72,8 @@ class TritonPythonModel:
         for request in requests:
             params = json.loads(request.parameters())
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
+            fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
+            delay = params["DELAY"] if "DELAY" in params else None
 
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
@@ -83,8 +85,17 @@ class TritonPythonModel:
             stream = stream_np.flatten()[0]
             if stream:
                 for _ in range(rep_count):
+                    if delay is not None:
+                        time.sleep(delay)
                     sender.send(response)
-                sender.send(None, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                sender.send(
+                    None
+                    if not fail_last
+                    else pb_utils.InferenceResponse(
+                        error=pb_utils.TritonError("An Error Occurred")
+                    ),
+                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                )
             # If stream disabled, just send one response
             else:
                 sender.send(
