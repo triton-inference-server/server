@@ -259,11 +259,11 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
         const MappingSchema* request_schema,
-        const MappingSchema* response_schema, bool server_sent_events,
+        const MappingSchema* response_schema, bool streaming,
         TRITONSERVER_InferenceRequest* triton_request)
         : InferRequestClass(server, req, response_compression_type),
           request_schema_(request_schema), response_schema_(response_schema),
-          sse_(server_sent_events), triton_request_(triton_request)
+          streaming_(streaming), triton_request_(triton_request)
     {
     }
     virtual ~GenerateRequestClass();
@@ -322,7 +322,7 @@ class HTTPAPIServer : public HTTPServer {
 
     const MappingSchema* request_schema_{nullptr};
     const MappingSchema* response_schema_{nullptr};
-    const bool sse_{false};
+    const bool streaming_{false};
     // Pointer to associated Triton request, this class does not own the
     // request and must not reference it after a successful
     // TRITONSERVER_ServerInferAsync.

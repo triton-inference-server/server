@@ -367,8 +367,10 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value& tensor_data, int* counter,
     int64_t expected_cnt)
 {
-  // FIXME should invert loop and switch so don't have to do a switch
-  // each iteration.
+  // FIXME should move 'switch' statement outside the recursive function and
+  // pass in a read data callback once data type is confirmed.
+  // Currently 'switch' is performed on each element even through all elements
+  // have the same data type.
 
   // Recurse on array element if not last dimension...
   TRITONSERVER_Error* assert_err =
@@ -3103,13 +3105,12 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(),
-        streaming /* server-sent events */, irequest));
+        generate_stream_response_schema_.get(), streaming, irequest));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming /* server-sent events */, irequest));
+        streaming, irequest));
   }
 
   const char* request_id = "<id_unknown>";
@@ -3391,19 +3392,16 @@ HTTPAPIServer::HandleInfer(
   evbuffer* decompressed_buffer = nullptr;
   RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
 
-  LOG_INFO << "Get Content Length";
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
       req, GetContentLength(req, decompressed_buffer, &content_length));
 
-  LOG_INFO << "Get Header Length";
   // Get the header length
   size_t header_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
       req, GetInferenceHeaderLength(req, content_length, &header_length));
 
-  LOG_INFO << "Create Triton Inference Request";
   // Create the inference request object which provides all information needed
   // for an inference. Make sure it is cleaned up on early error.
   TRITONSERVER_InferenceRequest* irequest = nullptr;
@@ -3412,7 +3410,6 @@ HTTPAPIServer::HandleInfer(
                &irequest, server_.get(), model_name.c_str(),
                requested_model_version));
 
-  LOG_INFO << "Create HTTP InferRequest";
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
@@ -3446,7 +3443,6 @@ HTTPAPIServer::HandleInfer(
     }
   };
 
-  LOG_INFO << "Parse EVRequest to TritonRequest";
   // Parse EV request and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
       EVRequestToTritonRequest(
@@ -3988,7 +3984,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
 void
 HTTPAPIServer::GenerateRequestClass::StartResponse(evhtp_res code)
 {
-  if (sse_) {
+  if (streaming_) {
     AddContentTypeHeader(req_, "text/event-stream; charset=utf-8");
   } else {
     AddContentTypeHeader(req_, "application/json");
@@ -4022,7 +4018,7 @@ void
 HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
 {
   // check if response count in the case of non-streaming
-  if (!sse_) {
+  if (!streaming_) {
     std::lock_guard<std::mutex> lk(res_mtx_);
     // For non-streaming, wait until end
     if (!end) {
@@ -4160,7 +4156,7 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
 
   // [FIXME] compression
   evbuffer* response_body = evbuffer_new();
-  if (sse_) {
+  if (streaming_) {
     static std::string sse_prefix = "data: ";
     evbuffer_add(response_body, sse_prefix.c_str(), sse_prefix.length());
   }
@@ -4168,7 +4164,7 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
   evbuffer_add(response_body, buffer.Base(), buffer.Size());
-  if (sse_) {
+  if (streaming_) {
     static std::string sse_suffix = "\n\n";
     evbuffer_add(response_body, sse_suffix.c_str(), sse_suffix.length());
   }
@@ -4185,12 +4181,12 @@ void
 HTTPAPIServer::GenerateRequestClass::AddErrorJson(TRITONSERVER_Error* error)
 {
   evbuffer* buffer = evbuffer_new();
-  if (sse_) {
+  if (streaming_) {
     static std::string sse_prefix = "data: ";
     evbuffer_add(buffer, sse_prefix.c_str(), sse_prefix.length());
   }
   EVBufferAddErrorJson(buffer, error);
-  if (sse_) {
+  if (streaming_) {
     static std::string sse_suffix = "\n\n";
     evbuffer_add(buffer, sse_suffix.c_str(), sse_suffix.length());
   }
