@@ -167,7 +167,7 @@ EOF
 chmod a+x $HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT
 # Pull the TensorRT image
 docker pull $TENSORRT_IMAGE
-# Run the TensorRT model generation script in the TensorRT models
+# Run the TensorRT model generation script inside the TensorRT container
 docker run \
   $DOCKER_GPU_ARGS \
   --rm --entrypoint $CONTAINER_SOURCE_DIR/$TRT_MODEL_SCRIPT \
