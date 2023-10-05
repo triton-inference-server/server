@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 backend: "python"
 
-# Disabling batching in Triton, let vLLM handle the batching on its own.
 max_batch_size: 0
 
 model_transaction_policy {
@@ -53,7 +52,6 @@ output [
   }
 ]
 
-# The usage of device is deferred to the vLLM engine
 instance_group [
   {
     count: 1

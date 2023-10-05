@@ -62,7 +62,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
 
     def generate(self, model_name, inputs):
         url = self._get_infer_url(model_name, "generate")
-        return requests.post(url, data=json.dumps(inputs))
+        return requests.post(
+            url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
+        )
 
     def generate_expect_failure(self, model_name, inputs, msg):
         url = self._get_infer_url(model_name, "generate")
@@ -245,10 +247,10 @@ class GenerateEndpointTest(tu.TestResultCollector):
         self.check_sse_responses(r, [{"TEXT": text}, {"error": "An Error Occurred"}])
 
     def test_race_condition(self):
-        # HTTP response send logic and Triton response complete logic are
-        # performed in different threads, both have shared access to the same
-        # generate request object, and thus send sufficient load to the endpoint
-        # in case of race condition.
+        # In Triton HTTP frontend, the HTTP response is sent in a different
+        # thread than Triton response complete thread, both programs have shared
+        # access to the same object, so this test is sending sufficient load to
+        # the endpoint, in attempt to expose race condition if any  .
         input1 = {"PROMPT": "hello", "STREAM": False, "param": "segfault"}
         input2 = {
             "PROMPT": "hello",
@@ -258,8 +260,8 @@ class GenerateEndpointTest(tu.TestResultCollector):
         }
         threads = []
 
-        def thread_func(model_name, input):
-            self.generate_stream(model_name, input1).raise_for_status()
+        def thread_func(model_name, inputs):
+            self.generate_stream(model_name, inputs).raise_for_status()
 
         for _ in range(50):
             threads.append(
@@ -274,12 +276,17 @@ class GenerateEndpointTest(tu.TestResultCollector):
             thread.join()
 
     def test_one_response(self):
-        # "STREAM" controls response behavior,
-        # True sends two responses, one with infer response and one with flag
-        # only, where generate endpoint will be able to handle as in
-        # non-decoupled mode.
-        # False sends one response with infer response and flag, which is the
-        # same behavior as how non-decoupled model return response.
+        # In the current 'inputs' setting, the model will send at least 1
+        # response, "STREAM" controls model behavior on sending model responses:
+        # If True, the model sends two responses, one is the actual infer
+        # response and the other contains flag only to signal end of response.
+        # 'generate_stream' endpoint is designed for this case so it should send
+        # infer response and complete HTTP response appropriately. And
+        # 'generate' endpoint will be able to handle this case as at its core
+        # only one infer response is received, which is the same as typical HTTP
+        # usage.
+        # If False, the model sends one response containing infer response and
+        # end flag, which is the same as how non-decoupled model responds.
         inputs = {"PROMPT": "hello world", "STREAM": True}
         r = self.generate_stream(self._model_name, inputs)
         r.raise_for_status()

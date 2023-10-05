@@ -4068,20 +4068,15 @@ HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
     buffer = pending_http_responses_.front();
     pending_http_responses_.pop();
   }
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_START", request->send_start_ns);
-  }
-#endif  // TRITON_ENABLE_TRACING
-
   evhtp_send_reply_chunk(req_, buffer);
   evbuffer_free(buffer);
 
 #ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_END", request->send_end_ns);
+  if (trace_ != nullptr) {
+    // [FIXME] currently send_start_ns / send_end_ns is
+    // not captured in evhtp when response is sent in chunks
+    trace_->CaptureTimestamp("HTTP_SEND_START", req_->send_start_ns);
+    trace_->CaptureTimestamp("HTTP_SEND_END", req_->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 }
