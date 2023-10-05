@@ -337,9 +337,7 @@ JsonBytesArrayByteSize(
 {
   *byte_size = 0;
   // Recurse if not last dimension...
-  TRITONSERVER_Error* assert_err =
-      tensor_data.AssertType(triton::common::TritonJson::ValueType::ARRAY);
-  if (assert_err == nullptr) {
+  if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
@@ -356,7 +354,6 @@ JsonBytesArrayByteSize(
         tensor_data.AsString(&str, &len), "Unable to parse JSON bytes array");
     *byte_size += len + sizeof(uint32_t);
   }
-  TRITONSERVER_ErrorDelete(assert_err);
 
   return nullptr;  // success
 }
@@ -373,9 +370,7 @@ ReadDataFromJsonHelper(
   // have the same data type.
 
   // Recurse on array element if not last dimension...
-  TRITONSERVER_Error* assert_err =
-      tensor_data.AssertType(triton::common::TritonJson::ValueType::ARRAY);
-  if (assert_err == nullptr) {
+  if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
@@ -504,7 +499,6 @@ ReadDataFromJsonHelper(
         break;
     }
   }
-  TRITONSERVER_ErrorDelete(assert_err);
 
   return nullptr;  // success
 }
@@ -2815,7 +2809,7 @@ HTTPAPIServer::EVRequestToJson(
     if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
-          "[POC] unexpected error getting request buffers");
+          "Unexpected error getting request buffers");
     }
   }
   size_t buffer_len = evbuffer_get_length(req->buffer_in);
@@ -3093,6 +3087,13 @@ HTTPAPIServer::HandleGenerate(
 
   // [FIXME] decompression should have been done here. before parsing request
   // body
+  if (GetRequestCompressionType(req) != DataCompressor::Type::IDENTITY) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Unsupported content-encoding, only 'identity' is supported."));
+  }
 
   // Create the inference request object which provides all information needed
   // for an inference. Make sure it is cleaned up on early error.
@@ -3318,10 +3319,7 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
               .c_str());
     }
 
-    auto assert_err =
-        tensor_data.AssertType(triton::common::TritonJson::ValueType::ARRAY);
-    size_t element_cnt = (assert_err == nullptr) ? tensor_data.ArraySize() : 1;
-    TRITONSERVER_ErrorDelete(assert_err);
+    size_t element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
 
     size_t byte_size = 0;
     if (dtype == TRITONSERVER_TYPE_BYTES) {
@@ -3336,7 +3334,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       if (!it->second.Find("shape", &value)) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
-            "unexpected 'shape' not found in model metadata");
+            (std::string(
+                 "Unexpected 'shape' not found in model metadata for input '") +
+             name)
+                .c_str());
       }
       for (size_t i = 0; i < value.ArraySize(); ++i) {
         int64_t d = 0;
@@ -3353,7 +3354,9 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
           if (element_cnt % *rit) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
-                "The schema can not convert input to tensor with proper shape");
+                (std::string("The schema can not convert input '") + name +
+                 "' to tensor with proper shape")
+                    .c_str());
           }
           element_cnt /= *rit;
         }
@@ -3367,7 +3370,9 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       if (element_cnt != 1) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
-            "The schema can not convert input to tensor with proper shape");
+            (std::string("The schema can not convert input '") + name +
+             "' to tensor with proper shape")
+                .c_str());
       }
     }
 
@@ -4093,13 +4098,13 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
 
   // Response metadata in addition to output tensor / parameter falls under
   // "unspecified field" with predefined name:
-  // "response_id", "model_name", "model_version"
+  // "id", "model_name", "model_version"
   std::map<std::string, TritonOutput> triton_outputs;
-  const char* request_id = "";
-  RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &request_id));
-  if (strncmp(request_id, "", 1)) {
+  const char* id = "";
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &id));
+  if (strncmp(id, "", 1)) {
     triton_outputs.emplace(
-        "response_id", TritonOutput(TritonOutput::Type::RESERVED, request_id));
+        "id", TritonOutput(TritonOutput::Type::RESERVED, id));
   }
   const char* model_name;
   int64_t model_version;

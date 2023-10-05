@@ -57,7 +57,8 @@ class MappingSchema {
   // * for requests, the unspecified key will be converted to Triton input
   //   following the EXACT_MAPPING rule.
   // * for responses, the Triton output will be converted to JSON key-value
-  //   pairs at top level if the name is unspecified in the schema.
+  //   pairs at top level if the name is unspecified in the schema,
+  //   following the EXACT_MAPPING rule.
   const bool allow_unspecified_{true};
   const Kind kind_{Kind::EXACT_MAPPING};
 
@@ -295,7 +296,6 @@ class HTTPAPIServer : public HTTPServer {
 
    private:
     struct TritonOutput {
-     public:
       enum class Type { RESERVED, TENSOR, PARAMETER };
       TritonOutput(Type t, const std::string& val) : type(t), value(val) {}
       explicit TritonOutput(Type t, uint32_t i) : type(t), index(i) {}
