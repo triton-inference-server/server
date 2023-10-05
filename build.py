@@ -1044,7 +1044,7 @@ COPY . .
 ENTRYPOINT []
 """
 
-    # Install miniconda required for the DALI backend.
+    # Install miniconda required for the DALI and vllm backend.
     if target_platform() != "windows":
         df += install_miniconda(argmap["CONDA_VERSION"], target_machine())
 
@@ -1277,6 +1277,18 @@ RUN apt-get update && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
+"""
+
+    # Build conda environment for vllm backend
+    if "vllm" in backends:
+        df += install_miniconda(argmap["CONDA_VERSION"], target_machine)
+        vllm_conda_env_bash = "https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/tools/environment.yml"
+
+        df += """
+# conda environment is required for the vllm backend
+RUN conda install -y mamba -c conda-forge  && \
+    wget "{vllm_conda_env_bash}" && \
+    mamba env create -f environment.yml
 """
 
     df += """
@@ -1761,6 +1773,29 @@ def backend_build(
         os.path.join(repo_install_dir, "backends", be),
         os.path.join(install_dir, "backends"),
     )
+
+    cmake_script.comment()
+    cmake_script.comment(f"end '{be}' backend")
+    cmake_script.commentln(8)
+    cmake_script.blankln()
+
+
+def backend_clone(
+    be,
+    cmake_script,
+    tag,
+    install_dir,
+    github_organization,
+):
+    repo_clone_dir = os.path.join(install_dir, "backends")
+
+    cmake_script.commentln(8)
+    cmake_script.comment(f"'{be}' backend")
+    cmake_script.comment("Delete this section to remove backend from build")
+    cmake_script.comment()
+    cmake_script.mkdir(repo_clone_dir)
+    cmake_script.cwd(repo_clone_dir)
+    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     cmake_script.comment()
     cmake_script.comment(f"end '{be}' backend")
@@ -2620,17 +2655,26 @@ if __name__ == "__main__":
             else:
                 github_organization = FLAGS.github_organization
 
-            backend_build(
-                be,
-                cmake_script,
-                backends[be],
-                script_build_dir,
-                script_install_dir,
-                github_organization,
-                images,
-                components,
-                library_paths,
-            )
+            if be == "vllm":
+                backend_clone(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_install_dir,
+                    github_organization,
+                )
+            else:
+                backend_build(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                    images,
+                    components,
+                    library_paths,
+                )
 
         # Commands to build each repo agent...
         for ra in repoagents:
