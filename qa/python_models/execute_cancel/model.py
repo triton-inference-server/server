@@ -59,9 +59,7 @@ class TritonPythonModel:
     def _execute_processed_requests(self, processed_requests):
         responses = []
         for processed_request in processed_requests:
-            response = pb_utils.InferenceResponse(
-                error=pb_utils.TritonError(message="not cancelled")
-            )
+            error = pb_utils.TritonError(message="not cancelled")
             object_to_check_cancelled = None
             if "response_sender" in processed_request:
                 object_to_check_cancelled = processed_request["response_sender"]
@@ -78,14 +76,16 @@ class TritonPythonModel:
                         + str(time_elapsed)
                         + " s"
                     )
-                    response = None
+                    error = pb_utils.TritonError(
+                        message="cancelled", code=pb_utils.TritonError.CANCELLED
+                    )
                     break
                 self._logger.log_info(
                     "[execute_cancel] Request not cancelled at "
                     + str(time_elapsed)
                     + " s"
                 )
-            responses.append(response)
+            responses.append(pb_utils.InferenceResponse(error=error))
         return responses
 
     def _execute_decoupled(self, processed_requests):
@@ -94,9 +94,7 @@ class TritonPythonModel:
             responses = execute_processed_requests(processed_requests)
             for i in range(len(responses)):  # len(responses) == len(processed_requests)
                 response_sender = processed_requests[i]["response_sender"]
-                response = responses[i]
-                if response != None:
-                    response_sender.send(response)
+                response_sender.send(responses[i])
                 response_sender.send(
                     flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
                 )
