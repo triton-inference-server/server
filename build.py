@@ -1292,7 +1292,9 @@ RUN conda install -y mamba -c conda-forge  && \
     wget "{vllm_conda_env_bash}" && \
     mamba env create -f environment.yml && \
     cp /opt/conda/envs/vllm_env/lib/python3.10/site-packages/conda_pack/scripts/posix/activate /opt/conda/envs/vllm_env/bin/
-"""
+""".format(
+            vllm_conda_env_bash=vllm_conda_env_bash
+        )
 
     df += """
 WORKDIR /opt/tritonserver
