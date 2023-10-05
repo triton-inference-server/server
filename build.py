@@ -1284,11 +1284,14 @@ RUN apt-get update && \
         df += install_miniconda(argmap["CONDA_VERSION"], target_machine)
         vllm_conda_env_bash = "https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/tools/environment.yml"
 
+        # The last copy is needed so that user could run vllm models with unpacked
+        # conda env
         df += """
 # conda environment is required for the vllm backend
 RUN conda install -y mamba -c conda-forge  && \
     wget "{vllm_conda_env_bash}" && \
-    mamba env create -f environment.yml
+    mamba env create -f environment.yml && \
+    cp /opt/conda/envs/vllm_env/lib/python3.10/site-packages/conda_pack/scripts/posix/activate /opt/conda/envs/vllm_env/bin/
 """
 
     df += """
