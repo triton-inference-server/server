@@ -1787,25 +1787,25 @@ def backend_build(
 
 def backend_clone(
     be,
-    cmake_script,
+    clone_script,
     tag,
     install_dir,
     github_organization,
 ):
     repo_clone_dir = os.path.join(install_dir, "backends")
 
-    cmake_script.commentln(8)
-    cmake_script.comment(f"'{be}' backend")
-    cmake_script.comment("Delete this section to remove backend from build")
-    cmake_script.comment()
-    cmake_script.mkdir(repo_clone_dir)
-    cmake_script.cwd(repo_clone_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    clone_script.commentln(8)
+    clone_script.comment(f"'{be}' backend")
+    clone_script.comment("Delete this section to remove backend from build")
+    clone_script.comment()
+    clone_script.mkdir(repo_clone_dir)
+    clone_script.cwd(repo_clone_dir)
+    clone_script.gitclone(backend_repo(be), tag, be, github_organization)
 
-    cmake_script.comment()
-    cmake_script.comment(f"end '{be}' backend")
-    cmake_script.commentln(8)
-    cmake_script.blankln()
+    clone_script.comment()
+    clone_script.comment(f"end '{be}' backend")
+    clone_script.commentln(8)
+    clone_script.blankln()
 
 
 def repo_agent_build(
