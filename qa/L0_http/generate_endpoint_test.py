@@ -356,6 +356,13 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 "attempt to access JSON non-string as string", r.json()["error"]
             )
 
+    def test_parameters(self):
+        # Test reserved nested object for parameters
+        text = "hello world"
+        rep_count = 3
+        inputs = {"PROMPT": [text], "STREAM": True, "parameters":{"REPETITION": rep_count}}
+        self.generate_stream_expect_success(self._model_name, inputs, text, rep_count)
+
 
 if __name__ == "__main__":
     unittest.main()
