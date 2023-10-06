@@ -84,6 +84,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     data_compressor_test
     PRIVATE
       triton-core-serverapi   # from repo-core
+      triton-core-serverstub  # from repo-core
       GTest::gtest
       GTest::gtest_main
       ${LIBEVENT_LIBRARIES}

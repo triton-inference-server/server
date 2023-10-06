@@ -1,4 +1,4 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -43,6 +44,26 @@
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
+
+class MappingSchema {
+ public:
+  enum class Kind {
+    EXACT_MAPPING,
+    // An object of this kind means it is a nested mapping schema.
+    MAPPING_SCHEMA
+  };
+  std::map<std::string, std::unique_ptr<MappingSchema>> children_;
+  // Whether an unspecified key is allowed. If true,
+  // * for requests, the unspecified key will be converted to Triton input
+  //   following the EXACT_MAPPING rule.
+  // * for responses, the Triton output will be converted to JSON key-value
+  //   pairs at top level if the name is unspecified in the schema,
+  //   following the EXACT_MAPPING rule.
+  const bool allow_unspecified_{true};
+  const Kind kind_{Kind::EXACT_MAPPING};
+
+ private:
+};
 
 // Generic HTTP server using evhtp
 class HTTPServer {
@@ -186,6 +207,9 @@ class HTTPAPIServer : public HTTPServer {
   // send the response.
   class InferRequestClass {
    public:
+    // [FIXME] decompression / compression should be handled implicitly
+    // within InferRequestClass. This alleviate the check for decompressed
+    // buffer in HTTPServer code.
     explicit InferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type);
@@ -199,7 +223,7 @@ class HTTPAPIServer : public HTTPServer {
     static void InferResponseComplete(
         TRITONSERVER_InferenceResponse* response, const uint32_t flags,
         void* userp);
-    TRITONSERVER_Error* FinalizeResponse(
+    virtual TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
 
     // Helper function to set infer response header in the form specified by
@@ -230,6 +254,96 @@ class HTTPAPIServer : public HTTPServer {
     std::atomic<uint32_t> response_count_;
   };
 
+  class GenerateRequestClass : public InferRequestClass {
+   public:
+    explicit GenerateRequestClass(
+        TRITONSERVER_Server* server, evhtp_request_t* req,
+        DataCompressor::Type response_compression_type,
+        const MappingSchema* request_schema,
+        const MappingSchema* response_schema, bool streaming,
+        TRITONSERVER_InferenceRequest* triton_request)
+        : InferRequestClass(server, req, response_compression_type),
+          request_schema_(request_schema), response_schema_(response_schema),
+          streaming_(streaming), triton_request_(triton_request)
+    {
+    }
+    virtual ~GenerateRequestClass();
+
+    // [FIXME] Specialize response complete function for now, should have
+    // been a dispatcher and call into object specific response function.
+    static void InferResponseComplete(
+        TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+        void* userp);
+    static void ChunkResponseCallback(evthr_t* thr, void* arg, void* shared);
+    static void EndResponseCallback(evthr_t* thr, void* arg, void* shared);
+    // Return whether the response is ending
+    void SendChunkResponse(bool end);
+
+    // Response preparation
+    TRITONSERVER_Error* FinalizeResponse(
+        TRITONSERVER_InferenceResponse* response) override;
+    void AddErrorJson(TRITONSERVER_Error* error);
+    void StartResponse(evhtp_res code);
+
+    // [DLIS-5551] currently always performs basic conversion, only maps schema
+    // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for
+    // customized conversion where a detailed schema will be provided.
+    TRITONSERVER_Error* ConvertGenerateRequest(
+        std::map<std::string, triton::common::TritonJson::Value>&
+            input_metadata,
+        const MappingSchema* schema,
+        triton::common::TritonJson::Value& generate_request);
+
+    const MappingSchema* RequestSchema() { return request_schema_; }
+    const MappingSchema* ResponseSchema() { return response_schema_; }
+
+   private:
+    struct TritonOutput {
+      enum class Type { RESERVED, TENSOR, PARAMETER };
+      TritonOutput(Type t, const std::string& val) : type(t), value(val) {}
+      explicit TritonOutput(Type t, uint32_t i) : type(t), index(i) {}
+      Type type;
+      // RESERVED type
+      std::string value;
+      // TENSOR, PARAMETER type
+      uint32_t index;
+    };
+    TRITONSERVER_Error* ExactMappingInput(
+        const std::string& name, triton::common::TritonJson::Value& value,
+        std::map<std::string, triton::common::TritonJson::Value>&
+            input_metadata);
+
+    // [DLIS-5551] currently always performs basic conversion, only maps schema
+    // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for
+    // customized conversion where a detailed schema will be provided.
+    TRITONSERVER_Error* ConvertGenerateResponse(
+        const std::map<std::string, TritonOutput>& output_metadata,
+        const MappingSchema* schema,
+        triton::common::TritonJson::Value* generate_response,
+        std::set<std::string>* mapped_outputs);
+    TRITONSERVER_Error* ExactMappingOutput(
+        const std::string& name, const TritonOutput& triton_output,
+        triton::common::TritonJson::Value* generate_response,
+        std::set<std::string>* mapped_outputs);
+
+    const MappingSchema* request_schema_{nullptr};
+    const MappingSchema* response_schema_{nullptr};
+    const bool streaming_{false};
+    // Pointer to associated Triton request, this class does not own the
+    // request and must not reference it after a successful
+    // TRITONSERVER_ServerInferAsync.
+    TRITONSERVER_InferenceRequest* triton_request_{nullptr};
+    // Placeholder to completing response, this class does not own
+    // the response.
+    TRITONSERVER_InferenceResponse* triton_response_{nullptr};
+    // As InferResponseComplete and ChunkResponseCallback are called in
+    // different threads, need to have dedicated buffers for each response and
+    // ensure mutual exclusive access.
+    std::mutex res_mtx_;
+    std::queue<evbuffer*> pending_http_responses_;
+    bool end_{false};
+  };
+
  protected:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -238,6 +352,7 @@ class HTTPAPIServer : public HTTPServer {
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
+  // [FIXME] extract to "infer" class
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req)
   {
@@ -255,6 +370,10 @@ class HTTPAPIServer : public HTTPServer {
   virtual DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req);
   virtual DataCompressor::Type GetResponseCompressionType(evhtp_request_t* req);
 
+
+  TRITONSERVER_Error* GetModelConfig(
+      const std::string& model_name, int64_t requested_model_version,
+      std::string* config_json);
   TRITONSERVER_Error* GetContentLength(
       evhtp_request_t* req, evbuffer* decompressed_buffer,
       int32_t* content_length);
@@ -318,7 +437,27 @@ class HTTPAPIServer : public HTTPServer {
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
   void HandleLogging(evhtp_request_t* req);
 
-  TRITONSERVER_Error* EVBufferToTritonRequest(
+  // Text Generation / LLM format
+  //'streaming' selects the schema pair to convert request / response.
+  // 'streaming' also controls the response convention, if true,
+  // Server-Sent Events format will be used to send responses.
+  void HandleGenerate(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str, bool streaming);
+
+  // 'meta_data_root' is the root JSON document for 'input_metadata'.
+  // In TritonJson, the Value objects are references to the root document.
+  // Therefore the document must stay valid.
+  TRITONSERVER_Error* ModelInputMetadata(
+      const std::string& model_name, const int64_t model_version,
+      std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
+      triton::common::TritonJson::Value* meta_data_root);
+
+  // Parses full evhtp request and its evbuffers into JSON.
+  TRITONSERVER_Error* EVRequestToJson(
+      evhtp_request_t* req, triton::common::TritonJson::Value* request_json);
+  // Parses evhtp request buffers into Triton Inference Request.
+  TRITONSERVER_Error* EVRequestToTritonRequest(
       evhtp_request_t* req, const std::string& model_name,
       TRITONSERVER_InferenceRequest* irequest, evbuffer* decompressed_buffer,
       InferRequestClass* infer_req, size_t header_length);
@@ -367,6 +506,16 @@ class HTTPAPIServer : public HTTPServer {
   re2::RE2 systemsharedmemory_regex_;
   re2::RE2 cudasharedmemory_regex_;
   re2::RE2 trace_regex_;
+
+  // [DLIS-5551] currently always performs basic conversion, only maps schema
+  // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for
+  // customized conversion where a detailed schema will be provided.
+  std::unique_ptr<MappingSchema> generate_request_schema_{new MappingSchema()};
+  std::unique_ptr<MappingSchema> generate_response_schema_{new MappingSchema()};
+  std::unique_ptr<MappingSchema> generate_stream_response_schema_{
+      new MappingSchema()};
+  std::unique_ptr<MappingSchema> generate_stream_request_schema_{
+      new MappingSchema()};
 };
 
 }}  // namespace triton::server
