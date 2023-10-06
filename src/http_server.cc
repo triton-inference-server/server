@@ -4138,8 +4138,10 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
         case TRITONSERVER_PARAMETER_BYTES:
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,
-              "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is "
-              "not currently supported");
+              (std::string("Response parameter '") + name +
+               "' has type 'TRITONSERVER_PARAMETER_BYTES' which is "
+               "not currently supported")
+                  .c_str());
           break;
       }
     }
@@ -4305,8 +4307,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
         case TRITONSERVER_PARAMETER_BYTES:
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,
-              "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is "
-              "not currently supported");
+              (std::string("Response parameter '") + name +
+               "' has type 'TRITONSERVER_PARAMETER_BYTES' which is "
+               "not currently supported")
+                  .c_str());
           break;
       }
       break;
@@ -4331,7 +4335,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
       // sanity check
       if (info->kind_ != AllocPayload::OutputInfo::JSON) {
         return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL, "Unexpected output response type");
+            TRITONSERVER_ERROR_INTERNAL,
+            (std::string("non-JSON output response type is requested for '") +
+             cname + "'")
+                .c_str());
       }
 
       size_t element_count = 1;

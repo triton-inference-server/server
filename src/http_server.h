@@ -285,6 +285,9 @@ class HTTPAPIServer : public HTTPServer {
     void AddErrorJson(TRITONSERVER_Error* error);
     void StartResponse(evhtp_res code);
 
+    // [DLIS-5551] currently always performs basic conversion, only maps schema
+    // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcomming kinds are for
+    // customized conversion where a detailed schema will be provided.
     TRITONSERVER_Error* ConvertGenerateRequest(
         std::map<std::string, triton::common::TritonJson::Value>&
             input_metadata,
@@ -310,6 +313,9 @@ class HTTPAPIServer : public HTTPServer {
         std::map<std::string, triton::common::TritonJson::Value>&
             input_metadata);
 
+    // [DLIS-5551] currently always performs basic conversion, only maps schema
+    // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcomming kinds are for
+    // customized conversion where a detailed schema will be provided.
     TRITONSERVER_Error* ConvertGenerateResponse(
         const std::map<std::string, TritonOutput>& output_metadata,
         const MappingSchema* schema,
@@ -501,7 +507,9 @@ class HTTPAPIServer : public HTTPServer {
   re2::RE2 cudasharedmemory_regex_;
   re2::RE2 trace_regex_;
 
-  // [DLIS-5551] currently always perform basic conversion
+  // [DLIS-5551] currently always performs basic conversion, only maps schema
+  // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcomming kinds are for
+  // customized conversion where a detailed schema will be provided.
   std::unique_ptr<MappingSchema> generate_request_schema_{new MappingSchema()};
   std::unique_ptr<MappingSchema> generate_response_schema_{new MappingSchema()};
   std::unique_ptr<MappingSchema> generate_stream_response_schema_{
