@@ -363,6 +363,18 @@ class GenerateEndpointTest(tu.TestResultCollector):
         inputs = {"PROMPT": [text], "STREAM": True, "parameters":{"REPETITION": rep_count}}
         self.generate_stream_expect_success(self._model_name, inputs, text, rep_count)
 
+        # non object parameters
+        inputs = {"PROMPT": [text], "STREAM": True, "parameters": 1}
+
+        r = self.generate(self._model_name, inputs)
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            self.assertIn(
+                "Expected JSON object for keyword: 'parameters'", r.json()["error"]
+            )
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3282,8 +3282,10 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
         case MappingSchema::Kind::MAPPING_SCHEMA: {
           // The key is nested schema
           triton::common::TritonJson::Value nested_generate_request;
-          RETURN_IF_ERR(generate_request.MemberAsObject(
-              m.c_str(), &nested_generate_request));
+          RETURN_MSG_IF_ERR(
+              generate_request.MemberAsObject(
+                  m.c_str(), &nested_generate_request),
+              "Expected JSON object for keyword: '" + m + "'");
           RETURN_IF_ERR(ConvertGenerateRequest(
               input_metadata, it->second.get(), nested_generate_request));
           break;
