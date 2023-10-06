@@ -34,6 +34,8 @@ import platform
 import stat
 import subprocess
 import sys
+import importlib.util
+import requests
 from inspect import getsourcefile
 
 #
@@ -1274,10 +1276,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if "fastertransformer" in backends:
         be = "fastertransformer"
-        import importlib.util
-
-        import requests
-
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
             backends[be]
         )
@@ -1318,10 +1316,6 @@ RUN apt-get update && \
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
-        import importlib.util
-
-        import requests
-
         # FIXME: Update the url
         url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
