@@ -62,6 +62,14 @@ class MappingSchema {
   const bool allow_unspecified_{true};
   const Kind kind_{Kind::EXACT_MAPPING};
 
+  explicit MappingSchema(
+      const MappingSchema::Kind& kind = Kind::EXACT_MAPPING,
+      const bool& allow_unspecified = true)
+      : allow_unspecified_(allow_unspecified), kind_(kind)
+  {
+  }
+
+
  private:
 };
 

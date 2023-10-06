@@ -1082,6 +1082,17 @@ HTTPAPIServer::HTTPAPIServer(
       TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
           allocator_, OutputBufferAttributes),
       "setting allocator's buffer attributes function");
+
+  // Reserved field parameters for generate
+  // If present, parameters will be converted to tensors
+  // or parameters based on model config
+  
+  // Note: may change in future versions
+  const std::string parameters_field = "parameters";
+  generate_stream_request_schema_->children_.emplace(parameters_field,
+						     new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
+  generate_request_schema_->children_.emplace(parameters_field,
+					      new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
 }
 
 HTTPAPIServer::~HTTPAPIServer()
