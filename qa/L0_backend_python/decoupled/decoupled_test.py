@@ -256,6 +256,39 @@ class DecoupledTest(tu.TestResultCollector):
                 "The completed request size must be zero.",
             )
 
+    def test_decoupled_execute_cancel(self):
+        model_name = "execute_cancel"
+        log_path = "decoupled_server.log"
+        execute_delay = 4.0  # seconds
+        shape = [1, 1]
+
+        user_data = UserData()
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            input_data = np.array([[execute_delay]], dtype=np.float32)
+            inputs = [
+                grpcclient.InferInput(
+                    "EXECUTE_DELAY", shape, np_to_triton_dtype(input_data.dtype)
+                )
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            client.async_stream_infer(model_name, inputs)
+            time.sleep(2)  # model delay for decoupling request and response sender
+            time.sleep(2)  # ensure the request is executing
+            client.stop_stream(cancel_requests=True)
+            time.sleep(2)  # ensure the cancellation is delivered
+
+        self.assertFalse(user_data._completed_requests.empty())
+        while not user_data._completed_requests.empty():
+            data_item = user_data._completed_requests.get()
+            self.assertIsInstance(data_item, InferenceServerException)
+            self.assertEqual(data_item.status(), "StatusCode.CANCELLED")
+
+        with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
+            log_text = f.read()
+        self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
+        self.assertIn("[execute_cancel] Request cancelled at ", log_text)
+
 
 if __name__ == "__main__":
     unittest.main()
