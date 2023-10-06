@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import importlib.util
 import multiprocessing
 import os
 import os.path
@@ -34,9 +35,9 @@ import platform
 import stat
 import subprocess
 import sys
-import importlib.util
-import requests
 from inspect import getsourcefile
+
+import requests
 
 #
 # Build Triton Inference Server.
