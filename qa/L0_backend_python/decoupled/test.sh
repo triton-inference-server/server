@@ -27,7 +27,7 @@
 
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
-EXPECTED_NUM_TESTS="5"
+EXPECTED_NUM_TESTS="6"
 TEST_RESULT_FILE='test_results.txt'
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
@@ -49,6 +49,11 @@ cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32/
 mkdir -p models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
+
+mkdir -p models/execute_cancel/1/
+cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
+cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
+echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/config.pbtxt
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 mkdir -p models/square_int32/1/
