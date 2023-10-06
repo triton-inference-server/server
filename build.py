@@ -1801,6 +1801,8 @@ def backend_clone(
     clone_script.mkdir(repo_clone_dir)
     clone_script.cwd(repo_clone_dir)
     clone_script.gitclone(backend_repo(be), tag, be, github_organization)
+    clone_script.rmdir(os.path.join(repo_clone_dir, backend_repo(be), "ci"))
+    clone_script.rmdir(os.path.join(repo_clone_dir, backend_repo(be), "tools"))
 
     clone_script.comment()
     clone_script.comment(f"end '{be}' backend")
