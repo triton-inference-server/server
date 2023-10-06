@@ -63,10 +63,12 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
   do {                                                                 \
     TRITONSERVER_Error* err__ = (X);                                   \
     if (err__ != nullptr) {                                            \
-      return TRITONSERVER_ErrorNew(                                    \
+      auto new_err = TRITONSERVER_ErrorNew(                            \
           TRITONSERVER_ErrorCode(err__),                               \
           (std::string(MSG) + ": " + TRITONSERVER_ErrorMessage(err__)) \
               .c_str());                                               \
+      TRITONSERVER_ErrorDelete(err__);                                 \
+      return new_err;                                                  \
     }                                                                  \
   } while (false)
 
