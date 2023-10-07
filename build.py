@@ -1789,20 +1789,27 @@ def backend_clone(
     be,
     clone_script,
     tag,
+    build_dir,
     install_dir,
     github_organization,
 ):
-    repo_clone_dir = os.path.join(install_dir, "backends")
+    repo_target_dir = os.path.join(install_dir, "backends")
 
     clone_script.commentln(8)
     clone_script.comment(f"'{be}' backend")
     clone_script.comment("Delete this section to remove backend from build")
     clone_script.comment()
-    clone_script.mkdir(repo_clone_dir)
-    clone_script.cwd(repo_clone_dir)
+    clone_script.mkdir(build_dir)
+    clone_script.cwd(build_dir)
     clone_script.gitclone(backend_repo(be), tag, be, github_organization)
-    clone_script.rmdir(os.path.join(repo_clone_dir, backend_repo(be), "ci"))
-    clone_script.rmdir(os.path.join(repo_clone_dir, backend_repo(be), "tools"))
+
+    cmake_script.mkdir(os.path.join(install_dir, "backends"))
+    cmake_script.rmdir(os.path.join(install_dir, "backends", backend_repo(be)))
+    cmake_script.mkdir(os.path.join(install_dir, "backends", backend_repo(be)))
+    cmake_script.cp(
+        os.path.join(build_dir, backend_repo(be), "src", "model.py"),
+        os.path.join(install_dir, "backends", backend_repo(be)),
+    )
 
     clone_script.comment()
     clone_script.comment(f"end '{be}' backend")
@@ -2667,6 +2674,7 @@ if __name__ == "__main__":
                     be,
                     cmake_script,
                     backends[be],
+                    script_build_dir,
                     script_install_dir,
                     github_organization,
                 )
