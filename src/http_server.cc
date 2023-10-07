@@ -3286,8 +3286,10 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
               generate_request.MemberAsObject(
                   m.c_str(), &nested_generate_request),
               "Expected JSON object for keyword: '" + m + "'");
-          RETURN_IF_ERR(ConvertGenerateRequest(
-              input_metadata, it->second.get(), nested_generate_request));
+          RETURN_MSG_IF_ERR(
+              ConvertGenerateRequest(
+                  input_metadata, it->second.get(), nested_generate_request),
+              "Converting keyword: '" + m + "'");
           break;
         }
         default:
