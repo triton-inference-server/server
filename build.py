@@ -2506,7 +2506,11 @@ if __name__ == "__main__":
 
     if "vllm" in backends:
         if "python" not in backends:
-            log("vLLM backend requires Python backend, adding Python backend with tag {}".format(backends["vllm"]))
+            log(
+                "vLLM backend requires Python backend, adding Python backend with tag {}".format(
+                    backends["vllm"]
+                )
+            )
             backends["python"] = backends["vllm"]
 
     # Initialize map of repo agents to build and repo-tag for each.
