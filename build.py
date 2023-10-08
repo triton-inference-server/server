@@ -1793,8 +1793,6 @@ def backend_clone(
     install_dir,
     github_organization,
 ):
-    repo_target_dir = os.path.join(install_dir, "backends")
-
     clone_script.commentln(8)
     clone_script.comment(f"'{be}' backend")
     clone_script.comment("Delete this section to remove backend from build")
@@ -1803,18 +1801,14 @@ def backend_clone(
     clone_script.cwd(build_dir)
     clone_script.gitclone(backend_repo(be), tag, be, github_organization)
 
+    repo_target_dir = os.path.join(install_dir, "backends")
     clone_script.mkdir(repo_target_dir)
     backend_dir = os.path.join(repo_target_dir, backend_repo(be))
     clone_script.rmdir(backend_dir)
     clone_script.mkdir(backend_dir)
-    # TODO: Remove after done debugging
-    backend_build_dir = os.path.join(build_dir, backend_repo(be))
-    backend_build_dir_src = os.path.join(build_dir, backend_repo(be), "src")
-    clone_script.cmd(f"ls -lR {backend_build_dir}")
-    clone_script.cmd(f"ls -lR {backend_build_dir_src}")
 
     clone_script.cp(
-        os.path.join(build_dir, backend_repo(be), "src", "model.py"),
+        os.path.join(build_dir, be, "src", "model.py"),
         backend_dir,
     )
 
