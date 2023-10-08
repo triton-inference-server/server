@@ -1803,7 +1803,7 @@ def backend_clone(
 
     repo_target_dir = os.path.join(install_dir, "backends")
     clone_script.mkdir(repo_target_dir)
-    backend_dir = os.path.join(repo_target_dir, backend_repo(be))
+    backend_dir = os.path.join(repo_target_dir, be)
     clone_script.rmdir(backend_dir)
     clone_script.mkdir(backend_dir)
 
