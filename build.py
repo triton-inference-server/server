@@ -1803,12 +1803,19 @@ def backend_clone(
     clone_script.cwd(build_dir)
     clone_script.gitclone(backend_repo(be), tag, be, github_organization)
 
-    cmake_script.mkdir(os.path.join(install_dir, "backends"))
-    cmake_script.rmdir(os.path.join(install_dir, "backends", backend_repo(be)))
-    cmake_script.mkdir(os.path.join(install_dir, "backends", backend_repo(be)))
-    cmake_script.cp(
+    clone_script.mkdir(repo_target_dir)
+    backend_dir = os.path.join(repo_target_dir, backend_repo(be))
+    clone_script.rmdir(backend_dir)
+    clone_script.mkdir(backend_dir)
+    # TODO: Remove after done debugging
+    backend_build_dir = os.path.join(build_dir, backend_repo(be))
+    backend_build_dir_src = os.path.join(build_dir, backend_repo(be), "src")
+    self.cmd(f"ls -lR {backend_build_dir}")
+    self.cmd(f"ls -lR {backend_build_dir_src}")
+    
+    clone_script.cp(
         os.path.join(build_dir, backend_repo(be), "src", "model.py"),
-        os.path.join(install_dir, "backends", backend_repo(be)),
+        backend_dir,
     )
 
     clone_script.comment()
