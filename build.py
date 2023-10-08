@@ -74,7 +74,7 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
-        "py310_23.1.0-1",  # Conda version.
+        "py310_23.1.0-1",  # Conda version
     )
 }
 
@@ -1279,22 +1279,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 """
 
-    # Build conda environment for vllm backend
     if "vllm" in backends:
-        df += install_miniconda(argmap["CONDA_VERSION"], target_machine)
-        vllm_conda_env_bash = "https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/tools/environment.yml"
-
-        # The last copy is needed so that user could run vllm models with unpacked
-        # conda env
+        # [DLIS-5606] Build Conda environment for vLLM backend
+        # Remove Pip install once Conda environment works.
         df += """
-# conda environment is required for the vllm backend
-RUN conda install -y mamba -c conda-forge  && \
-    wget "{vllm_conda_env_bash}" && \
-    mamba env create -f environment.yml && \
-    cp /opt/conda/envs/vllm_env/lib/python3.10/site-packages/conda_pack/scripts/posix/activate /opt/conda/envs/vllm_env/bin/
-""".format(
-            vllm_conda_env_bash=vllm_conda_env_bash
-        )
+RUN pip3 install vllm==0.2.0
+"""
 
     df += """
 WORKDIR /opt/tritonserver
