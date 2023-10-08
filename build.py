@@ -80,6 +80,7 @@ TRITON_VERSION_MAP = {
         "py310_23.1.0-1",  # Conda version
         "9.1.0.1",  # TRT version for building TRT-LLM backend
         "12.2",  # CUDA version for building TRT-LLM backend
+        "0.2.0",  # vLLM version
     )
 }
 
@@ -1332,6 +1333,16 @@ RUN apt-get update && \
             argmap["TRT_LLM_TRT_VERSION"], argmap["TRT_LLM_CUDA_VERSION"]
         )
 
+    if "vllm" in backends:
+        # [DLIS-5606] Build Conda environment for vLLM backend
+        # Remove Pip install once vLLM backend moves to Conda environment.
+        df += """
+# vLLM needed for vLLM backend
+RUN pip3 install vllm=={}
+""".format(
+            TRITON_VERSION_MAP[FLAGS.version][9]
+        )
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
@@ -1837,6 +1848,39 @@ def backend_build(
     cmake_script.comment(f"end '{be}' backend")
     cmake_script.commentln(8)
     cmake_script.blankln()
+
+
+def backend_clone(
+    be,
+    clone_script,
+    tag,
+    build_dir,
+    install_dir,
+    github_organization,
+):
+    clone_script.commentln(8)
+    clone_script.comment(f"'{be}' backend")
+    clone_script.comment("Delete this section to remove backend from build")
+    clone_script.comment()
+    clone_script.mkdir(build_dir)
+    clone_script.cwd(build_dir)
+    clone_script.gitclone(backend_repo(be), tag, be, github_organization)
+
+    repo_target_dir = os.path.join(install_dir, "backends")
+    clone_script.mkdir(repo_target_dir)
+    backend_dir = os.path.join(repo_target_dir, be)
+    clone_script.rmdir(backend_dir)
+    clone_script.mkdir(backend_dir)
+
+    clone_script.cp(
+        os.path.join(build_dir, be, "src", "model.py"),
+        backend_dir,
+    )
+
+    clone_script.comment()
+    clone_script.comment(f"end '{be}' backend")
+    clone_script.commentln(8)
+    clone_script.blankln()
 
 
 def repo_agent_build(
@@ -2691,17 +2735,27 @@ if __name__ == "__main__":
             else:
                 github_organization = FLAGS.github_organization
 
-            backend_build(
-                be,
-                cmake_script,
-                backends[be],
-                script_build_dir,
-                script_install_dir,
-                github_organization,
-                images,
-                components,
-                library_paths,
-            )
+            if be == "vllm":
+                backend_clone(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                )
+            else:
+                backend_build(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                    images,
+                    components,
+                    library_paths,
+                )
 
         # Commands to build each repo agent...
         for ra in repoagents:
