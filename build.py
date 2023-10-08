@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import importlib.util
 import multiprocessing
 import os
 import os.path
@@ -35,6 +36,8 @@ import stat
 import subprocess
 import sys
 from inspect import getsourcefile
+
+import requests
 
 #
 # Build Triton Inference Server.
@@ -75,6 +78,8 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
+        "9.1.0.1",  # TRT version for building TRT-LLM backend
+        "12.2",  # CUDA version for building TRT-LLM backend
     )
 }
 
@@ -564,6 +569,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = fastertransformer_cmake_args()
     elif be == "tensorrt":
         args = tensorrt_cmake_args()
+    elif be == "tensorrtllm":
+        args = tensorrtllm_cmake_args(images)
     else:
         args = []
 
@@ -855,6 +862,39 @@ def fastertransformer_cmake_args():
             "fastertransformer", "CMAKE_EXPORT_COMPILE_COMMANDS", None, 1
         ),
         cmake_backend_arg("fastertransformer", "ENABLE_FP8", None, "OFF"),
+    ]
+    return cargs
+
+
+def tensorrtllm_cmake_args(images):
+    cargs = [
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TRT_LIB_DIR",
+            None,
+            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
+        ),
+        cmake_backend_arg(
+            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
+        ),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TRTLLM_BUILD_CONTAINER",
+            None,
+            images["base"],
+        ),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TENSORRT_VERSION",
+            None,
+            TRITON_VERSION_MAP[FLAGS.version][7],
+        ),
+        cmake_backend_arg(
+            "tensorrtllm",
+            "CUDA_VERSION",
+            None,
+            TRITON_VERSION_MAP[FLAGS.version][8],
+        ),
     ]
     return cargs
 
@@ -1237,10 +1277,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if "fastertransformer" in backends:
         be = "fastertransformer"
-        import importlib.util
-
-        import requests
-
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
             backends[be]
         )
@@ -1278,6 +1314,23 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 """
+    # Add dependencies needed for tensorrtllm backend
+    if "tensorrtllm" in backends:
+        be = "tensorrtllm"
+        # FIXME: Update the url
+        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+            backends[be]
+        )
+
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader(
+            "trtllm_buildscript", loader=None, origin=url
+        )
+        trtllm_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, trtllm_buildscript.__dict__)
+        df += trtllm_buildscript.create_postbuild(
+            argmap["TRT_LLM_TRT_VERSION"], argmap["TRT_LLM_CUDA_VERSION"]
+        )
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
@@ -1448,6 +1501,8 @@ def create_build_dockerfiles(
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][6],
     }
+    dockerfileargmap["TRT_LLM_TRT_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][7]
+    dockerfileargmap["TRT_LLM_CUDA_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][8]
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
     # since we are using PyTorch and TensorFlow containers that
@@ -1733,6 +1788,12 @@ def core_build(
     cmake_script.blankln()
 
 
+def tensorrtllm_prebuild(cmake_script):
+    # Export the TRT_ROOT environment variable
+    cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
+    cmake_script.cmd("export ARCH=$(uname -m)")
+
+
 def backend_build(
     be,
     cmake_script,
@@ -1753,7 +1814,16 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    # FIXME: Use GitHub repo
+    if be == "tensorrtllm":
+        cmake_script.gitclone(
+            backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish"
+        )
+    else:
+        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+
+    if be == "tensorrtllm":
+        tensorrtllm_prebuild(cmake_script)
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
@@ -1764,6 +1834,7 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
+
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
         os.path.join(install_dir, "backends"),
@@ -2472,6 +2543,15 @@ if __name__ == "__main__":
             parts[0] = "tensorflow"
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
+
+    if "vllm" in backends:
+        if "python" not in backends:
+            log(
+                "vLLM backend requires Python backend, adding Python backend with tag {}".format(
+                    backends["vllm"]
+                )
+            )
+            backends["python"] = backends["vllm"]
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
