@@ -80,6 +80,7 @@ TRITON_VERSION_MAP = {
         "py310_23.1.0-1",  # Conda version
         "9.1.0.1",  # TRT version for building TRT-LLM backend
         "12.2",  # CUDA version for building TRT-LLM backend
+        "0.2.0",  # vLLM version
     )
 }
 
@@ -1336,8 +1337,11 @@ RUN apt-get update && \
         # [DLIS-5606] Build Conda environment for vLLM backend
         # Remove Pip install once Conda environment works.
         df += """
-RUN pip3 install vllm==0.2.0
-"""
+# vLLM needed for vLLM backend
+RUN pip3 install vllm=={}
+""".format(
+            TRITON_VERSION_MAP[FLAGS.version][9]
+        )
 
     df += """
 WORKDIR /opt/tritonserver
