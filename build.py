@@ -1085,7 +1085,7 @@ COPY . .
 ENTRYPOINT []
 """
 
-    # Install miniconda required for the DALI and vllm backend.
+    # Install miniconda required for the DALI backend.
     if target_platform() != "windows":
         df += install_miniconda(argmap["CONDA_VERSION"], target_machine())
 
@@ -1335,7 +1335,7 @@ RUN apt-get update && \
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
-        # Remove Pip install once Conda environment works.
+        # Remove Pip install once vLLM backend moves to Conda environment.
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
