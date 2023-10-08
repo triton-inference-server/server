@@ -1810,8 +1810,8 @@ def backend_clone(
     # TODO: Remove after done debugging
     backend_build_dir = os.path.join(build_dir, backend_repo(be))
     backend_build_dir_src = os.path.join(build_dir, backend_repo(be), "src")
-    self.cmd(f"ls -lR {backend_build_dir}")
-    self.cmd(f"ls -lR {backend_build_dir_src}")
+    clone_script.cmd(f"ls -lR {backend_build_dir}")
+    clone_script.cmd(f"ls -lR {backend_build_dir_src}")
 
     clone_script.cp(
         os.path.join(build_dir, backend_repo(be), "src", "model.py"),
