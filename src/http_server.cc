@@ -1083,18 +1083,7 @@ HTTPAPIServer::HTTPAPIServer(
           allocator_, OutputBufferAttributes),
       "setting allocator's buffer attributes function");
 
-  // Reserved field parameters for generate
-  // If present, parameters will be converted to tensors
-  // or parameters based on model config
-
-  // Note: may change in future versions
-  const std::string parameters_field = "parameters";
-  generate_stream_request_schema_->children_.emplace(
-      parameters_field,
-      new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
-  generate_request_schema_->children_.emplace(
-      parameters_field,
-      new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
+  ConfigureGenerateMappingSchema();
 }
 
 HTTPAPIServer::~HTTPAPIServer()
@@ -3281,6 +3270,14 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
           // The key is nested schema
+          if (input_metadata.find(m) != input_metadata.end()) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string(
+                     "Keyword '" + m +
+                     "' for nested schema also given as input tensor name")
+                     .c_str()));
+          }
           triton::common::TritonJson::Value nested_generate_request;
           RETURN_MSG_IF_ERR(
               generate_request.MemberAsObject(

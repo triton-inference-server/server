@@ -524,6 +524,25 @@ class HTTPAPIServer : public HTTPServer {
       new MappingSchema()};
   std::unique_ptr<MappingSchema> generate_stream_request_schema_{
       new MappingSchema()};
+
+  // Provisional definition of generate mapping schema
+  // to allow for parameters passing
+  //
+  // Note: subject to change
+  void ConfigureGenerateMappingSchema()
+  {
+    // Reserved field parameters for generate
+    // If present, parameters will be converted to tensors
+    // or parameters based on model config
+
+    const std::string parameters_field = "parameters";
+    generate_stream_request_schema_->children_.emplace(
+        parameters_field,
+        new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
+    generate_request_schema_->children_.emplace(
+        parameters_field,
+        new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
+  }
 };
 
 }}  // namespace triton::server
