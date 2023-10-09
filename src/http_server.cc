@@ -1082,6 +1082,8 @@ HTTPAPIServer::HTTPAPIServer(
       TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
           allocator_, OutputBufferAttributes),
       "setting allocator's buffer attributes function");
+
+  ConfigureGenerateMappingSchema();
 }
 
 HTTPAPIServer::~HTTPAPIServer()
@@ -3268,11 +3270,23 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
           // The key is nested schema
+          if (input_metadata.find(m) != input_metadata.end()) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string(
+                     "Keyword '" + m +
+                     "' for nested schema also given as input tensor name")
+                     .c_str()));
+          }
           triton::common::TritonJson::Value nested_generate_request;
-          RETURN_IF_ERR(generate_request.MemberAsObject(
-              m.c_str(), &nested_generate_request));
-          RETURN_IF_ERR(ConvertGenerateRequest(
-              input_metadata, it->second.get(), nested_generate_request));
+          RETURN_MSG_IF_ERR(
+              generate_request.MemberAsObject(
+                  m.c_str(), &nested_generate_request),
+              "Expected JSON object for keyword: '" + m + "'");
+          RETURN_MSG_IF_ERR(
+              ConvertGenerateRequest(
+                  input_metadata, it->second.get(), nested_generate_request),
+              "Converting keyword: '" + m + "'");
           break;
         }
         default:
