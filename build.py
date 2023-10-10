@@ -1323,7 +1323,7 @@ RUN apt-get update && \
         #     backends[be]
         # )
         print("trtllm tag:", backends[be])
-        url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/krish-triton-changes/tools/gen_trtllm_dockerfile.py"
+        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/main/tools/gen_trtllm_dockerfile.py"
 
         response = requests.get(url)
         spec = importlib.util.spec_from_loader(
