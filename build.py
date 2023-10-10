@@ -1319,11 +1319,9 @@ RUN apt-get update && \
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
         # FIXME: Update the url
-        # url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
-        #     backends[be]
-        # )
-        print("trtllm tag:", backends[be])
-        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/main/tools/gen_trtllm_dockerfile.py"
+        url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+            backends[be]
+        )
 
         response = requests.get(url)
         spec = importlib.util.spec_from_loader(
@@ -1797,6 +1795,11 @@ def core_build(
 def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
+    cmake_script.cmd("export ARCH=$(uname -m)")
+
+    # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
+    # to get the build working for r23.10.
+    # patch inflight_batcher_llm/CMakeLists.txt  < inflight_batcher_llm/CMakeLists.txt.patch
     cmake_script.cmd("export ARCH=$(uname -m)")
 
 
