@@ -1319,7 +1319,7 @@ RUN apt-get update && \
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
         # FIXME: Update the url
-        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+        url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
         )
 
@@ -1821,7 +1821,7 @@ def backend_build(
     # FIXME: Use GitHub repo
     if be == "tensorrtllm":
         cmake_script.gitclone(
-            backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish"
+            backend_repo("tekit"), tag, be, "https://gitlab-master.nvidia.com/krish"
         )
     else:
         cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
