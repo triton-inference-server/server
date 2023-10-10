@@ -68,7 +68,7 @@ See `TRITONBACKEND_RequestIsCancelled` and `TRITONBACKEND_ResponseFactoryIsCance
 in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h)
 for more details. The backend upon detecting request cancellation can stop processing
 it any further.
-The python models running behind python backend can also query the cancellation status
+The Python models running behind Python backend can also query the cancellation status
 of request and response_sender. See [this](https://github.com/triton-inference-server/python_backend#request-cancellation-handling)
 section in python backend documentation for more details.
 
