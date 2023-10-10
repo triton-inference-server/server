@@ -166,7 +166,7 @@ Use the [Triton Client](https://github.com/triton-inference-server/client) API t
   - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
   - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
 - [Shared Memory Extension](protocol/extension_shared_memory.md)
-### Cancelling Inflight Inference Request
+### Cancelling Inference Requests
 Triton can detect and handle request that have been cancelled from the client-side. This [document](user_guide/request_cancellation.md) discusses scope and limitations of the feature.
 ### Performance Analysis
 Understanding Inference performance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
