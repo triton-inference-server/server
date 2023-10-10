@@ -78,6 +78,8 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
+        "9.1.0.1",  # TRT version for building TRT-LLM backend
+        "12.2",  # CUDA version for building TRT-LLM backend
         "0.2.1.post1",  # vLLM version
     )
 }
@@ -1362,6 +1364,16 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
 RUN pip3 install vllm=={}
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][7]
+        )
+
+    if "vllm" in backends:
+        # [DLIS-5606] Build Conda environment for vLLM backend
+        # Remove Pip install once vLLM backend moves to Conda environment.
+        df += """
+# vLLM needed for vLLM backend
+RUN pip3 install vllm=={}
+""".format(
+            TRITON_VERSION_MAP[FLAGS.version][9]
         )
 
     df += """
