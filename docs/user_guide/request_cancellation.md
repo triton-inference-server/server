@@ -42,12 +42,12 @@ and `TRITONSERVER_InferenceRequestIsCancelled` to cancel and query the cancellat
 status of an inflight request. Read more about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 In addition, [gRPC endpoint](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) can
-now detect cancelation from the client and attempt to terminate request.
+now detect cancellation from the client and attempt to terminate request.
 At present, only gRPC python client supports issuing request cancellation
 to the server endpoint. See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
 for more details on how to issue requests from the client-side.
 See gRPC guide on RPC [cancellation](https://grpc.io/docs/guides/cancellation/) for
-finer details. 
+finer details.
 
 
 Upon receiving request cancellation, triton does its best to cancel request
@@ -56,9 +56,14 @@ for execution, it is upto the individual backends to detect and handle
 request termination.
 Currently, following backend(s) support(s) early termination:
     - [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
+    - [python backend](https://github.com/triton-inference-server/python_backend)
+
+Python backend is a special case where we expose the APIs to detect cancellation
+status of the request but it is upto the `model.py` developer to detect whether
+the request is cancelled and terminate further execution.
 
 **For the backend developer**: The backend APIs have also been enhanced to let the
-backend detect whether the request received from Triton core has been cancelled. 
+backend detect whether the request received from Triton core has been cancelled.
 See `TRITONBACKEND_RequestIsCancelled` and `TRITONBACKEND_ResponseFactoryIsCancelled`
 in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h)
 for more details. The backend upon detecting request cancellation can stop processing
