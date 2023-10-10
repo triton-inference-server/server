@@ -356,6 +356,44 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 "attempt to access JSON non-string as string", r.json()["error"]
             )
 
+    def test_parameters(self):
+        # Test reserved nested object for parameters
+        text = "hello world"
+        rep_count = 3
+        inputs = {
+            "PROMPT": [text],
+            "STREAM": True,
+            "parameters": {"REPETITION": rep_count},
+        }
+        self.generate_stream_expect_success(self._model_name, inputs, text, rep_count)
+
+        # parameters keyword is not an object
+        inputs = {"PROMPT": [text], "STREAM": True, "parameters": 1}
+
+        r = self.generate(self._model_name, inputs)
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            self.assertIn(
+                "Expected JSON object for keyword: 'parameters'", r.json()["error"]
+            )
+
+        # parameters contains complex object
+        inputs = {
+            "PROMPT": [text],
+            "STREAM": True,
+            "parameters": {"nested": {"twice": 1}},
+        }
+
+        r = self.generate(self._model_name, inputs)
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            self.assertIn(
+                "Converting keyword: 'parameters': parameter 'nested' has invalid type.",
+                r.json()["error"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
