@@ -54,7 +54,7 @@ Upon receiving request cancellation, triton does its best to cancel request
 at various points. However, once a request has been given to the backend
 for execution, it is upto the individual backends to detect and handle
 request termination.
-Currently, following backend(s) support(s) early termination:
+Currently, the following backends support early termination:
     - [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
     - [python backend](https://github.com/triton-inference-server/python_backend)
 
