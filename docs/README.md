@@ -69,7 +69,7 @@ The User Guide describes how to configure Triton, organize and configure your mo
 * Collecting Server Metrics [[Overview](README.md#metrics) || [Details](user_guide/metrics.md)]
 * Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details](user_guide/custom_operations.md)]
 * Using the Client API [[Overview](README.md#client-libraries-and-examples) || [Details](https://github.com/triton-inference-server/client)]
-* Cancelling Inflight Inference Request [[Overview](README.md#cancelling-inflight-inference-request) || [Details](user_guide/request_cancellation.md)]
+* Cancelling Inference Requests [[Overview](README.md#cancelling-inference-requests) || [Details](user_guide/request_cancellation.md)]
 * Analyzing Performance [[Overview](README.md#performance-analysis)]
 * Deploying on edge (Jetson) [[Overview](README.md#jetson-and-jetpack)]
 * Debugging Guide [Details](./user_guide/debugging_guide.md)
