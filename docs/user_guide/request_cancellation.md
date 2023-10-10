@@ -79,8 +79,8 @@ at various points. However, once a request has been given to the backend
 for execution, it is upto the individual backends to detect and handle
 request termination.
 Currently, the following backends support early termination:
-    - [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
-    - [python backend](https://github.com/triton-inference-server/python_backend)
+- [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
+- [python backend](https://github.com/triton-inference-server/python_backend)
 
 Python backend is a special case where we expose the APIs to detect cancellation
 status of the request but it is up to the `model.py` developer to detect whether
