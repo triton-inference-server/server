@@ -1818,14 +1818,12 @@ def tensorrtllm_prebuild(cmake_script):
 
     # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
     # to get the build working for r23.10.
-    cmake_script.cmd("cd tensorrtllm_backend")
     cmake_script.cmd(
-        "patch inflight_batcher_llm/CMakeLists.txt  < inflight_batcher_llm/CMakeLists.txt.patch"
+        "patch tensorrtllm/inflight_batcher_llm/CMakeLists.txt  < tensorrtllm/inflight_batcher_llm/CMakeLists.txt.patch"
     )
-    cmake_script.cmd("mv inflight_batcher_llm/src .")
-    cmake_script.cmd("mv inflight_batcher_llm/cmake .")
-    cmake_script.cmd("mv inflight_batcher_llm/CMakeLists.txt .")
-    cmake_script.cmd("cd ..")
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
 
 
 def backend_build(
@@ -1854,7 +1852,7 @@ def backend_build(
         #     backend_repo("tekit"), tag, be, "https://gitlab-master.nvidia.com/ftp"
         # )
         cmake_script.cmd(
-            "git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend".format(
+            "git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm".format(
                 tag,
                 os.environ["REMOVE_ME_TRTLLM_USERNAME"],
                 os.environ["REMOVE_ME_TRTLLM_TOKEN"],
