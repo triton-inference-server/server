@@ -26,10 +26,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-sys.path.append("../common")
-
 import asyncio
 import queue
 import time
@@ -37,9 +33,8 @@ import unittest
 from functools import partial
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as grpcclient
-import tritonclient.grpc.aio as aiogrpcclient
+import tritonclient.grpc.aio as grpcclientaio
 from tritonclient.utils import InferenceServerException
 
 
@@ -55,102 +50,74 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class ClientCancellationTest(tu.TestResultCollector):
+class GrpcCancellationTest(unittest.TestCase):
+    _model_name = "custom_identity_int32"
+    _model_delay = 10.0  # seconds
+    _grpc_params = {"url": "localhost:8001", "verbose": True}
+
     def setUp(self):
-        self.model_name_ = "custom_identity_int32"
-        self.input0_data_ = np.array([[10]], dtype=np.int32)
-        self._start_time_ms = 0
-        self._end_time_ms = 0
+        self._client = grpcclient.InferenceServerClient(**self._grpc_params)
+        self._client_aio = grpcclientaio.InferenceServerClient(**self._grpc_params)
+        self._user_data = UserData()
+        self._callback = partial(callback, self._user_data)
+        self._prepare_request()
+        self._record_start_time()
 
-    def _record_start_time_ms(self):
-        self._start_time_ms = int(round(time.time() * 1000))
+    def tearDown(self):
+        self._record_end_time()
+        self._assert_max_duration()
+        self._assert_cancelled_by_client()
 
-    def _record_end_time_ms(self):
-        self._end_time_ms = int(round(time.time() * 1000))
+    def _record_start_time(self):
+        self._start_time = time.time()  # seconds
 
-    def _test_runtime_duration(self, upper_limit):
-        self.assertTrue(
-            (self._end_time_ms - self._start_time_ms) < upper_limit,
-            "test runtime expected less than "
-            + str(upper_limit)
-            + "ms response time, got "
-            + str(self._end_time_ms - self._start_time_ms)
-            + " ms",
-        )
+    def _record_end_time(self):
+        self._end_time = time.time()  # seconds
 
     def _prepare_request(self):
-        self.inputs_ = []
-        self.inputs_.append(grpcclient.InferInput("INPUT0", [1, 1], "INT32"))
-        self.outputs_ = []
-        self.outputs_.append(grpcclient.InferRequestedOutput("OUTPUT0"))
+        self._inputs = []
+        self._inputs.append(grpcclient.InferInput("INPUT0", [1, 1], "INT32"))
+        self._outputs = []
+        self._outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
+        self._inputs[0].set_data_from_numpy(np.array([[10]], dtype=np.int32))
 
-        self.inputs_[0].set_data_from_numpy(self.input0_data_)
+    def _assert_max_duration(self):
+        max_duration = self._model_delay * 0.5  # seconds
+        duration = self._end_time - self._start_time  # seconds
+        self.assertLess(
+            duration,
+            max_duration,
+            "test runtime expected less than "
+            + str(max_duration)
+            + "s response time, got "
+            + str(duration)
+            + "s",
+        )
+
+    def _assert_cancelled_by_client(self):
+        self.assertFalse(self._user_data._completed_requests.empty())
+        data_item = self._user_data._completed_requests.get()
+        self.assertIsInstance(data_item, InferenceServerException)
+        self.assertIn("Locally cancelled by application!", str(data_item))
 
     def test_grpc_async_infer(self):
-        # Sends a request using async_infer to a
-        # model that takes 10s to execute. Issues
-        # a cancellation request after 2s. The client
-        # should return with appropriate exception within
-        # 5s.
-        triton_client = grpcclient.InferenceServerClient(
-            url="localhost:8001", verbose=True
+        future = self._client.async_infer(
+            model_name=self._model_name,
+            inputs=self._inputs,
+            callback=self._callback,
+            outputs=self._outputs,
         )
-        self._prepare_request()
-
-        user_data = UserData()
-
-        self._record_start_time_ms()
-
-        with self.assertRaises(InferenceServerException) as cm:
-            future = triton_client.async_infer(
-                model_name=self.model_name_,
-                inputs=self.inputs_,
-                callback=partial(callback, user_data),
-                outputs=self.outputs_,
-            )
-            time.sleep(2)
-            future.cancel()
-
-            data_item = user_data._completed_requests.get()
-            if type(data_item) == InferenceServerException:
-                raise data_item
-        self.assertIn("Locally cancelled by application!", str(cm.exception))
-
-        self._record_end_time_ms()
-        self._test_runtime_duration(5000)
+        time.sleep(2)  # ensure the inference has started
+        future.cancel()
+        time.sleep(0.1)  # context switch
 
     def test_grpc_stream_infer(self):
-        # Sends a request using async_stream_infer to a
-        # model that takes 10s to execute. Issues stream
-        # closure with cancel_requests=True. The client
-        # should return with appropriate exception within
-        # 5s.
-        triton_client = grpcclient.InferenceServerClient(
-            url="localhost:8001", verbose=True
+        self._client.start_stream(callback=self._callback)
+        self._client.async_stream_infer(
+            model_name=self._model_name, inputs=self._inputs, outputs=self._outputs
         )
-
-        self._prepare_request()
-        user_data = UserData()
-
-        triton_client.start_stream(callback=partial(callback, user_data))
-        self._record_start_time_ms()
-
-        with self.assertRaises(InferenceServerException) as cm:
-            for i in range(1):
-                triton_client.async_stream_infer(
-                    model_name=self.model_name_,
-                    inputs=self.inputs_,
-                    outputs=self.outputs_,
-                )
-                time.sleep(2)
-            triton_client.stop_stream(cancel_requests=True)
-            data_item = user_data._completed_requests.get()
-            if type(data_item) == InferenceServerException:
-                raise data_item
-        self.assertIn("Locally cancelled by application!", str(cm.exception))
-
-        self._record_end_time_ms()
-        self._test_runtime_duration(5000)
+        time.sleep(2)  # ensure the inference has started
+        self._client.stop_stream(cancel_requests=True)
 
 
 # Disabling AsyncIO cancellation testing. Enable once
@@ -170,8 +137,8 @@ class ClientCancellationTest(tu.TestResultCollector):
 #                _ = await anext(generator)
 #
 #        async def test_aio_infer(self):
-#            triton_client = aiogrpcclient.InferenceServerClient(
-#                url="localhost:8001", verbose=True
+#            triton_client = grpcclientaio.InferenceServerClient(
+#                url=self._triton_grpc_url, verbose=True
 #            )
 #            self._prepare_request()
 #            self._record_start_time_ms()
@@ -192,7 +159,7 @@ class ClientCancellationTest(tu.TestResultCollector):
 #                await task
 #
 #            self._record_end_time_ms()
-#            self._test_runtime_duration(5000)
+#            self._assert_runtime_duration(5000)
 #
 #        asyncio.run(test_aio_infer(self))
 #
@@ -203,8 +170,8 @@ class ClientCancellationTest(tu.TestResultCollector):
 #        # should return with appropriate exception within
 #        # 5s.
 #        async def test_aio_streaming_infer(self):
-#            async with aiogrpcclient.InferenceServerClient(
-#                url="localhost:8001", verbose=True
+#            async with grpcclientaio.InferenceServerClient(
+#                url=self._triton_grpc_url, verbose=True
 #            ) as triton_client:
 #
 #                async def async_request_iterator():
@@ -240,7 +207,7 @@ class ClientCancellationTest(tu.TestResultCollector):
 #                    await task
 #
 #                self._record_end_time_ms()
-#                self._test_runtime_duration(5000)
+#                self._assert_runtime_duration(5000)
 #
 #        asyncio.run(test_aio_streaming_infer(self))
 
