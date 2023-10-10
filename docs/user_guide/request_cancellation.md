@@ -37,9 +37,15 @@ and later determine the results are no longer needed. Continuing to process
 requests whose results are no longer required can significantly impact server
 resources.
 
+## Issuing Request Cancellation
+
+### Triton C API
+
 [In-Process Triton Server C API](../customization_guide/inference_protocols.md#in-process-triton-server-api) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
 and `TRITONSERVER_InferenceRequestIsCancelled` to cancel and query the cancellation
 status of an inflight request. Read more about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
+### gRPC Endpoint
 
 In addition, [gRPC endpoint](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) can
 now detect cancellation from the client and attempt to terminate request.
@@ -49,8 +55,26 @@ for more details on how to issue requests from the client-side.
 See gRPC guide on RPC [cancellation](https://grpc.io/docs/guides/cancellation/) for
 finer details.
 
+## Handling in Triton Core
 
-Upon receiving request cancellation, triton does its best to cancel request
+Triton core checks for requests that have been cancelled at some critical points
+when using [dynamic](./model_configuration.md#dynamic-batcher) or
+[sequence batching](./model_configuration.md#sequence-batcher). We also test for
+the cancelled requests after every [ensemble](./model_configuration.md#ensemble-scheduler)
+step and terminate further processing the requests.
+
+On detecting a cancelled request, Triton core responds with CANCELLED status. If a request
+is cancelled when using [sequence_batching](./model_configuration.md#sequence-batcher),
+then all the pending requests in the same sequence will also be cancelled. The sequence
+is represented by the requests that has identical sequence id.
+
+**Note**: Currently, Triton core does not detect cancellation status of a request once
+it is forwarded to [rate limiter](./rate_limiter.md). Improving the request cancellation
+detection and handling within Triton core is work in progress.
+
+## Handling in Backend
+
+Upon receiving request cancellation, triton does its best to terminate request
 at various points. However, once a request has been given to the backend
 for execution, it is upto the individual backends to detect and handle
 request termination.
