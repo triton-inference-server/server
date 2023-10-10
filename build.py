@@ -78,8 +78,6 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "9.1.0.3",  # TRT version for building TRT-LLM backend
-        "12.2",  # CUDA version for building TRT-LLM backend
         "0.2.0",  # vLLM version
     )
 }
@@ -1331,7 +1329,11 @@ RUN git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia
 RUN cd tensorrtllm_backend && git submodule update --init --recursive
 RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
 RUN rm -fr tensorrtllm_backend
-    """.format(backends[be], os.environ["REMOVE_ME_TRTLLM_USERNAME"], os.environ["REMOVE_ME_TRTLLM_TOKEN"])
+    """.format(
+            backends[be],
+            os.environ["REMOVE_ME_TRTLLM_USERNAME"],
+            os.environ["REMOVE_ME_TRTLLM_TOKEN"],
+        )
 
         df += """
 RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
@@ -1359,7 +1361,7 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][9]
+            TRITON_VERSION_MAP[FLAGS.version][7]
         )
 
     df += """
@@ -1819,11 +1821,14 @@ def tensorrtllm_prebuild(cmake_script):
     # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
     # to get the build working for r23.10.
     cmake_script.cmd("cd tensorrtllm_backend")
-    cmake_script.cmd("patch inflight_batcher_llm/CMakeLists.txt  < inflight_batcher_llm/CMakeLists.txt.patch")
+    cmake_script.cmd(
+        "patch inflight_batcher_llm/CMakeLists.txt  < inflight_batcher_llm/CMakeLists.txt.patch"
+    )
     cmake_script.cmd("mv inflight_batcher_llm/src .")
     cmake_script.cmd("mv inflight_batcher_llm/cmake .")
     cmake_script.cmd("mv inflight_batcher_llm/CMakeLists.txt .")
     cmake_script.cmd("cd ..")
+
 
 def backend_build(
     be,
@@ -1850,7 +1855,13 @@ def backend_build(
         # cmake_script.gitclone(
         #     backend_repo("tekit"), tag, be, "https://gitlab-master.nvidia.com/ftp"
         # )
-        cmake_script.cmd("git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend".format(tag, os.environ["REMOVE_ME_TRTLLM_USERNAME"], os.environ["REMOVE_ME_TRTLLM_TOKEN"]))
+        cmake_script.cmd(
+            "git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend".format(
+                tag,
+                os.environ["REMOVE_ME_TRTLLM_USERNAME"],
+                os.environ["REMOVE_ME_TRTLLM_TOKEN"],
+            )
+        )
     else:
         cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
