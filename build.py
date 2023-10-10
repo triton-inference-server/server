@@ -1526,8 +1526,6 @@ def create_build_dockerfiles(
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][6],
     }
-    dockerfileargmap["TRT_LLM_TRT_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][7]
-    dockerfileargmap["TRT_LLM_CUDA_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][8]
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
     # since we are using PyTorch and TensorFlow containers that
