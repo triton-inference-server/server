@@ -1319,9 +1319,11 @@ RUN apt-get update && \
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
         # FIXME: Update the url
-        url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
-            backends[be]
-        )
+        # url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+        #     backends[be]
+        # )
+        print("trtllm tag:", backends[be])
+        url = "https://gitlab-master.nvidia.com/krish/tekit_backend/-/raw/krish-triton-changes/tools/gen_trtllm_dockerfile.py"
 
         response = requests.get(url)
         spec = importlib.util.spec_from_loader(
