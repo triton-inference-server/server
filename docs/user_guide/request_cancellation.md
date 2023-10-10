@@ -59,7 +59,7 @@ Currently, following backend(s) support(s) early termination:
     - [python backend](https://github.com/triton-inference-server/python_backend)
 
 Python backend is a special case where we expose the APIs to detect cancellation
-status of the request but it is upto the `model.py` developer to detect whether
+status of the request but it is up to the `model.py` developer to detect whether
 the request is cancelled and terminate further execution.
 
 **For the backend developer**: The backend APIs have also been enhanced to let the
