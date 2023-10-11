@@ -28,7 +28,7 @@
 
 # Request Cancellation
 
-Starting from 23.10, Triton supports handling request cancellation received
+Starting from r23.10, Triton supports handling request cancellation received
 from the gRPC client or a C API user. Long running inference requests such
 as for auto generative large language models may run for an indeterminate
 amount of time or indeterminate number of steps. Additionally clients may
@@ -39,7 +39,7 @@ resources.
 
 ## Issuing Request Cancellation
 
-### Triton C API
+### In-Process C API
 
 [In-Process Triton Server C API](../customization_guide/inference_protocols.md#in-process-triton-server-api) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
 and `TRITONSERVER_InferenceRequestIsCancelled` to issue cancellation and query
@@ -77,9 +77,9 @@ detection and handling within Triton core is work in progress.
 
 ## Handling in Backend
 
-Upon receiving request cancellation, triton does its best to terminate request
+Upon receiving request cancellation, Triton does its best to terminate request
 at various points. However, once a request has been given to the backend
-for execution, it is upto the individual backends to detect and handle
+for execution, it is up to the individual backends to detect and handle
 request termination.
 Currently, the following backends support early termination:
 - [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
