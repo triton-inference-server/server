@@ -128,9 +128,13 @@ the HTTP body.
 
     $generate_response =
     {
+      "model_name" : $string,
+      "model_version" : $string,
       "text_output" : $string
     }
 
+* "model_name" : The name of the model used for inference.
+* "model_version" : The specific model version used for inference.
 * "text_output" : The output of the inference.
 
 #### Example Response
@@ -138,6 +142,8 @@ the HTTP body.
 ```
 200
 {
+  "model_name" : "mymodel",
+  "model_version" : "1",
   "text_output" : "model output"
 }
 ```
