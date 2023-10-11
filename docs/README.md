@@ -69,6 +69,7 @@ The User Guide describes how to configure Triton, organize and configure your mo
 * Collecting Server Metrics [[Overview](README.md#metrics) || [Details](user_guide/metrics.md)]
 * Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details](user_guide/custom_operations.md)]
 * Using the Client API [[Overview](README.md#client-libraries-and-examples) || [Details](https://github.com/triton-inference-server/client)]
+* Cancelling Inference Requests [[Overview](README.md#cancelling-inference-requests) || [Details](user_guide/request_cancellation.md)]
 * Analyzing Performance [[Overview](README.md#performance-analysis)]
 * Deploying on edge (Jetson) [[Overview](README.md#jetson-and-jetpack)]
 * Debugging Guide [Details](./user_guide/debugging_guide.md)
@@ -165,6 +166,8 @@ Use the [Triton Client](https://github.com/triton-inference-server/client) API t
   - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
   - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
 - [Shared Memory Extension](protocol/extension_shared_memory.md)
+### Cancelling Inference Requests
+Triton can detect and handle requests that have been cancelled from the client-side. This [document](user_guide/request_cancellation.md) discusses scope and limitations of the feature.
 ### Performance Analysis
 Understanding Inference performance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
 - [Performance Tuning Guide](user_guide/performance_tuning.md)
