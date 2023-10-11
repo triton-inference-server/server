@@ -78,7 +78,7 @@ mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
 
-for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer"; do
+for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer"; do
 
     TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
     SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
