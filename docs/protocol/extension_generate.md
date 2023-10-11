@@ -28,7 +28,7 @@
 
 # Generate Extension
 
-**Note:** The Generate Extension is *provisional* and likely to change in future versions. 
+**Note:** The Generate Extension is *provisional* and likely to change in future versions.
 
 This document describes Triton's generate extension. The generate
 extension provides a simple text-oriented endpoint schema for interacting with
