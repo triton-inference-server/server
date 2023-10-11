@@ -59,9 +59,10 @@ finer details.
 
 Triton core checks for requests that have been cancelled at some critical points
 when using [dynamic](./model_configuration.md#dynamic-batcher) or
-[sequence batching](./model_configuration.md#sequence-batcher). We also test for
-the cancelled requests after every [ensemble](./model_configuration.md#ensemble-scheduler)
-step and terminate further processing the requests.
+[sequence](./model_configuration.md#sequence-batcher) batching. The checking is
+also performed between each
+[ensemble](./model_configuration.md#ensemble-scheduler) steps and terminates
+further processing if the request is cancelled.
 
 On detecting a cancelled request, Triton core responds with CANCELLED status. If a request
 is cancelled when using [sequence_batching](./model_configuration.md#sequence-batcher),
