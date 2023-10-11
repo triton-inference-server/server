@@ -1323,6 +1323,10 @@ RUN apt-get update && \
         df += """
 WORKDIR /workspace
 
+# Remove previous TRT installation
+RUN apt-get remove --purge -y tensorrt* libnvinfer*
+RUN pip uninstall -y tensorrt
+
 # Install new version of TRT using the script from TRT-LLM
 RUN apt-get update && apt-get install -y --no-install-recommends python-is-python3
 RUN git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend
