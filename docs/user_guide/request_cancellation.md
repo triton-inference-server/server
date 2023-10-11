@@ -42,8 +42,10 @@ resources.
 ### Triton C API
 
 [In-Process Triton Server C API](../customization_guide/inference_protocols.md#in-process-triton-server-api) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
-and `TRITONSERVER_InferenceRequestIsCancelled` to cancel and query the cancellation
-status of an inflight request. Read more about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+and `TRITONSERVER_InferenceRequestIsCancelled` to issue cancellation and query
+whether cancellation has been issued on an inflight request respectively. Read more
+about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
 
 ### gRPC Endpoint
 
