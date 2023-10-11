@@ -28,13 +28,16 @@
 
 # Generate Extension
 
+**Note:** The Generate Extension is *provisional* and likely to change in future versions. 
+
 This document describes Triton's generate extension. The generate
-extension provides a simple text oriented endpoint schema for interacting
-with LLM models. This generate endpoint is specific to HTTP/REST frontend.
+extension provides a simple text-oriented endpoint schema for interacting with
+large language models (LLMs). The generate endpoint is specific to HTTP/REST
+frontend.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+In all JSON schemas shown in this document, `$number`, `$string`, `$boolean`,
 `$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
@@ -52,23 +55,23 @@ POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/generate_stream
 ### generate v.s. generate_stream
 
 Both URLs expect the same request JSON object, and generate the same response
-JSON object. However, `generate` return exactly 1 response JSON object, while
-`generate_stream` may return various number of responses based on the inference
+JSON object. However, `generate` returns exactly 1 response JSON object, while
+`generate_stream` may return multiple responses based on the inference
 results. `generate_stream` returns the responses as
 [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html#server-sent-events)
 (SSE), where each response will be a "data" chunk in the HTTP response body.
-Also note that an error may be returned during inference, whereas the HTTP
-response code has been set at first response of the SSE, which can result in
-receiving error object while status code is success (200). Therefore the user
-must always check whether an error object is received when generating responses
-through `generate_stream`.
+Also, note that an error may be returned during inference, whereas the HTTP
+response code has been set in the first response of the SSE, which can result in
+receiving an [error object](#generate-response-json-error-object) while status
+code shows success (200). Therefore the user must always check whether an error
+object is received when generating responses through `generate_stream`.
 
 ### Generate Request JSON Object
 
 The generate request object, identified as *$generate_request*, is
 required in the HTTP body of the POST request. The model name and
 (optionally) version must be available in the URL. If a version is not
-provided the server may choose a version based on its own policies or
+provided, the server may choose a version based on its own policies or
 return an error.
 
     $generate_request =
@@ -95,9 +98,27 @@ $string, $number, or $boolean.
 
     $parameter = $string : $string | $number | $boolean
 
-Parameters are model-specific. In other words, the accepting names and values
-varies according to the model. The user should check with the model
+Parameters are model-specific. The user should check with the model
 specification to set the parameters.
+
+#### Example Request
+
+Below is an example to send generate request with additional model parameters `stream` and `temperature`.
+
+```
+POST /v2/models/mymodel/generate HTTP/1.1
+Host: localhost:8000
+Content-Type: application/json
+Content-Length: <xx>
+{
+  "text_input":  "client input",
+  "parameters" :
+    {
+      "stream": false,
+      "temperature": 0
+    }
+}
+```
 
 ### Generate Response JSON Object
 
@@ -112,6 +133,15 @@ the HTTP body.
 
 * "text_output" : The output of the inference.
 
+#### Example Response
+
+```
+200
+{
+  "text_output" : "model output"
+}
+```
+
 ### Generate Response JSON Error Object
 
 A failed generate request must be indicated by an HTTP error status
@@ -124,3 +154,12 @@ A failed generate request must be indicated by an HTTP error status
     }
 
 * “error” : The descriptive message for the error.
+
+#### Example Error
+
+```
+400
+{
+  "error" : "error message"
+}
+```
