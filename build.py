@@ -1818,9 +1818,10 @@ def tensorrtllm_prebuild(cmake_script):
 
     # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
     # to get the build working for r23.10.
-    cmake_script.cmd(
-        "patch tensorrtllm/inflight_batcher_llm/CMakeLists.txt  < tensorrtllm/inflight_batcher_llm/CMakeLists.txt.patch"
-    )
+    # Uncomment the patch once moving to the GitHub repo
+    # cmake_script.cmd(
+    #     "patch tensorrtllm/inflight_batcher_llm/CMakeLists.txt  < tensorrtllm/inflight_batcher_llm/CMakeLists.txt.patch"
+    # )
     cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
     cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
     cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
