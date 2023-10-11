@@ -1355,6 +1355,14 @@ RUN if pip freeze | grep -q "nvidia.*"; then \
     fi
 RUN pip cache purge
 
+# Install required packages for example models
+RUN python3 -m pip install --upgrade pip && \
+        pip3 install transformers && \
+        pip3 install torch && \
+        pip3 install tritonclient[all] && \
+        pip3 install pandas && \
+        pip3 install tabulate
+
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
 
