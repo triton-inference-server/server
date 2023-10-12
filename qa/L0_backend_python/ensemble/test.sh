@@ -27,7 +27,7 @@
 
 CLIENT_PY=./lifecycle_test.py
 CLIENT_LOG="./ensemble_client.log"
-EXPECTED_NUM_TESTS="1"
+EXPECTED_NUM_TESTS="2"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -47,14 +47,10 @@ cp ../../python_models/ensemble/config.pbtxt ./models/ensemble
 
 mkdir -p models/add_sub_1/1/
 cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_1
-(cd models/add_sub_1 && \
-          sed -i "s/^name:.*/name: \"add_sub_1\"/" config.pbtxt)
 cp ../../python_models/add_sub/model.py ./models/add_sub_1/1/
 
 mkdir -p models/add_sub_2/1/
 cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_2/
-(cd models/add_sub_2 && \
-          sed -i "s/^name:.*/name: \"add_sub_2\"/" config.pbtxt)
 cp ../../python_models/add_sub/model.py ./models/add_sub_2/1/
 
 # Ensemble GPU Model
