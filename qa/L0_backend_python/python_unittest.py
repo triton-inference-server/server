@@ -56,8 +56,13 @@ class PythonUnittest(tu.TestResultCollector):
     def test_python_unittest(self):
         model_name = os.environ["MODEL_NAME"]
 
+        # Warmup model, let it do any upfront initializations required
+        self._run_unittest(model_name)
+
         with self._shm_leak_detector.Probe() as shm_probe:
-            self._run_unittest(model_name)
+            for i in range(5):
+                print(f"[{model_name}] Test iteration: {i}")
+                self._run_unittest(model_name)
 
 
 if __name__ == "__main__":
