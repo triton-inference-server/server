@@ -55,7 +55,7 @@ set +e
 echo "All work and no play makes Jack a dull boy" >> raw_data
 python3 validation.py generate_compressed_data
 
-$DATA_COMPRESSOR_TEST >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/opt/tritonserver/lib:${LD_LIBRARY_PATH} $DATA_COMPRESSOR_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Data Compression Test Failed\n***"
     RET=1
