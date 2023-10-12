@@ -128,7 +128,7 @@ class PythonTest(tu.TestResultCollector):
         shape = [total_byte_size]
         model_name = "identity_uint8_nobatch"
         dtype = np.uint8
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             self._infer_help(model_name, shape, dtype)
 
         # 1 GiB payload leads to error in the main Python backend process.
@@ -154,7 +154,7 @@ class PythonTest(tu.TestResultCollector):
         # Send a small paylaod to make sure it is still working properly
         total_byte_size = 2 * 1024 * 1024
         shape = [total_byte_size]
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             self._infer_help(model_name, shape, dtype)
 
     # GPU tensors are not supported on jetson
@@ -165,71 +165,79 @@ class PythonTest(tu.TestResultCollector):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "identity_bool"
-            with httpclient.InferenceServerClient("localhost:8000") as client:
-                input_data = np.array([[True] * 1000], dtype=bool)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+                with httpclient.InferenceServerClient("localhost:8000") as client:
+                    input_data = np.array([[True] * 1000], dtype=bool)
+                    inputs = [
+                        httpclient.InferInput(
+                            "INPUT0",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+
+                    requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+
+                    # intentionally create a shared memory region with not enough size.
+                    client.unregister_cuda_shared_memory()
+                    shm0_handle = self._create_cuda_region(client, 1, "output0_data")
+
+                    requested_outputs[0].set_shared_memory("output0_data", 1)
+                    with self.assertRaises(InferenceServerException) as ex:
+                        client.infer(model_name, inputs, outputs=requested_outputs)
+                    self.assertIn(
+                        "should be at least 1000 bytes to hold the results",
+                        str(ex.exception),
                     )
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-
-                requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-
-                # intentionally create a shared memory region with not enough size.
-                client.unregister_cuda_shared_memory()
-                shm0_handle = self._create_cuda_region(client, 1, "output0_data")
-
-                requested_outputs[0].set_shared_memory("output0_data", 1)
-                with self.assertRaises(InferenceServerException) as ex:
-                    client.infer(model_name, inputs, outputs=requested_outputs)
-                self.assertIn(
-                    "should be at least 1000 bytes to hold the results",
-                    str(ex.exception),
-                )
-                client.unregister_cuda_shared_memory()
-                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
+                    client.unregister_cuda_shared_memory()
+                    cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
         def test_dlpack_tensor_error(self):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "dlpack_identity"
-            with httpclient.InferenceServerClient("localhost:8000") as client:
-                input_data = np.array([[1] * 1000], dtype=np.float32)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+                with httpclient.InferenceServerClient("localhost:8000") as client:
+                    input_data = np.array([[1] * 1000], dtype=np.float32)
+                    inputs = [
+                        httpclient.InferInput(
+                            "INPUT0",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
+                        )
+                    ]
+
+                    requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+                    input_data_size = input_data.itemsize * input_data.size
+                    client.unregister_cuda_shared_memory()
+                    input_region = self._create_cuda_region(
+                        client, input_data_size, "input0_data"
                     )
-                ]
+                    inputs[0].set_shared_memory("input0_data", input_data_size)
+                    cuda_shared_memory.set_shared_memory_region(
+                        input_region, [input_data]
+                    )
 
-                requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-                input_data_size = input_data.itemsize * input_data.size
-                client.unregister_cuda_shared_memory()
-                input_region = self._create_cuda_region(
-                    client, input_data_size, "input0_data"
-                )
-                inputs[0].set_shared_memory("input0_data", input_data_size)
-                cuda_shared_memory.set_shared_memory_region(input_region, [input_data])
+                    # Intentionally create a small region to trigger an error
+                    shm0_handle = self._create_cuda_region(client, 1, "output0_data")
+                    requested_outputs[0].set_shared_memory("output0_data", 1)
 
-                # Intentionally create a small region to trigger an error
-                shm0_handle = self._create_cuda_region(client, 1, "output0_data")
-                requested_outputs[0].set_shared_memory("output0_data", 1)
-
-                with self.assertRaises(InferenceServerException) as ex:
-                    client.infer(model_name, inputs, outputs=requested_outputs)
-                self.assertIn(
-                    "should be at least 4000 bytes to hold the results",
-                    str(ex.exception),
-                )
-                client.unregister_cuda_shared_memory()
-                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
+                    with self.assertRaises(InferenceServerException) as ex:
+                        client.infer(model_name, inputs, outputs=requested_outputs)
+                    self.assertIn(
+                        "should be at least 4000 bytes to hold the results",
+                        str(ex.exception),
+                    )
+                    client.unregister_cuda_shared_memory()
+                    cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
     def test_async_infer(self):
         model_name = "identity_uint8"
         request_parallelism = 4
         shape = [2, 2]
 
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             with httpclient.InferenceServerClient(
                 "localhost:8000", concurrency=request_parallelism
             ) as client:
@@ -329,7 +337,7 @@ class PythonTest(tu.TestResultCollector):
 
     def test_bool(self):
         model_name = "identity_bool"
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.array([[True, False, True]], dtype=bool)
                 inputs = [
@@ -346,7 +354,7 @@ class PythonTest(tu.TestResultCollector):
     def test_infer_pytorch(self):
         model_name = "pytorch_fp32_fp32"
         shape = [1, 1, 28, 28]
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.zeros(shape, dtype=np.float32)
                 inputs = [
@@ -380,7 +388,7 @@ class PythonTest(tu.TestResultCollector):
     def test_init_args(self):
         model_name = "init_args"
         shape = [2, 2]
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.zeros(shape, dtype=np.float32)
                 inputs = [
@@ -403,7 +411,7 @@ class PythonTest(tu.TestResultCollector):
         # The first run will use np.bytes_ and the second run will use
         # np.object_
         for i in range(2):
-            with self._shm_leak_detector.Probe() as shm_probe:
+            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     utf8 = "😀"
                     input_data = np.array(
@@ -423,7 +431,7 @@ class PythonTest(tu.TestResultCollector):
     def test_optional_input(self):
         model_name = "optional"
 
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             for has_input0 in [True, False]:
                 for has_input1 in [True, False]:
                     self._optional_input_infer(model_name, has_input0, has_input1)
@@ -436,7 +444,7 @@ class PythonTest(tu.TestResultCollector):
         # backend. The model will return 4 responses (np.object_ and np.bytes) *
         # (empty output and fixed output)
         for i in range(4):
-            with self._shm_leak_detector.Probe() as shm_probe:
+            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     input_data = np.array(["123456"], dtype=np.object_)
                     inputs = [
@@ -459,25 +467,26 @@ class PythonTest(tu.TestResultCollector):
         shape = [2, 10, 11, 6, 5]
         new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_numpy = np.random.rand(*shape)
-            input_numpy = input_numpy.astype(np.float32)
-            inputs = [
-                httpclient.InferInput(
-                    "INPUT0", shape, np_to_triton_dtype(input_numpy.dtype)
-                )
-            ]
-            inputs[0].set_data_from_numpy(input_numpy)
-            result = client.infer(model_name, inputs)
-            output0 = input_numpy.reshape(new_shape)
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input_numpy = np.random.rand(*shape)
+                input_numpy = input_numpy.astype(np.float32)
+                inputs = [
+                    httpclient.InferInput(
+                        "INPUT0", shape, np_to_triton_dtype(input_numpy.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_numpy)
+                result = client.infer(model_name, inputs)
+                output0 = input_numpy.reshape(new_shape)
 
-            # Transpose the tensor to create a non-contiguous tensor.
-            output1 = input_numpy.T
-            output2 = np.transpose(input_numpy, shape_reorder)
+                # Transpose the tensor to create a non-contiguous tensor.
+                output1 = input_numpy.T
+                output2 = np.transpose(input_numpy, shape_reorder)
 
-            self.assertTrue(np.all(output0 == result.as_numpy("OUTPUT0")))
-            self.assertTrue(np.all(output1 == result.as_numpy("OUTPUT1")))
-            self.assertTrue(np.all(output2 == result.as_numpy("OUTPUT2")))
+                self.assertTrue(np.all(output0 == result.as_numpy("OUTPUT0")))
+                self.assertTrue(np.all(output1 == result.as_numpy("OUTPUT1")))
+                self.assertTrue(np.all(output2 == result.as_numpy("OUTPUT2")))
 
 
 if __name__ == "__main__":

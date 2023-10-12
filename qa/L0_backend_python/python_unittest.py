@@ -56,11 +56,15 @@ class PythonUnittest(tu.TestResultCollector):
     def test_python_unittest(self):
         model_name = os.environ["MODEL_NAME"]
 
-        # Warmup model, let it do any upfront initializations required
+        # Stress test memory growth test more on nightly runs
+        nightly = int(os.environ.get("TRITON_NIGHTLY", "0"))
+        repetitions = 5 if nightly else 1
+
+        # Warmup run, let it do any upfront shm initializations required
         self._run_unittest(model_name)
 
-        with self._shm_leak_detector.Probe() as shm_probe:
-            for i in range(5):
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            for i in range(repetitions):
                 print(f"[{model_name}] Test iteration: {i}")
                 self._run_unittest(model_name)
 

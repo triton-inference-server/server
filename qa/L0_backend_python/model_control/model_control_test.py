@@ -50,7 +50,7 @@ class ExplicitModelTest(tu.TestResultCollector):
         input0_data = np.expand_dims(input0_data, axis=0)
         inputs[0].set_data_from_numpy(input0_data)
 
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             result = client.infer(
                 model_name=model_name,
                 inputs=inputs,
