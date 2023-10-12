@@ -411,15 +411,21 @@ class ShmLeakDetector:
     """Detect shared memory leaks when testing Python backend."""
 
     class ShmLeakProbe:
-        def __init__(self, shm_monitors):
+        def __init__(self, shm_monitors, verbose=True):
             self._shm_monitors = shm_monitors
+            self._verbose = verbose
 
         def __enter__(self):
             if _test_jetson:
                 return self
             self._shm_region_free_sizes = []
             for shm_monitor in self._shm_monitors:
-                self._shm_region_free_sizes.append(shm_monitor.free_memory())
+                free_memory = shm_monitor.free_memory()
+                self._shm_region_free_sizes.append(free_memory)
+                if self._verbose:
+                    print(
+                        f"[DEBUG][__enter__][{shm_monitor}] Current Free Shared Memory: {free_memory}"
+                    )
 
             return self
 
@@ -428,7 +434,12 @@ class ShmLeakDetector:
                 return
             current_shm_sizes = []
             for shm_monitor in self._shm_monitors:
-                current_shm_sizes.append(shm_monitor.free_memory())
+                free_memory = shm_monitor.free_memory()
+                current_shm_sizes.append(free_memory)
+                if self._verbose:
+                    print(
+                        f"[DEBUG][__exit__][{shm_monitor}] Current Free Shared Memory: {free_memory}"
+                    )
 
             shm_leak_detected = False
             for current_shm_size, prev_shm_size in zip(
