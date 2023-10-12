@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ set +e
 echo "All work and no play makes Jack a dull boy" >> raw_data
 python3 validation.py generate_compressed_data
 
-$DATA_COMPRESSOR_TEST >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/opt/tritonserver/lib:${LD_LIBRARY_PATH} $DATA_COMPRESSOR_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Data Compression Test Failed\n***"
     RET=1
@@ -147,6 +147,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
