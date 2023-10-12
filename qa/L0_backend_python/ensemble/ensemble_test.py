@@ -45,7 +45,7 @@ class EnsembleTest(tu.TestResultCollector):
 
     def infer(self, model_name):
         shape = [16]
-        with self._shm_leak_detector.Probe() as shm_probe:
+        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data_0 = np.random.random(shape).astype(np.float32)
                 input_data_1 = np.random.random(shape).astype(np.float32)
