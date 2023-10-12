@@ -28,7 +28,8 @@
 
 # Generate Extension
 
-**Note:** The Generate Extension is *provisional* and likely to change in future versions.
+> [!NOTE]
+> The Generate Extension is *provisional* and likely to change in future versions.
 
 This document describes Triton's generate extension. The generate
 extension provides a simple text-oriented endpoint schema for interacting with
@@ -85,6 +86,10 @@ return an error.
   generate request expressed as key/value pairs. See
   [Parameters](#parameters) for more information.
 
+> [!NOTE]
+> Any additional properties in the request object are passed either as
+> parameters or tensors based on model specification.
+
 #### Parameters
 
 The *$parameters* JSON describes zero or more “name”/”value” pairs,
@@ -106,6 +111,8 @@ specification to set the parameters.
 Below is an example to send generate request with additional model parameters `stream` and `temperature`.
 
 ```
+$ curl -X POST localhost:8000/v2/models/mymodel/generate -d '{"text_input": "client input", "parameters": {"stream": false, "temperature": 0}}'
+
 POST /v2/models/mymodel/generate HTTP/1.1
 Host: localhost:8000
 Content-Type: application/json
