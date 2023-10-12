@@ -121,7 +121,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
             )
         )
         await asyncio.sleep(2)  # ensure the inference has started
-        self.assertTrue(infer_task.cancel())
+        infer_task.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await infer_task
 

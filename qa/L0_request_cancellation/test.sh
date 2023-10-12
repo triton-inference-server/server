@@ -98,6 +98,12 @@ for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc
         cat $TEST_LOG
         RET=1
     fi
+    grep "Cancellation notification received for" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
     set -e
 
     kill $SERVER_PID
