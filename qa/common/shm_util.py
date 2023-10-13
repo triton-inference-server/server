@@ -420,8 +420,7 @@ class ShmLeakDetector:
                 return self
             self._shm_region_free_sizes = []
             for shm_monitor in self._shm_monitors:
-                free_memory = shm_monitor.free_memory()
-                self._shm_region_free_sizes.append(free_memory)
+                self._shm_region_free_sizes.append(shm_monitor.free_memory())
 
             return self
 
@@ -430,8 +429,7 @@ class ShmLeakDetector:
                 return
             current_shm_sizes = []
             for shm_monitor in self._shm_monitors:
-                free_memory = shm_monitor.free_memory()
-                current_shm_sizes.append(free_memory)
+                current_shm_sizes.append(shm_monitor.free_memory())
 
             shm_leak_detected = False
             for current_shm_size, prev_shm_size in zip(
@@ -457,11 +455,11 @@ class ShmLeakDetector:
                     triton_shm_monitor.SharedMemoryManager(shm_region)
                 )
 
-    def Probe(self):
+    def Probe(self, debug_str=""):
         # Jetson cleanup takes too long and results in false positives.
         # Do not use the shared memory check on Jetson.
         # [DLIS-4876] Investigate how to re-enable shared memory check on Jetson.
         if _test_jetson:
             return self.ShmLeakProbe(None)
         else:
-            return self.ShmLeakProbe(self._shm_monitors)
+            return self.ShmLeakProbe(self._shm_monitors, debug_str=debug_str)
