@@ -64,7 +64,6 @@ Major features include:
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
 - Supports writing custom backends in python.
-  python based backends.
 - Model pipelines using
   [Ensembling](docs/user_guide/architecture.md#ensemble-models) or [Business
   Logic Scripting
