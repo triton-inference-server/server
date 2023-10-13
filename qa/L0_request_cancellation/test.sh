@@ -60,13 +60,13 @@ mkdir -p models/model/1 && (cd models/model && \
 SERVER_LOG=server.log
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Unit Tests Failed\n***"
     cat $SERVER_LOG
-   RET=1
+    RET=1
 fi
 
-
 #
-# gRPC client tests
+# gRPC cancellation tests
 #
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
@@ -78,16 +78,12 @@ mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
 
-CLIENT_CANCELLATION_TEST=grpc_client_test.client_cancellation_test.py
-TEST_RESULT_FILE='grpc_client_test.test_results.txt'
-CLIENT_LOG=`pwd`/grpc_client_test.client.log
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-# gRPC client-side cancellation tests...
-for i in test_grpc_async_infer \
-    test_grpc_stream_infer \
-   ; do
+for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer"; do
 
-    SERVER_LOG=grpc_client_test.${i}.server.log
+    TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
+    SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -96,27 +92,26 @@ for i in test_grpc_async_infer \
     fi
 
     set +e
-    python $CLIENT_CANCELLATION_TEST ClientCancellationTest.$i >>$CLIENT_LOG 2>&1
+    python grpc_cancellation_test.py GrpcCancellationTest.$TEST_CASE > $TEST_LOG 2>&1
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
+        echo -e "\n***\n*** gRPC Cancellation Tests Failed on $TEST_CASE\n***"
+        cat $TEST_LOG
+        RET=1
     fi
-
+    grep "Cancellation notification received for" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
     set -e
+
     kill $SERVER_PID
     wait $SERVER_PID
 done
 
 #
-# End-to-end tests
+# End-to-end scheduler tests
 #
 rm -rf models && mkdir models
 mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
@@ -171,8 +166,8 @@ fi
 set +e
 python scheduler_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Scheduler Tests Failed\n***"
     cat $TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 set -e
