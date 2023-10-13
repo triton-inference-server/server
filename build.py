@@ -78,8 +78,6 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "9.1.0.1",  # TRT version for building TRT-LLM backend
-        "12.2",  # CUDA version for building TRT-LLM backend
         "0.2.0",  # vLLM version
     )
 }
@@ -884,19 +882,8 @@ def tensorrtllm_cmake_args(images):
             None,
             images["base"],
         ),
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TENSORRT_VERSION",
-            None,
-            TRITON_VERSION_MAP[FLAGS.version][7],
-        ),
-        cmake_backend_arg(
-            "tensorrtllm",
-            "CUDA_VERSION",
-            None,
-            TRITON_VERSION_MAP[FLAGS.version][8],
-        ),
     ]
+    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
 
 
@@ -1315,23 +1302,66 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 """
+    # FIXME: Use the postbuild script here
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
-        # FIXME: Update the url
-        url = "https://gitlab-master.nvidia.com/krish/tensorrtllm_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
-            backends[be]
+        # # FIXME: Update the url
+        # url = "https://gitlab-master.nvidia.com/ftp/tekit_backend/-/raw/{}/tools/gen_trtllm_dockerfile.py".format(
+        #     backends[be]
+        # )
+
+        # response = requests.get(url)
+        # spec = importlib.util.spec_from_loader(
+        #     "trtllm_buildscript", loader=None, origin=url
+        # )
+        # trtllm_buildscript = importlib.util.module_from_spec(spec)
+        # exec(response.content, trtllm_buildscript.__dict__)
+        # df += trtllm_buildscript.create_postbuild(
+        #     backends[be] # repo tag
+        # )
+        df += """
+WORKDIR /workspace
+
+# Remove previous TRT installation
+RUN apt-get remove --purge -y tensorrt* libnvinfer*
+RUN pip uninstall -y tensorrt
+
+# Install new version of TRT using the script from TRT-LLM
+RUN apt-get update && apt-get install -y --no-install-recommends python-is-python3
+RUN git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend
+RUN cd tensorrtllm_backend && git submodule update --init --recursive
+RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
+RUN rm -fr tensorrtllm_backend
+    """.format(
+            backends[be],
+            os.environ["REMOVE_ME_TRTLLM_USERNAME"],
+            os.environ["REMOVE_ME_TRTLLM_TOKEN"],
         )
 
-        response = requests.get(url)
-        spec = importlib.util.spec_from_loader(
-            "trtllm_buildscript", loader=None, origin=url
-        )
-        trtllm_buildscript = importlib.util.module_from_spec(spec)
-        exec(response.content, trtllm_buildscript.__dict__)
-        df += trtllm_buildscript.create_postbuild(
-            argmap["TRT_LLM_TRT_VERSION"], argmap["TRT_LLM_CUDA_VERSION"]
-        )
+        df += """
+RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
+ENV TRT_ROOT=/usr/local/tensorrt
+
+# Remove TRT contents that are not needed in runtime
+RUN ARCH="$(uname -i)" && \
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
+    rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
+    rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
+
+# Install required packages for TRT-LLM models
+RUN python3 -m pip install --upgrade pip && \
+        pip3 install transformers && \
+        pip3 install torch
+
+# Uninstall unused nvidia packages
+RUN if pip freeze | grep -q "nvidia.*"; then \
+        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \
+    fi
+RUN pip cache purge
+
+ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+"""
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
@@ -1340,7 +1370,7 @@ RUN apt-get update && \
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][9]
+            TRITON_VERSION_MAP[FLAGS.version][7]
         )
 
     df += """
@@ -1505,8 +1535,6 @@ def create_build_dockerfiles(
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][6],
     }
-    dockerfileargmap["TRT_LLM_TRT_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][7]
-    dockerfileargmap["TRT_LLM_CUDA_VERSION"] = TRITON_VERSION_MAP[FLAGS.version][8]
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
     # since we are using PyTorch and TensorFlow containers that
@@ -1797,6 +1825,16 @@ def tensorrtllm_prebuild(cmake_script):
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
     cmake_script.cmd("export ARCH=$(uname -m)")
 
+    # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
+    # to get the build working for r23.10.
+    # Uncomment the patch once moving to the GitHub repo
+    # cmake_script.cmd(
+    #     "patch tensorrtllm/inflight_batcher_llm/CMakeLists.txt  < tensorrtllm/inflight_batcher_llm/CMakeLists.txt.patch"
+    # )
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
+    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
+
 
 def backend_build(
     be,
@@ -1820,8 +1858,15 @@ def backend_build(
     cmake_script.cwd(build_dir)
     # FIXME: Use GitHub repo
     if be == "tensorrtllm":
-        cmake_script.gitclone(
-            backend_repo(be), tag, be, "https://gitlab-master.nvidia.com/krish"
+        # cmake_script.gitclone(
+        #     backend_repo("tekit"), tag, be, "https://gitlab-master.nvidia.com/ftp"
+        # )
+        cmake_script.cmd(
+            "git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm".format(
+                tag,
+                os.environ["REMOVE_ME_TRTLLM_USERNAME"],
+                os.environ["REMOVE_ME_TRTLLM_TOKEN"],
+            )
         )
     else:
         cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
