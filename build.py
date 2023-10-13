@@ -1368,7 +1368,7 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
         # Remove Pip install once vLLM backend moves to Conda environment.
         df += """
 # vLLM needed for vLLM backend
-RUN pip3 install torch=2.0.1 vllm=={}
+RUN pip3 install torch==2.0.1 vllm=={}
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][7]
         )
