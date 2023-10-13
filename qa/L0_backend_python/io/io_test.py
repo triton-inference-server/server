@@ -30,6 +30,7 @@ import sys
 
 sys.path.append("../../common")
 
+import itertools
 import os
 import queue
 import unittest
@@ -64,43 +65,50 @@ class IOTest(tu.TestResultCollector):
     def _run_ensemble_test(self, model_name):
         user_data = UserData()
         input0 = np.random.random([1000]).astype(np.float32)
-        self._client.start_stream(callback=partial(callback, user_data))
-        for model_1_in_gpu in [True, False]:
-            for model_2_in_gpu in [True, False]:
-                for model_3_in_gpu in [True, False]:
-                    gpu_output = np.asarray(
-                        [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu], dtype=bool
-                    )
-                    inputs = [
-                        grpcclient.InferInput(
-                            "INPUT0", input0.shape, np_to_triton_dtype(input0.dtype)
-                        ),
-                        grpcclient.InferInput(
-                            "GPU_OUTPUT",
-                            gpu_output.shape,
-                            np_to_triton_dtype(gpu_output.dtype),
-                        ),
-                    ]
-                    inputs[0].set_data_from_numpy(input0)
-                    inputs[1].set_data_from_numpy(gpu_output)
-                    self._client.async_stream_infer(
-                        model_name=model_name, inputs=inputs
-                    )
-                    if TRIAL == "default":
+        # Use context manager to close client stream if any early exit occurs
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            # Each pair represents whether the corresponding model is in GPU or not.
+            gpu_flags = [(True, False), (True, False), (True, False)]
+            # Create iterable of all possible combinations of each model gpu location
+            # ex: (True, True, True), (True, True, False), (True, False, True), ...
+            combinations = itertools.product(*gpu_flags)
+            for model_1_in_gpu, model_2_in_gpu, model_3_in_gpu in combinations:
+                gpu_output = np.asarray(
+                    [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu], dtype=bool
+                )
+                inputs = [
+                    grpcclient.InferInput(
+                        "INPUT0", input0.shape, np_to_triton_dtype(input0.dtype)
+                    ),
+                    grpcclient.InferInput(
+                        "GPU_OUTPUT",
+                        gpu_output.shape,
+                        np_to_triton_dtype(gpu_output.dtype),
+                    ),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(gpu_output)
+                client.async_stream_infer(model_name=model_name, inputs=inputs)
+                if TRIAL == "default":
+                    result = user_data._completed_requests.get()
+                    output0 = result.as_numpy("OUTPUT0")
+                    self.assertIsNotNone(output0)
+                    self.assertTrue(np.all(output0 == input0))
+                else:
+                    response_repeat = 2
+                    for _ in range(response_repeat):
                         result = user_data._completed_requests.get()
                         output0 = result.as_numpy("OUTPUT0")
                         self.assertIsNotNone(output0)
                         self.assertTrue(np.all(output0 == input0))
-                    else:
-                        response_repeat = 2
-                        for _ in range(response_repeat):
-                            result = user_data._completed_requests.get()
-                            output0 = result.as_numpy("OUTPUT0")
-                            self.assertIsNotNone(output0)
-                            self.assertTrue(np.all(output0 == input0))
 
     def test_ensemble_io(self):
         model_name = "ensemble_io"
+
+        # FIXME: This test detects a decrease of 80 bytes, which fails inequality check:
+        # [ensemble_io] Shared memory leak detected: 1006976 (current) != 1007056 (prev).
+        # so Probe was modified to check for growth instead of inequality.
         with self._shm_leak_detector.Probe(debug_str=model_name):
             self._run_ensemble_test(model_name)
 
