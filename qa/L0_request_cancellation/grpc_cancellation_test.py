@@ -80,11 +80,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         self.assertLess(
             duration,
             max_duration,
-            "test runtime expected less than "
-            + str(max_duration)
-            + "s response time, got "
-            + str(duration)
-            + "s",
+            f"test runtime expected less than {max_duration}s response time, got {duration}s",
         )
 
     def _assert_callback_cancelled(self):
