@@ -40,12 +40,14 @@ fi
 
 # Models
 DATADIR=/data/inferenceserver/${REPO_VERSION}
+JAVACPP_BRANCH=${JAVACPP_BRANCH:="https://github.com/bytedeco/javacpp-presets.git"}
+JAVACPP_BRANCH_TAG=${JAVACPP_BRANCH_TAG:="master"}
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set -e
 git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} https://github.com/triton-inference-server/client.git
-source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh -b $PWD --keep-build-dependencies
+source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh -b $PWD --javacpp-branch ${JAVACPP_BRANCH} --javacpp-tag ${JAVACPP_BRANCH_TAG} --keep-build-dependencies
 cd ..
 
 CLIENT_LOG="client.log"
