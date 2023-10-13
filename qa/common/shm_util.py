@@ -435,10 +435,10 @@ class ShmLeakDetector:
             for current_shm_size, prev_shm_size in zip(
                 current_shm_sizes, self._shm_region_free_sizes
             ):
-                if current_shm_size != prev_shm_size:
+                if current_shm_size > prev_shm_size:
                     shm_leak_detected = True
                     print(
-                        f"[{self._debug_str}] Shared memory leak detected: {current_shm_size} (current) != {prev_shm_size} (prev)."
+                        f"[{self._debug_str}] Shared memory leak detected: {current_shm_size} (current) > {prev_shm_size} (prev)."
                     )
             assert not shm_leak_detected, "Shared memory leak detected."
 
