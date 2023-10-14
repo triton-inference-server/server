@@ -406,11 +406,19 @@ class PBBLSTest(unittest.TestCase):
         output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
         self.assertTrue(np.all(output0 == input0))
 
-    def test_bls_tensor_lifecycle(self):
+    def cuda_memory_stats(self):
+        allocated_bytes = torch.cuda.memory_allocated()
+        reserved_bytes = torch.cuda.memory_reserved()
+        return allocated_bytes, reserved_bytes
+
+    def bls_tensor_lifecycle_helper(self):
         model_name = "dlpack_identity"
+        verbose = True
 
         # A 10 MB tensor.
         input_size = 10 * 1024 * 1024
+        input_type_size_bytes = 4  # TYPE_FP32
+        input_size_bytes = input_size * input_type_size_bytes
 
         # Sending the tensor 50 times to test whether the deallocation is
         # happening correctly. If the deallocation doesn't happen correctly,
@@ -438,26 +446,43 @@ class PBBLSTest(unittest.TestCase):
                 output0.as_numpy(), input0, "BLS CPU memory lifecycle failed."
             )
 
+        # Show total memory stats before gpu tensor test
+        print(torch.cuda.memory_summary())
+
         # Checking the same with the GPU tensors.
         for index in range(50):
             input0 = None
             infer_request = None
             input0_pb = None
+            fail_msg = f"GPU memory lifecycle test failed at index: {index}"
 
             torch.cuda.empty_cache()
-            free_memory, _ = torch.cuda.mem_get_info()
-            if index == 1:
-                recorded_memory = free_memory
+            alloced, cached = self.cuda_memory_stats()
 
-            if index > 1:
-                self.assertEqual(
-                    free_memory,
-                    recorded_memory,
-                    "GPU memory lifecycle test failed at index: " + str(index),
-                )
+            # Check cuda memory usage is cleaned up (empty) between iterations
+            # when device tensors go out of scope
+            self.assertEqual(alloced, 0, fail_msg)
+            # Check that cache is properly cleaned up when emptied
+            self.assertEqual(cached, 0, fail_msg)
+
+            if verbose:
+                # NOTE: this reflects total gpu memory usage, and may be affected
+                # by other processes, so don't use it for direct checks but log it
+                # for debugging/context.
+                free_memory, total_memory = torch.cuda.mem_get_info()
+                used_memory = total_memory - free_memory
+                print(f"[DEBUG][Iteration {index}][GPU] {used_memory=} bytes")
 
             input0 = torch.ones([1, input_size], dtype=torch.float32).to("cuda")
             input0_pb = pb_utils.Tensor.from_dlpack("INPUT0", to_dlpack(input0))
+            # Check cuda memory usage after creating device tensor
+            alloced, _ = self.cuda_memory_stats()
+            self.assertEqual(
+                alloced,
+                input_size_bytes,
+                "Expected precise byte allocation after input tensor creation",
+            )
+
             infer_request = pb_utils.InferenceRequest(
                 model_name=model_name,
                 inputs=[input0_pb],
@@ -477,6 +502,14 @@ class PBBLSTest(unittest.TestCase):
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
             output0_pytorch = from_dlpack(output0.to_dlpack())
 
+            # Stats after getting output tensor
+            alloced, _ = self.cuda_memory_stats()
+            self.assertEqual(
+                alloced,
+                input_size_bytes,
+                "Expected only input allocation, as output zero-copies input tensor",
+            )
+
             # Set inference response and output0_pytorch to None, to make sure
             # that the DLPack is still valid.
             output0 = None
@@ -486,12 +519,18 @@ class PBBLSTest(unittest.TestCase):
                 f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model.",
             )
 
-            # We are seeing intermittent failures in the GPU memory lifecycle
-            # test where the free memory is not the same as the recorded memory.
-            # It is suspected that this is due to the Python garbage collector
-            # not releasing the memory immediately. Calling the garbage
-            # collector here to make sure that the memory is cleaned up.
-            collected = gc.collect()
+        print(torch.cuda.memory_summary())
+
+    def assert_cuda_memory_empty(self, msg):
+        torch.cuda.empty_cache()
+        alloced, cached = self.cuda_memory_stats()
+        self.assertEqual(alloced, 0, msg)
+        self.assertEqual(cached, 0, msg)
+
+    def test_bls_tensor_lifecycle(self):
+        self.assert_cuda_memory_empty("Expected all gpu memory cleaned up before test")
+        self.bls_tensor_lifecycle_helper()
+        self.assert_cuda_memory_empty("Expected all gpu memory cleaned up after test")
 
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_decoupled=False):
         input0 = torch.rand(16)
@@ -738,6 +777,8 @@ class TritonPythonModel:
         for _ in requests:
             # Run the unittest and store the results in InferenceResponse.
             test = unittest.main("model", exit=False)
+            for test_case, traceback in test.result.failures:
+                print(f"{test_case} failed:\n{traceback}")
             responses.append(
                 pb_utils.InferenceResponse(
                     [

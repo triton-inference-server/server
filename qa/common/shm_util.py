@@ -440,7 +440,9 @@ class ShmLeakDetector:
                     print(
                         f"[{self._debug_str}] Shared memory leak detected: {current_shm_size} (current) > {prev_shm_size} (prev)."
                     )
-            assert not shm_leak_detected, "Shared memory leak detected."
+            assert (
+                not shm_leak_detected
+            ), f"[{self._debug_str}] Shared memory leak detected."
 
     def __init__(self, prefix="triton_python_backend_shm_region"):
         if _test_jetson:
