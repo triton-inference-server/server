@@ -119,6 +119,8 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
 
         set +e
 
+        # FIXME: Seeing intermittent shm leak for bls decoupled:
+        # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
         export MODEL_NAME='bls'
         python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
