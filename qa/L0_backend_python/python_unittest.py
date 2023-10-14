@@ -51,10 +51,13 @@ class PythonUnittest(tu.TestResultCollector):
 
             # The model returns 1 if the tests were successfully passed.
             # Otherwise, it will return 0.
-            self.assertEqual(output0, [1])
+            self.assertEqual(
+                output0, [1], f"python_unittest failed for model {model_name}"
+            )
 
     def test_python_unittest(self):
         model_name = os.environ["MODEL_NAME"]
+        bls_kind = os.environ.get("BLS_KIND", "non_decoupled")
 
         # Stress test memory growth test more on nightly runs
         nightly = int(os.environ.get("TRITON_NIGHTLY", "0"))
@@ -63,9 +66,10 @@ class PythonUnittest(tu.TestResultCollector):
         # Warmup run, let it do any upfront shm initializations required
         self._run_unittest(model_name)
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        debug_str = f"{model_name} {bls_kind}"
+        with self._shm_leak_detector.Probe(debug_str=debug_str) as shm_probe:
             for i in range(repetitions):
-                print(f"[{model_name}] Test iteration: {i}")
+                print(f"[{debug_str}] Test iteration: {i}")
                 self._run_unittest(model_name)
 
 
