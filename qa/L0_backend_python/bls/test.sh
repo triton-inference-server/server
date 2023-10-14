@@ -37,8 +37,6 @@ BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 RET=0
-# This variable is used to print out the correct server log for each sub-test.
-SUB_TEST_RET=0
 rm -fr *.log ./models *.txt
 
 pip3 uninstall -y torch
@@ -104,97 +102,43 @@ cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ .
     echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
 
 for TRIAL in non_decoupled decoupled ; do
-    export BLS_KIND=$TRIAL
-    SERVER_LOG="./bls_$TRIAL.inference_server.log"
+    for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
+        export MODEL_NAME=${MODEL_NAME}
+        export BLS_KIND=${TRIAL}
+        SERVER_LOG="./${MODEL_NAME}_${TRIAL}.inference_server.log"
 
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    set +e
-
-    # FIXME: Seeing intermittent shm leak for bls decoupled:
-    # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
-    export MODEL_NAME='bls'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-            SUB_TEST_RET=1
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER for ${MODEL_NAME} ${TRIAL}\n***"
+            cat $SERVER_LOG
+            exit 1
         fi
-    fi
 
-    export MODEL_NAME='bls_memory'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        set +e
+
+        # FIXME: Seeing intermittent shm leak for bls decoupled:
+        # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
+            cat $SERVER_LOG
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
-            SUB_TEST_RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $SERVER_LOG
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
+                RET=1
+            fi
         fi
-    fi
 
-    export MODEL_NAME='bls_memory_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-            SUB_TEST_RET=1
-        fi
-    fi
+        set -e
 
-    export MODEL_NAME='bls_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-            SUB_TEST_RET=1
-        fi
-    fi
-
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-    if [ $SUB_TEST_RET -eq 1 ]; then
-        cat $CLIENT_LOG
-        cat $SERVER_LOG
-    fi
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 done
 
 # Test error handling when BLS is used in "initialize" or "finalize" function
@@ -205,6 +149,7 @@ mkdir -p models/bls_init_error/1/
 cp ../../python_models/bls_init_error/model.py models/bls_init_error/1/
 cp ../../python_models/bls_init_error/config.pbtxt models/bls_init_error
 SERVER_LOG="./bls_init_error_server.log"
+# This variable is used to print out the correct server log for each sub-test.
 SUB_TEST_RET=0
 
 run_server
