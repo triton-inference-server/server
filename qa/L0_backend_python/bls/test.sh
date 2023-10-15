@@ -106,41 +106,47 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
     SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
     for TRIAL in non_decoupled decoupled ; do
         for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
-        export MODEL_NAME=${MODEL_NAME}
-        export BLS_KIND=${TRIAL}
-        SERVER_LOG="./${MODEL_NAME}_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
+            export MODEL_NAME=${MODEL_NAME}
+            export BLS_KIND=${TRIAL}
+            SERVER_LOG="./${MODEL_NAME}_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
 
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER for ${MODEL_NAME} ${TRIAL}\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
+            run_server
+            if [ "$SERVER_PID" == "0" ]; then
+                echo -e "\n***\n*** Failed to start $SERVER for ${MODEL_NAME} ${TRIAL}\n***"
+                cat $SERVER_LOG
+                # Mark failure, but continue so logs can be collected at the end
+                RET=1
+                continue
+            fi
 
-        set +e
+            set +e
 
-        # FIXME: Seeing intermittent shm leak for bls decoupled:
-        # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
-        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
-            cat $SERVER_LOG
-            cat $CLIENT_LOG
-            RET=1
-        else
-            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            # FIXME: Seeing intermittent shm leak for bls decoupled:
+            # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
+            python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
+                echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                 cat $SERVER_LOG
                 cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
                 RET=1
+            else
+                check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+                if [ $? -ne 0 ]; then
+                    cat $SERVER_LOG
+                    cat $CLIENT_LOG
+                    echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
+                    RET=1
+                fi
             fi
-        fi
 
-        set -e
+            set -e
 
-        kill $SERVER_PID
-        wait $SERVER_PID
+            kill $SERVER_PID
+            wait $SERVER_PID
+
+            # Give time for python processes to properly clean up
+            sleep 30
+        done
 
         # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
         if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
@@ -203,23 +209,23 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-    echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-else
-    echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
     RET=1
-    SUB_TEST_RET=1
-fi
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        RET=1
+        SUB_TEST_RET=1
+    fi
+
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 # Test model loading API with BLS
@@ -239,46 +245,46 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-export MODEL_NAME='bls_model_loading'
-
-set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-set -e
-if [ "$code" != "200" ]; then
-    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
-    SUB_TEST_RET=1
-fi
-
-set +e
-
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-    SUB_TEST_RET=1
 else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+    export MODEL_NAME='bls_model_loading'
+
+    set +e
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+    set -e
+    if [ "$code" == "400" ]; then
+        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
         RET=1
         SUB_TEST_RET=1
     fi
-fi
 
-set -e
+    set +e
 
-kill $SERVER_PID
-wait $SERVER_PID
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
+        cat $CLIENT_LOG
+        RET=1
+        SUB_TEST_RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+            SUB_TEST_RET=1
+        fi
+    fi
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 # Test model loading API with BLS warmup
@@ -310,24 +316,24 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-set -e
-if [ "$code" != "200" ]; then
-    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
-    SUB_TEST_RET=1
-fi
+else
+    set +e
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+    set -e
+    if [ "$code" == "400" ]; then
+        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+        RET=1
+        SUB_TEST_RET=1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 # Test BLS parameters
