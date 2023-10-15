@@ -111,7 +111,9 @@ for TRIAL in non_decoupled decoupled ; do
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER for ${MODEL_NAME} ${TRIAL}\n***"
             cat $SERVER_LOG
-            exit 1
+            # Mark failure, but continue so logs can be collected at the end
+            RET=1
+            continue
         fi
 
         set +e
@@ -138,6 +140,8 @@ for TRIAL in non_decoupled decoupled ; do
 
         kill $SERVER_PID
         wait $SERVER_PID
+        # Give time for python processes to properly clean up
+        sleep 30
     done
 done
 
@@ -185,23 +189,23 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-    echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-else
-    echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
     RET=1
-    SUB_TEST_RET=1
-fi
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        RET=1
+        SUB_TEST_RET=1
+    fi
+
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 # Test model loading API with BLS
@@ -221,46 +225,46 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-export MODEL_NAME='bls_model_loading'
-
-set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-set -e
-if [ "$code" == "400" ]; then
-    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
-    SUB_TEST_RET=1
-fi
-
-set +e
-
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-    SUB_TEST_RET=1
 else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+    export MODEL_NAME='bls_model_loading'
+
+    set +e
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+    set -e
+    if [ "$code" == "400" ]; then
+        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
         RET=1
         SUB_TEST_RET=1
     fi
-fi
 
-set -e
+    set +e
 
-kill $SERVER_PID
-wait $SERVER_PID
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
+        cat $CLIENT_LOG
+        RET=1
+        SUB_TEST_RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+            SUB_TEST_RET=1
+        fi
+    fi
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 # Test model loading API with BLS warmup
@@ -292,24 +296,24 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-set -e
-if [ "$code" == "400" ]; then
-    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
-    SUB_TEST_RET=1
-fi
+else
+    set +e
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+    set -e
+    if [ "$code" == "400" ]; then
+        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+        RET=1
+        SUB_TEST_RET=1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-if [ $SUB_TEST_RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    if [ $SUB_TEST_RET -eq 1 ]; then
+        cat $CLIENT_LOG
+        cat $SERVER_LOG
+    fi
 fi
 
 if [ $RET -eq 1 ]; then
