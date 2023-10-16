@@ -4444,13 +4444,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 
   if (std::string(req->uri->path->full) == "/v2/models/stats") {
     // model statistics
-    // key statistics
     HandleModelStats(req);
     return;
   }
   if (std::string(req->uri->path->full) == "/v2/logging") {
     // change logging
-    // key "logging"
     HandleLogging(req);
     return;
   }
@@ -4476,19 +4474,17 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       return;
     } else if (kind == "config") {
       // model configuration
-      //key "model-config"
       HandleModelConfig(req, model_name, version);
       return;
     } else if (kind == "stats") {
       // model statistics
-      //key "statistics"
       HandleModelStats(req, model_name, version);
       return;
     } else if (kind == "trace/setting") {
       // Trace with specific model, there is no specification on versioning
       // so fall out and return bad request error if version is specified
       if (version.empty()) {
-	//restricted key "trace"
+        // restricted key "trace"
         HandleTrace(req, model_name);
         return;
       }
@@ -4503,7 +4499,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   std::string region, action, rest, repo_name;
   if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
-    
+
     HandleServerMetadata(req);
     return;
   } else if (RE2::FullMatch(
@@ -4516,7 +4512,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
                  std::string(req->uri->path->full), systemsharedmemory_regex_,
                  &region, &action)) {
     // system shared memory
-    //key "shared-memory"
     HandleSystemSharedMemory(req, region, action);
     return;
   } else if (RE2::FullMatch(
@@ -4529,7 +4524,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
                  std::string(req->uri->path->full), modelcontrol_regex_,
                  &repo_name, &kind, &model_name, &action)) {
     // model repository
-    // key model-repository
     if (kind == "index") {
       HandleRepositoryIndex(req, repo_name);
       return;
