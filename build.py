@@ -1330,18 +1330,26 @@ RUN pip uninstall -y tensorrt
 # Install new version of TRT using the script from TRT-LLM
 RUN apt-get update && apt-get install -y --no-install-recommends python-is-python3
 RUN git clone --single-branch --depth=1 -b {} https://{}:{}@gitlab-master.nvidia.com/ftp/tekit_backend.git tensorrtllm_backend
-RUN cd tensorrtllm_backend && git submodule update --init --recursive
-RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
-RUN rm -fr tensorrtllm_backend
-    """.format(
+""".format(
             backends[be],
             os.environ["REMOVE_ME_TRTLLM_USERNAME"],
             os.environ["REMOVE_ME_TRTLLM_TOKEN"],
         )
-
         df += """
+RUN cd tensorrtllm_backend && git submodule update --init --recursive
+RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
 RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
 ENV TRT_ROOT=/usr/local/tensorrt
+
+# Install PyTorch using the script from TRT-LLM
+RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_pytorch.sh /tmp/
+# `pypi` for x86_64 arch and `src_cxx11_abi` for aarch64 arch
+RUN ARCH="$(uname -i)" && \
+    if [ "${ARCH}" = "aarch64" ]; then TORCH_INSTALL_TYPE="src_non_cxx11_abi"; \
+    else TORCH_INSTALL_TYPE="pypi"; fi && \
+    bash /tmp/install_pytorch.sh $TORCH_INSTALL_TYPE && rm /tmp/install_pytorch.sh
+
+RUN rm -fr tensorrtllm_backend
 
 # Remove TRT contents that are not needed in runtime
 RUN ARCH="$(uname -i)" && \
