@@ -27,12 +27,12 @@
 
 ############################################################################
 ## This script generates the model repository needed for TensorRT testing
-## on the Jetson device. Generating these models requires having TensorRT 
+## on the Jetson device. Generating these models requires having TensorRT
 ## container.
 ############################################################################
 #!/bin/bash -xe
 # Make all generated files accessible outside of container
-umask 0000 
+umask 0000
 
 # Set the version of the models
 TRITON_VERSION=${TRITON_VERSION:=23.09}
