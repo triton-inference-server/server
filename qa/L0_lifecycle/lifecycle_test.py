@@ -2919,7 +2919,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_concurrent_same_model_load_unload_stress(self):
         model_name = "identity_zero_1_int32"
-        num_threads = 16
+        num_threads = 32
         num_iterations = 1024
         try:
             triton_client = grpcclient.InferenceServerClient(
@@ -2951,7 +2951,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 try:
                     triton_client.load_model(model_name)
                 except InferenceServerException as ex:
-                    # Acceptable for an unload to happen after a load completes, but
+                    # Acceptable for an unload to happen after a load completes, only
                     # before the load can verify its load state.
                     error_message = ex.message()
                     self.assertIn(error_message, load_fail_messages)
@@ -2961,7 +2961,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 try:
                     triton_client.unload_model(model_name)
                 except InferenceServerException as ex:
-                    # Acceptable for a load to happen during an async unload
+                    # Acceptable for a load to happen after an unload completes, only
+                    # before the unload can verify its unload state.
                     error_message = ex.message()
                     self.assertIn(error_message, unload_fail_messages)
                     if error_message not in exception_stats:
