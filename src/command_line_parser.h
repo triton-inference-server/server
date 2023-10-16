@@ -189,6 +189,7 @@ struct TritonServerParameters {
   std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
+  RestrictedFeatureMap http_restricted_apis_{};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -281,8 +282,10 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
       const std::string& arg);
-  std::tuple<std::string, std::string, std::string>
-  ParseGrpcRestrictedProtocolOption(const std::string& arg);
+  void ParseRestrictedFeatureOption(
+      const std::string& arg, const std::string& option_name,
+      const std::string& header_prefix, const std::string& feature_name,
+      RestrictedFeatureMap& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
   InferenceTraceMode ParseTraceModeOption(std::string arg);
@@ -308,7 +311,8 @@ class TritonParser {
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
   std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
       const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim);
+      const std::string& second_delim, const std::string& option_name,
+      const std::string& config_name);
 
   // Initialize individual option groups
   void SetupOptions();

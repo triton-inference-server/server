@@ -252,9 +252,7 @@ class CommonHandler : public HandlerBase {
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::health::v1::Health::AsyncService* health_service,
-      ::grpc::ServerCompletionQueue* cq,
-      std::map<std::string, std::pair<std::string, std::string>>
-          restricted_keys);
+      ::grpc::ServerCompletionQueue* cq, RestrictedFeatureMap restricted_keys);
 
   // Descriptive name of of the handler.
   const std::string& Name() const { return name_; }
@@ -2411,33 +2409,16 @@ Server::Server(
   model_infer_cq_ = builder_.AddCompletionQueue();
   model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
-  // Read and set restriction for each protocol specified
-  // map from protocol name to a pair of header to look for and the key
-  std::map<std::string, std::pair<std::string, std::string>> restricted_keys;
-  for (const auto& pg : options.protocol_groups_) {
-    for (const auto& p : pg.protocols_) {
-      if (restricted_keys.find(p) != restricted_keys.end()) {
-        throw std::invalid_argument(
-            std::string("protocol '") + p +
-            "' can not be "
-            "specified in multiple config group");
-      }
-      const auto header = std::string(kRestrictedProtocolHeaderTemplate) +
-                          pg.restricted_key_.first;
-      restricted_keys[p] = std::make_pair(header, pg.restricted_key_.second);
-    }
-  }
-
   // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
-      &health_service_, common_cq_.get(), restricted_keys));
+      &health_service_, common_cq_.get(), options.restricted_protocols_));
 
   // [FIXME] "register" logic is different for infer
   // Handler for model inference requests.
-  const auto it = restricted_keys.find("inference");
+  const auto it = options.restricted_protocols_.find("inference");
   std::pair<std::string, std::string> restricted_kv =
-      (it == restricted_keys.end())
+      (it == options.restricted_protocols_.end())
           ? std::pair<std::string, std::string>{"", ""}
           : it->second;
   for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {

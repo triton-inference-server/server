@@ -667,6 +667,49 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+### Test Restricted  APIs ###
+
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --http-restricted-api=model-repository,health:k1=v1 \
+             --http-restricted-api=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="api 'health' can not be specified in multiple config groups"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+### Test Restricted  APIs ###
+
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --http-restricted-api=model-repository:admin-key=admin-value \
+             --http-restricted-api=inference,health:infer-key=infer-value"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_UNIT_TEST RestrictedProtocolTest > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC Restricted Protocol Test Failed\n***"
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
 ###
 
 if [ $RET -eq 0 ]; then

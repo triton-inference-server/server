@@ -613,7 +613,7 @@ SERVER_ARGS="--model-repository=${MODELDIR} \
              --grpc-restricted-protocol=model-repository,health:k1=v1 \
              --grpc-restricted-protocol=metadata,health:k2=v2"
 run_server
-EXPECTED_MSG="protocol 'health' can not be specified in multiple config group"
+EXPECTED_MSG="protocol 'health' can not be specified in multiple config groups"
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Expect fail to start $SERVER\n***"
     kill $SERVER_PID

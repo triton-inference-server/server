@@ -26,6 +26,7 @@
 #pragma once
 
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -98,16 +99,17 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     }                                                             \
   } while (false)
 
-#define THROW_IF_ERR(EX_TYPE, X, MSG)                                     \
-  do {                                                                    \
-    TRITONSERVER_Error* err__ = (X);                                      \
-    if (err__ != nullptr) {                                               \
-      auto ex__ = (EX_TYPE)(std::string("error: ") + (MSG) + ": " +       \
-                            TRITONSERVER_ErrorCodeString(err__) + " - " + \
-                            TRITONSERVER_ErrorMessage(err__));            \
-      TRITONSERVER_ErrorDelete(err__);                                    \
-      throw ex__;                                                         \
-    }                                                                     \
+#define THROW_IF_ERR(EX_TYPE, X, MSG)                   \
+  do {                                                  \
+    TRITONSERVER_Error* err__ = (X);                    \
+    if (err__ != nullptr) {                             \
+      auto ex__ = (EX_TYPE)(                            \
+          std::string("error: ") + (MSG) + ": " +       \
+          TRITONSERVER_ErrorCodeString(err__) + " - " + \
+          TRITONSERVER_ErrorMessage(err__));            \
+      TRITONSERVER_ErrorDelete(err__);                  \
+      throw ex__;                                       \
+    }                                                   \
   } while (false)
 
 #define IGNORE_ERR(X)                  \
@@ -170,4 +172,6 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 /// \return The joint string.
 std::string Join(const std::vector<std::string>& vec, const std::string& delim);
 
+typedef std::map<std::string, std::pair<std::string, std::string>>
+    RestrictedFeatureMap;
 }}  // namespace triton::server
