@@ -1714,470 +1714,474 @@ TritonParser::Parse(int argc, char** argv)
   return {lparams, {}};
 }
 
-  std::string TritonParser::FormatUsageMessage(std::string str, int offset)
-  {
-    int width = 60;
-    int current_pos = offset;
-    while (current_pos + width < int(str.length())) {
-      int n = str.rfind(' ', current_pos + width);
-      if (n != int(std::string::npos)) {
-        str.replace(n, 1, "\n\t");
-        current_pos += (width + 9);
-      }
+std::string
+TritonParser::FormatUsageMessage(std::string str, int offset)
+{
+  int width = 60;
+  int current_pos = offset;
+  while (current_pos + width < int(str.length())) {
+    int n = str.rfind(' ', current_pos + width);
+    if (n != int(std::string::npos)) {
+      str.replace(n, 1, "\n\t");
+      current_pos += (width + 9);
     }
-
-    return str;
   }
 
-  std::string TritonParser::Usage()
-  {
+  return str;
+}
+
+std::string
+TritonParser::Usage()
+{
+  std::stringstream ss;
+  for (const auto& group : option_groups_) {
+    if (!group.first.empty() && !group.second.empty()) {
+      ss << std::endl << group.first << ":" << std::endl;
+    }
+
+    for (const auto& o : group.second) {
+      if (!o.arg_desc_.empty()) {
+        ss << "  --" << o.flag_ << " <" << o.arg_desc_ << ">" << std::endl
+           << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
+      } else {
+        ss << "  --" << o.flag_ << std::endl
+           << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
+      }
+    }
+  }
+  return ss.str();
+}
+
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseMetricsConfigOption(const std::string& arg)
+{
+  // Format is "<setting>=<value>" for generic configs/settings
+  int delim_setting = arg.find("=");
+  if (delim_setting < 0) {
     std::stringstream ss;
-    for (const auto& group : option_groups_) {
-      if (!group.first.empty() && !group.second.empty()) {
-        ss << std::endl << group.first << ":" << std::endl;
-      }
-
-      for (const auto& o : group.second) {
-        if (!o.arg_desc_.empty()) {
-          ss << "  --" << o.flag_ << " <" << o.arg_desc_ << ">" << std::endl
-             << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
-        } else {
-          ss << "  --" << o.flag_ << std::endl
-             << "\t" << FormatUsageMessage(o.desc_, 0) << std::endl;
-        }
-      }
-    }
-    return ss.str();
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
   }
 
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseMetricsConfigOption(const std::string& arg)
-  {
-    // Format is "<setting>=<value>" for generic configs/settings
-    int delim_setting = arg.find("=");
-    if (delim_setting < 0) {
-      std::stringstream ss;
-      ss << "--metrics-config option format is "
-         << "<setting>=<value>. Got " << arg << std::endl;
-      throw ParseException(ss.str());
-    }
+  // Break section before "=" into substr to avoid matching commas
+  // in setting values.
+  auto name_substr = arg.substr(0, delim_setting);
+  int delim_name = name_substr.find(",");
 
-    // Break section before "=" into substr to avoid matching commas
-    // in setting values.
-    auto name_substr = arg.substr(0, delim_setting);
-    int delim_name = name_substr.find(",");
+  // No name-specific configs currently supported, though it may be in
+  // the future. Map global configs to empty string like other configs for
+  // now.
+  std::string name_string = std::string();
+  if (delim_name >= 0) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global metrics config
 
-    // No name-specific configs currently supported, though it may be in
-    // the future. Map global configs to empty string like other configs for
-    // now.
-    std::string name_string = std::string();
-    if (delim_name >= 0) {
-      std::stringstream ss;
-      ss << "--metrics-config option format is "
-         << "<setting>=<value>. Got " << arg << std::endl;
-      throw ParseException(ss.str());
-    }  // else global metrics config
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
 
-    std::string setting_string =
-        arg.substr(delim_name + 1, delim_setting - delim_name - 1);
-    std::string value_string = arg.substr(delim_setting + 1);
-
-    if (setting_string.empty() || value_string.empty()) {
-      std::stringstream ss;
-      ss << "--metrics-config option format is "
-         << "<setting>=<value>. Got " << arg << std::endl;
-      throw ParseException(ss.str());
-    }
-
-    return {name_string, setting_string, value_string};
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
   }
 
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseCacheConfigOption(const std::string& arg)
-  {
-    // Format is "<cache_name>,<setting>=<value>" for specific
-    // config/settings and "<setting>=<value>" for cache agnostic
-    // configs/settings
-    int delim_name = arg.find(",");
-    int delim_setting = arg.find("=", delim_name + 1);
+  return {name_string, setting_string, value_string};
+}
 
-    std::string name_string = std::string();
-    if (delim_name > 0) {
-      name_string = arg.substr(0, delim_name);
-    }
-    // No cache-agnostic global settings are currently supported
-    else {
-      std::stringstream ss;
-      ss << "No cache specified. --cache-config option format is "
-         << "<cache name>,<setting>=<value>. Got " << arg << std::endl;
-      throw ParseException(ss.str());
-    }
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseCacheConfigOption(const std::string& arg)
+{
+  // Format is "<cache_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for cache agnostic
+  // configs/settings
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
 
-    if (delim_setting < 0) {
-      std::stringstream ss;
-      ss << "--cache-config option format is '<cache "
-            "name>,<setting>=<value>'. Got "
-         << arg << std::endl;
-      throw ParseException(ss.str());
-    }
-    std::string setting_string =
-        arg.substr(delim_name + 1, delim_setting - delim_name - 1);
-    std::string value_string = arg.substr(delim_setting + 1);
-
-    if (setting_string.empty() || value_string.empty()) {
-      std::stringstream ss;
-      ss << "--cache-config option format is '<cache "
-            "name>,<setting>=<value>'. Got "
-         << arg << std::endl;
-      throw ParseException(ss.str());
-    }
-
-    return {name_string, setting_string, value_string};
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  }
+  // No cache-agnostic global settings are currently supported
+  else {
+    std::stringstream ss;
+    ss << "No cache specified. --cache-config option format is "
+       << "<cache name>,<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
   }
 
-  std::tuple<std::string, int, int>
-  TritonParser::ParseRateLimiterResourceOption(const std::string& arg)
-  {
-    std::string error_string(
-        "--rate-limit-resource option format is "
-        "'<resource_name>:<count>:<device>' or '<resource_name>:<count>'. "
-        "Got " +
-        arg);
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--cache-config option format is '<cache "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
 
-    std::string name_string("");
-    int count = -1;
-    int device_id = -1;
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--cache-config option format is '<cache "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
 
-    size_t delim_first = arg.find(":");
-    size_t delim_second = arg.find(":", delim_first + 1);
+  return {name_string, setting_string, value_string};
+}
 
-    if (delim_second != std::string::npos) {
-      // Handle format `<resource_name>:<count>:<device>'
-      size_t delim_third = arg.find(":", delim_second + 1);
-      if (delim_third != std::string::npos) {
-        throw ParseException(error_string);
-      }
-      name_string = arg.substr(0, delim_first);
-      count = ParseOption<int>(
-          arg.substr(delim_first + 1, delim_second - delim_first - 1));
-      device_id = ParseOption<int>(arg.substr(delim_second + 1));
-    } else if (delim_first != std::string::npos) {
-      // Handle format `<resource_name>:<count>'
-      name_string = arg.substr(0, delim_first);
-      count = ParseOption<int>(arg.substr(delim_first + 1));
-    } else {
-      // If no colons found
+std::tuple<std::string, int, int>
+TritonParser::ParseRateLimiterResourceOption(const std::string& arg)
+{
+  std::string error_string(
+      "--rate-limit-resource option format is "
+      "'<resource_name>:<count>:<device>' or '<resource_name>:<count>'. "
+      "Got " +
+      arg);
+
+  std::string name_string("");
+  int count = -1;
+  int device_id = -1;
+
+  size_t delim_first = arg.find(":");
+  size_t delim_second = arg.find(":", delim_first + 1);
+
+  if (delim_second != std::string::npos) {
+    // Handle format `<resource_name>:<count>:<device>'
+    size_t delim_third = arg.find(":", delim_second + 1);
+    if (delim_third != std::string::npos) {
       throw ParseException(error_string);
     }
-
-    return {name_string, count, device_id};
+    name_string = arg.substr(0, delim_first);
+    count = ParseOption<int>(
+        arg.substr(delim_first + 1, delim_second - delim_first - 1));
+    device_id = ParseOption<int>(arg.substr(delim_second + 1));
+  } else if (delim_first != std::string::npos) {
+    // Handle format `<resource_name>:<count>'
+    name_string = arg.substr(0, delim_first);
+    count = ParseOption<int>(arg.substr(delim_first + 1));
+  } else {
+    // If no colons found
+    throw ParseException(error_string);
   }
 
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseBackendConfigOption(const std::string& arg)
-  {
-    // Format is "<backend_name>,<setting>=<value>" for specific
-    // config/settings and "<setting>=<value>" for backend agnostic
-    // configs/settings
-    int delim_name = arg.find(",");
-    int delim_setting = arg.find("=", delim_name + 1);
+  return {name_string, count, device_id};
+}
 
-    std::string name_string = std::string();
-    if (delim_name > 0) {
-      name_string = arg.substr(0, delim_name);
-    } else if (delim_name == 0) {
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseBackendConfigOption(const std::string& arg)
+{
+  // Format is "<backend_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for backend agnostic
+  // configs/settings
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  } else if (delim_name == 0) {
+    std::stringstream ss;
+    ss << "No backend specified. --backend-config option format is "
+       << "<backend name>,<setting>=<value> or "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global backend config
+
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--backend-config option format is '<backend "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--backend-config option format is '<backend "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  return {name_string, setting_string, value_string};
+}
+
+void
+TritonParser::ParseRestrictedFeatureOption(
+    const std::string& arg, const std::string& option_name,
+    const std::string& key_prefix, const std::string& feature_type,
+    RestrictedFeatureMap& restricted_features)
+{
+  const auto& parsed_tuple =
+      ParseGenericConfigOption(arg, ":", "=", option_name, "config name");
+
+  const auto& features = SplitOptions(std::get<0>(parsed_tuple), ",");
+  const auto& key = std::get<1>(parsed_tuple);
+  const auto& value = std::get<2>(parsed_tuple);
+
+  for (const auto& feature : features) {
+    if (restricted_features.count(feature)) {
+      // restricted feature can only be in one group
       std::stringstream ss;
-      ss << "No backend specified. --backend-config option format is "
-         << "<backend name>,<setting>=<value> or "
-         << "<setting>=<value>. Got " << arg << std::endl;
-      throw ParseException(ss.str());
-    }  // else global backend config
-
-    if (delim_setting < 0) {
-      std::stringstream ss;
-      ss << "--backend-config option format is '<backend "
-            "name>,<setting>=<value>'. Got "
-         << arg << std::endl;
+      ss << "restricted " << feature_type << " '" << feature
+         << "' can not be specified in multiple config groups" << std::endl;
       throw ParseException(ss.str());
     }
-    std::string setting_string =
-        arg.substr(delim_name + 1, delim_setting - delim_name - 1);
-    std::string value_string = arg.substr(delim_setting + 1);
+    restricted_features[feature] = std::make_pair(key_prefix + key, value);
+  }
+}
 
-    if (setting_string.empty() || value_string.empty()) {
-      std::stringstream ss;
-      ss << "--backend-config option format is '<backend "
-            "name>,<setting>=<value>'. Got "
-         << arg << std::endl;
-      throw ParseException(ss.str());
-    }
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseHostPolicyOption(const std::string& arg)
+{
+  return ParseGenericConfigOption(arg, ",", "=", "host-policy", "policy name");
+}
 
-    return {name_string, setting_string, value_string};
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseGenericConfigOption(
+    const std::string& arg, const std::string& first_delim,
+    const std::string& second_delim, const std::string& option_name,
+    const std::string& config_name)
+{
+  // Format is "<string>,<string>=<string>"
+  int delim_name = arg.find(first_delim);
+  int delim_setting = arg.find(second_delim, delim_name + 1);
+
+  std::string error_string = "--" + option_name + " option format is '<" +
+                             config_name + ">" + first_delim + "<setting>" +
+                             second_delim + "<value>'. Got " + arg + "\n";
+
+  // Check for 2 semicolons
+  if ((delim_name < 0) || (delim_setting < 0)) {
+    throw ParseException(error_string);
   }
 
-  void
-  TritonParser::ParseRestrictedFeatureOption(
-      const std::string& arg, const std::string& option_name,
-      const std::string& key_prefix, const std::string& feature_type,
-      RestrictedFeatureMap& restricted_features)
-  {
-    const auto& parsed_tuple =
-        ParseGenericConfigOption(arg, ":", "=", option_name, "config name");
+  std::string name_string = arg.substr(0, delim_name);
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
 
-    const auto& features = SplitOptions(std::get<0>(parsed_tuple), ",");
-    const auto& key = std::get<1>(parsed_tuple);
-    const auto& value = std::get<2>(parsed_tuple);
-
-    for (const auto& feature : features) {
-      if (restricted_features.count(feature)) {
-        // restricted feature can only be in one group
-        std::stringstream ss;
-        ss << "restricted " << feature_type << " '" << feature
-           << "' can not be specified in multiple config groups" << std::endl;
-        throw ParseException(ss.str());
-      }
-      restricted_features[feature] = std::make_pair(key_prefix + key, value);
-    }
+  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+    throw ParseException(error_string);
   }
 
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseHostPolicyOption(const std::string& arg)
-  {
-    return ParseGenericConfigOption(
-        arg, ",", "=", "host-policy", "policy name");
-  }
-
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseGenericConfigOption(
-      const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim, const std::string& option_name,
-      const std::string& config_name)
-  {
-    // Format is "<string>,<string>=<string>"
-    int delim_name = arg.find(first_delim);
-    int delim_setting = arg.find(second_delim, delim_name + 1);
-
-    std::string error_string = "--" + option_name + " option format is '<" +
-                               config_name + ">" + first_delim + "<setting>" +
-                               second_delim + "<value>'. Got " + arg + "\n";
-
-    // Check for 2 semicolons
-    if ((delim_name < 0) || (delim_setting < 0)) {
-      throw ParseException(error_string);
-    }
-
-    std::string name_string = arg.substr(0, delim_name);
-    std::string setting_string =
-        arg.substr(delim_name + 1, delim_setting - delim_name - 1);
-    std::string value_string = arg.substr(delim_setting + 1);
-
-    if (name_string.empty() || setting_string.empty() || value_string.empty()) {
-      throw ParseException(error_string);
-    }
-
-    return {name_string, setting_string, value_string};
-  }
+  return {name_string, setting_string, value_string};
+}
 
 #ifdef TRITON_ENABLE_TRACING
-  TRITONSERVER_InferenceTraceLevel TritonParser::ParseTraceLevelOption(
-      std::string arg)
-  {
-    std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
-      return std::tolower(c);
-    });
+TRITONSERVER_InferenceTraceLevel
+TritonParser::ParseTraceLevelOption(std::string arg)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
 
-    if ((arg == "false") || (arg == "off")) {
-      return TRITONSERVER_TRACE_LEVEL_DISABLED;
-    }
-    if ((arg == "true") || (arg == "on") || (arg == "min") || (arg == "max") ||
-        (arg == "timestamps")) {
-      return TRITONSERVER_TRACE_LEVEL_TIMESTAMPS;
-    }
-    if (arg == "tensors") {
-      return TRITONSERVER_TRACE_LEVEL_TENSORS;
-    }
-
-    throw ParseException("invalid value for trace level option: " + arg);
+  if ((arg == "false") || (arg == "off")) {
+    return TRITONSERVER_TRACE_LEVEL_DISABLED;
+  }
+  if ((arg == "true") || (arg == "on") || (arg == "min") || (arg == "max") ||
+      (arg == "timestamps")) {
+    return TRITONSERVER_TRACE_LEVEL_TIMESTAMPS;
+  }
+  if (arg == "tensors") {
+    return TRITONSERVER_TRACE_LEVEL_TENSORS;
   }
 
-  InferenceTraceMode TritonParser::ParseTraceModeOption(std::string arg)
-  {
-    std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
-      return std::tolower(c);
-    });
+  throw ParseException("invalid value for trace level option: " + arg);
+}
 
-    if (arg == "triton") {
-      return TRACE_MODE_TRITON;
-    }
-    if (arg == "opentelemetry") {
-      return TRACE_MODE_OPENTELEMETRY;
-    }
+InferenceTraceMode
+TritonParser::ParseTraceModeOption(std::string arg)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
 
-    throw ParseException(
-        "invalid value for trace mode option: " + arg +
-        ". Available options are \"triton\" and \"opentelemetry\"");
+  if (arg == "triton") {
+    return TRACE_MODE_TRITON;
+  }
+  if (arg == "opentelemetry") {
+    return TRACE_MODE_OPENTELEMETRY;
   }
 
-  std::tuple<std::string, std::string, std::string>
-  TritonParser::ParseTraceConfigOption(const std::string& arg)
-  {
-    int delim_name = arg.find(",");
-    int delim_setting = arg.find("=", delim_name + 1);
+  throw ParseException(
+      "invalid value for trace mode option: " + arg +
+      ". Available options are \"triton\" and \"opentelemetry\"");
+}
 
-    std::string name_string = std::string();
-    if (delim_name > 0) {
-      name_string =
-          std::to_string(ParseTraceModeOption(arg.substr(0, delim_name)));
-    } else if (delim_name == 0) {
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseTraceConfigOption(const std::string& arg)
+{
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string =
+        std::to_string(ParseTraceModeOption(arg.substr(0, delim_name)));
+  } else if (delim_name == 0) {
+    std::stringstream ss;
+    ss << "No trace mode specified. --trace-config option format is "
+       << "<trace mode>,<setting>=<value> or "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global trace config
+
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
+          "Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
+          "Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  return {name_string, setting_string, value_string};
+}
+
+void
+TritonParser::SetGlobalTraceArgs(
+    TritonServerParameters& lparams, bool trace_level_present,
+    bool trace_rate_present, bool trace_count_present,
+    bool explicit_disable_trace)
+{
+  for (const auto& global_setting : lparams.trace_config_map_[""]) {
+    try {
+      if (global_setting.first == "rate") {
+        if (trace_rate_present) {
+          std::cerr << "Warning: Overriding deprecated '--trace-rate' "
+                       "in favor of provided rate value in --trace-config!"
+                    << std::endl;
+        }
+        lparams.trace_rate_ = ParseOption<int>(global_setting.second);
+      }
+      if (global_setting.first == "level") {
+        if (trace_level_present) {
+          std::cerr << "Warning: Overriding deprecated '--trace-level' "
+                       "in favor of provided level in --trace-config!"
+                    << std::endl;
+        }
+        auto parsed_level_config = ParseTraceLevelOption(global_setting.second);
+        explicit_disable_trace |=
+            (parsed_level_config == TRITONSERVER_TRACE_LEVEL_DISABLED);
+        lparams.trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
+            lparams.trace_level_ | parsed_level_config);
+      }
+      if (global_setting.first == "mode") {
+        lparams.trace_mode_ = ParseTraceModeOption(global_setting.second);
+      }
+      if (global_setting.first == "count") {
+        if (trace_count_present) {
+          std::cerr << "Warning: Overriding deprecated '--trace-count' "
+                       "in favor of provided count in --trace-config!"
+                    << std::endl;
+        }
+        lparams.trace_count_ = ParseOption<int>(global_setting.second);
+      }
+    }
+    catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "No trace mode specified. --trace-config option format is "
-         << "<trace mode>,<setting>=<value> or "
-         << "<setting>=<value>. Got " << arg << std::endl;
+      ss << "Bad option: \"--trace-config " << global_setting.first << "\".\n"
+         << pe.what() << std::endl;
       throw ParseException(ss.str());
-    }  // else global trace config
+    }
+  }
+}
 
-    if (delim_setting < 0) {
+void
+TritonParser::SetTritonTraceArgs(
+    TritonServerParameters& lparams, bool trace_filepath_present,
+    bool trace_log_frequency_present)
+{
+  for (const auto& mode_setting :
+       lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
+    try {
+      if (mode_setting.first == "file") {
+        if (trace_filepath_present) {
+          std::cerr << "Warning: Overriding deprecated '--trace-file' "
+                       "in favor of provided file in --trace-config!"
+                    << std::endl;
+        }
+        lparams.trace_filepath_ = mode_setting.second;
+      } else if (mode_setting.first == "log-frequency") {
+        if (trace_log_frequency_present) {
+          std::cerr << "Warning: Overriding deprecated '--trace-file' "
+                       "in favor of provided file in --trace-config!"
+                    << std::endl;
+        }
+        lparams.trace_log_frequency_ = ParseOption<int>(mode_setting.second);
+      }
+    }
+    catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
-            "Got "
-         << arg << std::endl;
+      ss << "Bad option: \"--trace-config triton," << mode_setting.first
+         << "\".\n"
+         << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
-    std::string setting_string =
-        arg.substr(delim_name + 1, delim_setting - delim_name - 1);
-    std::string value_string = arg.substr(delim_setting + 1);
+  }
+}
 
-    if (setting_string.empty() || value_string.empty()) {
-      std::stringstream ss;
-      ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
-            "Got "
-         << arg << std::endl;
-      throw ParseException(ss.str());
-    }
+void
+TritonParser::VerifyOpentelemetryTraceArgs(
+    bool trace_filepath_present, bool trace_log_frequency_present)
+{
+  if (trace_filepath_present) {
+    std::cerr << "Warning: '--trace-file' is deprecated and will "
+                 "be ignored with opentelemetry tracing mode. "
+              << std::endl;
+  }
+  if (trace_log_frequency_present) {
+    std::cerr << "Warning: '--trace-log-frequency' is deprecated "
+                 "and will be ignored with opentelemetry tracing mode."
+              << std::endl;
+  }
+}
 
-    return {name_string, setting_string, value_string};
+void
+TritonParser::PostProcessTraceArgs(
+    TritonServerParameters& lparams, bool trace_level_present,
+    bool trace_rate_present, bool trace_count_present,
+    bool trace_filepath_present, bool trace_log_frequency_present,
+    bool explicit_disable_trace)
+{
+  SetGlobalTraceArgs(
+      lparams, trace_level_present, trace_rate_present, trace_count_present,
+      explicit_disable_trace);
+
+  if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
+    VerifyOpentelemetryTraceArgs(
+        trace_filepath_present, trace_log_frequency_present);
+  } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
+    SetTritonTraceArgs(
+        lparams, trace_filepath_present, trace_log_frequency_present);
   }
 
-  void TritonParser::SetGlobalTraceArgs(
-      TritonServerParameters & lparams, bool trace_level_present,
-      bool trace_rate_present, bool trace_count_present,
-      bool explicit_disable_trace)
-  {
-    for (const auto& global_setting : lparams.trace_config_map_[""]) {
-      try {
-        if (global_setting.first == "rate") {
-          if (trace_rate_present) {
-            std::cerr << "Warning: Overriding deprecated '--trace-rate' "
-                         "in favor of provided rate value in --trace-config!"
-                      << std::endl;
-          }
-          lparams.trace_rate_ = ParseOption<int>(global_setting.second);
-        }
-        if (global_setting.first == "level") {
-          if (trace_level_present) {
-            std::cerr << "Warning: Overriding deprecated '--trace-level' "
-                         "in favor of provided level in --trace-config!"
-                      << std::endl;
-          }
-          auto parsed_level_config =
-              ParseTraceLevelOption(global_setting.second);
-          explicit_disable_trace |=
-              (parsed_level_config == TRITONSERVER_TRACE_LEVEL_DISABLED);
-          lparams.trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
-              lparams.trace_level_ | parsed_level_config);
-        }
-        if (global_setting.first == "mode") {
-          lparams.trace_mode_ = ParseTraceModeOption(global_setting.second);
-        }
-        if (global_setting.first == "count") {
-          if (trace_count_present) {
-            std::cerr << "Warning: Overriding deprecated '--trace-count' "
-                         "in favor of provided count in --trace-config!"
-                      << std::endl;
-          }
-          lparams.trace_count_ = ParseOption<int>(global_setting.second);
-        }
-      }
-      catch (const ParseException& pe) {
-        std::stringstream ss;
-        ss << "Bad option: \"--trace-config " << global_setting.first << "\".\n"
-           << pe.what() << std::endl;
-        throw ParseException(ss.str());
-      }
-    }
+  if (explicit_disable_trace) {
+    lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
-
-  void TritonParser::SetTritonTraceArgs(
-      TritonServerParameters & lparams, bool trace_filepath_present,
-      bool trace_log_frequency_present)
-  {
-    for (const auto& mode_setting :
-         lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
-      try {
-        if (mode_setting.first == "file") {
-          if (trace_filepath_present) {
-            std::cerr << "Warning: Overriding deprecated '--trace-file' "
-                         "in favor of provided file in --trace-config!"
-                      << std::endl;
-          }
-          lparams.trace_filepath_ = mode_setting.second;
-        } else if (mode_setting.first == "log-frequency") {
-          if (trace_log_frequency_present) {
-            std::cerr << "Warning: Overriding deprecated '--trace-file' "
-                         "in favor of provided file in --trace-config!"
-                      << std::endl;
-          }
-          lparams.trace_log_frequency_ = ParseOption<int>(mode_setting.second);
-        }
-      }
-      catch (const ParseException& pe) {
-        std::stringstream ss;
-        ss << "Bad option: \"--trace-config triton," << mode_setting.first
-           << "\".\n"
-           << pe.what() << std::endl;
-        throw ParseException(ss.str());
-      }
-    }
-  }
-
-  void TritonParser::VerifyOpentelemetryTraceArgs(
-      bool trace_filepath_present, bool trace_log_frequency_present)
-  {
-    if (trace_filepath_present) {
-      std::cerr << "Warning: '--trace-file' is deprecated and will "
-                   "be ignored with opentelemetry tracing mode. "
-                << std::endl;
-    }
-    if (trace_log_frequency_present) {
-      std::cerr << "Warning: '--trace-log-frequency' is deprecated "
-                   "and will be ignored with opentelemetry tracing mode."
-                << std::endl;
-    }
-  }
-
-  void TritonParser::PostProcessTraceArgs(
-      TritonServerParameters & lparams, bool trace_level_present,
-      bool trace_rate_present, bool trace_count_present,
-      bool trace_filepath_present, bool trace_log_frequency_present,
-      bool explicit_disable_trace)
-  {
-    SetGlobalTraceArgs(
-        lparams, trace_level_present, trace_rate_present, trace_count_present,
-        explicit_disable_trace);
-
-    if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
-      VerifyOpentelemetryTraceArgs(
-          trace_filepath_present, trace_log_frequency_present);
-    } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
-      SetTritonTraceArgs(
-          lparams, trace_filepath_present, trace_log_frequency_present);
-    }
-
-    if (explicit_disable_trace) {
-      lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
-    }
-  }
+}
 
 #endif  // TRITON_ENABLE_TRACING
-}
-}  // namespace server
+}}      // namespace triton::server
