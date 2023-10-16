@@ -27,9 +27,8 @@
 
 ############################################################################
 ## This script generates the model repository needed for TensorRT testing
-## testing on the Jetson device. Generating these models requires having
-## TensorRT container.
-##
+## on the Jetson device. Generating these models requires having TensorRT 
+## container.
 ############################################################################
 #!/bin/bash -xe
 # Make all generated files accessible outside of container
@@ -46,7 +45,7 @@ TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3-igp
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp/models_build}
 # Set the path to the host model output directory
 HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
-# Set the source directory to store executable source file to genereate models
+# Set the source directory to store executable source file to generate models
 HOST_SOURCE_DIR=$HOST_BUILD_DIR/gen_srcdir
 
 # Set CI specific parameters
