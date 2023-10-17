@@ -79,6 +79,18 @@ set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/
 set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
 set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
 
+# Git Repos
+set(TRITON_THIRD_PARTY_GIT_REPO "https://github.com/triton-inference-server/third_party.git" CACHE STRING
+    "Git repository for third_party library.")
+set(TRITON_COMMON_GIT_REPO "https://github.com/triton-inference-server/common.git" CACHE STRING
+    "Git repository for common library.")
+set(TRITON_CORE_GIT_REPO "https://github.com/triton-inference-server/core.git" CACHE STRING
+    "Git repository for core library.")
+set(TRITON_BACKEND_GIT_REPO "https://github.com/triton-inference-server/backend.git" CACHE STRING
+    "Git repository for backend library.")
+
+
+
 # Third-party location
 set(TRITON_THIRD_PARTY_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party" CACHE STRING "Location of third-party build")
 set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party-src" CACHE STRING "Location of third-party source")
@@ -114,12 +126,12 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
+  GIT_REPOSITORY ${TRITON_CORE_GIT_REPO}
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
 FetchContent_Declare(
   repo-third-party
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/third_party.git
+  GIT_REPOSITORY ${TRITON_THIRD_PARTY_GIT_REPO}
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
 
@@ -240,9 +252,13 @@ ExternalProject_Add(triton-server
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
     -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
     -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
+    -DTRITON_THIRD_PARTY_GIT_REPO:STRING=${TRITON_THIRD_PARTY_GIT_REPO}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
+    -DTRITON_COMMON_GIT_REPO:STRING=${TRITON_COMMON_GIT_REPO}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
+    -DTRITON_CORE_GIT_REPO:STRING=${TRITON_CORE_GIT_REPO}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
+    -DTRITON_BACKEND_GIT_REPO:STRING=${TRITON_BACKEND_GIT_REPO}
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
     -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
     -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
