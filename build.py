@@ -1340,7 +1340,16 @@ RUN cd tensorrtllm_backend && git submodule update --init --recursive
 RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
 RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
 ENV TRT_ROOT=/usr/local/tensorrt
-
+"""
+        if target_machine == "aarch64":
+            # Need to install cmake since we are installing pytorch from source
+            df += """
+# CMake
+RUN ARCH="$(uname -i)" && wget https://github.com/Kitware/CMake/releases/download/v3.27.6/cmake-3.27.6-linux-${ARCH}.sh
+RUN bash cmake-3.27.6-linux-*.sh --prefix=/usr/local --exclude-subdir && rm cmake-3.27.6-linux-*.sh
+ENV PATH="/usr/local/bin:${PATH}"
+"""
+        df += """
 # Install PyTorch using the script from TRT-LLM
 RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_pytorch.sh /tmp/
 # `pypi` for x86_64 arch and `src_cxx11_abi` for aarch64 arch
@@ -1369,6 +1378,15 @@ RUN if pip freeze | grep -q "nvidia.*"; then \
 RUN pip cache purge
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+"""
+        if platform.machine().lower() == "aarch64":
+            # Remove cmake
+            df += """
+RUN rm -fr /usr/local/share/cmake* && \
+    rm -fr /usr/local/lib/cmake && \
+    rm -fr /usr/local/doc/cmake* && \
+    rm -fr /usr/local/bin/cmake && \
+    rm -fr /usr/local/share/aclocal/cmake.m4
 """
 
     if "vllm" in backends:
