@@ -1840,7 +1840,7 @@ cp -r identity_zero_1_int32 models && \
         mkdir 1 && \
         sed -i "s/string_value: \"10\"/string_value: \"0\"/" config.pbtxt)
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-thread-count=16 --log-verbose=2"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-thread-count=32 --log-verbose=2"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
