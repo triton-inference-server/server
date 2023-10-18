@@ -78,7 +78,7 @@ TRITON_VERSION_MAP = {
         "2023.0.0",  # Standalone OpenVINO
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "0.2.0",  # vLLM version
+        "0.2.1",  # vLLM version
     )
 }
 
@@ -1366,11 +1366,9 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
         # Remove Pip install once vLLM backend moves to Conda environment.
-        # [DLIS-5650] Pre-installing torch 2.0.1, since vllm 0.2
-        # requires torch >= 2.0.0, but it doesn't work with torch 2.1.0.
         df += """
 # vLLM needed for vLLM backend
-RUN pip3 install torch==2.0.1 vllm=={}
+RUN pip3 install vllm=={}
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][7]
         )
