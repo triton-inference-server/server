@@ -576,6 +576,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
   }
 
+  // If receiving the final callback then erase the state from the inflight
+  // state data structure to prevent cancellation being called on the request.
+  if (state->complete_) {
+    state->context_->EraseInflightState(state);
+  }
+
   if (state->IsGrpcContextCancelled()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     // Clean-up the received response object.
@@ -593,7 +599,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (state->complete_) {
       state->step_ = Steps::CANCELLED;
-      state->context_->EraseInflightState(state);
       state->context_->PutTaskBackToQueue(state);
     }
 
@@ -692,7 +697,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       // that state object can be released.
       if (state->complete_) {
         state->step_ = Steps::CANCELLED;
-        state->context_->EraseInflightState(state);
         state->context_->PutTaskBackToQueue(state);
       }
 

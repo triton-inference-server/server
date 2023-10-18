@@ -673,8 +673,12 @@ class InferHandlerState {
       all_states_.insert(state);
     }
 
-    // Adds the state object created on this context
-    void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
+    // Erases the state object created on this context
+    void EraseState(InferHandlerStateType* state)
+    {
+      EraseInflightState(state);
+      all_states_.erase(state);
+    }
 
     bool HandleCompletion()
     {
