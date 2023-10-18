@@ -627,17 +627,10 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          notify_state_(nullptr), received_notification_(false)
+          received_notification_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
-    }
-
-    ~Context()
-    {
-      if (notify_state_ != nullptr) {
-        delete notify_state_;
-      }
     }
 
     void SetCompressionLevel(grpc_compression_level compression_level)
@@ -647,9 +640,9 @@ class InferHandlerState {
 
     void GrpcContextAsyncNotifyWhenDone(InferHandlerStateType* state)
     {
-      notify_state_ =
-          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
-      ctx_->AsyncNotifyWhenDone(notify_state_);
+      notify_state_ = std::unique_ptr<InferHandlerStateType>(
+          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state));
+      ctx_->AsyncNotifyWhenDone(notify_state_.get());
     }
 
     void SetReceivedNotification(bool value) { received_notification_ = true; }
@@ -988,7 +981,7 @@ class InferHandlerState {
 
     // The state object that is sent to grpc async notification
     // for tracking the gRPC stream.
-    InferHandlerState* notify_state_;
+    std::unique_ptr<InferHandlerState> notify_state_;
 
     // Tracks whether the async notification has been delivered by
     // completion queue.
