@@ -987,7 +987,7 @@ class InferHandlerState {
     std::atomic<bool> ongoing_write_;
 
     // The state object that is sent to grpc async notification
-    // for tracking the gRPC stream associated wth
+    // for tracking the gRPC stream.
     InferHandlerState* notify_state_;
 
     // Tracks whether the async notification has been delivered by

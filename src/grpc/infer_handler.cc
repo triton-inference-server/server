@@ -973,6 +973,8 @@ ModelInferHandler::InferResponseComplete(
     return;
   }
 
+  state->context_->EraseInflightState(state);
+
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(std::make_pair(
       "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
@@ -987,7 +989,6 @@ ModelInferHandler::InferResponseComplete(
         "deleting GRPC inference response");
 
     state->step_ = Steps::CANCELLED;
-    state->context_->EraseInflightState(state);
 
     LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                    << state->unique_id_

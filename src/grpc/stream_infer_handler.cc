@@ -578,7 +578,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 
   // If receiving the final callback then erase the state from the inflight
   // state data structure to prevent cancellation being called on the request.
-  if (state->complete_) {
+  // Also make sure that if this state was sent to gRPC async notification
+  // mechanism then the state is not removed as it would be needed for handling
+  // the cancellation if detected.
+  if (state->complete_ && (!state->IsAsyncNotifyState())) {
     state->context_->EraseInflightState(state);
   }
 
