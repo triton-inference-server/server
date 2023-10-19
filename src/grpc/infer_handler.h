@@ -640,9 +640,9 @@ class InferHandlerState {
 
     void GrpcContextAsyncNotifyWhenDone(InferHandlerStateType* state)
     {
-      InferHandlerStateType* wrapped_state =
-          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state);
-      ctx_->AsyncNotifyWhenDone(wrapped_state);
+      notify_state_ = std::unique_ptr<InferHandlerStateType>(
+          new InferHandlerStateType(Steps::WAITING_NOTIFICATION, state));
+      ctx_->AsyncNotifyWhenDone(notify_state_.get());
     }
 
     void SetReceivedNotification(bool value) { received_notification_ = true; }
@@ -666,8 +666,12 @@ class InferHandlerState {
       all_states_.insert(state);
     }
 
-    // Adds the state object created on this context
-    void EraseState(InferHandlerStateType* state) { all_states_.erase(state); }
+    // Erases the state object created on this context
+    void EraseState(InferHandlerStateType* state)
+    {
+      EraseInflightState(state);
+      all_states_.erase(state);
+    }
 
     bool HandleCompletion()
     {
@@ -975,6 +979,10 @@ class InferHandlerState {
     // True if there is an ongoing write to the grpc stream
     std::atomic<bool> ongoing_write_;
 
+    // The state object that is sent to grpc async notification
+    // for tracking the gRPC stream.
+    std::unique_ptr<InferHandlerState> notify_state_;
+
     // Tracks whether the async notification has been delivered by
     // completion queue.
     bool received_notification_;
@@ -1274,7 +1282,6 @@ InferHandler<
         state->context_->SetReceivedNotification(true);
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;
-        delete state_wrapper;
       }
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
