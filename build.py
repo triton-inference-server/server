@@ -1813,10 +1813,12 @@ def backend_build(
                 tag
             )
         )
+        cmake_script.cmd("cd tensorrtllm")
         cmake_script.cmd(
-            "cd tensorrtllm_backend && git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git"
+            "git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git"
         )
-        cmake_script.cmd("cd tensorrtllm_backend && git submodule sync")
+        cmake_script.cmd("git submodule sync")
+        cmake_script.cmd("cd ..")
         tensorrtllm_prebuild(cmake_script)
     else:
         cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
