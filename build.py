@@ -1315,9 +1315,7 @@ RUN apt-get update && \
         )
         trtllm_buildscript = importlib.util.module_from_spec(spec)
         exec(response.content, trtllm_buildscript.__dict__)
-        df += trtllm_buildscript.create_postbuild(
-            backends[be] # repo tag
-        )
+        df += trtllm_buildscript.create_postbuild(backends[be])
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
