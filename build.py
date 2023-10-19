@@ -595,7 +595,9 @@ def backend_cmake_args(
     elif be == "openvino":
         args = openvino_cmake_args()
     elif be == "tensorflow":
-        args = tensorflow_cmake_args(images, library_paths)
+        args = tensorflow_cmake_args(
+            images, library_paths, components, components_git_orgs
+        )
     elif be == "python":
         args = []
     elif be == "dali":
@@ -821,9 +823,8 @@ def tensorrt_cmake_args():
     return cargs
 
 
-def tensorflow_cmake_args(images, library_paths):
+def tensorflow_cmake_args(images, library_paths, components, components_git_orgs):
     backend_name = "tensorflow"
-    extra_args = []
 
     # If a specific TF image is specified use it, otherwise pull from NGC.
     if backend_name in images:
@@ -832,8 +833,36 @@ def tensorflow_cmake_args(images, library_paths):
         image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
             FLAGS.upstream_container_version
         )
+
     extra_args = [
-        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
+        cmake_backend_arg(
+            "tensorflow", "TRITON_COMMON_REPO_TAG", "STRING", components["common"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
+        cmake_backend_arg(
+            "tensorflow", "TRITON_CORE_REPO_TAG", "STRING", components["core"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_CORE_GIT_REPO",
+            "STRING",
+            components_git_orgs["core"] + "core.git",
+        ),
+        cmake_backend_arg(
+            "tensorflow", "TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_BACKEND_GIT_REPO",
+            "STRING",
+            components_git_orgs["backend"] + "backend.git",
+        ),
+        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image),
     ]
     return extra_args
 
@@ -1818,6 +1847,7 @@ def backend_build(
     install_dir,
     images,
     components,
+    components_git_orgs,
     github_org,
     library_paths,
 ):
@@ -2824,6 +2854,7 @@ if __name__ == "__main__":
                     script_install_dir,
                     images,
                     components,
+                    components_git_orgs,
                     github_org,
                     library_paths,
                 )
