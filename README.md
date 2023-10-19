@@ -63,7 +63,8 @@ Major features include:
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
-- Supports writing custom backends in python.
+- Supports writing custom backends in python, a.k.a.
+  [Python-based backends.](https://github.com/triton-inference-server/backend/blob/main/docs/python_based_backends.md#python-based-backends)
 - Model pipelines using
   [Ensembling](docs/user_guide/architecture.md#ensemble-models) or [Business
   Logic Scripting
