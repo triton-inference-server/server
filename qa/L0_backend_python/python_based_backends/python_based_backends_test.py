@@ -24,7 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
 import queue
+import sys
 import unittest
 from functools import partial
 from random import randint
@@ -33,7 +35,6 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
-import sys
 sys.path.append("../../common")
 from test_util import TestResultCollector
 
@@ -48,6 +49,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(error)
     else:
         user_data._completed_requests.put(result)
+
 
 def create_vllm_request(
     prompt,
@@ -82,6 +84,7 @@ def create_vllm_request(
         "parameters": sampling_parameters,
     }
 
+
 class PythonBasedBackendsTest(TestResultCollector):
     def setUp(self):
         self.triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
@@ -92,31 +95,32 @@ class PythonBasedBackendsTest(TestResultCollector):
         self.python_model = "add_sub"
         self.pytorch_model = "add_sub_pytorch"
 
-    def test_vllm_models(self):
         self.triton_client.load_model(self.vllm_model_1)
+        self.triton_client.load_model(self.vllm_model_2)
+        self.triton_client.load_model(self.add_sub_model_1)
+        self.triton_client.load_model(self.add_sub_model_2)
+        self.triton_client.load_model(self.python_model)
+        self.triton_client.load_model(self.pytorch_model)
+
+    def test_vllm_models(self):
         self.assertTrue(self.triton_client.is_model_ready(self.vllm_model_1))
         self._test_vllm_model(self.vllm_model_1)
 
-        self.triton_client.load_model(self.vllm_model_2)
         self.assertTrue(self.triton_client.is_model_ready(self.vllm_model_2))
         self._test_vllm_model(self.vllm_model_2)
 
     def test_add_sub_models(self):
-        self.triton_client.load_model(self.add_sub_model_1)
         self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1))
         self._test_add_sub_model(model_name=self.add_sub_model_1, single_output=True)
 
-        self.triton_client.load_model(self.add_sub_model_2)
         self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_2))
         self._test_add_sub_model(model_name=self.add_sub_model_2, single_output=True)
 
     def test_python_model(self):
-        self.triton_client.load_model(self.python_model)
         self.assertTrue(self.triton_client.is_model_ready(self.python_model))
         self._test_add_sub_model(model_name=self.python_model, shape=[16])
 
     def test_pytorh_model(self):
-        self.triton_client.load_model(self.pytorch_model)
         self.assertTrue(self.triton_client.is_model_ready(self.pytorch_model))
         self._test_add_sub_model(model_name=self.pytorch_model)
 

@@ -38,7 +38,7 @@ CLIENT_LOG="./python_based_backends_client.log"
 TEST_RESULT_FILE="./test_results.txt"
 CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
-EXPECTED_NUM_TESTS=3
+EXPECTED_NUM_TESTS=4
 RET=0
 
 rm -rf ${MODEL_REPOSITORY}
@@ -113,9 +113,9 @@ rm -rf ${MODEL_REPOSITORY} ${GEN_PYTORCH_MODEL_PY}
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** vLLM test FAILED. \n***"
+    echo -e "\n***\n*** Python-based Backends test FAILED. \n***"
 else
-    echo -e "\n***\n*** vLLM test PASSED. \n***"
+    echo -e "\n***\n*** Python-based Backends test PASSED. \n***"
 fi
 
 collect_artifacts_from_subdir
