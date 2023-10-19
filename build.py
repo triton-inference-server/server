@@ -1785,6 +1785,11 @@ def tensorrtllm_prebuild(cmake_script):
     cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
     cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
 
+    cmake_script.cmd(
+        "cd tensorrtllm_backend && git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git"
+    )
+    cmake_script.cmd("cd tensorrtllm_backend && git submodule sync")
+
 
 def backend_build(
     be,
