@@ -365,6 +365,34 @@ if [ $SUB_TEST_RET -eq 1 ]; then
     cat $SERVER_LOG
 fi
 
+# Test BLS parameters
+rm -rf params_models && mkdir -p params_models/bls_parameters/1
+cp ../../python_models/bls_parameters/model.py ./params_models/bls_parameters/1
+cp ../../python_models/bls_parameters/config.pbtxt ./params_models/bls_parameters
+
+TEST_LOG="./bls_parameters.log"
+SERVER_LOG="./bls_parameters.server.log"
+
+SERVER_ARGS="--model-repository=`pwd`/params_models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 bls_parameters_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** bls_parameters_test.py FAILED. \n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 1 ]; then
     echo -e "\n***\n*** BLS test FAILED. \n***"
 else
