@@ -48,7 +48,7 @@ def generate_model(model_dir):
     )
 
     os.makedirs(model_dir, exist_ok=True)
-    model_path = os.path.join({model_dir}, "model.pt")
+    model_path = os.path.join(model_dir, "model.pt")
 
     traced_model.save(model_path)
 
