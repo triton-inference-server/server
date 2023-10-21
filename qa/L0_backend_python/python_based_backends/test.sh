@@ -41,6 +41,11 @@ GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
 EXPECTED_NUM_TESTS=4
 RET=0
 
+# Setup vllm_backend
+pip3 install vllm
+mkdir -p ${BACKEND_DIR}/vllm
+wget -P ${BACKEND_DIR}/vllm https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/src/model.py
+
 rm -rf ${MODEL_REPOSITORY}
 
 # Setup vllm backend models
@@ -48,8 +53,7 @@ mkdir -p ${MODEL_REPOSITORY}/vllm_opt_1/1/
 cp ${QA_MODELS_PATH}/python_based_backends/vllm_opt/model.json ${MODEL_REPOSITORY}/vllm_opt_1/1/
 cp ${QA_MODELS_PATH}/python_based_backends/vllm_opt/config.pbtxt ${MODEL_REPOSITORY}/vllm_opt_1
 
-mkdir -p ${MODEL_REPOSITORY}/vllm_opt_2/
-cp -r ${MODEL_REPOSITORY}/vllm_opt_1/* ${MODEL_REPOSITORY}/vllm_opt_2/
+cp -r ${MODEL_REPOSITORY}/vllm_opt_1/ ${MODEL_REPOSITORY}/vllm_opt_2/
 
 # Setup add_sub backend and models
 mkdir -p ${BACKEND_DIR}/add_sub
@@ -80,9 +84,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 set -e
-
-pip3 install tritonclient
-pip3 install grpcio
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
