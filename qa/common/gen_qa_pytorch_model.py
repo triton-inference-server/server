@@ -25,8 +25,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import os
 import argparse
+import os
+
 import torch
 from torch import nn
 
