@@ -1305,54 +1305,17 @@ RUN apt-get update && \
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
-        # url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
-        #     backends[be]
-        # )
-
-        # response = requests.get(url)
-        # spec = importlib.util.spec_from_loader(
-        #     "trtllm_buildscript", loader=None, origin=url
-        # )
-        # trtllm_buildscript = importlib.util.module_from_spec(spec)
-        # exec(response.content, trtllm_buildscript.__dict__)
-        # df += trtllm_buildscript.create_postbuild(backends[be])
-
-        df += """
-WORKDIR /workspace
-# Remove previous TRT installation
-RUN apt-get remove --purge -y tensorrt* libnvinfer*
-RUN pip uninstall -y tensorrt
-# Install new version of TRT using the script from TRT-LLM
-RUN apt-get update && apt-get install -y --no-install-recommends python-is-python3
-RUN git clone --single-branch --depth=1 -b {} https://github.com/triton-inference-server/tensorrtllm_backend.git tensorrtllm_backend
-RUN cd tensorrtllm_backend && git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git
-RUN cd tensorrtllm_backend && git submodule sync
-RUN cd tensorrtllm_backend && git submodule update --init --recursive
-RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
-RUN rm -fr tensorrtllm_backend
-    """.format(
+        url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
         )
 
-        df += """
-RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
-ENV TRT_ROOT=/usr/local/tensorrt
-# Remove TRT contents that are not needed in runtime
-RUN ARCH="$(uname -i)" && \
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
-    rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
-    rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
-# Install required packages for TRT-LLM models
-RUN python3 -m pip install --upgrade pip && \
-        pip3 install transformers && \
-        pip3 install torch
-# Uninstall unused nvidia packages
-RUN if pip freeze | grep -q "nvidia.*"; then \
-        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \
-    fi
-RUN pip cache purge
-ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
-"""
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader(
+            "trtllm_buildscript", loader=None, origin=url
+        )
+        trtllm_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, trtllm_buildscript.__dict__)
+        df += trtllm_buildscript.create_postbuild(backends[be])
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
