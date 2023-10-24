@@ -2051,6 +2051,7 @@ def cibase_build(
         "sequence",
         "dyna_sequence",
         "distributed_addsub",
+        "generative_sequence",
     ):
         be_install_dir = os.path.join(repo_install_dir, "backends", be)
         if target_platform() == "windows":

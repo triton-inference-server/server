@@ -132,6 +132,8 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_query/models/query/1 && \
     cp tritonbuild/tritonserver/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
     cp bin/query_test qa/L0_query/. && \
+    mkdir qa/L0_generative_sequence/models/generative_sequence/1 && \
+    cp tritonbuild/tritonserver/backends/generative_sequence/libtriton_generative_sequence.so qa/L0_generative_sequence/models/generative_sequence/1/. && \
     cp bin/register_api_test qa/L0_register/. && \
     cp bin/async_work_queue_test qa/L0_async_work_queue/. && \
     cp tritonbuild/tritonserver/backends/implicit_state/libtriton_implicit_state.so \
