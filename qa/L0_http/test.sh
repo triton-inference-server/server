@@ -44,6 +44,7 @@ RET=0
 
 CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
 BASIC_AUTH_TEST="./http_basic_auth_test.py"
+RESTRICTED_API_TEST="./http_restricted_api_test.py"
 NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
@@ -588,13 +589,15 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Run python unit test
-rm -r ${MODELDIR}/*
+MODELDIR=python_unit_test_models
+mkdir -p $MODELDIR
+rm -rf ${MODELDIR}/*
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_object ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float16 ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_3_float32 ${MODELDIR}/.
 cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element && \
-    (cd models/onnx_zero_1_object_1_element && \
+    (cd $MODELDIR/onnx_zero_1_object_1_element && \
         sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
         sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
 
@@ -668,8 +671,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 ### Test Restricted  APIs ###
-
-SERVER_ARGS="--model-repository=${MODELDIR} \
+MODELDIR="`pwd`/models"
+SERVER_ARGS="--model-repository=${MODELDIR}
              --http-restricted-api=model-repository,health:k1=v1 \
              --http-restricted-api=metadata,health:k2=v2"
 run_server
@@ -685,14 +688,11 @@ elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
     RET=1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
-
 ### Test Restricted  APIs ###
 
 SERVER_ARGS="--model-repository=${MODELDIR} \
              --http-restricted-api=model-repository:admin-key=admin-value \
-             --http-restricted-api=inference,health:infer-key=infer-value"
+             --http-restricted-api=inference:infer-key=infer-value"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -700,10 +700,11 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 set +e
-python $PYTHON_UNIT_TEST RestrictedProtocolTest > $CLIENT_LOG 2>&1
+
+python $RESTRICTED_API_TEST RestrictedAPITest > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Python GRPC Restricted Protocol Test Failed\n***"
+    echo -e "\n***\n*** Python HTTP Restricted Protocol Test Failed\n***"
     RET=1
 fi
 set -e
