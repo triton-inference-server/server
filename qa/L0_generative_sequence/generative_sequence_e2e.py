@@ -29,22 +29,25 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-
 import json
+
+# GRPC streaming helpers..
+import queue
+import unittest
+from functools import partial
+
+import numpy as np
 import requests
 import sseclient
-import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
-# GRPC streaming helpers..
-import queue
-from functools import partial
+
 class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
+
 
 def callback(user_data, result, error):
     if error:
@@ -58,11 +61,7 @@ class GenerativeSequenceTest(tu.TestResultCollector):
         headers = {"Accept": "text/event-stream"}
         url = "http://localhost:8000/v2/models/generative_sequence/generate_stream"
         inputs = {"INPUT": 2}
-        res = requests.post(
-            url,
-            data=json.dumps(inputs),
-            headers=headers
-        )
+        res = requests.post(url, data=json.dumps(inputs), headers=headers)
         res.raise_for_status()
         client = sseclient.SSEClient(res)
         res_count = 2
@@ -72,18 +71,18 @@ class GenerativeSequenceTest(tu.TestResultCollector):
             self.assertIn("OUTPUT", data)
             self.assertEqual(res_count, data["OUTPUT"])
         self.assertEqual(0, res_count)
-        
+
     def test_grpc_stream(self):
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
-            triton_client.start_stream(
-                callback=partial(callback, user_data)
-            )
+            triton_client.start_stream(callback=partial(callback, user_data))
             inputs = []
-            inputs.append(grpcclient.InferInput("INPUT", [1,1], "INT32"))
+            inputs.append(grpcclient.InferInput("INPUT", [1, 1], "INT32"))
             inputs[0].set_data_from_numpy(np.array([[2]], dtype=np.int32))
-            
-            triton_client.async_stream_infer(model_name="generative_sequence", inputs=inputs)
+
+            triton_client.async_stream_infer(
+                model_name="generative_sequence", inputs=inputs
+            )
             res_count = 2
             while res_count > 0:
                 data_item = user_data._completed_requests.get()
@@ -93,6 +92,7 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                 else:
                     self.assertEqual(res_count, data_item.as_numpy("OUTPUT")[0][0])
             self.assertEqual(0, res_count)
+
 
 if __name__ == "__main__":
     unittest.main()

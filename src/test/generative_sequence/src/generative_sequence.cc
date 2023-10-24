@@ -35,34 +35,20 @@
 namespace triton { namespace backend { namespace generative_sequence {
 
 
-// Simple generative sequence backend that demonstrates the TRITONBACKEND API for a
-// blocking backend. A blocking backend completes execution of the
-// inference before returning from TRITONBACKEND_ModelInstanceExecute.
+// Simple generative sequence backend that demonstrates the use of
+// TRITONSERVER_REQUEST_RELEASE_RESCHEDULE flag to generatively produce
+// sequence response.
 //
-// The backend supports models that take 5 input tensors, three INT32 [ 1 ]
-// control values, one UINT64 [ 1 ] correlation ID control, and one
-// variable-size INT32 [ -1 ] value input; and produces an output
-// tensor with the same shape as the input tensor. The input tensors
-// must be named "START", "END", "READY", "CORRID" and "INPUT". The
-// output tensor must be named "OUTPUT".
-//
-// The model maintains an INT32 accumulator for each sequence which
-// is updated based on the control values in "START", "END", "READY"
-// and "CORRID":
-//
-//   READY=0, START=x, END=x: Ignore value input, do not change
-//   accumulator value.
-//
-//   READY=1, START=1, END=x: Start accumulating. Set accumulator
-//   equal to sum of INPUT tensor elements.
-//
-//   READY=1, START=0, END=x: Add INPUT tensor elements to
-//   accumulator.
-//
-// In addition to the above, when END=1 CORRID is added to the accumulator.
-//
-// When READY=1, the accumulator is returned in every element of the
-// OUTPUT tensor.
+// The backend supports models that take 1 input tensor, an INT32 [ 1 ]
+// input named "INPUT"; and produces an output tensor "OUTPUT" with the same
+// shape as the input tensor. The input value indicates the total number of
+// responses to be generated and the output value indicates the number of
+// remaining responses. For example, if the request input has value 2,
+// the backend will:
+//   - Send a response with value 1.
+//   - Release request with RESCHEDULE flag.
+//   - When execute on the same request, send the last response with value 0.
+//   - Release request with ALL flag.
 //
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
@@ -136,7 +122,7 @@ class ModelInstanceState : public BackendModelInstance {
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
 
-  // return output value on receiving request, initalize remainder
+  // return output value on receiving request, initialize remainder
   // if the corrid hasn't been recorded.
   int32_t GetOutput(uint64_t corrid, int32_t init_value);
 
@@ -501,7 +487,7 @@ TRITONBACKEND_ModelInstanceExecute(
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,
           (std::string("request ") + std::to_string(r) +
-            ": failed to create response output, error response sent")
+           ": failed to create response output, error response sent")
               .c_str());
       continue;
     }
@@ -527,8 +513,8 @@ TRITONBACKEND_ModelInstanceExecute(
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,
           (std::string("request ") + std::to_string(r) +
-            ": failed to create output buffer in CPU memory, error "
-            "response sent")
+           ": failed to create output buffer in CPU memory, error "
+           "response sent")
               .c_str());
       continue;
     }
@@ -537,9 +523,12 @@ TRITONBACKEND_ModelInstanceExecute(
 
     // Set response flag and request flag correctly based on whether this
     // is the last response of the sequence.
-    uint32_t res_flag = (output_value <= 0) ? TRITONSERVER_RESPONSE_COMPLETE_FINAL : 0;
-    uint32_t req_flag = (output_value <= 0) ? TRITONSERVER_REQUEST_RELEASE_ALL : TRITONSERVER_REQUEST_RELEASE_RESCHEDULE;
-    
+    uint32_t res_flag =
+        (output_value <= 0) ? TRITONSERVER_RESPONSE_COMPLETE_FINAL : 0;
+    uint32_t req_flag = (output_value <= 0)
+                            ? TRITONSERVER_REQUEST_RELEASE_ALL
+                            : TRITONSERVER_REQUEST_RELEASE_RESCHEDULE;
+
     uint64_t exec_end_ns = 0;
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
@@ -549,8 +538,7 @@ TRITONBACKEND_ModelInstanceExecute(
     if (responses[r] != nullptr) {
       LOG_IF_ERROR(
           TRITONBACKEND_ResponseSend(
-              responses[r], res_flag,
-              nullptr /* success */),
+              responses[r], res_flag, nullptr /* success */),
           "failed sending response");
     }
 
