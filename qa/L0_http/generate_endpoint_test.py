@@ -396,4 +396,4 @@ class GenerateEndpointTest(tu.TestResultCollector):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=10)
+    unittest.main()
