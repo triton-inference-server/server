@@ -4484,13 +4484,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       // Trace with specific model, there is no specification on versioning
       // so fall out and return bad request error if version is specified
       if (version.empty()) {
-        // restricted key "trace"
         HandleTrace(req, model_name);
         return;
       }
     } else if (kind == "") {
       // model metadata
-      // restricted key "metadata"
       HandleModelMetadata(req, model_name, version);
       return;
     }
@@ -4505,7 +4503,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   } else if (RE2::FullMatch(
                  std::string(req->uri->path->full), server_regex_, &rest)) {
     // server health
-    // check restricted keys 'health'
     HandleServerHealth(req, rest);
     return;
   } else if (RE2::FullMatch(
