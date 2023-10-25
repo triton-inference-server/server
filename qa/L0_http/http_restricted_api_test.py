@@ -32,10 +32,8 @@ sys.path.append("../common")
 import unittest
 
 import numpy as np
-import requests
-import test_util as tu
 import tritonclient.http as tritonhttpclient
-from tritonclient.utils import InferenceServerException, np_to_triton_dtype
+from tritonclient.utils import InferenceServerException
 
 
 class RestrictedAPITest(unittest.TestCase):
