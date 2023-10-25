@@ -220,7 +220,7 @@ class PBBLSTest(unittest.TestCase):
                 infer_request.flags(), pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_START
             )
             infer_response = infer_request.exec()
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             output = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT")
             self.assertFalse(output.is_cpu())
             output = from_dlpack(output.to_dlpack()).to("cpu").cpu().detach().numpy()
@@ -242,7 +242,7 @@ class PBBLSTest(unittest.TestCase):
                         next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
-                self.assertFalse(infer_response.has_error())
+                self.assertFalse(infer_response.has_error(), infer_response.error())
 
                 # The new output is the previous output + the current input
                 expected_output = output[0] + i
@@ -275,7 +275,7 @@ class PBBLSTest(unittest.TestCase):
             else:
                 infer_response = infer_request.exec()
 
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             expected_output = output[0] + input.as_numpy()[0]
             output = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT")
             self.assertFalse(output.is_cpu())
@@ -345,7 +345,7 @@ class PBBLSTest(unittest.TestCase):
         else:
             infer_response = infer_request.exec()
 
-        self.assertFalse(infer_response.has_error())
+        self.assertFalse(infer_response.has_error(), infer_response.error())
 
         output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
         output1 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT1")
@@ -401,7 +401,7 @@ class PBBLSTest(unittest.TestCase):
         else:
             infer_response = infer_request.exec()
 
-        self.assertFalse(infer_response.has_error())
+        self.assertFalse(infer_response.has_error(), infer_response.error())
 
         output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
         self.assertTrue(np.all(output0 == input0))
@@ -431,7 +431,7 @@ class PBBLSTest(unittest.TestCase):
                     next(infer_responses)
             else:
                 infer_response = infer_request.exec()
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
 
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
             np.testing.assert_equal(
@@ -472,7 +472,7 @@ class PBBLSTest(unittest.TestCase):
             else:
                 infer_response = infer_request.exec()
 
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
 
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
             output0_pytorch = from_dlpack(output0.to_dlpack())
@@ -638,7 +638,7 @@ class PBBLSTest(unittest.TestCase):
         expected_output_cnt = np.array([expected_output_cnt], dtype=np.int32)
 
         for infer_response in response_iterator:
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             if len(infer_response.output_tensors()) > 0:
                 output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
                 self.assertIsNotNone(output0)
@@ -671,7 +671,7 @@ class PBBLSTest(unittest.TestCase):
             # case 1. Use Next() to get the next response first, then use
             # for-loop to get the remaining responses.
             infer_response = next(infer_responses)
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
             self.assertIsNotNone(output0)
             self.assertEqual(response_value, output0.as_numpy())
@@ -695,7 +695,7 @@ class PBBLSTest(unittest.TestCase):
             # get the remaining responses.
             response_count = 0
             for infer_response in infer_responses:
-                self.assertFalse(infer_response.has_error())
+                self.assertFalse(infer_response.has_error(), infer_response.error())
                 output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
                 self.assertIsNotNone(output0)
                 self.assertEqual(response_value, output0.as_numpy())
@@ -705,7 +705,7 @@ class PBBLSTest(unittest.TestCase):
                     break
 
             infer_response = next(infer_responses)
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
             self.assertIsNotNone(output0)
             self.assertEqual(response_value, output0.as_numpy())
@@ -720,7 +720,7 @@ class PBBLSTest(unittest.TestCase):
             infer_responses = infer_request.exec(decoupled=True)
 
             infer_response = next(infer_responses)
-            self.assertFalse(infer_response.has_error())
+            self.assertFalse(infer_response.has_error(), infer_response.error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
             self.assertIsNotNone(output0)
             self.assertEqual(response_value, output0.as_numpy())
