@@ -171,6 +171,6 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 /// \return The joint string.
 std::string Join(const std::vector<std::string>& vec, const std::string& delim);
 
-typedef std::map<std::string, std::pair<std::string, std::string>>
-    RestrictedFeatureMap;
+using RestrictedFeatureMap =
+    std::map<std::string, std::pair<std::string, std::string>>;
 }}  // namespace triton::server
