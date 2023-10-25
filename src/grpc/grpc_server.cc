@@ -252,7 +252,8 @@ class CommonHandler : public HandlerBase {
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::health::v1::Health::AsyncService* health_service,
-      ::grpc::ServerCompletionQueue* cq, RestrictedFeatureMap restricted_keys);
+      ::grpc::ServerCompletionQueue* cq,
+      const RestrictedFeatureMap& restricted_keys);
 
   // Descriptive name of of the handler.
   const std::string& Name() const { return name_; }
@@ -297,7 +298,7 @@ class CommonHandler : public HandlerBase {
   ::grpc::health::v1::Health::AsyncService* health_service_;
   ::grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
-  std::map<std::string, std::pair<std::string, std::string>> restricted_keys_;
+  const RestrictedFeatureMap& restricted_keys_;
   static std::pair<std::string, std::string> empty_restricted_key_;
 };
 
@@ -312,7 +313,7 @@ CommonHandler::CommonHandler(
     inference::GRPCInferenceService::AsyncService* service,
     ::grpc::health::v1::Health::AsyncService* health_service,
     ::grpc::ServerCompletionQueue* cq,
-    std::map<std::string, std::pair<std::string, std::string>> restricted_keys)
+    const RestrictedFeatureMap& restricted_keys)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
       trace_manager_(trace_manager), service_(service),
       health_service_(health_service), cq_(cq),
