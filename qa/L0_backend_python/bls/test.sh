@@ -34,7 +34,6 @@ source ../../common/util.sh
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 RET=0
 # This variable is used to print out the correct server log for each sub-test.
@@ -103,96 +102,109 @@ cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ .
     sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_cpu/' models/libtorch_cpu/config.pbtxt && \
     echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
 
-for TRIAL in non_decoupled decoupled ; do
-    export BLS_KIND=$TRIAL
-    SERVER_LOG="./bls_$TRIAL.inference_server.log"
+# Test with different sizes of CUDA memory pool
+for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
+    CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
+    SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
+    for TRIAL in non_decoupled decoupled ; do
+        export BLS_KIND=$TRIAL
+        SERVER_LOG="./bls_$TRIAL.$CUDA_MEMORY_POOL_SIZE_MB.inference_server.log"
 
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-    set +e
+        set +e
 
-    export MODEL_NAME='bls'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        export MODEL_NAME='bls'
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
             SUB_TEST_RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+                SUB_TEST_RET=1
+            fi
         fi
-    fi
 
-    export MODEL_NAME='bls_memory'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        export MODEL_NAME='bls_memory'
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
             SUB_TEST_RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+                SUB_TEST_RET=1
+            fi
         fi
-    fi
 
-    export MODEL_NAME='bls_memory_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        export MODEL_NAME='bls_memory_async'
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
             SUB_TEST_RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+                SUB_TEST_RET=1
+            fi
         fi
-    fi
 
-    export MODEL_NAME='bls_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        export MODEL_NAME='bls_async'
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
             cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
             SUB_TEST_RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+                SUB_TEST_RET=1
+            fi
         fi
-    fi
 
-    set -e
+        set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+        kill $SERVER_PID
+        wait $SERVER_PID
 
-    if [ $SUB_TEST_RET -eq 1 ]; then
-        cat $CLIENT_LOG
-        cat $SERVER_LOG
-    fi
+        if [ $SUB_TEST_RET -eq 1 ]; then
+            cat $CLIENT_LOG
+            cat $SERVER_LOG
+        fi
+
+        if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
+            if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
+                echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
+                cat $SERVER_LOG
+                RET=1
+            fi
+        fi
+    done
 done
 
 # Test error handling when BLS is used in "initialize" or "finalize" function
