@@ -45,3 +45,4 @@ model_transaction_policy {
 sequence_batching {
   generative_sequence : true
 }
+instance_group [{ kind: KIND_CPU }]
