@@ -50,8 +50,9 @@ rm -rf ${MODEL_REPOSITORY}
 
 # Setup vllm backend models
 mkdir -p ${MODEL_REPOSITORY}/vllm_opt_1/1/
-cp ${QA_MODELS_PATH}/python_based_backends/vllm_opt/model.json ${MODEL_REPOSITORY}/vllm_opt_1/1/
-cp ${QA_MODELS_PATH}/python_based_backends/vllm_opt/config.pbtxt ${MODEL_REPOSITORY}/vllm_opt_1
+wget -P ${MODEL_REPOSITORY}/vllm_opt_1/1/ https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/1/model.json
+wget -P ${MODEL_REPOSITORY}/vllm_opt_1 https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/config.pbtxt
+sed -i 's/"gpu_memory_utilization": 0.5/"gpu_memory_utilization": 0.25/' ${MODEL_REPOSITORY}/vllm_opt_1/1/model.json
 
 cp -r ${MODEL_REPOSITORY}/vllm_opt_1/ ${MODEL_REPOSITORY}/vllm_opt_2/
 
