@@ -80,6 +80,17 @@ namespace triton { namespace server {
     return;                                         \
   } while (false)
 
+#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, API_KEY)                     \
+  do {                                                                     \
+    static auto const is_restricted_api = restricted_apis_.count(API_KEY); \
+    static auto const restricted_api = restricted_apis_.find(API_KEY);     \
+    if (is_restricted_api &&                                               \
+        RespondIfRestricted(REQ, restricted_api->second)) {                \
+      return;                                                              \
+    }                                                                      \
+  } while (false)
+
+
 namespace {
 void
 EVBufferAddErrorJson(evbuffer* buffer, const char* message)
@@ -1272,9 +1283,7 @@ HTTPAPIServer::InferResponseFree(
 void
 HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
-  if (RestrictedAPI(req, "health")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "health");
 
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
@@ -1300,9 +1309,7 @@ void
 HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
-  if (RestrictedAPI(req, "model-repository")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "model-repository");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -1371,9 +1378,7 @@ HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
     const std::string& model_name, const std::string& action)
 {
-  if (RestrictedAPI(req, "model-repository")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "model-repository");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -1528,9 +1533,7 @@ HTTPAPIServer::HandleModelReady(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
-  if (RestrictedAPI(req, "health")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "health");
 
   if (req->method != htp_method_GET) {
     RETURN_AND_RESPOND_WITH_ERR(
@@ -1566,9 +1569,7 @@ HTTPAPIServer::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
-  if (RestrictedAPI(req, "metadata")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "metadata");
 
   AddContentTypeHeader(req, "application/json");
 
@@ -1640,9 +1641,7 @@ HTTPAPIServer::HandleModelConfig(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
-  if (RestrictedAPI(req, "model-config")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "model-config");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
@@ -1669,9 +1668,7 @@ HTTPAPIServer::HandleModelStats(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
-  if (RestrictedAPI(req, "statistics")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "statistics");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
@@ -1715,9 +1712,7 @@ HTTPAPIServer::HandleModelStats(
 void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
-  if (RestrictedAPI(req, "trace")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "trace");
 
   AddContentTypeHeader(req, "application/json");
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
@@ -1972,9 +1967,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 void
 HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 {
-  if (RestrictedAPI(req, "logging")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "logging");
 
   AddContentTypeHeader(req, "application/json");
   if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
@@ -2125,9 +2118,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
-  if (RestrictedAPI(req, "metadata")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "metadata");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_GET) {
@@ -2150,9 +2141,7 @@ HTTPAPIServer::HandleSystemSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
-  if (RestrictedAPI(req, "shared-memory")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "shared-memory");
 
   AddContentTypeHeader(req, "application/json");
   if ((action == "status") && (req->method != htp_method_GET)) {
@@ -2257,9 +2246,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
-  if (RestrictedAPI(req, "shared-memory")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "shared-memory");
 
   AddContentTypeHeader(req, "application/json");
   if ((action == "status") && (req->method != htp_method_GET)) {
@@ -3113,9 +3100,7 @@ HTTPAPIServer::HandleGenerate(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str, bool streaming)
 {
-  if (RestrictedAPI(req, "inference")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "inference");
 
   AddContentTypeHeader(req, "application/json");
   if (req->method != htp_method_POST) {
@@ -3465,9 +3450,7 @@ HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
-  if (RestrictedAPI(req, "inference")) {
-    return;
-  }
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, "inference");
 
   if (req->method != htp_method_POST) {
     RETURN_AND_RESPOND_WITH_ERR(
@@ -4560,14 +4543,11 @@ HTTPAPIServer::Create(
 }
 
 bool
-HTTPAPIServer::RestrictedAPI(evhtp_request_t* req, const std::string api)
+HTTPAPIServer::RespondIfRestricted(
+    evhtp_request_t* req, const RestrictedFeature& restricted_api)
 {
-  auto restricted_api = restricted_apis_.find(api);
-  if (restricted_api == restricted_apis_.end()) {
-    return false;
-  }
-  auto header = restricted_api->second.first;
-  auto expected_value = restricted_api->second.second;
+  auto header = restricted_api.first;
+  auto expected_value = restricted_api.second;
   const char* actual_value = evhtp_kv_find(req->headers_in, header.c_str());
   if ((actual_value == nullptr) || (actual_value != expected_value)) {
     EVBufferAddErrorJson(

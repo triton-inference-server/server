@@ -546,7 +546,8 @@ class HTTPAPIServer : public HTTPServer {
         new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
   }
   const RestrictedFeatureMap& restricted_apis_{};
-  bool RestrictedAPI(evhtp_request_t* req, const std::string api);
+  bool RespondIfRestricted(
+      evhtp_request_t* req, const RestrictedFeature& restricted_api);
 };
 
 }}  // namespace triton::server
