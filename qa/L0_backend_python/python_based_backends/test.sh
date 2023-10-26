@@ -31,30 +31,18 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 QA_MODELS_PATH="../../python_models"
-MODEL_REPOSITORY="`pwd`/models"
+MODEL_REPOSITORY="$(pwd)/models"
 SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
 SERVER_LOG="./python_based_backends_server.log"
 CLIENT_LOG="./python_based_backends_client.log"
 TEST_RESULT_FILE="./test_results.txt"
 CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
-EXPECTED_NUM_TESTS=4
+EXPECTED_NUM_TESTS=3
 RET=0
 
-# Setup vllm_backend
-pip3 install vllm
-mkdir -p ${BACKEND_DIR}/vllm
-wget -P ${BACKEND_DIR}/vllm https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/src/model.py
-
 rm -rf ${MODEL_REPOSITORY}
-
-# Setup vllm backend models
-mkdir -p ${MODEL_REPOSITORY}/vllm_opt_1/1/
-wget -P ${MODEL_REPOSITORY}/vllm_opt_1/1/ https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/1/model.json
-wget -P ${MODEL_REPOSITORY}/vllm_opt_1 https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/config.pbtxt
-sed -i 's/"gpu_memory_utilization": 0.5/"gpu_memory_utilization": 0.25/' ${MODEL_REPOSITORY}/vllm_opt_1/1/model.json
-
-cp -r ${MODEL_REPOSITORY}/vllm_opt_1/ ${MODEL_REPOSITORY}/vllm_opt_2/
+pip3 install torch
 
 # Setup add_sub backend and models
 mkdir -p ${BACKEND_DIR}/add_sub
@@ -94,7 +82,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY -v > $CLIENT_LOG 2>&1
+python3 $CLIENT_PY -v >$CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Running $CLIENT_PY FAILED. \n***"
