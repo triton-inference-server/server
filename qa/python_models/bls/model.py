@@ -617,7 +617,7 @@ class PBBLSTest(unittest.TestCase):
             model_name="identity_fp32_timeout",
             inputs=[input0],
             requested_output_names=["OUTPUT0"],
-            timeout=5,
+            timeout=10000,
         )
 
         if self._is_decoupled:
