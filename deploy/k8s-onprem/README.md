@@ -234,7 +234,14 @@ EOF
 $ helm install example -f config.yaml .
 ```
 
-In the configuration itself, pay attention to liveliness, readiness and startup probes of the Trion container itself, configured in the `templates/deployment.yaml`. By default, Triton loads all the models, before starting the HTTP server to respond to the probes. The process can take several minutes, depending on the models sizes. If it is not completed in  `startupProbe.failureThreshold * startupProbe.periodSeconds` seconds then Kubernetes considers this as a pod failure, and restarts it, ending up with an infinite loop of restarting pods. So, make sure to sufficiently increase these values. The liveliness and readiness probes are being sent ony after the first success of a startup probe. For details, see [the K8s documentation on probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) and the [feature page of the startup probe](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/950-liveness-probe-holdoff/README.md).
+## Probe Configuration
+
+In `templates/deployment.yaml` is configurations for `livenessProbe`, `readinessProbe` and `startupProbe` for the Triton server container. 
+By default, Triton loads all the models before starting the HTTP server to respond to the probes. The process can take several minutes, depending on the models sizes. 
+If it is not completed in `startupProbe.failureThreshold * startupProbe.periodSeconds` seconds then Kubernetes considers this as a pod failure and restarts it, ending up with an infinite loop of restarting pods, so make sure to sufficiently set these values for your use case.
+The liveliness and readiness probes are being sent only after the first success of a startup probe. 
+
+For more details, see the [Kubernetes probe documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) and the [feature page of the startup probe](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/950-liveness-probe-holdoff/README.md).
 
 ## Using Triton Inference Server
 
