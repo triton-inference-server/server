@@ -79,6 +79,8 @@ TRITON_VERSION_MAP = {
         "2.4.7",  # DCGM version
         "py310_23.1.0-1",  # Conda version
         "9.1.0.1",  # TRT version for building TRT-LLM backend
+        "12.2",  # CUDA version for building TRT-LLM backend
+        "0.2.1.post1",  # vLLM version
     )
 }
 
