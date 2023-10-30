@@ -533,14 +533,27 @@ TRITONBACKEND_ModelInstanceExecute(
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
+    // Release the request first as the testing backend may be configured to
+    // receive error on request release, in such a case, the error will be
+    // propagated back through error response.
+    auto err = TRITONBACKEND_RequestRelease(request, req_flag);
+    if (err) {
+      // Release request with ALL flag
+      LOG_IF_ERROR(
+          TRITONBACKEND_RequestRelease(
+              request, TRITONSERVER_REQUEST_RELEASE_ALL),
+          "failed releasing request");
+      res_flag = TRITONSERVER_RESPONSE_COMPLETE_FINAL;
+    }
+
     // Send all the responses that haven't already been sent because of
     // an earlier error.
     if (responses[r] != nullptr) {
       LOG_IF_ERROR(
-          TRITONBACKEND_ResponseSend(
-              responses[r], res_flag, nullptr /* success */),
+          TRITONBACKEND_ResponseSend(responses[r], res_flag, err),
           "failed sending response");
     }
+    TRITONSERVER_ErrorDelete(err);
 
     // Report statistics for each request.
     LOG_IF_ERROR(
@@ -549,10 +562,6 @@ TRITONBACKEND_ModelInstanceExecute(
             (responses[r] != nullptr) /* success */, exec_start_ns,
             exec_start_ns, exec_end_ns, exec_end_ns),
         "failed reporting request statistics");
-
-    LOG_IF_ERROR(
-        TRITONBACKEND_RequestRelease(request, req_flag),
-        "failed releasing request");
   }
 
   // Report the entire batch statistics.

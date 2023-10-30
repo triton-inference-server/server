@@ -43,6 +43,32 @@ import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
+MODEL_CONFIG_BASE = """
+{{
+"backend": "generative_sequence",
+"max_batch_size": 4,
+"input" : [
+  {{
+    "name": "INPUT",
+    "data_type": "TYPE_INT32",
+    "dims": [ 1 ]
+  }}
+],
+"output" : [
+  {{
+    "name": "OUTPUT",
+    "data_type": "TYPE_INT32",
+    "dims": [ 1 ]
+  }}
+],
+"model_transaction_policy" : {{
+  "decoupled": true
+}},
+{},
+"instance_group" : [{{ "kind": "KIND_CPU" }}]
+}}
+"""
+
 
 class UserData:
     def __init__(self):
@@ -57,6 +83,11 @@ def callback(user_data, result, error):
 
 
 class GenerativeSequenceTest(tu.TestResultCollector):
+    def setUp(self):
+        # Always make sure the original config is used
+        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            triton_client.load_model("generative_sequence")
+
     def test_generate_stream(self):
         headers = {"Accept": "text/event-stream"}
         url = "http://localhost:8000/v2/models/generative_sequence/generate_stream"
@@ -72,7 +103,7 @@ class GenerativeSequenceTest(tu.TestResultCollector):
             self.assertEqual(res_count, data["OUTPUT"])
         self.assertEqual(0, res_count)
 
-    def test_grpc_stream(self):
+    def test_grpc_stream(self, sequence_id=0, sequence_start=False):
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
             triton_client.start_stream(callback=partial(callback, user_data))
@@ -81,7 +112,10 @@ class GenerativeSequenceTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(np.array([[2]], dtype=np.int32))
 
             triton_client.async_stream_infer(
-                model_name="generative_sequence", inputs=inputs
+                model_name="generative_sequence",
+                inputs=inputs,
+                sequence_id=sequence_id,
+                sequence_start=sequence_start,
             )
             res_count = 2
             while res_count > 0:
@@ -92,6 +126,49 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                 else:
                     self.assertEqual(res_count, data_item.as_numpy("OUTPUT")[0][0])
             self.assertEqual(0, res_count)
+
+    def test_unsupported_sequence_scheduler(self):
+        # Override model config with scheduler settings that do not support
+        # request rescheduling.
+        configs = [
+            r'"sequence_batching" : { "direct" : {}, "generative_sequence" : false }',
+            r'"sequence_batching" : { "oldest" : {}, "generative_sequence" : false }',
+        ]
+        sid = 1
+        for sc in configs:
+            with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+                triton_client.load_model(
+                    "generative_sequence", config=MODEL_CONFIG_BASE.format(sc)
+                )
+            with self.assertRaises(InferenceServerException) as context:
+                # Without specifying 'generative_sequence : true', the sequence
+                # batcher expects sequence paramters to be provided explicitly
+                self.test_grpc_stream(sequence_id=sid, sequence_start=True)
+            sid += 1
+            print(str(context.exception))
+            self.assertTrue(
+                "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
+                in str(context.exception)
+            )
+
+    def test_unsupported_dynamic_scheduler(self):
+        # Override model config with scheduler settings that do not support
+        # request rescheduling.
+        configs = [
+            r'"dynamic_batching" : {}',
+        ]
+        for sc in configs:
+            with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+                triton_client.load_model(
+                    "generative_sequence", config=MODEL_CONFIG_BASE.format(sc)
+                )
+            with self.assertRaises(InferenceServerException) as context:
+                self.test_grpc_stream()
+            print(str(context.exception))
+            self.assertTrue(
+                "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
+                in str(context.exception)
+            )
 
 
 if __name__ == "__main__":

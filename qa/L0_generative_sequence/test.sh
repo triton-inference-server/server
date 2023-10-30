@@ -44,7 +44,7 @@ RET=0
 
 CLIENT_LOG="./generative_sequence_client.log"
 TEST_PY=./generative_sequence_e2e.py
-EXPECTED_NUM_TESTS="2"
+EXPECTED_NUM_TESTS="4"
 TEST_RESULT_FILE='test_results.txt'
 
 
@@ -55,7 +55,7 @@ rm -fr *.log
 pip install sseclient-py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=EXPLICIT"
 SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
