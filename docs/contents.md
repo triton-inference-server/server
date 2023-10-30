@@ -71,6 +71,7 @@ protocol/README.md
 customization_guide/inference_protocols
 protocol/extension_binary_data
 protocol/extension_classification
+protocol/extension_generate
 protocol/extension_logging
 protocol/extension_model_configuration
 protocol/extension_model_repository
