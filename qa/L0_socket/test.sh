@@ -312,11 +312,11 @@ for p in http grpc; do
     if [ "$p" == "http" ]; then
         SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-grpc-port=1"
         SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-grpc-port=1"
-        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=1"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=true"
     else
         SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1"
         SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=1"
-        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=1"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=true"
     fi
     # make sure the first server is launched successfully, then run the other
     # two servers and expect them to fail
