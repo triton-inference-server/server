@@ -142,7 +142,7 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                 )
             with self.assertRaises(InferenceServerException) as context:
                 # Without specifying 'generative_sequence : true', the sequence
-                # batcher expects sequence paramters to be provided explicitly
+                # batcher expects sequence parameters to be provided explicitly
                 self.test_grpc_stream(sequence_id=sid, sequence_start=True)
             sid += 1
             print(str(context.exception))
