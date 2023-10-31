@@ -671,6 +671,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 ### Test Restricted  APIs ###
+### Repeated API not allowed
+
 MODELDIR="`pwd`/models"
 SERVER_ARGS="--model-repository=${MODELDIR}
              --http-restricted-api=model-repository,health:k1=v1 \
@@ -688,11 +690,32 @@ elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
     RET=1
 fi
 
+### Test Unknown Restricted  API###
+### Unknown API not allowed
+
+MODELDIR="`pwd`/models"
+SERVER_ARGS="--model-repository=${MODELDIR}
+             --http-restricted-api=model-reposit,health:k1=v1 \
+             --http-restricted-api=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="unknown restricted api 'model-reposit'"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
 ### Test Restricted  APIs ###
+### Restricted model-repository, metadata, and inference
 
 SERVER_ARGS="--model-repository=${MODELDIR} \
              --http-restricted-api=model-repository:admin-key=admin-value \
-             --http-restricted-api=inference:infer-key=infer-value"
+             --http-restricted-api=inference,metadata:infer-key=infer-value"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

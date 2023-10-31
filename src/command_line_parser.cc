@@ -1919,7 +1919,7 @@ void
 TritonParser::ParseRestrictedFeatureOption(
     const std::string& arg, const std::string& option_name,
     const std::string& key_prefix, const std::string& feature_type,
-    RestrictedFeatureMap& restricted_features)
+    RestrictedFeatures& restricted_features)
 {
   const auto& parsed_tuple =
       ParseGenericConfigOption(arg, ":", "=", option_name, "config name");
@@ -1929,14 +1929,24 @@ TritonParser::ParseRestrictedFeatureOption(
   const auto& value = std::get<2>(parsed_tuple);
 
   for (const auto& feature : features) {
-    if (restricted_features.count(feature)) {
+    const auto& category = RestrictedFeatures::ToCategory(feature);
+
+    if (category == RestrictedCategory::INVALID) {
+      std::stringstream ss;
+      ss << "unknown restricted " << feature_type << " '" << feature << "' "
+         << std::endl;
+      throw ParseException(ss.str());
+    }
+
+    if (restricted_features.IsRestricted(category)) {
       // restricted feature can only be in one group
       std::stringstream ss;
       ss << "restricted " << feature_type << " '" << feature
          << "' can not be specified in multiple config groups" << std::endl;
       throw ParseException(ss.str());
     }
-    restricted_features[feature] = std::make_pair(key_prefix + key, value);
+    restricted_features.Insert(
+        category, std::make_pair(key_prefix + key, value));
   }
 }
 

@@ -73,7 +73,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, false /* reuse_port */,
             address, "" /* header_forward_pattern */, thread_cnt,
-            RestrictedFeatureMap()),
+            RestrictedFeatures()),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(

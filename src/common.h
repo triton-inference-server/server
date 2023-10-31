@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -170,9 +171,5 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 /// \param delim The delimiter to join with.
 /// \return The joint string.
 std::string Join(const std::vector<std::string>& vec, const std::string& delim);
-
-using RestrictedFeature = std::pair<std::string, std::string>;
-
-using RestrictedFeatureMap = std::map<std::string, RestrictedFeature>;
 
 }}  // namespace triton::server

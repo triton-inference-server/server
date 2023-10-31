@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "restricted_features.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #ifdef TRITON_ENABLE_GRPC
@@ -189,7 +190,7 @@ struct TritonServerParameters {
   std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
-  RestrictedFeatureMap http_restricted_apis_{};
+  RestrictedFeatures http_restricted_apis_{};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -285,7 +286,7 @@ class TritonParser {
   void ParseRestrictedFeatureOption(
       const std::string& arg, const std::string& option_name,
       const std::string& header_prefix, const std::string& feature_name,
-      RestrictedFeatureMap& restricted_features);
+      RestrictedFeatures& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
   InferenceTraceMode ParseTraceModeOption(std::string arg);

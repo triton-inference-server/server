@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include "../restricted_features.h"
 #include "../shared_memory_manager.h"
 #include "../tracer.h"
 #include "grpc_handler.h"
@@ -84,7 +85,7 @@ struct Options {
   // requests doesn't exceed this value there will be no
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
-  RestrictedFeatureMap restricted_protocols_;
+  RestrictedFeatures restricted_protocols_;
   std::string forward_header_pattern_;
 };
 

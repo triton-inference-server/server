@@ -48,8 +48,8 @@ class RestrictedAPITest(unittest.TestCase):
             "simple", headers={"infer-key": "infer-value"}
         )
 
-    # health, infer, model repository APIs are restricted.
-    # health and infer expects "infer-key : infer-value" header,
+    # metadata, infer, model repository APIs are restricted.
+    # metadata and infer expects "infer-key : infer-value" header,
     # model repository expected "admin-key : admin-value".
     def test_model_repository(self):
         with self.assertRaisesRegex(InferenceServerException, "This API is restricted"):
@@ -63,6 +63,11 @@ class RestrictedAPITest(unittest.TestCase):
             self.client_.unload_model(
                 self.model_name_, headers={"admin-key": "admin-value"}
             )
+
+    def test_metadata(self):
+        with self.assertRaisesRegex(InferenceServerException, "This API is restricted"):
+            self.client_.get_server_metadata()
+        self.client_.get_server_metadata({"infer-key": "infer-value"})
 
     def test_infer(self):
         # setup
