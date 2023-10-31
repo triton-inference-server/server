@@ -4495,7 +4495,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   std::string region, action, rest, repo_name;
   if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
-
     HandleServerMetadata(req);
     return;
   } else if (RE2::FullMatch(
