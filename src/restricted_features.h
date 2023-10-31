@@ -77,7 +77,7 @@ class RestrictedFeatures {
   ///
   /// \param[in] category category to restrict
   /// \param[in] restriction header, value pair
-  void Insert(RestrictedCategory category, const Restriction& restriction)
+  void Insert(const RestrictedCategory& category, Restriction&& restriction)
   {
     restrictions_[category] = std::move(restriction);
     restricted_categories_[category] = true;

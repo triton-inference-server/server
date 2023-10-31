@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "restricted_features.h"
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
@@ -102,12 +103,16 @@ Contains(const std::vector<std::string>& vec, const std::string& str)
 }
 
 std::string
-Join(const std::vector<std::string>& vec, const std::string& delim)
+Join(const boost::span<const std::string>& container, const std::string& delim)
 {
+  if (container.empty()) {
+    return "";
+  }
   std::stringstream ss;
-  std::copy(
-      vec.begin(), vec.end(),
-      std::ostream_iterator<std::string>(ss, delim.c_str()));
+  ss << container[0];
+  for (size_t i = 1; i < container.size(); ++i) {
+    ss << delim << container[i];
+  }
   return ss.str();
 }
 

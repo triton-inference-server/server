@@ -469,7 +469,9 @@ TritonParser::SetupOptions()
        "flag is --http-restricted-api=<apis>,<key>=<value>. Where "
        "<api> is a comma-separated list of apis to be restricted. "
        "<key> will be additional header key to be checked when a HTTP request "
-       "is received, and <value> is the value expected to be matched."});
+       "is received, and <value> is the value expected to be matched."
+       " Allowed APIs: " +
+           Join(RESTRICTED_CATEGORY_NAMES, ", ")});
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
@@ -572,7 +574,9 @@ TritonParser::SetupOptions()
        "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
        "<protocol> is a comma-separated list of protocols to be restricted. "
        "<key> will be additional header key to be checked when a GRPC request "
-       "is received, and <value> is the value expected to be matched."});
+       "is received, and <value> is the value expected to be matched."
+       " Allowed protocols: " +
+           Join(RESTRICTED_CATEGORY_NAMES, ", ")});
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_LOGGING
