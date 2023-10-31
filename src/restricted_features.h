@@ -63,7 +63,7 @@ class RestrictedFeatures {
   /// Returns RestrictedCategory enum from category name
   ///
   /// \param[in] category category name
-  /// \return category enum
+  /// \return category enum returns INVALID if unknown
   static RestrictedCategory ToCategory(const std::string& category)
   {
     const auto found = std::find(
