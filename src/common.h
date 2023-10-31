@@ -25,9 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <algorithm>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
