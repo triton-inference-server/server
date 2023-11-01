@@ -285,7 +285,7 @@ class TritonParser {
       const std::string& arg);
   void ParseRestrictedFeatureOption(
       const std::string& arg, const std::string& option_name,
-      const std::string& header_prefix, const std::string& feature_name,
+      const std::string& header_prefix, const std::string& feature_type,
       RestrictedFeatures& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
