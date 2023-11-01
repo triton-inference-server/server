@@ -107,7 +107,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 self.assertIn(key, data)
                 self.assertEqual(value, data[key])
             res_count += 1
-        self.assertTrue(len(expected_res), res_count)
+        self.assertEqual(len(expected_res), res_count)
         # Make sure there is no message in the wrong form
         for remaining in client._read():
             self.assertTrue(
