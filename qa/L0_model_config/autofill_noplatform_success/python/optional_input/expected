@@ -1,4 +1,4 @@
-name: "incomplete_input"
+name: "optional_input"
 version_policy {
   latest {
     num_versions: 1
@@ -26,7 +26,7 @@ output {
   dims: 4
 }
 instance_group {
-  name: "incomplete_input"
+  name: "optional_input"
   count: 1
   gpus: 0
   kind: KIND_GPU

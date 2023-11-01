@@ -1,4 +1,4 @@
-name: "incomplete_input"
+name: "optional_input"
 
 input [
   {
