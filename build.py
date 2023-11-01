@@ -1806,22 +1806,10 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
+    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     if be == "tensorrtllm":
-        cmake_script.cmd(
-            "git clone --single-branch --depth=1 -b {} https://github.com/triton-inference-server/tensorrtllm_backend tensorrtllm".format(
-                tag
-            )
-        )
-        cmake_script.cmd("cd tensorrtllm")
-        cmake_script.cmd(
-            "git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git"
-        )
-        cmake_script.cmd("git submodule sync")
-        cmake_script.cmd("cd ..")
         tensorrtllm_prebuild(cmake_script)
-    else:
-        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
