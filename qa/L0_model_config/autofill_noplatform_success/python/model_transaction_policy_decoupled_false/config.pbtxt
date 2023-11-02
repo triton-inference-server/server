@@ -1,5 +1,3 @@
-name: "model_transaction_policy_decoupled_false"
-
 input [
   {
     name: "INPUT0"

@@ -1,5 +1,3 @@
-name: "model_transaction_policy_no_op"
-
 model_transaction_policy {
   decoupled: true
 }
