@@ -468,12 +468,6 @@ function kill_servers () {
     done
 }
 
-# Collect all logs and core dumps and copy them to an upper-level directory for
-# proper capture on the CI.
-function collect_artifacts_from_subdir () {
-    cp *.*log* core* ../ || true
-}
-
 # Sort an array
 # Call with sort_array <array_name>
 # Example: sort_array array

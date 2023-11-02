@@ -450,6 +450,4 @@ else
     echo -e "\n***\n*** Example verification test FAILED.\n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET
