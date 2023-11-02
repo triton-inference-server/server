@@ -1,4 +1,3 @@
-name: "model_transaction_policy_invalid_args"
 
 input [
   {
