@@ -26,6 +26,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <string>
 
 namespace triton { namespace server {
