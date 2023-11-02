@@ -53,21 +53,35 @@ class PythonBasedBackendsTest(TestResultCollector):
         self.triton_client.load_model(self.pytorch_model)
 
     def test_add_sub_models(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1, model_version="2"))
-        self._test_add_sub_model(model_name=self.add_sub_model_1, model_version="2", single_output=True)
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.add_sub_model_1, model_version="2")
+        )
+        self._test_add_sub_model(
+            model_name=self.add_sub_model_1, model_version="2", single_output=True
+        )
 
-        self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1, model_version="1"))
-        self._test_add_sub_model(model_name=self.add_sub_model_1, model_version="1", single_output=True)
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.add_sub_model_1, model_version="1")
+        )
+        self._test_add_sub_model(
+            model_name=self.add_sub_model_1, model_version="1", single_output=True
+        )
 
         self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_2))
         self._test_add_sub_model(model_name=self.add_sub_model_2, single_output=True)
 
     def test_python_model(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.python_model, model_version="2"))
-        self._test_add_sub_model(model_name=self.python_model, shape=[16], model_version="2")
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.python_model, model_version="2")
+        )
+        self._test_add_sub_model(
+            model_name=self.python_model, shape=[16], model_version="2"
+        )
 
     def test_pytorh_model(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.pytorch_model, model_version="1"))
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.pytorch_model, model_version="1")
+        )
         self._test_add_sub_model(model_name=self.pytorch_model)
 
     def _test_add_sub_model(
