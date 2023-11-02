@@ -49,17 +49,19 @@ mkdir -p ${BACKEND_DIR}/add_sub
 cp ${QA_MODELS_PATH}/python_based_backends/add_sub_backend/model.py ${BACKEND_DIR}/add_sub/model.py
 
 mkdir -p ${MODEL_REPOSITORY}/add/1/
-cp ${QA_MODELS_PATH}/python_based_backends/add_sub_backend/add_model.json ${MODEL_REPOSITORY}/add/1/model.json
-cp ${QA_MODELS_PATH}/python_based_backends/add_sub_backend/config.pbtxt ${MODEL_REPOSITORY}/add/
+echo '{ "operation": "add" }' > ${MODEL_REPOSITORY}/add/1/model.json
+echo "backend: \"add_sub\"" > ${MODEL_REPOSITORY}/add/config.pbtxt
+cp -r ${MODEL_REPOSITORY}/add/1/ ${MODEL_REPOSITORY}/add/2/
 
 mkdir -p ${MODEL_REPOSITORY}/sub/1/
-cp ${QA_MODELS_PATH}/python_based_backends/add_sub_backend/sub_model.json ${MODEL_REPOSITORY}/sub/1/model.json
-cp ${QA_MODELS_PATH}/python_based_backends/add_sub_backend/config.pbtxt ${MODEL_REPOSITORY}/sub/
+echo '{ "operation": "sub" }' > ${MODEL_REPOSITORY}/sub/1/model.json
+echo "backend: \"add_sub\"" > ${MODEL_REPOSITORY}/sub/config.pbtxt
 
 # Setup python backend model
 mkdir -p ${MODEL_REPOSITORY}/add_sub/1
 cp ${QA_MODELS_PATH}/add_sub/model.py ${MODEL_REPOSITORY}/add_sub/1/
 cp ${QA_MODELS_PATH}/add_sub/config.pbtxt ${MODEL_REPOSITORY}/add_sub/
+cp -r ${MODEL_REPOSITORY}/add_sub/1/ ${MODEL_REPOSITORY}/add_sub/2/
 
 # Setup pytorch backend model
 cp ${GEN_PYTORCH_MODEL_PY} ./gen_qa_pytorch_model.py
