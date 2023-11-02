@@ -1,0 +1,45 @@
+name: "model_transaction_policy_decoupled_false"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 4
+input {
+  name: "INPUT0"
+  data_type: TYPE_FP32
+  dims: 4
+}
+input {
+  name: "INPUT1"
+  data_type: TYPE_FP32
+  dims: 4
+}
+output {
+  name: "OUTPUT1"
+  data_type: TYPE_FP32
+  dims: 4
+}
+output {
+  name: "OUTPUT0"
+  data_type: TYPE_FP32
+  dims: 4
+}
+instance_group {
+  name: "model_transaction_policy_decoupled_false"
+  count: 1
+  gpus: 0
+  kind: KIND_GPU
+}
+default_model_filename: "model.py"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "python"
+model_transaction_policy {
+}
