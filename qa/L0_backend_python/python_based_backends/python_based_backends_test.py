@@ -44,27 +44,35 @@ class PythonBasedBackendsTest(TestResultCollector):
         self.python_model = "add_sub"
         self.pytorch_model = "add_sub_pytorch"
 
-        self.triton_client.load_model(self.add_sub_model_1)
+        self.triton_client.load_model(
+            self.add_sub_model_1,
+            config='{"backend":"add_sub","version_policy":{"latest":{"num_versions":2}}}',
+        )
         self.triton_client.load_model(self.add_sub_model_2)
         self.triton_client.load_model(self.python_model)
         self.triton_client.load_model(self.pytorch_model)
 
     def test_add_sub_models(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1))
-        self._test_add_sub_model(model_name=self.add_sub_model_1, single_output=True)
+        self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1, model_version="2"))
+        self._test_add_sub_model(model_name=self.add_sub_model_1, model_version="2", single_output=True)
+
+        self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_1, model_version="1"))
+        self._test_add_sub_model(model_name=self.add_sub_model_1, model_version="1", single_output=True)
 
         self.assertTrue(self.triton_client.is_model_ready(self.add_sub_model_2))
         self._test_add_sub_model(model_name=self.add_sub_model_2, single_output=True)
 
     def test_python_model(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.python_model))
-        self._test_add_sub_model(model_name=self.python_model, shape=[16])
+        self.assertTrue(self.triton_client.is_model_ready(self.python_model, model_version="2"))
+        self._test_add_sub_model(model_name=self.python_model, shape=[16], model_version="2")
 
     def test_pytorh_model(self):
-        self.assertTrue(self.triton_client.is_model_ready(self.pytorch_model))
+        self.assertTrue(self.triton_client.is_model_ready(self.pytorch_model, model_version="1"))
         self._test_add_sub_model(model_name=self.pytorch_model)
 
-    def _test_add_sub_model(self, model_name, shape=[4], single_output=False):
+    def _test_add_sub_model(
+        self, model_name, model_version="1", shape=[4], single_output=False
+    ):
         input0_data = np.random.rand(*shape).astype(np.float32)
         input1_data = np.random.rand(*shape).astype(np.float32)
 
@@ -90,7 +98,11 @@ class PythonBasedBackendsTest(TestResultCollector):
             ]
 
         response = self.triton_client.infer(
-            model_name, inputs, request_id=str(randint(10, 99)), outputs=outputs
+            model_name=model_name,
+            inputs=inputs,
+            model_version=model_version,
+            request_id=str(randint(10, 99)),
+            outputs=outputs,
         )
 
         if single_output:
