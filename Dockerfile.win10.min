@@ -92,7 +92,7 @@ WORKDIR /
 #
 # Installing Vcpkg
 #
-ARG VCPGK_VERSION=2023.07.21
+ARG VCPGK_VERSION=2022.11.14
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat

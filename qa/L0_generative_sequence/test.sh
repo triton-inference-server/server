@@ -1,4 +1,5 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,35 +25,68 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-backend: "python"
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-input [
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
+source ../common/util.sh
 
-instance_group [{ kind: KIND_CPU }]
+RET=0
+
+CLIENT_LOG="./generative_sequence_client.log"
+TEST_PY=./generative_sequence_e2e.py
+EXPECTED_NUM_TESTS="4"
+TEST_RESULT_FILE='test_results.txt'
+
+
+export CUDA_VISIBLE_DEVICES=0
+
+rm -fr *.log
+
+pip install sseclient-py
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=EXPLICIT"
+SERVER_LOG="./inference_server.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $TEST_PY >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET

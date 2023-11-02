@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,35 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-backend: "python"
+include(CMakeFindDependencyMacro)
 
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-input [
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
+get_filename_component(
+  TRITONSEQUENCEBACKEND_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH
+)
 
-instance_group [{ kind: KIND_CPU }]
+list(APPEND CMAKE_MODULE_PATH ${TRITONSEQUENCEBACKEND_CMAKE_DIR})
+
+if(NOT TARGET TritonGenerativeSequenceBackend::triton-sequence-backend)
+  include("${TRITONSEQUENCEBACKEND_CMAKE_DIR}/TritonGenerativeSequenceBackendTargets.cmake")
+endif()
+
+set(TRITONSEQUENCEBACKEND_LIBRARIES TritonGenerativeSequenceBackend::triton-sequence-backend)

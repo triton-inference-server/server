@@ -78,6 +78,4 @@ else
     echo -e "\n***\n*** model_control_test PASSED. \n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET
