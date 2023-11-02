@@ -78,7 +78,7 @@ class PythonBasedBackendsTest(TestResultCollector):
             model_name=self.python_model, shape=[16], model_version="2"
         )
 
-    def test_pytorh_model(self):
+    def test_pytorch_model(self):
         self.assertTrue(
             self.triton_client.is_model_ready(self.pytorch_model, model_version="1")
         )
