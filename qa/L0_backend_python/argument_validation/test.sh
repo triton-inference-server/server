@@ -75,6 +75,4 @@ else
     echo -e "\n***\n*** Argument validation test PASSED. \n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET

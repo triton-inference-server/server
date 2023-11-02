@@ -172,6 +172,4 @@ else
     echo -e "\n***\n*** IO test FAILED.\n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET
