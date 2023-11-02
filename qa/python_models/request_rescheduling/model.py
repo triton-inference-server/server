@@ -32,10 +32,6 @@ import triton_python_backend_utils as pb_utils
 
 
 class REQUESTRESCHEDULETest(unittest.TestCase):
-    # def setUp(self):
-    #     pb_utils.unload_model("generate_sequence")
-    #     pb_utils.load_model("generate_sequence")
-
     def test_wrong_return_type(self):
         input0 = pb_utils.Tensor("INPUT0", (np.random.randn(*[4])).astype(np.float32))
         infer_request = pb_utils.InferenceRequest(

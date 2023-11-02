@@ -60,7 +60,6 @@ cp ../../python_models/generate_sequence/model.py models/generate_sequence/1/
 cp ../../python_models/generate_sequence/config.pbtxt models/generate_sequence
 
 SERVER_LOG="./request_rescheduling_server.log"
-# SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --model-control-mode=explicit --load-model=request_rescheduling"
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 run_server
