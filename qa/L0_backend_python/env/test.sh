@@ -315,6 +315,4 @@ else
   echo -e "\n***\n*** Env Manager Test FAILED.\n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET

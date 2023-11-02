@@ -213,6 +213,4 @@ else
     echo -e "\n***\n*** Lifecycle test PASSED. \n***"
 fi
 
-collect_artifacts_from_subdir
-
 exit $RET

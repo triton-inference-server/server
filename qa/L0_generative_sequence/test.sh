@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,25 +25,38 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./custom_metrics_client.log"
-EXPECTED_NUM_TESTS="1"
-TEST_RESULT_FILE='test_results.txt'
-source ../../common/util.sh
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./custom_metrics_server.log"
+source ../common/util.sh
 
 RET=0
-rm -fr *.log ./models *.txt
 
-mkdir -p models/custom_metrics/1/
-cp ../../python_models/custom_metrics/model.py models/custom_metrics/1/
-cp ../../python_models/custom_metrics/config.pbtxt models/custom_metrics
+CLIENT_LOG="./generative_sequence_client.log"
+TEST_PY=./generative_sequence_e2e.py
+EXPECTED_NUM_TESTS="4"
+TEST_RESULT_FILE='test_results.txt'
 
+
+export CUDA_VISIBLE_DEVICES=0
+
+rm -fr *.log
+
+pip install sseclient-py
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=EXPLICIT"
+SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -52,12 +65,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-
-export MODEL_NAME='custom_metrics'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+python $TEST_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
-    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
@@ -67,19 +76,17 @@ else
         RET=1
     fi
 fi
-
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-
-if [ $RET -eq 1 ]; then
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** Custom Metrics test FAILED. \n***"
-else
-    echo -e "\n***\n*** Custom Metrics test PASSED. \n***"
+    echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
