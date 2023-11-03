@@ -655,7 +655,10 @@ class InferHandlerState {
     }
 
     // Increments the ongoing request counter
-    void IncrementRequestCounter() { ongoing_requests_++; }
+    void IncrementRequestCounter() {
+      ongoing_requests_++;
+      LOG_INFO << "Ongoing requeests: " << ongoing_requests_++;
+    }
 
     // Decrements the ongoing request counter
     void DecrementRequestCounter() { ongoing_requests_--; }
@@ -844,6 +847,7 @@ class InferHandlerState {
     {
       std::lock_guard<std::recursive_mutex> lock(mu_);
       states_.push(state);
+      LOG_INFO << "Number of states: " << states_.size();
     }
 
     // Write the response to the stream directly.
