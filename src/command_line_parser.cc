@@ -1276,7 +1276,7 @@ TritonParser::Parse(int argc, char** argv)
           lparams.http_port_ = ParseOption<int>(optarg);
           break;
         case OPTION_REUSE_HTTP_PORT:
-          lparams.reuse_http_port_ = ParseOption<int>(optarg);
+          lparams.reuse_http_port_ = ParseOption<bool>(optarg);
           break;
         case OPTION_HTTP_ADDRESS:
           lparams.http_address_ = optarg;
@@ -1330,7 +1330,7 @@ TritonParser::Parse(int argc, char** argv)
           lgrpc_options.socket_.port_ = ParseOption<int>(optarg);
           break;
         case OPTION_REUSE_GRPC_PORT:
-          lgrpc_options.socket_.reuse_port_ = ParseOption<int>(optarg);
+          lgrpc_options.socket_.reuse_port_ = ParseOption<bool>(optarg);
           break;
         case OPTION_GRPC_ADDRESS:
           lgrpc_options.socket_.address_ = optarg;

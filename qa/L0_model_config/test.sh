@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -209,7 +209,13 @@ for modelpath in \
         autofill_noplatform_success/python/dynamic_batching_no_op \
         autofill_noplatform_success/python/dynamic_batching \
         autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform_success/python/model_transaction_policy \
+        autofill_noplatform_success/python/model_transaction_policy_decoupled_false \
+        autofill_noplatform_success/python/model_transaction_policy_no_op \
+        autofill_noplatform_success/python/optional_input \
         autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/model_transaction_policy_invalid_args \
+        autofill_noplatform/python/model_transaction_policy_mismatch \
         autofill_noplatform/python/output_wrong_property ; do
     mkdir -p $modelpath/1
     mv $modelpath/model.py $modelpath/1/.
