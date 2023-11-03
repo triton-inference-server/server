@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <boost/core/span.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -164,13 +163,25 @@ int64_t GetElementCount(const std::vector<int64_t>& dims);
 /// \return True if the str is found, false otherwise.
 bool Contains(const std::vector<std::string>& vec, const std::string& str);
 
-/// Joins container of strings 'container' into a single string delimited by
+/// Joins container of strings into a single string delimited by
 /// 'delim'.
 ///
-/// \param container The container of strings to join
+/// \param container The container of strings to join.
 /// \param delim The delimiter to join with.
 /// \return The joint string.
-std::string Join(
-    const boost::span<const std::string>& container, const std::string& delim);
+template <class T>
+std::string
+Join(const T& container, const std::string& delim)
+{
+  if (container.empty()) {
+    return "";
+  }
+  std::stringstream ss;
+  ss << container[0];
+  for (size_t i = 1; i < container.size(); ++i) {
+    ss << delim << container[i];
+  }
+  return ss.str();
+}
 
 }}  // namespace triton::server

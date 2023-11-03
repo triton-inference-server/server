@@ -102,18 +102,4 @@ Contains(const std::vector<std::string>& vec, const std::string& str)
   return std::find(vec.begin(), vec.end(), str) != vec.end();
 }
 
-std::string
-Join(const boost::span<const std::string>& container, const std::string& delim)
-{
-  if (container.empty()) {
-    return "";
-  }
-  std::stringstream ss;
-  ss << container[0];
-  for (size_t i = 1; i < container.size(); ++i) {
-    ss << delim << container[i];
-  }
-  return ss.str();
-}
-
 }}  // namespace triton::server
