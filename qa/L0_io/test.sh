@@ -68,8 +68,7 @@ for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
             cp ../python_models/add_sub/config.pbtxt $MODELSDIR/${full}/. && \
             (cd $MODELSDIR/${full} && \
                     sed -i "s/label_filename:.*//" config.pbtxt && \
-                    sed -i "0,/name:.*/{s/name:.*/name: \"${full}\"/}" config.pbtxt && \
-                                        echo "max_batch_size: 64" >> config.pbtxt)
+                    echo "max_batch_size: 64" >> config.pbtxt)
 
         # ensemble version of the model.
         mkdir -p $MODELSDIR/fan_${full}/1 && \
