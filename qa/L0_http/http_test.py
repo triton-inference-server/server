@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import base64
+import os
 import sys
 
 sys.path.append("../common")
@@ -204,6 +206,41 @@ class HttpTest(tu.TestResultCollector):
                         InferenceServerException, "Unsupported HTTP header"
                     ):
                         client.infer(model_name=model, inputs=inputs, headers=headers)
+
+    # Test that model load API file override can't be used to create files
+    # outside of any model directory.
+    def test_model_load_arbitrary_file(self):
+        # When using model load API, temporary model directories are created in
+        # a randomly generated /tmp/XXXXXX directory for the life of the model,
+        # and cleaned up on model unload.
+        model_load_basepath = "/tmp/XXXXXX"
+        # Set target path that tries to escape out of model directory, and
+        # a creates new file that didn't already exist
+        new_file = os.path.join(model_load_basepath, "..", "..", "new_dir", "test.txt")
+        self.assertFalse(os.path.exists(new_file))
+        # Same for a file that did already exist
+        existing_file = os.path.join(model_load_basepath, "..", "..", ".bashrc")
+        self.assertTrue(os.path.exists(existing_file))
+        # Contents to try writing to file, though it should fail to be written
+        new_contents = "This shouldn't exist"
+        new_contents_b64 = base64.b64encode(new_contents.encode()).decode()
+
+        config = ""
+        new_files = {f"file:{new_file}": new_contents_b64}
+        existing_files = {f"file:{existing_file}": new_contents_b64}
+        with tritonhttpclient.InferenceServerClient("localhost:8000") as client:
+            with self.assertRaisesRegex(InferenceServerException):
+                client.load_model("new_model1", config=config, files=new_files)
+            with self.assertRaisesRegex(InferenceServerException):
+                client.load_model("new_model2", config=config, files=existing_files)
+
+        # Assert new file wasn't created
+        self.assertFalse(os.path.exists(new_file))
+        # Read the existing file and make sure it's contents weren't overwritten
+        self.assertTrue(os.path.exists(existing_file))
+        with open(existing_file) as f:
+            contents = f.read()
+            self.assertNotEqual(contents, new_contents)
 
 
 if __name__ == "__main__":
