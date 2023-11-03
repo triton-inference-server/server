@@ -38,6 +38,7 @@
 
 #include "common.h"
 #include "data_compressor.h"
+#include "restricted_features.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
 #include "triton/common/logging.h"
@@ -151,6 +152,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
+      const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPAPIServer();
@@ -358,7 +360,8 @@ class HTTPAPIServer : public HTTPServer {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
-      const std::string& header_forward_pattern, const int thread_cnt);
+      const std::string& header_forward_pattern, const int thread_cnt,
+      const RestrictedFeatures& restricted_apis);
   virtual void Handle(evhtp_request_t* req) override;
   // [FIXME] extract to "infer" class
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
@@ -543,6 +546,9 @@ class HTTPAPIServer : public HTTPServer {
         parameters_field,
         new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
   }
+  const RestrictedFeatures& restricted_apis_{};
+  bool RespondIfRestricted(
+      evhtp_request_t* req, const Restriction& restriction);
 };
 
 }}  // namespace triton::server
