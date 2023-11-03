@@ -45,3 +45,4 @@ optimization {
   }
 }
 backend: "tensorrt"
+runtime: "libtriton_tensorrt.so"

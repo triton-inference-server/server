@@ -44,3 +44,4 @@ optimization {
     }
 }
 backend: "python"
+runtime: "libtriton_python.so"
