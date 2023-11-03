@@ -2559,9 +2559,9 @@ class LifeCycleTest(tu.TestResultCollector):
     # outside of any model directory.
     def test_file_override_security(self):
         # When using model load API, temporary model directories are created in
-        # a randomly generated /tmp/XXXXXX directory for the life of the model,
-        # and cleaned up on model unload.
-        model_basepath = "/tmp/XXXXXX"
+        # a randomly generated /tmp/folderXXXXXX directory for the life of the
+        # model, and cleaned up on model unload.
+        model_basepath = "/tmp/folderXXXXXX"
         if os.path.exists(model_basepath) and os.path.isdir(model_basepath):
             shutil.rmtree(model_basepath)
         os.makedirs(model_basepath)
@@ -2581,8 +2581,16 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(os.path.exists(os.path.join(model_basepath, existing_file_rel)))
 
         # Symlinks
-        escape_dir_symlink_rel = "escape_symlink"
-        escape_dir_symlink_full = os.path.join(model_basepath, escape_dir_symlink_rel)
+        ## No easy way to inject symlink into generated temp model dir, so for
+        ## testing sake, make a fixed symlink path in /tmp.
+        escape_dir_symlink_rel = os.path.join("..", "escape_symlink")
+        escape_dir_symlink_full = "/tmp/escape_symlink"
+        self.assertEqual(
+            os.path.abspath(os.path.join(model_basepath, escape_dir_symlink_rel)),
+            escape_dir_symlink_full,
+        )
+        if os.path.exists(escape_dir_symlink_full):
+            os.unlink(escape_dir_symlink_full)
         os.symlink(root_home_dir, escape_dir_symlink_full)
         self.assertTrue(os.path.abspath(escape_dir_symlink_full), root_home_dir)
 
@@ -2592,7 +2600,7 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertFalse(
             os.path.exists(os.path.join(model_basepath, symlink_new_file_rel))
         )
-        symlink_existing_file_rel = os.path.join(escape_dir_symlink_full, ".bashrc")
+        symlink_existing_file_rel = os.path.join(escape_dir_symlink_rel, ".bashrc")
         self.assertTrue(
             os.path.exists(os.path.join(model_basepath, symlink_existing_file_rel))
         )
@@ -2605,11 +2613,11 @@ class LifeCycleTest(tu.TestResultCollector):
         existing_files = [existing_file_rel, symlink_existing_file_rel]
         all_files = new_files + existing_files
         for filepath in all_files:
-            config = ""
+            # minimal config to create a new model
+            config = json.dumps({"backend": "identity"})
             files = {f"file:{filepath}": new_contents_b64}
             with httpclient.InferenceServerClient("localhost:8000") as client:
-                # Load should fail due to no model version found in filepath
-                with self.assertRaises(InferenceServerException):
+                with self.assertRaisesRegex(InferenceServerException, "failed to load"):
                     client.load_model("new_model", config=config, files=files)
 
         for rel_path in new_files:
