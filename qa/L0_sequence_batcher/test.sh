@@ -339,6 +339,8 @@ for MODEL in $MODELS; do
 
     if [ "$USE_SINGLE_BUFFER" == "1" && "$IMPLICIT_STATE" == "1" ]; then
       SED_REPLACE_PATTERN="N;N;N;N;N;/state.*dims:.*/a use_single_buffer: true"
+      (cd models0/$(basename $MODEL) && \
+        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
       (cd models1/$(basename $MODEL) && \
         sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
       (cd models2/$(basename $MODEL) && \

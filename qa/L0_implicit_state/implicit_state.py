@@ -83,6 +83,62 @@ class ImplicitStateTest(tu.TestResultCollector):
         err_str = str(e.exception).lower()
         self.assertIn("state 'undefined_state' is not a valid state name", err_str)
 
+    def test_implicit_state_single_buffer(self):
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1], "INT32"))
+        inputs.append(tritonhttpclient.InferInput("TEST_CASE", [1], "INT32"))
+        inputs[0].set_data_from_numpy(np.random.randint(5, size=[1], dtype=np.int32))
+        inputs[1].set_data_from_numpy(np.asarray([2], dtype=np.int32))
+
+        triton_client.infer(
+            model_name="single_state_buffer",
+            inputs=inputs,
+            sequence_id=2,
+            sequence_start=True,
+            sequence_end=False,
+        )
+
+        triton_client.infer(
+            model_name="single_state_buffer",
+            inputs=inputs,
+            sequence_id=2,
+            sequence_start=False,
+            sequence_end=True,
+        )
+
+    def test_implicit_state_growable_memory(self):
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1], "INT32"))
+        inputs.append(tritonhttpclient.InferInput("TEST_CASE", [1], "INT32"))
+        inputs[0].set_data_from_numpy(np.random.randint(5, size=[1], dtype=np.int32))
+        inputs[1].set_data_from_numpy(np.asarray([3], dtype=np.int32))
+
+        triton_client.infer(
+            model_name="growable_memory",
+            inputs=inputs,
+            sequence_id=2,
+            sequence_start=True,
+            sequence_end=False,
+        )
+
+        triton_client.infer(
+            model_name="growable_memory",
+            inputs=inputs,
+            sequence_id=2,
+            sequence_start=False,
+            sequence_end=False,
+        )
+
+        triton_client.infer(
+            model_name="growable_memory",
+            inputs=inputs,
+            sequence_id=2,
+            sequence_start=False,
+            sequence_end=True,
+        )
+
     def test_no_update(self):
         # Test implicit state without updating any state
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")

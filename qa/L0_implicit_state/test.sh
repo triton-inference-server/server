@@ -62,10 +62,14 @@ source ../common/util.sh
 cp ./libtriton_implicit_state.so models/no_implicit_state/
 cp ./libtriton_implicit_state.so models/no_state_update/
 cp ./libtriton_implicit_state.so models/wrong_internal_state/
+cp ./libtriton_implicit_state.so models/single_state_buffer/
+cp ./libtriton_implicit_state.so models/growable_memory/
 
 mkdir -p models/no_implicit_state/1/
 mkdir -p models/no_state_update/1/
 mkdir -p models/wrong_internal_state/1/
+mkdir -p models/single_state_buffer/1/
+mkdir -p models/growable_memory/1/
 
 for BACKEND in $BACKENDS; do
     dtype="int32"
@@ -94,7 +98,7 @@ done
 CLIENT_LOG=`pwd`/client.log
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 IMPLICIT_STATE_CLIENT='implicit_state.py'
-EXPECTED_TEST_NUM=5
+EXPECTED_TEST_NUM=6
 rm -rf $CLIENT_LOG
 
 run_server
