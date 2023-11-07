@@ -68,6 +68,7 @@ class PythonUnittest(tu.TestResultCollector):
                 model_name == "bls"
                 or model_name == "bls_memory"
                 or model_name == "bls_memory_async"
+                or model_name == "bls_request_rescheduling"
             ):
                 # For these tests, the memory region size will be grown. Because of
                 # this we need to use the shared memory probe only on the later
@@ -75,7 +76,7 @@ class PythonUnittest(tu.TestResultCollector):
                 self._run_unittest(model_name)
 
                 # [FIXME] See DLIS-3684
-                self._run_unittest(model_name)
+                # self._run_unittest(model_name)
                 with self._shm_leak_detector.Probe() as shm_probe:
                     self._run_unittest(model_name)
             else:

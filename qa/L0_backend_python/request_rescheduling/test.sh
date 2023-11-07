@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,31 +36,34 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
 RET=0
-# This variable is used to print out the correct server log for each sub-test.
-SUB_TEST_RET=0
+
 rm -fr *.log ./models *.txt
 
-# pip3 uninstall -y torch
-# pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 uninstall -y torch
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
-mkdir -p models/request_rescheduling/1/
-cp ../../python_models/request_rescheduling/model.py models/request_rescheduling/1/
-cp ../../python_models/request_rescheduling/config.pbtxt models/request_rescheduling
-
-mkdir -p models/request_rescheduling_error/1/
-cp ../../python_models/request_rescheduling_error/model.py models/request_rescheduling_error/1/
-cp ../../python_models/request_rescheduling_error/config.pbtxt models/request_rescheduling_error
+mkdir -p models/bls_request_rescheduling/1/
+cp ../../python_models/bls_request_rescheduling/model.py models/bls_request_rescheduling/1/
+cp ../../python_models/bls_request_rescheduling/config.pbtxt models/bls_request_rescheduling
 
 mkdir -p models/request_rescheduling_addsub/1/
 cp ../../python_models/request_rescheduling_addsub/model.py models/request_rescheduling_addsub/1/
 cp ../../python_models/request_rescheduling_addsub/config.pbtxt models/request_rescheduling_addsub
 
-mkdir -p models/generate_sequence/1/
-cp ../../python_models/generate_sequence/model.py models/generate_sequence/1/
-cp ../../python_models/generate_sequence/config.pbtxt models/generate_sequence
+mkdir -p models/generative_sequence/1/
+cp ../../python_models/generative_sequence/model.py models/generative_sequence/1/
+cp ../../python_models/generative_sequence/config.pbtxt models/generative_sequence
+
+mkdir -p models/request_rescheduling_cases/1/
+cp ../../python_models/request_rescheduling_cases/model.py models/request_rescheduling_cases/1/
+cp ../../python_models/request_rescheduling_cases/config.pbtxt models/request_rescheduling_cases
+
+mkdir -p models/wrong_return_type/1/
+cp ../../python_models/wrong_return_type/model.py models/wrong_return_type/1/
+cp ../../python_models/wrong_return_type/config.pbtxt models/wrong_return_type
 
 SERVER_LOG="./request_rescheduling_server.log"
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -69,12 +72,12 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-export MODEL_NAME='request_rescheduling'
+export MODEL_NAME='bls_request_rescheduling'
 
 set +e
 python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** request_rescheduling unit test FAILED. \n***"
+    echo -e "\n***\n*** bls_request_rescheduling test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
 else

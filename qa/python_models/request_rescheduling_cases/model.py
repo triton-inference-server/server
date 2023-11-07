@@ -25,24 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import threading
+import time
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """
-    This model takes 1 input tensor, an INT32 [ 1 ] input named "INPUT", and
-    produces an output tensor "OUTPUT" with the same shape as the input tensor.
-    The input value indicates the total number of responses to be generated and
-    the output value indicates the number of remaining responses. For example,
-    if the request input has value 2, the model will:
-        - Send a response with value 1.
-        - Release request with RESCHEDULE flag.
-        - When execute on the same request, send the last response with value 0.
-        - Release request with ALL flag.
-    """
-
     def initialize(self, args):
         self.model_config = model_config = json.loads(args["model_config"])
 
@@ -98,35 +88,61 @@ class TritonPythonModel:
                 )
             )
 
-        self.remaining_response = 0
-        self.reset_flag = True
+        self.idx = 0
+        self.inflight_thread_count = 0
+        self.inflight_thread_count_lck = threading.Lock()
 
     def execute(self, requests):
         for request in requests:
-            in_input = pb_utils.get_input_tensor_by_name(request, "IN").as_numpy()
+            case = pb_utils.get_input_tensor_by_name(request, "IN").as_numpy()
 
-            if self.reset_flag:
-                self.remaining_response = in_input[0]
-                self.reset_flag = False
-
-            response_sender = request.get_response_sender()
-
-            self.remaining_response -= 1
-
-            out_output = pb_utils.Tensor(
-                "OUT", np.array([self.remaining_response], np.int32)
-            )
-            response = pb_utils.InferenceResponse(output_tensors=[out_output])
-
-            if self.remaining_response <= 0:
-                response_sender.send(
-                    response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
-                )
-                self.reset_flag = True
+            if case[0] == 0:
+                self.send_final_flag_before_rescheduling_request(request)
+            elif case[0] == 1:
+                self.process_request_thread(request)
             else:
-                request.set_release_flags(
-                    pb_utils.TRITONSERVER_REQUEST_RELEASE_RESCHEDULE
-                )
-                response_sender.send(response)
+                raise pb_utils.TritonModelException("Unknown test case.")
 
         return None
+
+    def send_final_flag_before_rescheduling_request(self, request):
+        response_sender = request.get_response_sender()
+        if self.idx == 0:
+            out_output = pb_utils.Tensor("OUT", np.array([0], np.int32))
+            response = pb_utils.InferenceResponse(output_tensors=[out_output])
+            response_sender.send(response)
+            response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            request.set_release_flags(pb_utils.TRITONSERVER_REQUEST_RELEASE_RESCHEDULE)
+            self.idx = 1
+
+    def process_request_thread(self, request):
+        thread = threading.Thread(
+            target=self.response_thread,
+            args=(
+                request.get_response_sender(),
+                pb_utils.get_input_tensor_by_name(request, "IN").as_numpy(),
+            ),
+        )
+
+        thread.daemon = True
+
+        with self.inflight_thread_count_lck:
+            self.inflight_thread_count += 1
+
+        if self.idx == 0:
+            request.set_release_flags(pb_utils.TRITONSERVER_REQUEST_RELEASE_RESCHEDULE)
+            thread.start()
+            self.idx = 1
+
+    def response_thread(self, response_sender, in_input):
+        output_value = in_input[0]
+        while output_value >= 0:
+            out_output = pb_utils.Tensor("OUT", np.array([output_value], np.int32))
+            response = pb_utils.InferenceResponse(output_tensors=[out_output])
+            response_sender.send(response)
+            output_value -= 1
+
+        response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+
+        with self.inflight_thread_count_lck:
+            self.inflight_thread_count -= 1
