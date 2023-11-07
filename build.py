@@ -1172,6 +1172,9 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
         df += """
 RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
 """
+    df += """
+    USER ${TRITON_SERVER_USER}
+    """
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)

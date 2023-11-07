@@ -167,6 +167,9 @@ def end_dockerfile(ddir, dockerfile_name, argmap):
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
 """
+    df += """
+    USER ${TRITON_SERVER_USER}
+    """
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
