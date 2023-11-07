@@ -115,29 +115,47 @@ class ImplicitStateTest(tu.TestResultCollector):
         inputs[0].set_data_from_numpy(np.random.randint(5, size=[1], dtype=np.int32))
         inputs[1].set_data_from_numpy(np.asarray([3], dtype=np.int32))
 
-        triton_client.infer(
+        output = triton_client.infer(
             model_name="growable_memory",
             inputs=inputs,
             sequence_id=2,
             sequence_start=True,
             sequence_end=False,
         )
+        output_state = output.as_numpy("OUTPUT_STATE")
+        expected_output_state = np.zeros(output_state.shape, dtype=np.int8)
+        np.testing.assert_equal(output_state, expected_output_state)
 
-        triton_client.infer(
+        output = triton_client.infer(
             model_name="growable_memory",
             inputs=inputs,
             sequence_id=2,
             sequence_start=False,
             sequence_end=False,
         )
+        output_state = output.as_numpy("OUTPUT_STATE")
+        expected_output_state = np.concatenate(
+            [expected_output_state, np.ones(expected_output_state.shape, dtype=np.int8)]
+        )
+        np.testing.assert_equal(output_state, expected_output_state)
 
-        triton_client.infer(
+        output = triton_client.infer(
             model_name="growable_memory",
             inputs=inputs,
             sequence_id=2,
             sequence_start=False,
             sequence_end=True,
         )
+        output_state = output.as_numpy("OUTPUT_STATE")
+        expected_output_state = np.concatenate(
+            [
+                expected_output_state,
+                np.full(
+                    (expected_output_state.shape[0] // 2,), dtype=np.int8, fill_value=2
+                ),
+            ]
+        )
+        np.testing.assert_equal(output_state, expected_output_state)
 
     def test_no_update(self):
         # Test implicit state without updating any state

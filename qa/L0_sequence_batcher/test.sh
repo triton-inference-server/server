@@ -337,21 +337,22 @@ for MODEL in $MODELS; do
         sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
         sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
 
-    if [ "$USE_SINGLE_BUFFER" == "1" && "$IMPLICIT_STATE" == "1" ]; then
-      SED_REPLACE_PATTERN="N;N;N;N;N;/state.*dims:.*/a use_single_buffer: true"
-      (cd models0/$(basename $MODEL) && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-      (cd models1/$(basename $MODEL) && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-      (cd models2/$(basename $MODEL) && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-      (cd models4/$(basename $MODEL) && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-      (cd queue_delay_models/$(basename $MODEL)_full && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-      (cd queue_delay_models/$(basename $MODEL)_half && \
-        sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
-    fi
+    # TODO: Enable single state buffer testing for sequence batcher
+    # if [ "$USE_SINGLE_BUFFER" == "1" && "$IMPLICIT_STATE" == "1" ]; then
+    #   SED_REPLACE_PATTERN="N;N;N;N;N;/state.*dims:.*/a use_single_buffer: true"
+    #   (cd models0/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models1/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models2/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models4/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd queue_delay_models/$(basename $MODEL)_full && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd queue_delay_models/$(basename $MODEL)_half && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    # fi
   else
     cp -r $MODEL queue_delay_models/$(basename $MODEL)_full && \
       (cd queue_delay_models/$(basename $MODEL)_full && \

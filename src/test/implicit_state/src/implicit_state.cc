@@ -1060,12 +1060,17 @@ TRITONBACKEND_ModelInstanceExecute(
       } break;
       case 3: {
         TRITONBACKEND_State* response_state;
-        std::vector<int64_t> shape{1};
+        size_t block_size = sizeof(int8_t) * 1024 * 1024;
+        int64_t current_elements =
+            (instance_state->request_index_ + 1) * 1024 * 1024;
+        std::cout << "current elements are "
+                  << (instance_state->request_index_ + 1) << std::endl;
+        std::vector<int64_t> shape{current_elements};
         GUARDED_RESPOND_IF_ERROR(
             responses, r, request,
             TRITONBACKEND_StateNew(
                 &response_state, request, "OUTPUT_STATE",
-                TRITONSERVER_TYPE_INT32, shape.data() /* data */,
+                TRITONSERVER_TYPE_INT8, shape.data() /* data */,
                 shape.size() /* dim_count */));
 
         if (responses[r] == nullptr) {
@@ -1081,8 +1086,6 @@ TRITONBACKEND_ModelInstanceExecute(
         int64_t actual_memory_type_id = 0;
         char* buffer;
 
-        size_t block_size = sizeof(int32_t) * 1024 * 1024;
-
         // Request an output buffer in GPU. This is only for testing purposes
         // to make sure that GPU output buffers can be requested.
         GUARDED_RESPOND_IF_ERROR(
@@ -1097,6 +1100,43 @@ TRITONBACKEND_ModelInstanceExecute(
         cudaMemset(
             buffer + block_size * (instance_state->request_index_),
             instance_state->request_index_, block_size);
+
+        TRITONBACKEND_Output* response_output;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_ResponseOutput(
+                responses[r], &response_output, "OUTPUT_STATE",
+                TRITONSERVER_TYPE_INT8, shape.data() /* data */,
+                shape.size() /* dim_count */));
+
+        actual_memory_type = TRITONSERVER_MEMORY_CPU;
+        actual_memory_type_id = 0;
+        char* output_buffer;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_OutputBuffer(
+                response_output, reinterpret_cast<void**>(&output_buffer),
+                block_size * (instance_state->request_index_ + 1),
+                &actual_memory_type, &actual_memory_type_id));
+        if ((responses[r] == nullptr) ||
+            (actual_memory_type != TRITONSERVER_MEMORY_CPU)) {
+          GUARDED_RESPOND_IF_ERROR(
+              responses, r, request,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_UNSUPPORTED,
+                  "the backend can only handle CPU tensors"));
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               "the backend can only handle CPU tensors"
+               "response sent")
+                  .c_str());
+          continue;
+        }
+        cudaMemcpy(
+            output_buffer, buffer,
+            block_size * (instance_state->request_index_ + 1),
+            cudaMemcpyDeviceToHost);
 
         instance_state->state_ = buffer;
       } break;
