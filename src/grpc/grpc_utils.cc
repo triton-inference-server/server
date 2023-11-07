@@ -26,6 +26,9 @@
 
 #include "grpc_utils.h"
 
+#include <chrono>
+#include <thread>
+
 namespace triton { namespace server { namespace grpc {
 
 std::ostream&
@@ -74,7 +77,7 @@ void
 GrpcStatusUtil::Create(::grpc::Status* status, TRITONSERVER_Error* err)
 {
   const char* dstr = getenv("TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC");
-  delay_response = 0;
+  uint64_t delay_response = 0;
   if (dstr != nullptr) {
     delay_response = atoi(dstr);
     // Will delay the write of the response by the specified time.
