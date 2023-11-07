@@ -133,6 +133,9 @@ class ClientTimeoutTest(tu.TestResultCollector):
                 model_name=self.model_name_, client_timeout=self.SMALL_INTERVAL
             )
         self.assertIn("Deadline Exceeded", str(cm.exception))
+        triton_client.unload_model(
+            model_name=self.model_name_, client_timeout=self.NORMAL_INTERVAL
+        )
         triton_client.load_model(
             model_name=self.model_name_, client_timeout=self.NORMAL_INTERVAL
         )
