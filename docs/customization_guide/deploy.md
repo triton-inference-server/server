@@ -112,9 +112,9 @@ described here with basic recommendations.
 
 ###### `--exit-on-error <boolean>, default True`
 
-Exits the inference server if any error occurs during
-initialization. Recommended to set to `True` to catch any
-unanticipated errors.
+   Exits the inference server if any error occurs during
+   initialization. Recommended to set to `True` to catch any
+   unanticipated errors.
 
    *  `--disable-auto-complete-config, default enabled`
 
