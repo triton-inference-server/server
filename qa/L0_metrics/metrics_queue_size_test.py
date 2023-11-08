@@ -223,6 +223,10 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
 
     def test_fail_max_queue_size(self):
         model_name = "max_queue_size"
+        # This test checks whether metrics are properly accounts for requests
+        # that fail to enqueue on the server. The test sets the max_queue_size
+        # and any additional requests beyond the specified queue size should fail
+        # instead of waiting for execution.
         batch_size = self.max_batch_size
         self._test_helper(
             model_name, batch_size, self._send_async_requests, max_queue_size=4
