@@ -38,7 +38,8 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-> [!IMPORTANT] Ultimately the security of a solution based on Triton
+> [!IMPORTANT]
+> Ultimately the security of a solution based on Triton
 > is the responsibility of the developer building and deploying that
 > solution. When deploying in production settings please have security
 > experts review any potential risks and threats.
