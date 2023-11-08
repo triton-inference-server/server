@@ -38,11 +38,21 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
+| [Running with Least Privilege](#running-with-least-privilege) | [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-gateway-or-proxy)
+
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
 > is the responsibility of the developer building and deploying that
 > solution. When deploying in production settings please have security
 > experts review any potential risks and threats.
+
+> [!WARNING]
+> Allowing dynamic updates to the model repository can lead
+> to arbitrary execution attacks. Model repository access control is
+> critical in production deployments. Unless required for operation, recommended
+> to disable dynamic updates. If required, please ensure only trusted entities
+> can add or remove models from a model repository.
+
 
 ## Running with Least Privilege
 
@@ -221,7 +231,7 @@ Directory where cache shared libraries are found.
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty execution attacks.
 
-## Deploying behind a secure Proxy or Gateway
+## Deploying Behind a Secure Proxy or Gateway
 
 The Triton Inference Server is designed primarily as a microservice
 intended to be deployed as part of a larger solution within an
