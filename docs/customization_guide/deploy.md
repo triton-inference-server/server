@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Triton Inference Server Secure Deployment Guide
+# Secure Deployment Considerations
 
 The Triton Inference Server project is designed for flexibility and
 allows developers to create and deploy inferencing solutions in a
