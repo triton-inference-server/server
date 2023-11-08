@@ -56,9 +56,9 @@ consider.
 
 ## Deploying Behind a Secure Proxy or Gateway
 
-The Triton Inference Server is designed primarily as a microservice
-intended to be deployed as part of a larger solution within an
-application framework or service mesh.
+The Triton Inference Server is designed primarily as a microservice to
+be deployed as part of a larger solution within an application
+framework or service mesh.
 
 In such deployments it is typical to utilize dedicated gateway or
 proxy servers to handle authorization, access control, resource
