@@ -38,7 +38,7 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Running with Least Privilege](#running-with-least-privilege) | [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway)
+| [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway) | [Running with Least Privilege](#running-with-least-privilege) |
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
@@ -53,6 +53,35 @@ consider.
 > to disable dynamic updates. If required, please ensure only trusted entities
 > can add or remove models from a model repository.
 
+
+## Deploying Behind a Secure Proxy or Gateway
+
+The Triton Inference Server is designed primarily as a microservice
+intended to be deployed as part of a larger solution within an
+application framework or service mesh.
+
+In such deployments it is typical to utilize dedicated gateway or
+proxy servers to handle authorization, access control, resource
+management, encryption, load balancing, redundancy and many other
+security and availability features.
+
+The full design of such systems is outside the scope of this
+deployment guide but in such scenarios dedicated ingress controllers
+handle access from outside the trusted network while Triton Inference
+Server handles only trusted, validated requests.
+
+In such scenarios Triton Inference Server is not exposed directly to
+an untrusted network.
+
+### References on Secure Deployments
+
+In the following references, Triton Inference Server would be deployed
+as an "Application" or "Service" within the trusted internal network.
+
+* [https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/]
+* [https://istio.io/latest/docs/concepts/security/]
+* [https://konghq.com/blog/enterprise/envoy-service-mesh]
+* [https://www.solo.io/topics/envoy-proxy/]
 
 ## Running with Least Privilege
 
@@ -233,35 +262,6 @@ Directory where cache shared libraries are found.
 > Access to add or remove files from the repoagents directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty execution attacks.
-
-## Deploying Behind a Secure Proxy or Gateway
-
-The Triton Inference Server is designed primarily as a microservice
-intended to be deployed as part of a larger solution within an
-application framework or service mesh.
-
-In such deployments it is typical to utilize dedicated gateway or
-proxy servers to handle authorization, access control, resource
-management, encryption, load balancing, redundancy and many other
-security and availability features.
-
-The full design of such systems is outside the scope of this
-deployment guide but in such scenarios dedicated ingress controllers
-handle access from outside the trusted network while Triton Inference
-Server handles only trusted, validated requests.
-
-In such scenarios Triton Inference Server is not exposed directly to
-an untrusted network.
-
-### References on Secure Deployments
-
-In the following references, Triton Inference Server would be deployed
-as an "Application" or "Service" within the trusted internal network.
-
-* [https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/]
-* [https://istio.io/latest/docs/concepts/security/]
-* [https://konghq.com/blog/enterprise/envoy-service-mesh]
-* [https://www.solo.io/topics/envoy-proxy/]
 
 
 
