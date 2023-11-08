@@ -67,8 +67,9 @@ https://docs.docker.com/engine/security/
 
 Triton's pre-built containers contain a non-root user that can be used
 to launch the tritonserver application with limited permissions. This
-user is created with `user id 1000`. When launching the container
-using docker run the user can be set using `--user triton-server`.
+user, `triton-server` is created with `user id 1000`. When launching
+the container using docker the user can be set with the `--user`
+command line option.
 
 ##### Example Launch Command
 
@@ -76,7 +77,7 @@ using docker run the user can be set using `--user triton-server`.
 docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
 ```
 
-### Restrict and Disable Access to Protocols and APIs
+### 3. Restrict and Disable Access to Protocols and APIs
 
 The pre-built Triton inference server application enables a full set
 of features including health checks, server metadata, inference apis,
@@ -84,17 +85,25 @@ shared memory apis, model and model repository configuration,
 statistics, tracing and logging. Care should be taken to only expose
 those capabilities that are required for your solution.
 
-### Disabling Features at Compile Time
+#### Disabling Features at Compile Time
 
 When building a custom inference server application features can be
 selectively enabled or disabled using the `build.py` script. As an
 example a developer can use the flags `--endpoint http` and
 `--endpoint grpc` to compile support for `http`, `grpc` or
 both. Support for individual backends can be enabled as well. For more
-details please see documentation on building a custom inference server
-application.
+details please see [documentation](build.md) on building a custom
+inference server application.
 
-### Disabling at Launch
+#### Disabling Features at Application Launch
+
+The `tritonserver` application provides a number of command line
+options to enable and disable features when launched. For a full list
+of options please see `tritonserver --help`. The following options are
+ones to take special note of.
+
+##### `--exit-on-error <boolean>, default True`
+
 
 
 
