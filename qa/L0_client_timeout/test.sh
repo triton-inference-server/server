@@ -247,7 +247,20 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 set +e
+export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=1
 for i in test_grpc_load_model \
+         test_grpc_unload_model \
+         test_grpc_inference_statistics \
+         test_grpc_update_trace_settings \
+         test_grpc_get_trace_settings \
+         test_grpc_update_log_settings \
+         test_grpc_get_log_settings \
+         test_grpc_register_system_shared_memory \
+         test_grpc_get_system_shared_memory \
+         test_grpc_unregister_system_shared_memory \
+         test_grpc_register_cuda_shared_memory \
+         test_grpc_get_cuda_shared_memory_status \
+         test_grpc_uregister_cuda_shared_memory \
     ; do
     python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
