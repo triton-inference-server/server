@@ -29,8 +29,6 @@ import sys
 
 sys.path.append("../../common")
 
-import json
-
 # GRPC streaming helpers..
 import queue
 import unittest
