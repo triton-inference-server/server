@@ -110,17 +110,17 @@ options to enable and disable features when launched. For a full list
 of options please see `tritonserver --help`. The following subset are
 described here with basic recommendations.
 
-###### `--exit-on-error <boolean>, default True`
+##### `--exit-on-error <boolean>, default True`
 
-   Exits the inference server if any error occurs during
-   initialization. Recommended to set to `True` to catch any
-   unanticipated errors.
+Exits the inference server if any error occurs during
+initialization. Recommended to set to `True` to catch any
+unanticipated errors.
 
-   *  `--disable-auto-complete-config, default enabled`
+##### `--disable-auto-complete-config, default enabled`
 
-   Disables backends from autocompleting model configuration. If not
-   required for your solution recommended to disable to ensure model
-   configurations are defined statically.
+Disables backends from autocompleting model configuration. If not
+required for your solution recommended to disable to ensure model
+configurations are defined statically.
 
 ##### `--strict-readiness <boolean>, default True`
 
@@ -173,7 +173,8 @@ specific key, value pair shared secret. See
 [limit-endpoint-access](inference_protocols.md#limit-endpoint-access-beta)
 for more information.
 
-> [!Note] Restricting access can be used to limit exposure to model
+> [!Note]
+> Restricting access can be used to limit exposure to model
 > control APIs to trusted users.
 
 ##### `--http-restricted-api <<string>:<string>=<string>>`
@@ -183,7 +184,8 @@ specific key, value pair shared secret. See
 [limit-endpoint-access](inference_protocols.md#limit-endpoint-access-beta)
 for more information.
 
-> [!Note] Restricting access can be used to limit exposure to model
+> [!Note]
+> Restricting access can be used to limit exposure to model
 > control APIs to trusted users.
 
 ##### `--allow-sagemaker <boolean> default False`
