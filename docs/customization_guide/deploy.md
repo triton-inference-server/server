@@ -38,10 +38,79 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-> [!IMPORTANT]
-> Ultimately the security of a solution based on Triton
+> [!IMPORTANT] Ultimately the security of a solution based on Triton
 > is the responsibility of the developer building and deploying that
-> solution.
+> solution. When deploying in production settings please have security
+> experts review any potential risks and threats.
+
+## Running with Least Privilege
+
+The security principle of least privilege advocates that a process be
+granted the minimum permissions required to do its job.
+
+For an inference solution based on Triton Inference Server there are a
+number of ways to reduce security risks by limiting the permissions
+and capabilities of the server to the minimum required for correct
+operation.
+
+### Follow Best Practices for Launching Docker Containers
+
+When Triton is deployed as a containerized service, standard docker
+security practices apply. This includes limiting the resources that a
+container has access to as well as limiting network access to the
+container.
+
+https://docs.docker.com/engine/security/
+
+###  Running as a Non-Root User
+
+Triton's pre-built containers contain a non-root user that can be used
+to launch the tritonserver application with limited permissions. This
+user is created with `user id 1000`. When launching the container
+using docker run the user can be set using `--user triton-server`.
+
+##### Example Launch Command
+
+```
+docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
+```
+
+### Restrict and Disable Access to Protocols and APIs
+
+The pre-built Triton inference server application enables a full set
+of features including health checks, server metadata, inference apis,
+shared memory apis, model and model repository configuration,
+statistics, tracing and logging. Care should be taken to only expose
+those capabilities that are required for your solution.
+
+### Disabling Features at Compile Time
+
+When building a custom inference server application features can be
+selectively enabled or disabled using the `build.py` script. As an
+example a developer can use the flags `--endpoint http` and
+`--endpoint grpc` to compile support for `http`, `grpc` or
+both. Support for individual backends can be enabled as well. For more
+details please see documentation on building a custom inference server
+application.
+
+### Disabling at Launch
+
+
+
+
+https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/inference_protocols.html#limit-endpoint-access-beta
+
+
+
+
+https://www.digitalguardian.com/blog/what-principle-least-privilege-polp-best-practice-information-security-and-compliance#:~:text=The%20principle%20of%20least%20privilege%20works%20by%20allowing%20only%20enough,account%2C%20device%2C%20or%20application.
+
+
+
+Least Privilege: Allow running code only the permissions needed to
+complete the required tasks and no more. The intent of the least
+privileged principle is to reduce the "Exploitability" by minimizing
+the privilege proliferation.
 
 ##
 
@@ -49,4 +118,14 @@ consider.
 
 ##
 
-##
+
+
+https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/
+
+
+https://istio.io/latest/docs/concepts/security/
+
+https://konghq.com/blog/enterprise/envoy-service-mesh
+
+https://www.solo.io/topics/envoy-proxy/
+
