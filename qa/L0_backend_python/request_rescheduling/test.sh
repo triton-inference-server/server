@@ -83,6 +83,25 @@ else
 fi
 set -e
 
+GRPC_TEST_PY=./grpc_endpoint_test.py
+EXPECTED_NUM_TESTS="2"
+
+set +e
+python3 $GRPC_TEST_PY >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** GRPC Endpoint test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 

@@ -31,7 +31,16 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-class REQUESTRESCHEDULETest(unittest.TestCase):
+class REQUESTRESCHEDULINGTest(unittest.TestCase):
+    def _reload_model(self, model_name):
+        # Reload the model to reset the flag for multiple iterations
+        pb_utils.unload_model(model_name)
+        # TODO: Make this more robust to wait until fully unloaded
+        print("Sleep 10 seconds to make sure model finishes unloading...", flush=True)
+        time.sleep(10)
+        print("Done sleeping.", flush=True)
+        pb_utils.load_model(model_name)
+
     def test_wrong_return_type(self):
         input0 = pb_utils.Tensor("INPUT0", (np.random.randn(*[4])).astype(np.float32))
         infer_request = pb_utils.InferenceRequest(
@@ -48,6 +57,9 @@ class REQUESTRESCHEDULETest(unittest.TestCase):
         )
 
     def test_non_decoupled_e2e(self):
+        model_name = "request_rescheduling_addsub"
+        self._reload_model(model_name)
+
         input0_np = np.random.randn(*[16])
         input0_np = input0_np.astype(np.float32)
         input1_np = np.random.randn(*[16])
@@ -55,7 +67,7 @@ class REQUESTRESCHEDULETest(unittest.TestCase):
         input0 = pb_utils.Tensor("INPUT0", input0_np)
         input1 = pb_utils.Tensor("INPUT1", input1_np)
         infer_request = pb_utils.InferenceRequest(
-            model_name="request_rescheduling_addsub",
+            model_name=model_name,
             inputs=[input0, input1],
             requested_output_names=["OUTPUT0", "OUTPUT1"],
         )
@@ -77,13 +89,7 @@ class REQUESTRESCHEDULETest(unittest.TestCase):
 
     def test_decoupled_e2e(self):
         model_name = "generative_sequence"
-        # Reload the model to reset the flag for multiple iterations
-        pb_utils.unload_model(model_name)
-        # TODO: Make this more robust to wait until fully unloaded
-        print("Sleep 10 seconds to make sure model finishes unloading...", flush=True)
-        time.sleep(10)
-        print("Done sleeping.", flush=True)
-        pb_utils.load_model(model_name)
+        self._reload_model(model_name)
 
         input_value = 3
         input0 = pb_utils.Tensor("IN", np.array([input_value], dtype=np.int32))
