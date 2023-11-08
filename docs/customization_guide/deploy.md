@@ -87,7 +87,7 @@ consider.
 
 ### 3. Restrict or Disable Access to Protocols and APIs
 
-The pre-built Triton Inference Server application enables a full set
+The pre-built Triton Inference Serrver application enables a full set
 of features including health checks, server metadata, inference apis,
 shared memory apis, model and model repository configuration,
 statistics, tracing and logging. Care should be taken to only expose
@@ -107,9 +107,10 @@ inference server application.
 
 The `tritonserver` application provides a number of command line
 options to enable and disable features when launched. For a full list
-of options please see `tritonserver --help`. The following options are highlighted.
+of options please see `tritonserver --help`. The following subset are
+described here with basic recommendations.
 
-##### `--exit-on-error <boolean>, default True`
+###### `--exit-on-error <boolean>, default True`
 
 Exits the inference server if any error occurs during
 initialization. Recommended to set to `True` to catch any
