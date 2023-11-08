@@ -325,6 +325,10 @@ DYNAMIC_MODEL="${MODELDIR}/dynamic"
 cp -r "${DEFAULT_MODEL}" "${DYNAMIC_MODEL}"
 echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US} }\n" >> "${DYNAMIC_MODEL}/config.pbtxt"
 
+MAX_QUEUE_SIZE_MODEL="${MODELDIR}/max_queue_size"
+cp -r "${DEFAULT_MODEL}" "${MAX_QUEUE_SIZE_MODEL}"
+echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US} default_queue_policy { max_queue_size: 4 } }\n" >> "${MAX_QUEUE_SIZE_MODEL}/config.pbtxt"
+
 SEQUENCE_DIRECT_MODEL="${MODELDIR}/sequence_direct"
 cp -r "${DEFAULT_MODEL}" "${SEQUENCE_DIRECT_MODEL}"
 echo -e "\nsequence_batching { direct { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US}, minimum_slot_utilization: 1.0 } }\n" >> "${SEQUENCE_DIRECT_MODEL}/config.pbtxt"
@@ -347,7 +351,7 @@ run_and_check_server
 python3 ${PYTHON_TEST} 2>&1 | tee ${CLIENT_LOG}
 kill $SERVER_PID
 wait $SERVER_PID
-expected_tests=5
+expected_tests=6
 check_unit_test "${expected_tests}"
 
 if [ $RET -eq 0 ]; then
