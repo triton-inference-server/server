@@ -194,7 +194,9 @@ Enable Sagemaker request handling. Recommended to set to `False` unless required
 
 ##### `--allow-vertex-ai <boolean> default depends on environment variable`
 
-Enable Vertex AI request handling. Default is `True` if `AIP_MODE=PREDICTION`, false otherwise.
+Enable Vertex AI request handling. Default is `True` if
+`AIP_MODE=PREDICTION`, `False` otherwise. Recommended to set to
+`False` unless required.
 
 ##### `--allow-metrics <boolean> default True`
 
