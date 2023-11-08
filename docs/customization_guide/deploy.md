@@ -56,22 +56,22 @@ consider.
 
 ## Running with Least Privilege
 
-The security principle of least privilege advocates that a process be
-granted the minimum permissions required to do its job.
+  The security principle of least privilege advocates that a process be
+  granted the minimum permissions required to do its job.
 
-For an inference solution based on Triton Inference Server there are a
-number of ways to reduce security risks by limiting the permissions
-and capabilities of the server to the minimum required for correct
-operation.
+  For an inference solution based on Triton Inference Server there are a
+  number of ways to reduce security risks by limiting the permissions
+  and capabilities of the server to the minimum required for correct
+  operation.
 
 ### 1. Follow Best Practices for Launching Docker Containers
 
-When Triton is deployed as a containerized service, standard docker
-security practices apply. This includes limiting the resources that a
-container has access to as well as limiting network access to the
-container.
+  When Triton is deployed as a containerized service, standard docker
+  security practices apply. This includes limiting the resources that a
+  container has access to as well as limiting network access to the
+  container.
 
-https://docs.docker.com/engine/security/
+  https://docs.docker.com/engine/security/
 
 ### 2. Run as a Non-Root User
 
