@@ -116,7 +116,7 @@ Exits the inference server if any error occurs during
 initialization. Recommended to set to `True` to catch any
 unanticipated errors.
 
-##### `--disable-auto-complete-config, default enabled`
+   *  `--disable-auto-complete-config, default enabled`
 
 Disables backends from autocompleting model configuration. If not
 required for your solution recommended to disable to ensure model
