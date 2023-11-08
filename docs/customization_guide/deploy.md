@@ -165,7 +165,7 @@ Specifies the mode for model management.
 > [!WARNING]
 > Allowing dynamic updates to the model repository can lead
 > to arbitrary code execution. Model repository access control is
-> critical in production deployments. Unless required for operation, recommended
+> critical in production deployments. Unless required for operation, it's recommended
 > to disable dynamic updates. If required, please ensure only trusted entities
 > can add or remove models from a model repository.
 
