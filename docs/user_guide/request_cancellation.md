@@ -28,7 +28,7 @@
 
 # Request Cancellation
 
-Starting from r23.10, Triton supports handling request cancellation received
+Starting from r23.11, Triton supports handling request cancellation received
 from the gRPC client or a C API user. Long running inference requests such
 as for auto generative large language models may run for an indeterminate
 amount of time or indeterminate number of steps. Additionally clients may
