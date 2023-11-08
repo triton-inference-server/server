@@ -164,7 +164,7 @@ Specifies the mode for model management.
 
 > [!WARNING]
 > Allowing dynamic updates to the model repository can lead
-> to arbitrary execution attacks. Model repository access control is
+> to arbitrary code execution. Model repository access control is
 > critical in production deployments. Unless required for operation, recommended
 > to disable dynamic updates. If required, please ensure only trusted entities
 > can add or remove models from a model repository.
@@ -244,7 +244,7 @@ Directory where backend shared libraries are found.
 > [!Warning]
 > Access to add or remove files from the backends directory
 > must be access controlled. Adding untrusted files
-> can lead to arbitrarty execution attacks.
+> can lead to arbitrarty code execution.
 
 ##### `repoagent-directory <string> default /opt/tritonserver/repoagents`
 Directory where repository agent shared libraries are found.
@@ -252,7 +252,7 @@ Directory where repository agent shared libraries are found.
 > [!Warning]
 > Access to add or remove files from the repoagents directory
 > must be access controlled. Adding untrusted files
-> can lead to arbitrarty execution attacks.
+> can lead to arbitrarty code execution.
 
 ##### `cache-directory <string> default /opt/tritonserver/caches`
 
@@ -261,7 +261,7 @@ Directory where cache shared libraries are found.
 > [!Warning]
 > Access to add or remove files from the repoagents directory
 > must be access controlled. Adding untrusted files
-> can lead to arbitrarty execution attacks.
+> can lead to arbitrarty code execution.
 
 
 
