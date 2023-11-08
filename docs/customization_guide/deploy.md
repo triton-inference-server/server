@@ -122,44 +122,138 @@ initialization is complete and server is healthy.
 
 ##### `--model-control-mode <string>, default "none"`
 
+Specifies the mode for model management.
+
 > [!WARNING]
-> Allowing dynamic updates to the model repository
-> can lead to arbitrary execution attacks. Model repository
-> access control is critical in production deployments.
+> Allowing dynamic updates to the model repository can lead
+> to arbitrary execution attacks. Model repository access control is
+> critical in production deployments. Unless required for operation, recommended
+> to disable dynamic updates. If required, please ensure only trusted entities
+> can add or remove models from a model repository.
 
-Specify the mode for model management.
+Options:
 
- * `none`
+ * `none`- Models are loaded at start up and can not be modified.
+ * `poll`- Server process will poll the model repository for changes.
+ * `explicit` - Models can be loaded and unloaded via the model control APIs.
+
+Recommended to set to `none` unless dynamic updates are required. If
+dynamic updates are required care must be taken to control access to
+the model repository files and load and unload APIs.
+
+##### `--allow-http <boolean>, default True`
+
+Enable HTTP request handling. Recommended to set to `False` if not required.
+
+##### `--allow-grpc <boolean>, default True`
+
+Enable gRPC request handling. Recommended to set to `False` if not required.
+
+##### `--grpc-use-ssl <boolean> default False`
+
+Use SSL authentication for gRPC requests. Recommended to set to `True` if service is not protected by a gateway or proxy.
+
+##### `--grpc-use-ssl-mutual <boolean> default False`
+
+Use mutual SSL authentication for gRPC requests. Recommended to set to `True` if service is not protected by a gateway or proxy.
+
+##### `--grpc-restricted-protocol <<string>:<string>=<string>>`
+
+Restrict access to specific gRPC protocol categories to users with
+specific key, value pair shared secret. See
+[limit-endpoint-access](inference_protocols.md#limit-endpoint-access-beta)
+for more information.
+
+> [!Note] Restricting access can be used to limit exposure to model
+> control APIs to trusted users.
+
+##### `--http-restricted-api <<string>:<string>=<string>>`
+
+Restrict access to specific HTTP API categories to users with
+specific key, value pair shared secret. See
+[limit-endpoint-access](inference_protocols.md#limit-endpoint-access-beta)
+for more information.
+
+> [!Note] Restricting access can be used to limit exposure to model
+> control APIs to trusted users.
+
+##### `--allow-sagemaker <boolean> default False`
+
+Enable Sagemaker request handling. Recommended to set to `False` unless required.
+
+##### `--allow-vertex-ai <boolean> default depends on environment variable`
+
+Enable Vertex AI request handling. Default is `True` if `AIP_MODE=PREDICTION`, false otherwise.
+
+##### `--allow-metrics <boolean> default True`
+
+Allow server to publish prometheus style metrics. Recommended to set
+to `False` if not required to avoid capturing or exposing any sensitive information.
+
+#### `--trace-config level=<string> default "off"`
+
+Tracing mode. Trace mode supports `triton` and `opentelemetry`. Unless required `--trace-config level=off` should be set to avoid capturing or exposing any sensitive information.
 
 
-https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/inference_protocols.html#limit-endpoint-access-beta
+##### `backend-directory <string> default /opt/tritonserver/backends`
+
+Directory where backend shared libraries are found.
+
+> ![Warning]
+> Access to add or remove files from the backends directory
+> must be access controlled. Adding untrusted files
+> can lead to arbitrarty execution attacks.
+
+##### `repoagent-directory <string> default /opt/tritonserver/repoagents`
+Directory where repository agent shared libraries are found.
+
+> ![Warning]
+> Access to add or remove files from the repoagents directory
+> must be access controlled. Adding untrusted files
+> can lead to arbitrarty execution attacks.
+
+##### `cache-directory <string> default /opt/tritonserver/caches`
+
+Directory where cache shared libraries are found.
+
+> ![Warning]
+> Access to add or remove files from the repoagents directory
+> must be access controlled. Adding untrusted files
+> can lead to arbitrarty execution attacks.
+
+## Deploying behind a secure Proxy or Gateway
+
+The Triton Inference Server is designed primarily as a microservice
+intended to be deployed as part of a larger solution within an
+application framework or service mesh.
+
+In such deployments it is typical to utilize dedicated gateway or
+proxy servers to handle authorization, access control, resource
+management, encryption, load balancing, redundancy and many other
+security and availability features.
+
+The full design of such systems is outside the scope of this
+deployment guide but in such scenarios dedicated ingress controllers
+handle access from outside the trusted network while Triton Inference
+Server handles only trusted, validated requests.
+
+In such scenarios Triton Inference Server is not exposed directly to
+an untrusted network.
+
+### References on Secure Deployments
+
+In the following references, Triton Inference Server would be deployed
+as an "Application" or "Service" within the trusted internal network.
+
+* [https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/]
+* [https://istio.io/latest/docs/concepts/security/]
+* [https://konghq.com/blog/enterprise/envoy-service-mesh]
+* [https://www.solo.io/topics/envoy-proxy/]
 
 
 
 
-https://www.digitalguardian.com/blog/what-principle-least-privilege-polp-best-practice-information-security-and-compliance#:~:text=The%20principle%20of%20least%20privilege%20works%20by%20allowing%20only%20enough,account%2C%20device%2C%20or%20application.
 
 
 
-Least Privilege: Allow running code only the permissions needed to
-complete the required tasks and no more. The intent of the least
-privileged principle is to reduce the "Exploitability" by minimizing
-the privilege proliferation.
-
-##
-
-##
-
-##
-
-
-
-https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/
-
-
-https://istio.io/latest/docs/concepts/security/
-
-https://konghq.com/blog/enterprise/envoy-service-mesh
-
-https://www.solo.io/topics/envoy-proxy/
 
