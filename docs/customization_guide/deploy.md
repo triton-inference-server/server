@@ -69,23 +69,21 @@ consider.
   When Triton is deployed as a containerized service, standard docker
   security practices apply. This includes limiting the resources that a
   container has access to as well as limiting network access to the
-  container.
-
-  https://docs.docker.com/engine/security/
+  container. https://docs.docker.com/engine/security/
 
 ### 2. Run as a Non-Root User
 
-Triton's pre-built containers contain a non-root user that can be used
-to launch the tritonserver application with limited permissions. This
-user, `triton-server` is created with `user id 1000`. When launching
-the container using docker the user can be set with the `--user`
-command line option.
+   Triton's pre-built containers contain a non-root user that can be used
+   to launch the tritonserver application with limited permissions. This
+   user, `triton-server` is created with `user id 1000`. When launching
+   the container using docker the user can be set with the `--user`
+   command line option.
 
 ##### Example Launch Command
 
-```
-docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
-```
+   ```
+   docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
+   ```
 
 ### 3. Restrict and Disable Access to Protocols and APIs
 
