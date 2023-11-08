@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Deploying a Triton Inference Server
+# Security Considerations in Deploying a Triton Inference Server
 
 The Triton Inference Server project is designed for flexibility and
 allows developers to create and deploy inferencing solutions in a
@@ -54,7 +54,7 @@ number of ways to reduce security risks by limiting the permissions
 and capabilities of the server to the minimum required for correct
 operation.
 
-### Follow Best Practices for Launching Docker Containers
+### 1. Follow Best Practices for Launching Docker Containers
 
 When Triton is deployed as a containerized service, standard docker
 security practices apply. This includes limiting the resources that a
@@ -63,7 +63,7 @@ container.
 
 https://docs.docker.com/engine/security/
 
-###  Running as a Non-Root User
+### 2. Run as a Non-Root User
 
 Triton's pre-built containers contain a non-root user that can be used
 to launch the tritonserver application with limited permissions. This
