@@ -86,7 +86,7 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
         # Test specific configurations
         self.max_queue_size = 0
 
-    def _validate_model_config(self, model_name, max_queue_size = 0):
+    def _validate_model_config(self, model_name, max_queue_size=0):
         config = self.client.get_model_config(model_name)
         print(config)
         params = config.get("parameters", {})
@@ -158,7 +158,9 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
             )
             num_sent += 1
 
-    def _test_helper(self, model_name, batch_size, send_requests_func, max_queue_size = 0):
+    def _test_helper(
+        self, model_name, batch_size, send_requests_func, max_queue_size=0
+    ):
         self._validate_model_config(model_name, max_queue_size=max_queue_size)
 
         queue_size = QUEUE_METRIC_TEMPLATE.format(model_name=model_name)
@@ -172,14 +174,16 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
         # Give Triton a second to load all requests into queues
         time.sleep(1)
 
+        # Start from (num_requests-batch_size) because 1 batch should be executing,
+        # and the rest of the requests should be queued.
+        # If max_queue_size is specified then the queued requests would be capped
+        # at max_queue_size.
         if max_queue_size != 0:
             self._assert_metric_equals(queue_size, max_queue_size)
             starting_queue_size = max_queue_size
         else:
             starting_queue_size = self.num_requests - batch_size
 
-        # Start from (num_requests-batch_size) because 1 batch should be executing,
-        # and the rest of the requests should be queued.
         for expected_queue_size in range(starting_queue_size, 0, -1 * batch_size):
             self._assert_metric_equals(queue_size, expected_queue_size)
             time.sleep(self.delay_sec)
@@ -191,7 +195,7 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
         # All requests should've been executed without any batching
         expected_infer_count = starting_queue_size + batch_size
         self._assert_metric_equals(infer_count, expected_infer_count)
-        expected_exec_count = math.ceil(expected_infer_count/ batch_size)
+        expected_exec_count = math.ceil(expected_infer_count / batch_size)
         self._assert_metric_equals(exec_count, expected_exec_count)
 
         failed_count = 0
@@ -201,8 +205,9 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
             except Exception as e:
                 failed_count = failed_count + 1
 
-        self.assertEqual(failed_count, self.num_requests - batch_size - starting_queue_size)
-
+        self.assertEqual(
+            failed_count, self.num_requests - batch_size - starting_queue_size
+        )
 
     def test_default_scheduler(self):
         model_name = "default"
@@ -219,7 +224,9 @@ class MetricsPendingRequestCountTest(tu.TestResultCollector):
     def test_fail_max_queue_size(self):
         model_name = "max_queue_size"
         batch_size = self.max_batch_size
-        self._test_helper(model_name, batch_size, self._send_async_requests, max_queue_size=4)
+        self._test_helper(
+            model_name, batch_size, self._send_async_requests, max_queue_size=4
+        )
 
     def test_sequence_batch_scheduler_direct(self):
         model_name = "sequence_direct"
