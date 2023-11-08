@@ -85,7 +85,7 @@ consider.
    docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
    ```
 
-### 3. Restrict and Disable Access to Protocols and APIs
+### 3. Restrict or Disable Access to Unrequired Protocols and APIs
 
 The pre-built Triton inference server application enables a full set
 of features including health checks, server metadata, inference apis,
