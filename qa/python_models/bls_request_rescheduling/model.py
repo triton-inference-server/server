@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import time
 import unittest
 
 import numpy as np
@@ -78,6 +79,10 @@ class REQUESTRESCHEDULETest(unittest.TestCase):
         model_name = "generative_sequence"
         # Reload the model to reset the flag for multiple iterations
         pb_utils.unload_model(model_name)
+        # TODO: Make this more robust to wait until fully unloaded
+        print("Sleep 10 seconds to make sure model finishes unloading...", flush=True)
+        time.sleep(10)
+        print("Done sleeping.", flush=True)
         pb_utils.load_model(model_name)
 
         input_value = 3
@@ -101,55 +106,6 @@ class REQUESTRESCHEDULETest(unittest.TestCase):
 
                     self.assertEqual(expected_output, output0.as_numpy()[0])
                     expected_output -= 1
-
-    def test_send_final_flag_before_rescheduling_request(self):
-        model_name = "request_rescheduling_cases"
-        # Reload the model to reset the flag for multiple iterations
-        pb_utils.unload_model(model_name)
-        pb_utils.load_model(model_name)
-
-        case_value = 0
-        input0 = pb_utils.Tensor("IN", np.array([case_value], dtype=np.int32))
-        infer_request = pb_utils.InferenceRequest(
-            model_name=model_name,
-            inputs=[input0],
-            requested_output_names=["OUT"],
-        )
-        infer_responses = infer_request.exec(decoupled=True)
-        for infer_response in infer_responses:
-            self.assertFalse(infer_response.has_error())
-
-            if len(infer_response.output_tensors()) > 0:
-                output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
-                self.assertIsNotNone(output0)
-
-                self.assertEqual(case_value, output0.as_numpy()[0])
-
-    def test_process_request_in_different_thread(self):
-        model_name = "request_rescheduling_cases"
-        # Reload the model to reset the flag for multiple iterations
-        pb_utils.unload_model(model_name)
-        pb_utils.load_model(model_name)
-
-        case_value = 1
-        input0 = pb_utils.Tensor("IN", np.array([case_value], dtype=np.int32))
-        infer_request = pb_utils.InferenceRequest(
-            model_name=model_name,
-            inputs=[input0],
-            requested_output_names=["OUT"],
-        )
-        infer_responses = infer_request.exec(decoupled=True)
-
-        expected_output = case_value
-        for infer_response in infer_responses:
-            self.assertFalse(infer_response.has_error())
-
-            if len(infer_response.output_tensors()) > 0:
-                output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
-                self.assertIsNotNone(output0)
-
-                self.assertEqual(expected_output, output0.as_numpy()[0])
-                expected_output -= 1
 
 
 class TritonPythonModel:

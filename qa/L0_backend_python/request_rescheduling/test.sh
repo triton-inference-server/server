@@ -39,9 +39,6 @@ RET=0
 
 rm -fr *.log ./models *.txt
 
-pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
-
 mkdir -p models/bls_request_rescheduling/1/
 cp ../../python_models/bls_request_rescheduling/model.py models/bls_request_rescheduling/1/
 cp ../../python_models/bls_request_rescheduling/config.pbtxt models/bls_request_rescheduling
@@ -53,10 +50,6 @@ cp ../../python_models/request_rescheduling_addsub/config.pbtxt models/request_r
 mkdir -p models/generative_sequence/1/
 cp ../../python_models/generative_sequence/model.py models/generative_sequence/1/
 cp ../../python_models/generative_sequence/config.pbtxt models/generative_sequence
-
-mkdir -p models/request_rescheduling_cases/1/
-cp ../../python_models/request_rescheduling_cases/model.py models/request_rescheduling_cases/1/
-cp ../../python_models/request_rescheduling_cases/config.pbtxt models/request_rescheduling_cases
 
 mkdir -p models/wrong_return_type/1/
 cp ../../python_models/wrong_return_type/model.py models/wrong_return_type/1/

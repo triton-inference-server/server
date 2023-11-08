@@ -76,7 +76,7 @@ class PythonUnittest(tu.TestResultCollector):
                 self._run_unittest(model_name)
 
                 # [FIXME] See DLIS-3684
-                # self._run_unittest(model_name)
+                self._run_unittest(model_name)
                 with self._shm_leak_detector.Probe() as shm_probe:
                     self._run_unittest(model_name)
             else:
