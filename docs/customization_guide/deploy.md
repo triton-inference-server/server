@@ -38,7 +38,7 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Running with Least Privilege](#running-with-least-privilege) | [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-gateway-or-proxy)
+| [Running with Least Privilege](#running-with-least-privilege) | [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway)
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
