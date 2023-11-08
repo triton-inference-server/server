@@ -118,9 +118,9 @@ described here with basic recommendations.
 
    *  `--disable-auto-complete-config, default enabled`
 
-Disables backends from autocompleting model configuration. If not
-required for your solution recommended to disable to ensure model
-configurations are defined statically.
+   Disables backends from autocompleting model configuration. If not
+   required for your solution recommended to disable to ensure model
+   configurations are defined statically.
 
 ##### `--strict-readiness <boolean>, default True`
 
