@@ -132,7 +132,7 @@ both. Support for individual backends can be enabled as well. For more
 details please see [documentation](build.md) on building a custom
 inference server application.
 
-#### Disabling Features at Application Launch
+#### Disabling / Restricting Features at Run Time
 
 The `tritonserver` application provides a number of command line
 options to enable and disable features when launched. For a full list
@@ -241,7 +241,7 @@ Tracing mode. Trace mode supports `triton` and `opentelemetry`. Unless required 
 
 Directory where backend shared libraries are found.
 
-> ![Warning]
+> [!Warning]
 > Access to add or remove files from the backends directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty execution attacks.
@@ -249,7 +249,7 @@ Directory where backend shared libraries are found.
 ##### `repoagent-directory <string> default /opt/tritonserver/repoagents`
 Directory where repository agent shared libraries are found.
 
-> ![Warning]
+> [!Warning]
 > Access to add or remove files from the repoagents directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty execution attacks.
@@ -258,13 +258,10 @@ Directory where repository agent shared libraries are found.
 
 Directory where cache shared libraries are found.
 
-> ![Warning]
+> [!Warning]
 > Access to add or remove files from the repoagents directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty execution attacks.
-
-
-
 
 
 
