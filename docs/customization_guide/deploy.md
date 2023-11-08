@@ -48,7 +48,7 @@ consider.
 
 > [!WARNING]
 > Allowing dynamic updates to the model repository can lead
-> to arbitrary execution attacks. Model repository access control is
+> to arbitrary code execution. Model repository access control is
 > critical in production deployments. Unless required for operation, recommended
 > to disable dynamic updates. If required, please ensure only trusted entities
 > can add or remove models from a model repository.
