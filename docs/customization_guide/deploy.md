@@ -99,13 +99,37 @@ inference server application.
 
 The `tritonserver` application provides a number of command line
 options to enable and disable features when launched. For a full list
-of options please see `tritonserver --help`. The following options are
-ones to take special note of.
+of options please see `tritonserver --help`. The following options are highlighted.
 
 ##### `--exit-on-error <boolean>, default True`
 
+Exits the inference server if any error occurs during
+initialization. Recommended to set to `True` to catch any
+unanticipated errors.
 
+##### `--disable-auto-complete-config, default enabled`
 
+Disables backends from autocompleting model configuration. If not
+required for your solution recommended to disable to ensure model
+configurations are defined statically.
+
+##### `--strict-readiness <boolean>, default True`
+
+If set to true `/v2/health/ready` will only report ready when all
+selected models are loaded. Recommended to set to `True` to provide a
+signal to other services and orchestration frameworks when full
+initialization is complete and server is healthy.
+
+##### `--model-control-mode <string>, default "none"`
+
+> [!WARNING]
+> Allowing dynamic updates to the model repository
+> can lead to arbitrary execution attacks. Model repository
+> access control is critical in production deployments.
+
+Specify the mode for model management.
+
+ * `none`
 
 
 https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/inference_protocols.html#limit-endpoint-access-beta
