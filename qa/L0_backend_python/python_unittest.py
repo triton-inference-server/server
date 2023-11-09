@@ -68,6 +68,7 @@ class PythonUnittest(tu.TestResultCollector):
                 model_name == "bls"
                 or model_name == "bls_memory"
                 or model_name == "bls_memory_async"
+                or model_name == "bls_request_rescheduling"
             ):
                 # For these tests, the memory region size will be grown. Because of
                 # this we need to use the shared memory probe only on the later

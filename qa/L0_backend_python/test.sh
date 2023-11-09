@@ -423,7 +423,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
+SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics request_rescheduling"
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
