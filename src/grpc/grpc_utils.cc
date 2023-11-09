@@ -77,18 +77,6 @@ operator<<(std::ostream& out, const Steps& step)
 void
 GrpcStatusUtil::Create(::grpc::Status* status, TRITONSERVER_Error* err)
 {
-  const char* dstr = getenv("TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC");
-  uint64_t delay_response = 0;
-  if (dstr != nullptr) {
-    delay_response = atoi(dstr);
-    // Will delay the write of the response by the specified time.
-    // This can be used to test the flow where there are other
-    // responses available to be written.
-    LOG_VERBOSE(1) << "Delaying the write of the response by " << delay_response
-                   << " seconds";
-    std::this_thread::sleep_for(std::chrono::seconds(delay_response));
-  }
-
   if (err == nullptr) {
     *status = ::grpc::Status::OK;
   } else {

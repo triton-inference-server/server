@@ -40,7 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 TIMEOUT_VALUE=100000000
-SHORT_TIMEOUT_VALUE=1000
+SHORT_TIMEOUT_VALUE=1
 RET=0
 
 CLIENT_TIMEOUT_TEST=client_timeout_test.py
@@ -60,7 +60,7 @@ source ../common/util.sh
 mkdir -p $DATADIR/custom_identity_int32/1
 
 # Test all APIs apart from Infer.
-export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=1
+export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -70,14 +70,10 @@ fi
 
 set +e
 # Expect timeout for everything
-sed -i 's#value: { string_value: "0" }#value: { string_value: "1" }#' $DATADIR/custom_identity_int32/config.pbtxt
 $CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -i grpc -p >> ${CLIENT_LOG}.c++.grpc_non_infer_apis 2>&1
-if [ $? -eq 0 ]; then
-    RET=1
-fi
-if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_non_infer_apis` != "1" ]; then
+if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_non_infer_apis` != "18" ]; then
     cat ${CLIENT_LOG}.c++.grpc_non_infer_apis
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Test Failed. Expected 18 failed\n***"
     RET=1
 fi
 # Test all APIs with long timeout
@@ -92,9 +88,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test infer APIs
-export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=
+unset TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC
 SERVER_ARGS="--model-repository=$DATADIR"
-sed -i 's#value: { string_value: "1" }#value: { string_value: "0" }#' $DATADIR/custom_identity_int32/config.pbtxt
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -240,9 +235,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test all APIs other than infer
-export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=1
+export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
 SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model=custom_identity_int32 --log-verbose 2"
-sed -i 's#value: { string_value: "0" }#value: { string_value: "1" }#' $DATADIR/custom_identity_int32/config.pbtxt
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
