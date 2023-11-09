@@ -39,7 +39,6 @@ import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-from tritonclient import utils
 from tritonclient.utils import InferenceServerException
 
 
