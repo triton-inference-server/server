@@ -35,7 +35,6 @@ import unittest
 from functools import partial
 
 import numpy as np
-import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
