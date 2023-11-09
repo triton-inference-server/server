@@ -52,7 +52,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class GRPCENDPOINTTest(tu.TestResultCollector):
+class GrpcEndpointTest(tu.TestResultCollector):
     def test_grpc_decoupled(self, sequence_id=0, sequence_start=False):
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
