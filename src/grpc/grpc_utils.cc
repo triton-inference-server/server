@@ -27,6 +27,7 @@
 #include "grpc_utils.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <thread>
 
 namespace triton { namespace server { namespace grpc {
@@ -83,8 +84,8 @@ GrpcStatusUtil::Create(::grpc::Status* status, TRITONSERVER_Error* err)
     // Will delay the write of the response by the specified time.
     // This can be used to test the flow where there are other
     // responses available to be written.
-    LOG_INFO << "Delaying the write of the response by " << delay_response
-             << " seconds";
+    LOG_VERBOSE(1) << "Delaying the write of the response by " << delay_response
+                   << " seconds";
     std::this_thread::sleep_for(std::chrono::seconds(delay_response));
   }
 
