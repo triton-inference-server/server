@@ -1024,6 +1024,7 @@ RUN apt-get update && \
             libarchive-dev \
             libxml2-dev \
             libnuma-dev && \
+            wget \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
@@ -1255,6 +1256,7 @@ RUN apt-get update && \
             libnuma-dev \
             curl \
             libjemalloc-dev \
+            wget \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 
