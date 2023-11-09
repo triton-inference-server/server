@@ -62,7 +62,7 @@ sequence_batching {
         output_name: "OUTPUT_STATE"
         data_type: TYPE_INT8
         dims: [1024, 1024]
-        use_single_buffer: true
+        use_same_buffer_for_input_output: true
         use_growable_memory: true
     }
   ]
