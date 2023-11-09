@@ -96,7 +96,7 @@ for BACKEND in $BACKENDS; do
 done
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --cuda-virtual-address-size=0:$((1024*1024*4))"
 IMPLICIT_STATE_CLIENT='implicit_state.py'
 EXPECTED_TEST_NUM=6
 rm -rf $CLIENT_LOG

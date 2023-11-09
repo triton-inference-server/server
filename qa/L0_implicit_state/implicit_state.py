@@ -144,7 +144,7 @@ class ImplicitStateTest(tu.TestResultCollector):
             inputs=inputs,
             sequence_id=2,
             sequence_start=False,
-            sequence_end=True,
+            sequence_end=False,
         )
         output_state = output.as_numpy("OUTPUT_STATE")
         expected_output_state = np.concatenate(
@@ -156,6 +156,16 @@ class ImplicitStateTest(tu.TestResultCollector):
             ]
         )
         np.testing.assert_equal(output_state, expected_output_state)
+
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name="growable_memory",
+                inputs=inputs,
+                sequence_id=2,
+                sequence_start=False,
+                sequence_end=True,
+            )
+        print(e)
 
     def test_no_update(self):
         # Test implicit state without updating any state
