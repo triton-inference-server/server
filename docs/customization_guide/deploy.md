@@ -242,7 +242,7 @@ Tracing mode. Trace mode supports `triton` and `opentelemetry`. Unless required 
 Directory where backend shared libraries are found.
 
 > [!Warning]
-> Access to add or remove files from the backends directory
+> Access to add or remove files from the backend directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
@@ -250,7 +250,7 @@ Directory where backend shared libraries are found.
 Directory where repository agent shared libraries are found.
 
 > [!Warning]
-> Access to add or remove files from the repoagents directory
+> Access to add or remove files from the repoagent directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
@@ -259,7 +259,7 @@ Directory where repository agent shared libraries are found.
 Directory where cache shared libraries are found.
 
 > [!Warning]
-> Access to add or remove files from the repoagents directory
+> Access to add or remove files from the cache directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
