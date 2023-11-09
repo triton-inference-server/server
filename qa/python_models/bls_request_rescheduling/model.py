@@ -31,7 +31,7 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-class REQUESTRESCHEDULINGTest(unittest.TestCase):
+class RequestReschedulingTest(unittest.TestCase):
     def _reload_model(self, model_name):
         # Reload the model to reset the flag for multiple iterations
         pb_utils.unload_model(model_name)
