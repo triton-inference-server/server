@@ -56,7 +56,7 @@ namespace triton { namespace backend { namespace implicit {
 //   sent in a sequence.
 //
 //   * USE_GROWABLE_STATE_BUFFER = 3: In this test case we use growable state
-//   buffer. currently, growable state buffer only supports CUDA memory.
+//   buffer. Currently, growable state buffer only supports CUDA memory.
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, REQUEST, X)            \
   do {                                                                  \
@@ -754,7 +754,7 @@ TRITONBACKEND_ModelInstanceExecute(
         *reinterpret_cast<const int32_t*>(test_case_buffer);
     const int32_t ipbuffer_int =
         *reinterpret_cast<const int32_t*>(input_buffer);
-    int32_t ipbuffer_state_int;
+    int32_t ipbuffer_state_int = 0;
 
     if (test_case_buffer_int != 0) {
       TRITONBACKEND_Input* input_state = nullptr;
