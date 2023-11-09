@@ -998,7 +998,6 @@ RUN apt-get update \
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            wget \
             ca-certificates \
             autoconf \
             automake \
@@ -1246,6 +1245,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
+            wget \
             libb64-0d \
             libcurl4-openssl-dev \
             libre2-9 \
