@@ -70,8 +70,8 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.40.0dev": (
-        "23.11dev",  # triton container
+    "2.41.0dev": (
+        "23.12dev",  # triton container
         "23.10",  # upstream container
         "1.16.2",  # ORT
         "2023.0.0",  # ORT OpenVINO
@@ -1024,6 +1024,7 @@ RUN apt-get update && \
             libarchive-dev \
             libxml2-dev \
             libnuma-dev && \
+            wget \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
@@ -1255,6 +1256,7 @@ RUN apt-get update && \
             libnuma-dev \
             curl \
             libjemalloc-dev \
+            wget \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 
