@@ -55,6 +55,7 @@ user_guide/metrics
 user_guide/trace
 user_guide/jetson
 user_guide/v1_to_v2
+customization_guide/deploy
 ```
 
 ```{toctree}
