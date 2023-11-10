@@ -33,7 +33,7 @@ allows developers to create and deploy inferencing solutions in a
 variety of ways. Developers can deploy Triton as an http server, a
 grpc server, a server supporting both, or embed a Triton server into
 their own application. Developers can deploy Triton locally or in the
-cloud, within a kubernetes cluster, behind an API gateway or as a
+cloud, within a Kubernetes cluster behind an API gateway or as a
 standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
@@ -47,12 +47,13 @@ consider.
 > experts review any potential risks and threats.
 
 > [!WARNING]
-> Allowing dynamic updates to the model repository can lead
-> to arbitrary code execution. Model repository access control is
-> critical in production deployments. Unless required for operation, it's recommended
-> to disable dynamic updates. If required, please ensure only trusted entities
-> can add or remove models from a model repository.
-
+> Dynamic updates to model repositories are disabled by
+> default. Enabling dynamic updates to model repositories either
+> through model loading APIs or through directory polling can lead to
+> arbitrary code execution. Model repository access control is
+> critical in production deployments. If dynamic updates are required,
+> ensure only trusted entities have access to model loading APIs and
+> model repository directories.
 
 ## Deploying Behind a Secure Proxy or Gateway
 
@@ -93,14 +94,23 @@ as an "Application" or "Service" within the trusted internal network.
   and capabilities of the server to the minimum required for correct
   operation.
 
-### 1. Follow Best Practices for Launching Docker Containers
+### 1. Follow Best Practices for Securing Kubernetes Deployments
+
+ When deploying Triton within a Kubernetes pod ensure that it is
+ running with a service account with the fewest possible
+ permissions. Ensure that you have configured [role based access
+ control](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+ to limit access to resources and capabilities as required by your
+ application.
+
+### 2. Follow Best Practices for Launching Standalone Docker Containers
 
   When Triton is deployed as a containerized service, standard docker
   security practices apply. This includes limiting the resources that a
   container has access to as well as limiting network access to the
   container. https://docs.docker.com/engine/security/
 
-### 2. Run as a Non-Root User
+### 3. Run as a Non-Root User
 
    Triton's pre-built containers contain a non-root user that can be used
    to launch the tritonserver application with limited permissions. This
@@ -114,7 +124,7 @@ as an "Application" or "Service" within the trusted internal network.
    docker run --rm --user triton-server -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:YY.MM-py3 tritonserver --model-repository=/models
    ```
 
-### 3. Restrict or Disable Access to Protocols and APIs
+### 4. Restrict or Disable Access to Protocols and APIs
 
 The pre-built Triton Inference Serrver application enables a full set
 of features including health checks, server metadata, inference apis,
