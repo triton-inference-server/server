@@ -1023,8 +1023,8 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             libxml2-dev \
-            libnuma-dev && \
-            wget \
+            libnuma-dev \
+            wget && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
