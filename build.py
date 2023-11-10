@@ -996,8 +996,8 @@ RUN apt-get update \
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
             ca-certificates \
             autoconf \
             automake \
@@ -1023,9 +1023,9 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             libxml2-dev \
-            libnuma-dev && \
+            libnuma-dev \
             wget \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
@@ -1243,30 +1243,33 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            software-properties-common \
-            libb64-0d \
-            libcurl4-openssl-dev \
-            libre2-9 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+            clang \
+            curl \
+            dirmngr \
             git \
             gperf \
-            dirmngr \
+            libb64-0d \
+            libcurl4-openssl-dev \
             libgoogle-perftools-dev \
-            libnuma-dev \
-            curl \
             libjemalloc-dev \
+            libnuma-dev \
+            libre2-9 \
+            software-properties-common \
             wget \
-            {backend_dependencies} && \
-    rm -rf /var/lib/apt/lists/*
+            {backend_dependencies} \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
 RUN wget -O /tmp/boost.tar.gz \
-        https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz && \
-    (cd /tmp && tar xzf boost.tar.gz) && \
-    cd /tmp/boost_1_80_0 && ./bootstrap.sh --prefix=/usr && ./b2 install && \
-    rm -rf /tmp/boost*
+        https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz \
+      && (cd /tmp && tar xzf boost.tar.gz) \
+      && cd /tmp/boost_1_80_0 \
+      && ./bootstrap.sh --prefix=/usr \
+      && ./b2 install \
+      && rm -rf /tmp/boost*
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
