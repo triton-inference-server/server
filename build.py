@@ -1024,7 +1024,6 @@ RUN apt-get update && \
             libarchive-dev \
             libxml2-dev \
             libnuma-dev && \
-            wget \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
