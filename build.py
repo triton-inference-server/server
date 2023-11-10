@@ -996,8 +996,8 @@ RUN apt-get update \
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
             ca-certificates \
             autoconf \
             automake \
@@ -1023,9 +1023,9 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             libxml2-dev \
-            libnuma-dev && \
+            libnuma-dev \
             wget \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
@@ -1243,8 +1243,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
             software-properties-common \
             libb64-0d \
             libcurl4-openssl-dev \
@@ -1257,8 +1257,8 @@ RUN apt-get update && \
             curl \
             libjemalloc-dev \
             wget \
-            {backend_dependencies} && \
-    rm -rf /var/lib/apt/lists/*
+            {backend_dependencies} \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
