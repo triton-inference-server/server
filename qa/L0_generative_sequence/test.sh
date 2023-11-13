@@ -44,7 +44,7 @@ RET=0
 
 CLIENT_LOG="./generative_sequence_client.log"
 TEST_PY=./generative_sequence_e2e.py
-EXPECTED_NUM_TESTS="4"
+EXPECTED_NUM_TESTS="5"
 TEST_RESULT_FILE='test_results.txt'
 
 

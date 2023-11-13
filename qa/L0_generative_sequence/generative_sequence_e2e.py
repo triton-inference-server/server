@@ -127,6 +127,25 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                     self.assertEqual(res_count, data_item.as_numpy("OUTPUT")[0][0])
             self.assertEqual(0, res_count)
 
+    def test_reschedule_error(self):
+        # Use short idle timeout (< backend reschedule delay: 0.5s) so that
+        # the backend won't be able to reschedule the request as the scheduler
+        # will terminate the sequence early
+        config = r'"sequence_batching" : { "generative_sequence" : true, "max_sequence_idle_microseconds" : 200000 }'
+        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            triton_client.load_model(
+                "generative_sequence", config=MODEL_CONFIG_BASE.format(config)
+            )
+        with self.assertRaises(InferenceServerException) as context:
+            # Without specifying 'generative_sequence : true', the sequence
+            # batcher expects sequence parameters to be provided explicitly
+            self.test_grpc_stream()
+        print(str(context.exception))
+        self.assertTrue(
+            "must specify the START flag on the first request of the sequence"
+            in str(context.exception)
+        )
+
     def test_unsupported_sequence_scheduler(self):
         # Override model config with scheduler settings that do not support
         # request rescheduling.
@@ -145,7 +164,6 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                 # batcher expects sequence parameters to be provided explicitly
                 self.test_grpc_stream(sequence_id=sid, sequence_start=True)
             sid += 1
-            print(str(context.exception))
             self.assertTrue(
                 "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
                 in str(context.exception)
@@ -164,7 +182,6 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                 )
             with self.assertRaises(InferenceServerException) as context:
                 self.test_grpc_stream()
-            print(str(context.exception))
             self.assertTrue(
                 "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
                 in str(context.exception)
