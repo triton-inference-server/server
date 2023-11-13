@@ -533,6 +533,8 @@ TRITONBACKEND_ModelInstanceExecute(
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
+    // wait for 0.5 second before rescheduling the request.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // Release the request first as the testing backend may be configured to
     // receive error on request release, in such a case, the error will be
     // propagated back through error response.
