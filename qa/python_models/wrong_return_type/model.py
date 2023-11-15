@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,68 +24,44 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
-fi
+import json
 
-source ../common/util.sh
-
-RET=0
-
-CLIENT_LOG="./generative_sequence_client.log"
-TEST_PY=./generative_sequence_e2e.py
-EXPECTED_NUM_TESTS="5"
-TEST_RESULT_FILE='test_results.txt'
+import triton_python_backend_utils as pb_utils
 
 
-export CUDA_VISIBLE_DEVICES=0
+class TritonPythonModel:
+    def initialize(self, args):
+        self.model_config = model_config = json.loads(args["model_config"])
 
-rm -fr *.log
+        output0_config = pb_utils.get_output_config_by_name(model_config, "OUTPUT0")
 
-pip install sseclient-py
+        self.output0_dtype = pb_utils.triton_string_to_numpy(
+            output0_config["data_type"]
+        )
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=EXPLICIT"
-SERVER_LOG="./inference_server.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+    def execute(self, requests):
+        output0_dtype = self.output0_dtype
 
-set +e
-python $TEST_PY >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
+        responses = []
 
-kill $SERVER_PID
-wait $SERVER_PID
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
+            out_0 = in_0.as_numpy()
 
-exit $RET
+            # Create output tensors. You need pb_utils.Tensor
+            # objects to create pb_utils.InferenceResponse.
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0.astype(output0_dtype))
+
+            inference_response = pb_utils.InferenceResponse(
+                output_tensors=[out_tensor_0]
+            )
+
+            request.set_release_flags(pb_utils.TRITONSERVER_REQUEST_RELEASE_RESCHEDULE)
+            # Should append `None` for rescheduled requests.
+            responses.append(inference_response)
+
+        return responses
+
+    def finalize(self):
+        pass

@@ -310,7 +310,7 @@ class CommonHandler : public HandlerBase {
   ::grpc::health::v1::Health::AsyncService* health_service_;
   ::grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
-  const RestrictedFeatures& restricted_keys_;
+  RestrictedFeatures restricted_keys_{};
   const uint64_t response_delay_ = 0;
 };
 
