@@ -48,8 +48,15 @@ namespace triton { namespace backend { namespace implicit {
 //   for a non existent state or a model that doesn't have states section in
 //   sequence batching.
 //
-//   * STATE_UPDATE_FALSE = 3: Tests not calling the state update and expecting
+//   * STATE_UPDATE_FALSE = 1: Tests not calling the state update and expecting
 //   the implicit state to not be updated.
+//
+//   * USE_SINGLE_STATE_BUFFER = 2: For this scenario we will be using the same
+//   buffer for both input and output state. In total there will be 3 requests
+//   sent in a sequence.
+//
+//   * USE_GROWABLE_STATE_BUFFER = 3: In this test case we use growable state
+//   buffer. Currently, growable state buffer only supports CUDA memory.
 
 #define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, REQUEST, X)            \
   do {                                                                  \
@@ -179,6 +186,10 @@ class ModelInstanceState : public BackendModelInstance {
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
+  void* state_ = nullptr;
+
+  // Index of the request in the sequence
+  uint32_t request_index_ = 0;
 
  private:
   ModelInstanceState(
@@ -364,14 +375,6 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
       ModelInstanceState::Create(model_state, instance, &instance_state));
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceSetState(
       instance, reinterpret_cast<void*>(instance_state)));
-
-  // Because this backend just copies IN -> OUT and requires that
-  // input and output be in CPU memory, we fail if a GPU instances is
-  // requested.
-  RETURN_ERROR_IF_FALSE(
-      instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("'implicit_state' backend only supports CPU instances"));
 
   return nullptr;  // success
 }
@@ -634,6 +637,12 @@ TRITONBACKEND_ModelInstanceExecute(
       continue;
     }
 
+    const float* lstart_buffer = reinterpret_cast<const float*>(start_buffer);
+    if (*lstart_buffer == 1) {
+      instance_state->request_index_ = 0;
+      instance_state->state_ = nullptr;
+    }
+
     const void* end_buffer = nullptr;
     GUARDED_RESPOND_IF_ERROR(
         responses, r, request,
@@ -745,7 +754,7 @@ TRITONBACKEND_ModelInstanceExecute(
         *reinterpret_cast<const int32_t*>(test_case_buffer);
     const int32_t ipbuffer_int =
         *reinterpret_cast<const int32_t*>(input_buffer);
-    int32_t ipbuffer_state_int;
+    int32_t ipbuffer_state_int = 0;
 
     if (test_case_buffer_int != 0) {
       TRITONBACKEND_Input* input_state = nullptr;
@@ -768,7 +777,24 @@ TRITONBACKEND_ModelInstanceExecute(
               input_state, 0 /* input_buffer_count */, &input_state_buffer,
               &buffer_byte_size, &input_memory_type, &input_memory_type_id));
       if ((responses[r] == nullptr) ||
-          (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
+          (test_case_buffer_int == 3 &&
+           input_memory_type != TRITONSERVER_MEMORY_GPU)) {
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_UNSUPPORTED,
+                "growable memory should always provide memory in GPU"));
+        LOG_MESSAGE(
+            TRITONSERVER_LOG_ERROR,
+            (std::string("request ") + std::to_string(r) +
+             ": failed to get input buffer in GPU memory, error "
+             "response sent")
+                .c_str());
+        continue;
+      } else if (
+          (responses[r] == nullptr) ||
+          (input_memory_type == TRITONSERVER_MEMORY_GPU &&
+           test_case_buffer_int != 3)) {
         GUARDED_RESPOND_IF_ERROR(
             responses, r, request,
             TRITONSERVER_ErrorNew(
@@ -783,9 +809,32 @@ TRITONBACKEND_ModelInstanceExecute(
         continue;
       }
 
-      const int32_t ipbuffer_state =
-          *reinterpret_cast<const int32_t*>(input_state_buffer);
-      ipbuffer_state_int = ipbuffer_state;
+      // When using single state buffer, input/output tensors should point to
+      // the buffer.
+      if ((test_case_buffer_int == 2 || test_case_buffer_int == 3) &&
+          instance_state->state_ != nullptr) {
+        if (input_state_buffer != instance_state->state_) {
+          GUARDED_RESPOND_IF_ERROR(
+              responses, r, request,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_UNSUPPORTED,
+                  "Input and output state are using different buffers."));
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               ": input and output state are using different buffers, error "
+               "response sent")
+                  .c_str());
+          continue;
+        }
+      }
+
+      if (test_case_buffer_int == 2 || test_case_buffer_int == 1 ||
+          test_case_buffer_int == 0) {
+        const int32_t ipbuffer_state =
+            *reinterpret_cast<const int32_t*>(input_state_buffer);
+        ipbuffer_state_int = ipbuffer_state;
+      }
     }
 
     switch (test_case_buffer_int) {
@@ -866,7 +915,6 @@ TRITONBACKEND_ModelInstanceExecute(
             TRITONBACKEND_StateBuffer(
                 response_state, reinterpret_cast<void**>(&buffer),
                 sizeof(int32_t), &actual_memory_type, &actual_memory_type_id));
-
 
         if ((responses[r] == nullptr) ||
             (actual_memory_type == TRITONSERVER_MEMORY_GPU)) {
@@ -975,7 +1023,130 @@ TRITONBACKEND_ModelInstanceExecute(
         }
         lbuffer = reinterpret_cast<int32_t*>(buffer);
         *lbuffer = ipbuffer_int + ipbuffer_state_int;
-      }
+      } break;
+      // USE_SINGLE_BUFFER
+      case 2: {
+        TRITONBACKEND_State* response_state;
+        std::vector<int64_t> shape{1};
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_StateNew(
+                &response_state, request, "OUTPUT_STATE",
+                TRITONSERVER_TYPE_INT32, shape.data() /* data */,
+                shape.size() /* dim_count */));
+
+        if (responses[r] == nullptr) {
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               ": failed to create the output state 'OUTPUT_STATE', error "
+               "response sent")
+                  .c_str());
+          continue;
+        }
+        TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_CPU;
+        int64_t actual_memory_type_id = 0;
+        char* buffer;
+
+        // Request an output buffer in GPU. This is only for testing purposes
+        // to make sure that GPU output buffers can be requested.
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_StateBuffer(
+                response_state, reinterpret_cast<void**>(&buffer),
+                sizeof(int32_t), &actual_memory_type, &actual_memory_type_id));
+
+        instance_state->state_ = buffer;
+      } break;
+      case 3: {
+        TRITONBACKEND_State* response_state;
+        size_t block_size = sizeof(int8_t) * 1024 * 1024;
+        int64_t current_elements =
+            (instance_state->request_index_ + 1) * 1024 * 1024;
+        std::cout << "current elements are "
+                  << (instance_state->request_index_ + 1) << std::endl;
+        std::vector<int64_t> shape{current_elements};
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_StateNew(
+                &response_state, request, "OUTPUT_STATE",
+                TRITONSERVER_TYPE_INT8, shape.data() /* data */,
+                shape.size() /* dim_count */));
+
+        if (responses[r] == nullptr) {
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               ": failed to create the output state 'OUTPUT_STATE', error "
+               "response sent")
+                  .c_str());
+          continue;
+        }
+        TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_GPU;
+        int64_t actual_memory_type_id = 0;
+        char* buffer;
+
+        // Request an output buffer in GPU. This is only for testing purposes
+        // to make sure that GPU output buffers can be requested.
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_StateBuffer(
+                response_state, reinterpret_cast<void**>(&buffer),
+                block_size * (instance_state->request_index_ + 1),
+                &actual_memory_type, &actual_memory_type_id));
+
+        // Only write the new data to the portion of the state buffer that
+        // has been grown.
+        cudaMemset(
+            buffer + block_size * (instance_state->request_index_),
+            instance_state->request_index_, block_size);
+
+        TRITONBACKEND_Output* response_output;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_ResponseOutput(
+                responses[r], &response_output, "OUTPUT_STATE",
+                TRITONSERVER_TYPE_INT8, shape.data() /* data */,
+                shape.size() /* dim_count */));
+
+        actual_memory_type = TRITONSERVER_MEMORY_CPU;
+        actual_memory_type_id = 0;
+        char* output_buffer;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_OutputBuffer(
+                response_output, reinterpret_cast<void**>(&output_buffer),
+                block_size * (instance_state->request_index_ + 1),
+                &actual_memory_type, &actual_memory_type_id));
+        if ((responses[r] == nullptr) ||
+            (actual_memory_type != TRITONSERVER_MEMORY_CPU)) {
+          GUARDED_RESPOND_IF_ERROR(
+              responses, r, request,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_UNSUPPORTED,
+                  "the backend can only handle CPU tensors"));
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               "the backend can only handle CPU tensors"
+               "response sent")
+                  .c_str());
+          continue;
+        }
+        cudaMemcpy(
+            output_buffer, buffer,
+            block_size * (instance_state->request_index_ + 1),
+            cudaMemcpyDeviceToHost);
+
+        instance_state->state_ = buffer;
+      } break;
+    }
+    const float* lend_buffer = reinterpret_cast<const float*>(end_buffer);
+
+    if (*lend_buffer == 1) {
+      instance_state->request_index_ = 0;
+    } else {
+      instance_state->request_index_ += 1;
     }
 
     uint64_t exec_end_ns = 0;
