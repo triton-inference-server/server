@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         logger = pb_utils.Logger
         logger.log("Initialize-Specific Msg!", logger.INFO)
@@ -36,7 +35,7 @@ class TritonPythonModel:
         logger.log_warn("Initialize-Warning Msg!")
         logger.log_error("Initialize-Error Msg!")
         logger.log_verbose("Initialize-Verbose Msg!")
-        
+
     def execute(self, requests):
         """
         Identity model in Python backend.

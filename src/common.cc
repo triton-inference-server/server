@@ -1,4 +1,4 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,6 +26,10 @@
 
 #include "common.h"
 
+#include <algorithm>
+#include <iterator>
+
+#include "restricted_features.h"
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
@@ -90,6 +94,12 @@ GetElementCount(const std::vector<int64_t>& dims)
   }
 
   return cnt;
+}
+
+bool
+Contains(const std::vector<std::string>& vec, const std::string& str)
+{
+  return std::find(vec.begin(), vec.end(), str) != vec.end();
 }
 
 }}  // namespace triton::server

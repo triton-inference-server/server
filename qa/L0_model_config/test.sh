@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -209,7 +209,13 @@ for modelpath in \
         autofill_noplatform_success/python/dynamic_batching_no_op \
         autofill_noplatform_success/python/dynamic_batching \
         autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform_success/python/model_transaction_policy \
+        autofill_noplatform_success/python/model_transaction_policy_decoupled_false \
+        autofill_noplatform_success/python/model_transaction_policy_no_op \
+        autofill_noplatform_success/python/optional_input \
         autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/model_transaction_policy_invalid_args \
+        autofill_noplatform/python/model_transaction_policy_mismatch \
         autofill_noplatform/python/output_wrong_property ; do
     mkdir -p $modelpath/1
     mv $modelpath/model.py $modelpath/1/.
@@ -291,14 +297,14 @@ cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 
-# Run tests for logs which do not have a timestamp on them 
+# Run tests for logs which do not have a timestamp on them
 for TARGET in `ls cli_messages`; do
     case $TARGET in
         "cli_override")
             EXTRA_ARGS="--disable-auto-complete-config --strict-model-config=false" ;;
-        "cli_deprecation") 
+        "cli_deprecation")
             EXTRA_ARGS="--strict-model-config=true" ;;
-        *) 
+        *)
             EXTRA_ARGS="" ;;
     esac
 

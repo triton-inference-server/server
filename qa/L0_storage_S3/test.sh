@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,7 +82,7 @@ RET=0
 # Test 3 Scenarios:
 # 1. Only AWS ENV vars (Without aws configure)
 # 2. AWS ENV vars + dummy values in aws configure [ENV vars have higher priority]
-# 3. Only aws configure (Without AWS ENV vars)
+# 3. Only AWS configured (Without AWS ENV vars)
 for ENV_VAR in "env" "env_dummy" "config"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
@@ -292,7 +292,47 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test localization to a specified location
+export TRITON_AWS_MOUNT_DIRECTORY=`pwd`/aws_localization_test
+
+if [ -d "$TRITON_AWS_MOUNT_DIRECTORY" ]; then
+  rm -rf $TRITON_AWS_MOUNT_DIRECTORY
+fi
+
+mkdir -p $TRITON_AWS_MOUNT_DIRECTORY
+
+SERVER_LOG=$SERVER_LOG_BASE.custom_localization.log
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+if [ -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AWS_MOUNT_DIRECTORY is empty \n***"
+    ls -A $TRITON_AWS_MOUNT_DIRECTORY
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ -d "$TRITON_AWS_MOUNT_DIRECTORY" ] && [ ! -z "$(ls -A $TRITON_AWS_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AWS_MOUNT_DIRECTORY was not cleared properly. \n***"
+    ls -A $TRITON_AWS_MOUNT_DIRECTORY
+    exit 1
+fi
+
+rm -rf $TRITON_AWS_MOUNT_DIRECTORY
+unset TRITON_AWS_MOUNT_DIRECTORY
+
 # Save models for AWS_SESSION_TOKEN test
+rm -rf tmp_cred_test_models
 mv models tmp_cred_test_models
 # Clean up bucket contents
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
@@ -356,6 +396,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # Copy models into S3 bucket
 aws s3 cp tmp_cred_test_models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
+SERVER_LOG=$SERVER_LOG_BASE.temporary_credentials_test.log
 SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
 
 run_server
@@ -388,6 +429,7 @@ wait $SERVER_PID
 
 # Test access decline
 export AWS_SECRET_ACCESS_KEY="[Invalid]" && export AWS_SESSION_TOKEN=""
+SERVER_LOG=$SERVER_LOG_BASE.access_decline_test.log
 SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
@@ -415,6 +457,64 @@ export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
 aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
+# Clean up bucket contents
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test case where S3 folder has >1000 files
+rm -rf models
+
+mkdir -p models/model/1
+# Create Python model that reads the number of files in the
+# model directory when loaded
+echo "import os
+
+class TritonPythonModel:
+
+    def initialize(self, args):
+        count = 0
+        model_dir = args['model_repository']
+        for path in os.listdir(model_dir):
+            if os.path.isfile(os.path.join(model_dir, path)):
+                count += 1
+        print('Found {} files in model directory'.format(count))
+
+    def execute(self):
+        pass" > models/model/1/model.py
+
+for i in {1..1050}; do
+    touch models/model/0${i}.txt
+done
+
+# Provide extended timeout to allow >1000 files to be loaded
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=600 --model-control-mode=none"
+SERVER_LOG=$SERVER_LOG_BASE.many_files.log
+
+# copy contents of /models into S3 bucket and wait for them to be loaded.
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test that the server starts up. Files will be loaded in numerically
+# ascending order, so the model file is loaded after the first 1000
+# files. If AWS fails to load >1000 files, the model file will not
+# be loaded and the server will fail to start.
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Confirm the correct number of files loaded
+EXPECTED_MSG="Found 1050 files in model directory"
+if ! grep "$EXPECTED_MSG" $SERVER_LOG; then
+echo -e "\n***\n*** Expected file count message not found\n***"
+cat $SERVER_LOG
+RET=1
+fi
 
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"

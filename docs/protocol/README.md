@@ -55,6 +55,48 @@ specification](https://github.com/triton-inference-server/common/blob/main/proto
 is also available. In addition, you can find the GRPC health checking protocol protobuf
 specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
 
+## Restricted Protocols
+
 You can configure the Triton endpoints, which implement the protocols, to
 restrict access to some protocols and to control network settings, please refer
 to [protocol customization guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.
+
+## IPv6
+
+Assuming your host or [docker config](https://docs.docker.com/config/daemon/ipv6/)
+supports IPv6 connections, `tritonserver` can be configured to use IPv6
+HTTP endpoints as follows:
+```
+$ tritonserver ... --http-address ipv6:[::1]&
+...
+I0215 21:04:11.572305 571 grpc_server.cc:4868] Started GRPCInferenceService at 0.0.0.0:8001
+I0215 21:04:11.572528 571 http_server.cc:3477] Started HTTPService at ipv6:[::1]:8000
+I0215 21:04:11.614167 571 http_server.cc:184] Started Metrics Service at ipv6:[::1]:8002
+```
+
+This can be confirmed via `netstat`, for example:
+```
+$ netstat -tulpn | grep tritonserver
+tcp6      0      0 :::8000      :::*      LISTEN      571/tritonserver
+tcp6      0      0 :::8001      :::*      LISTEN      571/tritonserver
+tcp6      0      0 :::8002      :::*      LISTEN      571/tritonserver
+```
+
+And can be tested via `curl`, for example:
+```
+$ curl -6 --verbose "http://[::1]:8000/v2/health/ready"
+*   Trying ::1:8000...
+* TCP_NODELAY set
+* Connected to ::1 (::1) port 8000 (#0)
+> GET /v2/health/ready HTTP/1.1
+> Host: [::1]:8000
+> User-Agent: curl/7.68.0
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Content-Length: 0
+< Content-Type: text/plain
+<
+* Connection #0 to host ::1 left intact
+```

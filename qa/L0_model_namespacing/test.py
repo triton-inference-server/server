@@ -25,23 +25,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import os
+import sys
 
 sys.path.append(os.path.join(os.environ["TRITON_QA_ROOT_DIR"], "common"))
 
-import numpy as np
-import unittest
-import time
 import shutil
-import test_util as tu
+import time
+import unittest
 
+import numpy as np
+import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
 #
 # Test utilities
 #
+
 
 # Checker to perform inference on given model, expecting model to have
 # [INPUT0, INPUT1] and produce [OUTPUT0, OUTPUT1] where:
@@ -62,22 +63,27 @@ class AddSubChecker:
 
         # Create infer input tensors
         self.inputs_ = []
-        self.inputs_.append(checker_client.InferInput('INPUT0', [16], "INT32"))
-        self.inputs_.append(checker_client.InferInput('INPUT1', [16], "INT32"))
+        self.inputs_.append(checker_client.InferInput("INPUT0", [16], "INT32"))
+        self.inputs_.append(checker_client.InferInput("INPUT1", [16], "INT32"))
 
         # Initialize the data and expected output
         input_data = np.arange(start=0, stop=16, dtype=np.int32)
         self.inputs_[0].set_data_from_numpy(input_data)
         self.inputs_[1].set_data_from_numpy(input_data)
         self.expected_outputs_ = {
-          "add" : (input_data + input_data),
-          "sub" : (input_data - input_data)
+            "add": (input_data + input_data),
+            "sub": (input_data - input_data),
         }
-        
+
     def infer(self, model):
         res = self.client_.infer(model, self.inputs_)
-        np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-        np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
+        np.testing.assert_allclose(
+            res.as_numpy("OUTPUT0"), self.expected_outputs_["add"]
+        )
+        np.testing.assert_allclose(
+            res.as_numpy("OUTPUT1"), self.expected_outputs_["sub"]
+        )
+
 
 # Checker to perform inference on given model, expecting model to have
 # [INPUT0, INPUT1] and produce [OUTPUT0, OUTPUT1] where:
@@ -86,12 +92,18 @@ class AddSubChecker:
 class SubAddChecker(AddSubChecker):
     def infer(self, model):
         res = self.client_.infer(model, self.inputs_)
-        np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-        np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+        np.testing.assert_allclose(
+            res.as_numpy("OUTPUT0"), self.expected_outputs_["sub"]
+        )
+        np.testing.assert_allclose(
+            res.as_numpy("OUTPUT1"), self.expected_outputs_["add"]
+        )
+
 
 #
 # Test suites and cases
 #
+
 
 class ModelNamespacePoll(tu.TestResultCollector):
     def setUp(self):
@@ -99,7 +111,6 @@ class ModelNamespacePoll(tu.TestResultCollector):
         self.subadd_ = SubAddChecker()
         # For other server interaction
         self.client_ = httpclient.InferenceServerClient("localhost:8000")
-
 
     def check_health(self, expect_live=True, expect_ready=True):
         self.assertEqual(self.client_.is_server_live(), expect_live)
@@ -126,16 +137,19 @@ class ModelNamespacePoll(tu.TestResultCollector):
         self.check_health()
 
         # infer check
-        for model in ["simple_addsub",]:
+        for model in [
+            "simple_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["simple_subadd",]:
+        for model in [
+            "simple_subadd",
+        ]:
             self.subadd_.infer(model)
-            
+
         # error check
         try:
             self.addsub_.infer("composing_model")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
@@ -149,23 +163,26 @@ class ModelNamespacePoll(tu.TestResultCollector):
         self.check_health()
 
         # infer
-        for model in ["composing_addsub",]:
+        for model in [
+            "composing_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["composing_subadd",]:
+        for model in [
+            "composing_subadd",
+        ]:
             self.subadd_.infer(model)
 
         # error check
         try:
             self.addsub_.infer("simple_ensemble")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
     def test_dynamic_resolution(self):
         # Same model setup as 'test_duplication', will remove / add one of the
         # composing model at runtime and expect the ensemble to be properly
-        # linked to exisiting composing model at different steps.
+        # linked to existing composing model at different steps.
         # 1. Remove 'composing_model' in addsub_repo, expect both ensembles use
         #    'composing_model' in subadd_repo and act as subadd
         # 2. Add back 'composing_model' in addsub_repo, expect the ensembles to behave the
@@ -183,22 +200,25 @@ class ModelNamespacePoll(tu.TestResultCollector):
         # infer
         for model in ["simple_subadd", "simple_addsub", "composing_model"]:
             self.subadd_.infer(model)
-  
+
         # step 2.
         shutil.move(composing_after_path, composing_before_path)
         time.sleep(5)
 
         # infer
-        for model in ["simple_addsub",]:
+        for model in [
+            "simple_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["simple_subadd",]:
+        for model in [
+            "simple_subadd",
+        ]:
             self.subadd_.infer(model)
 
         # error check
         try:
             self.addsub_.infer("composing_model")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
@@ -241,16 +261,19 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
             self.client_.load_model(model)
 
         # infer
-        for model in ["simple_addsub",]:
+        for model in [
+            "simple_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["simple_subadd",]:
+        for model in [
+            "simple_subadd",
+        ]:
             self.subadd_.infer(model)
 
         # error check
         try:
             self.addsub_.infer("composing_model")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
@@ -265,25 +288,28 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         # load ensembles, cascadingly load composing model
         for model in ["simple_ensemble"]:
             self.client_.load_model(model)
-        
+
         # infer
-        for model in ["composing_addsub",]:
+        for model in [
+            "composing_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["composing_subadd",]:
+        for model in [
+            "composing_subadd",
+        ]:
             self.subadd_.infer(model)
 
         # error check
         try:
             self.addsub_.infer("simple_ensemble")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
     def test_dynamic_resolution(self):
         # Same model setup as 'test_duplication', will remove / add one of the
         # composing model at runtime and expect the ensemble to be properly
-        # linked to exisiting composing model at different steps.
+        # linked to existing composing model at different steps.
         # 1. Remove 'composing_model' in addsub_repo, expect both ensembles use
         #    'composing_model' in subadd_repo and act as subadd.
         # 2. Add back 'composing_model' in addsub_repo, expect the ensembles to behave the
@@ -303,28 +329,33 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         # infer
         for model in ["simple_subadd", "simple_addsub", "composing_model"]:
             self.subadd_.infer(model)
-  
+
         # step 2.
         shutil.move(composing_after_path, composing_before_path)
         # Explicitly load one of the ensembel, should still trigger cascading
         # (re-)load
-        for model in ["simple_addsub", ]:
+        for model in [
+            "simple_addsub",
+        ]:
             self.client_.load_model(model)
 
         # infer
-        for model in ["simple_addsub",]:
+        for model in [
+            "simple_addsub",
+        ]:
             self.addsub_.infer(model)
-        for model in ["simple_subadd",]:
+        for model in [
+            "simple_subadd",
+        ]:
             self.subadd_.infer(model)
 
         # error check
         try:
             self.addsub_.infer("composing_model")
-            self.assertTrue(False,
-                            "expected error for inferring ambiguous named model")
+            self.assertTrue(False, "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
             self.assertIn("ambiguity", ex.message())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -55,8 +55,8 @@ Repository](#modifying-the-model-repository).
 ## Model Control Mode EXPLICIT
 
 At startup, Triton loads only those models specified explicitly with the
-`--load-model` command-line option. To load ALL models at startup, specify 
-`--load-model=*` as the ONLY `--load-model` argument. Specifying 
+`--load-model` command-line option. To load ALL models at startup, specify
+`--load-model=*` as the ONLY `--load-model` argument. Specifying
 `--load-model=*` in conjunction with another `--load-model` argument will
 result in error. If `--load-model` is not specified then no models are loaded
 at startup. Models that Triton is not able to load will be marked as
@@ -212,18 +212,29 @@ repository, copy in the new shared libraries, and then reload the
 model.
 
 * If only the model instance configuration on the 'config.pbtxt' is modified
-(i.e. increasing/decreasing the instance count) for non-sequence models,
-then Triton will update the model rather then reloading it, when either a load
-request is received under
+(i.e. increasing/decreasing the instance count), then Triton will update the
+model rather then reloading it, when either a load request is received under
 [Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the
 'config.pbtxt' is detected under
 [Model Control Mode POLL](#model-control-mode-poll).
+  * The new model configuration may also be passed to Triton via the
+[load API](../protocol/extension_model_repository.md#load).
+  * Some text editors create a swap file in the model directory when the
+'config.pbtxt' is modified in place. The swap file is not part of the model
+configuration, so its presence in the model directory may be detected as a new file
+and cause the model to fully reload when only an update is expected.
 
-* If a sequence model is updated with in-flight sequence(s), Triton does not
-guarentee any remaining request(s) from the in-flight sequence(s) will be routed
-to the same model instance for processing. It is currently the responsibility of
-the user to ensure any in-flight sequence(s) is complete before updating a
-sequence model.
+* If a sequence model is *updated* (i.e. decreasing the instance count), Triton
+will wait until the in-flight sequence is completed (or timed-out) before the
+instance behind the sequence is removed.
+  * If the instance count is decreased, arbitrary instance(s) are selected among
+idle instances and instances with in-flight sequence(s) for removal.
+
+* If a sequence model is *reloaded* with in-flight sequence(s) (i.e. changes to
+the model file), Triton does not guarantee any remaining request(s) from the
+in-flight sequence(s) will be routed to the same model instance for processing.
+It is currently the responsibility of the user to ensure any in-flight
+sequence(s) are completed before reloading a sequence model.
 
 ## Concurrently Loading Models
 
@@ -233,7 +244,7 @@ performance requirements, the optimal amount of resources dedicated to loading
 models may differ. Triton exposes a `--model-load-thread-count` option to
 configure the number of threads dedicated to loading models, which defaults to 4.
 
-To set this parameter with the C API, refer to 
-`TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 
+To set this parameter with the C API, refer to
+`TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 

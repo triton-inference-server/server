@@ -78,7 +78,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
         model_path_regex_(
             R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
         platform_ensemble_regex_(R"(platform:(\s)*\"ensemble\")"),
-        ping_mode_("live"),
+        ping_mode_(GetEnvironmentVariableOrDefault(
+            "SAGEMAKER_TRITON_PING_MODE", "ready")),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
             "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
@@ -130,7 +131,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       size_t* header_length) override;
 
 
-  // Currently the compresssion schema hasn't been defined,
+  // Currently the compression schema hasn't been defined,
   // assume identity compression type is used for both request and response
   DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override
   {

@@ -70,7 +70,7 @@ documentation and using
 [grpc_service.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
 you can generate language bindings for all the languages supported by
 GRPC. We provide three examples of this for
-[Go](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/go), 
+[Go](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/go),
 [Python](https://github.com/triton-inference-server/client/blob/main/src/python/examples/grpc_client.py) and
 [Java](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/java).
 
@@ -154,7 +154,7 @@ available Triton instances.
 
 ## If the server segfaults, how can I debug it?
 
-The NGC build is a Release build and does not contain Debug symbols. 
+The NGC build is a Release build and does not contain Debug symbols.
 The build.py as well defaults to a Release build. Refer to the instructions
 in [build.md](../customization_guide/build.md#building-with-debug-symbols) to create a Debug build
 of Triton. This will help find the cause of the segmentation fault when
@@ -162,3 +162,44 @@ looking at the gdb trace for the segfault.
 
 When opening a GitHub issue for the segfault with Triton, please include
 the backtrace to better help us resolve the problem.
+
+## What are the benefits of using [Triton Inference Server](https://developer.nvidia.com/triton-inference-server) as part of the [NVIDIA AI Enterprise Software Suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/)?
+
+NVIDIA AI Enterprise enables enterprises to implement full AI workflows by
+delivering an entire end-to-end AI platform. Four key benefits:
+
+### Enterprise-Grade Support, Security & API Stability:
+
+Business-critical AI projects stay on track with NVIDIA Enterprise Support,
+available globally to assist both IT teams with deploying and managing the
+lifecycle of AI applications and the developer teams with building AI
+applications.  Support includes maintenance updates, dependable SLAs and
+response times.  Regular security reviews and priority notifications mitigate
+potential risk of unmanaged opensource and ensure compliance with corporate
+standards.  Finally, long term support and regression testing ensures API
+stability between releases.
+
+### Speed time to production with AI Workflows & Pretrained Models:
+To reduce the complexity of developing common AI applications, NVIDIA AI
+Enterprise includes
+[AI workflows](https://www.nvidia.com/en-us/launchpad/ai/workflows/) which are
+reference applications for specific business outcomes such as Intelligent
+Virtual Assistants and Digital Fingerprinting for real-time cybersecurity threat
+detection.  AI workflow reference applications may include
+[AI frameworks](https://docs.nvidia.com/deeplearning/frameworks/index.html) and
+[pretrained models](https://developer.nvidia.com/ai-models),
+[Helm Charts](https://catalog.ngc.nvidia.com/helm-charts),
+[Jupyter Notebooks](https://developer.nvidia.com/run-jupyter-notebooks) and
+[documentation](https://docs.nvidia.com/ai-enterprise/index.html#overview).
+
+### Performance for Efficiency and Cost Savings:
+Using accelerated compute for AI workloads such as data process with
+[NVIDIA RAPIDS Accelerator](https://developer.nvidia.com/rapids) for Apache
+Spark and inference with Triton Inference Sever delivers better performance
+which also improves efficiency and reduces operation and infrastructure costs,
+including savings from reduced time and energy consumption.
+
+### Optimized and Certified to Deploy Everywhere:
+Cloud, Data Center, Edge Optimized and certified to ensure reliable performance
+whether it’s running your AI in the public cloud, virtualized data centers, or
+on DGX systems.

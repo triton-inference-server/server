@@ -1,4 +1,6 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,10 +25,10 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import mlflow
 import os
-import click
 
+import click
+import mlflow
 import triton_flavor
 
 
@@ -35,18 +37,20 @@ import triton_flavor
     "--model_name",
     help="Model name",
 )
-@click.option("--model_directory",
-              type=click.Path(exists=True, readable=True),
-              required=True,
-              help="Model filepath")
+@click.option(
+    "--model_directory",
+    type=click.Path(exists=True, readable=True),
+    required=True,
+    help="Model filepath",
+)
 @click.option(
     "--flavor",
-    type=click.Choice(['triton'], case_sensitive=True),
+    type=click.Choice(["triton"], case_sensitive=True),
     required=True,
     help="Model flavor",
 )
 def publish_to_mlflow(model_name, model_directory, flavor):
-    mlflow_tracking_uri = os.environ['MLFLOW_TRACKING_URI']
+    mlflow_tracking_uri = os.environ["MLFLOW_TRACKING_URI"]
     artifact_path = "triton"
 
     mlflow.set_tracking_uri(uri=mlflow_tracking_uri)

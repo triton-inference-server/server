@@ -42,9 +42,9 @@ frameworks dynamically allocate memory. Running all such models
 simultaneously may lead to system going out-of-memory.
 
 Rate limiter allows to postpone the inference execution on some
-model instances such that not all of them runs simultaneously. 
+model instances such that not all of them runs simultaneously.
 The model priorities are used to decide which model instance
-to schedule next. 
+to schedule next.
 
 ## Using Rate Limiter
 

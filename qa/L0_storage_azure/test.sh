@@ -85,7 +85,7 @@ RET=0
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 function run_unit_tests() {
-    python $INFER_TEST >$CLIENT_LOG 2>&1
+    BACKENDS=$BACKENDS python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -169,6 +169,45 @@ for ENV_VAR in "shared_key"; do
     wait $SERVER_PID
 done
 
+# Test localization to a specified location
+export TRITON_AZURE_MOUNT_DIRECTORY=`pwd`/azure_localization_test
+
+if [ -d "$TRITON_AZURE_MOUNT_DIRECTORY" ]; then
+  rm -rf $TRITON_AZURE_MOUNT_DIRECTORY
+fi
+
+mkdir -p $TRITON_AZURE_MOUNT_DIRECTORY
+
+SERVER_LOG=$SERVER_LOG_BASE.custom_localization.log
+SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+if [ -z "$(ls -A $TRITON_AZURE_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AZURE_MOUNT_DIRECTORY is empty \n***"
+    ls -A $TRITON_AZURE_MOUNT_DIRECTORY
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ -d "$TRITON_AZURE_MOUNT_DIRECTORY" ] && [ ! -z "$(ls -A $TRITON_AZURE_MOUNT_DIRECTORY)" ]; then
+    echo -e "\n***\n*** Test localization to a specified location failed. \n***"
+    echo -e "\n***\n*** Specified mount folder $TRITON_AZURE_MOUNT_DIRECTORY was not cleared properly. \n***"
+    ls -A $TRITON_AZURE_MOUNT_DIRECTORY
+    exit 1
+fi
+
+rm -rf $TRITON_AZURE_MOUNT_DIRECTORY
+unset TRITON_AZURE_MOUNT_DIRECTORY
+
 # Add test for explicit model control
 SERVER_LOG=$SERVER_LOG_BASE.explicit.log
 CLIENT_LOG=$CLIENT_LOG_BASE.explicit.log
@@ -218,7 +257,7 @@ for FW in ${AUTOCOMPLETE_BACKENDS}; do
     for model in ${FW}_float32_float32_float32 ${FW}_object_object_object; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${model} models/
         # Config files specify things expected by unit test like label_filename
-        # and max_batch_size for comparing results, so remove some key fields 
+        # and max_batch_size for comparing results, so remove some key fields
         # for autocomplete to fill that won't break the unit test.
         sed -i '/platform:/d' models/${model}/config.pbtxt
         sed -i '/data_type:/d' models/${model}/config.pbtxt

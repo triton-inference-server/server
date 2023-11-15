@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./custom_metrics_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
@@ -35,7 +35,7 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./custom_metrics_server.log"
 
 RET=0
 rm -fr *.log ./models *.txt
@@ -54,7 +54,7 @@ fi
 set +e
 
 export MODEL_NAME='custom_metrics'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
     cat $CLIENT_LOG

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,16 +26,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 import fcntl
+import os
 
-__model_name = "model_init_del"
+_model_name = "model_init_del"
 
 #
 # Helper functions for reading/writing state to disk
 #
 
-def __get_number(filename):
+
+def _get_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r", encoding="utf-8", errors="strict") as f:
@@ -43,14 +46,16 @@ def __get_number(filename):
         txt = "0"
     return int(txt)
 
-def __store_number(filename, number):
+
+def _store_number(filename, number):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         fcntl.lockf(f, fcntl.LOCK_EX)
         f.write(txt)
 
-def __inc_number(filename):
+
+def _inc_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
@@ -63,69 +68,104 @@ def __inc_number(filename):
             f.write(txt)
     except FileNotFoundError:
         number = 1
-        __store_number(filename, number)
+        _store_number(filename, number)
     return number
+
 
 #
 # Functions for communicating initialize and finalize count between the model
 # and test
 #
 
-def __get_count_filename(kind):
+
+def _get_count_filename(kind):
     if kind != "initialize" and kind != "finalize":
         raise KeyError("Invalid count kind: " + str(kind))
-    filename = __model_name + "_" + kind + "_count.txt"
+    filename = _model_name + "_" + kind + "_count.txt"
     return filename
 
+
 def get_count(kind):
-    return __get_number(__get_count_filename(kind))
+    return _get_number(_get_count_filename(kind))
+
 
 def inc_count(kind):
-    return __inc_number(__get_count_filename(kind))
+    return _inc_number(_get_count_filename(kind))
+
 
 def reset_count(kind):
     count = 0
-    __store_number(__get_count_filename(kind), count)
+    _store_number(_get_count_filename(kind), count)
     return count
+
 
 #
 # Functions for communicating varies of delay (in seconds) to the model
 #
 
-def __get_delay_filename(kind):
+
+def _get_delay_filename(kind):
     if kind != "initialize" and kind != "infer":
         raise KeyError("Invalid delay kind: " + str(kind))
-    filename = __model_name + "_" + kind + "_delay.txt"
+    filename = _model_name + "_" + kind + "_delay.txt"
     return filename
 
+
 def get_delay(kind):
-    return __get_number(__get_delay_filename(kind))
+    return _get_number(_get_delay_filename(kind))
+
 
 def set_delay(kind, delay):
-    __store_number(__get_delay_filename(kind), delay)
+    _store_number(_get_delay_filename(kind), delay)
     return delay
+
 
 #
 # Functions for modifying the model
 #
 
+
 def update_instance_group(instance_group_str):
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
     with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
         txt = f.read()
-        txt = txt.split("instance_group [")[0]
+        txt, post_match = txt.split("instance_group [")
         txt += "instance_group [\n"
         txt += instance_group_str
-        txt += "\n]\n"
+        txt += "\n]  # end instance_group\n"
+        txt += post_match.split("\n]  # end instance_group\n")[1]
         f.truncate(0)
         f.seek(0)
         f.write(txt)
     return txt
 
+
+def update_sequence_batching(sequence_batching_str):
+    full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
+    with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+        txt = f.read()
+        if "sequence_batching {" in txt:
+            txt, post_match = txt.split("sequence_batching {")
+            if sequence_batching_str != "":
+                txt += "sequence_batching {\n"
+                txt += sequence_batching_str
+                txt += "\n}  # end sequence_batching\n"
+            txt += post_match.split("\n}  # end sequence_batching\n")[1]
+        elif sequence_batching_str != "":
+            txt += "\nsequence_batching {\n"
+            txt += sequence_batching_str
+            txt += "\n}  # end sequence_batching\n"
+        f.truncate(0)
+        f.seek(0)
+        f.write(txt)
+    return txt
+
+
 def update_model_file():
     full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
     with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
         f.write("\n# dummy model file update\n")
+
 
 def enable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -136,6 +176,7 @@ def enable_batching():
         f.seek(0)
         f.write(txt)
     return txt
+
 
 def disable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")

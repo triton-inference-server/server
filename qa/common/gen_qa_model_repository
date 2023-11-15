@@ -48,14 +48,14 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.05}
+TRITON_VERSION=${TRITON_VERSION:=23.10}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.13.0
 ONNX_OPSET=0
 
 # OPENVINO version
-OPENVINO_VERSION=2022.3.0
+OPENVINO_VERSION=2023.0.0
 
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
@@ -63,7 +63,7 @@ TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-t
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
 
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE" 
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
@@ -91,14 +91,16 @@ HOST_VARIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_
 HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
 HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
+HOST_SCALARMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
-rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR 
+rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
 rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
+rm -rf $HOST_SCALARMODELSDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -123,6 +125,7 @@ mkdir -p $HOST_VARIMPLICITSEQDESTDIR
 mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_TORCHTRTDESTDIR
+mkdir -p $HOST_SCALARMODELSDESTDIR
 
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
@@ -154,6 +157,8 @@ cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
+cp ./gen_common.py $HOST_SRCDIR/.
+cp ./gen_qa_ort_scalar_models.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
@@ -185,6 +190,7 @@ RAGGEDDESTDIR=/tmp/raggedmodels
 FORMATDESTDIR=/tmp/formatmodels
 DATADEPENDENTDIR=/tmp/datadependentmodels
 TORCHTRTDESTDIR=/tmp/torchtrtmodels
+SCALARMODELSDESTDIR=/tmp/scalarmodels
 
 # OPENVINO
 #
@@ -242,6 +248,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$OPENVINOSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+       --mount type=bind,source=$HOST_SCALARMODELSDESTDIR,target=$SCALARMODELSDESTDIR \
        $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -292,6 +299,8 @@ python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONN
 chmod -R 777 $DYNASEQIMPLICITDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
+python3 $SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$SCALARMODELSDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$ONNXSCRIPT
@@ -316,6 +325,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_VARINITIALSTATEIMPLICITSEQDESTDIR,target=$VARINITIALSTATEIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_INITIALSTATEIMPLICITSEQDESTDIR,target=$INITIALSTATEIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_SCALARMODELSDESTDIR,target=$SCALARMODELSDESTDIR \
        $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -341,10 +351,16 @@ python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$SEQDESTDIR
 chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --models_dir=$IMPLICITSEQDESTDIR
+chmod -R 777 $IMPLICITSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VARIMPLICITSEQDESTDIR
+chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
 chmod -R 777 $TORCHTRTDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TORCHSCRIPT
@@ -364,6 +380,9 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_TORCHTRTDESTDIR,target=$TORCHTRTDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -377,6 +396,10 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 set -x
+# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
+# Upgrade protobuf version to fix the issue.
+pip3 install "protobuf>4.24.0"
+
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
@@ -453,6 +476,7 @@ chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
 chmod -R 777 $IDENTITYBIGDESTDIR
@@ -478,7 +502,7 @@ python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDI
 chmod -R 777 $DATADEPENDENTDIR
 # Make shared library for custom clip plugin.
 # FIXME: [DLIS-4138] Once TensorRT uploads a new custom sample plugin they maintain, we should switch to
-# that one. This uses the provided plugin code from Release 8.4. This could break when TensorRT makes 
+# that one. This uses the provided plugin code from Release 8.4. This could break when TensorRT makes
 # changes to their plugin code.
 (git clone -b release/8.4 https://github.com/NVIDIA/TensorRT.git && \
 cd /workspace/TensorRT/samples/python/uff_custom_plugin && cmake . && make && \

@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,14 +26,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_PY=./decoupled_test.py
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="5"
+CLIENT_LOG="./decoupled_client.log"
+EXPECTED_NUM_TESTS="6"
 TEST_RESULT_FILE='test_results.txt'
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./decoupled_server.log"
 
 pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
@@ -48,6 +49,11 @@ cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32/
 mkdir -p models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
+
+mkdir -p models/execute_cancel/1/
+cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
+cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
+echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/config.pbtxt
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 mkdir -p models/square_int32/1/

@@ -28,9 +28,9 @@
 
 # Model Repository
 
-**Is this your first time setting up a model repository?** Check out 
+**Is this your first time setting up a model repository?** Check out
 [these tutorials](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#setting-up-the-model-repository)
- to begin your Triton journey! 
+ to begin your Triton journey!
 
 The Triton Inference Server serves models from one or more model
 repositories that are specified when the server is started. While
@@ -80,7 +80,7 @@ corresponding model. The config.pbtxt file describes the [model
 configuration](model_configuration.md) for the model. For some models,
 config.pbtxt is required while for others it is optional. See
 [Auto-Generated Model
-Configuration](model_configuration.md#auto-generated-model-configuration) 
+Configuration](model_configuration.md#auto-generated-model-configuration)
 for more information.
 
 Each <model-name> directory must have at least one numeric
@@ -120,27 +120,42 @@ repository path must be prefixed with gs://.
 $ tritonserver --model-repository=gs://bucket/path/to/model/repository ...
 ```
 
-When using Google Cloud Storage, the
-[GOOGLE_APPLICATION_CREDENTIALS](https://cloud.google.com/docs/authentication/application-default-credentials#GAC)
-environment variable should be set and contains the location of a credential
-JSON file. If no credential is provided, Triton will use credentials from the
-[attached service account](https://cloud.google.com/docs/authentication/application-default-credentials#attached-sa)
-providing a value for the
-[Authorization HTTP header](https://googleapis.dev/cpp/google-cloud-storage/1.42.0/classgoogle_1_1cloud_1_1storage_1_1oauth2_1_1ComputeEngineCredentials.html#a8c3a5d405366523e2f4df06554f0a676) 
-can be obtained. If not obtainable, anonymous credential will be used.
-
-To access buckets with anonymous credential (also known as public bucket), the
-bucket (and objects) should have granted `get` and `list` permission to all
-users. It is tested that adding both
+When using Google Cloud Storage, credentials are fetched and attempted in the
+following order:
+1. [GOOGLE_APPLICATION_CREDENTIALS environment variable](https://cloud.google.com/docs/authentication/application-default-credentials#GAC)
+   - The environment variable should be set and contains the location of a
+credential JSON file.
+   - Authorized user credential will be attempted first, and then service
+account credential.
+2. [The attached service account](https://cloud.google.com/docs/authentication/application-default-credentials#attached-sa)
+   - A value for the
+[Authorization HTTP header](https://googleapis.dev/cpp/google-cloud-storage/1.42.0/classgoogle_1_1cloud_1_1storage_1_1oauth2_1_1ComputeEngineCredentials.html#a8c3a5d405366523e2f4df06554f0a676)
+should be obtainable.
+3. Anonymous credential (also known as public bucket)
+   - The bucket (and objects) should have granted `get` and `list` permission to
+all users.
+   - One way to grant such permission is by adding both
 [storage.objectViewer](https://cloud.google.com/storage/docs/access-control/iam-roles#standard-roles)
 and
 [storage.legacyBucketReader](https://cloud.google.com/storage/docs/access-control/iam-roles#legacy-roles)
-predefined roles for "allUsers" to the bucket can accomplish that, which can be
-added by the following commands:
+predefined roles for "allUsers" to the bucket, for example:
+        ```
+        $ gsutil iam ch allUsers:objectViewer "${BUCKET_URL}"
+        $ gsutil iam ch allUsers:legacyBucketReader "${BUCKET_URL}"
+        ```
+
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_GCS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_GCS_MOUNT_DIRECTORY=/path/to/your/local/directory
 ```
-$ gsutil iam ch allUsers:objectViewer "${BUCKET_URL}"
-$ gsutil iam ch allUsers:legacyBucketReader "${BUCKET_URL}"
-```
+
+**Make sure, that `TRITON_GCS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
 
 #### S3
 
@@ -159,9 +174,9 @@ subsequently the bucket path.
 $ tritonserver --model-repository=s3://host:port/bucket/path/to/model/repository ...
 ```
 
-By default, Triton uses HTTP to communicate with your instance of S3. If 
+By default, Triton uses HTTP to communicate with your instance of S3. If
 your instance of S3 supports HTTPS and you wish for Triton to use the HTTPS
-protocol to communicate with it, you can specify the same in the model 
+protocol to communicate with it, you can specify the same in the model
 repository path by prefixing the host name with https://.
 
 ```bash
@@ -176,6 +191,19 @@ variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvar
 If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
+
+By default, Triton makes a local copy of a remote model repository
+in a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AWS_MOUNT_DIRECTORY` environment variable to
+a path pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
+```
+
+**Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
 
 #### Azure Storage
 
@@ -196,13 +224,26 @@ here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCO
 $ export AZURE_STORAGE_ACCOUNT="account_name"
 $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
 ```
+By default, Triton makes a local copy of a remote model repository in
+a temporary folder, which is deleted after Triton server is shut down.
+If you would like to control where remote model repository is copied to,
+you may set the `TRITON_AZURE_MOUNT_DIRECTORY` environment variable to a path
+pointing to the existing folder on your local machine.
+
+```bash
+export TRITON_AZURE_MOUNT_DIRECTORY=/path/to/your/local/directory
+```
+
+**Make sure, that `TRITON_AZURE_MOUNT_DIRECTORY` exists on your local machine
+and it is empty.**
+
 
 ### Cloud Storage with Credential file (Beta)
 
 *This feature is currently in beta and may be subject to change.*
 
-To group the credentials into a single file for Triton, you may set the 
-`TRITON_CLOUD_CREDENTIAL_PATH` environment variable to a path pointing to a 
+To group the credentials into a single file for Triton, you may set the
+`TRITON_CLOUD_CREDENTIAL_PATH` environment variable to a path pointing to a
 JSON file of the following format, residing in the local file system.
 
 ```
@@ -254,10 +295,17 @@ This feature is intended for use-cases which multiple credentials are needed
 for each cloud storage provider. Be sure to replace any credential paths/keys
 with the actual paths/keys from the example above.
 
-If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the 
+If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the
 [Cloud Storage with Environment variables](#cloud-storage-with-environment-variables)
 will be used.
 
+### Caching of Cloud Storage
+
+Triton currently doesn't perform file caching for cloud storage.
+However, this functionality can be implemented through
+[repository agent API](https://github.com/triton-inference-server/server/blob/bbbcad7d87adc9596f99e3685da5d6b73380514f/docs/customization_guide/repository_agents.md) by injecting a proxy, which checks a specific local directory for caching
+given the cloud storage (original path) of the model,
+and then decides if cached files may be used.
 
 ## Model Versions
 

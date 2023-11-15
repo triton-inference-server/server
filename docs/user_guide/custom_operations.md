@@ -64,7 +64,7 @@ simple way to ensure you are using the correct version of TensorRT is
 to use the [NGC TensorRT
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt)
 corresponding to the Triton container. For example, if you are using
-the 23.05 version of Triton, use the 23.05 version of the TensorRT
+the 23.10 version of Triton, use the 23.10 version of the TensorRT
 container.
 
 ## TensorFlow
@@ -72,7 +72,7 @@ container.
 TensorFlow allows users to [add custom
 operations](https://www.tensorflow.org/guide/create_op) which can then
 be used in TensorFlow models. You can load custom TensorFlow operations
-into Triton in two ways: 
+into Triton in two ways:
 * At model load time, by listing them in the model configuration.
 * At server launch time, by using LD_PRELOAD.
 
@@ -123,7 +123,7 @@ simple way to ensure you are using the correct version of TensorFlow
 is to use the [NGC TensorFlow
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow)
 corresponding to the Triton container. For example, if you are using
-the 23.05 version of Triton, use the 23.05 version of the TensorFlow
+the 23.10 version of Triton, use the 23.10 version of the TensorFlow
 container.
 
 ## PyTorch
@@ -167,7 +167,7 @@ simple way to ensure you are using the correct version of PyTorch is
 to use the [NGC PyTorch
 container](https://ngc.nvidia.com/catalog/containers/nvidia:pytorch)
 corresponding to the Triton container. For example, if you are using
-the 23.05 version of Triton, use the 23.05 version of the PyTorch
+the 23.10 version of Triton, use the 23.10 version of the PyTorch
 container.
 
 ## ONNX
@@ -181,7 +181,7 @@ example](https://github.com/microsoft/onnxruntime/blob/master/onnxruntime/test/s
 from the
 [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime)
 repository and your ONNXRuntime custom operations are compiled into
-libonnxcustom.so, adding the following to the model configuraion of
+libonnxcustom.so, adding the following to the model configuration of
 your model makes those operations available to that specific ONNX
 model.
 

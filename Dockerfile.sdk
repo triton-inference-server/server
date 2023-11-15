@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:23.05-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:23.10-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -42,7 +42,7 @@ ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.4.7
+ARG DCGM_VERSION=3.2.6
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -97,7 +97,7 @@ RUN apt update && apt install -y gpg wget && \
     tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
     apt-get update && \
     apt-get install -y --no-install-recommends cmake cmake-data && \
-    cmake --version 
+    cmake --version
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -197,8 +197,8 @@ RUN mkdir qa
 COPY qa/L0_sdk qa/L0_sdk
 COPY qa/L0_client_build_variants qa/L0_client_build_variants
 
-# Create a directory for all the python client tests to enable unit testing 
-RUN mkdir -p qa/python_client_unit_tests/ 
+# Create a directory for all the python client tests to enable unit testing
+RUN mkdir -p qa/python_client_unit_tests/
 COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_client_unit_tests/
 
 # Install an image needed by the quickstart and other documentation.

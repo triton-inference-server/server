@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,8 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="3"
+CLIENT_LOG="./lifecycle_client.log"
+EXPECTED_NUM_TESTS="5"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -35,10 +35,18 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./lifecycle_server.log"
 
 RET=0
 rm -fr *.log ./models
+
+mkdir -p models/error_code/1/
+cp ../../python_models/error_code/model.py ./models/error_code/1/
+cp ../../python_models/error_code/config.pbtxt ./models/error_code/
+
+mkdir -p models/execute_cancel/1/
+cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
+cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
 
 mkdir -p models/execute_error/1/
 cp ../../python_models/execute_error/model.py ./models/execute_error/1/
@@ -72,7 +80,7 @@ set +e
 
 # Run this multiple times to catch any intermittent segfault.
 for i in {0..4}; do
-    python3 lifecycle_test.py > $CLIENT_LOG 2>&1 
+    python3 lifecycle_test.py > $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"

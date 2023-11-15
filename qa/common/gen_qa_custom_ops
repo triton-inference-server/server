@@ -37,14 +37,14 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.05}
+TRITON_VERSION=${TRITON_VERSION:=23.10}
 NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$TRITON_VERSION}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$NVIDIA_UPSTREAM_VERSION-tf2-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
 
 CUDA_DEVICE=${NV_GPU:=0}
 
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE" 
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
@@ -66,8 +66,8 @@ PYTSCRIPT=pyt_gen.cmds
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
 
-# Tensorflow  
-# Set compilation option by "Select a particular C++ dialect." 
+# Tensorflow
+# Set compilation option by "Select a particular C++ dialect."
 [[ "${NVIDIA_UPSTREAM_VERSION}" < "22.10"  ]] && STD_FLAG="c++14" || STD_FLAG="c++17"
 
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
@@ -75,6 +75,10 @@ cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+
+# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
+# Upgrade protobuf version to fix the issue.
+pip3 install "protobuf>4.24.0"
 
 TF_CFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
 TF_LFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
@@ -88,12 +92,12 @@ g++ -std=${STD_FLAG} -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $DESTDIR/libze
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cc .
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc .
 patch -i $SRCDIR/cuda_op_kernel.cu.cc.patch cuda_op_kernel.cu.cc
-nvcc -std=${STD_FLAG} -O2 -c -arch=all -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
 g++ -std=${STD_FLAG} -shared -o $DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 cp $SRCDIR/busy_op_kernel.cc .
 cp $SRCDIR/busy_op_kernel.cu.cc .
-nvcc -std=${STD_FLAG} -O2 -c -arch=all -o busy_op_kernel.cu.o busy_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o busy_op_kernel.cu.o busy_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
 g++ -std=${STD_FLAG} -shared -o $DESTDIR/libbusyop.so busy_op_kernel.cc busy_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 python3 $SRCDIR/gen_qa_custom_ops_models.py --graphdef --savedmodel \
@@ -126,7 +130,7 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py310_cu121//custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/py310_cu122/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 

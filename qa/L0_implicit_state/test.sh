@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,14 +41,16 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 TEST_RESULT_FILE='test_results.txt'
 
 export ENSEMBLES=0
-BACKENDS=${BACKENDS:="onnx plan"}
+BACKENDS=${BACKENDS:="libtorch onnx plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
 INITIAL_STATE_ZERO=${INITIAL_STATE_ZERO:="0"}
 INITIAL_STATE_FILE=${INITIAL_STATE_FILE:="0"}
+SINGLE_STATE_BUFFER=${SINGLE_STATE_BUFFER:="0"}
 
 export INITIAL_STATE_ZERO
 export INITIAL_STATE_FILE
+export SINGLE_STATE_BUFFER
 
 MODELDIR=${MODELDIR:=`pwd`/models}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -60,10 +62,14 @@ source ../common/util.sh
 cp ./libtriton_implicit_state.so models/no_implicit_state/
 cp ./libtriton_implicit_state.so models/no_state_update/
 cp ./libtriton_implicit_state.so models/wrong_internal_state/
+cp ./libtriton_implicit_state.so models/single_state_buffer/
+cp ./libtriton_implicit_state.so models/growable_memory/
 
 mkdir -p models/no_implicit_state/1/
 mkdir -p models/no_state_update/1/
 mkdir -p models/wrong_internal_state/1/
+mkdir -p models/single_state_buffer/1/
+mkdir -p models/growable_memory/1/
 
 for BACKEND in $BACKENDS; do
     dtype="int32"
@@ -78,15 +84,21 @@ for BACKEND in $BACKENDS; do
     rm -rf models/$model_name_allow_output
     cp -r $DATADIR/qa_sequence_implicit_model_repository/$model_name models/$model_name_allow_output
 
-    (cd models/$model_name_allow_output && \
-        sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
-        echo -e "output [{ name: \"OUTPUT_STATE\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    if [ $BACKEND == "libtorch" ]; then
+    	(cd models/$model_name_allow_output && \
+    	    sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
+    	    echo -e "output [{ name: \"OUTPUT_STATE__1\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    else
+    	(cd models/$model_name_allow_output && \
+    	    sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
+    	    echo -e "output [{ name: \"OUTPUT_STATE\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    fi
 done
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --cuda-virtual-address-size=0:$((1024*1024*4))"
 IMPLICIT_STATE_CLIENT='implicit_state.py'
-EXPECTED_TEST_NUM=5
+EXPECTED_TEST_NUM=7
 rm -rf $CLIENT_LOG
 
 run_server

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,19 +30,20 @@ import sys
 
 sys.path.append("../../common")
 
-import test_util as tu
-import shm_util
-from functools import partial
-import tritonclient.http as httpclient
-import tritonclient.grpc as grpcclient
-from tritonclient.utils import *
-import numpy as np
-import unittest
 import queue
+import time
+import unittest
+from functools import partial
+
+import numpy as np
+import shm_util
+import test_util as tu
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import *
 
 
 class UserData:
-
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -53,17 +56,87 @@ def callback(user_data, result, error):
 
 
 class LifecycleTest(tu.TestResultCollector):
-
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
+    def test_error_code(self):
+        model_name = "error_code"
+        shape = [1, 1]
+        # [(Triton error, expected gRPC error message starting), ...]
+        errors = [
+            ("UNKNOWN", "[StatusCode.UNKNOWN]"),
+            ("INTERNAL", "[StatusCode.INTERNAL]"),
+            ("NOT_FOUND", "[StatusCode.NOT_FOUND]"),
+            ("INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
+            ("UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
+            ("UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
+            ("ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("CANCELLED", "[StatusCode.CANCELLED]"),
+            ("(default)", "[StatusCode.INTERNAL] unrecognized"),
+        ]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                for error, expected_grpc_error_start in errors:
+                    input_data = np.array([[error]], dtype=np.object_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    with self.assertRaises(InferenceServerException) as e:
+                        client.infer(model_name, inputs)
+                    # e.g. [StatusCode.UNKNOWN] error code: TRITONSERVER_ERROR_UNKNOWN
+                    # e.g. [StatusCode.INTERNAL] unrecognized error code: (default)
+                    self.assertEqual(
+                        str(e.exception),
+                        expected_grpc_error_start + " error code: " + error,
+                    )
+
+    def test_execute_cancel(self):
+        model_name = "execute_cancel"
+        log_path = "lifecycle_server.log"
+        execute_delay = 4.0  # seconds
+        shape = [1, 1]
+        response = {"responded": False, "result": None, "error": None}
+
+        def callback(result, error):
+            response["responded"] = True
+            response["result"] = result
+            response["error"] = error
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                input_data = np.array([[execute_delay]], dtype=np.float32)
+                inputs = [
+                    grpcclient.InferInput(
+                        "EXECUTE_DELAY", shape, np_to_triton_dtype(input_data.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                exec_future = client.async_infer(model_name, inputs, callback)
+                time.sleep(2)  # ensure the request is executing
+                self.assertFalse(response["responded"])
+                exec_future.cancel()
+                time.sleep(2)  # ensure the cancellation is delivered
+                self.assertTrue(response["responded"])
+
+        self.assertEqual(response["result"], None)
+        self.assertIsInstance(response["error"], InferenceServerException)
+        self.assertEqual(response["error"].status(), "StatusCode.CANCELLED")
+        with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
+            log_text = f.read()
+            self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
+            self.assertIn("[execute_cancel] Request cancelled at ", log_text)
+
     def test_batch_error(self):
-        # The execute_error model returns an error for the first request and
-        # sucessfully processes the second request. This is making sure that
-        # an error in a single request does not completely fail the batch.
+        # The execute_error model returns an error for the first and third
+        # request and successfully processes the second request. This is making
+        # sure that an error in a single request does not completely fail the
+        # batch.
         model_name = "execute_error"
         shape = [2, 2]
-        number_of_requests = 2
+        number_of_requests = 3
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
@@ -74,16 +147,16 @@ class LifecycleTest(tu.TestResultCollector):
                 input_data = np.random.randn(*shape).astype(np.float32)
                 input_datas.append(input_data)
                 inputs = [
-                    grpcclient.InferInput("IN", input_data.shape,
-                                          np_to_triton_dtype(input_data.dtype))
+                    grpcclient.InferInput(
+                        "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                    )
                 ]
                 inputs[0].set_data_from_numpy(input_data)
-                triton_client.async_stream_infer(model_name=model_name,
-                                                 inputs=inputs)
+                triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
 
             for i in range(number_of_requests):
                 result = user_data._completed_requests.get()
-                if i == 0:
+                if i == 0 or i == 2:
                     self.assertIs(type(result), InferenceServerException)
                     continue
 
@@ -93,7 +166,9 @@ class LifecycleTest(tu.TestResultCollector):
                 self.assertTrue(
                     np.array_equal(output_data, input_datas[i]),
                     "error: expected output {} to match input {}".format(
-                        output_data, input_datas[i]))
+                        output_data, input_datas[i]
+                    ),
+                )
 
     def test_infer_pymodel_error(self):
         model_name = "wrong_model"
@@ -103,8 +178,9 @@ class LifecycleTest(tu.TestResultCollector):
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
                 inputs = [
-                    httpclient.InferInput("IN", input_data.shape,
-                                          np_to_triton_dtype(input_data.dtype))
+                    httpclient.InferInput(
+                        "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                    )
                 ]
                 inputs[0].set_data_from_numpy(input_data)
                 try:
@@ -114,21 +190,24 @@ class LifecycleTest(tu.TestResultCollector):
                     self.assertTrue(
                         e.message().startswith(
                             "Failed to process the request(s) for model instance"
-                        ), "Exception message is not correct")
+                        ),
+                        "Exception message is not correct",
+                    )
                 else:
                     self.assertTrue(
-                        False,
-                        "Wrong exception raised or did not raise an exception")
+                        False, "Wrong exception raised or did not raise an exception"
+                    )
 
     def test_incorrect_execute_return(self):
-        model_name = 'execute_return_error'
+        model_name = "execute_return_error"
         shape = [1, 1]
         with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = (5 * np.random.randn(*shape)).astype(np.float32)
                 inputs = [
-                    httpclient.InferInput("INPUT", input_data.shape,
-                                          np_to_triton_dtype(input_data.dtype))
+                    httpclient.InferInput(
+                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                    )
                 ]
                 inputs[0].set_data_from_numpy(input_data)
 
@@ -138,8 +217,10 @@ class LifecycleTest(tu.TestResultCollector):
 
                 self.assertTrue(
                     "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0', message: Expected a list in the "
-                    "execute return" in str(e.exception), "Exception message is not correct.")
+                    "'execute_return_error_0_0', message: Expected a list in the "
+                    "execute return" in str(e.exception),
+                    "Exception message is not correct.",
+                )
 
                 # The second inference request will return a list of None object
                 # instead of Python InferenceResponse objects.
@@ -148,10 +229,12 @@ class LifecycleTest(tu.TestResultCollector):
 
                 self.assertTrue(
                     "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0', message: Expected an "
+                    "'execute_return_error_0_0', message: Expected an "
                     "'InferenceResponse' object in the execute function return"
-                    " list" in str(e.exception), "Exception message is not correct.")
+                    " list" in str(e.exception),
+                    "Exception message is not correct.",
+                )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

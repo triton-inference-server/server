@@ -45,18 +45,23 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+MODELDIR="model_repository"
+# Use identity model as dummy step to ensure parameters pass through each step
+mkdir -p "${MODELDIR}/identity/1"
+mkdir -p "${MODELDIR}/ensemble/1"
+
 # TODO: Add support and testing for C++ client parameters:
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
 RET=0
 for i in {0..1}; do
-  
+
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   if [ $i == 1 ]; then
-    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
   else
-    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
   fi
   run_server
   if [ "$SERVER_PID" == "0" ]; then
@@ -64,7 +69,7 @@ for i in {0..1}; do
       cat $SERVER_LOG
       exit 1
   fi
-  
+
   set +e
   TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
@@ -72,9 +77,9 @@ for i in {0..1}; do
       echo -e "\n***\n*** Test Failed\n***"
       RET=1
   fi
-  
+
   set -e
-  
+
   kill $SERVER_PID
   wait $SERVER_PID
 done
