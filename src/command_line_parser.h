@@ -145,6 +145,7 @@ struct TritonServerParameters {
   // memory pool configuration
   int64_t pinned_memory_pool_byte_size_{1 << 28};
   std::list<std::pair<int, uint64_t>> cuda_pools_;
+  std::list<std::pair<int, size_t>> cuda_virtual_address_size_;
 
   // [FIXME] this option is broken after backend separation: this should have
   // controlled backend copy behavior but not properly propagate to backend
