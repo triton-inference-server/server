@@ -40,7 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 TIMEOUT_VALUE=100000000
-SHORT_TIMEOUT_VALUE=1
+SHORT_TIMEOUT_VALUE=1000
 RET=0
 
 CLIENT_TIMEOUT_TEST=client_timeout_test.py
@@ -62,6 +62,10 @@ mkdir -p $DATADIR/custom_identity_int32/1
 # Test all APIs apart from Infer.
 export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
 run_server
+if [ $? -eq 1 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC non-infer APIs\n***"
+    RET=1
+fi
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -78,7 +82,7 @@ if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_non_infer_apis` != "18"
 fi
 # Test all APIs with long timeout
 $CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -i grpc -p >> ${CLIENT_LOG} 2>&1
-if [ $? -eq 1 ]; then
+if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Test Failed: GRPC non-infer APIs\n***"
     RET=1
 fi
@@ -89,7 +93,7 @@ wait $SERVER_PID
 
 # Test infer APIs
 unset TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose 2"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
