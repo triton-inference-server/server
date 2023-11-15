@@ -135,6 +135,7 @@ images.
 - [Build Triton Inference Server for Windows 10](docs/customization_guide/build.md#building-for-windows-10)
 - Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md),
   [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
+- [Secure Deployment Considerations](docs/customization_guide/deploy.md)
 
 ### Using Triton
 
