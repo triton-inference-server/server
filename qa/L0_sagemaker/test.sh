@@ -403,6 +403,7 @@ mkdir -p ${ENSEMBLE_MODEL_PATH}/fan_${model_name}/1 && \
             (cd ${ENSEMBLE_MODEL_PATH}/fan_${model_name} && \
                     sed -i "s/label_filename:.*//" config.pbtxt && \
                     sed -i "s/model_name: \"ENSEMBLE_MODEL_NAME\"/model_name: \"${model_name}\"/" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"fan_${model_name}\"/}" config.pbtxt && \
                     echo "max_batch_size: 64" >> config.pbtxt)
 
 # # custom float32 component of ensemble
