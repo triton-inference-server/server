@@ -210,8 +210,6 @@ apt-get update && \
             software-properties-common
 ln -s /usr/bin/python3 /usr/bin/python
 
-pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
-
 pip3 install  "numpy<=1.23.5" setuptools
 
 pip3 install openvino==$OPENVINO_VERSION
