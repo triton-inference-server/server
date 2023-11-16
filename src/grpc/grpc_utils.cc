@@ -26,7 +26,6 @@
 
 #include "grpc_utils.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <thread>
 

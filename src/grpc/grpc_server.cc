@@ -2406,12 +2406,13 @@ Server::Server(
   model_infer_cq_ = builder_.AddCompletionQueue();
   model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
-  // A common Handler for other non-inference requests
+  // For testing purposes only, add artificial delay in grpc responses.
   const char* dstr = getenv("TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC");
   uint64_t response_delay = 0;
   if (dstr != nullptr) {
     response_delay = atoi(dstr);
   }
+  // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
       &health_service_, common_cq_.get(), options.restricted_protocols_,

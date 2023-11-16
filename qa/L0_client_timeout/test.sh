@@ -43,7 +43,8 @@ TIMEOUT_VALUE=100000000
 SHORT_TIMEOUT_VALUE=1000
 RET=0
 
-CLIENT_TIMEOUT_TEST=client_timeout_test.py
+CLIENT_INFER_TIMEOUT_TEST=client_infer_timeout_test.py
+CLIENT_NON_INFER_TIMEOUT_TEST=client_non_infer_timeout_test.py
 CLIENT_TIMEOUT_TEST_CPP=../clients/client_timeout_test
 TEST_RESULT_FILE='test_results.txt'
 
@@ -219,7 +220,7 @@ for i in test_grpc_infer \
     test_http_infer \
     test_http_async_infer \
    ; do
-    python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
+    python $CLIENT_INFER_TIMEOUT_TEST ClientInferTimeoutTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
@@ -249,34 +250,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 set +e
 
-for i in test_grpc_server_live \
-         test_grpc_is_server_ready \
-         test_grpc_is_model_ready \
-         test_grpc_get_server_metadata \
-         test_grpc_get_model_metadata \
-         test_grpc_get_model_config \
-         test_grpc_model_repository_index \
-         test_grpc_load_model \
-         test_grpc_unload_model \
-         test_grpc_get_inference_statistics \
-         test_grpc_update_trace_settings \
-         test_grpc_get_trace_settings \
-         test_grpc_update_log_settings \
-         test_grpc_get_log_settings \
-         test_grpc_get_system_shared_memory_status \
-         test_grpc_register_system_shared_memory \
-         test_grpc_unregister_system_shared_memory \
-         test_grpc_get_cuda_shared_memory_status \
-         test_grpc_register_cuda_shared_memory \
-         test_grpc_unregister_cuda_shared_memory \
-    ; do
-    python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    fi
-done
+python $CLIENT_NON_INFER_TIMEOUT_TEST >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+    echo -e "\n***\n*** Test $i Failed\n***"
+    RET=1
+fi
+
 set -e
 kill $SERVER_PID
 wait $SERVER_PID
