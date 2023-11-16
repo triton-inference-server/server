@@ -3173,6 +3173,7 @@ HTTPAPIServer::HandleGenerate(
         streaming, irequest));
   }
   generate_request->trace_ = trace;
+
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
   // by reference to capture local updates, except for shared pointers which
