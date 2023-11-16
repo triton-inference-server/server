@@ -223,7 +223,8 @@ class HTTPAPIServer : public HTTPServer {
     // buffer in HTTPServer code.
     explicit InferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
-        DataCompressor::Type response_compression_type);
+        DataCompressor::Type response_compression_type,
+        TRITONSERVER_InferenceRequest* triton_request);
     virtual ~InferRequestClass() = default;
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
@@ -254,6 +255,9 @@ class HTTPAPIServer : public HTTPServer {
     // lifetime of the request.
     std::list<std::vector<char>> serialized_data_;
 
+    static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
+    static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+
    protected:
     TRITONSERVER_Server* server_;
     evhtp_request_t* req_;
@@ -264,13 +268,17 @@ class HTTPAPIServer : public HTTPServer {
     // Counter to keep track of number of responses generated.
     std::atomic<uint32_t> response_count_;
 
-    // Keep track of active requests
-    // note this should only be accessed
-    // from event thread
-    static std::unordered_set<evhtp_request_t*> active_requests_;
-
     // Event hook for called before request deletion
     static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);
+
+    // Set to keep track of active requests.
+    // To maintain thread safety must only be manipulated on event thread
+    static std::unordered_set<evhtp_request*> active_requests_;
+
+    // Pointer to associated Triton request, this class does not own the
+    // request and must not reference it after a successful
+    // TRITONSERVER_ServerInferAsync (except for cancellation).
+    TRITONSERVER_InferenceRequest* triton_request_{nullptr};
   };
 
   class GenerateRequestClass : public InferRequestClass {
@@ -281,9 +289,10 @@ class HTTPAPIServer : public HTTPServer {
         const MappingSchema* request_schema,
         const MappingSchema* response_schema, bool streaming,
         TRITONSERVER_InferenceRequest* triton_request)
-        : InferRequestClass(server, req, response_compression_type),
+        : InferRequestClass(
+              server, req, response_compression_type, triton_request),
           request_schema_(request_schema), response_schema_(response_schema),
-          streaming_(streaming), triton_request_(triton_request)
+          streaming_(streaming)
     {
     }
     virtual ~GenerateRequestClass();
@@ -348,10 +357,7 @@ class HTTPAPIServer : public HTTPServer {
     const MappingSchema* request_schema_{nullptr};
     const MappingSchema* response_schema_{nullptr};
     const bool streaming_{false};
-    // Pointer to associated Triton request, this class does not own the
-    // request and must not reference it after a successful
-    // TRITONSERVER_ServerInferAsync.
-    TRITONSERVER_InferenceRequest* triton_request_{nullptr};
+
     // Placeholder to completing response, this class does not own
     // the response.
     TRITONSERVER_InferenceResponse* triton_response_{nullptr};
@@ -377,10 +383,10 @@ class HTTPAPIServer : public HTTPServer {
   virtual void Handle(evhtp_request_t* req) override;
   // [FIXME] extract to "infer" class
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
-      evhtp_request_t* req)
+      evhtp_request_t* req, TRITONSERVER_InferenceRequest* triton_request)
   {
     return std::unique_ptr<InferRequestClass>(new InferRequestClass(
-        server_.get(), req, GetResponseCompressionType(req)));
+        server_.get(), req, GetResponseCompressionType(req), triton_request));
   }
 
   // Helper function to retrieve infer request header in the form specified by
@@ -505,10 +511,6 @@ class HTTPAPIServer : public HTTPServer {
   TRITONSERVER_Error* ParseJsonTritonRequestID(
       triton::common::TritonJson::Value& request_json,
       TRITONSERVER_InferenceRequest* irequest);
-
-
-  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 

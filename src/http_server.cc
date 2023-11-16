@@ -3509,7 +3509,7 @@ HTTPAPIServer::HandleInfer(
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
-  auto infer_request = CreateInferRequest(req);
+  auto infer_request = CreateInferRequest(req, irequest);
   infer_request->trace_ = trace;
 
   const char* request_id = "<id_unknown>";
@@ -3585,14 +3585,22 @@ HTTPAPIServer::HandleInfer(
 }
 
 void
-HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::InferRequestClass::OKReplyCallback(
+    evthr_t* thr, void* arg, void* shared)
 {
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, EVHTP_RES_OK);
-  evhtp_request_resume(request);
+
+  if (InferRequestClass::active_requests_.count(request) == 0) {
+    if (infer_request->triton_request_ != nullptr) {
+      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+    }
+  } else {
+    evhtp_send_reply(request, EVHTP_RES_OK);
+    evhtp_request_resume(request);
+  }
 
 #ifdef TRITON_ENABLE_TRACING
   if (infer_request->trace_ != nullptr) {
@@ -3607,14 +3615,22 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::InferRequestClass::BADReplyCallback(
+    evthr_t* thr, void* arg, void* shared)
 {
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, EVHTP_RES_BADREQ);
-  evhtp_request_resume(request);
+
+  if (InferRequestClass::active_requests_.count(request) == 0) {
+    if (infer_request->triton_request_ != nullptr) {
+      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+    }
+  } else {
+    evhtp_send_reply(request, EVHTP_RES_BADREQ);
+    evhtp_request_resume(request);
+  }
 
 #ifdef TRITON_ENABLE_TRACING
   if (infer_request->trace_ != nullptr) {
@@ -3641,9 +3657,11 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
-    DataCompressor::Type response_compression_type)
+    DataCompressor::Type response_compression_type,
+    TRITONSERVER_InferenceRequest* triton_request)
     : server_(server), req_(req),
-      response_compression_type_(response_compression_type), response_count_(0)
+      response_compression_type_(response_compression_type), response_count_(0),
+      triton_request_(triton_request)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
@@ -3717,11 +3735,15 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   if (err == nullptr) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
+    evthr_defer(
+        infer_request->thread_, InferRequestClass::OKReplyCallback,
+        infer_request);
   } else {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
     TRITONSERVER_ErrorDelete(err);
-    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    evthr_defer(
+        infer_request->thread_, InferRequestClass::BADReplyCallback,
+        infer_request);
   }
 
   LOG_TRITONSERVER_ERROR(
