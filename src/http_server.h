@@ -35,6 +35,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "common.h"
 #include "data_compressor.h"
@@ -262,6 +263,14 @@ class HTTPAPIServer : public HTTPServer {
 
     // Counter to keep track of number of responses generated.
     std::atomic<uint32_t> response_count_;
+
+    // Keep track of active requests
+    // note this should only be accessed
+    // from event thread
+    static std::unordered_set<evhtp_request_t*> active_requests_;
+
+    // Event hook for called before request deletion
+    static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);
   };
 
   class GenerateRequestClass : public InferRequestClass {
@@ -294,6 +303,8 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_InferenceResponse* response) override;
     void AddErrorJson(TRITONSERVER_Error* error);
     void StartResponse(evhtp_res code);
+
+    static void StartResponse_2(evthr_t* thr, void* arg, void* shared);
 
     // [DLIS-5551] currently always performs basic conversion, only maps schema
     // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for
@@ -352,6 +363,8 @@ class HTTPAPIServer : public HTTPServer {
     std::mutex res_mtx_;
     std::queue<evbuffer*> pending_http_responses_;
     bool end_{false};
+    // starting response code
+    evhtp_res response_code_;
   };
 
  protected:
