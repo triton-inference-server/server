@@ -3197,7 +3197,6 @@ HTTPAPIServer::HandleGenerate(
           "deleting HTTP/REST inference request");
       AddContentTypeHeader(req, "application/json");
       EVBufferAddErrorJson(req->buffer_out, error);
-
       evhtp_send_reply(req, EVHTP_RES_BADREQ);
       evhtp_request_resume(req);
 
