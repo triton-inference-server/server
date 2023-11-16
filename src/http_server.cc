@@ -3645,7 +3645,7 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
   }
 
   InferRequestClass::active_requests_.erase(request);
-  return 200;
+  return EVHTP_RES_OK;
 }
 
 HTTPAPIServer::InferRequestClass::InferRequestClass(
