@@ -394,8 +394,7 @@ cp ../python_models/add_sub/model.py ${ENSEMBLE_MODEL_PATH}/${model_name}/1/. &&
 cp ../python_models/add_sub/config.pbtxt ${ENSEMBLE_MODEL_PATH}/${model_name}/.
 (cd ${ENSEMBLE_MODEL_PATH}/${model_name} && \
                     sed -i "s/label_filename:.*//" config.pbtxt && \
-                    sed -i "0,/name:.*/{s/name:.*/name: \"${model_name}\"/}" config.pbtxt && \
-                                        echo "max_batch_size: 64" >> config.pbtxt)
+                    echo "max_batch_size: 64" >> config.pbtxt)
 
 # Ensemble part
 mkdir -p ${ENSEMBLE_MODEL_PATH}/fan_${model_name}/1 && \
