@@ -26,9 +26,6 @@
 
 #include "grpc_utils.h"
 
-#include <cstdlib>
-#include <thread>
-
 namespace triton { namespace server { namespace grpc {
 
 std::ostream&
