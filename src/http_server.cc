@@ -3635,15 +3635,6 @@ evhtp_res
 HTTPAPIServer::InferRequestClass::RequestFiniHook(
     evhtp_request* request, void* arg)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
-
-  evhtp_request_t* stored_request = infer_request->EvHtpRequest();
-  if (stored_request != request) {
-    LOG_ERROR << "[INTERNAL] mismatched request pointer in finish hook";
-    InferRequestClass::active_requests_.erase(stored_request);
-  }
-
   InferRequestClass::active_requests_.erase(request);
   return EVHTP_RES_OK;
 }
