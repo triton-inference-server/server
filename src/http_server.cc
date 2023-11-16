@@ -4079,7 +4079,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   if (infer_request->IncrementResponseCount() == 0) {
     infer_request->response_code_ =
         (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
-    evthr_defer(infer_request->thread_, StartResponse_2, infer_request);
+    evthr_defer(infer_request->thread_, StartResponse, infer_request);
   }
 
 #ifdef TRITON_ENABLE_TRACING
@@ -4102,7 +4102,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
 }
 
 void
-HTTPAPIServer::GenerateRequestClass::StartResponse_2(
+HTTPAPIServer::GenerateRequestClass::StartResponse(
     evthr_t* thr, void* arg, void* shared)
 {
   auto infer_request =
@@ -4123,18 +4123,6 @@ HTTPAPIServer::GenerateRequestClass::StartResponse_2(
   }
   evhtp_send_reply_chunk_start(req, infer_request->response_code_);
   evhtp_request_resume(req);
-}
-
-void
-HTTPAPIServer::GenerateRequestClass::StartResponse(evhtp_res code)
-{
-  if (streaming_) {
-    AddContentTypeHeader(req_, "text/event-stream; charset=utf-8");
-  } else {
-    AddContentTypeHeader(req_, "application/json");
-  }
-  evhtp_send_reply_chunk_start(req_, code);
-  evhtp_request_resume(req_);
 }
 
 void
