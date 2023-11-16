@@ -566,7 +566,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
   if (err == nullptr) {
     connection_paused = true;
 
-    auto infer_request = CreateInferRequest(req);
+    auto infer_request = CreateInferRequest(req, irequest);
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
