@@ -302,9 +302,7 @@ class HTTPAPIServer : public HTTPServer {
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response) override;
     void AddErrorJson(TRITONSERVER_Error* error);
-    void StartResponse(evhtp_res code);
-
-    static void StartResponse_2(evthr_t* thr, void* arg, void* shared);
+    static void StartResponse(evthr_t* thr, void* arg, void* shared);
 
     // [DLIS-5551] currently always performs basic conversion, only maps schema
     // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for

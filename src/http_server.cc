@@ -3122,12 +3122,6 @@ HTTPAPIServer::HandleGenerate(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
-
-  //  auto test_callback_2 = [](evhtp_request_t* req, void*arg) -> evhtp_res {
-  // printf("finish!\n");
-  // return  200;
-  //  };
-
   int64_t requested_model_version;
   RETURN_AND_RESPOND_IF_ERR(
       req,
@@ -4148,10 +4142,6 @@ void
 HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
     evthr_t* thr, void* arg, void* shared)
 {
-  std::thread::id this_id = std::this_thread::get_id();
-
-  std::cout << "thread " << this_id << " chunk callback...\n";
-
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
@@ -4169,11 +4159,6 @@ void
 HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
     evthr_t* thr, void* arg, void* shared)
 {
-  std::thread::id this_id = std::this_thread::get_id();
-
-  std::cout << "thread " << this_id << " end callback...\n";
-
-
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
@@ -4181,11 +4166,11 @@ HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
     if (infer_request->triton_request_ != nullptr) {
       TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
     }
-    return;
+  } else {
+    infer_request->SendChunkResponse(true /* end */);
+    evhtp_send_reply_chunk_end(infer_request->EvHtpRequest());
   }
 
-  infer_request->SendChunkResponse(true /* end */);
-  evhtp_send_reply_chunk_end(infer_request->EvHtpRequest());
   delete infer_request;
 }
 
@@ -4222,9 +4207,7 @@ HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
     buffer = pending_http_responses_.front();
     pending_http_responses_.pop();
   }
-  printf("here before sending response!\n");
   evhtp_send_reply_chunk(req_, buffer);
-  printf("here after sending response!\n");
   evbuffer_free(buffer);
 
 #ifdef TRITON_ENABLE_TRACING
