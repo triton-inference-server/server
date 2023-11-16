@@ -357,7 +357,6 @@ class HTTPAPIServer : public HTTPServer {
     const MappingSchema* request_schema_{nullptr};
     const MappingSchema* response_schema_{nullptr};
     const bool streaming_{false};
-
     // Placeholder to completing response, this class does not own
     // the response.
     TRITONSERVER_InferenceResponse* triton_response_{nullptr};
