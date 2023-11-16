@@ -4086,7 +4086,6 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(evhtp_res code)
     AddContentTypeHeader(req_, "application/json");
   }
   evhtp_send_reply_chunk_start(req_, code);
-  evhtp_request_resume(req_);
 }
 
 void
@@ -4107,6 +4106,17 @@ HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
 
   infer_request->SendChunkResponse(true /* end */);
   evhtp_send_reply_chunk_end(infer_request->EvHtpRequest());
+  // Evhtp will clean up connection immediately if the request is not paused
+  // when the client closes the connection, therefore we keep request paused
+  // (disable read from client) until we are done with the responses. We may
+  // check the connection state on each response callback invocation and return
+  // an error so the backend may terminate the execution earlier, but there
+  // hasn't been an established contract on how backend should react when the
+  // response send function returns an error, here we choose to continue the
+  // response processing regardless for simplicity reason. We may revisit this
+  // if client-side disconnection is found to be a significant waste of
+  // computation resource.
+  evhtp_request_resume(infer_request->req_);
   delete infer_request;
 }
 
