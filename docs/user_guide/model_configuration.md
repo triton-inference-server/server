@@ -980,18 +980,24 @@ indicating sequence start, end, ready and correlation ID. See
 [Stateful Models](architecture.md#stateful-models) for more
 information and examples.
 
-#### Generative Sequence
+#### Iterative Sequences [Beta]
 
-When using sequence batcher, user may enable "generative sequences" by
-specifying the following:
+The sequence batcher also supports stateful execution of "iterative
+sequences" where a single request is processed over a number of
+scheduling iterations. "iterative sequences" enable the scheduler to
+batch multiple inflight sequences at each step and allow the model or
+backend to complete a sequences at any iteration.
+
+If a backend supports iterative sequences, a user's can configure
+"iterative sequences" by specifying the following:
 
 ```
   sequence_batching {
-    generative_sequence: true
+    iterative_sequence: true
   }
 ```
 
-"Generative sequence" refers to the type of model execution that the model
+An "iterative sequence" refers to the type of model execution that the model
 iteratively executes on the same request to produce responses until it
 has generated all responses for the request. When generative sequence is
 enabled, the scheduler will expect a single incoming request to initiate the
