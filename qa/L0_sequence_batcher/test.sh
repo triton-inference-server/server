@@ -42,6 +42,8 @@ TEST_RESULT_FILE='test_results.txt'
 
 # Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
+ldconfig || true
+
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
