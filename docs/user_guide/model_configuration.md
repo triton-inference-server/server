@@ -980,6 +980,44 @@ indicating sequence start, end, ready and correlation ID. See
 [Stateful Models](architecture.md#stateful-models) for more
 information and examples.
 
+#### Generative Sequence
+
+When using sequence batcher, user may enable "generative sequences" by
+specifying the following:
+
+```
+  sequence_batching {
+    generative_sequence: true
+  }
+```
+
+"Generative sequence" refers to the type of model execution that the model
+iteratively executes on the same request to produce responses until it
+has generated all responses for the request. When generative sequence is
+enabled, the scheduler will expect a single incoming request to initiate the
+sequence, and then the backends that support generative sequence can yield back
+to the sequence batcher to reschedule the request for further execution in
+a future batch.
+
+Because only one request is used to represent the whole sequence, the user
+doesn't need to and should not set
+[control inputs](architecture.md#control-inputs) mentioned in the previous
+section. They will be filled internally by the scheduler.
+
+There are similarities between generative sequence and [decoupled](#decoupled)
+setting that undetermined number of responses may be generated for a request.
+One major difference is that generative sequence may reschedule and execute the
+same request repeatedly to fully utilize the batching feature in Triton: an
+decoupled model generate all responses associated to a request within the same
+execution which can waste computation resource if execution on one of the
+request in the batch is much longer than the rest, whereas for generative
+sequence, the response generation is broken down into multiple executions and
+each execution can be run with an newly formed batch. Also note that the two
+settings are not mutually exclusive, the user may enable both for the models
+that fit.
+
+
+
 ### Ensemble Scheduler
 
 The ensemble scheduler must be used for [ensemble
