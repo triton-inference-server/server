@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "generative_sequence"
+name: "iterative_sequence"
 backend: "python"
 max_batch_size: 0
 model_transaction_policy {
@@ -45,7 +45,7 @@ output [
   }
 ]
 sequence_batching {
-  generative_sequence : true
+  iterative_sequence : true
 }
 
 instance_group [{ kind: KIND_CPU }]
