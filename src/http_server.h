@@ -225,7 +225,13 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
         TRITONSERVER_InferenceRequest* triton_request);
-    virtual ~InferRequestClass() = default;
+    virtual ~InferRequestClass()
+    {
+      if (req_ != nullptr) {
+        evhtp_request_unset_hook(req_, evhtp_hook_on_request_fini);
+      }
+      req_ = nullptr;
+    }
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -270,10 +276,6 @@ class HTTPAPIServer : public HTTPServer {
 
     // Event hook for called before request deletion
     static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);
-
-    // Set to keep track of active requests.
-    // To maintain thread safety must only be manipulated on event thread
-    static std::unordered_set<evhtp_request*> active_requests_;
 
     // Pointer to associated Triton request, this class does not own the
     // request and must not reference it after a successful

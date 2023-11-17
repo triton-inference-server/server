@@ -3593,9 +3593,11 @@ HTTPAPIServer::InferRequestClass::OKReplyCallback(
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
 
-  if (InferRequestClass::active_requests_.count(request) == 0) {
+  if (request == nullptr) {
     if (infer_request->triton_request_ != nullptr) {
-      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
+          "cancelling request");
     }
   } else {
     evhtp_send_reply(request, EVHTP_RES_OK);
@@ -3623,9 +3625,11 @@ HTTPAPIServer::InferRequestClass::BADReplyCallback(
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
 
-  if (InferRequestClass::active_requests_.count(request) == 0) {
+  if (request == nullptr) {
     if (infer_request->triton_request_ != nullptr) {
-      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
+          "cancelling request");
     }
   } else {
     evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -3644,14 +3648,17 @@ HTTPAPIServer::InferRequestClass::BADReplyCallback(
   delete infer_request;
 }
 
-std::unordered_set<evhtp_request*>
-    HTTPAPIServer::InferRequestClass::active_requests_ = {};
-
 evhtp_res
 HTTPAPIServer::InferRequestClass::RequestFiniHook(
     evhtp_request* request, void* arg)
 {
-  InferRequestClass::active_requests_.erase(request);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+  if (infer_request->req_ != request) {
+    LOG_ERROR << "[INTERNAL] mismatched request in fini hook";
+  } else {
+    infer_request->req_ = nullptr;
+  }
   return EVHTP_RES_OK;
 }
 
@@ -3667,9 +3674,8 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
   thread_ = htpconn->thread;
   evhtp_request_pause(req);
   evhtp_request_set_hook(
-      req, evhtp_hook_on_request_fini, (evhtp_hook)(void*)RequestFiniHook,
+      req_, evhtp_hook_on_request_fini, (evhtp_hook)(void*)RequestFiniHook,
       reinterpret_cast<void*>(this));
-  InferRequestClass::active_requests_.emplace(req);
 }
 
 void
@@ -4123,9 +4129,11 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
   auto req = infer_request->EvHtpRequest();
 
-  if (InferRequestClass::active_requests_.count(req) == 0) {
+  if (req == nullptr) {
     if (infer_request->triton_request_ != nullptr) {
-      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
+          "cancelling request");
     }
     return;
   }
@@ -4146,9 +4154,11 @@ HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
-  if (InferRequestClass::active_requests_.count(infer_request->req_) == 0) {
+  if (infer_request->req_ == nullptr) {
     if (infer_request->triton_request_ != nullptr) {
-      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
+          "cancelling request");
     }
     return;
   }
@@ -4163,9 +4173,11 @@ HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
-  if (InferRequestClass::active_requests_.count(infer_request->req_) == 0) {
+  if (infer_request->req_ == nullptr) {
     if (infer_request->triton_request_ != nullptr) {
-      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_);
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
+          "cancelling request");
     }
   } else {
     infer_request->SendChunkResponse(true /* end */);
