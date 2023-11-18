@@ -87,10 +87,7 @@ class TritonPythonModel:
                 for _ in range(rep_count):
                     if delay is not None:
                         time.sleep(delay)
-                    if not sender.is_cancelled():
-                        sender.send(response)
-                    else:
-                        break
+                    sender.send(response)
                 sender.send(
                     None
                     if not fail_last

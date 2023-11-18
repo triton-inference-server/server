@@ -3593,13 +3593,7 @@ HTTPAPIServer::InferRequestClass::OKReplyCallback(
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
 
-  if (request == nullptr) {
-    if (infer_request->triton_request_ != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
-          "cancelling request");
-    }
-  } else {
+  if (request != nullptr) {
     evhtp_send_reply(request, EVHTP_RES_OK);
     evhtp_request_resume(request);
   }
@@ -3625,13 +3619,7 @@ HTTPAPIServer::InferRequestClass::BADReplyCallback(
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
 
-  if (request == nullptr) {
-    if (infer_request->triton_request_ != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
-          "cancelling request");
-    }
-  } else {
+  if (request != nullptr) {
     evhtp_send_reply(request, EVHTP_RES_BADREQ);
     evhtp_request_resume(request);
   }
@@ -3652,6 +3640,12 @@ evhtp_res
 HTTPAPIServer::InferRequestClass::RequestFiniHook(
     evhtp_request* request, void* arg)
 {
+  // TODO: Cancel request
+  //
+  // Currently request release call back can happen before
+  // response is complete. Need a way to guarantee lifetime
+  // of request object.
+
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
   if (infer_request->req_ != request) {
@@ -4130,11 +4124,6 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   auto req = infer_request->EvHtpRequest();
 
   if (req == nullptr) {
-    if (infer_request->triton_request_ != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
-          "cancelling request");
-    }
     return;
   }
 
@@ -4155,11 +4144,6 @@ HTTPAPIServer::GenerateRequestClass::ChunkResponseCallback(
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
   if (infer_request->req_ == nullptr) {
-    if (infer_request->triton_request_ != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
-          "cancelling request");
-    }
     return;
   }
 
@@ -4173,13 +4157,7 @@ HTTPAPIServer::GenerateRequestClass::EndResponseCallback(
   auto infer_request =
       reinterpret_cast<HTTPAPIServer::GenerateRequestClass*>(arg);
 
-  if (infer_request->req_ == nullptr) {
-    if (infer_request->triton_request_ != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_),
-          "cancelling request");
-    }
-  } else {
+  if (infer_request->EvHtpRequest() != nullptr) {
     infer_request->SendChunkResponse(true /* end */);
     evhtp_send_reply_chunk_end(infer_request->EvHtpRequest());
   }
