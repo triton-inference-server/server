@@ -3642,8 +3642,8 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 {
   // TODO: Cancel request
   //
-  // Currently request release call back can happen before
-  // response is complete. Need a way to guarantee lifetime
+  // Currently request release callback can happen before
+  // responses are sent. Need a way to guarantee lifetime
   // of request object.
 
   HTTPAPIServer::InferRequestClass* infer_request =
