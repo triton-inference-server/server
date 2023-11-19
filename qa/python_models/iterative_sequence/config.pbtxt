@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,16 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-include(CMakeFindDependencyMacro)
+name: "iterative_sequence"
+backend: "python"
+max_batch_size: 0
+model_transaction_policy {
+  decoupled: True
+}
+input [
+  {
+    name: "IN"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+sequence_batching {
+  iterative_sequence : true
+}
 
-get_filename_component(
-  TRITONSEQUENCEBACKEND_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH
-)
-
-list(APPEND CMAKE_MODULE_PATH ${TRITONSEQUENCEBACKEND_CMAKE_DIR})
-
-if(NOT TARGET TritonGenerativeSequenceBackend::triton-sequence-backend)
-  include("${TRITONSEQUENCEBACKEND_CMAKE_DIR}/TritonGenerativeSequenceBackendTargets.cmake")
-endif()
-
-set(TRITONSEQUENCEBACKEND_LIBRARIES TritonGenerativeSequenceBackend::triton-sequence-backend)
+instance_group [{ kind: KIND_CPU }]

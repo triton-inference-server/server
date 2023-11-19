@@ -56,6 +56,6 @@ output [
   }
 ]
 sequence_batching {
-  generative_sequence : true
+  iterative_sequence : true
 }
 instance_group [{ kind: KIND_CPU }]
