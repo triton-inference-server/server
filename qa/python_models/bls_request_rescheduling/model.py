@@ -88,7 +88,7 @@ class RequestReschedulingTest(unittest.TestCase):
         self.assertEqual(expected_output_1[0], output1.as_numpy()[0])
 
     def test_decoupled_e2e(self):
-        model_name = "generative_sequence"
+        model_name = "iterative_sequence"
         self._reload_model(model_name)
 
         input_value = 3
