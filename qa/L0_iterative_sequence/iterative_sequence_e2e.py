@@ -45,7 +45,7 @@ from tritonclient.utils import InferenceServerException
 
 MODEL_CONFIG_BASE = """
 {{
-"backend": "generative_sequence",
+"backend": "iterative_sequence",
 "max_batch_size": 4,
 "input" : [
   {{
@@ -82,15 +82,15 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class GenerativeSequenceTest(tu.TestResultCollector):
+class IterativeSequenceTest(tu.TestResultCollector):
     def setUp(self):
         # Always make sure the original config is used
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
-            triton_client.load_model("generative_sequence")
+            triton_client.load_model("iterative_sequence")
 
     def test_generate_stream(self):
         headers = {"Accept": "text/event-stream"}
-        url = "http://localhost:8000/v2/models/generative_sequence/generate_stream"
+        url = "http://localhost:8000/v2/models/iterative_sequence/generate_stream"
         inputs = {"INPUT": 2}
         res = requests.post(url, data=json.dumps(inputs), headers=headers)
         res.raise_for_status()
@@ -112,7 +112,7 @@ class GenerativeSequenceTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(np.array([[2]], dtype=np.int32))
 
             triton_client.async_stream_infer(
-                model_name="generative_sequence",
+                model_name="iterative_sequence",
                 inputs=inputs,
                 sequence_id=sequence_id,
                 sequence_start=sequence_start,
@@ -127,25 +127,43 @@ class GenerativeSequenceTest(tu.TestResultCollector):
                     self.assertEqual(res_count, data_item.as_numpy("OUTPUT")[0][0])
             self.assertEqual(0, res_count)
 
+    def test_reschedule_error(self):
+        # Use short idle timeout (< backend reschedule delay: 0.5s) so that
+        # the backend won't be able to reschedule the request as the scheduler
+        # will terminate the sequence early
+        config = r'"sequence_batching" : { "iterative_sequence" : true, "max_sequence_idle_microseconds" : 200000 }'
+        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            triton_client.load_model(
+                "iterative_sequence", config=MODEL_CONFIG_BASE.format(config)
+            )
+        with self.assertRaises(InferenceServerException) as context:
+            # Without specifying 'iterative_sequence : true', the sequence
+            # batcher expects sequence parameters to be provided explicitly
+            self.test_grpc_stream()
+        print(str(context.exception))
+        self.assertTrue(
+            "must specify the START flag on the first request of the sequence"
+            in str(context.exception)
+        )
+
     def test_unsupported_sequence_scheduler(self):
         # Override model config with scheduler settings that do not support
         # request rescheduling.
         configs = [
-            r'"sequence_batching" : { "direct" : {}, "generative_sequence" : false }',
-            r'"sequence_batching" : { "oldest" : {}, "generative_sequence" : false }',
+            r'"sequence_batching" : { "direct" : {}, "iterative_sequence" : false }',
+            r'"sequence_batching" : { "oldest" : {}, "iterative_sequence" : false }',
         ]
         sid = 1
         for sc in configs:
             with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
                 triton_client.load_model(
-                    "generative_sequence", config=MODEL_CONFIG_BASE.format(sc)
+                    "iterative_sequence", config=MODEL_CONFIG_BASE.format(sc)
                 )
             with self.assertRaises(InferenceServerException) as context:
-                # Without specifying 'generative_sequence : true', the sequence
+                # Without specifying 'iterative_sequence : true', the sequence
                 # batcher expects sequence parameters to be provided explicitly
                 self.test_grpc_stream(sequence_id=sid, sequence_start=True)
             sid += 1
-            print(str(context.exception))
             self.assertTrue(
                 "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
                 in str(context.exception)
@@ -160,11 +178,10 @@ class GenerativeSequenceTest(tu.TestResultCollector):
         for sc in configs:
             with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
                 triton_client.load_model(
-                    "generative_sequence", config=MODEL_CONFIG_BASE.format(sc)
+                    "iterative_sequence", config=MODEL_CONFIG_BASE.format(sc)
                 )
             with self.assertRaises(InferenceServerException) as context:
                 self.test_grpc_stream()
-            print(str(context.exception))
             self.assertTrue(
                 "Request is released with TRITONSERVER_REQUEST_RELEASE_RESCHEDULE"
                 in str(context.exception)

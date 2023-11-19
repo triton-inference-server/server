@@ -23,17 +23,26 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-include(CMakeFindDependencyMacro)
-
-get_filename_component(
-  TRITONSEQUENCEBACKEND_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH
-)
-
-list(APPEND CMAKE_MODULE_PATH ${TRITONSEQUENCEBACKEND_CMAKE_DIR})
-
-if(NOT TARGET TritonGenerativeSequenceBackend::triton-sequence-backend)
-  include("${TRITONSEQUENCEBACKEND_CMAKE_DIR}/TritonGenerativeSequenceBackendTargets.cmake")
-endif()
-
-set(TRITONSEQUENCEBACKEND_LIBRARIES TritonGenerativeSequenceBackend::triton-sequence-backend)
+backend: "iterative_sequence"
+max_batch_size: 4
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+model_transaction_policy {
+  decoupled: True
+}
+sequence_batching {
+  iterative_sequence : true
+}
+instance_group [{ kind: KIND_CPU }]

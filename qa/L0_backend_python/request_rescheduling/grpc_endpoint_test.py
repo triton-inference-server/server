@@ -57,8 +57,8 @@ class GrpcEndpointTest(tu.TestResultCollector):
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
             # Reload the model to reset the flag
-            triton_client.unload_model("generative_sequence")
-            triton_client.load_model("generative_sequence")
+            triton_client.unload_model("iterative_sequence")
+            triton_client.load_model("iterative_sequence")
 
             triton_client.start_stream(callback=partial(callback, user_data))
             inputs = []
@@ -66,7 +66,7 @@ class GrpcEndpointTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(np.array([3], dtype=np.int32))
 
             triton_client.async_stream_infer(
-                model_name="generative_sequence",
+                model_name="iterative_sequence",
                 inputs=inputs,
                 sequence_id=sequence_id,
                 sequence_start=sequence_start,

@@ -32,11 +32,11 @@
 #include "triton/backend/backend_model.h"
 #include "triton/backend/backend_model_instance.h"
 
-namespace triton { namespace backend { namespace generative_sequence {
+namespace triton { namespace backend { namespace iterative_sequence {
 
 
-// Simple generative sequence backend that demonstrates the use of
-// TRITONSERVER_REQUEST_RELEASE_RESCHEDULE flag to generatively produce
+// Simple iterative sequence backend that demonstrates the use of
+// TRITONSERVER_REQUEST_RELEASE_RESCHEDULE flag to iteratively produce
 // sequence response.
 //
 // The backend supports models that take 1 input tensor, an INT32 [ 1 ]
@@ -302,7 +302,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
   RETURN_ERROR_IF_FALSE(
       instance_state->Kind() == TRITONSERVER_INSTANCEGROUPKIND_CPU,
       TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("'generative_sequence' backend only supports CPU instances"));
+      std::string("'iterative_sequence' backend only supports CPU instances"));
 
   return nullptr;  // success
 }
@@ -533,6 +533,8 @@ TRITONBACKEND_ModelInstanceExecute(
     SET_TIMESTAMP(exec_end_ns);
     max_exec_end_ns = std::max(max_exec_end_ns, exec_end_ns);
 
+    // wait for 0.5 second before rescheduling the request.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // Release the request first as the testing backend may be configured to
     // receive error on request release, in such a case, the error will be
     // propagated back through error response.
@@ -577,4 +579,4 @@ TRITONBACKEND_ModelInstanceExecute(
 
 }  // extern "C"
 
-}}}  // namespace triton::backend::generative_sequence
+}}}  // namespace triton::backend::iterative_sequence
