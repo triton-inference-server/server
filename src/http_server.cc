@@ -3158,6 +3158,13 @@ HTTPAPIServer::HandleGenerate(
                &irequest, server_.get(), model_name.c_str(),
                requested_model_version));
 
+  std::shared_ptr<TRITONSERVER_InferenceRequest> irequest_shared = {
+      irequest, [](TRITONSERVER_InferenceRequest* request) {
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestDelete(request),
+            "deleting HTTP/REST inference request");
+      }};
+
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   std::unique_ptr<GenerateRequestClass> generate_request;
@@ -3165,12 +3172,12 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(), streaming, irequest));
+        generate_stream_response_schema_.get(), streaming, irequest_shared));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest));
+        streaming, irequest_shared));
   }
   generate_request->trace_ = trace;
 
@@ -3193,9 +3200,6 @@ HTTPAPIServer::HandleGenerate(
 
       LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(error);
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting HTTP/REST inference request");
       AddContentTypeHeader(req, "application/json");
       EVBufferAddErrorJson(req->buffer_out, error);
       evhtp_send_reply(req, EVHTP_RES_BADREQ);
@@ -3233,10 +3237,13 @@ HTTPAPIServer::HandleGenerate(
           input_metadata, generate_request->RequestSchema(), request),
       error_callback);
 
+  auto request_release_payload =
+      std::make_unique<RequestReleasePayload>(irequest_shared, nullptr);
   // [FIXME] decompression..
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestClass::InferRequestComplete, nullptr),
+          irequest, InferRequestClass::InferRequestComplete,
+          request_release_payload.get()),
       error_callback);
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -3258,6 +3265,7 @@ HTTPAPIServer::HandleGenerate(
   }
 #endif  // TRITON_ENABLE_TRACING
   generate_request.release();
+  request_release_payload.release();
 }
 
 TRITONSERVER_Error*
@@ -3367,7 +3375,7 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
     RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
-        name, generate_request, triton_request_));
+        name, generate_request, triton_request_.get()));
   } else {
     // Parse data type and shape
     std::string value;
@@ -3451,9 +3459,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
         dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
 
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
-        triton_request_, name.c_str(), dtype, &shape_vec[0], shape_vec.size()));
+        triton_request_.get(), name.c_str(), dtype, &shape_vec[0],
+        shape_vec.size()));
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-        triton_request_, name.c_str(), &serialized[0], serialized.size(),
+        triton_request_.get(), name.c_str(), &serialized[0], serialized.size(),
         TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
   }
   return nullptr;  // success
@@ -3505,11 +3514,16 @@ HTTPAPIServer::HandleInfer(
       req, TRITONSERVER_InferenceRequestNew(
                &irequest, server_.get(), model_name.c_str(),
                requested_model_version));
-
+  std::shared_ptr<TRITONSERVER_InferenceRequest> irequest_shared(
+      irequest, [](TRITONSERVER_InferenceRequest* request) {
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestDelete(request),
+            "deleting HTTP/REST inference request");
+      });
   // HTTP request paused when creating inference request. Resume it on exit if
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
-  auto infer_request = CreateInferRequest(req, irequest);
+  auto infer_request = CreateInferRequest(req, irequest_shared);
   infer_request->trace_ = trace;
 
   const char* request_id = "<id_unknown>";
@@ -3532,10 +3546,6 @@ HTTPAPIServer::HandleInfer(
         TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
       }
 #endif  // TRITON_ENABLE_TRACING
-
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting HTTP/REST inference request");
     }
   };
 
@@ -3557,10 +3567,12 @@ HTTPAPIServer::HandleInfer(
 
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
+  auto request_release_payload = std::make_unique<RequestReleasePayload>(
+      irequest_shared, decompressed_buffer);
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          decompressed_buffer),
+          request_release_payload.get()),
       error_callback);
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -3582,6 +3594,7 @@ HTTPAPIServer::HandleInfer(
 
   RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
   infer_request.release();
+  request_release_payload.release();
 }
 
 void
@@ -3640,17 +3653,16 @@ evhtp_res
 HTTPAPIServer::InferRequestClass::RequestFiniHook(
     evhtp_request* request, void* arg)
 {
-  // TODO: Cancel request
-  //
-  // Currently request release callback can happen before
-  // responses are sent. Need a way to guarantee lifetime
-  // of request object.
-
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
   if (infer_request->req_ != request) {
     LOG_ERROR << "[INTERNAL] mismatched request in fini hook";
+    return EVHTP_RES_ERROR;
   } else {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestCancel(
+            infer_request->triton_request_.get()),
+        "cancelling request");
     infer_request->req_ = nullptr;
   }
   return EVHTP_RES_OK;
@@ -3659,7 +3671,7 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
-    TRITONSERVER_InferenceRequest* triton_request)
+    std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
       triton_request_(triton_request)
@@ -3679,13 +3691,11 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
   // FIXME need to manage the lifetime of InferRequestClass so that we
   // delete it here.
 
+  RequestReleasePayload* request_release_payload =
+      reinterpret_cast<RequestReleasePayload*>(userp);
+
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    if (userp != nullptr) {
-      evbuffer_free(reinterpret_cast<evbuffer*>(userp));
-    }
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting HTTP/REST inference request");
+    delete request_release_payload;
   }
 }
 

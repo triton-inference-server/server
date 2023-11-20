@@ -500,11 +500,19 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
   // Create the inference request object which provides all information needed
   // for an inference.
   TRITONSERVER_InferenceRequest* irequest = nullptr;
+  std::shared_ptr<TRITONSERVER_InferenceRequest> irequest_shared = nullptr;
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, server_.get(), model_name.c_str(), requested_model_version);
   }
-
+  if (err == nullptr) {
+    irequest_shared = std::shared_ptr<TRITONSERVER_InferenceRequest>(
+        irequest, [](TRITONSERVER_InferenceRequest* request) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(request),
+              "deleting HTTP/REST inference request");
+        });
+  }
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
   if (err == nullptr) {
@@ -566,7 +574,10 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
   if (err == nullptr) {
     connection_paused = true;
 
-    auto infer_request = CreateInferRequest(req, irequest);
+    auto infer_request = CreateInferRequest(req, irequest_shared);
+    auto request_release_payload = std::make_unique<RequestReleasePayload>(
+        irequest_shared, decompressed_buffer);
+
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
@@ -589,7 +600,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          decompressed_buffer);
+          request_release_payload.get());
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -611,6 +622,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       }
       if (err == nullptr) {
         infer_request.release();
+        request_release_payload.release();
       }
     }
   }
@@ -633,10 +645,6 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
     }
 #endif  // TRITON_ENABLE_TRACING
-
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(irequest),
-        "deleting HTTP/REST inference request");
   }
 }
 
