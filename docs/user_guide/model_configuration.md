@@ -980,6 +980,60 @@ indicating sequence start, end, ready and correlation ID. See
 [Stateful Models](architecture.md#stateful-models) for more
 information and examples.
 
+#### Iterative Sequence
+
+When using sequence batcher, user may enable "iterative sequences" by
+specifying the following:
+
+```
+  sequence_batching {
+    iterative_sequence: true
+  }
+```
+
+"Iterative sequence" refers to the type of model execution that the model
+iteratively executes on the same request to produce responses until it
+has generated all responses for the request. When iterative sequence is
+enabled, the scheduler will expect a single incoming request to initiate the
+sequence, and then the backends that support iterative sequence can yield back
+to the sequence batcher to reschedule the request for further execution in
+a future batch.
+
+Because only one request is used to represent the whole sequence, the user
+doesn't need to and should not set
+[control inputs](architecture.md#control-inputs) mentioned in the previous
+section. They will be filled internally by the scheduler.
+
+There are similarities between iterative sequence and [decoupled](#decoupled)
+setting that undetermined number of responses may be generated for a request.
+One major difference is that iterative sequence may reschedule and execute the
+same request repeatedly to fully utilize the batching feature in Triton: a
+decoupled model generates all responses associated to a request within the same
+execution which can waste computation resource if execution on one of the
+request in the batch is much longer than the rest, whereas for iterative
+sequence, the response generation is broken down into multiple executions and
+each execution can be run with an newly formed batch. Also note that the two
+settings are not mutually exclusive, the user may enable both for the models
+that fit.
+
+##### Achieve Inflight Batching with Iterative Sequence
+
+Inflight batching is a terminology used in large language model (LLM) inferencing,
+where, if not implemented, the model throughput will be limited. In a LLM
+inference, the length of the responses within a batch can vary significantly,
+as a result, the batch slot of early ending responses will remain idle until
+the whole batch is completed. Inflight batching is introduced to continuously
+assign new request to the early ending batch slot while the batch is still in
+execution, which can be mapped to the iterative sequence usage described in the
+previous section.
+
+To achieve inflight batching with iterative sequence, the backend should break
+an execution into steps of execution, where each step corresponds to one
+Triton model instance execution. At the end of each step, the model instance
+will release the request of the early ending response and reschedule the rest of
+the requests so that Triton will form and schedule the next batch of requests
+that mixes new and rescheduled requests.
+
 ### Ensemble Scheduler
 
 The ensemble scheduler must be used for [ensemble
