@@ -146,27 +146,30 @@ multiple groups. The following protocols / APIs are recognized:
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
   * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
-* `restricted-key` : Key to determine the GRPC / HTTP request header
-to be checked when a request to the protocol / API is received. The
+* `restricted-key` : The GRPC / HTTP request header
+to be checked when a request is received. The
 completed header for GRPC will be in the form of
 `triton-grpc-protocol-<restricted-key>`. The completed header for HTTP
-will be in the form of `<restricted-key>`
+will be in the form of `<restricted-key>`.
 
-* `restricted-value` : The value of the header to be matched in order to proceed in
-the process of the specified protocols.
+* `restricted-value` : The header value required to access the specified protocols.
 
 #### Example
 
-To start server with a subset of protocols to be restricted in use
-case described above, the following command line arguments can be set
-to accept "standard inference" request without additional header and
-the rest of the protocols with
-`triton-grpc-protocol-<admin-key>=<admin-value>` specified in header
-for GRPC and `<admin-key>=<admin-value>` for HTTP:
+To start the server with a set of protocols and APIs restricted for
+`admin` usage and the rest of the protocols and APIs left unrestricted
+use the following command line arguments:
+
 
 ```
-tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> --http-restricted-api=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
+tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> \
+             --http-restricted-api=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
 ```
+
+GRPC requests to `admin` protocols require that an additional header
+`triton-grpc-protocol-<admin-key>` is provided with value
+`<admin-value>`. HTTP requests to `admin` APIs required that an
+additional header `<admin-key>` is provided with value `<admin-value`.
 
 
 ## In-Process Triton Server API
