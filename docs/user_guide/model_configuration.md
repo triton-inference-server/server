@@ -1007,8 +1007,8 @@ section. They will be filled internally by the scheduler.
 There are similarities between generative sequence and [decoupled](#decoupled)
 setting that undetermined number of responses may be generated for a request.
 One major difference is that generative sequence may reschedule and execute the
-same request repeatedly to fully utilize the batching feature in Triton: an
-decoupled model generate all responses associated to a request within the same
+same request repeatedly to fully utilize the batching feature in Triton: a
+decoupled model generates all responses associated to a request within the same
 execution which can waste computation resource if execution on one of the
 request in the batch is much longer than the rest, whereas for generative
 sequence, the response generation is broken down into multiple executions and
@@ -1016,7 +1016,23 @@ each execution can be run with an newly formed batch. Also note that the two
 settings are not mutually exclusive, the user may enable both for the models
 that fit.
 
+##### Achieve Inflight Batching with Generative Sequence
 
+Inflight batching is a terminology used in large language model (LLM) inferencing,
+where, if not implemented, the model throughput will be limited. In a LLM
+inference, the length of the responses within a batch can vary significantly,
+as a result, the batch slot of early ending responses will remain idle until
+the whole batch is completed. Inflight batching is introduced to continuously
+assign new request to the early ending batch slot while the batch is still in
+execution, which can be mapped to the generative sequence usage described in the
+previous section.
+
+To achieve inflight batching with generative sequence, the backend should break
+an execution into steps of execution, where each step corresponds to one
+Triton model instance execution. At the end of each step, the model instance
+will release the request of the early ending response and reschedule the rest of
+the requests so that Triton will form and schedule the next batch of requests
+that mixes new and rescheduled requests.
 
 ### Ensemble Scheduler
 
