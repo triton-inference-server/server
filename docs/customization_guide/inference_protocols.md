@@ -122,7 +122,7 @@ can provide one set of access credentials for inference APIs and
 another for model control APIs such as model loading and unloading.
 
 The following options can be specified to declare a restricted
-protocol group (GRPC) or restricted api group (HTTP):
+protocol group (GRPC) or restricted API group (HTTP):
 
 ```
 --grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-key>=<restricted-value>
@@ -132,7 +132,7 @@ protocol group (GRPC) or restricted api group (HTTP):
 The option can be specified multiple times to specifies multiple groups of
 protocols or APIs with different restriction settings.
 
-* `protocols / apis` : A comma-separated list of protocols / APIs to be included in this
+* `protocols / APIs` : A comma-separated list of protocols / APIs to be included in this
 group. Note that currently a given protocol / API is not allowed to be included in
 multiple groups. The following protocols / APIs are recognized:
 
