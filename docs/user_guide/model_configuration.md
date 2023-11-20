@@ -1027,7 +1027,7 @@ one of the requests in the batch takes much longer than the rest. With
 broken down into multiple iterations and a backend can start
 processing new requests as soon as any request is complete.
 
-##### Continuous and Inflight Batching with Iterative Sequences
+##### Continuous/Inflight Batching with Iterative Sequences
 
 Continuous batching, iteration level batching, and inflight batching
 are terms used in large language model (LLM) inferencing to describe
