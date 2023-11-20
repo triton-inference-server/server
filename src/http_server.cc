@@ -3671,7 +3671,7 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
-    std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
       triton_request_(triton_request)

@@ -52,7 +52,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
     explicit SagemakeInferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
-        std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
         : InferRequestClass(
               server, req, response_compression_type, triton_request)
     {
@@ -124,7 +124,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
-      std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request) override
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+      override
   {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
         server_.get(), req, GetResponseCompressionType(req), triton_request));

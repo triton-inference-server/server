@@ -223,7 +223,7 @@ class HTTPAPIServer : public HTTPServer {
     explicit InferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
-        std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request);
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request);
     virtual ~InferRequestClass()
     {
       if (req_ != nullptr) {
@@ -375,7 +375,7 @@ class HTTPAPIServer : public HTTPServer {
   // request release callback.
   struct RequestReleasePayload final {
     RequestReleasePayload(
-        std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request,
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request,
         evbuffer* buffer)
         : inference_request_(inference_request), buffer_(buffer){};
 
@@ -404,7 +404,7 @@ class HTTPAPIServer : public HTTPServer {
   // [FIXME] extract to "infer" class
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
-      std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
   {
     return std::unique_ptr<InferRequestClass>(new InferRequestClass(
         server_.get(), req, GetResponseCompressionType(req), triton_request));
