@@ -101,10 +101,10 @@ add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
 
 add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(dyna_sequence dyna_sequence)
-add_subdirectory(generative_sequence generative_sequence)
-add_subdirectory(implicit_state implicit_state)
+add_subdirectory(iterative_sequence iterative_sequence)
 add_subdirectory(query_backend query_backend)
 
 if(${TRITON_ENABLE_GPU})
   add_subdirectory(sequence sequence)
+  add_subdirectory(implicit_state implicit_state)
 endif()

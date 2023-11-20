@@ -24,38 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "request_rescheduling_addsub"
+name: "iterative_sequence"
 backend: "python"
-
+max_batch_size: 0
+model_transaction_policy {
+  decoupled: True
+}
 input [
   {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-input [
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
+    name: "IN"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
   }
 ]
 output [
   {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
+    name: "OUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
   }
 ]
 sequence_batching {
   iterative_sequence : true
 }
+
 instance_group [{ kind: KIND_CPU }]

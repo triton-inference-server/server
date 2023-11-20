@@ -26,32 +26,32 @@
 
 cmake_minimum_required(VERSION 3.17)
 
-project(tritongenerativesequencebackend LANGUAGES C CXX)
+project(tritoniterativesequencebackend LANGUAGES C CXX)
 
 #
-# libtriton_generative_sequence.so
+# libtriton_iterative_sequence.so
 # Shared library implementing the Triton Sequence Backend API
 #
-configure_file(src/libtriton_generative_sequence.ldscript libtriton_generative_sequence.ldscript COPYONLY)
+configure_file(src/libtriton_iterative_sequence.ldscript libtriton_iterative_sequence.ldscript COPYONLY)
 
 add_library(
-  triton-generative-sequence-backend SHARED
-  src/generative_sequence.cc
+  triton-iterative-sequence-backend SHARED
+  src/iterative_sequence.cc
 )
 
 add_library(
-  TritonGenerativeSequenceBackend::triton-generative-sequence-backend ALIAS triton-generative-sequence-backend
+  TritonIterativeSequenceBackend::triton-iterative-sequence-backend ALIAS triton-iterative-sequence-backend
 )
 
-target_compile_features(triton-generative-sequence-backend PRIVATE cxx_std_11)
+target_compile_features(triton-iterative-sequence-backend PRIVATE cxx_std_11)
 target_compile_options(
-  triton-generative-sequence-backend PRIVATE
+  triton-iterative-sequence-backend PRIVATE
   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
     -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
 )
 
 target_link_libraries(
-  triton-generative-sequence-backend
+  triton-iterative-sequence-backend
   PRIVATE
     triton-backend-utils    # from repo-backend
     triton-core-serverapi   # from repo-core
@@ -60,49 +60,49 @@ target_link_libraries(
 )
 
 set_target_properties(
-  triton-generative-sequence-backend PROPERTIES
+  triton-iterative-sequence-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
-  OUTPUT_NAME triton_generative_sequence
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_generative_sequence.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_generative_sequence.ldscript"
+  OUTPUT_NAME triton_iterative_sequence
+  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_iterative_sequence.ldscript
+  LINK_FLAGS "-Wl,--version-script libtriton_iterative_sequence.ldscript"
 )
 
 #
 # Install
 #
 include(GNUInstallDirs)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonGenerativeSequenceBackend)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonIterativeSequenceBackend)
 
 install(
   TARGETS
-    triton-generative-sequence-backend
+    triton-iterative-sequence-backend
   EXPORT
-    triton-generative-sequence-backend-targets
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/generative_sequence
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/generative_sequence
+    triton-iterative-sequence-backend-targets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/iterative_sequence
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/iterative_sequence
 )
 
 install(
   EXPORT
-    triton-generative-sequence-backend-targets
+    triton-iterative-sequence-backend-targets
   FILE
-    TritonGenerativeSequenceBackendTargets.cmake
+    TritonIterativeSequenceBackendTargets.cmake
   NAMESPACE
-    TritonGenerativeSequenceBackend::
+    TritonIterativeSequenceBackend::
   DESTINATION
     ${INSTALL_CONFIGDIR}
 )
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
-  ${CMAKE_CURRENT_LIST_DIR}/cmake/TritonGenerativeSequenceBackendConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/TritonGenerativeSequenceBackendConfig.cmake
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/TritonIterativeSequenceBackendConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TritonIterativeSequenceBackendConfig.cmake
   INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 install(
   FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/TritonGenerativeSequenceBackendConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/TritonIterativeSequenceBackendConfig.cmake
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
@@ -110,9 +110,9 @@ install(
 # Export from build tree
 #
 export(
-  EXPORT triton-generative-sequence-backend-targets
-  FILE ${CMAKE_CURRENT_BINARY_DIR}/TritonGenerativeSequenceBackendTargets.cmake
-  NAMESPACE TritonGenerativeSequenceBackend::
+  EXPORT triton-iterative-sequence-backend-targets
+  FILE ${CMAKE_CURRENT_BINARY_DIR}/TritonIterativeSequenceBackendTargets.cmake
+  NAMESPACE TritonIterativeSequenceBackend::
 )
 
-export(PACKAGE TritonGenerativeSequenceBackend)
+export(PACKAGE TritonIterativeSequenceBackend)

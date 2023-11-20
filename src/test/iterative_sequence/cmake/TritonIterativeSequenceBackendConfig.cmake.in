@@ -32,8 +32,8 @@ get_filename_component(
 
 list(APPEND CMAKE_MODULE_PATH ${TRITONSEQUENCEBACKEND_CMAKE_DIR})
 
-if(NOT TARGET TritonGenerativeSequenceBackend::triton-sequence-backend)
-  include("${TRITONSEQUENCEBACKEND_CMAKE_DIR}/TritonGenerativeSequenceBackendTargets.cmake")
+if(NOT TARGET TritonIterativeSequenceBackend::triton-sequence-backend)
+  include("${TRITONSEQUENCEBACKEND_CMAKE_DIR}/TritonIterativeSequenceBackendTargets.cmake")
 endif()
 
-set(TRITONSEQUENCEBACKEND_LIBRARIES TritonGenerativeSequenceBackend::triton-sequence-backend)
+set(TRITONSEQUENCEBACKEND_LIBRARIES TritonIterativeSequenceBackend::triton-sequence-backend)
