@@ -169,7 +169,7 @@ tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-reposit
 GRPC requests to `admin` protocols require that an additional header
 `triton-grpc-protocol-<admin-key>` is provided with value
 `<admin-value>`. HTTP requests to `admin` APIs required that an
-additional header `<admin-key>` is provided with value `<admin-value`.
+additional header `<admin-key>` is provided with value `<admin-value>`.
 
 
 ## In-Process Triton Server API
