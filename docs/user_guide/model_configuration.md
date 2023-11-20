@@ -1037,7 +1037,7 @@ throughput by reusing batch slots as soon as they are free without
 waiting for all requests in a batch to complete.
 
 As the number of steps required to process a request can vary
-significantly batching existing requests and new requests continuously
+significantly, batching existing requests and new requests continuously
 can have a significant impact on throughput and latency.
 
 To achieve inflight batching with iterative sequences, the backend
