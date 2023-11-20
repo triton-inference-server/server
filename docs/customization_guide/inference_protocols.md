@@ -118,7 +118,7 @@ For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.c
 
 Triton users may want to restrict access to protocols or APIs that are
 provided by the GRPC or HTTP endpoints of a server. For example, users
-can provide one set of access credentials for inference apis and
+can provide one set of access credentials for inference APIs and
 another for model control apis such as model loading and unloading.
 
 The following options can be specified to declare a restricted
