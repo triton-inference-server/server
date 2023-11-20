@@ -34,8 +34,10 @@
 [support growing buffers](https://github.com/triton-inference-server/common/blob/a8a7341ff15bb6faddde2d11035c895476516a96/protobuf/model_config.proto#L1405)
 and [use a single buffer](https://github.com/triton-inference-server/common/blob/a8a7341ff15bb6faddde2d11035c895476516a96/protobuf/model_config.proto#L1386C3-L1386C3) for both input and output states.
 
- * The backend API has been enhanced to support rescheduling a request. Currently,
- only [Python
+ * Sequence batcher has been enhanced to support
+[iterative scheduling](https://github.com/triton-inference-server/server/blob/r23.11/docs/user_guide/model_configuration.md#iterative-sequences).
+The backend API has been enhanced to support rescheduling a request.
+Currently, only [Python
 backend](https://github.com/triton-inference-server/python_backend/tree/r23.11#request-rescheduling) and Custom C++ backends support request rescheduling.
 
  * TRT-LLM backend now supports request cancellation.
@@ -65,6 +67,11 @@ for container image versions on which the 23.10 inference server container is
 based.
 
  ## Known Issues
+* When using the generate streaming endpoint, Triton will segfault
+  if the client closes the connection before all responses have been generated.
+  The [fix](https://github.com/triton-inference-server/server/pull/6591)
+  will be available in the next release.
+  
 * Reuse-grpc-port and reuse-http-port are now properly parsed as booleans. 0 and 1
 will continue to work as values. Any other integers will throw an error.
 
