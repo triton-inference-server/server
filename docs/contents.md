@@ -42,6 +42,7 @@ user_guide/architecture
 user_guide/model_repository
 customization_guide/repository_agents
 user_guide/model_configuration
+user_guide/request_cancellation
 user_guide/optimization
 user_guide/ragged_batching
 user_guide/rate_limiter
@@ -60,7 +61,9 @@ customization_guide/deploy
 
 ```{toctree}
 :maxdepth: 1
+:caption: Debugging
 
+user_guide/debugging_guide
 user_guide/faq
 ```
 
