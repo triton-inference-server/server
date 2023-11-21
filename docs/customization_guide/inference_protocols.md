@@ -31,7 +31,8 @@
 Clients can communicate with Triton using either an [HTTP/REST
 protocol](#httprest-and-grpc-protocols), a [GRPC
 protocol](#httprest-and-grpc-protocols), or by an [in-process C
-API](#in-process-triton-server-api).
+API](#in-process-triton-server-api) or its
+[C++ wrapper](https://github.com/triton-inference-server/developer_tools/tree/main/server).
 
 ## HTTP/REST and GRPC Protocols
 
@@ -114,26 +115,27 @@ These options can be used to configure the KeepAlive settings:
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
-#### Limit Endpoint Access (BETA)
+### Limit Endpoint Access (BETA)
 
-In some use cases, Triton users may want to restrict the access of the protocols on a given endpoint.
-For example, there can be need for two separate protocol groups that one exposes standard inference
-protocols for user access, while the other one exposes other extension protocols for administration
-usage and should not be accessible by non-admin user.
+Triton users may want to restrict access to protocols or APIs that are
+provided by the GRPC or HTTP endpoints of a server. For example, users
+can provide one set of access credentials for inference APIs and
+another for model control APIs such as model loading and unloading.
 
-The following option can be specified to declare an restricted protocol group:
+The following options can be specified to declare a restricted
+protocol group (GRPC) or restricted API group (HTTP):
 
 ```
 --grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-key>=<restricted-value>
+--http-restricted-api=<API_1>,API_2>,...:<restricted-key>=<restricted-value>
 ```
 
 The option can be specified multiple times to specifies multiple groups of
-protocols with different restriction settings.
+protocols or APIs with different restriction settings.
 
-* `protocols` : A comma-separated list of protocols to be included in this
-group. Note that currently a given protocol is not allowed to be included in
-multiple groups. The following protocols are currently recognized by all network
-protocol types mentioned above:
+* `protocols / APIs` : A comma-separated list of protocols / APIs to be included in this
+group. Note that currently a given protocol / API is not allowed to be included in
+multiple groups. The following protocols / APIs are recognized:
 
   * `health` : Health endpoint defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health-1). For GRPC endpoint, this value also exposes [GRPC health check protocol](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
   * `metadata` : Server / model metadata endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata-1).
@@ -145,23 +147,30 @@ protocol types mentioned above:
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
   * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
-* `restricted-key` : Key to determine the GRPC request header to be checked when a
-request to the protocol is received. The completed header will be in the form of
-`triton-grpc-protocol-<restricted-key>`
+* `restricted-key` : The GRPC / HTTP request header
+to be checked when a request is received. The
+completed header for GRPC will be in the form of
+`triton-grpc-protocol-<restricted-key>`. The completed header for HTTP
+will be in the form of `<restricted-key>`.
 
-* `restricted-value` : The value of the header to be matched in order to proceed in
-the process of the specified protocols.
+* `restricted-value` : The header value required to access the specified protocols.
 
 #### Example
 
-To start server with a subset of protocols to be restricted in use case
-described above, the following command line arguments can be set to accept
-"standard inference" request without additional header and the rest of the
-protocols with `triton-grpc-protocol-<admin-key>=<admin-value>` specified in header:
+To start the server with a set of protocols and APIs restricted for
+`admin` usage and the rest of the protocols and APIs left unrestricted
+use the following command line arguments:
+
 
 ```
-tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
+tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> \
+             --http-restricted-api=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
 ```
+
+GRPC requests to `admin` protocols require that an additional header
+`triton-grpc-protocol-<admin-key>` is provided with value
+`<admin-value>`. HTTP requests to `admin` APIs required that an
+additional header `<admin-key>` is provided with value `<admin-value>`.
 
 
 ## In-Process Triton Server API
