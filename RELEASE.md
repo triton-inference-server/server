@@ -51,7 +51,7 @@ backend](https://github.com/triton-inference-server/python_backend/tree/r23.11#r
  * A [new tutorial](https://github.com/triton-inference-server/tutorials/blob/r23.11/Popular_Models_Guide/Llama2/trtllm_guide.md)
 demonstrating how to deploy LLaMa2 using TRT-LLM has been added.
 
- * The HTTP endpoint has been enhanced to support access restriction.
+ * The HTTP endpoint has been enhanced to support [access restriction](https://github.com/triton-inference-server/server/blob/r23.11/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta).
  * [Secure Deployment Guide](https://github.com/triton-inference-server/server/blob/r23.11/docs/customization_guide/deploy.md)
 has been added to provide guidance on deploying Triton securely.
  * The client model loading API no longer allows uploading files outside the model
