@@ -42,7 +42,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   target_compile_options(
     grpc-endpoint-library
     PRIVATE
-      /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+      /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
   )
 else()
   target_compile_options(
