@@ -356,6 +356,18 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 "attempt to access JSON non-string as string", r.json()["error"]
             )
 
+    def test_close_connection_during_streaming(self):
+        # verify the responses are streamed as soon as it is generated
+        text = "hello world"
+        rep_count = 3
+        inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": rep_count, "DELAY": 2}
+        res = self.generate_stream(self._model_name, inputs, stream=True)
+        # close connection while the responses are being generated
+        res.close()
+        # check server healthiness
+        health_url = "http://localhost:8000/v2/health/live"
+        requests.get(health_url).raise_for_status()
+
     def test_parameters(self):
         # Test reserved nested object for parameters
         text = "hello world"
