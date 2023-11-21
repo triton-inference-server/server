@@ -349,10 +349,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
-
       ::grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
