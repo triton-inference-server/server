@@ -262,6 +262,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       err = TRITONSERVER_InferenceRequestNew(
           &irequest, tritonserver_.get(), request.model_name().c_str(),
           requested_model_version);
+      state->inference_request_ = {
+          irequest, [](TRITONSERVER_InferenceRequest* request) {
+            LOG_TRITONSERVER_ERROR(
+                TRITONSERVER_InferenceRequestDelete(request),
+                "deleting gRPC inference request");
+          }};
     }
 
     if (err == nullptr) {
@@ -285,9 +291,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, std::move(serialized_data),
           response_queue_, &state->alloc_payload_);
     }
+
+    auto request_release_payload =
+        std::make_unique<RequestReleasePayload>(state->inference_request_);
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */);
+          irequest, InferRequestComplete,
+          request_release_payload.get() /* request_release_userp */);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -317,7 +327,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
     // irequest to handle gRPC stream cancellation.
     if (err == nullptr) {
-      state->context_->InsertInflightState(state, irequest);
+      state->context_->InsertInflightState(state);
+      // The payload will be cleaned in request release callback.
+      request_release_payload.release();
     } else {
       // If there was an error then enqueue the error response and show
       // it to be ready for writing.

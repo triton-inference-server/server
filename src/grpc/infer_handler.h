@@ -88,6 +88,17 @@ class Barrier {
   size_t generation_;
 };
 
+// Simple structure that carries the userp payload needed for
+// request release callback.
+struct RequestReleasePayload final {
+  explicit RequestReleasePayload(
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request)
+      : inference_request_(inference_request){};
+
+ private:
+  std::shared_ptr<TRITONSERVER_InferenceRequest> inference_request_ = nullptr;
+};
+
 //
 // ResponseQueue
 //
@@ -716,14 +727,9 @@ class InferHandlerState {
     // within the server core. Should only be called when
     // the request was successfully enqueued on Triton.
     void InsertInflightState(
-        InferHandlerStateType* state, TRITONSERVER_InferenceRequest* irequest)
+        InferHandlerStateType* state)
     {
       std::lock_guard<std::recursive_mutex> lock(mu_);
-      // The irequest_ptr_ will get populated when it is
-      // marked as active which means the request has been
-      // successfully enqueued to Triton core using
-      // TRITONSERVER_ServerInferAsync.
-      state->irequest_ptr_ = irequest;
       inflight_states_.insert(state);
     }
 
@@ -748,7 +754,7 @@ class InferHandlerState {
           if (state->step_ != Steps::CANCELLED &&
               state->step_ != Steps::COMPLETE) {
             LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
-            if (state->irequest_ptr_ == nullptr) {
+            if (state->inference_request_.get() == nullptr) {
               // The context might be holding some states that have
               // not been issued to Triton core. Need to skip calling
               // issuing cancellation for such requests.
@@ -758,7 +764,7 @@ class InferHandlerState {
             // Assuming if RequestComplete callback is run asynchronously
             // before this point.
             TRITONSERVER_Error* err = nullptr;
-            err = TRITONSERVER_InferenceRequestCancel(state->irequest_ptr_);
+            err = TRITONSERVER_InferenceRequestCancel(state->inference_request_.get());
             // TODO: Add request id to the message
             if (err != nullptr) {
               LOG_INFO << "Failed to cancel the request: "
@@ -1023,7 +1029,6 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
-    irequest_ptr_ = nullptr;
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
@@ -1042,6 +1047,7 @@ class InferHandlerState {
   void Release()
   {
     context_ = nullptr;
+    inference_request_.reset();
     ClearTraceTimestamps();
   }
 
@@ -1077,7 +1083,10 @@ class InferHandlerState {
   Steps step_;
   std::recursive_mutex step_mtx_;
 
-  TRITONSERVER_InferenceRequest* irequest_ptr_;
+  // Shared pointer to the inference request object. The lifetime of
+  // inference request object is extended till all the responses from
+  // the request are processed and the request is released.
+  std::shared_ptr<TRITONSERVER_InferenceRequest> inference_request_;
 
 #ifdef TRITON_ENABLE_TRACING
   std::shared_ptr<TraceManager::Trace> trace_;
