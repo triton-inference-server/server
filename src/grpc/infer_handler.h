@@ -726,8 +726,7 @@ class InferHandlerState {
     // Inserts the state to a set tracking active requests
     // within the server core. Should only be called when
     // the request was successfully enqueued on Triton.
-    void InsertInflightState(
-        InferHandlerStateType* state)
+    void InsertInflightState(InferHandlerStateType* state)
     {
       std::lock_guard<std::recursive_mutex> lock(mu_);
       inflight_states_.insert(state);
@@ -764,7 +763,8 @@ class InferHandlerState {
             // Assuming if RequestComplete callback is run asynchronously
             // before this point.
             TRITONSERVER_Error* err = nullptr;
-            err = TRITONSERVER_InferenceRequestCancel(state->inference_request_.get());
+            err = TRITONSERVER_InferenceRequestCancel(
+                state->inference_request_.get());
             // TODO: Add request id to the message
             if (err != nullptr) {
               LOG_INFO << "Failed to cancel the request: "
