@@ -47,6 +47,10 @@ spec:
         release: {{ .Release.Name }}
 
     spec:
+      {{- with .Values.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageName }}"
@@ -61,6 +65,7 @@ spec:
                  "--repository-poll-secs=5"]
 
           env:
+          {{- if .Values.secret.create }}
           - name: AWS_DEFAULT_REGION
             valueFrom:
               secretKeyRef:
@@ -76,6 +81,7 @@ spec:
               secretKeyRef:
                 name: aws-credentials
                 key: AWS_SECRET_ACCESS_KEY
+          {{- end }}
 
           ports:
             - containerPort: 8000

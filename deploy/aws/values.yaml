@@ -36,6 +36,9 @@ service:
   type: LoadBalancer
 
 secret:
+  create: true
   region: AWS_REGION
   id: AWS_SECRET_KEY_ID
   key: AWS_SECRET_ACCESS_KEY
+
+serviceAccountName:
