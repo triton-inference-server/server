@@ -859,15 +859,15 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, tritonserver_.get(), request.model_name().c_str(),
         requested_model_version);
+  }
+
+  if (err == nullptr) {
     state->inference_request_ = {
         irequest, [](TRITONSERVER_InferenceRequest* request) {
           LOG_TRITONSERVER_ERROR(
               TRITONSERVER_InferenceRequestDelete(request),
               "deleting gRPC inference request");
         }};
-  }
-
-  if (err == nullptr) {
     err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
   }
 
