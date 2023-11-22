@@ -651,7 +651,7 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=13
+EXPECTED_NUM_TESTS=14
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -677,6 +677,8 @@ MODELDIR="`pwd`/models"
 SERVER_ARGS="--model-repository=${MODELDIR}
              --http-restricted-api=model-repository,health:k1=v1 \
              --http-restricted-api=metadata,health:k2=v2"
+SERVER_LOG="./http_restricted_endpoint_test.log"
+CLIENT_LOG="./http_restricted_endpoint_test.log"
 run_server
 EXPECTED_MSG="api 'health' can not be specified in multiple config groups"
 if [ "$SERVER_PID" != "0" ]; then
