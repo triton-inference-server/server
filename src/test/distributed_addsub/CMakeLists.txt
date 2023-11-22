@@ -64,7 +64,7 @@ set_target_properties(
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_distributed_addsub
   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_distributed_addsub.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_distributed_addsub.ldscript"
+  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_distributed_addsub.ldscript"
 )
 
 #
