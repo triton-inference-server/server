@@ -1314,20 +1314,20 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 """
-    # Add dependencies needed for tensorrtllm backend
-    if "tensorrtllm" in backends:
-        be = "tensorrtllm"
-        url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
-            backends[be]
-        )
+    # # Add dependencies needed for tensorrtllm backend
+    # if "tensorrtllm" in backends:
+    #     be = "tensorrtllm"
+    #     url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
+    #         backends[be]
+    #     )
 
-        response = requests.get(url)
-        spec = importlib.util.spec_from_loader(
-            "trtllm_buildscript", loader=None, origin=url
-        )
-        trtllm_buildscript = importlib.util.module_from_spec(spec)
-        exec(response.content, trtllm_buildscript.__dict__)
-        df += trtllm_buildscript.create_postbuild(backends[be])
+    #     response = requests.get(url)
+    #     spec = importlib.util.spec_from_loader(
+    #         "trtllm_buildscript", loader=None, origin=url
+    #     )
+    #     trtllm_buildscript = importlib.util.module_from_spec(spec)
+    #     exec(response.content, trtllm_buildscript.__dict__)
+    #     df += trtllm_buildscript.create_postbuild(backends[be])
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
