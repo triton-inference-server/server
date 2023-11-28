@@ -656,7 +656,7 @@ class PBBLSTest(unittest.TestCase):
             model_name="identity_fp32_timeout",
             inputs=[input0],
             requested_output_names=["OUTPUT0"],
-            timeout=10000,
+            timeout=5,
         )
 
         if self._is_decoupled:
@@ -669,6 +669,23 @@ class PBBLSTest(unittest.TestCase):
         self.assertTrue(infer_response.has_error())
         self.assertIn("Request timeout expired", infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
+
+        infer_request = pb_utils.InferenceRequest(
+            model_name="identity_fp32_timeout",
+            inputs=[input0],
+            requested_output_names=["OUTPUT0"],
+            timeout=10000,
+        )
+
+        if self._is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
+            infer_response = next(infer_responses)
+        else:
+            infer_response = infer_request.exec()
+
+        # Expect no timeout error. Check for log message
+        # in test.sh
+        self.assertFalse(infer_response.has_error())
 
     def _test_response_iterator_square(
         self, expected_output_cnt, expected_output_value, response_iterator
