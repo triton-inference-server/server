@@ -38,8 +38,7 @@ INPUT_DATA="./input_data.json"
 SERVER_LOG="${NAME}_server.log"
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
-# Select the single GPU that will be available to the inference
-# server. Or use "export CUDA_VISIBLE_DEVICE=" to run on CPU.
+# Select the single GPU that will be available to the inference server.
 export CUDA_VISIBLE_DEVICES=0
 EXPORT_FILE=profile-export-vllm-model.json
 
@@ -47,8 +46,20 @@ pip3 install tritonclient
 rm -rf $MODEL_REPO $EXPORT_FILE *.tjson *.json *.csv
 
 mkdir -p $MODEL_REPO/$MODEL_NAME/1
-wget -P $MODEL_REPO/$MODEL_NAME/1 https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/1/model.json
-wget -P $MODEL_REPO/$MODEL_NAME/ https://raw.githubusercontent.com/triton-inference-server/vllm_backend/main/samples/model_repository/vllm_model/config.pbtxt
+echo '{
+    "model":"facebook/opt-125m",
+    "disable_log_requests": "true",
+    "gpu_memory_utilization": 0.5
+}' > $MODEL_REPO/$MODEL_NAME/1/model.json
+
+echo 'backend: "vllm"
+instance_group [
+  {
+    count: 1
+    kind: KIND_MODEL
+  }
+]' > $MODEL_REPO/$MODEL_NAME/config.pbtxt
+
 echo '{
     "data": [
         {
