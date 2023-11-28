@@ -1793,10 +1793,11 @@ def tensorrtllm_prebuild(cmake_script):
 
     # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
     # to get the build working for r23.10.
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
-
+    # cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
+    # cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
+    # cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
+    cmake_script.cmd("cd tensorrtllm/tensorrt_llm")
+    cmake_script.cmd("python3 scripts/build_wheel.py --trt_root /usr/local/tensorrt")
 
 def backend_build(
     be,
