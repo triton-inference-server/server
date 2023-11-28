@@ -883,7 +883,7 @@ def tensorrtllm_cmake_args(images):
             images["base"],
         ),
     ]
-    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
+    # cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
 
 
