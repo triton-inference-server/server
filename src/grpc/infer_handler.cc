@@ -640,10 +640,11 @@ InferRequestComplete(
 {
   LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
 
+  RequestReleasePayload* request_release_payload =
+      static_cast<RequestReleasePayload*>(userp);
+
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting GRPC inference request");
+    delete request_release_payload;
   }
 }
 
@@ -861,6 +862,12 @@ ModelInferHandler::Execute(InferHandler::State* state)
   }
 
   if (err == nullptr) {
+    state->inference_request_ = {
+        irequest, [](TRITONSERVER_InferenceRequest* request) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(request),
+              "deleting gRPC inference request");
+        }};
     err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
   }
 
@@ -881,9 +888,13 @@ ModelInferHandler::Execute(InferHandler::State* state)
         tritonserver_, shm_manager_, request, std::move(serialized_data),
         response_queue, &state->alloc_payload_);
   }
+
+  auto request_release_payload =
+      std::make_unique<RequestReleasePayload>(state->inference_request_);
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-        irequest, InferRequestComplete, nullptr /* request_release_userp */);
+        irequest, InferRequestComplete,
+        request_release_payload.get() /* request_release_userp */);
   }
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -922,15 +933,13 @@ ModelInferHandler::Execute(InferHandler::State* state)
   // COMPLETE or CANCELLED. Recording the state and the irequest
   // to handle gRPC stream cancellation.
   if (err == nullptr) {
-    state->context_->InsertInflightState(state, irequest);
+    state->context_->InsertInflightState(state);
+    // The payload will be cleaned in request release callback.
+    request_release_payload.release();
   } else {
     // If error go immediately to COMPLETE.
     LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(irequest),
-        "deleting GRPC inference request");
 
     ::grpc::Status status;
     GrpcStatusUtil::Create(&status, err);

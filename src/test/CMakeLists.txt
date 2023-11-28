@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -101,9 +101,10 @@ add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
 
 add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(dyna_sequence dyna_sequence)
-add_subdirectory(implicit_state implicit_state)
+add_subdirectory(iterative_sequence iterative_sequence)
 add_subdirectory(query_backend query_backend)
 
 if(${TRITON_ENABLE_GPU})
   add_subdirectory(sequence sequence)
+  add_subdirectory(implicit_state implicit_state)
 endif()

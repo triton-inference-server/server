@@ -1,1 +1,1 @@
-input 'INPUT1' in auto-complete-config function for model 'input_wrong_property' contains property other than 'name', 'data_type' and 'dims'.
+input 'INPUT1' in auto-complete-config function for model 'input_wrong_property' contains property other than 'name', 'data_type', 'dims' and 'optional'.

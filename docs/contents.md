@@ -42,6 +42,7 @@ user_guide/architecture
 user_guide/model_repository
 customization_guide/repository_agents
 user_guide/model_configuration
+user_guide/request_cancellation
 user_guide/optimization
 user_guide/ragged_batching
 user_guide/rate_limiter
@@ -55,11 +56,14 @@ user_guide/metrics
 user_guide/trace
 user_guide/jetson
 user_guide/v1_to_v2
+customization_guide/deploy
 ```
 
 ```{toctree}
 :maxdepth: 1
+:caption: Debugging
 
+user_guide/debugging_guide
 user_guide/faq
 ```
 
@@ -71,6 +75,7 @@ protocol/README.md
 customization_guide/inference_protocols
 protocol/extension_binary_data
 protocol/extension_classification
+protocol/extension_generate
 protocol/extension_logging
 protocol/extension_model_configuration
 protocol/extension_model_repository

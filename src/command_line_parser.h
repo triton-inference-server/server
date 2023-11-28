@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "restricted_features.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #ifdef TRITON_ENABLE_GRPC
@@ -144,6 +145,7 @@ struct TritonServerParameters {
   // memory pool configuration
   int64_t pinned_memory_pool_byte_size_{1 << 28};
   std::list<std::pair<int, uint64_t>> cuda_pools_;
+  std::list<std::pair<int, size_t>> cuda_virtual_address_size_;
 
   // [FIXME] this option is broken after backend separation: this should have
   // controlled backend copy behavior but not properly propagate to backend
@@ -189,6 +191,7 @@ struct TritonServerParameters {
   std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
+  RestrictedFeatures http_restricted_apis_{};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -281,8 +284,10 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
       const std::string& arg);
-  std::tuple<std::string, std::string, std::string>
-  ParseGrpcRestrictedProtocolOption(const std::string& arg);
+  void ParseRestrictedFeatureOption(
+      const std::string& arg, const std::string& option_name,
+      const std::string& header_prefix, const std::string& feature_type,
+      RestrictedFeatures& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
   InferenceTraceMode ParseTraceModeOption(std::string arg);
@@ -308,7 +313,8 @@ class TritonParser {
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
   std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
       const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim);
+      const std::string& second_delim, const std::string& option_name,
+      const std::string& config_name);
 
   // Initialize individual option groups
   void SetupOptions();

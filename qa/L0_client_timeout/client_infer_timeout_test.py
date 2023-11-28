@@ -37,9 +37,9 @@ from functools import partial
 
 import numpy as np
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 class UserData:
@@ -54,10 +54,12 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class ClientTimeoutTest(tu.TestResultCollector):
+class ClientInferTimeoutTest(tu.TestResultCollector):
     def setUp(self):
         self.model_name_ = "custom_identity_int32"
         self.input0_data_ = np.array([[10]], dtype=np.int32)
+        self.input0_data_byte_size_ = 32
+        self.INFER_SMALL_INTERVAL = 2.0  # seconds for a timeout
 
     def _prepare_request(self, protocol):
         if protocol == "grpc":
@@ -118,7 +120,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
                 inputs=self.inputs_,
                 callback=partial(callback, user_data),
                 outputs=self.outputs_,
-                client_timeout=2,
+                client_timeout=self.INFER_SMALL_INTERVAL,
             )
             data_item = user_data._completed_requests.get()
             if type(data_item) == InferenceServerException:
@@ -190,7 +192,9 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # response. Expect an exception for small timeout values.
         with self.assertRaises(socket.timeout) as cm:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000", verbose=True, network_timeout=2.0
+                url="localhost:8000",
+                verbose=True,
+                network_timeout=self.INFER_SMALL_INTERVAL,
             )
             _ = triton_client.infer(
                 model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
@@ -216,7 +220,9 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # response. Expect an exception for small timeout values.
         with self.assertRaises(socket.timeout) as cm:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000", verbose=True, network_timeout=2.0
+                url="localhost:8000",
+                verbose=True,
+                network_timeout=self.INFER_SMALL_INTERVAL,
             )
             async_request = triton_client.async_infer(
                 model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_

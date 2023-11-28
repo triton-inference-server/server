@@ -34,7 +34,7 @@
 under-development progress towards the next release. The current release is
 version [2.38.0](https://github.com/triton-inference-server/server/tree/r23.09)
 and corresponds to the 23.09 container release on
-NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
+[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ----
 Triton Inference Server is an open source inference serving software that
@@ -141,6 +141,7 @@ images.
 - [Build Triton Inference Server for Windows 10](docs/customization_guide/build.md#building-for-windows-10)
 - Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md),
   [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
+- [Secure Deployment Considerations](docs/customization_guide/deploy.md)
 
 ### Using Triton
 

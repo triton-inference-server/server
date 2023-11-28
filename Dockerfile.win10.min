@@ -92,12 +92,12 @@ WORKDIR /
 #
 # Installing Vcpkg
 #
-ARG VCPGK_VERSION=2023.07.21
+ARG VCPGK_VERSION=2022.11.14
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-filesystem:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
 RUN vcpkg.exe integrate install
 
 LABEL VCPGK_VERSION=${VCPGK_VERSION}

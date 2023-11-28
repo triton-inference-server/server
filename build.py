@@ -70,15 +70,15 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.40.0dev": (
-        "23.11dev",  # triton container
+    "2.41.0dev": (
+        "23.12dev",  # triton container
         "23.10",  # upstream container
-        "1.16.0",  # ORT
+        "1.16.3",  # ORT
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
-        "2.4.7",  # DCGM version
+        "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "0.2.1.post1",  # vLLM version
+        "0.2.2",  # vLLM version
     )
 }
 
@@ -996,8 +996,8 @@ RUN apt-get update \
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
             ca-certificates \
             autoconf \
             automake \
@@ -1023,8 +1023,9 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             libxml2-dev \
-            libnuma-dev && \
-    rm -rf /var/lib/apt/lists/*
+            libnuma-dev \
+            wget \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
@@ -1034,6 +1035,7 @@ RUN pip3 install --upgrade pip && \
 RUN wget -O /tmp/boost.tar.gz \
         https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz && \
     (cd /tmp && tar xzf boost.tar.gz) && \
+    cd /tmp/boost_1_80_0 && ./bootstrap.sh --prefix=/usr && ./b2 install && \
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
@@ -1241,21 +1243,33 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            software-properties-common \
-            libb64-0d \
-            libcurl4-openssl-dev \
-            libre2-9 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+            clang \
+            curl \
+            dirmngr \
             git \
             gperf \
-            dirmngr \
+            libb64-0d \
+            libcurl4-openssl-dev \
             libgoogle-perftools-dev \
-            libnuma-dev \
-            curl \
             libjemalloc-dev \
-            {backend_dependencies} && \
-    rm -rf /var/lib/apt/lists/*
+            libnuma-dev \
+            libre2-9 \
+            software-properties-common \
+            wget \
+            {backend_dependencies} \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install boost version >= 1.78 for boost::span
+# Current libboost-dev apt packages are < 1.78, so install from tar.gz
+RUN wget -O /tmp/boost.tar.gz \
+        https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz \
+      && (cd /tmp && tar xzf boost.tar.gz) \
+      && cd /tmp/boost_1_80_0 \
+      && ./bootstrap.sh --prefix=/usr \
+      && ./b2 install \
+      && rm -rf /tmp/boost*
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
@@ -1305,54 +1319,17 @@ RUN apt-get update && \
     # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
         be = "tensorrtllm"
-        # url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
-        #     backends[be]
-        # )
-
-        # response = requests.get(url)
-        # spec = importlib.util.spec_from_loader(
-        #     "trtllm_buildscript", loader=None, origin=url
-        # )
-        # trtllm_buildscript = importlib.util.module_from_spec(spec)
-        # exec(response.content, trtllm_buildscript.__dict__)
-        # df += trtllm_buildscript.create_postbuild(backends[be])
-
-        df += """
-WORKDIR /workspace
-# Remove previous TRT installation
-RUN apt-get remove --purge -y tensorrt* libnvinfer*
-RUN pip uninstall -y tensorrt
-# Install new version of TRT using the script from TRT-LLM
-RUN apt-get update && apt-get install -y --no-install-recommends python-is-python3
-RUN git clone --single-branch --depth=1 -b {} https://github.com/triton-inference-server/tensorrtllm_backend.git tensorrtllm_backend
-RUN cd tensorrtllm_backend && git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git
-RUN cd tensorrtllm_backend && git submodule sync
-RUN cd tensorrtllm_backend && git submodule update --init --recursive
-RUN cp tensorrtllm_backend/tensorrt_llm/docker/common/install_tensorrt.sh /tmp/
-RUN rm -fr tensorrtllm_backend
-    """.format(
+        url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
             backends[be]
         )
 
-        df += """
-RUN bash /tmp/install_tensorrt.sh && rm /tmp/install_tensorrt.sh
-ENV TRT_ROOT=/usr/local/tensorrt
-# Remove TRT contents that are not needed in runtime
-RUN ARCH="$(uname -i)" && \
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
-    rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
-    rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
-# Install required packages for TRT-LLM models
-RUN python3 -m pip install --upgrade pip && \
-        pip3 install transformers && \
-        pip3 install torch
-# Uninstall unused nvidia packages
-RUN if pip freeze | grep -q "nvidia.*"; then \
-        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \
-    fi
-RUN pip cache purge
-ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
-"""
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader(
+            "trtllm_buildscript", loader=None, origin=url
+        )
+        trtllm_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, trtllm_buildscript.__dict__)
+        df += trtllm_buildscript.create_postbuild(backends[be])
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
@@ -1843,22 +1820,10 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
+    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     if be == "tensorrtllm":
-        cmake_script.cmd(
-            "git clone --single-branch --depth=1 -b {} https://github.com/triton-inference-server/tensorrtllm_backend tensorrtllm".format(
-                tag
-            )
-        )
-        cmake_script.cmd("cd tensorrtllm")
-        cmake_script.cmd(
-            "git submodule set-url -- tensorrt_llm https://github.com/NVIDIA/TensorRT-LLM.git"
-        )
-        cmake_script.cmd("git submodule sync")
-        cmake_script.cmd("cd ..")
         tensorrtllm_prebuild(cmake_script)
-    else:
-        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
@@ -2037,6 +2002,7 @@ def cibase_build(
         "sequence",
         "dyna_sequence",
         "distributed_addsub",
+        "iterative_sequence",
     ):
         be_install_dir = os.path.join(repo_install_dir, "backends", be)
         if target_platform() == "windows":
