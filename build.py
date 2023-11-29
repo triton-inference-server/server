@@ -608,7 +608,11 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", True))
 
     cargs += cmake_backend_extra_args(be)
-    cargs.append("..")
+    if be == "tensorrtllm":
+        cargs.append("-S ../inflight_batcher_llm -B .")
+
+    else:
+        cargs.append("..")
     return cargs
 
 
@@ -1799,7 +1803,6 @@ def tensorrtllm_prebuild(cmake_script):
     # cmake_script.cmd("find /opt/conda -name ld -exec rm -f {} \;")
     cmake_script.cmd("cd tensorrtllm/tensorrt_llm")
     cmake_script.cmd("python3 scripts/build_wheel.py --trt_root /usr/local/tensorrt")
-    cmake_script.cmd("cd ../inflight_batcher_llm")
 
 
 def backend_build(
