@@ -28,6 +28,7 @@ import sys
 
 sys.path.append("../common")
 
+import base64
 from builtins import range
 from functools import partial
 import os
@@ -2384,6 +2385,83 @@ class LifeCycleTest(tu.TestResultCollector):
                 self._infer_success_models([
                     base[0],
                 ], (3,), model_shape)
+
+    # Test that model load API file override can't be used to create files
+    # outside of any model directory.
+    def test_file_override_security(self):
+        # When using model load API, temporary model directories are created in
+        # a randomly generated /tmp/folderXXXXXX directory for the life of the
+        # model, and cleaned up on model unload.
+        model_basepath = "/tmp/folderXXXXXX"
+        if os.path.exists(model_basepath) and os.path.isdir(model_basepath):
+            shutil.rmtree(model_basepath)
+        os.makedirs(model_basepath)
+
+        # Set file override paths that try to escape out of model directory,
+        # and test both pre-existing and non-existent files.
+        root_home_dir = "/root"
+
+        # Relative paths
+        escape_dir_rel = os.path.join("..", "..", "root")
+        escape_dir_full = os.path.join(model_basepath, escape_dir_rel)
+        self.assertEqual(os.path.abspath(escape_dir_full), root_home_dir)
+
+        new_file_rel = os.path.join(escape_dir_rel, "new_dir", "test.txt")
+        self.assertFalse(os.path.exists(os.path.join(model_basepath, new_file_rel)))
+        existing_file_rel = os.path.join(escape_dir_rel, ".bashrc")
+        self.assertTrue(os.path.exists(os.path.join(model_basepath, existing_file_rel)))
+
+        # Symlinks
+        ## No easy way to inject symlink into generated temp model dir, so for
+        ## testing sake, make a fixed symlink path in /tmp.
+        escape_dir_symlink_rel = os.path.join("..", "escape_symlink")
+        escape_dir_symlink_full = "/tmp/escape_symlink"
+        self.assertEqual(
+            os.path.abspath(os.path.join(model_basepath, escape_dir_symlink_rel)),
+            escape_dir_symlink_full,
+        )
+        if os.path.exists(escape_dir_symlink_full):
+            os.unlink(escape_dir_symlink_full)
+        os.symlink(root_home_dir, escape_dir_symlink_full)
+        self.assertTrue(os.path.abspath(escape_dir_symlink_full), root_home_dir)
+
+        symlink_new_file_rel = os.path.join(
+            escape_dir_symlink_rel, "new_dir", "test.txt"
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(model_basepath, symlink_new_file_rel))
+        )
+        symlink_existing_file_rel = os.path.join(escape_dir_symlink_rel, ".bashrc")
+        self.assertTrue(
+            os.path.exists(os.path.join(model_basepath, symlink_existing_file_rel))
+        )
+
+        # Contents to try writing to file, though it should fail to be written
+        new_contents = "This shouldn't exist"
+        new_contents_b64 = base64.b64encode(new_contents.encode())
+
+        new_files = [new_file_rel, symlink_new_file_rel]
+        existing_files = [existing_file_rel, symlink_existing_file_rel]
+        all_files = new_files + existing_files
+        for filepath in all_files:
+            # minimal config to create a new model
+            config = json.dumps({"backend": "identity"})
+            files = {f"file:{filepath}": new_contents_b64}
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                with self.assertRaisesRegex(InferenceServerException, "failed to load"):
+                    client.load_model("new_model", config=config, files=files)
+
+        for rel_path in new_files:
+            # Assert new file wasn't created
+            self.assertFalse(os.path.exists(os.path.join(model_basepath, rel_path)))
+
+        for rel_path in existing_files:
+            # Read the existing file and make sure it's contents weren't overwritten
+            existing_file = os.path.join(model_basepath, rel_path)
+            self.assertTrue(os.path.exists(existing_file))
+            with open(existing_file) as f:
+                contents = f.read()
+                self.assertNotEqual(contents, new_contents)
 
     def test_shutdown_dynamic(self):
         model_shape = (1, 1)

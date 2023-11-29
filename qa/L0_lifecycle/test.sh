@@ -1527,6 +1527,8 @@ rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_file_override >>$CLIENT_LOG 2>&1
 check_unit_test
+python $LC_TEST LifeCycleTest.test_file_override_security >>$CLIENT_LOG 2>&1
+check_unit_test
 set -e
 
 kill $SERVER_PID
