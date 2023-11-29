@@ -887,7 +887,7 @@ def tensorrtllm_cmake_args(images):
             images["base"],
         ),
     ]
-    # cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
+    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
 
 
@@ -1801,8 +1801,8 @@ def tensorrtllm_prebuild(cmake_script):
     # cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
     # cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
     # cmake_script.cmd("find /opt/conda -name ld -exec rm -f {} \;")
-    cmake_script.cmd("cd tensorrtllm/tensorrt_llm")
-    cmake_script.cmd("python3 scripts/build_wheel.py --trt_root /usr/local/tensorrt")
+    # cmake_script.cmd("cd tensorrtllm/tensorrt_llm")
+    # cmake_script.cmd("python3 scripts/build_wheel.py --trt_root /usr/local/tensorrt")
 
 
 def backend_build(
