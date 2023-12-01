@@ -198,7 +198,7 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
         fi
 
         # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
-        if [ `grep -c "Request timeout: 10000" $SERVER_LOG` == "0" ]; then
+        if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
             echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
             cat $SERVER_LOG
             RET=1

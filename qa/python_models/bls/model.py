@@ -670,11 +670,14 @@ class PBBLSTest(unittest.TestCase):
         self.assertIn("Request timeout expired", infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
+        # Verifies two things:
+        # 1. A request timeout can be accessed by receiver models
+        # 2. A user can specify a very large value (11s) for a timeout
         infer_request = pb_utils.InferenceRequest(
             model_name="identity_fp32_timeout",
             inputs=[input0],
             requested_output_names=["OUTPUT0"],
-            timeout=10000,
+            timeout=11000000000,
         )
 
         if self._is_decoupled:
