@@ -33,13 +33,12 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
 NAME="vllm_benchmarking_test"
-MODEL_NAME="vllm_model"
+MODEL_NAME="gpt2_vllm"
 INPUT_DATA="./input_data.json"
 SERVER_LOG="${NAME}_server.log"
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
-# Select the single GPU that will be available to the inference server.
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:=0}
 EXPORT_FILE=profile-export-vllm-model.json
 
 pip3 install tritonclient
@@ -47,10 +46,10 @@ rm -rf $MODEL_REPO $EXPORT_FILE *.tjson *.json *.csv
 
 mkdir -p $MODEL_REPO/$MODEL_NAME/1
 echo '{
-    "model":"facebook/opt-125m",
+    "model":"gpt2",
     "disable_log_requests": "true",
     "gpu_memory_utilization": 0.5
-}' > $MODEL_REPO/$MODEL_NAME/1/model.json
+}' >$MODEL_REPO/$MODEL_NAME/1/model.json
 
 echo 'backend: "vllm"
 instance_group [
@@ -58,7 +57,7 @@ instance_group [
     count: 1
     kind: KIND_MODEL
   }
-]' > $MODEL_REPO/$MODEL_NAME/config.pbtxt
+]' >$MODEL_REPO/$MODEL_NAME/config.pbtxt
 
 echo '{
     "data": [
@@ -74,13 +73,13 @@ echo '{
             ]
         }
     ]
-}' > $INPUT_DATA
+}' >$INPUT_DATA
 
 RET=0
 ARCH="amd64"
 STATIC_BATCH=1
 INSTANCE_CNT=1
-CONCURRENCY="10:100:10"
+CONCURRENCY="100"
 MODEL_FRAMEWORK="vllm"
 PERF_CLIENT_PROTOCOL="grpc"
 PERF_CLIENT=perf_analyzer
@@ -89,7 +88,7 @@ PERF_CLIENT_ARGS="-v -m $MODEL_NAME --concurrency-range=${CONCURRENCY} --measure
                   --input-data=$INPUT_DATA --profile-export-file=$EXPORT_FILE -i $PERF_CLIENT_PROTOCOL --async --streaming --stability-percentage=999"
 
 run_server
-if (( $SERVER_PID == 0 )); then
+if (($SERVER_PID == 0)); then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -100,22 +99,22 @@ $PERF_CLIENT $PERF_CLIENT_ARGS -f ${NAME}.csv 2>&1 | tee ${NAME}_perf_analyzer.l
 set +o pipefail
 set -e
 
-echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-echo -e "\"s_benchmark_repo_branch\":\"${BENCHMARK_REPO_BRANCH}\"," >> ${NAME}.tjson
-echo -e "\"s_benchmark_name\":\"${NAME}\"," >> ${NAME}.tjson
-echo -e "\"s_server\":\"triton\"," >> ${NAME}.tjson
-echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${NAME}.tjson
-echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
-echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
-echo -e "\"s_concurrency\":\"${CONCURRENCY}\"," >> ${NAME}.tjson
-echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
-echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${NAME}.tjson
-echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${NAME}.tjson
-
 if [[ -n "${SERVER_PID}" ]]; then
-  kill $SERVER_PID
-  wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
 fi
+
+echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >>${NAME}.tjson
+echo -e "\"s_benchmark_repo_branch\":\"${BENCHMARK_REPO_BRANCH}\"," >>${NAME}.tjson
+echo -e "\"s_benchmark_name\":\"${NAME}\"," >>${NAME}.tjson
+echo -e "\"s_server\":\"triton\"," >>${NAME}.tjson
+echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >>${NAME}.tjson
+echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >>${NAME}.tjson
+echo -e "\"s_model\":\"${MODEL_NAME}\"," >>${NAME}.tjson
+echo -e "\"s_concurrency\":\"${CONCURRENCY}\"," >>${NAME}.tjson
+echo -e "\"l_batch_size\":${STATIC_BATCH}," >>${NAME}.tjson
+echo -e "\"l_instance_count\":${INSTANCE_CNT}," >>${NAME}.tjson
+echo -e "\"s_architecture\":\"${ARCH}\"}]" >>${NAME}.tjson
 
 if [ -f $REPORTER ]; then
     set +e
@@ -125,8 +124,8 @@ if [ -f $REPORTER ]; then
         URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
     fi
 
-    python3 $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
-    if (( $? != 0 )); then
+    python3 $REPORTER -v -e ${EXPORT_FILE} -o ${NAME}.json --csv ${NAME}.csv --gpu-metrics --token-latency ${URL_FLAG} ${NAME}.tjson
+    if (($? != 0)); then
         RET=1
     fi
 
@@ -135,7 +134,7 @@ fi
 
 rm -rf $MODEL_REPO $INPUT_DATA
 
-if (( $RET == 0 )); then
+if (($RET == 0)); then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
