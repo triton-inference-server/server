@@ -1320,21 +1320,23 @@ RUN apt-get update && \
 """
     # # Add dependencies needed for tensorrtllm backend
     if "tensorrtllm" in backends:
-        TORCH_VERSION = TRITON_VERSION_MAP[FLAGS.version][7]
+        torch_version = TRITON_VERSION_MAP[FLAGS.version][8]
         if platform.machine() == "x86_64":
             df += """
-RUN pip3 install torch=={TORCH_VERSION}
-"""
+# Add dependencies needed for tensorrtllm backend
+RUN pip3 install torch=={}
+""".format(torch_version)
         else:
             df += """
-RUN cd /tmp \
-    && git clone --recurse-submodules --depth 1 --branch v{TORCH_VERSION} {github_organization}/pytorch.git \
-    && cd pytorch \
-    && pip3 install -r requirements.txt \
-    && _GLIBCXX_USE_CXX11_ABI=1 TORCH_CUDA_ARCH_LIST="8.0;9.0" python3 setup.py install \
-    && cd /tmp \
+# Add dependencies needed for tensorrtllm backend
+RUN cd /tmp \\
+    && git clone --recurse-submodules --depth 1 --branch v{0} {1}/pytorch.git \\
+    && cd pytorch \\
+    && pip3 install -r requirements.txt \\
+    && _GLIBCXX_USE_CXX11_ABI=1 TORCH_CUDA_ARCH_LIST="8.0;9.0" python3 setup.py install \\
+    && cd /tmp \\
     && rm -rf /tmp/pytorch
-"""
+""".format(torch_version,github_organization)
     # if "tensorrtllm" in backends:
     #     be = "tensorrtllm"
     #     url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
