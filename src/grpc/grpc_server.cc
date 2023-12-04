@@ -2408,8 +2408,7 @@ Server::Server(
 
     row = {
         "max_connection_age_ms",
-        std::to_string(
-            keepalive_options.max_connection_age_ms_)};
+        std::to_string(keepalive_options.max_connection_age_ms_)};
     table_printer.InsertRow(row);
 
     row = {
