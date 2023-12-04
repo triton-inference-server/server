@@ -37,7 +37,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.10}
+TRITON_VERSION=${TRITON_VERSION:=23.11}
 NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$TRITON_VERSION}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$NVIDIA_UPSTREAM_VERSION-tf2-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
@@ -130,7 +130,7 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py310_cu122/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/py310_cu123/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 

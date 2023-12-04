@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r23.10 branch, `<container tag>` will default to r23.10. If you are
+r23.11 branch, `<container tag>` will default to r23.11. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -334,8 +334,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r23.10 branch, '<container tag>' will default to
-r23.10. Therefore, you typically do not need to provide '<container
+are building on the r23.11 branch, '<container tag>' will default to
+r23.11. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
