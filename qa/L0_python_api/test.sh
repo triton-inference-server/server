@@ -25,25 +25,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TEST_LOG="./python_binding.log"
+BINDING_TEST_LOG="./python_binding.log"
 
 RET=0
 
-rm -f $TEST_LOG
+rm -f $BINDING_TEST_LOG
 
 set +e
 
-python test_binding.py > $TEST_LOG 2>&1
+python test_binding.py > $BINDING_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $BINDING_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+
+API_TEST_LOG="./python_api.log"
+
+python test_api.py > $API_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $API_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $TEST_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
