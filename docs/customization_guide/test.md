@@ -49,7 +49,7 @@ $ ./gen_qa_custom_ops
 ```
 
 This will create multiple model repositories in /tmp/<version>/qa_*
-(for example /tmp/23.10/qa_model_repository).  The TensorRT models
+(for example /tmp/23.11/qa_model_repository).  The TensorRT models
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.
