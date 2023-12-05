@@ -235,7 +235,7 @@ with a `tritonserver` binary.
 
 ```bash
 # Start server container
-docker run -ti --rm --gpus=all --network=host -v $PWD:/mnt --name triton-server nvcr.io/nvidia/tritonserver:23.10-py3
+docker run -ti --rm --gpus=all --network=host -v $PWD:/mnt --name triton-server nvcr.io/nvidia/tritonserver:23.11-py3
 
 # Start serving your models
 tritonserver --model-repository=/mnt/models
@@ -284,7 +284,7 @@ by setting the `-u` flag, such as `perf_analyzer -m densenet_onnx -u
 
 ```bash
 # Start the SDK container interactively
-docker run -ti --rm --gpus=all --network=host -v $PWD:/mnt --name triton-client nvcr.io/nvidia/tritonserver:23.10-py3-sdk
+docker run -ti --rm --gpus=all --network=host -v $PWD:/mnt --name triton-client nvcr.io/nvidia/tritonserver:23.11-py3-sdk
 
 # Benchmark model being served from step 3
 perf_analyzer -m densenet_onnx --concurrency-range 1:4

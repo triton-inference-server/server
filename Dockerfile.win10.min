@@ -83,7 +83,13 @@ ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
-RUN vs_buildtools.exe --quiet --wait --norestart --nocache install --installPath %VS_INSTALL_PATH_WP% --channelUri "C:\tmp\VisualStudio.chman" --installChannelUri "C:\tmp\VisualStudio.chman" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --locale "En-us"
+RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
+      --installPath %VS_INSTALL_PATH_WP% \
+      --channelUri "C:\tmp\VisualStudio.chman" \
+      --installChannelUri "C:\tmp\VisualStudio.chman" \
+      --add Microsoft.VisualStudio.Workload.VCTools \
+      --includeRecommended \
+      --locale "En-us"
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
@@ -97,7 +103,17 @@ RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/mi
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-filesystem:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe install \
+      b64:x64-windows \
+      boost-filesystem:x64-windows \
+      boost-interprocess:x64-windows \
+      boost-stacktrace:x64-windows \
+      openssl-windows:x64-windows \
+      openssl:x64-windows \
+      pthread:x64-windows \
+      rapidjson:x64-windows \
+      re2:x64-windows \
+      zlib:x64-windows
 RUN vcpkg.exe integrate install
 
 LABEL VCPGK_VERSION=${VCPGK_VERSION}
@@ -108,8 +124,8 @@ WORKDIR /
 # Installing CUDA
 #
 ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=2
-ARG CUDA_PATCH=1
+ARG CUDA_MINOR=3
+ARG CUDA_PATCH=0
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -157,7 +173,7 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing cuDNN
 #
-ARG CUDNN_VERSION=8.9.5.27
+ARG CUDNN_VERSION=8.9.6.50
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 
