@@ -41,4 +41,4 @@ optimization {
   }
 }
 backend: "pytorch"
-runtime: "libtriton_pytorch.so"
+runtime: ""

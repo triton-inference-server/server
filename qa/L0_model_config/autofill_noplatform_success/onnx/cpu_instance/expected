@@ -33,4 +33,4 @@ optimization {
   }
 }
 backend: "onnxruntime"
-runtime: "libtriton_onnxruntime.so"
+runtime: ""

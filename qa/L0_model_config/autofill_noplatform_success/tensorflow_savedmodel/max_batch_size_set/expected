@@ -45,4 +45,4 @@ optimization {
   }
 }
 backend: "tensorflow"
-runtime: "libtriton_tensorflow.so"
+runtime: ""
