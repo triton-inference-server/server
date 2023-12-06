@@ -477,13 +477,20 @@ TraceManager::Trace::StartSpan(
 
   if (activity == TRITONSERVER_TRACE_REQUEST_START) {
     int64_t model_version;
+    const char* request_id;
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceModelVersion(trace, &model_version),
         "getting model version");
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceRequestId(trace, &request_id),
+        "getting request id");
     span->SetAttribute("triton.model_name", model_name);
     span->SetAttribute("triton.model_version", model_version);
     span->SetAttribute("triton.trace_id", trace_id);
     span->SetAttribute("triton.trace_parent_id", parent_id);
+    if (std::string(request_id) != "") {
+      span->SetAttribute("triton.request_id", request_id);
+    }
   }
 
   otel_context_ = otel_context_.SetValue(span_key, span);
