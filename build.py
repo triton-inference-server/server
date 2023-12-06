@@ -2755,7 +2755,10 @@ if __name__ == "__main__":
     components_git_orgs = {key: DEFAULT_GIT_ORG for key in COMPONENTS_GIT_ORG_KEYS}
     for git_org in FLAGS.git_org:
         parts = git_org.split("!")
-        fail_if(len(parts) != 2, "--git-org must specify <component-name>:<git-org>")
+        fail_if(
+            len(parts) != 2,
+            "--git-org must specify <component-name>!<git-org>, note '!' separator.",
+        )
         fail_if(
             parts[0] not in components_git_orgs,
             '--git-org <component-name> must be one of "{}"'.format(
