@@ -347,6 +347,7 @@ enum TritonOptionId {
   OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
+  OPTION_CUDA_VIRTUAL_ADDRESS_SIZE,
   OPTION_RESPONSE_CACHE_BYTE_SIZE,
   OPTION_CACHE_CONFIG,
   OPTION_CACHE_DIR,
@@ -752,6 +753,18 @@ TritonParser::SetupOptions()
        "times, but only once per GPU device. Subsequent uses will overwrite "
        "previous uses for the same GPU device. Default is 64 MB."});
   memory_device_options_.push_back(
+      {OPTION_CUDA_VIRTUAL_ADDRESS_SIZE, "cuda-virtual-address-size",
+       "<integer>:<integer>",
+       "The total CUDA virtual address size that will be used for each "
+       "implicit state when growable memory is used. This value determines "
+       "the maximum size of each implicit state. The state size cannot go "
+       "beyond this value. The argument should be "
+       "2 integers separated by colons in the format "
+       "<GPU device ID>:<CUDA virtual address size>. This option can be used "
+       "multiple "
+       "times, but only once per GPU device. Subsequent uses will overwrite "
+       "previous uses for the same GPU device. Default is 1 GB."});
+  memory_device_options_.push_back(
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
@@ -995,6 +1008,14 @@ TritonServerParameters::BuildTritonServerOptions()
         TRITONSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
             loptions, cuda_pool.first, cuda_pool.second),
         "setting total CUDA memory byte size");
+  }
+  for (const auto& cuda_virtual_address_size : cuda_virtual_address_size_) {
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetCudaVirtualAddressSize(
+            loptions, cuda_virtual_address_size.first,
+            cuda_virtual_address_size.second),
+        "setting total CUDA virtual address size");
   }
   THROW_IF_ERR(
       ParseException,
@@ -1568,6 +1589,10 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
           lparams.cuda_pools_.push_back(
               ParsePairOption<int, uint64_t>(optarg, ":"));
+          break;
+        case OPTION_CUDA_VIRTUAL_ADDRESS_SIZE:
+          lparams.cuda_virtual_address_size_.push_back(
+              ParsePairOption<int, size_t>(optarg, ":"));
           break;
         case OPTION_RESPONSE_CACHE_BYTE_SIZE: {
           cache_size_present = true;

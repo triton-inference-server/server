@@ -38,6 +38,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+ldconfig || true
+
 export CUDA_VISIBLE_DEVICES=0
 
 TEST_RESULT_FILE='test_results.txt'

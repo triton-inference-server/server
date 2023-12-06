@@ -47,9 +47,9 @@ mkdir -p models/request_rescheduling_addsub/1/
 cp ../../python_models/request_rescheduling_addsub/model.py models/request_rescheduling_addsub/1/
 cp ../../python_models/request_rescheduling_addsub/config.pbtxt models/request_rescheduling_addsub
 
-mkdir -p models/generative_sequence/1/
-cp ../../python_models/generative_sequence/model.py models/generative_sequence/1/
-cp ../../python_models/generative_sequence/config.pbtxt models/generative_sequence
+mkdir -p models/iterative_sequence/1/
+cp ../../python_models/iterative_sequence/model.py models/iterative_sequence/1/
+cp ../../python_models/iterative_sequence/config.pbtxt models/iterative_sequence
 
 mkdir -p models/wrong_return_type/1/
 cp ../../python_models/wrong_return_type/model.py models/wrong_return_type/1/

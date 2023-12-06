@@ -51,8 +51,10 @@ class SagemakerAPIServer : public HTTPAPIServer {
    public:
     explicit SagemakeInferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
-        DataCompressor::Type response_compression_type)
-        : InferRequestClass(server, req, response_compression_type)
+        DataCompressor::Type response_compression_type,
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+        : InferRequestClass(
+              server, req, response_compression_type, triton_request)
     {
     }
     using InferRequestClass::InferResponseComplete;
@@ -72,8 +74,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const int32_t port, const std::string address, const int thread_cnt)
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, false /* reuse_port */,
-            address, "" /* header_forward_pattern */, thread_cnt,
-            RestrictedFeatures()),
+            address, "" /* header_forward_pattern */, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(
@@ -122,10 +123,12 @@ class SagemakerAPIServer : public HTTPAPIServer {
   static void BADReplyCallback507(evthr_t* thr, void* arg, void* shared);
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
-      evhtp_request_t* req) override
+      evhtp_request_t* req,
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+      override
   {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
-        server_.get(), req, GetResponseCompressionType(req)));
+        server_.get(), req, GetResponseCompressionType(req), triton_request));
   }
   TRITONSERVER_Error* GetInferenceHeaderLength(
       evhtp_request_t* req, int32_t content_length,

@@ -33,7 +33,7 @@
 ```
 docker run --gpus all -it --network host \
     --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
-    -v ~:/scripts nvcr.io/nvidia/tensorrt:23.10-py3
+    -v ~:/scripts nvcr.io/nvidia/tensorrt:23.11-py3
 
 pip install onnx six torch tf2onnx tensorflow
 
