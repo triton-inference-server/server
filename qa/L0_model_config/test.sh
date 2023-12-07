@@ -255,6 +255,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float
 mkdir -p special_cases/noautofill_noconfig/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float32_float32_float32/1/model.graphdef \
     special_cases/noautofill_noconfig/1/
+# Create runtime escape scenario
+mkdir -p special_cases/runtime_escape/1 special_cases/runtime_escape/dummy_runtime
+touch special_cases/runtime_escape/dummy_runtime/libtriton_identity.so
 
 # Copy reshape model files into the test model repositories.
 mkdir -p autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
