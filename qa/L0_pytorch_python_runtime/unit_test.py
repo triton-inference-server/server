@@ -31,7 +31,9 @@ import unittest
 
 import torch
 
+# satisfy Python runtime import requirements
 sys.modules["triton_python_backend_utils"] = unittest.mock.MagicMock()
+# import modules from Python runtime to be tested
 from py_runtime import _gather_torch_tensors, _scatter_torch_tensors
 
 
