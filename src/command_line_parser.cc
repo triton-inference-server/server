@@ -574,12 +574,12 @@ TritonParser::SetupOptions()
       {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS, "grpc-max-connection-age",
        Option::ArgInt,
        "Maximum time that a channel may exist in milliseconds."
-       "Default is INT_MAX (infinite)."});
+       "Default is undefined."});
   grpc_options_.push_back(
       {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
        "grpc-max-connection-age-grace", Option::ArgInt,
        "Grace period after the channel reaches its max age. "
-       "Default is INT_MAX (infinite)."});
+       "Default is undefined."});
   grpc_options_.push_back(
       {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
        "<string>:<string>=<string>",
