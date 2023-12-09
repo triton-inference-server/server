@@ -71,6 +71,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
         r = requests.post(
             url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
         )
+        # Content-Type header should always be JSON for errors
+        self.assertEqual(r.headers["Content-Type"], "'application/json'")
+
         try:
             r.raise_for_status()
             self.assertTrue(False, f"Expected failure, success for {inputs}")
@@ -79,6 +82,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
 
     def generate_stream_expect_failure(self, model_name, inputs, msg):
         r = self.generate_stream(model_name, inputs)
+        # Content-Type header should always be JSON for errors
+        self.assertEqual(r.headers["Content-Type"], "'application/json'")
+
         try:
             r.raise_for_status()
             self.assertTrue(False, f"Expected failure, success for {inputs}")
@@ -90,6 +96,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
     ):
         r = self.generate_stream(model_name, inputs)
         r.raise_for_status()
+        self.assertEqual(
+            r.headers["Content-Type"], "'text/event-stream; charset=utf-8'"
+        )
         self.check_sse_responses(r, [{"TEXT": expected_output}] * rep_count)
 
     def check_sse_responses(self, res, expected_res):
@@ -128,7 +137,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         r.raise_for_status()
 
         self.assertIn("Content-Type", r.headers)
-        self.assertIn("application/json", r.headers["Content-Type"])
+        self.assertEqual(r.headers["Content-Type"], "'application/json'")
 
         data = r.json()
         self.assertIn("TEXT", data)
