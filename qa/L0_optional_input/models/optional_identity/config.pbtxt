@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,19 +23,31 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-replicaCount: 1
-
-image:
-  imageName: nvcr.io/nvidia/tritonserver:23.12-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
-  numGpus: 1
-
-service:
-  type: LoadBalancer
-
-secret:
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+backend: "python"
+max_batch_size: 4
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
