@@ -101,7 +101,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
     def check_sse_responses(self, res, expected_res):
         # Validate SSE format
         self.assertIn("Content-Type", res.headers)
-        self.assertEqual("text/event-stream", res.headers["Content-Type"])
+        self.assertEqual(
+            "text/event-stream; charset=utf-8", res.headers["Content-Type"]
+        )
 
         # SSE format (data: []) is hard to parse, use helper library for simplicity
         client = sseclient.SSEClient(res)
