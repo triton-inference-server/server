@@ -75,7 +75,7 @@ an [error JSON object](#generate-response-json-error-object).
     responses through `/generate_stream`.
     * If the request fails before inference begins, then a JSON error will
     be returned with `Content-Type` of `application/json`, similar to errors
-    from other endpoints and the status code should correctly reflect an error.
+    from other endpoints with the status code set to an error.
 
 ### Generate Request JSON Object
 
