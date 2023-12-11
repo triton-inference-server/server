@@ -110,7 +110,7 @@ test_setups=("cp models/libtriton_singlebatching.so ${BACKEND_DIR}/batchstrategy
     "cp models/libtriton_volumebatching.so ${BACKEND_DIR}/batchstrategy.so && sed -i \"s/(12))/(4, 5, 6))/\" ${BATCH_CUSTOM_TEST}"
     "mv ${BACKEND_DIR}/batchstrategy.so ${MODEL_DIR} && cp models/libtriton_singlebatching.so ${BACKEND_DIR}"
     "mv ${MODEL_DIR}/batchstrategy.so ${VERSION_DIR}/batchstrategy.so"
-    "mv ${VERSION_DIR}/batchstrategy.so models/${MODEL_NAME}/libtriton_volumebatching.so && echo \"parameters: {key: \\"TRITON_BATCH_STRATEGY_PATH\\", value: {string_value: \\"${MODEL_DIR}/libtriton_volumebatching.so\\"}}\" >> ${CONFIG_PATH}")
+    "mv ${VERSION_DIR}/batchstrategy.so models/${MODEL_NAME}/libtriton_volumebatching.so && echo \"parameters: {key: \\\"TRITON_BATCH_STRATEGY_PATH\\\", value: {string_value: \\\"${MODEL_DIR}/libtriton_volumebatching.so\\\"}}\" >> ${CONFIG_PATH}")
 
 for i in "${!test_setups[@]}"; do
     echo "Running ${test_types[$i]} test"
