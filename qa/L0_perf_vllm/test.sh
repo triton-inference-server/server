@@ -84,6 +84,9 @@ MODEL_FRAMEWORK="vllm"
 PERF_CLIENT_PROTOCOL="grpc"
 PERF_CLIENT=perf_analyzer
 
+# Set stability-percentage 999 to bypass the stability check in PA.
+# LLM generates a sequence of tokens that is unlikely to be within a reasonable bound to determine valid measurement in terms of latency.
+# Using "count_windows" measurement mode, which automatically extends the window for collecting responses.
 PERF_CLIENT_ARGS="-v -m $MODEL_NAME --concurrency-range=${CONCURRENCY} --measurement-mode=count_windows --measurement-request-count=10 \
                   --input-data=$INPUT_DATA --profile-export-file=$EXPORT_FILE -i $PERF_CLIENT_PROTOCOL --async --streaming --stability-percentage=999"
 
