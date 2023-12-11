@@ -68,10 +68,14 @@ These responses will be sent as
 response body. In the case of inference errors, responses will have
 an [error JSON object](#generate-response-json-error-object).
     * Note that the HTTP response code is set in the first response of the SSE,
-    so if an error occurs after the first response for the request,
-    it can result in receiving an error object while the status code shows
-    success (200). Therefore, the user must always check whether an error
-    object is received when generating responses through `/generate_stream`.
+    so if the first response succeeds but an error occurs in a subsequent
+    response for the request, it can result in receiving an error object
+    while the status code shows success (200). Therefore, the user must
+    always check whether an error object is received when generating
+    responses through `/generate_stream`.
+    * If the request fails before inference begins, then a JSON error will
+    be returned with `Content-Type` of `application/json`, similar to errors
+    from other endpoints and the status code should correctly reflect an error.
 
 ### Generate Request JSON Object
 
