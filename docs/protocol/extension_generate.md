@@ -53,7 +53,7 @@ POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/generate
 POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/generate_stream
 ```
 
-### generate v.s. generate_stream
+### generate vs. generate_stream
 
 Both URLs expect the same request JSON object, and generate the same JSON
 response object. However, there are some differences in the format used to
