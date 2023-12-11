@@ -1039,15 +1039,13 @@ RUN wget -O /tmp/boost.tar.gz \
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
-RUN apt update && apt install -y gpg wget && \
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-        gpg --dearmor - |  \
-        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    . /etc/os-release && \
-    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
-    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends cmake cmake-data
+RUN apt update -q=2 \\
+    && apt install -y gpg wget \\
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
+    && . /etc/os-release \\
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
+    && apt-get update -q=2 \\
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
 
         if FLAGS.enable_gpu:

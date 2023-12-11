@@ -142,13 +142,8 @@ class OptionalInputTest(tu.TestResultCollector):
             stats = self.triton_client_.get_inference_statistics(model_name, "1")
             self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
             actual_exec_cnt = stats.model_stats[0].execution_count
-            if actual_exec_cnt == exec_cnt:
+            if stats.model_stats[0].execution_count > 0:
                 break
-            print(
-                "WARNING: expect {} executions, got {} (attempt {})".format(
-                    exec_cnt, actual_exec_cnt, i
-                )
-            )
             time.sleep(1)
 
         self.assertEqual(
@@ -406,6 +401,40 @@ class OptionalInputTest(tu.TestResultCollector):
                 np.array_equal(output_data, expected),
                 "{}, {}, expected: {}, got {}".format(
                     self.model_name_, "OUTPUT1", expected, output_data
+                ),
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_ensemble_optional_connecting_tensor(self):
+        # The ensemble is a special case of pipelining models with optional
+        # inputs, where the request will only produce a subset of inputs
+        # for the second model while the ensemble graph connects all inputs of
+        # the second model (which is valid because the not-provided inputs
+        # are marked optional). See 'config.pbtxt' for detail.
+        self.model_name_ = "optional_connecting_tensor"
+
+        # Provide all inputs, send requests that don't form preferred batch
+        # so all requests should be returned after the queue delay
+        try:
+            provided_inputs = ("INPUT0",)
+            inputs = []
+            outputs = []
+            for provided_input in provided_inputs:
+                inputs.append(self.inputs_[provided_input])
+                outputs.append(self.outputs_[provided_input])
+
+            triton_client = grpcclient.InferenceServerClient("localhost:8001")
+            results = triton_client.infer(
+                model_name=self.model_name_, inputs=inputs, outputs=outputs
+            )
+
+            expected = self.input_data_["INPUT0"]
+            output_data = results.as_numpy("OUTPUT0")
+            self.assertTrue(
+                np.array_equal(output_data, expected),
+                "{}, {}, expected: {}, got {}".format(
+                    self.model_name_, "OUTPUT0", expected, output_data
                 ),
             )
         except Exception as ex:
