@@ -80,6 +80,7 @@ RUN apt-get update && \
             wget \
             python3-pdfkit \
             openjdk-11-jdk \
+            libre2-dev \
             maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
