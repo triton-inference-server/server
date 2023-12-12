@@ -98,8 +98,8 @@ def collect_token_latencies(export_data, data):
         for prev_res, res in pairwise(responses):
             token_to_token_latencies.append((res - prev_res) / 1_000_000)
 
-    data["d_avg_token_to_token_latency"] = np.mean(token_to_token_latencies)  # msec
-    data["d_avg_first_token_latency"] = np.mean(first_token_latencies)  # msec
+    data["d_avg_token_to_token_latency_ms"] = np.mean(token_to_token_latencies)  # msec
+    data["d_avg_first_token_latency_ms"] = np.mean(first_token_latencies)  # msec
 
 
 def annotate(data):
