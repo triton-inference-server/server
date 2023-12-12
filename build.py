@@ -616,7 +616,9 @@ def pytorch_cmake_args(images):
     if "pytorch" in images:
         image = images["pytorch"]
     else:
-        image = "nvcr.io/nvidia/pytorch:{}-py3".format(FLAGS.upstream_container_version)
+        image = "nvcr.io/nvidia/pytorch:{}-py3".format(
+            FLAGS.upstream_container_version
+        )
     cargs = [
         cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
     ]
@@ -648,6 +650,7 @@ def onnxruntime_cmake_args(images, library_paths):
                 "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
             )
         )
+
 
     if target_platform() == "windows":
         if "base" in images:
@@ -764,7 +767,9 @@ def tensorflow_cmake_args(images, library_paths):
             FLAGS.upstream_container_version
         )
     extra_args = [
-        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
+        cmake_backend_arg(
+            backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image
+        )
     ]
     return extra_args
 

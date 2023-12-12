@@ -256,6 +256,12 @@ RUN if [ "$IGPU_BUILD" == "0" ]; then \
         cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
     fi
 
+RUN if [ "$IGPU_BUILD" == "0" ]; then \
+        cp backends/repeat/libtriton_repeat.so qa/L0_model_config && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_decoupled/models/repeat_int32/1 && \
+        cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
+    fi
+
 RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
         qa/L0_decoupled/python_models/repeat_int32/1/. && \
