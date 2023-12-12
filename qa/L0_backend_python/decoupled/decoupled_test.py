@@ -295,7 +295,7 @@ class DecoupledTest(tu.TestResultCollector):
 
         model_name = "decoupled_raise_exception"
         shape = [2, 2]
-        number_of_requests = 2
+        number_of_requests = 10
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
             triton_client.start_stream(callback=partial(callback, user_data))
@@ -310,13 +310,14 @@ class DecoupledTest(tu.TestResultCollector):
                     )
                 ]
                 inputs[0].set_data_from_numpy(input_data)
-                # with self.assertRaises(Exception) as ex:
                 triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
 
             for i in range(number_of_requests):
                 result = user_data._completed_requests.get()
                 self.assertIs(type(result), InferenceServerException)
                 self.assertIn("Intentional Error", result.message())
+
+            self.assertTrue(triton_client.is_model_ready(model_name))
 
 
 if __name__ == "__main__":
