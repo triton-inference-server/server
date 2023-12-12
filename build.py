@@ -1775,7 +1775,6 @@ def core_build(
     cmake_script.commentln(8)
     cmake_script.blankln()
 
-
 def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
