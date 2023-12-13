@@ -338,8 +338,9 @@ class TritonPlugin(BaseDeploymentClient):
             # with proper model versions and version strategy, which may differ from
             # the versioning in MLFlow
             for file in artifact_path.iterdir():
-                if file.name not in ["MLmodel", "conda.yaml"]:
+                if file.is_dir():
                     copy_paths["model_path"]["from"] = file
+                    break
             copy_paths["model_path"]["to"] = triton_deployment_dir
         elif flavor == "onnx":
             # Look for model file via MLModel metadata or iterating dir
