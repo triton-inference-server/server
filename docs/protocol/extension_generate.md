@@ -53,19 +53,29 @@ POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/generate
 POST v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/generate_stream
 ```
 
-### generate v.s. generate_stream
+### generate vs. generate_stream
 
-Both URLs expect the same request JSON object, and generate the same response
-JSON object. However, `generate` returns exactly 1 response JSON object, while
-`generate_stream` may return multiple responses based on the inference
-results. `generate_stream` returns the responses as
+Both URLs expect the same request JSON object, and generate the same JSON
+response object. However, there are some differences in the format used to
+return each:
+* `/generate` returns exactly 1 response JSON object with a
+`Content-Type` of `application/json`
+* `/generate_stream` may return multiple responses based on the inference
+results, with a `Content-Type` of `text/event-stream; charset=utf-8`.
+These responses will be sent as
 [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html#server-sent-events)
-(SSE), where each response will be a "data" chunk in the HTTP response body.
-Also, note that an error may be returned during inference, whereas the HTTP
-response code has been set in the first response of the SSE, which can result in
-receiving an [error object](#generate-response-json-error-object) while status
-code shows success (200). Therefore the user must always check whether an error
-object is received when generating responses through `generate_stream`.
+(SSE), where each response will be a "data" chunk in the HTTP
+response body. In the case of inference errors, responses will have
+an [error JSON object](#generate-response-json-error-object).
+    * Note that the HTTP response code is set in the first response of the SSE,
+    so if the first response succeeds but an error occurs in a subsequent
+    response for the request, it can result in receiving an error object
+    while the status code shows success (200). Therefore, the user must
+    always check whether an error object is received when generating
+    responses through `/generate_stream`.
+    * If the request fails before inference begins, then a JSON error will
+    be returned with `Content-Type` of `application/json`, similar to errors
+    from other endpoints with the status code set to an error.
 
 ### Generate Request JSON Object
 

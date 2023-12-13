@@ -116,6 +116,13 @@ EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
 void
 AddContentTypeHeader(evhtp_request_t* req, const char* type)
 {
+  // Remove existing header if found
+  auto content_header =
+      evhtp_headers_find_header(req->headers_out, kContentTypeHeader);
+  if (content_header) {
+    evhtp_header_rm_and_free(req->headers_out, content_header);
+  }
+
   evhtp_headers_add_header(
       req->headers_out, evhtp_header_new(kContentTypeHeader, type, 1, 1));
 }
