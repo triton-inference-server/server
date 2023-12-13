@@ -246,11 +246,13 @@ RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
     mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
-    mkdir -p qa/L0_decoupled/models/nested_square/1
+    mkdir -p qa/L0_decoupled/models/nested_square/1 && \
+    mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1
 
 RUN if [ "$IGPU_BUILD" == "0" ]; then \
         cp backends/repeat/libtriton_repeat.so qa/L0_model_config && \
         cp backends/repeat/libtriton_repeat.so qa/L0_decoupled/models/repeat_int32/1 && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_grpc_state_cleanup/models/repeat_int32/1/. && \
         cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
     fi
 
@@ -263,10 +265,6 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
         qa/L0_decoupled/python_models/square_int32/1/. && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
         qa/L0_decoupled/python_models/square_int32/.
-
-RUN mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_grpc_state_cleanup/models/repeat_int32/1/.
 
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
