@@ -80,8 +80,8 @@ def collect_gpu_metrics(data):
 
     data["l_gpus_count"] = device_count
     data["s_gpu_model"] = ", ".join(unique_gpu_models)
-    data["d_total_gpu_memory"] = total_memory / (1024**2)
-    data["d_total_free_gpu_memory"] = total_free_memory / (1024**2)
+    data["d_total_gpu_memory_mb"] = total_memory / (1024**2)
+    data["d_total_free_gpu_memory_mb"] = total_free_memory / (1024**2)
 
     pynvml.nvmlShutdown()
 
