@@ -38,6 +38,7 @@ option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
+option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
 set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by Triton" )
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
