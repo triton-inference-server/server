@@ -1177,7 +1177,28 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-ENV LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+# Remove TRT contents that are not needed in runtime
+RUN ARCH="$(uname -i)" \\
+    && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
+    && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
+    && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
+
+# Install required packages for TRT-LLM models
+RUN python3 -m pip install --upgrade pip \\
+    && pip3 install transformers
+
+# Uninstall unused nvidia packages
+RUN if pip freeze | grep -q "nvidia.*"; then \\
+        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
+    fi
+RUN pip cache purge
+
+# Drop the static libs
+RUN ARCH="$(uname -i)" \\
+    && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
+          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
+
+ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
