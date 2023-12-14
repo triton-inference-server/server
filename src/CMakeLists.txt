@@ -774,7 +774,5 @@ endif() # NOT WIN32
 
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)
-  if ( NOT EXISTS "/etc/ld.so.conf.d/nvidia-tegra.conf" )
-    add_subdirectory(test test)
-  endif()
+  add_subdirectory(test test)
 endif() # NOT WIN32
