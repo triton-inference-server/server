@@ -880,12 +880,6 @@ def tensorrtllm_cmake_args(images):
         cmake_backend_arg(
             "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
         ),
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TRTLLM_BUILD_CONTAINER",
-            None,
-            images["base"],
-        ),
     ]
     cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
