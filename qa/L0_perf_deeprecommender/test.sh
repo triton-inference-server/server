@@ -43,7 +43,7 @@ TRTEXEC=/usr/src/tensorrt/bin/trtexec
 MODEL="deeprecommender"
 PROTOCOLS="grpc http"
 
-rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
+rm -f *.log  *.csv *.metrics *.tjson *.json
 
 #
 # Test minimum latency
@@ -58,6 +58,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
+        sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
 $TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
@@ -117,6 +118,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
+        sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
 $TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \

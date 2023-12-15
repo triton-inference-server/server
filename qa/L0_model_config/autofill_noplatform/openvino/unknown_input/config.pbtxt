@@ -1,0 +1,24 @@
+input {
+  name: "Func/PartitionedCall/input/_0:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}
+input {
+  name: "unknown_input"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}
+output {
+  name: "Func/PartitionedCall/output/_2:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}
+output {
+  name: "Func/PartitionedCall/output/_3:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}

@@ -1,4 +1,6 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,24 +29,25 @@
 import sys
 
 from scenarios import *
+
 sys.path.append("../common")
 
 import argparse
 import bisect
-from builtins import range
-from builtins import str
 import os
-import time
 import threading
+import time
 import traceback
-import numpy as np
+from builtins import range, str
 from functools import partial
-import tritonclient.grpc as grpcclient
+
+import numpy as np
 import prettytable
+import tritonclient.grpc as grpcclient
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 1024 * 1024
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
+BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx plan")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -62,24 +65,26 @@ STOP_STRESS_THREAD = False
 def get_trials(is_sequence=True):
     _trials = ()
     if is_sequence:
-        for backend in BACKENDS.split(' '):
-            if (backend != "libtorch") and (backend != 'savedmodel'):
+        for backend in BACKENDS.split(" "):
+            if (backend != "libtorch") and (backend != "savedmodel"):
                 _trials += (backend + "_nobatch",)
             _trials += (backend,)
     else:
         _trials = ()
-        for backend in BACKENDS.split(' '):
-            if (backend != "libtorch"):
+        for backend in BACKENDS.split(" "):
+            if backend != "libtorch":
                 _trials += (backend + "_nobatch",)
     return _trials
 
 
-def update_test_count(test_case_count,
-                      failed_test_case_count,
-                      request_count,
-                      test_case_name,
-                      success=True,
-                      count=1):
+def update_test_count(
+    test_case_count,
+    failed_test_case_count,
+    request_count,
+    test_case_name,
+    success=True,
+    count=1,
+):
     if success:
         # Count the times each test case runs
         if test_case_name in test_case_count:
@@ -101,7 +106,6 @@ def update_test_count(test_case_count,
 
 
 class ScenarioSelector:
-
     def __init__(self, probs, rng):
         self.rng_ = rng
         self.probs_range_ = []
@@ -118,20 +122,24 @@ class ScenarioSelector:
             self.probs_range_[i] /= total_weight
 
     def get_scenario(self):
-        return self.scenarios_[bisect.bisect_left(self.probs_range_,
-                                                  self.rng_.rand())]
+        return self.scenarios_[bisect.bisect_left(self.probs_range_, self.rng_.rand())]
 
 
-def stress_thread(name, seed, correlation_id_base, test_case_count,
-                  failed_test_case_count, sequence_request_count):
+def stress_thread(
+    name,
+    seed,
+    correlation_id_base,
+    test_case_count,
+    failed_test_case_count,
+    sequence_request_count,
+):
     # Thread responsible for generating sequences of inference
     # requests.
     global _thread_exceptions
 
     # Write any thread output to dedicated file
-    with open("{}.log".format(name), 'w') as out_file:
-        print("Starting thread {} with seed {}".format(name, seed),
-              file=out_file)
+    with open("{}.log".format(name), "w") as out_file:
+        print("Starting thread {} with seed {}".format(name, seed), file=out_file)
         rng = np.random.RandomState(seed)
 
         # FIXME revisit to check if it is necessary
@@ -150,74 +158,111 @@ def stress_thread(name, seed, correlation_id_base, test_case_count,
         rare_cnt = 8
         is_last_used_no_end = {}
 
-        update_counter_fn = partial(update_test_count, test_case_count,
-                                    failed_test_case_count,
-                                    sequence_request_count)
+        update_counter_fn = partial(
+            update_test_count,
+            test_case_count,
+            failed_test_case_count,
+            sequence_request_count,
+        )
         for c in range(common_cnt + rare_cnt):
             client_metadata_list.append(
-                (grpcclient.InferenceServerClient("localhost:8001",
-                                                  verbose=FLAGS.verbose),
-                 correlation_id_base + c))
+                (
+                    grpcclient.InferenceServerClient(
+                        "localhost:8001", verbose=FLAGS.verbose
+                    ),
+                    correlation_id_base + c,
+                )
+            )
         pa_start_seq_id = correlation_id_base + common_cnt + rare_cnt
         pa_end_seq_id = correlation_id_base + CORRELATION_ID_BLOCK_SIZE
 
         # Weight roughly in thousandth percent
-        ss = ScenarioSelector([
-            (60,
-             TimeoutScenario(name,
-                             get_trials(False),
-                             verbose=FLAGS.verbose,
-                             out_stream=out_file)),
-            (80, ResNetScenario(
-                name, verbose=FLAGS.verbose, out_stream=out_file)),
-            (60,
-             CrashingScenario(name, verbose=FLAGS.verbose,
-                              out_stream=out_file)),
-            (62,
-             SequenceNoEndScenario(name,
-                                   get_trials(),
-                                   rng,
-                                   is_last_used_no_end,
-                                   verbose=FLAGS.verbose,
-                                   out_stream=out_file)),
-            (68,
-             SequenceValidNoEndScenario(name,
-                                        get_trials(),
-                                        rng,
-                                        is_last_used_no_end,
-                                        verbose=FLAGS.verbose,
-                                        out_stream=out_file)),
-            (68,
-             SequenceValidValidScenario(name,
-                                        get_trials(),
-                                        rng,
-                                        is_last_used_no_end,
-                                        verbose=FLAGS.verbose,
-                                        out_stream=out_file)),
-            (7,
-             SequenceNoStartScenario(name,
-                                     get_trials(),
-                                     rng,
-                                     is_last_used_no_end,
-                                     verbose=FLAGS.verbose,
-                                     out_stream=out_file)),
-            (295,
-             SequenceValidScenario(name,
-                                   get_trials(),
-                                   rng,
-                                   is_last_used_no_end,
-                                   verbose=FLAGS.verbose,
-                                   out_stream=out_file)),
-            (300,
-             PerfAnalyzerScenario(
-                 name,
-                 rng,
-                 get_trials(),
-                 get_trials(False),
-                 sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
-                 verbose=FLAGS.verbose,
-                 out_stream=out_file)),
-        ], rng)
+        ss = ScenarioSelector(
+            [
+                (
+                    60,
+                    TimeoutScenario(
+                        name,
+                        get_trials(False),
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (80, ResNetScenario(name, verbose=FLAGS.verbose, out_stream=out_file)),
+                (
+                    60,
+                    CrashingScenario(name, verbose=FLAGS.verbose, out_stream=out_file),
+                ),
+                (
+                    62,
+                    SequenceNoEndScenario(
+                        name,
+                        get_trials(),
+                        rng,
+                        is_last_used_no_end,
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (
+                    68,
+                    SequenceValidNoEndScenario(
+                        name,
+                        get_trials(),
+                        rng,
+                        is_last_used_no_end,
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (
+                    68,
+                    SequenceValidValidScenario(
+                        name,
+                        get_trials(),
+                        rng,
+                        is_last_used_no_end,
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (
+                    7,
+                    SequenceNoStartScenario(
+                        name,
+                        get_trials(),
+                        rng,
+                        is_last_used_no_end,
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (
+                    295,
+                    SequenceValidScenario(
+                        name,
+                        get_trials(),
+                        rng,
+                        is_last_used_no_end,
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+                (
+                    300,
+                    PerfAnalyzerScenario(
+                        name,
+                        rng,
+                        get_trials(),
+                        get_trials(False),
+                        sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+            ],
+            rng,
+        )
 
         rare_idx = 0
         common_idx = 0
@@ -240,8 +285,9 @@ def stress_thread(name, seed, correlation_id_base, test_case_count,
                 update_counter_fn(scenario.scenario_name(), False)
                 _thread_exceptions_mutex.acquire()
                 try:
-                    _thread_exceptions.append((name, scenario.scenario_name(),
-                                               traceback.format_exc()))
+                    _thread_exceptions.append(
+                        (name, scenario.scenario_name(), traceback.format_exc())
+                    )
                 finally:
                     _thread_exceptions_mutex.release()
 
@@ -251,6 +297,72 @@ def stress_thread(name, seed, correlation_id_base, test_case_count,
         for c, i in client_metadata_list:
             print("thread {} closing client {}".format(name, i), file=out_file)
             c.close()
+
+        print("Exiting thread {}".format(name), file=out_file)
+
+
+def load_thread(
+    name,
+    seed,
+    correlation_id_base,
+    test_case_count,
+    failed_test_case_count,
+    sequence_request_count,
+):
+    # Thread responsible for generating sequences of inference
+    # requests.
+    global _thread_exceptions
+
+    # Write any thread output to dedicated file
+    with open("{}.log".format(name), "w") as out_file:
+        print("Starting thread {} with seed {}".format(name, seed), file=out_file)
+        rng = np.random.RandomState(seed)
+
+        update_counter_fn = partial(
+            update_test_count,
+            test_case_count,
+            failed_test_case_count,
+            sequence_request_count,
+        )
+        pa_start_seq_id = correlation_id_base
+        pa_end_seq_id = correlation_id_base + CORRELATION_ID_BLOCK_SIZE
+
+        # Create PerfAnalyzerScenario with no additional trial,
+        # the default model 'resnet', more compute intense than the simple
+        # models, will be the only choice for generating load
+        ss = ScenarioSelector(
+            [
+                (
+                    1,
+                    PerfAnalyzerScenario(
+                        name,
+                        rng,
+                        [],
+                        [],
+                        sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
+                        verbose=FLAGS.verbose,
+                        out_stream=out_file,
+                    ),
+                ),
+            ],
+            rng,
+        )
+
+        while not STOP_STRESS_THREAD:
+            scenario = ss.get_scenario()
+            try:
+                res = scenario.run(None)
+                if res is not None:
+                    update_counter_fn(scenario.scenario_name(), count=res)
+            except Exception as ex:
+                update_counter_fn(scenario.scenario_name(), False)
+                _thread_exceptions_mutex.acquire()
+                try:
+                    _thread_exceptions.append(
+                        (name, scenario.scenario_name(), traceback.format_exc())
+                    )
+                finally:
+                    _thread_exceptions_mutex.release()
 
         print("Exiting thread {}".format(name), file=out_file)
 
@@ -283,47 +395,45 @@ def accumulate_count(dict_list, test_case_name):
     return count
 
 
-def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
-                    _sequence_request_count):
+def generate_report(
+    elapsed_time, _test_case_count, _failed_test_case_count, _sequence_request_count
+):
     hrs = elapsed_time // 3600
     mins = (elapsed_time / 60) % 60
     secs = elapsed_time % 60
 
     test_case_description = {
-        'SequenceValidScenario':
-            'Send a sequence with "start" and "end" flags.',
-        'SequenceValidValidScenario':
-            'Send two sequences back to back using the same correlation ID'
-            ' with "start" and "end" flags.',
-        'SequenceValidNoEndScenario':
-            'Send two sequences back to back using the same correlation ID.'
-            ' The first with "start" and "end" flags, and the second with no'
-            ' "end" flag.',
-        'SequenceNoStartScenario':
-            'Send a sequence without a "start" flag. Sequence should get an'
-            ' error from the server.',
-        'SequenceNoEndScenario':
-            'Send a sequence with "start" flag but that never ends. The'
-            ' sequence should be aborted by the server and its slot reused'
-            ' for another sequence.',
-        'TimeoutScenario':
-            'Expect an exception for small timeout values.',
-        'ResNetScenario':
-            'Send a request using resnet model.',
-        'CrashingScenario':
-            'Client crashes in the middle of inferences.',
-        'PerfAnalyzerScenario':
-            'Client that maintains a specific load.',
+        "SequenceValidScenario": 'Send a sequence with "start" and "end" flags.',
+        "SequenceValidValidScenario": "Send two sequences back to back using the same correlation ID"
+        ' with "start" and "end" flags.',
+        "SequenceValidNoEndScenario": "Send two sequences back to back using the same correlation ID."
+        ' The first with "start" and "end" flags, and the second with no'
+        ' "end" flag.',
+        "SequenceNoStartScenario": 'Send a sequence without a "start" flag. Sequence should get an'
+        " error from the server.",
+        "SequenceNoEndScenario": 'Send a sequence with "start" flag but that never ends. The'
+        " sequence should be aborted by the server and its slot reused"
+        " for another sequence.",
+        "TimeoutScenario": "Expect an exception for small timeout values.",
+        "ResNetScenario": "Send a request using resnet model.",
+        "CrashingScenario": "Client crashes in the middle of inferences.",
+        "PerfAnalyzerScenario": "Client that maintains a specific load.",
     }
 
     f = open("stress_report.txt", "w")
-    f.write("Test Duration: {:0>2}:{:0>2}:{:0>2} (HH:MM:SS)\n".format(
-        int(hrs), int(mins), int(secs)))
+    f.write(
+        "Test Duration: {:0>2}:{:0>2}:{:0>2} (HH:MM:SS)\n".format(
+            int(hrs), int(mins), int(secs)
+        )
+    )
 
     t = prettytable.PrettyTable(hrules=prettytable.ALL)
     t.field_names = [
-        'Test Case', 'Number of Failures', 'Test Count', 'Request Count',
-        'Test Case Description'
+        "Test Case",
+        "Number of Failures",
+        "Test Count",
+        "Request Count",
+        "Test Case Description",
     ]
 
     t.align["Test Case"] = "l"
@@ -339,33 +449,38 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
     for c in test_case_description:
         # Accumulate all the individual thread counts
         acc_test_case_count[c] = accumulate_count(_test_case_count, c)
-        acc_failed_test_case_count[c] = accumulate_count(
-            _failed_test_case_count, c)
-        acc_sequence_request_count[c] = accumulate_count(
-            _sequence_request_count, c)
+        acc_failed_test_case_count[c] = accumulate_count(_failed_test_case_count, c)
+        acc_sequence_request_count[c] = accumulate_count(_sequence_request_count, c)
 
         description = test_case_description[c]
         # Add additional description on scenarios that allow failure
         if c in ALLOW_FAILURE_SCENARIO:
-            description += " Note that this scenario is marked to allow " \
-                           "failure due to subtle edge cases that will be " \
-                           "investigated in the future. However, only a " \
-                           "minimal failure count is expected and we should " \
-                           "take action if the number is concerning."
-        t.add_row([
-            c, acc_failed_test_case_count[c] if c in acc_failed_test_case_count
-            else 0, acc_test_case_count[c] if c in acc_test_case_count else 0,
-            acc_sequence_request_count[c]
-            if c in acc_sequence_request_count else 0,
-            format_content(description, 50)
-        ])
+            description += (
+                " Note that this scenario is marked to allow "
+                "failure due to subtle edge cases that will be "
+                "investigated in the future. However, only a "
+                "minimal failure count is expected and we should "
+                "take action if the number is concerning."
+            )
+        t.add_row(
+            [
+                c,
+                acc_failed_test_case_count[c] if c in acc_failed_test_case_count else 0,
+                acc_test_case_count[c] if c in acc_test_case_count else 0,
+                acc_sequence_request_count[c] if c in acc_sequence_request_count else 0,
+                format_content(description, 50),
+            ]
+        )
 
-    t.add_row([
-        'TOTAL',
-        sum(acc_failed_test_case_count.values()),
-        sum(acc_test_case_count.values()),
-        sum(acc_sequence_request_count.values()), 'X'
-    ])
+    t.add_row(
+        [
+            "TOTAL",
+            sum(acc_failed_test_case_count.values()),
+            sum(acc_test_case_count.values()),
+            sum(acc_sequence_request_count.values()),
+            "X",
+        ]
+    )
 
     print(t)
     f.write(str(t))
@@ -373,33 +488,48 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
     f.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-r',
-                        '--random-seed',
-                        type=int,
-                        required=False,
-                        help='Random seed.')
-    parser.add_argument('-t',
-                        '--concurrency',
-                        type=int,
-                        required=False,
-                        default=8,
-                        help='Request concurrency. Default is 8.')
     parser.add_argument(
-        '-d',
-        '--test-duration',
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-r", "--random-seed", type=int, required=False, help="Random seed."
+    )
+    parser.add_argument(
+        "-t",
+        "--concurrency",
+        type=int,
+        required=False,
+        default=8,
+        help="Request concurrency. Default is 8.",
+    )
+    parser.add_argument(
+        "--load-thread",
+        type=int,
+        required=False,
+        default=0,
+        help="Number of dedicated threads that keep compute "
+        "device (i.e. GPU/CPUs) under load. The load generated "
+        'from "--concurrency" often behaves as request spike, '
+        " this argument may be used to produce consistent load "
+        " to keep devices at high utilization. Default is 0, "
+        "which means no dedicated load thread will be created.",
+    )
+    parser.add_argument(
+        "-d",
+        "--test-duration",
         type=int,
         required=False,
         default=25000,
-        help='Duration of stress test to run. Default is 25000 seconds ' +
-        '(approximately 7 hours).')
+        help="Duration of stress test to run. Default is 25000 seconds "
+        + "(approximately 7 hours).",
+    )
     FLAGS = parser.parse_args()
 
     # Initialize the random seed. For reproducibility each thread
@@ -416,13 +546,17 @@ if __name__ == '__main__':
     print("test duration = {}".format(FLAGS.test_duration))
 
     # Create hashes for each thread for generating report
-    _test_case_count = [dict() for x in range(FLAGS.concurrency)]
-    _failed_test_case_count = [dict() for x in range(FLAGS.concurrency)]
-    _sequence_request_count = [dict() for x in range(FLAGS.concurrency)]
+    _test_case_count = [dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)]
+    _failed_test_case_count = [
+        dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)
+    ]
+    _sequence_request_count = [
+        dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)
+    ]
 
     threads = []
 
-    for idx, thd in enumerate(range(FLAGS.concurrency)):
+    for idx in range(FLAGS.concurrency):
         thread_name = "thread_{}".format(idx)
 
         # Create the seed for the thread. Since these are created in
@@ -435,11 +569,46 @@ if __name__ == '__main__':
         correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
 
         threads.append(
-            threading.Thread(target=stress_thread,
-                             args=(thread_name, seed, correlation_id_base,
-                                   _test_case_count[idx],
-                                   _failed_test_case_count[idx],
-                                   _sequence_request_count[idx])))
+            threading.Thread(
+                target=stress_thread,
+                args=(
+                    thread_name,
+                    seed,
+                    correlation_id_base,
+                    _test_case_count[idx],
+                    _failed_test_case_count[idx],
+                    _sequence_request_count[idx],
+                ),
+            )
+        )
+
+    for idx in range(FLAGS.load_thread):
+        thread_name = "load_thread_{}".format(idx)
+
+        # Create the seed for the thread. Since these are created in
+        # reproducible order off of the initial seed we will get
+        # reproducible results when given the same seed.
+        seed = np.random.randint(2**32)
+
+        # Each thread is reserved a block of correlation IDs or size
+        # CORRELATION_ID_BLOCK_SIZE
+        correlation_id_base = 1 + (
+            (FLAGS.concurrency + idx) * CORRELATION_ID_BLOCK_SIZE
+        )
+
+        threads.append(
+            threading.Thread(
+                target=load_thread,
+                args=(
+                    thread_name,
+                    seed,
+                    correlation_id_base,
+                    _test_case_count[idx],
+                    _failed_test_case_count[idx],
+                    _sequence_request_count[idx],
+                ),
+            )
+        )
 
     exit_code = 0
 
@@ -447,15 +616,13 @@ if __name__ == '__main__':
     for t in threads:
         t.start()
 
-    liveness_count = 0
-    while liveness_count < FLAGS.test_duration:
+    while (time.time() - start_time) < FLAGS.test_duration:
         time.sleep(1)
         for t in threads:
             # Stop the test early if there is early termination of a thread.
             if not t.is_alive():
                 exit_code = 1
                 break
-        liveness_count += 1
         if exit_code != 0:
             break
 
@@ -467,15 +634,18 @@ if __name__ == '__main__':
         if t.is_alive() and (exit_code == 0):
             exit_code = 1
 
-    generate_report(time.time() - start_time, _test_case_count,
-                    _failed_test_case_count, _sequence_request_count)
+    generate_report(
+        time.time() - start_time,
+        _test_case_count,
+        _failed_test_case_count,
+        _sequence_request_count,
+    )
 
     _thread_exceptions_mutex.acquire()
     try:
         if len(_thread_exceptions) > 0:
             for thread, scenario, ex in _thread_exceptions:
-                print("*********\n* {} {}\n{}*********\n".format(
-                    thread, scenario, ex))
+                print("*********\n* {} {}\n{}*********\n".format(thread, scenario, ex))
                 if scenario not in ALLOW_FAILURE_SCENARIO:
                     exit_code = 1
     finally:

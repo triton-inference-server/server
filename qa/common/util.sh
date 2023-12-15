@@ -1,4 +1,5 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +67,7 @@ function wait_for_server_ready() {
 
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
-        if ! kill -0 $spid; then
+        if ! kill -0 $spid > /dev/null 2>&1; then
             echo "=== Server not running."
             WAIT_RET=1
             return
@@ -146,6 +147,33 @@ function wait_for_model_stable() {
     echo "=== Timeout $wait_time_secs secs. Not all models stable."
 }
 
+function gdb_helper () {
+  if ! command -v gdb > /dev/null 2>&1; then
+    echo "=== WARNING: gdb not installed"
+    return
+  fi
+
+  ### Server Hang ###
+  if kill -0 ${SERVER_PID} > /dev/null 2>&1; then
+    # If server process is still alive, try to get backtrace and core dump from it
+    GDB_LOG="gdb_bt.${SERVER_PID}.log"
+    echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    # Dump backtrace log for quick analysis. Allow these commands to fail.
+    gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}" || true
+
+    # Generate core dump for deeper analysis. Default filename is "core.${PID}"
+    gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
+  fi
+
+  ### Server Segfaulted ###
+  # If there are any core dumps locally from a segfault, load them and get a backtrace
+  for corefile in $(ls core.* > /dev/null 2>&1); do
+    GDB_LOG="${corefile}.log"
+    echo -e "=== WARNING: SEGFAULT DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true;
+  done
+}
+
 # Run inference server. Return once server's health endpoint shows
 # ready or timeout expires. Sets SERVER_PID to pid of SERVER, or 0 if
 # error (including expired timeout)
@@ -168,12 +196,16 @@ function run_server () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
-        kill $SERVER_PID || true
+        # Get further debug information about server startup failure
+        gdb_helper || true
+
+        # Cleanup
+        kill $SERVER_PID > /dev/null 2>&1 || true
         SERVER_PID=0
     fi
 }
@@ -200,7 +232,7 @@ function run_server_tolive () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
@@ -244,7 +276,7 @@ function run_server_nowait () {
             echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
         fi
 
-        LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
         SERVER_PID=$!
     fi
 }
@@ -276,7 +308,7 @@ function run_server_leakcheck () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -391,4 +423,82 @@ function check_test_results () {
     fi
 
     return 0
+}
+
+# Run multiple inference servers and return immediately. Sets pid for each server
+# correspondingly, or 0 if error.
+function run_multiple_servers_nowait () {
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    local server_count=$1
+    server_pid=()
+    local server_args=()
+    local server_log=()
+    for (( i=0; i<$server_count; i++ )); do
+        let SERVER${i}_PID=0 || true
+        server_pid+=(SERVER${i}_PID)
+        server_args+=(SERVER${i}_ARGS)
+        server_log+=(SERVER${i}_LOG)
+    done
+
+    for (( i=0; i<$server_count; i++ )); do
+        if [ -z "$SERVER_LD_PRELOAD" ]; then
+            echo "=== Running $SERVER ${!server_args[$i]}"
+        else
+            echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]}"
+        fi
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER ${!server_args[$i]} > ${!server_log[$i]} 2>&1 &
+        let SERVER${i}_PID=$!
+    done
+}
+
+# Kill all inference servers.
+function kill_servers () {
+    for (( i=0; i<${#server_pid[@]}; i++ )); do
+        kill ${!server_pid[$i]}
+        wait ${!server_pid[$i]}
+    done
+}
+
+# Sort an array
+# Call with sort_array <array_name>
+# Example: sort_array array
+sort_array() {
+    local -n arr=$1
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    IFS=$'\n' sorted_arr=($(sort -n <<<"${arr[*]}"))
+    unset IFS
+    arr=("${sorted_arr[@]}")
+}
+
+# Remove an array's outliers
+# Call with remove_array_outliers <array_name> <percent to trim from both sides>
+# Example: remove_array_outliers array 5
+remove_array_outliers() {
+    local -n arr=$1
+    local percent=$2
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    local trim_count=$((length * percent / 100))
+    local start_index=$trim_count
+    local end_index=$((length - (trim_count*2)))
+
+    arr=("${arr[@]:$start_index:$end_index}")
 }

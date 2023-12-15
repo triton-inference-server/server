@@ -27,8 +27,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import csv
 import json
-import sys
+
 import numpy as np
 
 FLAGS = None
@@ -37,18 +38,17 @@ FLAGS = None
 def add_span(span_map, timestamps, span_name, ts_start, ts_end):
     for tag in (ts_start, ts_end):
         if tag not in timestamps:
-            raise ValueError('timestamps missing "{}": {}'.format(
-                tag, timestamps))
+            raise ValueError('timestamps missing "{}": {}'.format(tag, timestamps))
     if timestamps[ts_end] < timestamps[ts_start]:
-        raise ValueError('end timestamp "{}" < start timestamp "{}"'.format(
-            ts_end, ts_start))
+        raise ValueError(
+            'end timestamp "{}" < start timestamp "{}"'.format(ts_end, ts_start)
+        )
     if span_name not in span_map:
         span_map[span_name] = 0
     span_map[span_name] += timestamps[ts_end] - timestamps[ts_start]
 
 
-class AbstractFrontend():
-
+class AbstractFrontend:
     @property
     def filter_timestamp(self):
         return None
@@ -61,65 +61,88 @@ class AbstractFrontend():
 
 
 class HttpFrontend(AbstractFrontend):
-
     @property
     def filter_timestamp(self):
         return "HTTP_RECV_START"
 
     def add_frontend_span(self, span_map, timestamps):
-        if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END"
-                                                  in timestamps):
-            add_span(span_map, timestamps, "HTTP_INFER", "HTTP_RECV_START",
-                     "HTTP_SEND_END")
-            add_span(span_map, timestamps, "HTTP_RECV", "HTTP_RECV_START",
-                     "HTTP_RECV_END")
-            add_span(span_map, timestamps, "HTTP_SEND", "HTTP_SEND_START",
-                     "HTTP_SEND_END")
+        if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END" in timestamps):
+            add_span(
+                span_map, timestamps, "HTTP_INFER", "HTTP_RECV_START", "HTTP_SEND_END"
+            )
+            add_span(
+                span_map, timestamps, "HTTP_RECV", "HTTP_RECV_START", "HTTP_RECV_END"
+            )
+            add_span(
+                span_map, timestamps, "HTTP_SEND", "HTTP_SEND_START", "HTTP_SEND_END"
+            )
 
     def summarize_frontend_span(self, span_map, cnt):
         if "HTTP_INFER" in span_map:
             res = "HTTP infer request (avg): {}us\n".format(
-                span_map["HTTP_INFER"] / (cnt * 1000))
-            res += "\tReceive (avg): {}us\n".format(span_map["HTTP_RECV"] /
-                                                    (cnt * 1000))
-            res += "\tSend (avg): {}us\n".format(span_map["HTTP_SEND"] /
-                                                 (cnt * 1000))
+                span_map["HTTP_INFER"] / (cnt * 1000)
+            )
+            res += "\tReceive (avg): {}us\n".format(
+                span_map["HTTP_RECV"] / (cnt * 1000)
+            )
+            res += "\tSend (avg): {}us\n".format(span_map["HTTP_SEND"] / (cnt * 1000))
             res += "\tOverhead (avg): {}us\n".format(
-                (span_map["HTTP_INFER"] - span_map["REQUEST"] -
-                 span_map["HTTP_RECV"] - span_map["HTTP_SEND"]) / (cnt * 1000))
+                (
+                    span_map["HTTP_INFER"]
+                    - span_map["REQUEST"]
+                    - span_map["HTTP_RECV"]
+                    - span_map["HTTP_SEND"]
+                )
+                / (cnt * 1000)
+            )
             return res
         else:
             return None
 
 
 class GrpcFrontend(AbstractFrontend):
-
     @property
     def filter_timestamp(self):
         return "GRPC_WAITREAD_START"
 
     def add_frontend_span(self, span_map, timestamps):
-        if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END"
-                                                      in timestamps):
-            add_span(span_map, timestamps, "GRPC_INFER", "GRPC_WAITREAD_START",
-                     "GRPC_SEND_END")
-            add_span(span_map, timestamps, "GRPC_WAITREAD",
-                     "GRPC_WAITREAD_START", "GRPC_WAITREAD_END")
-            add_span(span_map, timestamps, "GRPC_SEND", "GRPC_SEND_START",
-                     "GRPC_SEND_END")
+        if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END" in timestamps):
+            add_span(
+                span_map,
+                timestamps,
+                "GRPC_INFER",
+                "GRPC_WAITREAD_START",
+                "GRPC_SEND_END",
+            )
+            add_span(
+                span_map,
+                timestamps,
+                "GRPC_WAITREAD",
+                "GRPC_WAITREAD_START",
+                "GRPC_WAITREAD_END",
+            )
+            add_span(
+                span_map, timestamps, "GRPC_SEND", "GRPC_SEND_START", "GRPC_SEND_END"
+            )
 
     def summarize_frontend_span(self, span_map, cnt):
         if "GRPC_INFER" in span_map:
             res = "GRPC infer request (avg): {}us\n".format(
-                span_map["GRPC_INFER"] / (cnt * 1000))
+                span_map["GRPC_INFER"] / (cnt * 1000)
+            )
             res += "\tWait/Read (avg): {}us\n".format(
-                span_map["GRPC_WAITREAD"] / (cnt * 1000))
-            res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] /
-                                                 (cnt * 1000))
+                span_map["GRPC_WAITREAD"] / (cnt * 1000)
+            )
+            res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] / (cnt * 1000))
             res += "\tOverhead (avg): {}us\n".format(
-                (span_map["GRPC_INFER"] - span_map["REQUEST"] -
-                 span_map["GRPC_WAITREAD"] - span_map["GRPC_SEND"]) /
-                (cnt * 1000))
+                (
+                    span_map["GRPC_INFER"]
+                    - span_map["REQUEST"]
+                    - span_map["GRPC_WAITREAD"]
+                    - span_map["GRPC_SEND"]
+                )
+                / (cnt * 1000)
+            )
             return res
         else:
             return None
@@ -132,7 +155,7 @@ def summarize(frontend, traces):
     model_span_map = dict()
 
     # Order traces by id to be more intuitive if 'show_trace'
-    traces = sorted(traces, key=lambda t: t.get('id', -1))
+    traces = sorted(traces, key=lambda t: t.get("id", -1))
 
     # Filter the trace that is not for the requested frontend
     match_frontend_id_set = set()
@@ -158,9 +181,9 @@ def summarize(frontend, traces):
         if "id" not in trace:
             continue
         if trace["id"] in match_frontend_id_set:
-            if (trace['id'] in filtered_traces.keys()):
-                rep_trace = filtered_traces[trace['id']]
-                # Apend the timestamp to the trace representing this 'id'
+            if trace["id"] in filtered_traces.keys():
+                rep_trace = filtered_traces[trace["id"]]
+                # Append the timestamp to the trace representing this 'id'
                 if "model_name" in trace:
                     rep_trace["model_name"] = trace["model_name"]
                 if "model_version" in trace:
@@ -171,7 +194,7 @@ def summarize(frontend, traces):
                 # Use this trace to represent this 'id'
                 if "timestamps" not in trace:
                     trace["timestamps"] = []
-                filtered_traces[trace['id']] = trace
+                filtered_traces[trace["id"]] = trace
 
     for trace_id, trace in filtered_traces.items():
         if trace_id not in match_frontend_id_set:
@@ -190,29 +213,57 @@ def summarize(frontend, traces):
 
             frontend.add_frontend_span(model_span_map[key], timestamps)
 
-            add_span(model_span_map[key], timestamps, "REQUEST",
-                     "REQUEST_START", "REQUEST_END")
+            add_span(
+                model_span_map[key],
+                timestamps,
+                "REQUEST",
+                "REQUEST_START",
+                "REQUEST_END",
+            )
 
             # The tags below will be missing for ensemble model
-            if ("QUEUE_START" in timestamps) and ("COMPUTE_START"
-                                                  in timestamps):
-                add_span(model_span_map[key], timestamps, "QUEUE",
-                         "QUEUE_START", "COMPUTE_START")
-            if ("COMPUTE_START" in timestamps) and ("COMPUTE_END"
-                                                    in timestamps):
-                add_span(model_span_map[key], timestamps, "COMPUTE",
-                         "COMPUTE_START", "COMPUTE_END")
-            if ("COMPUTE_INPUT_END" in timestamps) and ("COMPUTE_OUTPUT_START"
-                                                        in timestamps):
-                add_span(model_span_map[key], timestamps, "COMPUTE_INPUT",
-                         "COMPUTE_START", "COMPUTE_INPUT_END")
-                add_span(model_span_map[key], timestamps, "COMPUTE_INFER",
-                         "COMPUTE_INPUT_END", "COMPUTE_OUTPUT_START")
-                add_span(model_span_map[key], timestamps, "COMPUTE_OUTPUT",
-                         "COMPUTE_OUTPUT_START", "COMPUTE_END")
+            if ("QUEUE_START" in timestamps) and ("COMPUTE_START" in timestamps):
+                add_span(
+                    model_span_map[key],
+                    timestamps,
+                    "QUEUE",
+                    "QUEUE_START",
+                    "COMPUTE_START",
+                )
+            if ("COMPUTE_START" in timestamps) and ("COMPUTE_END" in timestamps):
+                add_span(
+                    model_span_map[key],
+                    timestamps,
+                    "COMPUTE",
+                    "COMPUTE_START",
+                    "COMPUTE_END",
+                )
+            if ("COMPUTE_INPUT_END" in timestamps) and (
+                "COMPUTE_OUTPUT_START" in timestamps
+            ):
+                add_span(
+                    model_span_map[key],
+                    timestamps,
+                    "COMPUTE_INPUT",
+                    "COMPUTE_START",
+                    "COMPUTE_INPUT_END",
+                )
+                add_span(
+                    model_span_map[key],
+                    timestamps,
+                    "COMPUTE_INFER",
+                    "COMPUTE_INPUT_END",
+                    "COMPUTE_OUTPUT_START",
+                )
+                add_span(
+                    model_span_map[key],
+                    timestamps,
+                    "COMPUTE_OUTPUT",
+                    "COMPUTE_OUTPUT_START",
+                    "COMPUTE_END",
+                )
             if FLAGS.show_trace:
-                print("{} ({}):".format(trace["model_name"],
-                                        trace["model_version"]))
+                print("{} ({}):".format(trace["model_name"], trace["model_version"]))
                 print("\tid: {}".format(trace["id"]))
                 if "parent_id" in trace:
                     print("\tparent id: {}".format(trace["parent_id"]))
@@ -230,34 +281,59 @@ def summarize(frontend, traces):
 
     for key, cnt in model_count_map.items():
         model_name, model_value = key
-        print("Summary for {} ({}): trace count = {}".format(
-            model_name, model_value, cnt))
+        print(
+            "Summary for {} ({}): trace count = {}".format(model_name, model_value, cnt)
+        )
 
-        frontend_summary = frontend.summarize_frontend_span(
-            model_span_map[key], cnt)
+        frontend_summary = frontend.summarize_frontend_span(model_span_map[key], cnt)
         if frontend_summary is not None:
             print(frontend_summary)
 
         # collect handler timeline
-        print("\tHandler (avg): {}us".format(model_span_map[key]["REQUEST"] /
-                                             (cnt * 1000)))
-        if ("QUEUE"
-                in model_span_map[key]) and "COMPUTE" in model_span_map[key]:
-            print("\t\tOverhead (avg): {}us".format(
-                (model_span_map[key]["REQUEST"] - model_span_map[key]["QUEUE"] -
-                 model_span_map[key]["COMPUTE"]) / (cnt * 1000)))
-            print("\t\tQueue (avg): {}us".format(model_span_map[key]["QUEUE"] /
-                                                 (cnt * 1000)))
-            print("\t\tCompute (avg): {}us".format(
-                model_span_map[key]["COMPUTE"] / (cnt * 1000)))
-        if ("COMPUTE_INPUT" in model_span_map[key]
-           ) and "COMPUTE_OUTPUT" in model_span_map[key]:
-            print("\t\t\tInput (avg): {}us".format(
-                model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)))
-            print("\t\t\tInfer (avg): {}us".format(
-                model_span_map[key]["COMPUTE_INFER"] / (cnt * 1000)))
-            print("\t\t\tOutput (avg): {}us".format(
-                model_span_map[key]["COMPUTE_OUTPUT"] / (cnt * 1000)))
+        print(
+            "\tHandler (avg): {}us".format(
+                model_span_map[key]["REQUEST"] / (cnt * 1000)
+            )
+        )
+        if ("QUEUE" in model_span_map[key]) and "COMPUTE" in model_span_map[key]:
+            print(
+                "\t\tOverhead (avg): {}us".format(
+                    (
+                        model_span_map[key]["REQUEST"]
+                        - model_span_map[key]["QUEUE"]
+                        - model_span_map[key]["COMPUTE"]
+                    )
+                    / (cnt * 1000)
+                )
+            )
+            print(
+                "\t\tQueue (avg): {}us".format(
+                    model_span_map[key]["QUEUE"] / (cnt * 1000)
+                )
+            )
+            print(
+                "\t\tCompute (avg): {}us".format(
+                    model_span_map[key]["COMPUTE"] / (cnt * 1000)
+                )
+            )
+        if (
+            "COMPUTE_INPUT" in model_span_map[key]
+        ) and "COMPUTE_OUTPUT" in model_span_map[key]:
+            print(
+                "\t\t\tInput (avg): {}us".format(
+                    model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)
+                )
+            )
+            print(
+                "\t\t\tInfer (avg): {}us".format(
+                    model_span_map[key]["COMPUTE_INFER"] / (cnt * 1000)
+                )
+            )
+            print(
+                "\t\t\tOutput (avg): {}us".format(
+                    model_span_map[key]["COMPUTE_OUTPUT"] / (cnt * 1000)
+                )
+            )
 
 
 def summarize_dataflow(traces):
@@ -268,7 +344,7 @@ def summarize_dataflow(traces):
     #   - child output
 
     # Order traces by id to be more intuitive if 'show_trace'
-    traces = sorted(traces, key=lambda t: t.get('id', -1))
+    traces = sorted(traces, key=lambda t: t.get("id", -1))
 
     # {3: [4, 5, 6], 4: [7]}
     dataflow_parent_map = dict()
@@ -295,14 +371,16 @@ def summarize_dataflow(traces):
     # {3: {4: {7: None}, 5: None, 6: None}}
     dataflow_tree_map = dict()
     depth = [0]
-    append_dataflow_tensor(dataflow_tree_map, first_parent_id,
-                           dataflow_parent_map, traces, depth)
+    append_dataflow_tensor(
+        dataflow_tree_map, first_parent_id, dataflow_parent_map, traces, depth
+    )
 
     print_dataflow_tensor(dataflow_tree_map, traces, depth[0], step=0)
 
 
-def append_dataflow_tensor(dataflow_tensor_map, parent_id, dataflow_tree_map,
-                           traces, depth):
+def append_dataflow_tensor(
+    dataflow_tensor_map, parent_id, dataflow_tree_map, traces, depth
+):
     if parent_id not in dataflow_tree_map:
         dataflow_tensor_map[parent_id] = None
         return
@@ -313,8 +391,9 @@ def append_dataflow_tensor(dataflow_tensor_map, parent_id, dataflow_tree_map,
 
     child_ids = dataflow_tree_map[parent_id]
     for child_id in child_ids:
-        append_dataflow_tensor(child_tensor_map, child_id, dataflow_tree_map,
-                               traces, depth)
+        append_dataflow_tensor(
+            child_tensor_map, child_id, dataflow_tree_map, traces, depth
+        )
 
 
 def print_dataflow_tensor(dataflow_tree_map, traces, depth, step):
@@ -324,8 +403,7 @@ def print_dataflow_tensor(dataflow_tree_map, traces, depth, step):
         if dataflow_tree_map[parent_id] is None:
             continue
 
-        print_dataflow_tensor(dataflow_tree_map[parent_id], traces, depth,
-                              step + 1)
+        print_dataflow_tensor(dataflow_tree_map[parent_id], traces, depth, step + 1)
 
 
 def print_tensor_by_id(id, traces, depth, step):
@@ -337,35 +415,48 @@ def print_tensor_by_id(id, traces, depth, step):
     print("{0}{1}".format(tabs, "=" * (50 + 8 * (depth - step))))
     for trace in traces:
         # print model name and version
-        if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace[
-                "id"] == id:
+        if (
+            "id" in trace
+            and "model_name" in trace
+            and "model_version" in trace
+            and "timestamps" in trace
+            and trace["id"] == id
+        ):
             print("{0}Name:   {1}".format(tabs, trace["model_name"]))
             print("{0}Version:{1}".format(tabs, trace["model_version"]))
         # print data
         if "id" in trace and "activity" in trace:
             if trace["id"] == id and trace["activity"] == "TENSOR_QUEUE_INPUT":
                 print("{0}{1}:".format(tabs, "QUEUE_INPUT"))
-                print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                                             get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace[
-                    "activity"] == "TENSOR_BACKEND_INPUT":
+                print(
+                    "{0}\t{1}: {2}".format(
+                        tabs, trace["tensor"]["name"], get_numpy_array(trace["tensor"])
+                    )
+                )
+            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_INPUT":
                 print("{0}{1}:".format(tabs, "BACKEND_INPUT"))
-                print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                                             get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace[
-                    "activity"] == "TENSOR_BACKEND_OUTPUT":
+                print(
+                    "{0}\t{1}: {2}".format(
+                        tabs, trace["tensor"]["name"], get_numpy_array(trace["tensor"])
+                    )
+                )
+            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_OUTPUT":
                 print("{0}{1}:".format(tabs, "BACKEND_OUTPUT"))
-                print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                                             get_numpy_array(trace["tensor"])))
+                print(
+                    "{0}\t{1}: {2}".format(
+                        tabs, trace["tensor"]["name"], get_numpy_array(trace["tensor"])
+                    )
+                )
     print("{0}{1}".format(tabs, "=" * (50 + 8 * (depth - step))))
 
 
 def find_first_id_with_tensor(traces):
     for trace in traces:
         if "activity" in trace and (
-                trace["activity"] == "TENSOR_QUEUE_INPUT" or
-                trace["activity"] == "TENSOR_BACKEND_INPUT" or
-                trace["activity"] == "TENSOR_BACKEND_OUTPUT"):
+            trace["activity"] == "TENSOR_QUEUE_INPUT"
+            or trace["activity"] == "TENSOR_BACKEND_INPUT"
+            or trace["activity"] == "TENSOR_BACKEND_OUTPUT"
+        ):
             return trace["id"]
     return 0
 
@@ -383,34 +474,41 @@ TRITON_TYPE_TO_NUMPY = {
     "FP16": np.float16,
     "FP32": np.float32,
     "FP64": np.float64,
-    "BYTES": np.object_
+    "BYTES": np.object_,
 }
 
 
 def get_numpy_array(tensor):
     dtype = TRITON_TYPE_TO_NUMPY[tensor["dtype"]]
-    value = map(float, tensor["data"].split(","))
+    if dtype == np.object_:
+        value = next(csv.reader([tensor["data"]], skipinitialspace=True))
+    else:
+        value = map(float, tensor["data"].split(","))
     shape = map(int, tensor["shape"].split(","))
     array = np.array(list(value), dtype=dtype)
     array = array.reshape(list(shape))
     return array
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-t',
-                        '--show-trace',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Show timestamps for each individual trace')
-    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-t",
+        "--show-trace",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Show timestamps for each individual trace",
+    )
+    parser.add_argument("file", type=argparse.FileType("r"), nargs="+")
     FLAGS = parser.parse_args()
 
     for f in FLAGS.file:

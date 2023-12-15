@@ -38,7 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
 # Descriptive name for the current results
 UNDERTEST_NAME=${NVIDIA_TRITON_SERVER_VERSION}
@@ -55,12 +55,12 @@ PERF_CLIENT_SLOWDOWN_THRESHOLD=5.0
 
 # Length of window, in milliseconds, to use when stabilizing latency
 # and infer/sec results.
-PERF_CLIENT_STABILIZE_WINDOW=5000
+PERF_CLIENT_STABILIZE_WINDOW=10000
 
 # Threshold, as a percentage, to use when stabilizing latency and
 # infer/sec results. Values must vary by less than this percent over 3
 # measurement windows to be considered value.
-PERF_CLIENT_STABILIZE_THRESHOLD=5.0
+PERF_CLIENT_STABILIZE_THRESHOLD=15.0
 
 RUNTEST=./run_test.sh
 

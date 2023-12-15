@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=15
 source ../common/util.sh
 
-rm -f $CLIENT_LOG $SERVER_LOG
+rm -f *.log
 
 RET=0
 
@@ -46,8 +46,8 @@ for address in default explicit; do
         SAME_EXPLICIT_ADDRESS=""
         DIFF_EXPLICIT_ADDRESS_ARGS=""
     else
-        SAME_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.1"
-        DIFF_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.2"
+        SAME_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.1 --metrics-address 127.0.0.1"
+        DIFF_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.2 --metrics-address 127.0.0.3"
     fi
 
     for p in http grpc; do
@@ -138,7 +138,7 @@ for address in default explicit; do
         kill $SERVER_PID
         wait $SERVER_PID
 
-        # error if http/grpc port overlaps with grpc/http explicit port 
+        # error if http/grpc port overlaps with grpc/http explicit port
         if [ "$p" == "http" ]; then
             SERVER_ARGS="--model-repository=$DATADIR $SAME_EXPLICIT_ADDRESS --http-port 8003 --grpc-port 8003"
             run_server_nowait
@@ -300,6 +300,112 @@ for address in default explicit; do
             fi
         fi
     done
+done
+
+# Test multiple servers binding to the same http/grpc port
+SERVER0_LOG="./inference_server0.log"
+SERVER1_LOG="./inference_server1.log"
+SERVER2_LOG="./inference_server2.log"
+
+for p in http grpc; do
+    # error if servers bind to the same http/grpc port without setting the reuse flag
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-grpc-port=true"
+        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-grpc-port=true"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=true"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=true"
+        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=true"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=true"
+    fi
+    # make sure the first server is launched successfully, then run the other
+    # two servers and expect them to fail
+    run_server
+    run_multiple_servers_nowait 2
+    sleep 15
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    if [ "$SERVER1_PID" != "0" ]; then
+        set +e
+        kill $SERVER0_PID
+        wait $SERVER0_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start SERVER0 $SERVER\n***"
+            cat $SERVER0_LOG
+            exit 1
+        fi
+        set -e
+    fi
+    if [ "$SERVER1_PID" != "0" ]; then
+        set +e
+        kill $SERVER1_PID
+        wait $SERVER1_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start SERVER1 $SERVER\n***"
+            cat $SERVER1_LOG
+            exit 1
+        fi
+        set -e
+    fi
+    kill_server
+
+    # 1. Allow multiple servers bind to the same http/grpc port with setting the reuse flag
+    # 2. Test different forms of setting --metrics-address and verify metrics are queryable
+    #   (a) Test default metrics-address being same as http-address
+    #   (b) Test setting metrics-address explicitly to 0.0.0.0
+    #   (c) Test setting metrics-address explicitly to 127.0.0.1
+    SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=true --reuse-grpc-port=true"
+    SERVER1_ARGS="--model-repository=$DATADIR --metrics-address 0.0.0.0 --metrics-port 8003 --reuse-http-port=true --reuse-grpc-port=true"
+    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.2 --metrics-port 8004 --reuse-http-port=true --reuse-grpc-port=true"
+    run_multiple_servers_nowait 3
+    sleep 15
+    if [ "$SERVER0_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER0 $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    if [ "$SERVER1_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER1 $SERVER\n***"
+        cat $SERVER1_LOG
+        exit 1
+    fi
+    if [ "$SERVER2_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER2 $SERVER\n***"
+        cat $SERVER2_LOG
+        exit 1
+    fi
+
+    set +e
+
+    # test if requests are being distributed among three servers
+    if [ "$p" == "http" ]; then
+        CLIENT_PY=../clients/simple_http_infer_client.py
+    else
+        CLIENT_PY=../clients/simple_grpc_infer_client.py
+    fi
+
+    pids=()
+    for i in {0..10}; do
+        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 &
+        pids+=" $!"
+    done
+    wait $pids || { echo -e "\n***\n*** Python ${p} Async Infer Test Failed\n***"; cat $CLIENT_LOG; RET=1; }
+
+    set -e
+
+    server0_request_count=`curl -s localhost:8002/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    server1_request_count=`curl -s localhost:8003/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    server2_request_count=`curl -s 127.0.0.2:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    if [ ${server0_request_count%.*} -eq 0 ] || \
+       [ ${server1_request_count%.*} -eq 0 ] || \
+       [ ${server2_request_count%.*} -eq 0 ]; then
+        echo -e "\n***\n*** Failed: ${p} requests are not distributed among all servers.\n***"
+        RET=1
+    fi
+    kill_servers
 done
 
 if [ $RET -eq 0 ]; then

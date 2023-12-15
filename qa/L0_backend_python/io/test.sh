@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 UNITTEST_PY=./io_test.py
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./io_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
@@ -37,14 +37,15 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./io_server.log"
 
 RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
+# IOTest.test_ensemble_io
 TRIALS="default decoupled"
 
 for trial in $TRIALS; do
@@ -82,25 +83,88 @@ for trial in $TRIALS; do
     fi
 
     set +e
-    python3 $UNITTEST_PY > $CLIENT_LOG
+    python3 $UNITTEST_PY IOTest.test_ensemble_io > $CLIENT_LOG.test_ensemble_io
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** io_test.py FAILED. \n***"
-        cat $CLIENT_LOG
+        echo -e "\n***\n*** IOTest.test_ensemble_io FAILED. \n***"
+        cat $CLIENT_LOG.test_ensemble_io
         RET=1
     else
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
+            cat $CLIENT_LOG.test_ensemble_io
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
         fi
     fi
-
     set -e
 
     kill $SERVER_PID
     wait $SERVER_PID
 done
+
+# IOTest.test_empty_gpu_output
+rm -rf models && mkdir models
+mkdir -p models/dlpack_empty_output/1/
+cp ../../python_models/dlpack_empty_output/model.py ./models/dlpack_empty_output/1/
+cp ../../python_models/dlpack_empty_output/config.pbtxt ./models/dlpack_empty_output/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 $UNITTEST_PY IOTest.test_empty_gpu_output > $CLIENT_LOG.test_empty_gpu_output
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** IOTest.test_empty_gpu_output FAILED. \n***"
+    cat $CLIENT_LOG.test_empty_gpu_output
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.test_empty_gpu_output
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# IOTest.test_variable_gpu_output
+rm -rf models && mkdir models
+mkdir -p models/variable_gpu_output/1/
+cp ../../python_models/variable_gpu_output/model.py ./models/variable_gpu_output/1/
+cp ../../python_models/variable_gpu_output/config.pbtxt ./models/variable_gpu_output/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 $UNITTEST_PY IOTest.test_variable_gpu_output > $CLIENT_LOG.test_variable_gpu_output
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
+    cat $CLIENT_LOG.test_variable_gpu_output
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.test_variable_gpu_output
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** IO test PASSED.\n***"

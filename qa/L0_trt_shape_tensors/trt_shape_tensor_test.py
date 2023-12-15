@@ -1,4 +1,6 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,24 +27,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import os
-import unittest
-import time
 import threading
-import traceback
-import numpy as np
-import infer_util as iu
-import test_util as tu
-import sequence_util as su
+import time
+import unittest
+from builtins import range
 
+import infer_util as iu
+import numpy as np
+import sequence_util as su
+import test_util as tu
 import tritongrpcclient as grpcclient
 
-TEST_SYSTEM_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 
 _model_instances = 1
 _max_queue_delay_ms = 10000
@@ -53,7 +53,6 @@ _deferred_exceptions = []
 
 
 class InferShapeTensorTest(tu.TestResultCollector):
-
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
         self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
@@ -76,14 +75,16 @@ class InferShapeTensorTest(tu.TestResultCollector):
             if len(_deferred_exceptions) > 0:
                 raise _deferred_exceptions[0]
 
-    def check_response(self,
-                       bs,
-                       thresholds,
-                       shape_values,
-                       dummy_input_shapes,
-                       shm_region_names=None,
-                       precreated_shm_regions=None,
-                       shm_suffix=""):
+    def check_response(
+        self,
+        bs,
+        thresholds,
+        shape_values,
+        dummy_input_shapes,
+        shm_region_names=None,
+        precreated_shm_regions=None,
+        shm_suffix="",
+    ):
         try:
             # Add batch size to shape as full shape is expected
             for i in range(len(dummy_input_shapes)):
@@ -94,7 +95,7 @@ class InferShapeTensorTest(tu.TestResultCollector):
 
             iu.infer_shape_tensor(
                 self,
-                'plan',
+                "plan",
                 np.float32,
                 shape_values,
                 dummy_input_shapes,
@@ -102,7 +103,8 @@ class InferShapeTensorTest(tu.TestResultCollector):
                 use_streaming=False,
                 shm_suffix=shm_suffix,
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                batch_size=bs)
+                batch_size=bs,
+            )
 
             end_ms = int(round(time.time() * 1000))
 
@@ -111,13 +113,21 @@ class InferShapeTensorTest(tu.TestResultCollector):
             if lt_ms is not None:
                 self.assertTrue(
                     (end_ms - start_ms) < lt_ms,
-                    "expected less than " + str(lt_ms) +
-                    "ms response time, got " + str(end_ms - start_ms) + " ms")
+                    "expected less than "
+                    + str(lt_ms)
+                    + "ms response time, got "
+                    + str(end_ms - start_ms)
+                    + " ms",
+                )
             if gt_ms is not None:
                 self.assertTrue(
                     (end_ms - start_ms) > gt_ms,
-                    "expected greater than " + str(gt_ms) +
-                    "ms response time, got " + str(end_ms - start_ms) + " ms")
+                    "expected greater than "
+                    + str(gt_ms)
+                    + "ms response time, got "
+                    + str(end_ms - start_ms)
+                    + " ms",
+                )
         except Exception as ex:
             self.add_deferred_exception(ex)
 
@@ -127,109 +137,164 @@ class InferShapeTensorTest(tu.TestResultCollector):
         bconfig = config.dynamic_batching
         self.assertTrue(2 in bconfig.preferred_batch_size)
         self.assertTrue(6 in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds,
-                         _max_queue_delay_ms * 1000)  # 10 secs
+        self.assertEqual(
+            bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000
+        )  # 10 secs
 
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
-        stats = self.triton_client_.get_inference_statistics(model_name, "1")
-        self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
-        self.assertEqual(stats.model_stats[0].name, model_name,
-                         "expect model stats for model {}".format(model_name))
+        # There is a time window between when responses are returned and statistics are updated.
+        # To prevent intermittent test failure during that window, wait up to 10 seconds for the
+        # inference statistics to be ready.
+        num_tries = 10
+        for i in range(num_tries):
+            stats = self.triton_client_.get_inference_statistics(model_name, "1")
+            self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
+            actual_exec_cnt = stats.model_stats[0].execution_count
+            if actual_exec_cnt == exec_cnt:
+                break
+            print(
+                "WARNING: expect {} executions, got {} (attempt {})".format(
+                    exec_cnt, actual_exec_cnt, i
+                )
+            )
+            time.sleep(1)
+
         self.assertEqual(
-            stats.model_stats[0].version, "1",
-            "expect model stats for model {} version 1".format(model_name))
+            stats.model_stats[0].name,
+            model_name,
+            "expect model stats for model {}".format(model_name),
+        )
+        self.assertEqual(
+            stats.model_stats[0].version,
+            "1",
+            "expect model stats for model {} version 1".format(model_name),
+        )
 
         if batch_exec is not None:
             batch_stats = stats.model_stats[0].batch_stats
             print(batch_stats)
             self.assertEqual(
-                len(batch_stats), len(batch_exec),
+                len(batch_stats),
+                len(batch_exec),
                 "expected {} different batch-sizes, got {}".format(
-                    len(batch_exec), len(batch_stats)))
+                    len(batch_exec), len(batch_stats)
+                ),
+            )
 
             for batch_stat in batch_stats:
                 bs = batch_stat.batch_size
                 bc = batch_stat.compute_infer.count
                 self.assertTrue(
-                    bs in batch_exec,
-                    "did not find expected batch-size {}".format(bs))
+                    bs in batch_exec, "did not find expected batch-size {}".format(bs)
+                )
                 # Get count from one of the stats
                 self.assertEqual(
-                    bc, batch_exec[bs],
-                    "expected model-execution-count {} for batch size {}, got {}"
-                    .format(batch_exec[bs], bs, bc))
+                    bc,
+                    batch_exec[bs],
+                    "expected model-execution-count {} for batch size {}, got {}".format(
+                        batch_exec[bs], bs, bc
+                    ),
+                )
 
         actual_exec_cnt = stats.model_stats[0].execution_count
         self.assertEqual(
-            actual_exec_cnt, exec_cnt,
-            "expected model-exec-count {}, got {}".format(
-                exec_cnt, actual_exec_cnt))
+            actual_exec_cnt,
+            exec_cnt,
+            "expected model-exec-count {}, got {}".format(exec_cnt, actual_exec_cnt),
+        )
 
         actual_infer_cnt = stats.model_stats[0].inference_count
         self.assertEqual(
-            actual_infer_cnt, infer_cnt,
+            actual_infer_cnt,
+            infer_cnt,
             "expected model-inference-count {}, got {}".format(
-                infer_cnt, actual_infer_cnt))
+                infer_cnt, actual_infer_cnt
+            ),
+        )
 
         actual_infer_cnt = stats.model_stats[0].inference_count
         self.assertEqual(
-            actual_infer_cnt, infer_cnt,
+            actual_infer_cnt,
+            infer_cnt,
             "expected model-inference-count {}, got {}".format(
-                infer_cnt, actual_infer_cnt))
+                infer_cnt, actual_infer_cnt
+            ),
+        )
 
     def test_static_batch(self):
         iu.infer_shape_tensor(
             self,
-            'plan',
-            np.float32, [[32, 32]], [[8, 4, 4]],
+            "plan",
+            np.float32,
+            [[32, 32]],
+            [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            batch_size=8)
+            batch_size=8,
+        )
         iu.infer_shape_tensor(
             self,
-            'plan',
-            np.float32, [[4, 4]], [[8, 32, 32]],
+            "plan",
+            np.float32,
+            [[4, 4]],
+            [[8, 32, 32]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            batch_size=8)
+            batch_size=8,
+        )
         iu.infer_shape_tensor(
             self,
-            'plan',
-            np.float32, [[4, 4]], [[8, 4, 4]],
+            "plan",
+            np.float32,
+            [[4, 4]],
+            [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            batch_size=8)
+            batch_size=8,
+        )
 
     def test_nobatch(self):
         iu.infer_shape_tensor(
             self,
-            'plan_nobatch',
-            np.float32, [[32, 32]], [[4, 4]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
+            "plan_nobatch",
+            np.float32,
+            [[32, 32]],
+            [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+        )
         iu.infer_shape_tensor(
             self,
-            'plan_nobatch',
-            np.float32, [[4, 4]], [[32, 32]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
+            "plan_nobatch",
+            np.float32,
+            [[4, 4]],
+            [[32, 32]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+        )
         iu.infer_shape_tensor(
             self,
-            'plan_nobatch',
-            np.float32, [[4, 4]], [[4, 4]],
-            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY)
+            "plan_nobatch",
+            np.float32,
+            [[4, 4]],
+            [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+        )
 
     def test_wrong_shape_values(self):
         over_shape_values = [[32, 33]]
         try:
             iu.infer_shape_tensor(
                 self,
-                'plan',
+                "plan",
                 np.float32,
-                over_shape_values, [[8, 4, 4]],
+                over_shape_values,
+                [[8, 4, 4]],
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                batch_size=8)
+                batch_size=8,
+            )
         # InferenceServerException will be raised from different namespace,
         # use dynamic type characteristic to catch both ex
         except Exception as ex:
             self.assertTrue(
                 "The shape value at index 2 is expected to be in range from 1 to 32, Got: 33"
-                in ex.message())
+                in ex.message()
+            )
 
     # Dynamic Batcher tests
     def test_dynamic_different_shape_values(self):
@@ -245,22 +310,27 @@ class InferShapeTensorTest(tu.TestResultCollector):
 
             threads = []
             threads.append(
-                threading.Thread(target=self.check_response,
-                                 args=(3, (6000, None)),
-                                 kwargs={
-                                     'shape_values': [[2, 2]],
-                                     'dummy_input_shapes': [[16, 16]],
-                                     'shm_suffix': '{}'.format(len(threads))
-                                 }))
+                threading.Thread(
+                    target=self.check_response,
+                    args=(3, (6000, None)),
+                    kwargs={
+                        "shape_values": [[2, 2]],
+                        "dummy_input_shapes": [[16, 16]],
+                        "shm_suffix": "{}".format(len(threads)),
+                    },
+                )
+            )
             threads.append(
-                threading.Thread(target=self.check_response,
-                                 args=(3, (_max_queue_delay_ms * 1.5,
-                                           _max_queue_delay_ms)),
-                                 kwargs={
-                                     'shape_values': [[4, 4]],
-                                     'dummy_input_shapes': [[16, 16]],
-                                     'shm_suffix': '{}'.format(len(threads))
-                                 }))
+                threading.Thread(
+                    target=self.check_response,
+                    args=(3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
+                    kwargs={
+                        "shape_values": [[4, 4]],
+                        "dummy_input_shapes": [[16, 16]],
+                        "shm_suffix": "{}".format(len(threads)),
+                    },
+                )
+            )
             threads[0].start()
             time.sleep(1)
             threads[1].start()
@@ -283,21 +353,27 @@ class InferShapeTensorTest(tu.TestResultCollector):
 
             threads = []
             threads.append(
-                threading.Thread(target=self.check_response,
-                                 args=(4, (6000, None)),
-                                 kwargs={
-                                     'shape_values': [[4, 4]],
-                                     'dummy_input_shapes': [[16, 16]],
-                                     'shm_suffix': '{}'.format(len(threads))
-                                 }))
+                threading.Thread(
+                    target=self.check_response,
+                    args=(4, (6000, None)),
+                    kwargs={
+                        "shape_values": [[4, 4]],
+                        "dummy_input_shapes": [[16, 16]],
+                        "shm_suffix": "{}".format(len(threads)),
+                    },
+                )
+            )
             threads.append(
-                threading.Thread(target=self.check_response,
-                                 args=(2, (6000, None)),
-                                 kwargs={
-                                     'shape_values': [[4, 4]],
-                                     'dummy_input_shapes': [[16, 16]],
-                                     'shm_suffix': '{}'.format(len(threads))
-                                 }))
+                threading.Thread(
+                    target=self.check_response,
+                    args=(2, (6000, None)),
+                    kwargs={
+                        "shape_values": [[4, 4]],
+                        "dummy_input_shapes": [[16, 16]],
+                        "shm_suffix": "{}".format(len(threads)),
+                    },
+                )
+            )
             threads[0].start()
             time.sleep(1)
             threads[1].start()
@@ -310,7 +386,6 @@ class InferShapeTensorTest(tu.TestResultCollector):
 
 
 class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
-
     def get_expected_result(self, expected_result, value, flag_str=None):
         # Adjust the expected_result for models
         expected_result = value
@@ -333,20 +408,21 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             # Need scheduler to wait for queue to contain all
             # inferences for both sequences.
             self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]),
-                             12)
-            self.assertTrue(
-                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(
-                int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+            self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
             precreated_shm0_handles = self.precreate_register_shape_tensor_regions(
-                ((2, 1), (4, 2), (8, 3)), dtype, 0)
+                ((2, 1), (4, 2), (8, 3)), dtype, 0
+            )
             precreated_shm1_handles = self.precreate_register_shape_tensor_regions(
-                ((2, 11), (4, 12), (8, 13)), dtype, 1)
+                ((2, 11), (4, 12), (8, 13)), dtype, 1
+            )
             precreated_shm2_handles = self.precreate_register_shape_tensor_regions(
-                ((2, 111), (4, 112), (8, 113)), dtype, 2)
+                ((2, 111), (4, 112), (8, 113)), dtype, 2
+            )
             precreated_shm3_handles = self.precreate_register_shape_tensor_regions(
-                ((2, 1111), (4, 1112), (8, 1113)), dtype, 3)
+                ((2, 1111), (4, 1112), (8, 1113)), dtype, 3
+            )
             threads = []
             threads.append(
                 threading.Thread(
@@ -357,12 +433,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1001,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 1, None), (None, 4, 2, None), ("end", 8,
-                                                                     3, None)),
+                        (
+                            ("start", 2, 1, None),
+                            (None, 4, 2, None),
+                            ("end", 8, 3, None),
+                        ),
                         self.get_expected_result(6, 3, "end"),
-                        precreated_shm0_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm0_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -372,12 +453,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1002,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 11, None), (None, 4, 12, None),
-                         ("end", 8, 13, None)),
+                        (
+                            ("start", 2, 11, None),
+                            (None, 4, 12, None),
+                            ("end", 8, 13, None),
+                        ),
                         self.get_expected_result(36, 13, "end"),
-                        precreated_shm1_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm1_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -387,12 +473,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1003,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 111, None), (None, 4, 112, None),
-                         ("end", 8, 113, None)),
+                        (
+                            ("start", 2, 111, None),
+                            (None, 4, 112, None),
+                            ("end", 8, 113, None),
+                        ),
                         self.get_expected_result(336, 113, "end"),
-                        precreated_shm2_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm2_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -402,12 +493,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1004,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 1111, None), (None, 4, 1112, None),
-                         ("end", 8, 1113, None)),
+                        (
+                            ("start", 2, 1111, None),
+                            (None, 4, 1112, None),
+                            ("end", 8, 1113, None),
+                        ),
                         self.get_expected_result(3336, 1113, "end"),
-                        precreated_shm3_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm3_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
 
             for t in threads:
                 t.start()
@@ -435,13 +531,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         dtype = np.float32
 
         precreated_shm0_handles = self.precreate_register_shape_tensor_regions(
-            ((1, 1), (1, 2), (1, 3)), dtype, 0)
+            ((1, 1), (1, 2), (1, 3)), dtype, 0
+        )
         precreated_shm1_handles = self.precreate_register_shape_tensor_regions(
-            ((32, 11), (32, 12), (32, 13)), dtype, 1)
+            ((32, 11), (32, 12), (32, 13)), dtype, 1
+        )
         precreated_shm2_handles = self.precreate_register_shape_tensor_regions(
-            ((16, 111), (16, 112), (16, 113)), dtype, 2)
+            ((16, 111), (16, 112), (16, 113)), dtype, 2
+        )
         precreated_shm3_handles = self.precreate_register_shape_tensor_regions(
-            ((1, 1111), (1, 1112), (1, 1113)), dtype, 3)
+            ((1, 1111), (1, 1112), (1, 1113)), dtype, 3
+        )
         try:
             model_name = tu.get_sequence_model_name("plan", dtype)
             self.check_setup(model_name)
@@ -449,12 +549,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             # Need scheduler to wait for queue to contain all
             # inferences for both sequences.
             self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]),
-                             12)
-            self.assertTrue(
-                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-            self.assertEqual(
-                int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+            self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+            self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
             threads = []
             threads.append(
@@ -466,12 +563,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1001,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 1, 1, None), (None, 1, 2, None), ("end", 1,
-                                                                     3, None)),
+                        (
+                            ("start", 1, 1, None),
+                            (None, 1, 2, None),
+                            ("end", 1, 3, None),
+                        ),
                         self.get_expected_result(6, 3, "end"),
-                        precreated_shm0_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm0_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -481,12 +583,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1002,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 32, 11, None), (None, 32, 12, None),
-                         ("end", 32, 13, None)),
+                        (
+                            ("start", 32, 11, None),
+                            (None, 32, 12, None),
+                            ("end", 32, 13, None),
+                        ),
                         self.get_expected_result(36, 13, "end"),
-                        precreated_shm1_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm1_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -496,12 +603,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1003,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 16, 111, None), (None, 16, 112, None),
-                         ("end", 16, 113, None)),
+                        (
+                            ("start", 16, 111, None),
+                            (None, 16, 112, None),
+                            ("end", 16, 113, None),
+                        ),
                         self.get_expected_result(336, 113, "end"),
-                        precreated_shm2_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm2_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -511,12 +623,17 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         1004,
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 1, 1111, None), (None, 1, 1112, None),
-                         ("end", 1, 1113, None)),
+                        (
+                            ("start", 1, 1111, None),
+                            (None, 1, 1112, None),
+                            ("end", 1, 1113, None),
+                        ),
                         self.get_expected_result(3336, 1113, "end"),
-                        precreated_shm3_handles),
-                    kwargs={'sequence_name': "{}".format(self._testMethodName)
-                           }))
+                        precreated_shm3_handles,
+                    ),
+                    kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                )
+            )
 
             for t in threads:
                 t.start()
@@ -537,12 +654,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
 
 class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
-
-    def get_expected_result(self,
-                            expected_result,
-                            corrid,
-                            value,
-                            flag_str=None):
+    def get_expected_result(self, expected_result, corrid, value, flag_str=None):
         expected_result = value
         if flag_str is not None:
             if "start" in flag_str:
@@ -556,20 +668,23 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         dtype = np.float32
 
         precreated_shm0_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((1, 1), (12, 2), (2, 3)), dtype, 0)
+            ((1, 1), (12, 2), (2, 3)), dtype, 0
+        )
         precreated_shm1_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((3, 11), (4, 12), (5, 13)), dtype, 1)
+            ((3, 11), (4, 12), (5, 13)), dtype, 1
+        )
         precreated_shm2_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((6, 111), (7, 112), (8, 113)), dtype, 2)
+            ((6, 111), (7, 112), (8, 113)), dtype, 2
+        )
         precreated_shm3_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((9, 1111), (10, 1112), (11, 1113)), dtype, 3)
+            ((9, 1111), (10, 1112), (11, 1113)), dtype, 3
+        )
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
             self.check_setup(model_name)
             self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertFalse(
-                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
             corrids = [1001, 1002, 1003, 1004]
             threads = []
@@ -582,17 +697,22 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[0],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 1, 1, None), (None, 12, 2, None), ("end", 2,
-                                                                      3, None)),
-                        self.get_expected_result(4 + corrids[0], corrids[0], 3,
-                                                 "end"),
-                        precreated_shm0_handles),
+                        (
+                            ("start", 1, 1, None),
+                            (None, 12, 2, None),
+                            ("end", 2, 3, None),
+                        ),
+                        self.get_expected_result(4 + corrids[0], corrids[0], 3, "end"),
+                        precreated_shm0_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[0]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[0]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -602,17 +722,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[1],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 3, 11, None), (None, 4, 12, None),
-                         ("end", 5, 13, None)),
-                        self.get_expected_result(36 + corrids[1], corrids[1],
-                                                 13, "end"),
-                        precreated_shm1_handles),
+                        (
+                            ("start", 3, 11, None),
+                            (None, 4, 12, None),
+                            ("end", 5, 13, None),
+                        ),
+                        self.get_expected_result(
+                            36 + corrids[1], corrids[1], 13, "end"
+                        ),
+                        precreated_shm1_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[1]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[1]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -622,17 +749,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[2],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 6, 111, None), (None, 7, 112, None),
-                         ("end", 8, 113, None)),
-                        self.get_expected_result(336 + corrids[2], corrids[2],
-                                                 113, "end"),
-                        precreated_shm2_handles),
+                        (
+                            ("start", 6, 111, None),
+                            (None, 7, 112, None),
+                            ("end", 8, 113, None),
+                        ),
+                        self.get_expected_result(
+                            336 + corrids[2], corrids[2], 113, "end"
+                        ),
+                        precreated_shm2_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[2]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[2]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -642,17 +776,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[3],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 9, 1111, None), (None, 10, 1112, None),
-                         ("end", 11, 1113, None)),
-                        self.get_expected_result(3336 + corrids[3], corrids[3],
-                                                 1113, "end"),
-                        precreated_shm3_handles),
+                        (
+                            ("start", 9, 1111, None),
+                            (None, 10, 1112, None),
+                            ("end", 11, 1113, None),
+                        ),
+                        self.get_expected_result(
+                            3336 + corrids[3], corrids[3], 1113, "end"
+                        ),
+                        precreated_shm3_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[3]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[3]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
 
             for t in threads:
                 t.start()
@@ -676,21 +817,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         dtype = np.float32
 
         precreated_shm0_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((2, 1), (4, 2), (8, 3)), dtype, 0)
+            ((2, 1), (4, 2), (8, 3)), dtype, 0
+        )
         precreated_shm1_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((2, 11), (4, 12), (8, 13)), dtype, 1)
+            ((2, 11), (4, 12), (8, 13)), dtype, 1
+        )
         precreated_shm2_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((2, 111), (4, 112), (8, 113)), dtype, 2)
+            ((2, 111), (4, 112), (8, 113)), dtype, 2
+        )
         precreated_shm3_handles = self.precreate_register_dynaseq_shape_tensor_regions(
-            ((2, 1111), (4, 1112), (8, 1113)), dtype, 3)
+            ((2, 1111), (4, 1112), (8, 1113)), dtype, 3
+        )
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
 
             self.check_setup(model_name)
             self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-            self.assertFalse(
-                "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
             corrids = [1001, 1002, 1003, 1004]
             threads = []
@@ -703,17 +847,22 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[0],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 1, None), (None, 4, 2, None), ("end", 8,
-                                                                     3, None)),
-                        self.get_expected_result(4 + corrids[0], corrids[0], 3,
-                                                 "end"),
-                        precreated_shm0_handles),
+                        (
+                            ("start", 2, 1, None),
+                            (None, 4, 2, None),
+                            ("end", 8, 3, None),
+                        ),
+                        self.get_expected_result(4 + corrids[0], corrids[0], 3, "end"),
+                        precreated_shm0_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[0]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[0]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -723,17 +872,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[1],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 11, None), (None, 4, 12, None),
-                         ("end", 8, 13, None)),
-                        self.get_expected_result(36 + corrids[1], corrids[1],
-                                                 13, "end"),
-                        precreated_shm1_handles),
+                        (
+                            ("start", 2, 11, None),
+                            (None, 4, 12, None),
+                            ("end", 8, 13, None),
+                        ),
+                        self.get_expected_result(
+                            36 + corrids[1], corrids[1], 13, "end"
+                        ),
+                        precreated_shm1_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[1]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[1]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -743,17 +899,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[2],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 111, None), (None, 4, 112, None),
-                         ("end", 8, 113, None)),
-                        self.get_expected_result(336 + corrids[2], corrids[2],
-                                                 113, "end"),
-                        precreated_shm2_handles),
+                        (
+                            ("start", 2, 111, None),
+                            (None, 4, 112, None),
+                            ("end", 8, 113, None),
+                        ),
+                        self.get_expected_result(
+                            336 + corrids[2], corrids[2], 113, "end"
+                        ),
+                        precreated_shm2_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[2]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[2]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
             threads.append(
                 threading.Thread(
                     target=self.check_sequence_shape_tensor_io,
@@ -763,17 +926,24 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrids[3],
                         (None, None),
                         # (flag_str, shape_value, value, pre_delay_ms)
-                        (("start", 2, 1111, None), (None, 4, 1112, None),
-                         ("end", 8, 1113, None)),
-                        self.get_expected_result(3336 + corrids[3], corrids[3],
-                                                 1113, "end"),
-                        precreated_shm3_handles),
+                        (
+                            ("start", 2, 1111, None),
+                            (None, 4, 1112, None),
+                            ("end", 8, 1113, None),
+                        ),
+                        self.get_expected_result(
+                            3336 + corrids[3], corrids[3], 1113, "end"
+                        ),
+                        precreated_shm3_handles,
+                    ),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, corrids[3]),
-                        'using_dynamic_batcher':
-                            True
-                    }))
+                        "sequence_name": "{}_{}".format(
+                            self._testMethodName, corrids[3]
+                        ),
+                        "using_dynamic_batcher": True,
+                    },
+                )
+            )
 
             for t in threads:
                 t.start()
@@ -815,5 +985,5 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         self._multi_sequence_different_shape_impl(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

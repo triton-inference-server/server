@@ -80,11 +80,13 @@ spec:
               secretKeyRef:
                 name: aws-credentials
                 key: AWS_SECRET_ACCESS_KEY
+{{- if .Values.secret.token }}
           - name: AWS_SESSION_TOKEN
             valueFrom:
               secretKeyRef:
                 name: aws-credentials
                 key: AWS_SESSION_TOKEN
+{{- end }}
 {{- end }}
 
           ports:

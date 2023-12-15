@@ -125,14 +125,14 @@ done
 sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_ENABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
 sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_DISABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 
-## Append cache config to each model config 
-echo "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
-echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+## Append cache config to each model config
+echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 # Force CPU memory for composing models since cache doesn't currently support GPU memory
-echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo -e "instance_group [{ kind: KIND_CPU, count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "instance_group [{ kind: KIND_CPU, count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 
 # Run server
 run_server
@@ -146,13 +146,14 @@ fi
 set +e
 RET=0
 PROTOCOLS="http grpc"
+STABILITY_THRESHOLD="15"
 for protocol in ${PROTOCOLS}; do
     for model in ${MODELS}; do
 	echo "================================================================"
 	echo "[PERMUTATION] Protocol=${protocol} Model=${model}"
 	echo "================================================================"
 
-        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} | tee ${CLIENT_LOG} 2>&1
+        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -s ${STABILITY_THRESHOLD} | tee ${CLIENT_LOG} 2>&1
         check_perf_analyzer_error $?
 
 	# Check response cache outputs

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,30 +49,30 @@ We the place the model into a GCS with following structure, `config.pbtxt` was p
     ├── bert_base_trt_gpu_seqlen128
     │   ├── 1
     │   │   └── model.plan
-    │   └── config.pbtxt    
+    │   └── config.pbtxt
     ├── bert_base_tf_gpu
     │   ├── 1
     │   │   └── model.savedmodel
-    │   └── config.pbtxt      
+    │   └── config.pbtxt
     ├── bert_base_tf_cpu
     │   ├── 1
     │   │   └── model.savedmodel
     │   └── config.pbtxt
-    ├── bert_distill_tf_gpu 
+    ├── bert_distill_tf_gpu
     │   ├── 1
     │   │   └── model.savedmodel
     │   └── config.pbtxt
     └── bert_distill_tf_cpu
         ├── 1
         │   └── model.savedmodel
-        └── config.pbtxt 
+        └── config.pbtxt
 ```
 
-When deploy Triton GKE application, point the model repository to directory contains the structure above with actual models. 
+When deploy Triton GKE application, point the model repository to directory contains the structure above with actual models.
 
 ## Performance
 
-We use perf analyzer of Triton to benchmark the performance of each model, the perf analyzer reside in another pod of the GKE cluster. 
+We use perf analyzer of Triton to benchmark the performance of each model, the perf analyzer reside in another pod of the GKE cluster.
 ```bash
 export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].port}')
@@ -91,6 +91,5 @@ GPU TensorRT BERT BASE: latency: 50ms, throughput: 465 qps
 
 With n1-standard-96 priced at $4.56/hr and n1-standard-4 at $0.19/hr and T4 at $0.35/hr totaling $0.54/hr. While achieving a much lower latency, the TCO of BERT inference with TensorRT on T4 is over 163 times that of Distill BERT inference on n1-standard-96.
 
-  
 
- 
+

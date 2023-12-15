@@ -106,7 +106,7 @@ function vertex_ai_wait_for_server_ready() {
     WAIT_RET=1
 }
 
-# Helper function to unset all AIP vairables before test
+# Helper function to unset all AIP variables before test
 function unset_vertex_variables() {
     unset AIP_MODE
     unset AIP_HTTP_PORT
@@ -418,7 +418,7 @@ else
   fi
 fi
 
-# Test AIP_STORAGE_URI won't be used if model repository is specified 
+# Test AIP_STORAGE_URI won't be used if model repository is specified
 SERVER_ARGS="--model-repository=single_model"
 run_server_nowait
 vertex_ai_wait_for_server_ready $SERVER_PID 10

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,7 +48,7 @@ ngc registry model download-version "nvidia/tao/peoplenet:pruned_v2.1"
 
 For latter you need to setup the [NGC CLI](https://ngc.nvidia.com/setup).
 
-Having downloaded the model from the NGC, unzip the archive `peoplenet_pruned_v2.1.zip` into `concurrency_and_dynamic_batching/tao/models/peoplenet`. 
+Having downloaded the model from the NGC, unzip the archive `peoplenet_pruned_v2.1.zip` into `concurrency_and_dynamic_batching/tao/models/peoplenet`.
 
 If you have the zip archive in the `concurrency_and_dynamic_batching` directory, the following will automatically place the model to the correct location:
 
@@ -78,10 +78,10 @@ The `tao-converter` tool is available as a compiled release file for different p
 After you have downloaded `tao-converter`, you might need to execute
 
 ```shell
-chmod 777 tao-converter 
-``` 
+chmod 777 tao-converter
+```
 
-in the directory with the tool. 
+in the directory with the tool.
 
 We provide a conversion script `tao/convert_peoplenet.sh` which expects the model to be present at the location.
 
@@ -139,13 +139,13 @@ To execute from the terminal, run from the `concurrency_and_dynamic_batching` di
 LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m system -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver
 ```
 
-The parameter `-t` controlls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurency options affects the performance.
+The parameter `-t` controls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurrency options affects the performance.
 
 You can enable saving detected bounding boxes in the project directory in form of overlays over the original image for each execution thread. You can turn the visualization on by setting the parameter `-s` to `true` upon execution (`-s` is set to `false` by default).
 
 ### Expected output
 
-Upon execution, in the terminal log you will see _Model 'peoplenet' Stats_ in json format reflecting the inference performance. We also output _TOTAL INFERENCE TIME_ which simply reflects the elapsed time requred to run the application including data loading, pre-processing and post-processing.
+Upon execution, in the terminal log you will see _Model 'peoplenet' Stats_ in json format reflecting the inference performance. We also output _TOTAL INFERENCE TIME_ which simply reflects the elapsed time required to run the application including data loading, pre-processing and post-processing.
 
 A typical output in the log for _Model 'peoplenet' Stats_ looks as follows:
 
@@ -210,7 +210,7 @@ TOTAL INFERENCE TIME: 174ms
 
 To learn about different statistics check out the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md#statistics-extension).
 
-To see how setting different values for concurrency affects total execution time and its componets reflected in the model stats, you need to modify a single parameter in the model config file.
+To see how setting different values for concurrency affects total execution time and its components reflected in the model stats, you need to modify a single parameter in the model config file.
 
 To enable concurrent model execution support for a model, corresponding model config file `trtis_model_repo_sample_1/peoplenet/config.pbtxt` includes the following:
 
@@ -223,17 +223,17 @@ instance_group [
 ]
 ```
 
-You can change the count of allowed inferences for the same model instance and observe how it affects performance in _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_. Note that on Jetson we dont recommend setting values too high: for instance, on a device like a Jetson Xavier AGX we don't recommend setting the number larger than 6. The values in the range 1-3 are optimal. 
+You can change the count of allowed inferences for the same model instance and observe how it affects performance in _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_. Note that on Jetson we dont recommend setting values too high: for instance, on a device like a Jetson Xavier AGX we don't recommend setting the number larger than 6. The values in the range 1-3 are optimal.
 
 While trying out different values, note how it affects total inference time as well as some inference statistics (like queue and compute times)
 
 ## Demonstration case 2: Dynamic batching
 
-For models that support batching, Triton implements multiple scheduling and batching algorithms that combine individual inference requests together to improve inference throughput. In this example, we want to demonstrate how enbling automatic dynamic batching affects inference performance. 
+For models that support batching, Triton implements multiple scheduling and batching algorithms that combine individual inference requests together to improve inference throughput. In this example, we want to demonstrate how enbling automatic dynamic batching affects inference performance.
 
 ### Running the sample
 
-To observe the effect of dynamic batching, from the `concurrency_and_dynamic_batching` directory execute: 
+To observe the effect of dynamic batching, from the `concurrency_and_dynamic_batching` directory execute:
 
 ```shell
 LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m system -v -r $(pwd)/trtis_model_repo_sample_2 -t 6 -s false -p $HOME/tritonserver
@@ -326,6 +326,6 @@ dynamic_batching {
 }
 ```
 
-To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#dynamic-batcher). 
+To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher).
 
 You can also try enabling both concurrent model execution and dynamic batching.

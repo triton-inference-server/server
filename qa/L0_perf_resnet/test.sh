@@ -38,7 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
 PROTOCOLS="grpc http triton_c_api"
 
@@ -110,7 +110,8 @@ done
 rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
@@ -167,7 +168,8 @@ CONCURRENCY=4
 rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \

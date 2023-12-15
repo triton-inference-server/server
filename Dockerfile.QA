@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITONTMP_DIR=/tmp
+ARG IGPU_BUILD=0
 
 ############################################################################
 ## Test artifacts built as part of the tritonserver build are
@@ -44,6 +45,7 @@ ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
+ARG IGPU_BUILD
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -62,13 +64,13 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools
 
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
+RUN apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -107,6 +109,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_sequence qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
+    mkdir qa/L0_grpc_state_cleanup/models && \
+    cp -r /workspace/src/test/models/repeat_int32 qa/L0_grpc_state_cleanup/models/ && \
     mkdir qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_dyna_sequence qa/L0_http/models && \
@@ -128,6 +132,8 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_query/models/query/1 && \
     cp tritonbuild/tritonserver/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
     cp bin/query_test qa/L0_query/. && \
+    mkdir qa/L0_iterative_sequence/models/iterative_sequence/1 && \
+    cp tritonbuild/tritonserver/backends/iterative_sequence/libtriton_iterative_sequence.so qa/L0_iterative_sequence/models/iterative_sequence/1/. && \
     cp bin/register_api_test qa/L0_register/. && \
     cp bin/async_work_queue_test qa/L0_async_work_queue/. && \
     cp tritonbuild/tritonserver/backends/implicit_state/libtriton_implicit_state.so \
@@ -137,7 +143,14 @@ RUN mkdir -p qa/common && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
+    cp bin/request_cancellation_test qa/L0_request_cancellation/. && \
+    cp bin/triton_json_test qa/L0_json/. && \
+    cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
+
+RUN mkdir -p qa/pkgs && \
+    cp python/triton*.whl qa/pkgs/. && \
+    cp python/test_binding.py qa/L0_python_api/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f bin/caffe2plan ]; then \
@@ -197,12 +210,6 @@ RUN cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
     mkdir -p qa/L0_infer_valgrind && \
     cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
-    mkdir -p qa/L0_infer_tf2 && \
-    cp -r qa/L0_infer/. qa/L0_infer_tf2 && \
-    if [ -d qa/L0_tf_image_models ]; then \
-        mkdir -p qa/L0_tf_image_models_tf2 && \
-            cp -r qa/L0_tf_image_models/. qa/L0_tf_image_models_tf2; \
-    fi; \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \
@@ -232,20 +239,22 @@ RUN if [ -d qa/L0_model_control_stress ]; then \
             cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind_massif; \
     fi
 
-RUN cp backends/repeat/libtriton_repeat.so qa/L0_model_config/.
-
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_decoupled/models/repeat_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
-    cp backends/square/libtriton_square.so \
-        qa/L0_decoupled/models/square_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/identity_int32/1
-RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/square_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
-    mkdir -p qa/L0_decoupled/models/nested_square/1
+    mkdir -p qa/L0_decoupled/models/nested_square/1 && \
+    mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1
+
+RUN if [ "$IGPU_BUILD" == "0" ]; then \
+        cp backends/repeat/libtriton_repeat.so qa/L0_model_config && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_decoupled/models/repeat_int32/1 && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_grpc_state_cleanup/models/repeat_int32/1/. && \
+        cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
+    fi
 
 RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
@@ -299,12 +308,16 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="22.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libpng-dev; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
     else \
-        echo "Ubuntu version must be either 18.04 or 20.04" && \
+        echo "Ubuntu version must be either 18.04, 20.04 or 22.04" && \
         exit 1; \
     fi
 
@@ -312,6 +325,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
 # libarchive-dev is required by Python backend
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
+                              gdb \
                               libopencv-dev \
                               libarchive-dev \
                               libopencv-core-dev \
@@ -334,22 +348,19 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six grpcio-channelz
-
-# L0_http_fuzz is hitting similar issue with boofuzz with latest version (0.4.0):
-# https://github.com/jtpereyda/boofuzz/issues/529
-# Hence, fixing the boofuzz version to 0.3.0
-RUN pip3 install 'boofuzz==0.3.0'
+    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil \
+                           awscli six grpcio-channelz prettytable virtualenv \
+                           check-jsonschema
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      wget https://golang.org/dl/go1.16.3.linux-arm64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-arm64.tar.gz && \
-      rm -f go1.16.3.linux-arm64.tar.gz; \
+      wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-arm64.tar.gz && \
+      rm -f go1.19.1.linux-arm64.tar.gz; \
     else \
-      wget https://golang.org/dl/go1.16.3.linux-amd64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz && \
-      rm -f go1.16.3.linux-amd64.tar.gz; \
+      wget https://golang.org/dl/go1.19.1.linux-amd64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-amd64.tar.gz && \
+      rm -f go1.19.1.linux-amd64.tar.gz; \
     fi
 ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
@@ -369,7 +380,14 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
+# Install Triton Python API
+RUN find qa/pkgs/ -maxdepth 1 -type f -name \
+    "tritonserver-*.whl" | xargs pip3 install --upgrade
+
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
 ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
+
+# Required for PyTorch to pickup the correct HPCX libraries
+ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}

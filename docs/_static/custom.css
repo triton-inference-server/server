@@ -1,0 +1,319 @@
+/*
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/5/2/52891dda673228d54e5d57bf1e4a3880d4b22405.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/e/0/e090b7dda7a582522c7f9045c6ce949cce60134f.woff) format("woff");
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/a/1/a107baabcbf6b241099122336bce7429bcfd377a.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/3/a/3a6060a4e3bce70e5552ba0de8af4b22c6cf9144.woff) format("woff");
+  font-weight: 300;
+  font-style: italic;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/9/9/9920d2b172b01d92fc9c1c0e521dcf45b59c47c3.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/6/c/6c7d947928a7e4ef3e80ed409bef6c243f2148cb.woff) format("woff");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/e/8/e8e63fe1244372cd942d957f44a5616a1eba0644.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/0/f/0f1fb2af0283ab09d36e7097bb07d895c3228f12.woff) format("woff");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/7/9/79d3c513a9cd72c59f65354f39f89ca52dc17dd2.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/2/5/2581ac533f5d01f4985d8a7245b0766b4630ced8.woff) format("woff");
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/3/9/39d9ef1ee9770dd503f19bb2ace2fdb4eff3bb50.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/7/b/7bb5d5e2e71b2e13c8098b2e67c0a0ed9258e6c7.woff) format("woff");
+  font-weight: 500;
+  font-style: italic;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/0/5/05276a55a43eb3f74981ec1e93252727afcd9d16.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/9/c/9cfec7ed941b06564aa4d5ca14610e81542d070f.woff) format("woff");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "NVIDIA Sans";
+  src: url(https://aws1.discourse-cdn.com/nvidia/original/3X/a/e/aebd14d09ba56f541e1b8735fb051e33710f9ae7.woff2) format("woff2"),
+      url(https://aws1.discourse-cdn.com/nvidia/original/3X/e/d/edbdabef43acc5c12e84a94baaa5542c9404cfeb.woff) format("woff");
+  font-weight: 700;
+  font-style: italic;
+}
+
+/* Custom Styles */
+:root {
+--pst-font-size-base: none;
+--pst-color-primary: 0, 133, 197;
+--pst-color-admonition-note: var(--pst-color-primary);
+--pst-color-admonition-default: var(--pst-color-primary);
+--pst-color-info: 255, 193, 7;
+--pst-color-admonition-tip: var(--pst-color-info);
+--pst-color-admonition-hint: var(--pst-color-info);
+--pst-color-admonition-important: var(--pst-color-info);
+--pst-color-warning: 245, 162, 82;
+--pst-color-danger: 230, 101, 129;
+--pst-color-admonition-warning: var(--pst-color-danger);
+--pst-color-link: 118, 185, 0;
+--pst-color-inline-code: 92, 22, 130;
+--font-family-sans-serif: NVIDIA Sans, Helvetica, Arial, Sans-serif;
+--pst-font-family-base-system: NVIDIA Sans, Helvetica, Arial, Sans-serif;
+font-family: NVIDIA Sans, Helvetica, Arial, Sans-serif;
+}
+
+.prev-next-area {
+    font-size: small;
+}
+
+.docutils caption {
+  caption-side: top;
+}
+
+#site-navigation h1.site-logo {
+  font-size: 0.85em;
+}
+
+/* colors
+nv green 118,185,0
+black 0, 0, 0
+light gray 205, 205, 205
+medium gray 140, 140, 140
+dark gray 94, 94, 94
+
+emerald 0, 133, 100
+emerald #008564
+amethyst 92, 22, 130
+amethyst #5C1682
+cpu blue 0, 133, 197
+cpu blue #0085C5
+garnet 137, 12, 88
+garnet 890C58
+fluorite 250, 194, 0
+fluorite FAC200
+*/
+
+:root {
+  --nv-green: #76b900;
+  --nv-green-darken: #6ead00;
+  --emerald: #008564;
+  --emerald-darken: #017c5d;
+  --amethyst: #5d1682;
+  --amethyst-darken: #4c116b;
+  --cpu-blue: #0071c5;
+  --cpu-blue-darken: #0062ad;
+  --garnet: #890c58;
+  --garnet-darken: #7a0c4e;
+  --fluorite: #fac200;
+  --fluorite-darken: #e4b301;
+  --dark-gray: #5e5e5e;
+  --light-gray: #cdcdcd;
+  --medium-gray: #8c8c8c;
+  --medium-gray-darken: #8c8c8cde;
+  --primary: #76b900;
+  --secondary: #008564;
+  --success: #5d1682;
+  --info: #0071c5;
+  --warning: #fac200;
+  --danger: #890c58;
+}
+
+/* Riva TBYB (ASR and TTS) Styling */
+.demo-box {
+  background-color: rgb(245,245,245);
+}
+a:link { text-decoration: none; }
+.scrollable {
+  height: 125px;
+  overflow-y: auto;
+  font-size: 1.3rem;
+}
+.dot {
+  height: 8px;
+  width: 8px;
+  background-color: rgb(228, 77, 77);
+  border-radius: 50%;
+  display: inline-block;
+}
+.timer {
+  font-size: 80%;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.form-select {
+  border-radius: 0%;
+  font-size: 80%;
+}
+.form-control {
+  border-radius: 0%;
+}
+.input-group-text {
+  border-radius: 0%;
+  font-size: 80%;
+  text-transform: uppercase;
+  background-color: rgb(245,245,245);
+}
+.card {
+  border-radius: 0%;
+}
+.speech-control {
+  border-top-width: 0px;
+}
+.btn {
+  border-radius: 0%;
+  font-size: 80%;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 125px;
+}
+.btn-primary {
+  background-color: var(--nv-green);
+  border-color: var(--nv-green);
+}
+.btn-primary:hover {
+  background-color: var(--nv-green-darken);
+  border-color: var(--nv-green-darken);
+}
+.btn-primary:focus, .btn-primary.focus {
+  background-color: var(--nv-green-darken);
+  border-color: var(--nv-green-darken);
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+          box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+}
+.btn-primary.disabled, .btn-primary:disabled {
+  background-color: var(--nv-green);
+  border-color: var(--nv-green);
+}
+.btn-primary:not(:disabled):not(.disabled):active, .btn-primary:not(:disabled):not(.disabled).active,
+.show > .btn-primary.dropdown-toggle {
+  background-color: var(--nv-green-darken);
+  border-color: var(--nv-green-darken);
+}
+.btn-primary:not(:disabled):not(.disabled):active:focus, .btn-primary:not(:disabled):not(.disabled).active:focus,
+.show > .btn-primary.dropdown-toggle:focus {
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+          box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+}
+.btn-secondary {
+  background-color: var(--medium-gray);
+  border-color: var(--medium-gray);
+}
+.btn-secondary:hover {
+  background-color: var(--medium-gray-darken);
+  border-color: var(--medium-gray-darken);
+}
+.btn-secondary:focus, .btn-secondary.focus {
+  background-color: var(--medium-gray-darken);
+  border-color: var(--medium-gray-darken);
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(140, 140, 140, 0.5);
+          box-shadow: 0 0 0 0.2rem rgba(140, 140, 140, 0.5);
+}
+.btn-secondary.disabled, .btn-secondary:disabled {
+  background-color: var(--medium-gray);
+  border-color: var(--medium-gray);
+}
+.btn-secondary:not(:disabled):not(.disabled):active, .btn-secondary:not(:disabled):not(.disabled).active,
+.show > .btn-secondary.dropdown-toggle {
+  background-color: var(--medium-gray-darken);
+  border-color: var(--medium-gray-darken);
+}
+.btn-secondary:not(:disabled):not(.disabled):active:focus, .btn-secondary:not(:disabled):not(.disabled).active:focus,
+.show > .btn-secondary.dropdown-toggle:focus {
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(140, 140, 140, 0.5);
+          box-shadow: 0 0 0 0.2rem rgba(140, 140, 140, 0.5);
+}
+.btn-link {
+  color: var(--nv-green);
+  text-decoration-line: none;
+}
+.btn-link:hover {
+  color: var(--nv-green-darken);
+}
+.btn-link:focus, .btn-link.focus {
+  color: var(--nv-green-darken);
+  -webkit-box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+          box-shadow: 0 0 0 0.2rem rgba(147, 173, 102, 0.5);
+}
+.link-primary {
+  color: var(--nv-green);
+}
+.link-primary:hover {
+  color: var(--nv-green-darken);
+}
+
+/* Riva ASR Styles */
+#riva-upload-label {
+  margin-top: 0.5rem;
+}
+
+/* Riva TTS Styles */
+.tts-control {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tts-control > p {
+  margin: unset;
+}
+
+#riva-tts-field {
+  resize: none;
+  border: unset;
+  padding: 0;
+  height: 100%;
+  font-size: 1.0rem;
+}
+
+#riva-terms-of-use p {
+  max-width: 620px;
+}
+
+/* Media Queries */
+@media (max-width: 1024px) {
+
+  /* Riva TTS and ASR */
+  .scrollable {
+      height: 250px;
+  }
+}
+

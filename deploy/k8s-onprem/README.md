@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -112,10 +112,10 @@ $ git clone https://github.com/triton-inference-server/server.git
 Triton Server needs a repository of models that it will make available
 for inferencing. For this example, we are using an existing NFS server and
 placing our model files there. See the
-[Model Repository documentation](../../docs/model_repository.md) for other
+[Model Repository documentation](../../docs/user_guide/model_repository.md) for other
 supported locations.
 
-Following the [QuickStart](../../docs/quickstart.md), download the
+Following the [QuickStart](../../docs/getting_started/quickstart.md), download the
 example model repository to your system and copy it onto your NFS server.
 Then, add the url or IP address of your NFS server and the server path of your
 model repository to `values.yaml`.
@@ -217,7 +217,7 @@ deploy a cluster with a minimum of two inference servers use *--set* to
 set the autoscaler.minReplicas parameter.
 
 ```
-$ helm install --name example --set autoscaler.minReplicas=2 .
+$ helm install example --set autoscaler.minReplicas=2 .
 ```
 
 You can also write your own "config.yaml" file with the values you
@@ -231,13 +231,23 @@ image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
   modelRepositoryPath: gs://my_model_repository
 EOF
-$ helm install --name example -f config.yaml .
+$ helm install example -f config.yaml .
 ```
+
+## Probe Configuration
+
+In `templates/deployment.yaml` is configurations for `livenessProbe`, `readinessProbe` and `startupProbe` for the Triton server container.
+By default, Triton loads all the models before starting the HTTP server to respond to the probes. The process can take several minutes, depending on the models sizes.
+If it is not completed in `startupProbe.failureThreshold * startupProbe.periodSeconds` seconds then Kubernetes considers this as a pod failure and restarts it,
+ending up with an infinite loop of restarting pods, so make sure to sufficiently set these values for your use case.
+The liveliness and readiness probes are being sent only after the first success of a startup probe.
+
+For more details, see the [Kubernetes probe documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) and the [feature page of the startup probe](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/950-liveness-probe-holdoff/README.md).
 
 ## Using Triton Inference Server
 
 Now that the inference server is running you can send HTTP or GRPC
-requests to it to perform inferencing. By default, this chart deploys [Traefik](traefik.io)
+requests to it to perform inferencing. By default, this chart deploys [Traefik](https://traefik.io/)
 and uses [IngressRoutes](https://doc.traefik.io/traefik/providers/kubernetes-crd/)
 to balance requests across all available nodes.
 
@@ -267,7 +277,7 @@ from the HTTP endpoint.
 $ curl $cluster_ip:8000/v2
 ```
 
-Follow the [QuickStart](../../docs/quickstart.md) to get the example
+Follow the [QuickStart](../../docs/getting_started/quickstart.md) to get the example
 image classification client that can be used to perform inferencing
 using image classification models on the inference
 server. For example,
@@ -284,7 +294,9 @@ Image 'images/mug.jpg':
 ## Testing Load Balancing and Autoscaling
 After you have confirmed that your Triton cluster is operational and can perform inference,
 you can test the load balancing and autoscaling features by sending a heavy load of requests.
-One option for doing this is using the [perf_analyzer](../../docs/perf_analyzer.md) application.
+One option for doing this is using the
+[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+application.
 
 You can apply a progressively increasing load with a command like:
 ```
@@ -305,13 +317,13 @@ NAME            REVISION  UPDATED                   STATUS    CHART             
 example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  triton-inference-server-1.0.0  1.0           default
 example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0   	 0.32.0     	 default
 
-$ helm delete --purge example
-$ helm delete --purge example-metrics
+$ helm uninstall example
+$ helm uninstall example-metrics
 ```
 
 For the Prometheus and Grafana services, you should [explicitly delete
-CRDs](https://github.com/helm/charts/tree/master/stable/prometheus-operator#uninstalling-the-chart):
+CRDs](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#uninstall-helm-chart):
 
 ```
-$ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
+$ kubectl delete crd alertmanagerconfigs.monitoring.coreos.com alertmanagers.monitoring.coreos.com podmonitors.monitoring.coreos.com probes.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com servicemonitors.monitoring.coreos.com thanosrulers.monitoring.coreos.com
 ```

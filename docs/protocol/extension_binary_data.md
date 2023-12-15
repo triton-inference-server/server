@@ -47,13 +47,13 @@ delivered in the HTTP body after the JSON object (see Examples).
 
 The binary tensor data extension uses parameters to indicate that an
 input or output tensor is communicated as binary data. The first
-parameter is used in $request_input and $response_output to indicate
+parameter is used in `$request_input` and `$response_output` to indicate
 that the input or output tensor is communicated as binary data:
 
 - "binary_data_size" : int64 parameter indicating the size of the
   tensor binary data, in bytes.
 
-The second parameter is used in $request_output to indicate that the
+The second parameter is used in `$request_output` to indicate that the
 output should be returned from Triton as binary data.
 
 - "binary_data" : bool parameter that is true if the output should be

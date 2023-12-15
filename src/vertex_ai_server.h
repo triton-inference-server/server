@@ -57,7 +57,7 @@ class VertexAiAPIServer : public HTTPAPIServer {
       evhtp_request_t* req, int32_t content_length,
       size_t* header_length) override;
 
-  // Currently the compresssion schema hasn't been defined,
+  // Currently the compression schema hasn't been defined,
   // assume identity compression type is used for both request and response
   DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override
   {

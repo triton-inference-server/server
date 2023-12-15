@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,15 +48,14 @@ ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
+PERF_CLIENT=../clients/perf_client
+TF_VERSION=${TF_VERSION:=2}
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
-if [ "$ARCH" == "aarch64" ]; then
-    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
-else
-    PERF_CLIENT=../clients/perf_client
-    DATADIR=/data/inferenceserver/${REPO_VERSION}
+if [ "$ARCH" != "aarch64" ]; then
+    DATADIR="/data/inferenceserver/${REPO_VERSION}"
 fi
 
 # Select the single GPU that will be available to the inference server
@@ -75,12 +74,16 @@ if [[ $BACKENDS == *"python"* ]]; then
         sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
 fi
 
+if [[ $BACKENDS == *"custom"* ]]; then
+    mkdir -p "custom_models/custom_zero_1_float32/1"
+fi
+
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
-PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
+PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory ${SHARED_MEMORY}"
 
-# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Server will be run in-process with C API
@@ -166,9 +169,10 @@ for BACKEND in $BACKENDS; do
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
+    echo "Time before starting server: $(date)"
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
-        SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
+        SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
         run_server
         if [ $SERVER_PID == 0 ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -177,19 +181,26 @@ for BACKEND in $BACKENDS; do
         fi
     fi
 
+    echo "Time before perf analyzer trials: $(date)"
     set +e
+    set -o pipefail
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
                  -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
+                 --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+    echo "Time after perf analyzer trials: $(date)"
+    set +o pipefail
     set -e
 
     echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson

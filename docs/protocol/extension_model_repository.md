@@ -41,8 +41,8 @@ Server Metadata.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. `#optional`
 indicates an optional JSON field.
 
 The model-repository extension requires Index, Load and Unload
@@ -65,7 +65,7 @@ loaded by the Load API. A model-repository index request is made with
 an HTTP POST to the index endpoint. In the corresponding response the
 HTTP body contains the JSON response.
 
-The index request object, identified as $repository_index_request, is
+The index request object, identified as `$repository_index_request`, is
 required in the HTTP body of the POST request.
 
 ```
@@ -78,7 +78,7 @@ $repository_index_request =
 - "ready" : Optional, default is false. If true return only models ready for inferencing.
 
 A successful index request is indicated by a 200 HTTP status code. The
-response object, identified as $repository_index_response, is returned
+response object, identified as `$repository_index_response`, is returned
 in the HTTP body for every successful request.
 
 ```
@@ -101,7 +101,7 @@ $repository_index_response =
 
 A failed index request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$repository_index_error_response object.
+`$repository_index_error_response` object.
 
 ```
 $repository_index_error_response =
@@ -117,7 +117,7 @@ $repository_index_error_response =
 The load API requests that a model be loaded into Triton, or reloaded
 if the model is already loaded. A load request is made with an HTTP
 POST to a load endpoint. The HTTP body may be empty or may contain
-the load request object, identified as $repository_load_request.
+the load request object, identified as `$repository_load_request`.
 A successful load request is indicated by a 200 HTTP status.
 
 
@@ -147,13 +147,13 @@ applied.
 This convention will be used to specify the override model directory to load
 the model from. For instance, if the user wants to specify a model directory
 that contains an ONNX model as version 2, then the user will specify the
-parameter to "file:2/model.onnx" : "<base64-encoded-file-content>". Note that
+parameter to "file:2/model.onnx" : "\<base64-encoded-file-content\>". Note that
 "config" parameter must be provided to serve as the model configuration of the
 override model directory.
 
 A failed load request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$repository_load_error_response object.
+`$repository_load_error_response` object.
 
 ```
 $repository_load_error_response =
@@ -163,12 +163,44 @@ $repository_load_error_response =
 ```
 - “error” : The descriptive message for the error.
 
+#### Examples
+
+For the following request, Triton will load the model "mymodel" with provided
+model configuration and model file.
+
+```
+POST /v2/repository/models/mymodel/load HTTP/1.1
+Host: localhost:8000
+{
+  "parameters": {
+    "config": "{
+      "name": "mymodel",
+      "backend": "onnxruntime",
+      "inputs": [{
+          "name": "INPUT0",
+          "datatype": "FP32",
+          "shape": [ 1 ]
+        }
+      ],
+      "outputs": [{
+          "name": "OUTPUT0",
+          "datatype": "FP32",
+          "shape": [ 1 ]
+        }
+      ]
+    }",
+
+    "file:1/model.onnx" : "<base64-encoded-file-content>"
+  }
+}
+```
+
 ### Unload
 
 The unload API requests that a model be unloaded from Triton. An
 unload request is made with an HTTP POST to an unload endpoint. The
 HTTP body may be empty or may contain the unload request object,
-identified as $repository_unload_request. A successful unload request
+identified as `$repository_unload_request`. A successful unload request
 is indicated by a 200 HTTP status.
 
 ```
@@ -192,7 +224,7 @@ The unload API accepts the following parameters:
 
 A failed unload request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$repository_unload_error_response object.
+`$repository_unload_error_response` object.
 
 ```
 $repository_unload_error_response =
@@ -329,7 +361,7 @@ applied.
 file content. This convention will be used to specify the override model
 directory to load the model from. For instance, if the user wants to specify a
 model directory that contains an ONNX model as version 2, then the user will
-specify the parameter to "file:2/model.onnx" : "<file-content>". Note that
+specify the parameter to "file:2/model.onnx" : "\<file-content\>". Note that
 "config" parameter must be provided to serve as the model configuration of the
 override model directory.
 

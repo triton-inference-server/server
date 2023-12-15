@@ -1,0 +1,22 @@
+name: "empty_config.identity"
+version_policy {
+latest {
+    num_versions: 1
+}
+}
+instance_group {
+name: "empty_config.identity"
+count: 1
+gpus: 0
+kind: KIND_GPU
+}
+default_model_filename: "model.identity"
+optimization {
+input_pinned_memory {
+    enable: true
+}
+output_pinned_memory {
+    enable: true
+}
+}
+backend: "identity"

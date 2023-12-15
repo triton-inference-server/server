@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,29 +33,37 @@ sys.path.append("../common")
 import os
 from builtins import range
 
-from tensorflow.python.framework import ops
-from tensorflow.python.saved_model import builder
-from tensorflow.python.saved_model import signature_constants
-from tensorflow.python.saved_model import tag_constants
-import tensorflow.compat.v1 as tf
 import gen_ensemble_model_utils as gu
-"""Create SaveModels that contains multiple tags and multiple signature defs"""
+import tensorflow.compat.v1 as tf
+from tensorflow.python.framework import ops
+from tensorflow.python.saved_model import builder, signature_constants, tag_constants
+
+"""Create SavedModels that contains multiple tags and multiple signature defs"""
 
 
-def create_savedmodel(models_dir,
-                      model_version=1,
-                      dims=16,
-                      model_name="sig_tag",
-                      tag_name="testTag",
-                      signature_def_name="testSigDef"):
+def create_savedmodel(
+    models_dir,
+    model_version=1,
+    dims=16,
+    model_name="sig_tag",
+    tag_name="testTag",
+    signature_def_name="testSigDef",
+    different_io=False,
+):
     """
-    Creates 4 SavedModels that have different combinations of model_name and tag_name.
-    The models multiplies the input tensor by a multiplier and the multiplier value is different for each model.
-    Naming convention and config used:
-    <model_name>0: tag: "serve",    signature_def: "serving_default",    multiplier 1
-    <model_name>1: tag: "serve",    signature_def: <signature_def_name>, multiplier 2
-    <model_name>2: tag: <tag_name>, signature_def: "serving_default",    multiplier 3
-    <model_name>3: tag: <tag_name>, signature_def: <signature_def_name>, multiplier 4
+    Creates one SavedModel with four variants of the model based on provided tag and signature_def.
+    The models multiplies the input tensor by a multiplier and the multiplier value is different for each variant.
+    Naming convention and config:
+    <model_name>_0: tag: "serve",    signature_def: "serving_default",    multiplier 1
+    <model_name>_1: tag: "serve",    signature_def: <signature_def_name>, multiplier 2
+    <model_name>_2: tag: <tag_name>, signature_def: "serving_default",    multiplier 3
+    <model_name>_3: tag: <tag_name>, signature_def: <signature_def_name>, multiplier 4
+
+    If different_io is true, there will be two variants of the model created.
+    The variants will have different numbers of inputs and outputs.
+    Alternate naming convention and config:
+    <model_name>0: tag: "serve",    signature_def: "serving_default",    two inputs/outputs
+    <model_name>1: tag: <tag_name>, signature_def: <signature_def_name>, one input/output
     """
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -74,84 +84,105 @@ def create_savedmodel(models_dir,
         # tag:tag_name, signature_def:signature_def_name
         multiplier_3 = tf.constant(4.0, name="multiplier_3")
 
-        output_tensor_0 = tf.multiply(multiplier_0,
-                                      input_tensor,
-                                      name="TENSOR_OUTPUT")
-        output_tensor_1 = tf.multiply(multiplier_1,
-                                      input_tensor,
-                                      name="TENSOR_OUTPUT")
-        output_tensor_2 = tf.multiply(multiplier_2,
-                                      input_tensor,
-                                      name="TENSOR_OUTPUT")
-        output_tensor_3 = tf.multiply(multiplier_3,
-                                      input_tensor,
-                                      name="TENSOR_OUTPUT")
+        output_tensor_0 = tf.multiply(multiplier_0, input_tensor, name="TENSOR_OUTPUT")
+        output_tensor_1 = tf.multiply(multiplier_1, input_tensor, name="TENSOR_OUTPUT")
+        output_tensor_2 = tf.multiply(multiplier_2, input_tensor, name="TENSOR_OUTPUT")
+        output_tensor_3 = tf.multiply(multiplier_3, input_tensor, name="TENSOR_OUTPUT")
 
         # build_tensor_info_op could be used if build_tensor_info is deprecated
         input_tensor_info = tf.saved_model.utils.build_tensor_info(input_tensor)
-        output_tensor_info_0 = tf.saved_model.utils.build_tensor_info(
-            output_tensor_0)
-        output_tensor_info_1 = tf.saved_model.utils.build_tensor_info(
-            output_tensor_1)
-        output_tensor_info_2 = tf.saved_model.utils.build_tensor_info(
-            output_tensor_2)
-        output_tensor_info_3 = tf.saved_model.utils.build_tensor_info(
-            output_tensor_3)
+        output_tensor_info_0 = tf.saved_model.utils.build_tensor_info(output_tensor_0)
+        output_tensor_info_1 = tf.saved_model.utils.build_tensor_info(output_tensor_1)
+        output_tensor_info_2 = tf.saved_model.utils.build_tensor_info(output_tensor_2)
+        output_tensor_info_3 = tf.saved_model.utils.build_tensor_info(output_tensor_3)
 
         # Using predict method name because simple save uses it
         # tag:"serve", signature_def:"serving_default"
         signature_0 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_0},
-            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME,
+        )
         # tag:"serve", signature_def:signature_def_name
         signature_1 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_1},
-            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME,
+        )
         # tag:tag_name, signature_def:"serving_default"
         signature_2 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_2},
-            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME,
+        )
         # tag:tag_name, signature_def:signature_def_name
         signature_3 = tf.saved_model.signature_def_utils.build_signature_def(
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_3},
-            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
-
-        signature_def_map_0 = {
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_0,
-            signature_def_name: signature_1
-        }
-        signature_def_map_1 = {
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_2,
-            signature_def_name: signature_3
-        }
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME,
+        )
+        # tag:tag_name, signature_def:signature_def_name, two inputs/outputs
+        signature_4 = tf.saved_model.signature_def_utils.build_signature_def(
+            inputs={"INPUT": input_tensor_info, "INPUT1": input_tensor_info},
+            outputs={"OUTPUT": output_tensor_info_0, "OUTPUT1": output_tensor_info_1},
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME,
+        )
 
         b = builder.SavedModelBuilder(model_version_dir + "/model.savedmodel")
-        b.add_meta_graph_and_variables(sess,
-                                       tags=[tag_constants.SERVING],
-                                       signature_def_map=signature_def_map_0,
-                                       assets_collection=ops.get_collection(
-                                           ops.GraphKeys.ASSET_FILEPATHS),
-                                       clear_devices=True)
-        b.add_meta_graph(tags=[tag_name],
-                         signature_def_map=signature_def_map_1,
-                         assets_collection=ops.get_collection(
-                             ops.GraphKeys.ASSET_FILEPATHS),
-                         clear_devices=True)
+
+        if different_io:
+            b.add_meta_graph_and_variables(
+                sess,
+                tags=[tag_name],
+                signature_def_map={signature_def_name: signature_0},
+                assets_collection=ops.get_collection(ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True,
+            )
+            b.add_meta_graph(
+                tags=[tag_constants.SERVING],
+                signature_def_map={
+                    signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_4
+                },
+                assets_collection=ops.get_collection(ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True,
+            )
+        else:
+            signature_def_map_0 = {
+                signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_0,
+                signature_def_name: signature_1,
+            }
+            signature_def_map_1 = {
+                signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_2,
+                signature_def_name: signature_3,
+            }
+
+            b.add_meta_graph_and_variables(
+                sess,
+                tags=[tag_constants.SERVING],
+                signature_def_map=signature_def_map_0,
+                assets_collection=ops.get_collection(ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True,
+            )
+            b.add_meta_graph(
+                tags=[tag_name],
+                signature_def_map=signature_def_map_1,
+                assets_collection=ops.get_collection(ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True,
+            )
+
         b.save()
 
 
-def create_savedmodel_modelconfig(models_dir,
-                                  model_version=1,
-                                  dims=16,
-                                  model_name="sig_tag",
-                                  tag_name="testTag",
-                                  signature_def_name="testSigDef"):
+def create_savedmodel_modelconfig(
+    models_dir,
+    model_version=1,
+    dims=16,
+    model_name="sig_tag",
+    tag_name="testTag",
+    signature_def_name="testSigDef",
+):
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "tensorflow_savedmodel"
 input [
@@ -180,9 +211,15 @@ value: {{
 string_value: "{}"
 }}
 }}
-'''.format(model_name, gu.np_to_model_dtype(tf.float32), str(dims),
-           gu.np_to_model_dtype(tf.float32), str(dims), tag_name,
-           signature_def_name)
+""".format(
+        model_name,
+        gu.np_to_model_dtype(tf.float32),
+        str(dims),
+        gu.np_to_model_dtype(tf.float32),
+        str(dims),
+        tag_name,
+        signature_def_name,
+    )
 
     try:
         os.makedirs(config_dir)
@@ -193,10 +230,11 @@ string_value: "{}"
         cfile.write(config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='getting model output dir')
-    parser.add_argument('--dir', help='directory to run model in')
+
+    parser = argparse.ArgumentParser(description="getting model output dir")
+    parser.add_argument("--dir", help="directory to run model in", required=True)
     args = parser.parse_args()
     base_dir = args.dir
     base_model_name = "sig_tag"
@@ -207,23 +245,46 @@ if __name__ == '__main__':
 
     for i in range(4):
         model_name = base_model_name + str(i)
-        create_savedmodel(args.dir,
-                          model_name=model_name,
-                          tag_name=test_tag,
-                          signature_def_name=test_sig_def)
-    create_savedmodel_modelconfig(args.dir,
-                                  model_name="sig_tag0",
-                                  tag_name=base_tag,
-                                  signature_def_name=base_sig_def)
-    create_savedmodel_modelconfig(args.dir,
-                                  model_name="sig_tag1",
-                                  tag_name=base_tag,
-                                  signature_def_name=test_sig_def)
-    create_savedmodel_modelconfig(args.dir,
-                                  model_name="sig_tag2",
-                                  tag_name=test_tag,
-                                  signature_def_name=base_sig_def)
-    create_savedmodel_modelconfig(args.dir,
-                                  model_name="sig_tag3",
-                                  tag_name=test_tag,
-                                  signature_def_name=test_sig_def)
+        create_savedmodel(
+            base_dir,
+            model_name=model_name,
+            tag_name=test_tag,
+            signature_def_name=test_sig_def,
+        )
+    create_savedmodel(
+        base_dir,
+        model_name=base_model_name + "_different_io",
+        tag_name=test_tag,
+        signature_def_name=test_sig_def,
+        different_io=True,
+    )
+    create_savedmodel_modelconfig(
+        base_dir,
+        model_name="sig_tag0",
+        tag_name=base_tag,
+        signature_def_name=base_sig_def,
+    )
+    create_savedmodel_modelconfig(
+        base_dir,
+        model_name="sig_tag1",
+        tag_name=base_tag,
+        signature_def_name=test_sig_def,
+    )
+    create_savedmodel_modelconfig(
+        base_dir,
+        model_name="sig_tag2",
+        tag_name=test_tag,
+        signature_def_name=base_sig_def,
+    )
+    create_savedmodel_modelconfig(
+        base_dir,
+        model_name="sig_tag3",
+        tag_name=test_tag,
+        signature_def_name=test_sig_def,
+    )
+    create_savedmodel_modelconfig(
+        base_dir,
+        model_name="sig_tag_different_io",
+        tag_name=test_tag,
+        signature_def_name=test_sig_def,
+    )

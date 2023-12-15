@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -121,6 +121,7 @@ SharedMemoryManager::UnregisterHelper(
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
 #include "common.h"
 #include "triton/common/logging.h"
 
@@ -150,7 +151,8 @@ MapSharedMemory(
     void** mapped_addr)
 {
   // map shared memory to process address space
-  *mapped_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  *mapped_addr =
+      mmap(NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_fd, offset);
   if (*mapped_addr == MAP_FAILED) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, std::string(
@@ -345,8 +347,8 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    *shm_mapped_addr =
-        (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
+    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
+                               it->second->offset_ + offset);
   } else {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
   }

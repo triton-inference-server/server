@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ proposed change so that the Triton team can provide feedback.
   will provide guidance about how and where your enhancement should be
   implemented.
 
-- [Testing](docs/test.md) is a critical part of any Triton
+- [Testing](docs/customization_guide/test.md) is a critical part of any Triton
   enhancement. You should plan on spending significant time on
   creating tests for your change. The Triton team will help you to
   design your testing so that it is compatible with existing testing
@@ -84,7 +84,7 @@ proposed change so that the Triton team can provide feedback.
 - Make sure all `L0_*` tests pass:
 
   - In the `qa/` directory, there are basic sanity tests scripted in
-    directories named `L0_...`.  See the [Test](docs/test.md)
+    directories named `L0_...`.  See the [Test](docs/customization_guide/test.md)
     documentation for instructions on running these tests.
 
 - Triton Inference Server's default build assumes recent versions of
@@ -103,21 +103,19 @@ proposed change so that the Triton team can provide feedback.
 
 # Coding Convention
 
-Use clang-format to format all source files (\*.h, \*.cc, \*.proto,
-*.py) to a consistent format. You should run clang-format on all
-source files before submitting a pull request:
+All pull requests are checked against the
+[pre-commit hooks](https://github.com/pre-commit/pre-commit-hooks)
+located [in the repository's top-level .pre-commit-config.yaml](https://github.com/NVIDIA/triton-inference-server/blob/master/pre-commit-config.yaml).
+The hooks do some sanity checking like linting and formatting.
+These checks must pass to merge a change.
 
-```
-$ apt-get install clang-format clang-format-6.0
-```
-
-For convenience there is a format.py script in the
-triton-inference-server/common repo in the "tools" directory that can
-be used to clang-format all files within the repo:
-
-```
-$ python3 ../common/tools/format.py *
-```
+To run these locally, you can
+[install pre-commit,](https://pre-commit.com/#install)
+then run `pre-commit install` inside the cloned repo. When you
+commit a change, the pre-commit hooks will run automatically.
+If a fix is implemented by a pre-commit hook, adding the file again
+and running `git commit` a second time will pass and successfully
+commit.
 
 # Contributor License Agreement (CLA)
 
@@ -125,3 +123,5 @@ Triton requires that all contributors (or their corporate entity) send
 a signed copy of the [Contributor License
 Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-CCLA-v1.pdf)
 to triton-cla@nvidia.com.
+*NOTE*: Contributors with no company affiliation can fill `N/A` in the
+`Corporation Name` and `Corporation Address` fields.

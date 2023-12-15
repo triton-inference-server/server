@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,37 +28,68 @@
 
 import argparse
 import os
-import re
 import pathlib
+import re
 
 FLAGS = None
-SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
-             'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
-REPO_PATH_FROM_THIS_FILE = '../..'
+SKIP_EXTS = (
+    "jpeg",
+    "jpg",
+    "pgm",
+    "png",
+    "log",
+    "preprocessed",
+    "jmx",
+    "gz",
+    "json",
+    "pdf",
+    "so",
+    "onnx",
+    "svg",
+)
+REPO_PATH_FROM_THIS_FILE = "../.."
 SKIP_PATHS = (
-    'build',
-    'deploy/gke-marketplace-app/.gitignore',
-    'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
-    'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
-    'deploy/fleetcommand/.helmignore', 'docs/examples/model_repository',
-    'docs/examples/jetson', 'docker',
-    'qa/common/cuda_op_kernel.cu.cc.patch',
-    'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
-    'qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt',
-    'qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt',
-    'qa/ensemble_models/wrong_label_int32_float32_float32/output0_labels.txt',
-    'qa/ensemble_models/label_override_int32_float32_float32/output0_labels.txt',
-    'qa/L0_model_config/noautofill_platform',
-    'qa/L0_model_config/autofill_noplatform',
-    'qa/L0_model_config/autofill_noplatform_success',
-    'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
-    'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
-    'qa/L0_java_resnet/expected_output_data',
-    'TRITON_VERSION')
+    "build",
+    "deploy/gke-marketplace-app/.gitignore",
+    "deploy/gke-marketplace-app/server-deployer/chart/.helmignore",
+    "deploy/gcp/.helmignore",
+    "deploy/aws/.helmignore",
+    "deploy/fleetcommand/.helmignore",
+    "docs/.gitignore",
+    "docs/_static/.gitattributes",
+    "docs/examples/model_repository",
+    "docs/examples/jetson",
+    "docker",
+    "qa/common/cuda_op_kernel.cu.cc.patch",
+    "qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt",
+    "qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt",
+    "qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt",
+    "qa/ensemble_models/wrong_label_int32_float32_float32/output0_labels.txt",
+    "qa/ensemble_models/label_override_int32_float32_float32/output0_labels.txt",
+    "qa/L0_model_config/noautofill_platform",
+    "qa/L0_model_config/autofill_noplatform",
+    "qa/L0_model_config/autofill_noplatform_success",
+    "qa/L0_model_config/special_cases",
+    "qa/L0_model_config/cli_messages/cli_override/expected",
+    "qa/L0_model_config/cli_messages/cli_deprecation/expected",
+    "qa/L0_model_namespacing/test_duplication",
+    "qa/L0_model_namespacing/test_dynamic_resolution",
+    "qa/L0_model_namespacing/test_ensemble_duplication",
+    "qa/L0_model_namespacing/test_no_duplication",
+    "qa/L0_perf_nomodel/baseline",
+    "qa/L0_perf_nomodel/legacy_baseline",
+    "qa/L0_warmup/raw_mug_data",
+    "qa/L0_java_resnet/expected_output_data",
+    "qa/L0_trt_dla_jetson/trt_dla_model_store",
+    "qa/openvino_models/dynamic_batch",
+    "qa/openvino_models/fixed_batch",
+    "CITATION.cff",
+    "TRITON_VERSION",
+)
 
-COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
+COPYRIGHT_YEAR_RE = "Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved."
 
-COPYRIGHT = '''
+COPYRIGHT = """
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -83,10 +114,11 @@ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
 OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-'''
+"""
 
-repo_abs_path = pathlib.Path(__file__).parent.joinpath(
-    REPO_PATH_FROM_THIS_FILE).resolve()
+repo_abs_path = (
+    pathlib.Path(__file__).parent.joinpath(REPO_PATH_FROM_THIS_FILE).resolve()
+)
 
 copyright_year_re = re.compile(COPYRIGHT_YEAR_RE)
 
@@ -96,32 +128,37 @@ def visit(path):
         print("visiting " + path)
 
     for skip in SKIP_EXTS:
-        if path.endswith('.' + skip):
+        if path.endswith("." + skip):
             if FLAGS.verbose:
                 print("skipping due to extension: " + path)
             return True
 
     for skip in SKIP_PATHS:
         if str(pathlib.Path(path).resolve()).startswith(
-                str(repo_abs_path.joinpath(skip).resolve())):
+            str(repo_abs_path.joinpath(skip).resolve())
+        ):
             if FLAGS.verbose:
                 print("skipping due to path prefix: " + path)
             return True
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         first_line = True
         line = None
         try:
             for fline in f:
                 line = fline
 
-                # Skip any '#!', '..', '<!--', or '{{/*' lines at the
+                # Skip any '#!', '..', '<!--', '\*' or '{{/*' lines at the
                 # start of the file
                 if first_line:
                     first_line = False
-                    if (fline.startswith("#!") or fline.startswith("..") or
-                            fline.startswith("<!--") or
-                            fline.startswith("{{/*")):
+                    if (
+                        fline.startswith("#!")
+                        or fline.startswith("..")
+                        or fline.startswith("<!--")
+                        or fline.startswith("/*")
+                        or fline.startswith("{{/*")
+                    ):
                         continue
                 # Skip empty lines...
                 if len(fline.strip()) != 0:
@@ -146,25 +183,32 @@ def visit(path):
         # or a year range. It is optionally allowed to have '# ' or
         # '// ' prefix.
         prefix = ""
-        if line.startswith('# '):
-            prefix = '# '
-        elif line.startswith('// '):
-            prefix = '// '
+        if line.startswith("# "):
+            prefix = "# "
+        elif line.startswith("// "):
+            prefix = "// "
         elif not line.startswith(COPYRIGHT_YEAR_RE[0]):
             print(
                 "incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for "
-                + path + ": " + line)
+                + path
+                + ": "
+                + line
+            )
             return False
 
         # Check if the copyright year line matches the regex
         # and see if the year(s) are reasonable
         years = []
 
-        copyright_row = line[len(prefix):]
+        copyright_row = line[len(prefix) :]
         if copyright_year_re.match(copyright_row):
-            for year in copyright_row.split("(c) " if "(c) " in
-                                            copyright_row else "Copyright "
-                                           )[1].split(" NVIDIA ")[0].split(","):
+            for year in (
+                copyright_row.split(
+                    "(c) " if "(c) " in copyright_row else "Copyright "
+                )[1]
+                .split(" NVIDIA ")[0]
+                .split(",")
+            ):
                 if len(year) == 4:  # 2021
                     years.append(int(year))
                 elif len(year) == 2:  # 21
@@ -183,17 +227,21 @@ def visit(path):
             return False
 
         if years[0] > FLAGS.year:
-            print("copyright start year greater than current year for " + path +
-                  ": " + line)
+            print(
+                "copyright start year greater than current year for "
+                + path
+                + ": "
+                + line
+            )
             return False
         if years[-1] > FLAGS.year:
-            print("copyright end year greater than current year for " + path +
-                  ": " + line)
+            print(
+                "copyright end year greater than current year for " + path + ": " + line
+            )
             return False
         for i in range(1, len(years)):
             if years[i - 1] >= years[i]:
-                print("copyright years are not increasing for " + path + ": " +
-                      line)
+                print("copyright years are not increasing for " + path + ": " + line)
                 return False
 
         # Subsequent lines must match the copyright body.
@@ -213,7 +261,7 @@ def visit(path):
             if len(copyright_body[copyright_idx]) == 0:
                 expected = prefix.strip()
             else:
-                expected = (prefix + copyright_body[copyright_idx])
+                expected = prefix + copyright_body[copyright_idx]
             if line != expected:
                 print("incorrect copyright body for " + path)
                 print("  expected: '" + expected + "'")
@@ -222,8 +270,11 @@ def visit(path):
             copyright_idx += 1
 
         if copyright_idx != len(copyright_body):
-            print("missing " + str(len(copyright_body) - copyright_idx) +
-                  " lines of the copyright body")
+            print(
+                "missing "
+                + str(len(copyright_body) - copyright_idx)
+                + " lines of the copyright body"
+            )
             return False
 
     if FLAGS.verbose:
@@ -231,24 +282,20 @@ def visit(path):
     return True
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-y',
-                        '--year',
-                        type=int,
-                        required=True,
-                        help='Copyright year')
-    parser.add_argument('paths',
-                        type=str,
-                        nargs='*',
-                        default=None,
-                        help='Directories or files to check')
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument("-y", "--year", type=int, required=True, help="Copyright year")
+    parser.add_argument(
+        "paths", type=str, nargs="*", default=None, help="Directories or files to check"
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.paths is None or len(FLAGS.paths) == 0:

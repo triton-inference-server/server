@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import json
-import triton_python_backend_utils as pb_utils
-
 
 class TritonPythonModel:
-
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
-        input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
-        output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
-        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        input0 = {"name": "INPUT0", "data_type": "TYPE_FP32", "dims": [4]}
+        output0 = {"name": "OUTPUT0", "data_type": "TYPE_FP32", "dims": [4]}
+        output1 = {"name": "OUTPUT1", "data_type": "TYPE_FP32", "dims": [4]}
 
         auto_complete_model_config.set_max_batch_size(0)
         auto_complete_model_config.add_input(input0)

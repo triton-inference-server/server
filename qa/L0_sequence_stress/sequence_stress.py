@@ -1,4 +1,6 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,17 +27,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 import argparse
-from builtins import range
-from builtins import str
-import time
 import threading
+import time
 import traceback
+from builtins import range, str
+from functools import partial
+
 import numpy as np
 import test_util as tu
-from functools import partial
 import tritongrpcclient as grpcclient
 from tritonclientutils import np_to_triton_dtype
 
@@ -55,7 +58,6 @@ _thread_exceptions_mutex = threading.Lock()
 
 
 class UserData:
-
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -70,21 +72,27 @@ class TimeoutException(Exception):
     pass
 
 
-def check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         input_dtype,
-                         steps,
-                         timeout_ms=DEFAULT_TIMEOUT_MS,
-                         sequence_name="<unknown>"):
+def check_sequence_async(
+    client_metadata,
+    trial,
+    model_name,
+    input_dtype,
+    steps,
+    timeout_ms=DEFAULT_TIMEOUT_MS,
+    sequence_name="<unknown>",
+):
     """Perform sequence of inferences using async run. The 'steps' holds
     a list of tuples, one for each inference with format:
 
     (flag_str, value, expected_result, delay_ms)
 
     """
-    if (("savedmodel" in trial) or ("graphdef" in trial) or
-        ("custom" in trial) or ("plan" in trial)):
+    if (
+        ("savedmodel" in trial)
+        or ("graphdef" in trial)
+        or ("custom" in trial)
+        or ("plan" in trial)
+    ):
         tensor_shape = (
             1,
             1,
@@ -107,27 +115,29 @@ def check_sequence_async(client_metadata,
         seq_start = False
         seq_end = False
         if flag_str is not None:
-            seq_start = ("start" in flag_str)
-            seq_end = ("end" in flag_str)
+            seq_start = "start" in flag_str
+            seq_end = "end" in flag_str
 
         if input_dtype == np.object_:
             in0 = np.full(tensor_shape, value, dtype=np.int32)
-            in0n = np.array([str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
+            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
             in0 = in0n.reshape(tensor_shape)
         else:
             in0 = np.full(tensor_shape, value, dtype=input_dtype)
         inputs = [
-            grpcclient.InferInput("INPUT", tensor_shape,
-                                  np_to_triton_dtype(input_dtype)),
+            grpcclient.InferInput(
+                "INPUT", tensor_shape, np_to_triton_dtype(input_dtype)
+            ),
         ]
         inputs[0].set_data_from_numpy(in0)
 
-        triton_client.async_stream_infer(model_name,
-                                         inputs,
-                                         sequence_id=sequence_id,
-                                         sequence_start=seq_start,
-                                         sequence_end=seq_end)
+        triton_client.async_stream_infer(
+            model_name,
+            inputs,
+            sequence_id=sequence_id,
+            sequence_start=seq_start,
+            sequence_end=seq_end,
+        )
         sent_count += 1
 
         if delay_ms is not None:
@@ -146,23 +156,21 @@ def check_sequence_async(client_metadata,
         if timeout_ms != None:
             now_ms = int(round(time.time() * 1000))
             if (now_ms - seq_start_ms) > timeout_ms:
-                raise TimeoutException(
-                    "Timeout expired for {}".format(sequence_name))
+                raise TimeoutException("Timeout expired for {}".format(sequence_name))
 
         result = results.as_numpy("OUTPUT")[0][0]
         if FLAGS.verbose:
-            print("{} {}: + {} = {}".format(sequence_name, sequence_id, value,
-                                            result))
+            print("{} {}: + {} = {}".format(sequence_name, sequence_id, value, result))
 
         if expected is not None:
             if input_dtype == np.object_:
-                assert int(
-                    result
-                ) == expected, "{}: expected result {}, got {}".format(
-                    sequence_name, expected, int(result))
+                assert int(result) == expected, "{}: expected result {}, got {}".format(
+                    sequence_name, expected, int(result)
+                )
             else:
                 assert result == expected, "{}: expected result {}, got {}".format(
-                    sequence_name, expected, result)
+                    sequence_name, expected, result
+                )
     triton_client.stop_stream()
 
 
@@ -175,12 +183,12 @@ def get_datatype(trial):
     return np.int32
 
 
-def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
-                   len_stddev, sequence_name):
+def sequence_valid(
+    client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name
+):
     # Create a variable length sequence with "start" and "end" flags.
     seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1],
-                                            seqlen))
+    print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1], seqlen))
 
     values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
 
@@ -199,31 +207,34 @@ def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
         expected_result += val
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms),)
+        steps.append(
+            (flags, val, expected_result, delay_ms),
+        )
 
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name)
+    check_sequence_async(
+        client_metadata, trial, model_name, dtype, steps, sequence_name=sequence_name
+    )
 
 
-def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
-                         len_mean, len_stddev, sequence_name):
+def sequence_valid_valid(
+    client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name
+):
     # Create two variable length sequences with "start" and "end"
     # flags, where both sequences use the same correlation ID and are
     # sent back-to-back.
     seqlen = [
         max(1, int(rng.normal(len_mean, len_stddev))),
-        max(1, int(rng.normal(len_mean, len_stddev)))
+        max(1, int(rng.normal(len_mean, len_stddev))),
     ]
-    print("{} {}: valid-valid seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
+    print(
+        "{} {}: valid-valid seqlen[0] = {}, seqlen[1] = {}".format(
+            sequence_name, client_metadata[1], seqlen[0], seqlen[1]
+        )
+    )
 
     values = [
         rng.randint(0, 1024 * 1024, size=seqlen[0], dtype=dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype)
+        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype),
     ]
 
     for p in [0, 1]:
@@ -242,31 +253,34 @@ def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
             expected_result += val
 
             # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms),)
+            steps.append(
+                (flags, val, expected_result, delay_ms),
+            )
 
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name)
+    check_sequence_async(
+        client_metadata, trial, model_name, dtype, steps, sequence_name=sequence_name
+    )
 
 
-def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
-                          len_mean, len_stddev, sequence_name):
+def sequence_valid_no_end(
+    client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name
+):
     # Create two variable length sequences, the first with "start" and
     # "end" flags and the second with no "end" flag, where both
     # sequences use the same correlation ID and are sent back-to-back.
     seqlen = [
         max(1, int(rng.normal(len_mean, len_stddev))),
-        max(1, int(rng.normal(len_mean, len_stddev)))
+        max(1, int(rng.normal(len_mean, len_stddev))),
     ]
-    print("{} {}: valid-no-end seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
+    print(
+        "{} {}: valid-no-end seqlen[0] = {}, seqlen[1] = {}".format(
+            sequence_name, client_metadata[1], seqlen[0], seqlen[1]
+        )
+    )
 
     values = [
         rng.randint(0, 1024 * 1024, size=seqlen[0], dtype=dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype)
+        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype),
     ]
 
     for p in [0, 1]:
@@ -285,23 +299,22 @@ def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
             expected_result += val
 
             # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms),)
+            steps.append(
+                (flags, val, expected_result, delay_ms),
+            )
 
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name)
+    check_sequence_async(
+        client_metadata, trial, model_name, dtype, steps, sequence_name=sequence_name
+    )
 
 
-def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
-                      sequence_name):
+def sequence_no_start(client_metadata, rng, trial, model_name, dtype, sequence_name):
     # Create a sequence without a "start" flag. Sequence should get an
     # error from the server.
     seqlen = 1
-    print("{} {}: no-start seqlen = {}".format(sequence_name,
-                                               client_metadata[1], seqlen))
+    print(
+        "{} {}: no-start seqlen = {}".format(sequence_name, client_metadata[1], seqlen)
+    )
 
     values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
 
@@ -313,29 +326,33 @@ def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
         delay_ms = None
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, None, delay_ms),)
+        steps.append(
+            (flags, val, None, delay_ms),
+        )
 
     try:
-        check_sequence_async(client_metadata,
-                             trial,
-                             model_name,
-                             dtype,
-                             steps,
-                             sequence_name=sequence_name)
+        check_sequence_async(
+            client_metadata,
+            trial,
+            model_name,
+            dtype,
+            steps,
+            sequence_name=sequence_name,
+        )
         assert False, "expected inference failure from missing START flag"
     except Exception as ex:
         if "must specify the START flag" not in ex.message():
             raise
 
 
-def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
-                    len_stddev, sequence_name):
+def sequence_no_end(
+    client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name
+):
     # Create a variable length sequence with "start" flag but that
     # never ends. The sequence should be aborted by the server and its
     # slot reused for another sequence.
     seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: no-end seqlen = {}".format(sequence_name, client_metadata[1],
-                                             seqlen))
+    print("{} {}: no-end seqlen = {}".format(sequence_name, client_metadata[1], seqlen))
 
     values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
 
@@ -352,18 +369,16 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
         expected_result += val
 
         # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms),)
+        steps.append(
+            (flags, val, expected_result, delay_ms),
+        )
 
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name)
+    check_sequence_async(
+        client_metadata, trial, model_name, dtype, steps, sequence_name=sequence_name
+    )
 
 
-def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
-                  dtype):
+def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, dtype):
     # Thread responsible for generating sequences of inference
     # requests.
     global _thread_exceptions
@@ -389,9 +404,13 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
 
         for c in range(common_cnt + rare_cnt):
             client_metadata_list.append(
-                (grpcclient.InferenceServerClient("localhost:8001",
-                                                  verbose=FLAGS.verbose),
-                 correlation_id_base + c))
+                (
+                    grpcclient.InferenceServerClient(
+                        "localhost:8001", verbose=FLAGS.verbose
+                    ),
+                    correlation_id_base + c,
+                )
+            )
             last_choices.append(None)
 
         rare_idx = 0
@@ -407,34 +426,40 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
                 # exercise the idle sequence path of the sequence
                 # scheduler
                 if choice < 0.33:
-                    sequence_no_end(client_metadata_list[client_idx],
-                                    rng,
-                                    trial,
-                                    model_name,
-                                    dtype,
-                                    SEQUENCE_LENGTH_MEAN,
-                                    SEQUENCE_LENGTH_STDEV,
-                                    sequence_name=name)
+                    sequence_no_end(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "no-end"
                 elif choice < 0.66:
-                    sequence_valid_no_end(client_metadata_list[client_idx],
-                                          rng,
-                                          trial,
-                                          model_name,
-                                          dtype,
-                                          SEQUENCE_LENGTH_MEAN,
-                                          SEQUENCE_LENGTH_STDEV,
-                                          sequence_name=name)
+                    sequence_valid_no_end(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "valid-no-end"
                 else:
-                    sequence_valid_valid(client_metadata_list[client_idx],
-                                         rng,
-                                         trial,
-                                         model_name,
-                                         dtype,
-                                         SEQUENCE_LENGTH_MEAN,
-                                         SEQUENCE_LENGTH_STDEV,
-                                         sequence_name=name)
+                    sequence_valid_valid(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "valid-valid"
 
                 rare_idx = (rare_idx + 1) % rare_cnt
@@ -450,54 +475,67 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
                 # just assume that the no-start is a continuation of
                 # the no-end sequence instead of being a sequence
                 # missing start flag.
-                if ((last_choice != "no-end") and
-                    (last_choice != "valid-no-end") and (choice < 0.01)):
-                    sequence_no_start(client_metadata,
-                                      rng,
-                                      trial,
-                                      model_name,
-                                      dtype,
-                                      sequence_name=name)
+                if (
+                    (last_choice != "no-end")
+                    and (last_choice != "valid-no-end")
+                    and (choice < 0.01)
+                ):
+                    sequence_no_start(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "no-start"
                 elif choice < 0.05:
-                    sequence_no_end(client_metadata,
-                                    rng,
-                                    trial,
-                                    model_name,
-                                    dtype,
-                                    SEQUENCE_LENGTH_MEAN,
-                                    SEQUENCE_LENGTH_STDEV,
-                                    sequence_name=name)
+                    sequence_no_end(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "no-end"
                 elif choice < 0.10:
-                    sequence_valid_no_end(client_metadata,
-                                          rng,
-                                          trial,
-                                          model_name,
-                                          dtype,
-                                          SEQUENCE_LENGTH_MEAN,
-                                          SEQUENCE_LENGTH_STDEV,
-                                          sequence_name=name)
+                    sequence_valid_no_end(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "valid-no-end"
                 elif choice < 0.15:
-                    sequence_valid_valid(client_metadata,
-                                         rng,
-                                         trial,
-                                         model_name,
-                                         dtype,
-                                         SEQUENCE_LENGTH_MEAN,
-                                         SEQUENCE_LENGTH_STDEV,
-                                         sequence_name=name)
+                    sequence_valid_valid(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "valid-valid"
                 else:
-                    sequence_valid(client_metadata,
-                                   rng,
-                                   trial,
-                                   model_name,
-                                   dtype,
-                                   SEQUENCE_LENGTH_MEAN,
-                                   SEQUENCE_LENGTH_STDEV,
-                                   sequence_name=name)
+                    sequence_valid(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                    )
                     last_choices[client_idx] = "valid"
 
     except Exception as ex:
@@ -518,38 +556,40 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
 
 
 def check_status(model_name):
-    client = grpcclient.InferenceServerClient("localhost:8001",
-                                              verbose=FLAGS.verbose)
+    client = grpcclient.InferenceServerClient("localhost:8001", verbose=FLAGS.verbose)
     stats = client.get_inference_statistics(model_name)
     print(stats)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-r',
-                        '--random-seed',
-                        type=int,
-                        required=False,
-                        help='Random seed.')
-    parser.add_argument('-t',
-                        '--concurrency',
-                        type=int,
-                        required=False,
-                        default=8,
-                        help='Request concurrency. Default is 8.')
     parser.add_argument(
-        '-i',
-        '--iterations',
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-r", "--random-seed", type=int, required=False, help="Random seed."
+    )
+    parser.add_argument(
+        "-t",
+        "--concurrency",
+        type=int,
+        required=False,
+        default=8,
+        help="Request concurrency. Default is 8.",
+    )
+    parser.add_argument(
+        "-i",
+        "--iterations",
         type=int,
         required=False,
         default=200,
-        help='Number of iterations of stress test to run. Default is 200.')
+        help="Number of iterations of stress test to run. Default is 200.",
+    )
     FLAGS = parser.parse_args()
 
     # Initialize the random seed. For reproducibility each thread
@@ -583,10 +623,19 @@ if __name__ == '__main__':
         correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
 
         threads.append(
-            threading.Thread(target=stress_thread,
-                             args=(thread_name, seed, FLAGS.iterations,
-                                   correlation_id_base, trial, model_name,
-                                   dtype)))
+            threading.Thread(
+                target=stress_thread,
+                args=(
+                    thread_name,
+                    seed,
+                    FLAGS.iterations,
+                    correlation_id_base,
+                    trial,
+                    model_name,
+                    dtype,
+                ),
+            )
+        )
 
     for t in threads:
         t.start()

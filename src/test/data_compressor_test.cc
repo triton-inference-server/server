@@ -33,6 +33,7 @@
 #endif
 
 #include <event2/buffer.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <fstream>
@@ -43,6 +44,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+
 #include "data_compressor.h"
 
 namespace ni = triton::server;
@@ -140,8 +142,8 @@ class DataCompressorTest : public ::testing::Test {
       : raw_data_length_(0), deflate_compressed_length_(0),
         gzip_compressed_length_(0)
   {
-    std::vector<std::string> files{"raw_data", "deflate_compressed_data",
-                                   "gzip_compressed_data"};
+    std::vector<std::string> files{
+        "raw_data", "deflate_compressed_data", "gzip_compressed_data"};
     for (const auto& file : files) {
       std::fstream fs(file);
       // get length of file

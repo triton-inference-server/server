@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def execute(self, requests):
         """
         Identity model using DLPack in Python backend.
@@ -36,6 +35,8 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0", input_tensor.to_dlpack())
+            out_tensor = pb_utils.Tensor.from_dlpack(
+                "OUTPUT0", input_tensor.to_dlpack()
+            )
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses

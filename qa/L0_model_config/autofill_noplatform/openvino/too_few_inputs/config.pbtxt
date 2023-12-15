@@ -1,0 +1,6 @@
+input {
+  name: "input1"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}

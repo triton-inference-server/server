@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,8 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <mutex>
 #include <sys/stat.h>
+
+#include <fstream>
+#include <mutex>
 
 #include "common.h"
 #include "dirent.h"
@@ -49,10 +51,16 @@ class SagemakerAPIServer : public HTTPAPIServer {
    public:
     explicit SagemakeInferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
-        DataCompressor::Type response_compression_type)
-        : InferRequestClass(server, req, response_compression_type)
+        DataCompressor::Type response_compression_type,
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+        : InferRequestClass(
+              server, req, response_compression_type, triton_request)
     {
     }
+    using InferRequestClass::InferResponseComplete;
+    static void InferResponseComplete(
+        TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+        void* userp);
 
     void SetResponseHeader(
         const bool has_binary_data, const size_t header_length) override;
@@ -65,12 +73,15 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const std::string address, const int thread_cnt)
       : HTTPAPIServer(
-            server, trace_manager, shm_manager, port, address, thread_cnt),
+            server, trace_manager, shm_manager, port, false /* reuse_port */,
+            address, "" /* header_forward_pattern */, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(
             R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
-        ping_mode_("ready"),
+        platform_ensemble_regex_(R"(platform:(\s)*\"ensemble\")"),
+        ping_mode_(GetEnvironmentVariableOrDefault(
+            "SAGEMAKER_TRITON_PING_MODE", "ready")),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
             "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
@@ -83,14 +94,23 @@ class SagemakerAPIServer : public HTTPAPIServer {
       std::unordered_map<std::string, std::string>* parse_map,
       const std::string& action);
 
+  void SageMakerMMEHandleInfer(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
+
   void SageMakerMMELoadModel(
       evhtp_request_t* req,
       const std::unordered_map<std::string, std::string> parse_map);
 
-  void SageMakerMMEHandleLoadError(
+  void SageMakerMMEHandleOOMError(
       evhtp_request_t* req, TRITONSERVER_Error* load_err);
 
+  static bool SageMakerMMECheckOOMError(TRITONSERVER_Error* load_err);
+
   void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
+
+  TRITONSERVER_Error* SageMakerMMECheckUnloadedModelIsUnavailable(
+      const char* model_name, bool* is_model_unavailable);
 
   void SageMakerMMEListModel(evhtp_request_t* req);
 
@@ -98,18 +118,24 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   void Handle(evhtp_request_t* req) override;
 
+  /* Method to return 507 on invoke i.e. during SageMakerMMEHandleInfer
+   */
+  static void BADReplyCallback507(evthr_t* thr, void* arg, void* shared);
+
   std::unique_ptr<InferRequestClass> CreateInferRequest(
-      evhtp_request_t* req) override
+      evhtp_request_t* req,
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+      override
   {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
-        server_.get(), req, GetResponseCompressionType(req)));
+        server_.get(), req, GetResponseCompressionType(req), triton_request));
   }
   TRITONSERVER_Error* GetInferenceHeaderLength(
       evhtp_request_t* req, int32_t content_length,
       size_t* header_length) override;
 
 
-  // Currently the compresssion schema hasn't been defined,
+  // Currently the compression schema hasn't been defined,
   // assume identity compression type is used for both request and response
   DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override
   {
@@ -123,6 +149,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
   re2::RE2 invocations_regex_;
   re2::RE2 models_regex_;
   re2::RE2 model_path_regex_;
+  re2::RE2 platform_ensemble_regex_;
 
   const std::string ping_mode_;
 
@@ -137,7 +164,13 @@ class SagemakerAPIServer : public HTTPAPIServer {
   std::unordered_map<std::string, std::string> sagemaker_models_list_;
 
   /* Mutex to handle concurrent updates */
-  std::mutex mutex_;
+  std::mutex models_list_mutex_;
+
+  /* Constants */
+  const uint32_t UNLOAD_TIMEOUT_SECS_ = 350;
+  const uint32_t UNLOAD_SLEEP_MILLISECONDS_ = 500;
+  const std::string UNLOAD_EXPECTED_STATE_ = "UNAVAILABLE";
+  const std::string UNLOAD_EXPECTED_REASON_ = "unloaded";
 };
 
 }}  // namespace triton::server

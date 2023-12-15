@@ -25,34 +25,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from email import encoders
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.text import MIMEText
 import glob
 import os
+import smtplib
 import sys
 import tarfile
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 
-def send(subject: str,
-         content: str,
-         attachments=None,
-         files_to_tar=None,
-         is_html=False):
-    FROM = os.environ.get('TRITON_FROM', '')
-    TO = os.environ.get('TRITON_TO_DL', '')
-    if FROM == '' or TO == '':
-        print('Must set TRITON_FROM and TRITON_TO_DL env variables')
+def send(
+    subject: str, content: str, attachments=None, files_to_tar=None, is_html=False
+):
+    FROM = os.environ.get("TRITON_FROM", "")
+    TO = os.environ.get("TRITON_TO_DL", "")
+    if FROM == "" or TO == "":
+        print("Must set TRITON_FROM and TRITON_TO_DL env variables")
         sys.exit(1)
 
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = FROM
-    msg['To'] = TO
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = FROM
+    msg["To"] = TO
     if is_html:
-        mime_text = MIMEText(content, 'html')
+        mime_text = MIMEText(content, "html")
     else:
         mime_text = MIMEText(content)
     msg.attach(mime_text)
@@ -67,12 +65,11 @@ def send(subject: str,
         attachments.append(subject + ".tgz")
 
     for fname in attachments:
-        p = MIMEBase('application', 'octet-stream')
+        p = MIMEBase("application", "octet-stream")
         with open(fname, "rb") as attachment:
             p.set_payload((attachment).read())
         encoders.encode_base64(p)
-        p.add_header('Content-Disposition',
-                     "attachment; filename= %s" % (fname))
+        p.add_header("Content-Disposition", "attachment; filename= %s" % (fname))
         msg.attach(p)
 
     mailServer = smtplib.SMTP("mailgw.nvidia.com")

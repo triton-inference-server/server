@@ -1,5 +1,5 @@
 <!--
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,8 +37,8 @@ its Server Metadata.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 Triton exposes the statistics endpoint at the following URL. The
@@ -55,7 +55,7 @@ GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/stats
 ### Statistics Response JSON Object
 
 A successful statistics request is indicated by a 200 HTTP status
-code. The response object, identified as $stats_model_response, is
+code. The response object, identified as `$stats_model_response`, is
 returned in the HTTP body for every successful statistics request.
 
 ```
@@ -65,8 +65,8 @@ $stats_model_response =
 }
 ```
 
-Each $model_stat object gives the statistics for a specific model and
-version. The $version field is optional for servers that do not
+Each `$model_stat` object gives the statistics for a specific model and
+version. The `$version` field is optional for servers that do not
 support versions.
 
 ```
@@ -78,7 +78,8 @@ $model_stat =
   "inference_count" : $number,
   "execution_count" : $number,
   "inference_stats" : $inference_stats,
-  "batch_stats" : [ $batch_stat, ... ]
+  "batch_stats" : [ $batch_stat, ... ],
+  "memory_usage" : [ $memory_usage, ...]
 }
 ```
 
@@ -118,6 +119,14 @@ $model_stat =
   how many actual model executions were performed and show differences
   due to different batch size (for example, larger batches typically
   take longer to compute).
+
+- "memory_usage" : The memory usage detected during model loading, which may be
+  used to estimate the memory to be released once the model is unloaded. Note
+  that the estimation is inferenced by the profiling tools and framework's
+  memory schema, therefore it is advised to perform experiments to understand
+  the scenario that the reported memory usage can be relied on. As a starting
+  point, the GPU memory usage for models in ONNX Runtime backend and TensorRT
+  backend is usually aligned.
 
 ```
 $inference_stats =
@@ -201,7 +210,7 @@ $batch_stats =
   the given batch size. For example, this duration should include the
   time to copy output tensor data from the GPU.
 
-The $duration_stat object reports a count and a total time. This
+The `$duration_stat` object reports a count and a total time. This
 format can be sampled to determine not only long-running averages but
 also incremental averages between sample points.
 
@@ -217,11 +226,27 @@ $duration_stat =
 
 - “ns” : The total duration for the statistic in nanoseconds.
 
+```
+$memory_usage =
+{
+  "type" : $string,
+  "id" : $number,
+  "byte_size" : $number
+}
+```
+
+- "type" : The type of memory, the value can be "CPU", "CPU_PINNED", "GPU".
+
+- "id" : The id of the memory, typically used with "type" to identify
+  a device that hosts the memory.
+
+- "byte_size" : The byte size of the memory.
+
 ### Statistics Response JSON Error Object
 
 A failed statistics request will be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$repository_statistics_error_response object.
+`$repository_statistics_error_response` object.
 
 ```
 $repository_statistics_error_response =
@@ -325,7 +350,16 @@ message ModelStatistics
   // executed in the model. The batch statistics indicate how many actual
   // model executions were performed and show differences due to different
   // batch size (for example, larger batches typically take longer to compute).
-  InferBatchStatistics batch_stats = 7;
+  repeated InferBatchStatistics batch_stats = 7;
+
+  // The memory usage detected during model loading, which may be
+  // used to estimate the memory to be released once the model is unloaded. Note
+  // that the estimation is inferenced by the profiling tools and framework's
+  // memory schema, therefore it is advised to perform experiments to understand
+  // the scenario that the reported memory usage can be relied on. As a starting
+  // point, the GPU memory usage for models in ONNX Runtime backend and TensorRT
+  // backend is usually aligned.
+  repeated MemoryUsage memory_usage = 8;
 }
 
 // Inference statistics.
@@ -341,7 +375,7 @@ message InferStatistics
   StatisticDuration fail = 2;
 
   // The count and cumulative duration that inference requests wait in
-  // scheduling or other queues. The "queue" count and cumulative 
+  // scheduling or other queues. The "queue" count and cumulative
   // duration includes cache hits.
   StatisticDuration queue = 3;
 
@@ -371,7 +405,7 @@ message InferStatistics
   // and extract output tensor data from the Response Cache on a cache
   // hit. For example, this duration should include the time to copy
   // output tensor data from the Response Cache to the response object.
-  // On cache hits, triton does not need to go to the model/backend 
+  // On cache hits, triton does not need to go to the model/backend
   // for the output tensor data, so the "compute_input", "compute_infer",
   // and "compute_output" fields are not updated. Assuming the response
   // cache is enabled for a given model, a cache hit occurs for a
@@ -385,7 +419,7 @@ message InferStatistics
   // The count of response cache misses and cumulative duration to lookup
   // and insert output tensor data from the computed response to the cache
   // For example, this duration should include the time to copy
-  // output tensor data from the resposne object to the Response Cache.
+  // output tensor data from the response object to the Response Cache.
   // Assuming the response cache is enabled for a given model, a cache
   // miss occurs for a request to that model when the request metadata
   // does NOT hash to an existing entry in the cache. See the response
@@ -415,5 +449,19 @@ message InferBatchStatistics
   // For example, this duration should include the time to copy output
   // tensor data from the GPU.
   StatisticDuration compute_output = 4;
+}
+
+// Memory usage.
+message MemoryUsage
+{
+  // The type of memory, the value can be "CPU", "CPU_PINNED", "GPU".
+  string type = 1;
+
+  // The id of the memory, typically used with "type" to identify
+  // a device that hosts the memory.
+  int64_t id = 2;
+
+  // The byte size of the memory.
+  uint64_t byte_size = 3;
 }
 ```

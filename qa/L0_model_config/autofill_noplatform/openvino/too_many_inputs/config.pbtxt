@@ -1,0 +1,18 @@
+input {
+  name: "Func/PartitionedCall/input/_0:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}
+input {
+  name: "input1"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}
+input {
+  name: "input_extra"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}

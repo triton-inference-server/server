@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,11 +57,68 @@ RET=0
 
 # Must explicitly set LD_LIBRARY_PATH so that the custom operations
 # can find libtensorflow_framework.so.
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow:$LD_LIBRARY_PATH
 
 # Tensorflow
+## Load operations via LD_PRELOAD
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+python $ZERO_OUT_TEST -v -m graphdef_zeroout >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $ZERO_OUT_TEST -v -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -v -m graphdef_cudaop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -v -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Load operations via model config
+SERVER_ARGS="--model-repository=tf_custom_ops"
+SERVER_LD_PRELOAD=""
+
+rm -rf tf_custom_ops && \
+    mkdir -p tf_custom_ops && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops .
+
+for MODEL_TYPE in savedmodel graphdef; do
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libbusyop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_busyop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libcudaop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_cudaop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libzeroout.so\" }" >> tf_custom_ops/${MODEL_TYPE}_zeroout/config.pbtxt
+done
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -111,7 +168,10 @@ LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
 
 # Pytorch
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops"
-SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
+# FIXME: Pre-loading the python library system to satisfy the symbol definitions
+# as the custom op library is built with different python version within
+# pytorch container. See DLIS-4152.
+SERVER_LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libpython3.10.so.1:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

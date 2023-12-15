@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,21 +24,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
 import time
+
+import triton_python_backend_utils as pb_utils
 
 # Sleep for 5 seconds to ensure that delayed startup works properly.
 time.sleep(5)
 
 
 class TritonPythonModel:
-
     def execute(self, requests):
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            out_tensor = utils.Tensor("OUT", input_tensor.as_numpy())
-            responses.append(utils.InferenceResponse([out_tensor]))
+            out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
     def finalize(self):

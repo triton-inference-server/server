@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,8 +26,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import argparse
+import sys
 
 # Check the valgrind logs for memory leaks, ignoring known memory leaks
 #   * cnmem https://github.com/NVIDIA/cnmem/issues/12
@@ -37,8 +39,12 @@ import argparse
 #     -> dlerror
 
 LEAK_WHITE_LIST = [
-    'cnmem', 'tensorflow::NewSession', 'dl-init', 'dl-open', 'dlerror',
-    'libtorch'
+    "cnmem",
+    "tensorflow::NewSession",
+    "dl-init",
+    "dl-open",
+    "dlerror",
+    "libtorch",
 ]
 
 
@@ -52,31 +58,29 @@ def check_valgrind_log(log_file):
     ----------
     log_file: str
         The path to the log file
-    
+
     Returns
     -------
     list of str
         a list of the leak records as strings
     """
 
-    with open(args.input_log_file, 'r') as f:
+    with open(args.input_log_file, "r") as f:
         logs = f.read()
 
     # Find the pid and start and end of definite leak reports
-    pid_token_end = logs.find('==', logs.find('==') + 1) + 2
+    pid_token_end = logs.find("==", logs.find("==") + 1) + 2
     pid_token = logs[:pid_token_end]
-    leaks_start = logs.find('are definitely lost')
-    first_leak_line = logs.rfind('\n', 0, leaks_start)
+    leaks_start = logs.find("are definitely lost")
+    first_leak_line = logs.rfind("\n", 0, leaks_start)
     if leaks_start == -1 or first_leak_line == -1:
         # No leaks in log
         return []
     end_of_leaks = logs.find(f"{pid_token} LEAK SUMMARY:")
     if end_of_leaks == -1:
-        print(
-            f"\n***\n*** Test Failed for {log_file}: Malformed Valgrind log.\n***"
-        )
+        print(f"\n***\n*** Test Failed for {log_file}: Malformed Valgrind log.\n***")
         sys.exit(1)
-    leak_records_section = logs[first_leak_line + 1:end_of_leaks]
+    leak_records_section = logs[first_leak_line + 1 : end_of_leaks]
 
     # Each leak record is separated by a line containing '==<pid>== \n'
     record_separator = f"{pid_token} \n"
@@ -94,21 +98,21 @@ def check_valgrind_log(log_file):
     return filtered_leak_records
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-f',
-        '--input-log-file',
+        "-f",
+        "--input-log-file",
         type=str,
         required=True,
-        help="The name of the file containing the valgrind logs.")
+        help="The name of the file containing the valgrind logs.",
+    )
     args = parser.parse_args()
 
     leak_records = check_valgrind_log(log_file=args.input_log_file)
     if leak_records:
         for leak in leak_records:
             print(leak)
-        print(
-            f"\n***\n*** Test Failed: {len(leak_records)} leaks detected.\n***")
+        print(f"\n***\n*** Test Failed: {len(leak_records)} leaks detected.\n***")
         sys.exit(1)
     sys.exit(0)

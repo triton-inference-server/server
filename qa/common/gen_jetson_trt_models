@@ -1,0 +1,188 @@
+#!/bin/bash
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+############################################################################
+## This script generates the model repository needed for TensorRT testing
+## on the Jetson device. Generating these models requires having TensorRT
+## container.
+############################################################################
+#!/bin/bash -xe
+# Make all generated files accessible outside of container
+umask 0000
+# Set the version of the models
+TRITON_VERSION=${TRITON_VERSION:=23.11}
+# Set the CUDA device to use
+CUDA_DEVICE=${RUNNER_ID:=0}
+# Set TensorRT image
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3-igpu}
+
+# Set the path to the host working directory
+HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp/models_build}
+# Set the path to the host model output directory
+HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
+# Set the source directory to store executable source file to generate models
+HOST_SOURCE_DIR=$HOST_BUILD_DIR/gen_srcdir
+
+# Set CI specific parameters
+DOCKER_GPU_ARGS="${DOCKER_GPU_ARGS:="--gpus device=$CUDA_DEVICE"}"
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS)
+
+
+# Set model output directories
+
+HOST_DESTDIR=$HOST_MODEL_DIR/qa_model_repository
+HOST_DATADEPENDENTDIR=$HOST_MODEL_DIR/qa_trt_data_dependent_model_repository
+HOST_DYNASEQDESTDIR=$HOST_MODEL_DIR/qa_dyna_sequence_model_repository
+HOST_DYNASEQIMPLICITDESTDIR=$HOST_MODEL_DIR/qa_dyna_sequence_implicit_model_repository
+HOST_FORMATDESTDIR=$HOST_MODEL_DIR/qa_trt_format_model_repository
+HOST_IDENTITYBIGDESTDIR=$HOST_MODEL_DIR/qa_identity_big_model_repository
+HOST_IDENTITYDESTDIR=$HOST_MODEL_DIR/qa_identity_model_repository
+HOST_IMPLICITSEQDESTDIR=$HOST_MODEL_DIR/qa_sequence_implicit_model_repository
+HOST_RAGGEDDESTDIR=$HOST_MODEL_DIR/qa_ragged_model_repository
+HOST_RESHAPEDESTDIR=$HOST_MODEL_DIR/qa_reshape_model_repository
+HOST_SEQDESTDIR=$HOST_MODEL_DIR/qa_sequence_model_repository
+HOST_SHAPEDESTDIR=$HOST_MODEL_DIR/qa_shapetensor_model_repository
+HOST_VARDESTDIR=$HOST_MODEL_DIR/qa_variable_model_repository
+HOST_VARIMPLICITSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_implicit_model_repository
+HOST_VARSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_model_repository
+
+# Clean up host working directory
+rm -fr $HOST_BUILD_DIR
+
+# Create the model output directories
+mkdir -p $HOST_SOURCE_DIR
+mkdir -p $HOST_DESTDIR
+mkdir -p $HOST_DATADEPENDENTDIR
+mkdir -p $HOST_DYNASEQDESTDIR
+mkdir -p $HOST_DYNASEQIMPLICITDESTDIR
+mkdir -p $HOST_FORMATDESTDIR
+mkdir -p $HOST_IDENTITYBIGDESTDIR
+mkdir -p $HOST_IDENTITYDESTDIR
+mkdir -p $HOST_IMPLICITSEQDESTDIR
+mkdir -p $HOST_RAGGEDDESTDIR
+mkdir -p $HOST_RESHAPEDESTDIR
+mkdir -p $HOST_SEQDESTDIR
+mkdir -p $HOST_SHAPEDESTDIR
+mkdir -p $HOST_VARDESTDIR
+mkdir -p $HOST_VARIMPLICITSEQDESTDIR
+mkdir -p $HOST_VARSEQDESTDIR
+
+# Copy the executable source file to the host generate models source directory
+cp ./gen_ensemble_model_utils.py $HOST_SOURCE_DIR/.
+cp ./gen_common.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_dyna_sequence_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_identity_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_implicit_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_noshape_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_ragged_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_reshape_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_sequence_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_trt_data_dependent_shape.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_trt_format_models.py $HOST_SOURCE_DIR/.
+cp ./gen_qa_trt_plugin_models.py $HOST_SOURCE_DIR/.
+cp ./test_util.py $HOST_SOURCE_DIR/.
+
+# Set TensorRT model generation script name
+TRT_MODEL_SCRIPT=trt_gen.cmds
+
+# Set container working directory
+CONTAINER_SOURCE_DIR=/workspace/src
+CONTAINER_MODEL_DIR=/tmp/models
+CONTAINER_DESTDIR=$CONTAINER_MODEL_DIR/qa_model_repository
+CONTAINER_DATADEPENDENTDIR=$CONTAINER_MODEL_DIR/qa_trt_data_dependent_model_repository
+CONTAINER_DYNASEQDESTDIR=$CONTAINER_MODEL_DIR/qa_dyna_sequence_model_repository
+CONTAINER_DYNASEQIMPLICITDESTDIR=$CONTAINER_MODEL_DIR/qa_dyna_sequence_implicit_model_repository
+CONTAINER_FORMATDESTDIR=$CONTAINER_MODEL_DIR/qa_trt_format_model_repository
+CONTAINER_IDENTITYBIGDESTDIR=$CONTAINER_MODEL_DIR/qa_identity_big_model_repository
+CONTAINER_IDENTITYDESTDIR=$CONTAINER_MODEL_DIR/qa_identity_model_repository
+CONTAINER_IMPLICITSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_sequence_implicit_model_repository
+CONTAINER_RAGGEDDESTDIR=$CONTAINER_MODEL_DIR/qa_ragged_model_repository
+CONTAINER_RESHAPEDESTDIR=$CONTAINER_MODEL_DIR/qa_reshape_model_repository
+CONTAINER_SEQDESTDIR=$CONTAINER_MODEL_DIR/qa_sequence_model_repository
+CONTAINER_SHAPEDESTDIR=$CONTAINER_MODEL_DIR/qa_shapetensor_model_repository
+CONTAINER_VARDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_model_repository
+CONTAINER_VARIMPLICITSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_implicit_model_repository
+CONTAINER_VARSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_model_repository
+
+# Set script to generate TensorRT models
+cat >$HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT <<EOF
+#!/bin/bash -xe
+# Make all generated files accessible outside of container
+umask 0000
+nvidia-smi -L || true
+export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
+ldconfig || true
+
+cd $CONTAINER_SOURCE_DIR
+# Models using shape tensor i/o
+python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --models_dir=$CONTAINER_DESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$CONTAINER_VARDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$CONTAINER_IDENTITYDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$CONTAINER_IDENTITYBIGDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$CONTAINER_RESHAPEDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$CONTAINER_SEQDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$CONTAINER_IMPLICITSEQDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$CONTAINER_VARIMPLICITSEQDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$CONTAINER_VARSEQDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQIMPLICITDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$CONTAINER_RAGGEDDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_format_models.py --models_dir=$CONTAINER_FORMATDESTDIR
+python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$CONTAINER_DATADEPENDENTDIR
+
+chmod -R 777 $CONTAINER_MODEL_DIR
+EOF
+# Make the TensorRT model generation script executable
+chmod a+x $HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT
+# Pull the TensorRT image
+docker pull $TENSORRT_IMAGE
+# Run the TensorRT model generation script inside the TensorRT container
+docker run \
+  $DOCKER_GPU_ARGS \
+  --rm --entrypoint $CONTAINER_SOURCE_DIR/$TRT_MODEL_SCRIPT \
+  --mount type=bind,source=$HOST_SOURCE_DIR,target=$CONTAINER_SOURCE_DIR \
+  --mount type=bind,source=$HOST_DESTDIR,target=$CONTAINER_DESTDIR \
+  --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$CONTAINER_DATADEPENDENTDIR \
+  --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$CONTAINER_DYNASEQDESTDIR \
+  --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$CONTAINER_DYNASEQIMPLICITDESTDIR \
+  --mount type=bind,source=$HOST_FORMATDESTDIR,target=$CONTAINER_FORMATDESTDIR \
+  --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$CONTAINER_IDENTITYBIGDESTDIR \
+  --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$CONTAINER_IDENTITYDESTDIR \
+  --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$CONTAINER_IMPLICITSEQDESTDIR \
+  --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$CONTAINER_RAGGEDDESTDIR \
+  --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$CONTAINER_RESHAPEDESTDIR \
+  --mount type=bind,source=$HOST_SEQDESTDIR,target=$CONTAINER_SEQDESTDIR \
+  --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$CONTAINER_SHAPEDESTDIR \
+  --mount type=bind,source=$HOST_VARDESTDIR,target=$CONTAINER_VARDESTDIR \
+  --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$CONTAINER_VARIMPLICITSEQDESTDIR \
+  --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$CONTAINER_VARSEQDESTDIR \
+  $TENSORRT_IMAGE

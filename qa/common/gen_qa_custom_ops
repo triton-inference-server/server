@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,15 +37,19 @@
 ##
 ############################################################################
 
-TRITON_VERSION=22.05
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
-PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
+TRITON_VERSION=${TRITON_VERSION:=23.11}
+NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$TRITON_VERSION}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$NVIDIA_UPSTREAM_VERSION-tf2-py3}
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
 
-CUDA_DEVICE=0
+CUDA_DEVICE=${NV_GPU:=0}
+
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
 
 ###
-HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_custom_ops
+HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
+HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_custom_ops
 
 rm -fr $HOST_DESTDIR
 mkdir -p $HOST_DESTDIR/tf_custom_ops $HOST_DESTDIR/libtorch_custom_ops
@@ -63,9 +67,18 @@ SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
 
 # Tensorflow
+# Set compilation option by "Select a particular C++ dialect."
+[[ "${NVIDIA_UPSTREAM_VERSION}" < "22.10"  ]] && STD_FLAG="c++14" || STD_FLAG="c++17"
+
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
+nvidia-smi -L || true
+nvidia-smi || true
 set -e
+
+# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
+# Upgrade protobuf version to fix the issue.
+pip3 install "protobuf>4.24.0"
 
 TF_CFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
 TF_LFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
@@ -73,19 +86,19 @@ TF_LFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get
 # No CUDA
 cd /tmp
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/zero_out_op_kernel_1.cc .
-g++ -std=c++11 -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $DESTDIR/libzeroout.so \${TF_CFLAGS[@]} \${TF_LFLAGS[@]}
+g++ -std=${STD_FLAG} -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $DESTDIR/libzeroout.so \${TF_CFLAGS[@]} \${TF_LFLAGS[@]}
 
 # CUDA. Need to patch so that we can build it outside of bazel/TF
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cc .
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc .
 patch -i $SRCDIR/cuda_op_kernel.cu.cc.patch cuda_op_kernel.cu.cc
-nvcc -std=c++11 -O2 -c -arch=all -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
-g++ -std=c++11 -shared -o $DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
+nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+g++ -std=${STD_FLAG} -shared -o $DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 cp $SRCDIR/busy_op_kernel.cc .
 cp $SRCDIR/busy_op_kernel.cu.cc .
-nvcc -std=c++11 -O2 -c -arch=all -o busy_op_kernel.cu.o busy_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
-g++ -std=c++11 -shared -o $DESTDIR/libbusyop.so busy_op_kernel.cc busy_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
+nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o busy_op_kernel.cu.o busy_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
+g++ -std=${STD_FLAG} -shared -o $DESTDIR/libbusyop.so busy_op_kernel.cc busy_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 python3 $SRCDIR/gen_qa_custom_ops_models.py --graphdef --savedmodel \
     --models_dir=$DESTDIR --zero_out_lib_path=$DESTDIR/libzeroout.so \
@@ -101,7 +114,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR/tf_custom_ops,target=$DESTDIR \
        $TENSORFLOW_IMAGE
@@ -113,9 +126,11 @@ fi
 # PyTorch
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
+nvidia-smi -L || true
+nvidia-smi || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py38_cu117/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/py310_cu123/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 
@@ -126,7 +141,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$PYTSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$PYTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR/libtorch_custom_ops,target=$DESTDIR \
        $PYTORCH_IMAGE
