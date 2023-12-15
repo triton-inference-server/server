@@ -88,6 +88,7 @@ endif()
 
 # re2
 #
+set(CMAKE_PREFIX_PATH "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2;${CMAKE_PREFIX_PATH}"
 find_library(RE2_LIBRARY NAMES re2)
 
 #
