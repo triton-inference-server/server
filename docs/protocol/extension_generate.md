@@ -102,9 +102,9 @@ return an error.
 
 #### Parameters
 
-The *$parameters* JSON describes zero or more “name”/”value” pairs,
+The `$parameters` JSON describes zero or more “name”/”value” pairs,
 where the “name” is the name of the parameter and the “value” is a
-$string, $number, or $boolean.
+`$string`, `$number`, or `$boolean`.
 
     $parameters =
     {
@@ -140,7 +140,7 @@ Content-Length: <xx>
 ### Generate Response JSON Object
 
 A successful generate request is indicated by a 200 HTTP status code.
-The generate response object, identified as *$generate_response*, is returned in
+The generate response object, identified as `$generate_response`, is returned in
 the HTTP body.
 
     $generate_response =
@@ -169,7 +169,7 @@ the HTTP body.
 
 A failed generate request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-*$generate_error_response* object.
+`$generate_error_response` object.
 
     $generate_error_response =
     {
