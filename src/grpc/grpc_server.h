@@ -66,6 +66,7 @@ struct SslOptions {
 };
 
 // GRPC KeepAlive: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+// https://grpc.io/docs/guides/keepalive/
 struct KeepAliveOptions {
   int keepalive_time_ms_{7200000};
   int keepalive_timeout_ms_{20000};
@@ -73,6 +74,8 @@ struct KeepAliveOptions {
   int http2_max_pings_without_data_{2};
   int http2_min_recv_ping_interval_without_data_ms_{300000};
   int http2_max_ping_strikes_{2};
+  int max_connection_age_ms_{0};
+  int max_connection_age_grace_ms_{0};
 };
 
 struct Options {

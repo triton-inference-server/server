@@ -2366,6 +2366,16 @@ Server::Server(
     builder_.AddChannelArgument(
         GRPC_ARG_HTTP2_MAX_PING_STRIKES,
         keepalive_options.http2_max_ping_strikes_);
+    if (keepalive_options.max_connection_age_ms_ != 0) {
+      builder_.AddChannelArgument(
+          GRPC_ARG_MAX_CONNECTION_AGE_MS,
+          keepalive_options.max_connection_age_ms_);
+    }
+    if (keepalive_options.max_connection_age_grace_ms_ != 0) {
+      builder_.AddChannelArgument(
+          GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
+          keepalive_options.max_connection_age_grace_ms_);
+    }
 
     std::vector<std::string> headers{"GRPC KeepAlive Option", "Value"};
     triton::common::TablePrinter table_printer(headers);
@@ -2399,6 +2409,20 @@ Server::Server(
         "http2_max_ping_strikes",
         std::to_string(keepalive_options.http2_max_ping_strikes_)};
     table_printer.InsertRow(row);
+
+    if (keepalive_options.max_connection_age_ms_ != 0) {
+      row = {
+          "max_connection_age_ms",
+          std::to_string(keepalive_options.max_connection_age_ms_)};
+      table_printer.InsertRow(row);
+    }
+
+    if (keepalive_options.max_connection_age_grace_ms_ != 0) {
+      row = {
+          "max_connection_age_grace_ms",
+          std::to_string(keepalive_options.max_connection_age_grace_ms_)};
+      table_printer.InsertRow(row);
+    }
     LOG_VERBOSE(1) << table_printer.PrintTable();
   }
 

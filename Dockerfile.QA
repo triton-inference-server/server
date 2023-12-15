@@ -32,6 +32,7 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITONTMP_DIR=/tmp
+ARG IGPU_BUILD=0
 
 ############################################################################
 ## Test artifacts built as part of the tritonserver build are
@@ -44,6 +45,7 @@ ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
+ARG IGPU_BUILD
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -237,20 +239,22 @@ RUN if [ -d qa/L0_model_control_stress ]; then \
             cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind_massif; \
     fi
 
-RUN cp backends/repeat/libtriton_repeat.so qa/L0_model_config/.
-
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_decoupled/models/repeat_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
-    cp backends/square/libtriton_square.so \
-        qa/L0_decoupled/models/square_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/identity_int32/1
-RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/square_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
-    mkdir -p qa/L0_decoupled/models/nested_square/1
+    mkdir -p qa/L0_decoupled/models/nested_square/1 && \
+    mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1
+
+RUN if [ "$IGPU_BUILD" == "0" ]; then \
+        cp backends/repeat/libtriton_repeat.so qa/L0_model_config && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_decoupled/models/repeat_int32/1 && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_grpc_state_cleanup/models/repeat_int32/1/. && \
+        cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
+    fi
 
 RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
@@ -261,10 +265,6 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
         qa/L0_decoupled/python_models/square_int32/1/. && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
         qa/L0_decoupled/python_models/square_int32/.
-
-RUN mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_grpc_state_cleanup/models/repeat_int32/1/.
 
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \

@@ -289,6 +289,36 @@ class DecoupledTest(tu.TestResultCollector):
         self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
         self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
+    def test_decoupled_raise_exception(self):
+        # The decoupled_raise_exception model raises an exception for the request.
+        # This test case is making sure that repeated exceptions are properly handled.
+
+        model_name = "decoupled_raise_exception"
+        shape = [2, 2]
+        number_of_requests = 10
+        user_data = UserData()
+        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            triton_client.start_stream(callback=partial(callback, user_data))
+
+            input_datas = []
+            for i in range(number_of_requests):
+                input_data = np.random.randn(*shape).astype(np.float32)
+                input_datas.append(input_data)
+                inputs = [
+                    grpcclient.InferInput(
+                        "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
+
+            for i in range(number_of_requests):
+                result = user_data._completed_requests.get()
+                self.assertIs(type(result), InferenceServerException)
+                self.assertIn("Intentional Error", result.message())
+
+            self.assertTrue(triton_client.is_model_ready(model_name))
+
 
 if __name__ == "__main__":
     unittest.main()
