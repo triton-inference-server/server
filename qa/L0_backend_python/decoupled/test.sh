@@ -27,7 +27,7 @@
 
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
-EXPECTED_NUM_TESTS="6"
+EXPECTED_NUM_TESTS="7"
 TEST_RESULT_FILE='test_results.txt'
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
