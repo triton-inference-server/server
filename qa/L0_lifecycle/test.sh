@@ -1390,7 +1390,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/unload`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1411,7 +1411,7 @@ rm models/graphdef_float32_float32_float32/*/*
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/load`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

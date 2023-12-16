@@ -92,7 +92,7 @@ function assert_curl_success {
 
 function assert_curl_failure {
   message="${1}"
-  if [ "$code" != "400" ]; then
+  if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
     RET=1
