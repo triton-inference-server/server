@@ -64,7 +64,7 @@ simple way to ensure you are using the correct version of TensorRT is
 to use the [NGC TensorRT
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt)
 corresponding to the Triton container. For example, if you are using
-the 23.10 version of Triton, use the 23.10 version of the TensorRT
+the 23.11 version of Triton, use the 23.11 version of the TensorRT
 container.
 
 ## TensorFlow
@@ -123,7 +123,7 @@ simple way to ensure you are using the correct version of TensorFlow
 is to use the [NGC TensorFlow
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow)
 corresponding to the Triton container. For example, if you are using
-the 23.10 version of Triton, use the 23.10 version of the TensorFlow
+the 23.11 version of Triton, use the 23.11 version of the TensorFlow
 container.
 
 ## PyTorch
@@ -167,7 +167,7 @@ simple way to ensure you are using the correct version of PyTorch is
 to use the [NGC PyTorch
 container](https://ngc.nvidia.com/catalog/containers/nvidia:pytorch)
 corresponding to the Triton container. For example, if you are using
-the 23.10 version of Triton, use the 23.10 version of the PyTorch
+the 23.11 version of Triton, use the 23.11 version of the PyTorch
 container.
 
 ## ONNX

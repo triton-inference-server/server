@@ -310,6 +310,8 @@ enum TritonOptionId {
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
   OPTION_GRPC_RESTRICTED_PROTOCOL,
+  OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS,
+  OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
@@ -568,6 +570,16 @@ TritonParser::SetupOptions()
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings. Default is 2."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS, "grpc-max-connection-age",
+       Option::ArgInt,
+       "Maximum time that a channel may exist in milliseconds."
+       "Default is undefined."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
+       "grpc-max-connection-age-grace", Option::ArgInt,
+       "Grace period after the channel reaches its max age. "
+       "Default is undefined."});
   grpc_options_.push_back(
       {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
        "<string>:<string>=<string>",
@@ -1434,6 +1446,14 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES:
           lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
+              ParseOption<int>(optarg);
+          break;
+        case OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS:
+          lgrpc_options.keep_alive_.max_connection_age_ms_ =
+              ParseOption<int>(optarg);
+          break;
+        case OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS:
+          lgrpc_options.keep_alive_.max_connection_age_grace_ms_ =
               ParseOption<int>(optarg);
           break;
         case OPTION_GRPC_RESTRICTED_PROTOCOL: {

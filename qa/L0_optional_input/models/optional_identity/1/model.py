@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,25 +24,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
-export APP_NAME=tritonserver
-export MAJOR_VERSION=2.40
-export MINOR_VERSION=2.40.0
-export NGC_VERSION=23.11-py3
+import triton_python_backend_utils as pb_utils
 
-docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
 
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker push $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker build --tag $REGISTRY/$APP_NAME/deployer .
-
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
+class TritonPythonModel:
+    def execute(self, requests):
+        """
+        Identity model in Python backend.
+        """
+        responses = []
+        for request in requests:
+            for tidx in ("0", "1"):
+                input_tensor = pb_utils.get_input_tensor_by_name(
+                    request, "INPUT" + tidx
+                )
+                if input_tensor is not None:
+                    out_tensor = pb_utils.Tensor(
+                        "OUTPUT" + tidx, input_tensor.as_numpy()
+                    )
+                    responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses

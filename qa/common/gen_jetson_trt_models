@@ -34,7 +34,7 @@
 # Make all generated files accessible outside of container
 umask 0000
 # Set the version of the models
-TRITON_VERSION=${TRITON_VERSION:=23.10}
+TRITON_VERSION=${TRITON_VERSION:=23.11}
 # Set the CUDA device to use
 CUDA_DEVICE=${RUNNER_ID:=0}
 # Set TensorRT image

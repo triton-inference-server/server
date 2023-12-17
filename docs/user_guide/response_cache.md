@@ -237,3 +237,7 @@ the cache.
   response caching.
 - The response cache does not currently support
   [decoupled models](decoupled_models.md).
+- Top-level requests to ensemble models do not currently support response
+  caching. However, composing models within an ensemble may have their
+  responses cached if supported and enabled by that composing model.
+
