@@ -30,10 +30,6 @@
 
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-**NOTE: You are currently on the r23.12 branch which tracks stabilization
-towards the next release. This branch is not usable during stabilization.**
-
-----
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
 multiple deep learning and machine learning frameworks, including TensorRT,
