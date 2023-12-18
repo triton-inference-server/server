@@ -48,6 +48,9 @@ namespace otel_resource = opentelemetry::sdk::resource;
 
 namespace triton { namespace server {
 
+static const int EXPORT_QUEUE_SIZE = 5000;
+static const int EXPORT_DELAY_MS = 2000;
+
 TRITONSERVER_Error*
 TraceManager::Create(
     TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
@@ -387,8 +390,11 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
         exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::
             Create();
       }
-      auto processor = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
-          std::move(exporter));
+      otel_trace_sdk::BatchSpanProcessorOptions processor_options;
+      processor_options.max_queue_size = EXPORT_QUEUE_SIZE;
+      processor_options.max_export_batch_size = EXPORT_QUEUE_SIZE;
+      processor_options.schedule_delay_millis = std::chrono::milliseconds(EXPORT_DELAY_MS);
+      auto processor = otel_trace_sdk::BatchSpanProcessorFactory::Create(std::move(exporter), processor_options);
       auto resource = otel_resource::Resource::Create(attributes);
       std::shared_ptr<otel_trace_api::TracerProvider> provider =
           otel_trace_sdk::TracerProviderFactory::Create(
