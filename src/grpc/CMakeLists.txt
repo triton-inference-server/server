@@ -37,7 +37,6 @@ add_library(
   stream_infer_handler.cc
 )
 
-target_compile_features(grpc-endpoint-library PRIVATE cxx_std_17)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   target_compile_options(
     grpc-endpoint-library
