@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -373,7 +373,7 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   // appropriately if connection closed or last response sent.
   //
   // But for now userp is the InferRequestClass object and the end of
-  // its life is in the OK or BAD ReplyCallback.
+  // its life is in the ReplyCallback.
 
   SagemakerAPIServer::SagemakeInferRequestClass* infer_request =
       reinterpret_cast<SagemakerAPIServer::SagemakeInferRequestClass*>(userp);
@@ -407,47 +407,25 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  if (err == nullptr) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else {
+  if (err != nullptr) {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    // [FIXME] In http_server.cc, error handling is enhanced to reporting
+    // different error code according to the Triton error code, holding
+    // the change from SageMaker endpoint as it may not fit their SLA.
+    infer_request->response_code_ = EVHTP_RES_BADREQ;
     if (SageMakerMMECheckOOMError(err) == true) {
       LOG_VERBOSE(1)
           << "Received an OOM error during INVOKE MODEL. Returning a 507."
           << std::endl;
-      evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
-    } else {
-      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+      infer_request->response_code_ = 507;
     }
     TRITONSERVER_ErrorDelete(err);
   }
+  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
-}
-
-void
-SagemakerAPIServer::BADReplyCallback507(evthr_t* thr, void* arg, void* shared)
-{
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
-
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, 507);
-
-  evhtp_request_resume(request);
-
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_START", request->send_start_ns);
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_END", request->send_end_ns);
-  }
-#endif  // TRITON_ENABLE_TRACING
-
-  delete infer_request;
 }
 
 void
