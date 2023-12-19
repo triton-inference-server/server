@@ -1766,6 +1766,9 @@ def backend_build(
     cmake_script.cwd(build_dir)
     cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
+    if be == "tensorrtllm":
+        tensorrtllm_prebuild(cmake_script)
+
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
     cmake_script.cmake(
