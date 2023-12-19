@@ -29,6 +29,8 @@ import sys
 
 sys.path.append("../common")
 
+import threading
+import time
 import unittest
 
 import numpy as np
@@ -204,6 +206,30 @@ class HttpTest(tu.TestResultCollector):
                         InferenceServerException, "Unsupported HTTP header"
                     ):
                         client.infer(model_name=model, inputs=inputs, headers=headers)
+
+    def test_descriptive_status_code(self):
+        model = "onnx_zero_1_float32_queue"
+        input_bytes = np.arange(8, dtype=np.float32).tobytes()
+
+        # Send two requests to model that only queues 1 request at the maximum,
+        # Expect the second request will be rejected with HTTP status code that
+        # aligns with error detail (server unavailable).
+        t = threading.Thread(
+            target=self._raw_binary_helper, args=(model, input_bytes, input_bytes)
+        )
+        t.start()
+        time.sleep(0.5)
+        with self.assertRaises(requests.exceptions.HTTPError) as context:
+            self._raw_binary_helper(model, input_bytes, input_bytes)
+        self.assertEqual(
+            503,
+            context.exception.response.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                503,
+                context.exception.response.status_code,
+            ),
+        )
+        t.join()
 
 
 if __name__ == "__main__":

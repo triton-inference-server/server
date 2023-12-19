@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -433,7 +433,7 @@ fi
 set +e
 # subadd should not be loaded
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/subadd/ready" localhost:8080/predict`
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Expect 'subadd' is not loaded\n***"
     RET=1
@@ -698,7 +698,7 @@ set -e
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/subadd/unload" localhost:8080/predict`
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
