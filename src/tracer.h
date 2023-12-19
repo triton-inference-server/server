@@ -41,6 +41,8 @@
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/simple_processor_factory.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
 #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
 #include "opentelemetry/trace/context.h"
 #include "opentelemetry/trace/propagation/http_trace_context.h"
