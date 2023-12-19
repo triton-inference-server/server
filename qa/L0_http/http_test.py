@@ -219,17 +219,16 @@ class HttpTest(tu.TestResultCollector):
         )
         t.start()
         time.sleep(0.5)
-        try:
+        with self.assertRaises(requests.exceptions.HTTPError) as context:
             self._raw_binary_helper(model, input_bytes, input_bytes)
-        except requests.exceptions.HTTPError as ex:
-            self.assertEqual(
+        self.assertEqual(
+            503,
+            context.exception.response.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
                 503,
-                ex.response.status_code,
-                "Expected error code {} returned for the request; got: {}".format(
-                    503,
-                    ex.response.status_code,
-                ),
-            )
+                context.exception.response.status_code,
+            ),
+        )
         t.join()
 
 
