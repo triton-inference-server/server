@@ -61,11 +61,6 @@ endif() # TRITON_ENABLE_GRPC
 
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
-# C++ standard
-if(DEFINED CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD)
-  message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
-endif()
-
 # CUDA
 #
 if(${TRITON_ENABLE_GPU})
@@ -122,6 +117,7 @@ if (NOT WIN32)
   set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
 endif()
 
+target_compile_features(main PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   message("Using MSVC as compiler, default target on Windows 10. "
     "If the target system is not Windows 10, please update _WIN32_WINNT "
@@ -357,6 +353,7 @@ if(${TRITON_ENABLE_HTTP}
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
 
+  target_compile_features(http-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(
       http-endpoint-library
@@ -511,6 +508,7 @@ if(${TRITON_ENABLE_TRACING})
   )
 
   if (NOT WIN32)
+    target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 
     target_include_directories(
       tracing-library
@@ -594,6 +592,7 @@ if (NOT WIN32)
     simple.cc
   )
 
+  target_compile_features(simple PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     message("Using MSVC as compiler, default target on Windows 10. "
             "If the target system is not Windows 10, please update _WIN32_WINNT "
@@ -657,6 +656,7 @@ if (NOT WIN32)
     multi_server.cc
   )
 
+  target_compile_features(multi_server PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     message("Using MSVC as compiler, default target on Windows 10. "
             "If the target system is not Windows 10, please update _WIN32_WINNT "
@@ -721,6 +721,7 @@ if (NOT WIN32)
       memory_alloc.cc
     )
 
+    target_compile_features(memory_alloc PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
       message("Using MSVC as compiler, default target on Windows 10. "
               "If the target system is not Windows 10, please update _WIN32_WINNT "
