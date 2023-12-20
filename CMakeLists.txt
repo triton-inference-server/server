@@ -30,7 +30,7 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
-# Use C++17 standard as Triton's default.
+# Use C++17 standard as Triton's minimum required.
 set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
 
 set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
