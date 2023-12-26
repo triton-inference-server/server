@@ -45,6 +45,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_ARGS="${BASE_SERVER_ARGS}"
 SERVER_LOG="./inference_server.log"
+PYTHON_TEST="metrics_config_test.py"
 source ../common/util.sh
 
 CLIENT_LOG="client.log"
@@ -100,8 +101,6 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-### GPU Metrics
-
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR
 model=libtorch_float32_float32_float32
@@ -112,6 +111,22 @@ mkdir -p $MODELDIR/${model}/1 && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
+set +e
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_pinned_memory_metrics_exist -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+CLIENT_PY="./pinned_memory_metrics_test.py"
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+set -e
+
+
+### GPU Metrics
 set +e
 export CUDA_VISIBLE_DEVICES=0,1,2
 run_and_check_server
@@ -227,7 +242,6 @@ MODELDIR="${PWD}/unit_test_models"
 mkdir -p "${MODELDIR}/identity_cache_on/1"
 mkdir -p "${MODELDIR}/identity_cache_off/1"
 BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
-PYTHON_TEST="metrics_config_test.py"
 
 # Check default settings: Counters should be enabled, summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
