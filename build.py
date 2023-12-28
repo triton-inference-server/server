@@ -291,7 +291,9 @@ class BuildScript:
 
     def makeinstall(self, target="install"):
         verbose_flag = "-v" if self._verbose else ""
-        self.cmd(f"cmake --build . -j{FLAGS.build_parallel} {verbose_flag} -t {target}")
+        self.cmd(
+            f"cmake --build . --config {FLAGS.build_type} -j{FLAGS.build_parallel} {verbose_flag} -t {target}"
+        )
 
     def gitclone(self, repo, tag, subdir, org):
         clone_dir = subdir
