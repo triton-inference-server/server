@@ -134,15 +134,6 @@ class GrpcFrontend(AbstractFrontend):
                 span_map["GRPC_WAITREAD"] / (cnt * 1000)
             )
             res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] / (cnt * 1000))
-            res += "\tOverhead (avg): {}us\n".format(
-                (
-                    span_map["GRPC_INFER"]
-                    - span_map["REQUEST"]
-                    - span_map["GRPC_WAITREAD"]
-                    - span_map["GRPC_SEND"]
-                )
-                / (cnt * 1000)
-            )
             return res
         else:
             return None
@@ -521,4 +512,7 @@ if __name__ == "__main__":
         print("File: {}".format(f.name))
         summarize(HttpFrontend(), trace_data)
         summarize(GrpcFrontend(), trace_data)
+        print(
+            "\n*Note: WAIT/READ time includes the time spent by gRPC handler waiting\nfor the request to be received by the server.\n"
+        )
         summarize_dataflow(trace_data)

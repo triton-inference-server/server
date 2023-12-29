@@ -289,7 +289,6 @@ Summary for simple (-1): trace count = 1
 GRPC infer request (avg): 21441us
 	Wait/Read (avg): 20923us
 	Send (avg): 74us
-	Overhead (avg): 46us
 	Handler (avg): 395us
   		Overhead (avg): 16us
   		Queue (avg): 47us
@@ -388,7 +387,7 @@ The meaning of the trace timestamps is:
 
 * Send: The time required to send the inference response.
 
-* Overhead: Additional time required in the HTTP or GRPC endpoint to
+* Overhead: Additional time required in the HTTP endpoint to
   process the inference request and response.
 
 * Handler: The total time spent handling the inference request, not
