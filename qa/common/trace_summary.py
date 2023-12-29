@@ -49,9 +49,19 @@ def add_span(span_map, timestamps, span_name, ts_start, ts_end):
 
 
 class AbstractFrontend:
+    _spans_added = False
+
     @property
     def filter_timestamp(self):
         return None
+
+    @property
+    def get_protocol(self):
+        return None
+    
+    @property
+    def spans_added(self):
+        return self._spans_added
 
     def add_frontend_span(self, span_map, timestamps):
         pass
@@ -65,6 +75,10 @@ class HttpFrontend(AbstractFrontend):
     def filter_timestamp(self):
         return "HTTP_RECV_START"
 
+    @property
+    def get_protocol(self):
+        return "HTTP"
+
     def add_frontend_span(self, span_map, timestamps):
         if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END" in timestamps):
             add_span(
@@ -76,6 +90,7 @@ class HttpFrontend(AbstractFrontend):
             add_span(
                 span_map, timestamps, "HTTP_SEND", "HTTP_SEND_START", "HTTP_SEND_END"
             )
+            self._spans_added = True
 
     def summarize_frontend_span(self, span_map, cnt):
         if "HTTP_INFER" in span_map:
@@ -105,6 +120,10 @@ class GrpcFrontend(AbstractFrontend):
     def filter_timestamp(self):
         return "GRPC_WAITREAD_START"
 
+    @property
+    def get_protocol(self):
+        return "GRPC"
+
     def add_frontend_span(self, span_map, timestamps):
         if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END" in timestamps):
             add_span(
@@ -124,6 +143,7 @@ class GrpcFrontend(AbstractFrontend):
             add_span(
                 span_map, timestamps, "GRPC_SEND", "GRPC_SEND_START", "GRPC_SEND_END"
             )
+            self._spans_added = True
 
     def summarize_frontend_span(self, span_map, cnt):
         if "GRPC_INFER" in span_map:
@@ -326,6 +346,11 @@ def summarize(frontend, traces):
                 )
             )
 
+    if frontend.get_protocol == "GRPC" and frontend.spans_added:
+        print(
+            "\n*Note: WAIT/READ time includes the time spent by gRPC handler waiting\nfor the request to be received by the server.\n"
+        )
+
 
 def summarize_dataflow(traces):
     # collect data flow
@@ -512,7 +537,4 @@ if __name__ == "__main__":
         print("File: {}".format(f.name))
         summarize(HttpFrontend(), trace_data)
         summarize(GrpcFrontend(), trace_data)
-        print(
-            "\n*Note: WAIT/READ time includes the time spent by gRPC handler waiting\nfor the request to be received by the server.\n"
-        )
         summarize_dataflow(trace_data)
