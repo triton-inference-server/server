@@ -121,7 +121,7 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
                     model_name=self.model_name, inputs=self.inputs, outputs=self.outputs
                 )
 
-                result = response.get_response()
+                _ = response.get_response()
 
             # Set the event to indicate that inference is completed
             self.inference_completed.set()
