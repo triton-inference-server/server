@@ -283,7 +283,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 |CPU Memory      | CPU Total Memory | `nv_cpu_memory_total_bytes` | Total CPU memory (RAM), in bytes | System-wide | Per interval |
 |                | CPU Used Memory | `nv_cpu_memory_used_bytes` | Used CPU memory (RAM), in bytes | System-wide | Per interval |
 
-## Pinned Memory Metrics 
+## Pinned Memory Metrics
 
 Starting in 24.01, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
 

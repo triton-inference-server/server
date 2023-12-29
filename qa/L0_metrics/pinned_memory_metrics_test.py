@@ -1,11 +1,12 @@
-import tritonclient.http as httpclient
-from tritonclient.utils import *
-import numpy as np
-import unittest
-import requests
-import time
 import re
 import threading
+import time
+import unittest
+
+import numpy as np
+import requests
+import tritonclient.http as httpclient
+from tritonclient.utils import *
 
 
 class TestPinnedMemoryMetrics(unittest.TestCase):
