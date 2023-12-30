@@ -3822,7 +3822,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
               name, reinterpret_cast<const char*>(vvalue)));
           break;
         case TRITONSERVER_PARAMETER_DOUBLE:
-          RETURN_IF_ERR(params_json.AddInt(
+          RETURN_IF_ERR(params_json.AddDouble(
               name, *(reinterpret_cast<const double*>(vvalue))));
           break;
         case TRITONSERVER_PARAMETER_BYTES:

@@ -343,7 +343,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         inputs = {
             "PROMPT": "hello world",
             "STREAM": True,
-            "PARAMS": {"PARAM_0": 0, "PARAM_1": True},
+            "PARAMS": {"PARAM_0": 0, "PARAM_1": True, "PARAM_2": 123.123},
         }
         r = self.generate(self._model_name, inputs)
         try:
