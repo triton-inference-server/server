@@ -293,7 +293,7 @@ class BuildScript:
         if target_platform() == "windows":
             verbose_flag = "" if self._verbose else "-clp:ErrorsOnly"
             self.cmd(
-                f"msbuild.exe -m:{FLAGS.build_parallel} {verbose_flag} -p:Configuration={FLAGS.build_type} {target}.vcxproj",
+                f"msbuild.exe -m:1 {verbose_flag} -p:Configuration={FLAGS.build_type} {target}.vcxproj",
                 check_exitcode=True,
             )
         else:
