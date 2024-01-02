@@ -55,7 +55,7 @@ class InferZeroTest(tu.TestResultCollector):
                     return
 
             if backend == "onnx":
-                if not tu.validate_for_tf_model(
+                if not tu.validate_for_onnx_model(
                     dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
                 ):
                     return
