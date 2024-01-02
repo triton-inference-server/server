@@ -58,7 +58,7 @@ class AbstractFrontend:
     @property
     def get_protocol(self):
         return None
-    
+
     @property
     def spans_added(self):
         return self._spans_added
