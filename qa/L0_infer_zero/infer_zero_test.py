@@ -41,17 +41,34 @@ np_dtype_string = np.dtype(object)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
+BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx libtorch")
 
 
 class InferZeroTest(tu.TestResultCollector):
     def _full_zero(self, dtype, shapes):
         # 'shapes' is list of shapes, one for each input.
+        for backend in BACKENDS.split(" "):
+            if backend == "graphdef" or backend == "savedmodel":
+                if not tu.validate_for_tf_model(
+                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
+                ):
+                    return
 
-        # For validation assume any shape can be used...
-        if tu.validate_for_tf_model(
-            dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-        ):
-            # model that supports batching
+            if backend == "onnx":
+                if not tu.validate_for_tf_model(
+                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
+                ):
+                    return
+
+            if backend == "libtorch":
+                # object models do not exist right now for PyTorch
+                if dtype == "object":
+                    return
+                if not tu.validate_for_libtorch_model(
+                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
+                ):
+                    return
+
             for bs in (1, 8):
                 batch_shapes = [
                     [
@@ -62,7 +79,7 @@ class InferZeroTest(tu.TestResultCollector):
                 ]
                 iu.infer_zero(
                     self,
-                    "graphdef",
+                    backend,
                     bs,
                     dtype,
                     batch_shapes,
@@ -70,64 +87,11 @@ class InferZeroTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
-                iu.infer_zero(
-                    self,
-                    "savedmodel",
-                    bs,
-                    dtype,
-                    batch_shapes,
-                    batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            # model that does not support batching
-            iu.infer_zero(
-                self,
-                "graphdef_nobatch",
-                1,
-                dtype,
-                shapes,
-                shapes,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-            iu.infer_zero(
-                self,
-                "savedmodel_nobatch",
-                1,
-                dtype,
-                shapes,
-                shapes,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
 
-        if tu.validate_for_onnx_model(
-            dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-        ):
-            # model that supports batching
-            for bs in (1, 8):
-                batch_shapes = [
-                    [
-                        bs,
-                    ]
-                    + shape
-                    for shape in shapes
-                ]
-                iu.infer_zero(
-                    self,
-                    "onnx",
-                    bs,
-                    dtype,
-                    batch_shapes,
-                    batch_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
             # model that does not support batching
             iu.infer_zero(
                 self,
-                "onnx_nobatch",
+                f"{backend}_nobatch",
                 1,
                 dtype,
                 shapes,
