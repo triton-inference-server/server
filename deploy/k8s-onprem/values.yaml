@@ -29,7 +29,7 @@ tags:
   loadBalancing: true
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:23.11-py3
+  imageName: nvcr.io/nvidia/tritonserver:23.12-py3
   pullPolicy: IfNotPresent
   modelRepositoryServer: < Replace with the IP Address of your file server >
   modelRepositoryPath: /srv/models

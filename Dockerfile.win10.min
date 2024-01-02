@@ -98,7 +98,7 @@ WORKDIR /
 #
 # Installing Vcpkg
 #
-ARG VCPGK_VERSION=2022.11.14
+ARG VCPGK_VERSION=2023.11.20
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
@@ -125,7 +125,7 @@ WORKDIR /
 #
 ARG CUDA_MAJOR=12
 ARG CUDA_MINOR=3
-ARG CUDA_PATCH=0
+ARG CUDA_PATCH=2
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -173,7 +173,7 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing cuDNN
 #
-ARG CUDNN_VERSION=8.9.6.50
+ARG CUDNN_VERSION=8.9.7.29
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 

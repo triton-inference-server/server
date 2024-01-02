@@ -72,13 +72,13 @@ import requests
 TRITON_VERSION_MAP = {
     "2.42.0dev": (
         "24.01dev",  # triton container
-        "23.11",  # upstream container
+        "23.12",  # upstream container
         "1.16.3",  # ORT
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "0.2.2",  # vLLM version
+        "0.2.3",  # vLLM version
     )
 }
 
@@ -608,7 +608,11 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", True))
 
     cargs += cmake_backend_extra_args(be)
-    cargs.append("..")
+    if be == "tensorrtllm":
+        cargs.append("-S ../inflight_batcher_llm -B .")
+
+    else:
+        cargs.append("..")
     return cargs
 
 
@@ -822,12 +826,6 @@ def tensorrtllm_cmake_args(images):
         cmake_backend_arg(
             "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
         ),
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TRTLLM_BUILD_CONTAINER",
-            None,
-            images["base"],
-        ),
     ]
     cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
@@ -893,7 +891,7 @@ RUN wget "{miniconda_url}" -O miniconda.sh -q && \
     find /opt/conda/ -follow -type f -name '*.a' -delete && \
     find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
     /opt/conda/bin/conda clean -afy
-ENV PATH /opt/conda/bin:${{PATH}}
+ENV PATH ${{PATH}}:/opt/conda/bin
 """
 
 
@@ -1117,7 +1115,31 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
         df += """
 RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
 """
+    if "tensorrtllm" in backends:
+        df += """
+# Remove TRT contents that are not needed in runtime
+RUN ARCH="$(uname -i)" \\
+    && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
+    && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
+    && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
 
+# Install required packages for TRT-LLM models
+RUN python3 -m pip install --upgrade pip \\
+    && pip3 install transformers
+
+# Uninstall unused nvidia packages
+RUN if pip freeze | grep -q "nvidia.*"; then \\
+        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
+    fi
+RUN pip cache purge
+
+# Drop the static libs
+RUN ARCH="$(uname -i)" \\
+    && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
+          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
+
+ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+"""
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1260,20 +1282,6 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 """
-    # Add dependencies needed for tensorrtllm backend
-    if "tensorrtllm" in backends:
-        be = "tensorrtllm"
-        url = "https://raw.githubusercontent.com/triton-inference-server/tensorrtllm_backend/{}/tools/gen_trtllm_dockerfile.py".format(
-            backends[be]
-        )
-
-        response = requests.get(url)
-        spec = importlib.util.spec_from_loader(
-            "trtllm_buildscript", loader=None, origin=url
-        )
-        trtllm_buildscript = importlib.util.module_from_spec(spec)
-        exec(response.content, trtllm_buildscript.__dict__)
-        df += trtllm_buildscript.create_postbuild(backends[be])
 
     if "vllm" in backends:
         # [DLIS-5606] Build Conda environment for vLLM backend
@@ -1736,12 +1744,6 @@ def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
     cmake_script.cmd("export ARCH=$(uname -m)")
-
-    # FIXME: Update the file structure to the one Triton expects. This is a temporary fix
-    # to get the build working for r23.10.
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/src tensorrtllm")
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/cmake tensorrtllm")
-    cmake_script.cmd("mv tensorrtllm/inflight_batcher_llm/CMakeLists.txt tensorrtllm")
 
 
 def backend_build(
