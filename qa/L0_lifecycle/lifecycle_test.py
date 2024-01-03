@@ -3064,11 +3064,14 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
 
+        # This test can replicate a load while async unloading on machines with
+        # sufficient concurrency. Regardless on whether it is replicated or not,
+        # the server must not crash.
         if load_before_unload_finish[0] == False:
-            warning_msg = "The test case did not replicate a load while async unloading. Consider increasing concurrency."
-            # Fail the test if the hardware has sufficient concurrency for this case.
-            self.assertLessEqual(multiprocessing.cpu_count(), num_threads, warning_msg)
-            # Add the warning into statistics to be tracked on test printout.
+            # Track non-replication on test printout via statistics.
+            warning_msg = "Cannot replicate a load while async unloading. CPU count: {}. num_threads: {}.".format(
+                multiprocessing.cpu_count(), num_threads
+            )
             global_exception_stats[warning_msg] = 1
 
         stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
