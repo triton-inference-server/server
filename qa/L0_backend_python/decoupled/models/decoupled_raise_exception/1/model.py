@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:23.12-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
-  numGpus: 1
+class TritonPythonModel:
+    def initialize(self, args):
+        pass
 
-service:
-  type: LoadBalancer
-
-secret:
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+    def execute(self, requests):
+        for request in requests:
+            raise Exception("Intentional Error")
+        return None

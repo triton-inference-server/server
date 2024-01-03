@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.11}
+TRITON_VERSION=${TRITON_VERSION:=23.12}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.13.0

@@ -301,7 +301,7 @@ export MODEL_NAME='bls_model_loading'
 set +e
 code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
 set -e
-if [ "$code" == "400" ]; then
+if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
     SUB_TEST_RET=1
@@ -370,7 +370,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
 set -e
-if [ "$code" == "400" ]; then
+if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
     RET=1
     SUB_TEST_RET=1

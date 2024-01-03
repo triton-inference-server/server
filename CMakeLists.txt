@@ -38,6 +38,7 @@ option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
+option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
 set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by Triton" )
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
@@ -232,6 +233,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+    -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
