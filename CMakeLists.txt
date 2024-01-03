@@ -189,7 +189,7 @@ else()
   set(TRITON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-set(TRITON_DEPENDS triton-core protobuf googletest)
+set(TRITON_DEPENDS triton-core protobuf googletest re2)
 if(${TRITON_ENABLE_GCS})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} google-cloud-cpp)
 endif() # TRITON_ENABLE_GCS
@@ -218,6 +218,7 @@ ExternalProject_Add(triton-server
     -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
     -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
     -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
+    -Dre2_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2/${LIB_DIR}/cmake/re2
     -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
     -DCURL_DIR:STRING=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/curl/${LIB_DIR}/cmake/CURL
     -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/${LIB_DIR}/cmake/nlohmann_json

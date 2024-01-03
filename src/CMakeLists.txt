@@ -88,7 +88,7 @@ endif()
 
 # re2
 #
-find_library(RE2_LIBRARY NAMES re2)
+find_package(re2 REQUIRED)
 
 #
 # tritonserver executable
@@ -383,7 +383,7 @@ if(${TRITON_ENABLE_HTTP}
       triton-core-serverstub  # from repo-core
       ${LIBEVENT_LIBRARIES}
       libevhtp::evhtp
-      ${RE2_LIBRARY}
+      re2::re2
   )
 
   target_include_directories(
