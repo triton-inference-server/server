@@ -33,6 +33,7 @@ sys.path.append("../common")
 import base64
 import concurrent.futures
 import json
+import multiprocessing
 import os
 import shutil
 import signal
@@ -3062,10 +3063,13 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
-        self.assertTrue(
-            load_before_unload_finish[0],
-            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
-        )
+
+        if load_before_unload_finish[0] == False:
+            warning_msg = "The test case did not replicate a load while async unloading. Consider increasing concurrency."
+            # Fail the test if the hardware has sufficient concurrency for this case.
+            self.assertLessEqual(multiprocessing.cpu_count(), num_threads, warning_msg)
+            # Add the warning into statistics to be tracked on test printout.
+            global_exception_stats[warning_msg] = 1
 
         stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
         with open(stats_path, mode="w", encoding="utf-8") as f:
