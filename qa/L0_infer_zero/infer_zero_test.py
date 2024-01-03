@@ -42,32 +42,26 @@ np_dtype_string = np.dtype(object)
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
 BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx libtorch")
+VALIDATION_FNS = {
+    "onnx": tu.validate_for_onnx_model,
+    "graphdef": tu.validate_for_tf_model,
+    "savedmodel": tu.validate_for_tf_model,
+    "libtorch": tu.validate_for_libtorch_model,
+}
 
 
 class InferZeroTest(tu.TestResultCollector):
     def _full_zero(self, dtype, shapes):
         # 'shapes' is list of shapes, one for each input.
         for backend in BACKENDS.split(" "):
-            if backend == "graphdef" or backend == "savedmodel":
-                if not tu.validate_for_tf_model(
-                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-                ):
-                    return
+            # object models do not exist right now for PyTorch
+            if backend == "libtorch" and dtype == "object":
+                return
 
-            if backend == "onnx":
-                if not tu.validate_for_onnx_model(
-                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-                ):
-                    return
-
-            if backend == "libtorch":
-                # object models do not exist right now for PyTorch
-                if dtype == "object":
-                    return
-                if not tu.validate_for_libtorch_model(
-                    dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-                ):
-                    return
+            if not VALIDATION_FNS[backend](
+                dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
+            ):
+                return
 
             for bs in (1, 8):
                 batch_shapes = [
