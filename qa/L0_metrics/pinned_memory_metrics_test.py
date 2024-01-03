@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
+import os
 import re
 import threading
 import time
@@ -36,12 +36,33 @@ import requests
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+# Triton server reserves 256 MB for pinned memory by default.
+DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
+
+# Pinned memory usage when server is idle (no inference)
+DEFAULT_USED_PINNED_MEMORY_SIZE = 0  # bytes
+
+
+total_bytes_pattern = re.compile(r"pool_total_bytes (\d+)")
+used_bytes_pattern = re.compile(r"pool_used_bytes (\d+)")
+
+
+def _get_metrics():
+    r = requests.get("http://localhost:8002/metrics")
+    r.raise_for_status()
+
+    total_bytes_match = total_bytes_pattern.search(r.text)
+    total_bytes_value = total_bytes_match.group(1)
+
+    used_bytes_match = used_bytes_pattern.search(r.text)
+    used_bytes_value = used_bytes_match.group(1)
+
+    return total_bytes_value, used_bytes_value
+
 
 class TestPinnedMemoryMetrics(unittest.TestCase):
     def setUp(self):
         self.inference_completed = threading.Event()
-        self.total_bytes_pattern = re.compile(r"pool_total_bytes (\d+)")
-        self.used_bytes_pattern = re.compile(r"pool_used_bytes (\d+)")
 
         shape = [1, 16]
         self.model_name = "libtorch_float32_float32_float32"
@@ -63,26 +84,18 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
         ]
 
         # Before loading the model
-        total_bytes_value, used_bytes_value = self._get_metrics()
-        self.assertEqual(int(total_bytes_value), 268435456)
-        self.assertEqual(int(used_bytes_value), 0)
+        self._assert_pinned_memory_utilization()
 
-    def _get_metrics(self):
-        r = requests.get("http://localhost:8002/metrics")
-        r.raise_for_status()
-
-        total_bytes_match = self.total_bytes_pattern.search(r.text)
-        total_bytes_value = total_bytes_match.group(1)
-
-        used_bytes_match = self.used_bytes_pattern.search(r.text)
-        used_bytes_value = used_bytes_match.group(1)
-
-        return total_bytes_value, used_bytes_value
+    def _assert_pinned_memory_utilization(self):
+        total_bytes_value, used_bytes_value = _get_metrics()
+        self.assertEqual(int(total_bytes_value), DEFAULT_TOTAL_PINNED_MEMORY_SIZE)
+        self.assertEqual(int(used_bytes_value), DEFAULT_USED_PINNED_MEMORY_SIZE)
 
     def _collect_metrics(self):
         while not self.inference_completed.is_set():
-            total_bytes_value, used_bytes_value = self._get_metrics()
-            self.assertEqual(int(total_bytes_value), 268435456)
+            total_bytes_value, used_bytes_value = _get_metrics()
+            self.assertEqual(int(total_bytes_value), DEFAULT_TOTAL_PINNED_MEMORY_SIZE)
+            # Assert pinned memory usage is within anticipated values
             self.assertIn(int(used_bytes_value), [0, 64, 128, 192, 256])
 
     def test_pinned_memory_metrics_asynchronous_requests(self):
@@ -93,9 +106,7 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
                 client.load_model(self.model_name)
 
             # Before starting the inference
-            total_bytes_value, used_bytes_value = self._get_metrics()
-            self.assertEqual(int(total_bytes_value), 268435456)
-            self.assertEqual(int(used_bytes_value), 0)
+            self._assert_pinned_memory_utilization()
 
             # Start a thread to collect metrics asynchronously
             metrics_thread = threading.Thread(target=self._collect_metrics)
@@ -125,9 +136,7 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
             metrics_thread.join()
 
         # After Completing inference, used_bytes_value should comedown to 0
-        total_bytes_value, used_bytes_value = self._get_metrics()
-        self.assertEqual(int(total_bytes_value), 268435456)
-        self.assertEqual(int(used_bytes_value), 0)
+        self._assert_pinned_memory_utilization()
 
     def test_pinned_memory_metrics_synchronous_requests(self):
         with httpclient.InferenceServerClient(url="localhost:8000") as client:
@@ -135,9 +144,7 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
                 client.load_model(self.model_name)
 
             # Before starting the inference
-            total_bytes_value, used_bytes_value = self._get_metrics()
-            self.assertEqual(int(total_bytes_value), 268435456)
-            self.assertEqual(int(used_bytes_value), 0)
+            self._assert_pinned_memory_utilization()
 
             # Start a thread to collect metrics asynchronously
             metrics_thread = threading.Thread(target=self._collect_metrics)
@@ -158,9 +165,20 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
             metrics_thread.join()
 
         # After Completing inference, used_bytes_value should comedown to 0
-        total_bytes_value, used_bytes_value = self._get_metrics()
-        self.assertEqual(int(total_bytes_value), 268435456)
-        self.assertEqual(int(used_bytes_value), 0)
+        self._assert_pinned_memory_utilization()
+
+
+class TestCustomPinnedMemorySize(unittest.TestCase):
+    def test_custom_pinned_memory_pool_size(self):
+        custom_pinned_memory_pool_size = os.environ.get(
+            "CUSTOM_PINNED_MEMORY_POOL_SIZE"
+        )
+        print(f"CUSTOM_PINNED_MEMORY_POOL_SIZE: {custom_pinned_memory_pool_size}")
+        self.assertIsNotNone(custom_pinned_memory_pool_size)
+
+        total_bytes_value, used_bytes_value = _get_metrics()
+        self.assertEqual(int(total_bytes_value), int(custom_pinned_memory_pool_size))
+        self.assertEqual(int(used_bytes_value), DEFAULT_USED_PINNED_MEMORY_SIZE)
 
 
 if __name__ == "__main__":
