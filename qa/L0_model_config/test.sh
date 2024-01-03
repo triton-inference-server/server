@@ -258,6 +258,8 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float32
 # Create runtime escape scenario
 mkdir -p special_cases/runtime_escape/1 special_cases/runtime_escape/dummy_runtime
 touch special_cases/runtime_escape/dummy_runtime/libtriton_identity.so
+# Setup invalid runtime model
+mkdir -p special_cases/invalid_runtime/1
 
 # Copy reshape model files into the test model repositories.
 mkdir -p autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
