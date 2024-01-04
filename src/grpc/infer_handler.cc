@@ -916,28 +916,26 @@ ModelInferHandler::Execute(InferHandler::State* state)
   if (err == nullptr) {
     TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-    state->trace_ =
-        std::move(trace_manager_->SampleTrace(request.model_name()));
+    TraceInitOptions start_options;
+    InferenceTraceMode mode = TRACE_MODE_TRITON;
+    trace_manager_->GetTraceMode(request.model_name(), &mode);
+    if (mode == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+      const GrpcServerCarrier carrier(state->context_->ctx_.get());
+      auto prop = otel_cntxt_propagation::GlobalTextMapPropagator::
+          GetGlobalPropagator();
+      auto ctxt = opentelemetry::context::Context();
+      start_options.propagated_context = prop->Extract(carrier, ctxt);
+#else
+      LOG_ERROR << "Unsupported trace mode: "
+                << TraceManager::InferenceTraceModeString(
+                       state->trace_->setting_->mode_);
+#endif
+    }
+    state->trace_ = std::move(
+        trace_manager_->SampleTrace(request.model_name(), start_options));
     if (state->trace_ != nullptr) {
       triton_trace = state->trace_->trace_;
-      if (state->trace_->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-        const GrpcServerCarrier carrier(state->context_->ctx_.get());
-        auto prop = otel_cntxt_propagation::GlobalTextMapPropagator::
-            GetGlobalPropagator();
-        state->trace_->otel_context_ =
-            prop->Extract(carrier, state->trace_->otel_context_);
-        auto root_span = state->trace_->StartSpan(
-            "InferRequest", TraceManager::CaptureTimestamp(),
-            otel_trace_api::kSpanKey);
-        state->trace_->otel_context_ =
-            state->trace_->otel_context_.SetValue(kRootSpan, root_span);
-#else
-        LOG_ERROR << "Unsupported trace mode: "
-                  << TraceManager::InferenceTraceModeString(
-                         state->trace_->setting_->mode_);
-#endif
-      }
     }
 #endif  // TRITON_ENABLE_TRACING
 

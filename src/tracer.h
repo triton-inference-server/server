@@ -37,6 +37,7 @@
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 #include "opentelemetry/context/propagation/global_propagator.h"
+#include "opentelemetry/context/runtime_context.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/processor.h"
@@ -48,6 +49,7 @@
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_cntxt_propagation = opentelemetry::context::propagation;
+namespace otel_cntxt = opentelemetry::context;
 #endif
 
 #include "triton/core/tritonserver.h"
@@ -73,6 +75,16 @@ typedef enum tracemode_enum {
   /// OpenTelemetry API for tracing
   TRACE_MODE_OPENTELEMETRY = 1
 } InferenceTraceMode;
+
+/// Options required at Trace initialization
+struct TraceInitOptions {
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+  opentelemetry::context::Context propagated_context{
+      opentelemetry::context::Context{}};
+#else
+  void* propagated_context{nullptr};
+#endif
+};
 
 //
 // Manager for tracing to a file.
@@ -129,7 +141,8 @@ class TraceManager {
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
-  std::shared_ptr<Trace> SampleTrace(const std::string& model_name);
+  std::shared_ptr<Trace> SampleTrace(
+      const std::string& model_name, const TraceInitOptions& start_options);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -139,7 +152,9 @@ class TraceManager {
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-      std::string* filepath);
+      std::string* filepath, InferenceTraceMode* mode);
+
+  void GetTraceMode(const std::string& model_name, InferenceTraceMode* mode);
 
   // Return the current timestamp.
   static uint64_t CaptureTimestamp()
@@ -228,8 +243,7 @@ class TraceManager {
         std::string parent_span_key = "");
 
     // OTel context to store spans, created in the current trace
-    opentelemetry::context::Context otel_context_ =
-        opentelemetry::context::Context();
+    opentelemetry::context::Context otel_context_;
 
    private:
     // OpenTelemetry SDK relies on system's clock for event timestamps.

@@ -1767,6 +1767,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   int32_t count;
   uint32_t log_frequency;
   std::string filepath;
+  InferenceTraceMode mode = TRACE_MODE_TRITON;
+
   if (!model_name.empty()) {
     bool ready = false;
     RETURN_AND_RESPOND_IF_ERR(
@@ -1962,7 +1964,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      model_name, &level, &rate, &count, &log_frequency, &filepath);
+      model_name, &level, &rate, &count, &log_frequency, &filepath, &mode);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level
@@ -3055,26 +3057,25 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
+  TraceInitOptions start_options;
+  InferenceTraceMode mode = TRACE_MODE_TRITON;
+  trace_manager_->GetTraceMode(model_name, &mode);
+  if (mode == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+    const HttpTextMapCarrier carrier(req->headers_in);
+    auto prop =
+        otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+    auto ctxt = opentelemetry::context::Context();
+    start_options.propagated_context = prop->Extract(carrier, ctxt);
+#else
+    LOG_ERROR << "Unsupported trace mode: "
+              << TraceManager::InferenceTraceModeString(trace->setting_->mode_);
+#endif
+  }
   std::shared_ptr<TraceManager::Trace> trace;
-  trace = std::move(trace_manager_->SampleTrace(model_name));
+  trace = std::move(trace_manager_->SampleTrace(model_name, start_options));
   if (trace != nullptr) {
     *triton_trace = trace->trace_;
-    if (trace->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-      const HttpTextMapCarrier carrier(req->headers_in);
-      auto prop = otel_cntxt_propagation::GlobalTextMapPropagator::
-          GetGlobalPropagator();
-      trace->otel_context_ = prop->Extract(carrier, trace->otel_context_);
-      auto root_span = trace->StartSpan(
-          "InferRequest", req->recv_start_ns, otel_trace_api::kSpanKey);
-      trace->otel_context_ =
-          trace->otel_context_.SetValue(kRootSpan, root_span);
-#else
-      LOG_ERROR << "Unsupported trace mode: "
-                << TraceManager::InferenceTraceModeString(
-                       trace->setting_->mode_);
-#endif
-    }
     // Timestamps from evhtp are capture in 'req'. We record here
     // since this is the first place where we have access to trace
     // manager.

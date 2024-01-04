@@ -1237,6 +1237,7 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
+    InferenceTraceMode mode = TRACE_MODE_TRITON;
 
     if (!request.model_name().empty()) {
       bool ready = false;
@@ -1444,7 +1445,8 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath,
+        &mode);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;

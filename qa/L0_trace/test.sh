@@ -704,7 +704,7 @@ OTEL_COLLECTOR_DIR=./opentelemetry-collector
 OTEL_COLLECTOR=./opentelemetry-collector/bin/otelcorecol_*
 OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 
-# Building the latest version of the OpenTelemetry collector.
+# Building OpenTelemetry collector (v0.82.0).
 # Ref: https://opentelemetry.io/docs/collector/getting-started/#local
 if [ -d "$OTEL_COLLECTOR_DIR" ]; then rm -Rf $OTEL_COLLECTOR_DIR; fi
 git clone --depth 1 --branch v0.82.0 https://github.com/open-telemetry/opentelemetry-collector.git
@@ -791,7 +791,6 @@ if ! [ -s trace_collector.log ] ; then
     exit 1
 fi
 
-# Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $OPENTELEMETRY_LOG

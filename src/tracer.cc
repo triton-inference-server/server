@@ -276,7 +276,7 @@ void
 TraceManager::GetTraceSetting(
     const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
     uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-    std::string* filepath)
+    std::string* filepath, InferenceTraceMode* mode)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -291,10 +291,26 @@ TraceManager::GetTraceSetting(
   *count = trace_setting->count_;
   *log_frequency = trace_setting->log_frequency_;
   *filepath = trace_setting->file_->FileName();
+  *mode = trace_setting->mode_;
+}
+
+void
+TraceManager::GetTraceMode(
+    const std::string& model_name, InferenceTraceMode* mode)
+{
+  std::shared_ptr<TraceSetting> trace_setting;
+  {
+    std::lock_guard<std::mutex> r_lk(r_mu_);
+    auto m_it = model_settings_.find(model_name);
+    trace_setting =
+        (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
+  }
+  *mode = trace_setting->mode_;
 }
 
 std::shared_ptr<TraceManager::Trace>
-TraceManager::SampleTrace(const std::string& model_name)
+TraceManager::SampleTrace(
+    const std::string& model_name, const TraceInitOptions& start_options)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -306,6 +322,24 @@ TraceManager::SampleTrace(const std::string& model_name)
   std::shared_ptr<Trace> ts = trace_setting->SampleTrace();
   if (ts != nullptr) {
     ts->setting_ = trace_setting;
+    if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+      auto steady_timestamp_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+              .count();
+      ts->otel_context_ = start_options.propagated_context;
+      opentelemetry::nostd::shared_ptr<otel_trace_api::Span> root_span;
+      root_span = ts->StartSpan(
+          "InferRequest", steady_timestamp_ns, otel_trace_api::kSpanKey);
+      // Storing "InferRequest" span as a root span
+      // to keep it alive for the duration of the request.
+      ts->otel_context_ = ts->otel_context_.SetValue(kRootSpan, root_span);
+#else
+      LOG_ERROR << "Unsupported trace mode: "
+                << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
+#endif
+    }
   }
   return ts;
 }
