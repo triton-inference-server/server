@@ -2996,6 +2996,16 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
+    # TODO: Consider revisiting this test
+    # The goal of this test is only to ensure the server does not crash when
+    # bombarded with concurrent load/unload requests for the same model.
+    # Some clean-up:
+    # 1. Improve core logic so all load/unload requests will always success, so
+    #    'load_fail_reasons' and 'unload_fail_reasons' can be removed.
+    # 2. Is it still necessary to track the ability to replicate a load while
+    #    async unloading?
+    # 3. What is the ideal number of threads and iterations, across different
+    #    machines, that the server is sufficiently stressed?
     def test_concurrent_same_model_load_unload_stress(self):
         model_name = "identity_zero_1_int32"
         num_threads = 32
