@@ -121,18 +121,19 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_pinned_memory_metrics_exist -v 2>&
 check_unit_test
 
 CLIENT_LOG="pinned_memory_metrics_test_client.log"
-python3 ${CLIENT_PY} -k TestPinnedMemoryMetrics -v 2>&1 | tee ${CLIENT_LOG}
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Custom Pinned memory pool size
 export CUSTOM_PINNED_MEMORY_POOL_SIZE=1024 # bytes
 SERVER_LOG="custom_pinned_memory_test_server.log"
 CLIENT_LOG="custom_pinned_memory_test_client.log"
-SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=100 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE"
 run_and_check_server
-python3 ${CLIENT_PY} -k TestCustomPinnedMemorySize -v 2>&1 | tee ${CLIENT_LOG}
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 
 kill $SERVER_PID

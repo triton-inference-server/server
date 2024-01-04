@@ -36,8 +36,13 @@ import requests
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
-# Triton server reserves 256 MB for pinned memory by default.
-DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
+custom_pinned_memory_pool_size = os.environ.get("CUSTOM_PINNED_MEMORY_POOL_SIZE")
+if custom_pinned_memory_pool_size is not None:
+    TOTAL_PINNED_MEMORY_SIZE = int(custom_pinned_memory_pool_size)
+else:
+    # Triton server reserves 256 MB for pinned memory by default.
+    TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
+print(f"TOTAL_PINNED_MEMORY_SIZE: {TOTAL_PINNED_MEMORY_SIZE} bytes")
 
 # Pinned memory usage when server is idle (no inference)
 DEFAULT_USED_PINNED_MEMORY_SIZE = 0  # bytes
@@ -88,13 +93,13 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
 
     def _assert_pinned_memory_utilization(self):
         total_bytes_value, used_bytes_value = _get_metrics()
-        self.assertEqual(int(total_bytes_value), DEFAULT_TOTAL_PINNED_MEMORY_SIZE)
+        self.assertEqual(int(total_bytes_value), TOTAL_PINNED_MEMORY_SIZE)
         self.assertEqual(int(used_bytes_value), DEFAULT_USED_PINNED_MEMORY_SIZE)
 
     def _collect_metrics(self):
         while not self.inference_completed.is_set():
             total_bytes_value, used_bytes_value = _get_metrics()
-            self.assertEqual(int(total_bytes_value), DEFAULT_TOTAL_PINNED_MEMORY_SIZE)
+            self.assertEqual(int(total_bytes_value), TOTAL_PINNED_MEMORY_SIZE)
             # Assert pinned memory usage is within anticipated values
             self.assertIn(int(used_bytes_value), [0, 64, 128, 192, 256])
 
@@ -166,19 +171,6 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
 
         # After Completing inference, used_bytes_value should comedown to 0
         self._assert_pinned_memory_utilization()
-
-
-class TestCustomPinnedMemorySize(unittest.TestCase):
-    def test_custom_pinned_memory_pool_size(self):
-        custom_pinned_memory_pool_size = os.environ.get(
-            "CUSTOM_PINNED_MEMORY_POOL_SIZE"
-        )
-        print(f"CUSTOM_PINNED_MEMORY_POOL_SIZE: {custom_pinned_memory_pool_size}")
-        self.assertIsNotNone(custom_pinned_memory_pool_size)
-
-        total_bytes_value, used_bytes_value = _get_metrics()
-        self.assertEqual(int(total_bytes_value), int(custom_pinned_memory_pool_size))
-        self.assertEqual(int(used_bytes_value), DEFAULT_USED_PINNED_MEMORY_SIZE)
 
 
 if __name__ == "__main__":
