@@ -112,7 +112,6 @@ RUN vcpkg.exe install \
       openssl:x64-windows \
       pthread:x64-windows \
       rapidjson:x64-windows \
-      re2:x64-windows \
       zlib:x64-windows
 RUN vcpkg.exe integrate install
 
