@@ -1433,4 +1433,31 @@ class ModelInferHandler
   grpc_compression_level compression_level_;
 };
 
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+class GrpcServerCarrier
+    : public opentelemetry::context::propagation::TextMapCarrier {
+ public:
+  GrpcServerCarrier(::grpc::ServerContext* context) : context_(context) {}
+  GrpcServerCarrier() = default;
+  virtual opentelemetry::nostd::string_view Get(
+      opentelemetry::nostd::string_view key) const noexcept override
+  {
+    auto it = context_->client_metadata().find({key.data(), key.size()});
+    if (it != context_->client_metadata().end()) {
+      return it->second.data();
+    }
+    return "";
+  }
+
+  virtual void Set(
+      opentelemetry::nostd::string_view /* key */,
+      opentelemetry::nostd::string_view /* value */) noexcept override
+  {
+    // Not required for server
+  }
+
+  ::grpc::ServerContext* context_;
+};
+#endif  // TRITON_ENABLE_TRACING
+
 }}}  // namespace triton::server::grpc

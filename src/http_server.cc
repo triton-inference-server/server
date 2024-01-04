@@ -3059,7 +3059,22 @@ HTTPAPIServer::StartTrace(
   trace = std::move(trace_manager_->SampleTrace(model_name));
   if (trace != nullptr) {
     *triton_trace = trace->trace_;
-
+    if (trace->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+      const HttpTextMapCarrier carrier(req->headers_in);
+      auto prop = otel_cntxt_propagation::GlobalTextMapPropagator::
+          GetGlobalPropagator();
+      trace->otel_context_ = prop->Extract(carrier, trace->otel_context_);
+      auto root_span = trace->StartSpan(
+          "InferRequest", req->recv_start_ns, otel_trace_api::kSpanKey);
+      trace->otel_context_ =
+          trace->otel_context_.SetValue(kRootSpan, root_span);
+#else
+      LOG_ERROR << "Unsupported trace mode: "
+                << TraceManager::InferenceTraceModeString(
+                       trace->setting_->mode_);
+#endif
+    }
     // Timestamps from evhtp are capture in 'req'. We record here
     // since this is the first place where we have access to trace
     // manager.

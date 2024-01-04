@@ -37,16 +37,18 @@
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
 #include "opentelemetry/context/propagation/global_propagator.h"
-#include "opentelemetry/trace/propagation/http_trace_context.h"
 #include "opentelemetry/exporters/ostream/span_exporter_factory.h"
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
+#include "opentelemetry/trace/propagation/http_trace_context.h"
+
 namespace otlp = opentelemetry::exporter::otlp;
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_common = opentelemetry::common;
 namespace otel_resource = opentelemetry::sdk::resource;
 #endif
+
 
 namespace triton { namespace server {
 
@@ -292,7 +294,7 @@ TraceManager::GetTraceSetting(
 }
 
 std::shared_ptr<TraceManager::Trace>
-TraceManager::SampleTrace(const std::string& model_name, otel_trace_api::SpanContext *span_context)
+TraceManager::SampleTrace(const std::string& model_name)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -301,7 +303,7 @@ TraceManager::SampleTrace(const std::string& model_name, otel_trace_api::SpanCon
     trace_setting =
         (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
   }
-  std::shared_ptr<Trace> ts = trace_setting->SampleTrace(span_context);
+  std::shared_ptr<Trace> ts = trace_setting->SampleTrace();
   if (ts != nullptr) {
     ts->setting_ = trace_setting;
   }
@@ -363,7 +365,9 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
     case TRACE_MODE_OPENTELEMETRY: {
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
       otlp::OtlpHttpExporterOptions opts;
-      otel_resource::ResourceAttributes attributes = {{otel_resource::SemanticConventions::kServiceName, "triton-inference-server"}};
+      otel_resource::ResourceAttributes attributes = {};
+      attributes[otel_resource::SemanticConventions::kServiceName] =
+          std::string("triton-inference-server");
       auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
       auto otel_options_it = config_map.find(mode_key);
       if (otel_options_it != config_map.end()) {
@@ -376,7 +380,7 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
             auto pos = setting.second.find('=');
             auto key = setting.second.substr(0, pos);
             auto value = setting.second.substr(pos + 1);
-            attributes.SetAttribute(key, value);
+            attributes[key] = value;
           }
         }
       }
@@ -397,9 +401,11 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
       otel_trace_api::Provider::SetTracerProvider(provider);
 
       // set global propagator
-      opentelemetry::context::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
-      opentelemetry::nostd::shared_ptr<opentelemetry::context::propagation::TextMapPropagator>(
-          new opentelemetry::trace::propagation::HttpTraceContext()));
+      opentelemetry::context::propagation::GlobalTextMapPropagator::
+          SetGlobalPropagator(
+              opentelemetry::nostd::shared_ptr<
+                  opentelemetry::context::propagation::TextMapPropagator>(
+                  new opentelemetry::trace::propagation::HttpTraceContext()));
       break;
 #else
       LOG_ERROR << "Unsupported trace mode: "
@@ -524,23 +530,6 @@ TraceManager::Trace::StartSpan(
   auto provider = opentelemetry::trace::Provider::GetTracerProvider();
   return provider->GetTracer(kTritonTracer)->StartSpan(display_name, options);
 }
-
-opentelemetry::nostd::shared_ptr<otel_trace_api::Span>
-TraceManager::Trace::StartServerSpan(
-    std::string display_name, const uint64_t& raw_timestamp_ns,
-    const otel_trace_api::SpanContext& span_context)
-{
-  otel_trace_api::StartSpanOptions options;
-  options.kind = otel_trace_api::SpanKind::kServer;
-  options.start_system_time =
-      time_offset_ + std::chrono::nanoseconds{raw_timestamp_ns};
-  options.start_steady_time =
-      otel_common::SteadyTimestamp{std::chrono::nanoseconds{raw_timestamp_ns}};
-  options.parent = span_context;
-  auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-  return provider->GetTracer(kTritonTracer)->StartSpan(display_name, options);
-}
-
 
 void
 TraceManager::Trace::EndSpan(std::string span_key)
@@ -1044,7 +1033,7 @@ TraceManager::TraceFile::SaveTraces(
 }
 
 std::shared_ptr<TraceManager::Trace>
-TraceManager::TraceSetting::SampleTrace(otel_trace_api::SpanContext *span_context)
+TraceManager::TraceSetting::SampleTrace()
 {
   bool create_trace = false;
   {
@@ -1078,27 +1067,6 @@ TraceManager::TraceSetting::SampleTrace(otel_trace_api::SpanContext *span_contex
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceId(trace, &lts->trace_id_),
         "getting trace id");
-    if (mode_ == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-      auto steady_timestamp_ns =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(
-              std::chrono::steady_clock::now().time_since_epoch())
-              .count();
-      opentelemetry::nostd::shared_ptr<otel_trace_api::Span> root_span;
-      if (span_context) {
-        root_span = lts->StartServerSpan("InferRequest", steady_timestamp_ns, *span_context);
-      } else {
-        root_span = lts->StartSpan("InferRequest", steady_timestamp_ns);
-      }
-      // Initializing OTel context and storing "InferRequest" span as a root
-      // span to keep it alive for the duration of the request.
-      lts->otel_context_ =
-          opentelemetry::context::Context({kRootSpan, root_span});
-#else
-      LOG_ERROR << "Unsupported trace mode: "
-                << TraceManager::InferenceTraceModeString(mode_);
-#endif
-    }
     return lts;
   }
   return nullptr;

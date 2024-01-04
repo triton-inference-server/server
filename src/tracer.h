@@ -36,15 +36,18 @@
 #include <unordered_map>
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#include "opentelemetry/context/propagation/global_propagator.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/simple_processor_factory.h"
 #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
 #include "opentelemetry/trace/context.h"
+#include "opentelemetry/trace/propagation/http_trace_context.h"
 #include "opentelemetry/trace/provider.h"
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
+namespace otel_cntxt_propagation = opentelemetry::context::propagation;
 #endif
 
 #include "triton/core/tritonserver.h"
@@ -126,7 +129,7 @@ class TraceManager {
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
-  std::shared_ptr<Trace> SampleTrace(const std::string& model_name, otel_trace_api::SpanContext *span_context = nullptr);
+  std::shared_ptr<Trace> SampleTrace(const std::string& model_name);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -224,12 +227,9 @@ class TraceManager {
         std::string display_name, const uint64_t& raw_timestamp_ns,
         std::string parent_span_key = "");
 
-    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartServerSpan(
-        std::string display_name, const uint64_t& raw_timestamp_ns,
-        const opentelemetry::trace::SpanContext &span_context);
-
     // OTel context to store spans, created in the current trace
-    opentelemetry::context::Context otel_context_;
+    opentelemetry::context::Context otel_context_ =
+        opentelemetry::context::Context();
 
    private:
     // OpenTelemetry SDK relies on system's clock for event timestamps.
@@ -401,7 +401,7 @@ class TraceManager {
         const std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>>&
             streams);
 
-    std::shared_ptr<Trace> SampleTrace(otel_trace_api::SpanContext *span_context = nullptr);
+    std::shared_ptr<Trace> SampleTrace();
 
     const TRITONSERVER_InferenceTraceLevel level_;
     const uint32_t rate_;
