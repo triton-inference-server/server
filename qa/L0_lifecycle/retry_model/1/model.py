@@ -27,7 +27,6 @@
 import json
 import os
 
-import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
