@@ -309,7 +309,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-      TraceInitOptions start_options;
+      TraceStartOptions start_options;
       InferenceTraceMode mode = TRACE_MODE_TRITON;
       trace_manager_->GetTraceMode(request.model_name(), &mode);
       if (mode == TRACE_MODE_OPENTELEMETRY) {
@@ -319,6 +319,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
             GetGlobalPropagator();
         auto ctxt = opentelemetry::context::Context();
         start_options.propagated_context = prop->Extract(carrier, ctxt);
+        otel_trace_api::SpanContext span_context =
+            otel_trace_api::GetSpan(start_options.propagated_context)
+                ->GetContext();
+        if (span_context.IsValid()) {
+          start_options.force_sample = true;
+        }
 #else
         LOG_ERROR << "Unsupported trace mode: "
                   << TraceManager::InferenceTraceModeString(

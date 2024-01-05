@@ -3057,7 +3057,7 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
-  TraceInitOptions start_options;
+  TraceStartOptions start_options;
   InferenceTraceMode mode = TRACE_MODE_TRITON;
   trace_manager_->GetTraceMode(model_name, &mode);
   if (mode == TRACE_MODE_OPENTELEMETRY) {
@@ -3067,6 +3067,11 @@ HTTPAPIServer::StartTrace(
         otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
     auto ctxt = opentelemetry::context::Context();
     start_options.propagated_context = prop->Extract(carrier, ctxt);
+    otel_trace_api::SpanContext span_context =
+        otel_trace_api::GetSpan(start_options.propagated_context)->GetContext();
+    if (span_context.IsValid()) {
+      start_options.force_sample = true;
+    }
 #else
     LOG_ERROR << "Unsupported trace mode: "
               << TraceManager::InferenceTraceModeString(trace->setting_->mode_);

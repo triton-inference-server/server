@@ -77,13 +77,14 @@ typedef enum tracemode_enum {
 } InferenceTraceMode;
 
 /// Options required at Trace initialization
-struct TraceInitOptions {
+struct TraceStartOptions {
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
   opentelemetry::context::Context propagated_context{
       opentelemetry::context::Context{}};
 #else
   void* propagated_context{nullptr};
 #endif
+  bool force_sample{false};
 };
 
 //
@@ -142,7 +143,7 @@ class TraceManager {
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
   std::shared_ptr<Trace> SampleTrace(
-      const std::string& model_name, const TraceInitOptions& start_options);
+      const std::string& model_name, const TraceStartOptions& start_options);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -415,7 +416,7 @@ class TraceManager {
         const std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>>&
             streams);
 
-    std::shared_ptr<Trace> SampleTrace();
+    std::shared_ptr<Trace> SampleTrace(bool force_sample = false);
 
     const TRITONSERVER_InferenceTraceLevel level_;
     const uint32_t rate_;

@@ -1450,8 +1450,8 @@ class GrpcServerCarrier
   }
 
   virtual void Set(
-      opentelemetry::nostd::string_view /* key */,
-      opentelemetry::nostd::string_view /* value */) noexcept override
+      opentelemetry::nostd::string_view key,
+      opentelemetry::nostd::string_view value) noexcept override
   {
     // Not required for server
   }

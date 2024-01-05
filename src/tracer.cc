@@ -310,7 +310,7 @@ TraceManager::GetTraceMode(
 
 std::shared_ptr<TraceManager::Trace>
 TraceManager::SampleTrace(
-    const std::string& model_name, const TraceInitOptions& start_options)
+    const std::string& model_name, const TraceStartOptions& start_options)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -319,7 +319,8 @@ TraceManager::SampleTrace(
     trace_setting =
         (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
   }
-  std::shared_ptr<Trace> ts = trace_setting->SampleTrace();
+  std::shared_ptr<Trace> ts =
+      trace_setting->SampleTrace(start_options.force_sample);
   if (ts != nullptr) {
     ts->setting_ = trace_setting;
     if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
@@ -1067,10 +1068,10 @@ TraceManager::TraceFile::SaveTraces(
 }
 
 std::shared_ptr<TraceManager::Trace>
-TraceManager::TraceSetting::SampleTrace()
+TraceManager::TraceSetting::SampleTrace(bool force_sample)
 {
   bool create_trace = false;
-  {
+  if (rate_ != 0) {
     std::lock_guard<std::mutex> lk(mu_);
     if (!Valid()) {
       return nullptr;
@@ -1081,7 +1082,7 @@ TraceManager::TraceSetting::SampleTrace()
       ++created_;
     }
   }
-  if (create_trace) {
+  if (create_trace || force_sample) {
     std::shared_ptr<TraceManager::Trace> lts(new Trace());
     // Split 'Trace' management to frontend and Triton trace separately
     // to avoid dependency between frontend request and Triton trace's
