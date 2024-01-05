@@ -36,12 +36,8 @@ import requests
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
-custom_pinned_memory_pool_size = os.environ.get("CUSTOM_PINNED_MEMORY_POOL_SIZE")
-if custom_pinned_memory_pool_size is not None:
-    TOTAL_PINNED_MEMORY_SIZE = int(custom_pinned_memory_pool_size)
-else:
-    # Triton server reserves 256 MB for pinned memory by default.
-    TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
+DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28 # bytes, Equivalent to 256 MB
+TOTAL_PINNED_MEMORY_SIZE = int(os.environ.get("CUSTOM_PINNED_MEMORY_POOL_SIZE", DEFAULT_TOTAL_PINNED_MEMORY_SIZE))
 print(f"TOTAL_PINNED_MEMORY_SIZE: {TOTAL_PINNED_MEMORY_SIZE} bytes")
 
 # Pinned memory usage when server is idle (no inference)
