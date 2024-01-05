@@ -290,15 +290,10 @@ class BuildScript:
         self.cmd(f'cmake {" ".join(env_args)} {" ".join(args)}', check_exitcode=True)
 
     def makeinstall(self, target="install"):
-        if target_platform() == "windows":
-            verbose_flag = "" if self._verbose else "-clp:ErrorsOnly"
-            self.cmd(
-                f"msbuild.exe -m:{FLAGS.build_parallel} {verbose_flag} -p:Configuration={FLAGS.build_type} {target}.vcxproj",
-                check_exitcode=True,
-            )
-        else:
-            verbose_flag = "VERBOSE=1" if self._verbose else "VERBOSE=0"
-            self.cmd(f"make -j{FLAGS.build_parallel} {verbose_flag} {target}")
+        verbose_flag = "-v" if self._verbose else ""
+        self.cmd(
+            f"cmake --build . --config {FLAGS.build_type} -j{FLAGS.build_parallel} {verbose_flag} -t {target}"
+        )
 
     def gitclone(self, repo, tag, subdir, org):
         clone_dir = subdir
