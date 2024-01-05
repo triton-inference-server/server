@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/python
 # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -36,19 +36,21 @@ import requests
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
-DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28 # bytes, Equivalent to 256 MB
-TOTAL_PINNED_MEMORY_SIZE = int(os.environ.get("CUSTOM_PINNED_MEMORY_POOL_SIZE", DEFAULT_TOTAL_PINNED_MEMORY_SIZE))
+# Triton server reserves 256 MB for pinned memory by default.
+DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
+TOTAL_PINNED_MEMORY_SIZE = int(
+    os.environ.get("CUSTOM_PINNED_MEMORY_POOL_SIZE", DEFAULT_TOTAL_PINNED_MEMORY_SIZE)
+)
 print(f"TOTAL_PINNED_MEMORY_SIZE: {TOTAL_PINNED_MEMORY_SIZE} bytes")
 
 # Pinned memory usage when server is idle (no inference)
 DEFAULT_USED_PINNED_MEMORY_SIZE = 0  # bytes
 
 
-total_bytes_pattern = re.compile(r"pool_total_bytes (\d+)")
-used_bytes_pattern = re.compile(r"pool_used_bytes (\d+)")
+def get_metrics():
+    total_bytes_pattern = re.compile(r"pool_total_bytes (\d+)")
+    used_bytes_pattern = re.compile(r"pool_used_bytes (\d+)")
 
-
-def _get_metrics():
     r = requests.get("http://localhost:8002/metrics")
     r.raise_for_status()
 
@@ -88,13 +90,13 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
         self._assert_pinned_memory_utilization()
 
     def _assert_pinned_memory_utilization(self):
-        total_bytes_value, used_bytes_value = _get_metrics()
+        total_bytes_value, used_bytes_value = get_metrics()
         self.assertEqual(int(total_bytes_value), TOTAL_PINNED_MEMORY_SIZE)
         self.assertEqual(int(used_bytes_value), DEFAULT_USED_PINNED_MEMORY_SIZE)
 
     def _collect_metrics(self):
         while not self.inference_completed.is_set():
-            total_bytes_value, used_bytes_value = _get_metrics()
+            total_bytes_value, used_bytes_value = get_metrics()
             self.assertEqual(int(total_bytes_value), TOTAL_PINNED_MEMORY_SIZE)
             # Assert pinned memory usage is within anticipated values
             self.assertIn(int(used_bytes_value), [0, 64, 128, 192, 256])
@@ -126,12 +128,12 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
 
             time.sleep(1)
 
-            # Set the event to indicate that inference is completed
-            self.inference_completed.set()
-
             # Wait for all inference requests to complete
             for async_request in async_requests:
                 async_request.get_result()
+
+            # Set the event to indicate that inference is completed
+            self.inference_completed.set()
 
             # Wait for the metrics thread to complete
             metrics_thread.join()
@@ -156,8 +158,9 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
                 response = client.infer(
                     model_name=self.model_name, inputs=self.inputs, outputs=self.outputs
                 )
-
                 response.get_response()
+
+            time.sleep(0.1)
 
             # Set the event to indicate that inference is completed
             self.inference_completed.set()
