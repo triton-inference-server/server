@@ -427,18 +427,18 @@ class ShmLeakDetector:
         def __exit__(self, type, value, traceback):
             if _test_jetson:
                 return
-            current_shm_sizes = []
+            curr_shm_free_sizes = []
             for shm_monitor in self._shm_monitors:
-                current_shm_sizes.append(shm_monitor.free_memory())
+                curr_shm_free_sizes.append(shm_monitor.free_memory())
 
             shm_leak_detected = False
-            for current_shm_size, prev_shm_size in zip(
-                current_shm_sizes, self._shm_region_free_sizes
+            for curr_shm_free_size, prev_shm_free_size in zip(
+                curr_shm_free_sizes, self._shm_region_free_sizes
             ):
-                if current_shm_size > prev_shm_size:
+                if curr_shm_free_size < prev_shm_free_size:
                     shm_leak_detected = True
                     print(
-                        f"[{self._debug_str}] Shared memory leak detected: {current_shm_size} (current) > {prev_shm_size} (prev)."
+                        f"[{self._debug_str}] Shared memory leak detected: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
                     )
             assert (
                 not shm_leak_detected
