@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -132,6 +132,7 @@ struct TritonServerParameters {
   int32_t repository_poll_secs_{15};
   // Number of threads to use for concurrently loading models
   uint32_t model_load_thread_count_{4};
+  uint32_t model_load_retry_count_{0};
   std::map<int, double> load_gpu_limit_;
 
   // Rate limiter configuration

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1936,6 +1936,54 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_load_retry
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+# Start without retry and the server should fail to start
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none \
+             --model-load-retry-count=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# the model should be available/ready
+set +e
+code=`curl -s -w %{http_code} localhost:8000/v2/models/retry_model/ready`
+set -e
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 kill $SERVER_PID
 wait $SERVER_PID
