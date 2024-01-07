@@ -85,7 +85,7 @@ target_include_directories(
 if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
   target_include_directories(
     grpc-endpoint-library
-    PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+    SYSTEM PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
   )
 endif()
 

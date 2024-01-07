@@ -367,7 +367,6 @@ class HTTPAPIServer : public HTTPServer {
     // ensure mutual exclusive access.
     std::mutex res_mtx_;
     std::queue<evbuffer*> pending_http_responses_;
-    bool end_{false};
   };
 
   // Simple structure that carries the userp payload needed for

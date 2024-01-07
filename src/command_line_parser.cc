@@ -2134,7 +2134,7 @@ void
 TritonParser::SetGlobalTraceArgs(
     TritonServerParameters& lparams, bool trace_level_present,
     bool trace_rate_present, bool trace_count_present,
-    bool explicit_disable_trace)
+    bool& explicit_disable_trace)
 {
   for (const auto& global_setting : lparams.trace_config_map_[""]) {
     try {

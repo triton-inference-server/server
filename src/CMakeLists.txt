@@ -244,7 +244,7 @@ if(${TRITON_ENABLE_TRACING})
   if (NOT WIN32)
     target_include_directories(
       main
-      PRIVATE
+      SYSTEM PRIVATE
         ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
   endif()
@@ -397,7 +397,7 @@ if(${TRITON_ENABLE_HTTP}
   if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
     target_include_directories(
       http-endpoint-library
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      SYSTEM PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
   endif()
 
@@ -512,7 +512,7 @@ if(${TRITON_ENABLE_TRACING})
 
     target_include_directories(
       tracing-library
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      SYSTEM PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(

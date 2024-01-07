@@ -298,7 +298,7 @@ class TritonParser {
   void SetGlobalTraceArgs(
       TritonServerParameters& lparams, bool trace_level_present,
       bool trace_rate_present, bool trace_count_present,
-      bool explicit_disable_trace);
+      bool& explicit_disable_trace);
   void SetTritonTraceArgs(
       TritonServerParameters& lparams, bool trace_filepath_present,
       bool trace_log_frequency_present);

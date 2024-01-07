@@ -310,7 +310,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
       state->trace_ =
-          std::move(trace_manager_->SampleTrace(request.model_name()));
+          trace_manager_->SampleTrace(request.model_name());
       if (state->trace_ != nullptr) {
         triton_trace = state->trace_->trace_;
       }

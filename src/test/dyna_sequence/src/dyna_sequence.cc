@@ -681,7 +681,7 @@ TRITONBACKEND_ModelInstanceExecute(
           responses, r,
           TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
     } else if (model_state->CorrelationIdType() == "TYPE_STRING") {
-      const char* correlation_id_str;
+      const char* correlation_id_str = "";
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_RequestCorrelationIdString(

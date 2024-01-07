@@ -3056,7 +3056,7 @@ HTTPAPIServer::StartTrace(
 {
 #ifdef TRITON_ENABLE_TRACING
   std::shared_ptr<TraceManager::Trace> trace;
-  trace = std::move(trace_manager_->SampleTrace(model_name));
+  trace = trace_manager_->SampleTrace(model_name);
   if (trace != nullptr) {
     *triton_trace = trace->trace_;
 
