@@ -71,7 +71,7 @@ AWS_ACCESS_KEY_ID_BACKUP=$AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_TIMEOUT=420
+SERVER_TIMEOUT=600
 
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
