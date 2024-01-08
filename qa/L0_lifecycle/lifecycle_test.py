@@ -33,6 +33,7 @@ sys.path.append("../common")
 import base64
 import concurrent.futures
 import json
+import multiprocessing
 import os
 import shutil
 import signal
@@ -2995,6 +2996,16 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
+    # TODO: Consider revisiting this test
+    # The goal of this test is only to ensure the server does not crash when
+    # bombarded with concurrent load/unload requests for the same model.
+    # Some clean-up:
+    # 1. Improve core logic so all load/unload requests will always success, so
+    #    'load_fail_reasons' and 'unload_fail_reasons' can be removed.
+    # 2. Is it still necessary to track the ability to replicate a load while
+    #    async unloading?
+    # 3. What is the ideal number of threads and iterations, across different
+    #    machines, that the server is sufficiently stressed?
     def test_concurrent_same_model_load_unload_stress(self):
         model_name = "identity_zero_1_int32"
         num_threads = 32
@@ -3062,10 +3073,16 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
-        self.assertTrue(
-            load_before_unload_finish[0],
-            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
-        )
+
+        # This test can replicate a load while async unloading on machines with
+        # sufficient concurrency. Regardless on whether it is replicated or not,
+        # the server must not crash.
+        if load_before_unload_finish[0] == False:
+            # Track non-replication on test printout via statistics.
+            warning_msg = "Cannot replicate a load while async unloading. CPU count: {}. num_threads: {}.".format(
+                multiprocessing.cpu_count(), num_threads
+            )
+            global_exception_stats[warning_msg] = 1
 
         stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
         with open(stats_path, mode="w", encoding="utf-8") as f:
