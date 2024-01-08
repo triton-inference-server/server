@@ -243,7 +243,7 @@ echo -e "\"s_server\":\"triton\"," >>${NAME}.tjson
 echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >>${NAME}.tjson
 echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >>${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >>${NAME}.tjson
-echo -e "\"s_concurrency\":\"${CONCURRENCY}\"," >>${NAME}.tjson
+echo -e "\"l_concurrency\":${CONCURRENCY}," >>${NAME}.tjson
 echo -e "\"l_batch_size\":${STATIC_BATCH}," >>${NAME}.tjson
 echo -e "\"l_instance_count\":${INSTANCE_CNT}," >>${NAME}.tjson
 echo -e "\"s_architecture\":\"${ARCH}\"}]" >>${NAME}.tjson
