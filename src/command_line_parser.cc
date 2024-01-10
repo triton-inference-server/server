@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -359,6 +359,7 @@ enum TritonOptionId {
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_MODEL_LOAD_THREAD_COUNT,
+  OPTION_MODEL_LOAD_RETRY_COUNT,
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
@@ -435,6 +436,10 @@ TritonParser::SetupOptions()
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
        "model repositories. Default is 4."});
+  model_repo_options_.push_back(
+      {OPTION_MODEL_LOAD_RETRY_COUNT, "model-load-retry-count", Option::ArgInt,
+       "The number of retry to load a model in "
+       "model repositories. Default is 0."});
   model_repo_options_.push_back(
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
@@ -1065,6 +1070,11 @@ TritonServerParameters::BuildTritonServerOptions()
       "setting model load thread count");
   THROW_IF_ERR(
       ParseException,
+      TRITONSERVER_ServerOptionsSetModelLoadRetryCount(
+          loptions, std::max(0u, model_load_retry_count_)),
+      "setting model load thread count");
+  THROW_IF_ERR(
+      ParseException,
       TRITONSERVER_ServerOptionsSetModelNamespacing(
           loptions, enable_model_namespacing_),
       "setting model namespacing");
@@ -1659,6 +1669,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_MODEL_LOAD_THREAD_COUNT:
           lparams.model_load_thread_count_ = ParseOption<int>(optarg);
+          break;
+        case OPTION_MODEL_LOAD_RETRY_COUNT:
+          lparams.model_load_retry_count_ = ParseOption<int>(optarg);
           break;
         case OPTION_BACKEND_CONFIG:
           lparams.backend_config_settings_.push_back(

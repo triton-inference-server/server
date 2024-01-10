@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.40.0'
+  publishedVersion: '2.41.0'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -89,7 +89,7 @@ properties:
   modelRepositoryPath:
     type: string
     title: Bucket where models are stored. Please make sure the user/service account to create the GKE app has permission to this GCS bucket. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
-    default: gs://triton_sample_models/23_09
+    default: gs://triton_sample_models/23_12
   image.ldPreloadPath:
     type: string
     title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.

@@ -118,10 +118,6 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   void Handle(evhtp_request_t* req) override;
 
-  /* Method to return 507 on invoke i.e. during SageMakerMMEHandleInfer
-   */
-  static void BADReplyCallback507(evthr_t* thr, void* arg, void* shared);
-
   std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
       const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)

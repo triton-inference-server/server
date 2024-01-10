@@ -460,7 +460,7 @@ rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -473,7 +473,7 @@ rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -600,6 +600,17 @@ cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element &&
     (cd $MODELDIR/onnx_zero_1_object_1_element && \
         sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
         sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
+# Model for error code test
+cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
+    (cd $MODELDIR/onnx_zero_1_float32_queue && \
+        sed -i "s/onnx_zero_1_float32/onnx_zero_1_float32_queue/" config.pbtxt && \
+        echo "dynamic_batching { " >> config.pbtxt && \
+        echo "    max_queue_delay_microseconds: 1000000" >> config.pbtxt && \
+        echo "    preferred_batch_size: [ 8 ]" >> config.pbtxt && \
+        echo "    default_queue_policy {" >> config.pbtxt && \
+        echo "        max_queue_size: 1" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "}" >> config.pbtxt)
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
@@ -613,7 +624,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=8
+EXPECTED_NUM_TESTS=9
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then

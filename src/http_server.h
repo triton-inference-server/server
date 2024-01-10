@@ -260,8 +260,7 @@ class HTTPAPIServer : public HTTPServer {
     // lifetime of the request.
     std::list<std::vector<char>> serialized_data_;
 
-    static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-    static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+    static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
    protected:
     TRITONSERVER_Server* server_;
@@ -280,6 +279,8 @@ class HTTPAPIServer : public HTTPServer {
     // request and must not reference it after a successful
     // TRITONSERVER_ServerInferAsync (except for cancellation).
     std::shared_ptr<TRITONSERVER_InferenceRequest> triton_request_{nullptr};
+
+    evhtp_res response_code_{EVHTP_RES_OK};
   };
 
   class GenerateRequestClass : public InferRequestClass {
@@ -367,8 +368,6 @@ class HTTPAPIServer : public HTTPServer {
     std::mutex res_mtx_;
     std::queue<evbuffer*> pending_http_responses_;
     bool end_{false};
-    // starting response code
-    evhtp_res response_code_;
   };
 
   // Simple structure that carries the userp payload needed for
