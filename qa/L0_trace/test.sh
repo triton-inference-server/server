@@ -698,68 +698,28 @@ set +e
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
-export TRITON_OPENTELEMETRY_TEST='false'
 OTLP_PORT=10000
-OTEL_COLLECTOR_DIR=./opentelemetry-collector
-OTEL_COLLECTOR=./opentelemetry-collector/bin/otelcorecol_*
+OTEL_COLLECTOR=./otelcol
 OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 
-# Building OpenTelemetry collector (v0.82.0).
+# Installing OpenTelemetry collector (v0.91.0).
 # Ref: https://opentelemetry.io/docs/collector/getting-started/#local
-if [ -d "$OTEL_COLLECTOR_DIR" ]; then rm -Rf $OTEL_COLLECTOR_DIR; fi
-git clone --depth 1 --branch v0.82.0 https://github.com/open-telemetry/opentelemetry-collector.git
-cd $OTEL_COLLECTOR_DIR
-make install-tools
-make otelcorecol
-cd ..
-$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
-
-
-SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=100 --trace-config=mode=opentelemetry \
-                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
-                --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_otel_http_exporter.log"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-$SIMPLE_HTTP_CLIENT >>$CLIENT_LOG 2>&1
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
-
-set +e
-
-if ! [[ -s $OTEL_COLLECTOR_LOG && `grep -c 'InstrumentationScope triton-server' $OTEL_COLLECTOR_LOG` == 3 ]] ; then
-    echo -e "\n***\n*** HTTP exporter test failed.\n***"
-    cat $OTEL_COLLECTOR_LOG
-    exit 1
-fi
+curl --proto '=https' --tlsv1.2 -fOL https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.91.0/otelcol_0.91.0_linux_amd64.tar.gz
+tar -xvf otelcol_0.91.0_linux_amd64.tar.gz
 
 
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="3"
-
-export TRITON_OPENTELEMETRY_TEST='true'
+EXPECTED_NUM_TESTS="11"
 
 SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=100 --trace-config=mode=opentelemetry \
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
                 --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_otel_ostream_exporter.log"
+SERVER_LOG="./inference_server_otel_otelcol_exporter.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -769,27 +729,6 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-# Preparing traces for unittest.
-# Note: running this separately, so that I could extract spans with `grep`
-# from server log later.
-python -c 'import opentelemetry_unittest; \
-        opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
-
-sleep 5
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-
-grep -z -o -P '({\n(?s).*}\n)' $SERVER_LOG >> trace_collector.log
-
-if ! [ -s trace_collector.log ] ; then
-    echo -e "\n***\n*** $SERVER_LOG did not contain any OpenTelemetry spans.\n***"
-    exit 1
-fi
 
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -803,5 +742,12 @@ else
         RET=1
     fi
 fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
 
 exit $RET

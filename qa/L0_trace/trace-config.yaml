@@ -32,23 +32,20 @@ receivers:
   otlp:
     protocols:
       http:
-        endpoint: 0.0.0.0:4318
+        endpoint: 0.0.0.0:10000
 
 processors:
   batch:
-    send_batch_size: 3
-    timeout: 5s
+    send_batch_size: 10
+    timeout: 10s
 
 exporters:
   file:
-    path: /mnt/Code/filename.log
-
-  debug:
-    verbosity: detailed
+    path: ./collected_traces.json
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, file]
+      exporters: [file]
