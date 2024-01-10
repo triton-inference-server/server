@@ -418,27 +418,27 @@ class ShmLeakDetector:
         def __enter__(self):
             if _test_jetson:
                 return self
-            self._shm_region_free_sizes = []
-            for shm_monitor in self._shm_monitors:
-                self._shm_region_free_sizes.append(shm_monitor.free_memory())
+            self._shm_region_free_sizes = {}
+            for shm_region, shm_monitor in self._shm_monitors.items():
+                self._shm_region_free_sizes[shm_region] = shm_monitor.free_memory()
 
             return self
 
         def __exit__(self, type, value, traceback):
             if _test_jetson:
                 return
-            curr_shm_free_sizes = []
-            for shm_monitor in self._shm_monitors:
-                curr_shm_free_sizes.append(shm_monitor.free_memory())
+            curr_shm_free_sizes = {}
+            for shm_region, shm_monitor in self._shm_monitors.items():
+                curr_shm_free_sizes[shm_region] = shm_monitor.free_memory()
 
             shm_leak_detected = False
-            for curr_shm_free_size, prev_shm_free_size in zip(
-                curr_shm_free_sizes, self._shm_region_free_sizes
-            ):
+            for shm_region in curr_shm_free_sizes:
+                curr_shm_free_size = curr_shm_free_sizes[shm_region]
+                prev_shm_free_size = self._shm_region_free_sizes[shm_region]
                 if curr_shm_free_size < prev_shm_free_size:
                     shm_leak_detected = True
                     print(
-                        f"[{self._debug_str}] Shared memory leak detected: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
+                        f"[{self._debug_str}] Shared memory leak detected [{shm_region}]: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
                     )
             assert (
                 not shm_leak_detected
@@ -449,12 +449,12 @@ class ShmLeakDetector:
             return
         import triton_shm_monitor
 
-        self._shm_monitors = []
+        self._shm_monitors = {}
         shm_regions = listdir("/dev/shm")
         for shm_region in shm_regions:
             if shm_region.startswith(prefix):
-                self._shm_monitors.append(
-                    triton_shm_monitor.SharedMemoryManager(shm_region)
+                self._shm_monitors[shm_region] = triton_shm_monitor.SharedMemoryManager(
+                    shm_region
                 )
 
     def Probe(self, debug_str=""):
