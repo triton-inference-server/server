@@ -101,11 +101,7 @@ class IOTest(tu.TestResultCollector):
                             self.assertTrue(np.all(output0 == input0))
 
     def test_ensemble_io(self):
-        # Only run the shared memory leak detection with the default trial
-        if TRIAL == "default":
-            with self._shm_leak_detector.Probe():
-                self._run_ensemble_test()
-        else:
+        with self._shm_leak_detector.Probe():
             self._run_ensemble_test()
 
     def test_empty_gpu_output(self):
