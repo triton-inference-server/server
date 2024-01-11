@@ -78,7 +78,7 @@ function build_gpt2_base_model {
     pushd gpt2 && rm pytorch_model.bin model.safetensors && wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin && popd
 
     # Convert weights from HF Tranformers to FT format
-    python3 hf_gpt_convert.py -p 8 -i gpt2 -o ./c-model/gpt2 --tensor-parallelism ${NUM_GPUS} --storage-type float16
+    python3 hf_gpt_convert.py -p 1 -i gpt2 -o ./c-model/gpt2 --tensor-parallelism ${NUM_GPUS} --storage-type float16
     cd ${BASE_DIR}
 }
 
