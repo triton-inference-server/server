@@ -327,8 +327,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         }
 #else
         LOG_ERROR << "Unsupported trace mode: "
-                  << TraceManager::InferenceTraceModeString(
-                         state->trace_->setting_->mode_);
+                  << TraceManager::InferenceTraceModeString(mode);
 #endif
       }
       state->trace_ = std::move(

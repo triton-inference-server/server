@@ -934,8 +934,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
       }
 #else
       LOG_ERROR << "Unsupported trace mode: "
-                << TraceManager::InferenceTraceModeString(
-                       state->trace_->setting_->mode_);
+                << TraceManager::InferenceTraceModeString(mode);
 #endif
     }
     state->trace_ = std::move(

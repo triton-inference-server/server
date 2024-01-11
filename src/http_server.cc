@@ -3072,7 +3072,7 @@ HTTPAPIServer::StartTrace(
     }
 #else
     LOG_ERROR << "Unsupported trace mode: "
-              << TraceManager::InferenceTraceModeString(trace->setting_->mode_);
+              << TraceManager::InferenceTraceModeString(mode);
 #endif
   }
   std::shared_ptr<TraceManager::Trace> trace;
