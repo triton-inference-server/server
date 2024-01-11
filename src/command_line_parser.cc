@@ -1072,7 +1072,7 @@ TritonServerParameters::BuildTritonServerOptions()
       ParseException,
       TRITONSERVER_ServerOptionsSetModelLoadRetryCount(
           loptions, std::max(0u, model_load_retry_count_)),
-      "setting model load thread count");
+      "setting model load retry count");
   THROW_IF_ERR(
       ParseException,
       TRITONSERVER_ServerOptionsSetModelNamespacing(
