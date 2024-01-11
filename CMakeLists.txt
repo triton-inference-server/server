@@ -30,6 +30,9 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
+# Use C++17 standard as Triton's minimum required.
+set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+
 set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
 
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
@@ -260,6 +263,7 @@ ExternalProject_Add(triton-server
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
+    -DTRITON_MIN_CXX_STANDARD:STRING=${TRITON_MIN_CXX_STANDARD}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
     -DTRITON_VERSION:STRING=${TRITON_VERSION}
