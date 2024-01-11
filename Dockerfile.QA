@@ -150,7 +150,7 @@ RUN mkdir -p qa/common && \
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
-    cp python/test/. qa/L0_python_api/.
+    cp -r python/test/. qa/L0_python_api/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f bin/caffe2plan ]; then \
