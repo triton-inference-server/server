@@ -922,7 +922,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     if (mode == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
       const GrpcServerCarrier carrier(state->context_->ctx_.get());
-      auto prop = otel_cntxt_propagation::GlobalTextMapPropagator::
+      auto prop = otel_cntxt::propagation::GlobalTextMapPropagator::
           GetGlobalPropagator();
       auto ctxt = opentelemetry::context::Context();
       start_options.propagated_context = prop->Extract(carrier, ctxt);

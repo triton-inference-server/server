@@ -36,18 +36,14 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
-#include "opentelemetry/context/propagation/global_propagator.h"
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
-#include "opentelemetry/trace/propagation/http_trace_context.h"
-
 namespace otlp = opentelemetry::exporter::otlp;
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_common = opentelemetry::common;
 namespace otel_resource = opentelemetry::sdk::resource;
 #endif
-
 
 namespace triton { namespace server {
 
@@ -275,7 +271,7 @@ void
 TraceManager::GetTraceSetting(
     const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
     uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-    std::string* filepath, InferenceTraceMode* mode)
+    std::string* filepath)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -290,7 +286,6 @@ TraceManager::GetTraceSetting(
   *count = trace_setting->count_;
   *log_frequency = trace_setting->log_frequency_;
   *filepath = trace_setting->file_->FileName();
-  *mode = trace_setting->mode_;
 }
 
 void

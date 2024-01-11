@@ -1767,8 +1767,6 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   int32_t count;
   uint32_t log_frequency;
   std::string filepath;
-  InferenceTraceMode mode = TRACE_MODE_TRITON;
-
   if (!model_name.empty()) {
     bool ready = false;
     RETURN_AND_RESPOND_IF_ERR(
@@ -1964,7 +1962,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      model_name, &level, &rate, &count, &log_frequency, &filepath, &mode);
+      model_name, &level, &rate, &count, &log_frequency, &filepath);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level

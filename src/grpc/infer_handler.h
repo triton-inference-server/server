@@ -1449,11 +1449,12 @@ class GrpcServerCarrier
     return "";
   }
 
+  // Not required on server side
   virtual void Set(
       opentelemetry::nostd::string_view key,
       opentelemetry::nostd::string_view value) noexcept override
   {
-    // Not required for server
+    return;
   }
 
   ::grpc::ServerContext* context_;

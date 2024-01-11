@@ -614,5 +614,4 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, const Restriction& restriction);
 };
 
-
 }}  // namespace triton::server

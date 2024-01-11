@@ -37,7 +37,6 @@
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 #include "opentelemetry/context/propagation/global_propagator.h"
-#include "opentelemetry/context/runtime_context.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/processor.h"
@@ -48,7 +47,6 @@
 #include "opentelemetry/trace/provider.h"
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
-namespace otel_cntxt_propagation = opentelemetry::context::propagation;
 namespace otel_cntxt = opentelemetry::context;
 #endif
 
@@ -153,7 +151,7 @@ class TraceManager {
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-      std::string* filepath, InferenceTraceMode* mode);
+      std::string* filepath);
 
   void GetTraceMode(const std::string& model_name, InferenceTraceMode* mode);
 
