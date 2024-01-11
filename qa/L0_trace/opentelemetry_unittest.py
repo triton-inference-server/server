@@ -37,6 +37,7 @@ import unittest
 from functools import partial
 
 import numpy as np
+import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -53,17 +54,23 @@ def callback(user_data, result, error):
         user_data.put(result)
 
 
-def prepare_data(client):
+def prepare_data(client, is_binary=True):
     inputs = []
-    input0_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
-    input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
-
+    input_data = np.array(
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], dtype=np.int32
+    )
     inputs.append(client.InferInput("INPUT0", [1, 16], "INT32"))
     inputs.append(client.InferInput("INPUT1", [1, 16], "INT32"))
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data)
-    inputs[1].set_data_from_numpy(input1_data)
+    input_data = np.expand_dims(input_data, axis=0)
+
+    if is_binary:
+        inputs[0].set_data_from_numpy(input_data)
+        inputs[1].set_data_from_numpy(input_data)
+    else:
+        inputs[0].set_data_from_numpy(input_data, binary_data=is_binary)
+        inputs[1].set_data_from_numpy(input_data, binary_data=is_binary)
 
     return inputs
 
@@ -677,6 +684,67 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 expected_trace_rate, simple_model_trace_settings["trace_rate"]
             ),
         )
+
+    def test_sagemaker_invocation_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, SageMaker (invocations) and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        inputs = prepare_data(httpclient, is_binary=False)
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(inputs)
+        self.client_headers["Content-Type"] = "application/json"
+        r = requests.post(
+            "http://localhost:8080/invocations",
+            data=request_body,
+            headers=self.client_headers,
+        )
+        r.raise_for_status()
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+        self._test_simple_trace(headers=self.client_headers)
+
+    def test_sagemaker_invoke_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, SageMaker (invoke) and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        # Loading model for this test
+        model_url = "/opt/ml/models/123456789abcdefghi/model"
+        request_body = {"model_name": self.simple_model_name, "url": model_url}
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(
+            "http://localhost:8080/models",
+            data=json.dumps(request_body),
+            headers=headers,
+        )
+        time.sleep(5)  # wait for model to load
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+
+        inputs = prepare_data(httpclient, is_binary=False)
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(inputs)
+
+        self.client_headers["Content-Type"] = "application/json"
+        invoke_url = "{}/{}/invoke".format(
+            "http://localhost:8080/models", self.simple_model_name
+        )
+        r = requests.post(invoke_url, data=request_body, headers=self.client_headers)
+        r.raise_for_status()
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+        time.sleep(5)
+        self._test_simple_trace(headers=self.client_headers)
 
 
 if __name__ == "__main__":

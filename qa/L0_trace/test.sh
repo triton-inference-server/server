@@ -707,14 +707,26 @@ OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 curl --proto '=https' --tlsv1.2 -fOL https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.91.0/otelcol_0.91.0_linux_amd64.tar.gz
 tar -xvf otelcol_0.91.0_linux_amd64.tar.gz
 
-
+rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="11"
+EXPECTED_NUM_TESTS="13"
 
-SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+# Set up repo and args for SageMaker
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
+MODEL_PATH="/opt/ml/models/123456789abcdefghi/model"
+rm -r ${MODEL_PATH}
+mkdir -p "${MODEL_PATH}"
+cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
+    rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
+        sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
+
+
+SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
+                --load-model=simple --load-model="ensemble_add_sub_int32_int32_int32" \
+                --load-model=bls_simple --trace-config=level=TIMESTAMPS \
+                --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
@@ -749,5 +761,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
+
+
 
 exit $RET

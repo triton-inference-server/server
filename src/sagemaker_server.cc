@@ -459,40 +459,8 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-  TraceStartOptions start_options;
-  InferenceTraceMode mode = TRACE_MODE_TRITON;
-  trace_manager_->GetTraceMode(model_name, &mode);
-  if (mode == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-    const HttpTextMapCarrier carrier(req->headers_in);
-    auto prop =
-        otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
-    auto ctxt = opentelemetry::context::Context();
-    start_options.propagated_context = prop->Extract(carrier, ctxt);
-    otel_trace_api::SpanContext span_context =
-        otel_trace_api::GetSpan(start_options.propagated_context)->GetContext();
-    if (span_context.IsValid()) {
-      start_options.force_sample = true;
-    }
-#else
-    LOG_ERROR << "Unsupported trace mode: "
-              << TraceManager::InferenceTraceModeString(trace->setting_->mode_);
-#endif
-  }
-  std::shared_ptr<TraceManager::Trace> trace;
-  if (err == nullptr) {
-    trace = std::move(trace_manager_->SampleTrace(model_name, start_options));
-    if (trace != nullptr) {
-      triton_trace = trace->trace_;
-      // Timestamps from evhtp are capture in 'req'. We record here
-      // since this is the first place where we have access to trace
-      // manager.
-      trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
-      trace->CaptureTimestamp("HTTP_RECV_END", req->recv_end_ns);
-    }
-  }
-#endif  // TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace =
+      StartTrace(req, model_name, &triton_trace);
 
   // Create the inference request object which provides all information needed
   // for an inference.
