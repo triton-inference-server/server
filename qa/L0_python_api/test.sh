@@ -42,7 +42,7 @@ fi
 
 API_TEST_LOG="./python_api.log"
 
-python test_api.py > $API_TEST_LOG 2>&1
+python -m pytest test_api.py > $API_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $API_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
