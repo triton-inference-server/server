@@ -81,6 +81,7 @@ TRITON_VERSION_MAP = {
         "0.2.3",  # vLLM version
     )
 }
+TRITON_VERSION_MAP["2.41.0dev"] = TRITON_VERSION_MAP["2.41.0"]
 
 CORE_BACKENDS = ["ensemble"]
 
