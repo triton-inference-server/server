@@ -298,6 +298,34 @@ TraceManager::GetTraceSetting(
       (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
 }
 
+TraceManager::TraceStartOptions
+TraceManager::GetTraceStartOptions(
+    otel_cntxt::propagation::TextMapCarrier& carrier,
+    const std::string& model_name)
+{
+  TraceManager::TraceStartOptions start_options;
+  GetTraceSetting(model_name, start_options.trace_setting);
+  if (start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+    auto prop =
+        otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+    auto ctxt = otel_cntxt::Context();
+    ctxt = prop->Extract(carrier, ctxt);
+    otel_trace_api::SpanContext span_context =
+        otel_trace_api::GetSpan(ctxt)->GetContext();
+    if (span_context.IsValid()) {
+      start_options.propagated_context = ctxt;
+      start_options.force_sample = true;
+    }
+#else
+    LOG_ERROR << "Unsupported trace mode: "
+              << TraceManager::InferenceTraceModeString(
+                     start_options.trace_setting.mode_);
+#endif  // _WIN32
+  }
+  return start_options;
+}
+
 
 std::shared_ptr<TraceManager::Trace>
 TraceManager::SampleTrace(const TraceStartOptions& start_options)
@@ -411,13 +439,10 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
               std::move(processor), resource);
 
       otel_trace_api::Provider::SetTracerProvider(provider);
-
-      // set global propagator
-      opentelemetry::context::propagation::GlobalTextMapPropagator::
-          SetGlobalPropagator(
-              opentelemetry::nostd::shared_ptr<
-                  opentelemetry::context::propagation::TextMapPropagator>(
-                  new opentelemetry::trace::propagation::HttpTraceContext()));
+      otel_cntxt::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
+          opentelemetry::nostd::shared_ptr<
+              otel_cntxt::propagation::TextMapPropagator>(
+              new otel_trace_api::propagation::HttpTraceContext()));
       break;
 #else
       LOG_ERROR << "Unsupported trace mode: "
@@ -1048,7 +1073,8 @@ std::shared_ptr<TraceManager::Trace>
 TraceManager::TraceSetting::SampleTrace(bool force_sample)
 {
   bool create_trace = false;
-  if (rate_ != 0) {
+  // [FIXME] current WAR for initiating trace based on propagated context
+  if (!force_sample && rate_ != 0) {
     std::lock_guard<std::mutex> lk(mu_);
     if (!Valid()) {
       return nullptr;

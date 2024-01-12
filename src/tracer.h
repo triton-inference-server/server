@@ -48,6 +48,9 @@
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_cntxt = opentelemetry::context;
+#elif defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#include <any>
+using otel_cntxt::propagation::TextMapCarrier = std::any;
 #endif
 
 #include "triton/core/tritonserver.h"
@@ -73,7 +76,6 @@ typedef enum tracemode_enum {
   /// OpenTelemetry API for tracing
   TRACE_MODE_OPENTELEMETRY = 1
 } InferenceTraceMode;
-
 
 //
 // Manager for tracing to a file.
@@ -131,14 +133,17 @@ class TraceManager {
   /// Options required at Trace initialization
   struct TraceStartOptions {
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-    opentelemetry::context::Context propagated_context{
-        opentelemetry::context::Context{}};
+    otel_cntxt::Context propagated_context{otel_cntxt::Context{}};
 #else
     void* propagated_context{nullptr};
 #endif
     std::shared_ptr<TraceSetting> trace_setting{nullptr};
     bool force_sample{false};
   };
+
+  TraceStartOptions GetTraceStartOptions(
+      otel_cntxt::propagation::TextMapCarrier& carrier,
+      const std::string& model_name);
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.

@@ -1433,14 +1433,8 @@ class ModelInferHandler
   grpc_compression_level compression_level_;
 };
 
-#if defined(TRITON_ENABLE_TRACING)
-TraceManager::TraceStartOptions GetTraceStartOptions(
-    TraceManager* trace_manager, ::grpc::ServerContext* context,
-    const std::string& model_name);
-
-#if !defined(_WIN32)
-class GrpcServerCarrier
-    : public opentelemetry::context::propagation::TextMapCarrier {
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
  public:
   GrpcServerCarrier(::grpc::ServerContext* context) : context_(context) {}
   GrpcServerCarrier() = default;
@@ -1464,8 +1458,8 @@ class GrpcServerCarrier
 
   ::grpc::ServerContext* context_;
 };
-#endif  // _WIN32
-
+#elif defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+using GrpcServerCarrier = std::any;
 #endif  // TRITON_ENABLE_TRACING
 
 }}}  // namespace triton::server::grpc

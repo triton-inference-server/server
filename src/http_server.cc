@@ -3055,8 +3055,9 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
+  HttpTextMapCarrier carrier(req->headers_in);
   auto start_options =
-      GetTraceStartOptions(trace_manager_, req->headers_in, model_name);
+      trace_manager_->GetTraceStartOptions(carrier, model_name);
   std::shared_ptr<TraceManager::Trace> trace;
   trace = std::move(trace_manager_->SampleTrace(start_options));
   if (trace != nullptr) {
@@ -4641,36 +4642,5 @@ HTTPAPIServer::RespondIfRestricted(
   }
   return false;
 }
-
-#ifdef TRITON_ENABLE_TRACING
-TraceManager::TraceStartOptions
-GetTraceStartOptions(
-    TraceManager* trace_manager, evhtp_kvs_t* headers,
-    const std::string& model_name)
-{
-  TraceManager::TraceStartOptions start_options;
-  trace_manager->GetTraceSetting(model_name, start_options.trace_setting);
-  if (start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-    const HttpTextMapCarrier carrier(headers);
-    auto prop =
-        otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
-    auto ctxt = opentelemetry::context::Context();
-    ctxt = prop->Extract(carrier, ctxt);
-    otel_trace_api::SpanContext span_context =
-        otel_trace_api::GetSpan(ctxt)->GetContext();
-    if (span_context.IsValid()) {
-      start_options.propagated_context = ctxt;
-      start_options.force_sample = true;
-    }
-#else
-    LOG_ERROR << "Unsupported trace mode: "
-              << TraceManager::InferenceTraceModeString(
-                     start_options.trace_setting.mode_);
-#endif
-  }
-  return start_options;
-}
-#endif  // TRITON_ENABLE_TRACING
 
 }}  // namespace triton::server
