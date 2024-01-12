@@ -56,11 +56,10 @@ def callback(user_data, result, error):
 
 def prepare_data(client, is_binary=True):
     inputs = []
-    input_data = np.array(
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], dtype=np.int32
-    )
-    inputs.append(client.InferInput("INPUT0", [1, 16], "INT32"))
-    inputs.append(client.InferInput("INPUT1", [1, 16], "INT32"))
+    dim = 16
+    input_data = np.arange(dim, dtype=np.int32)
+    inputs.append(client.InferInput("INPUT0", [1, dim], "INT32"))
+    inputs.append(client.InferInput("INPUT1", [1, dim], "INT32"))
 
     # Initialize the data
     input_data = np.expand_dims(input_data, axis=0)
