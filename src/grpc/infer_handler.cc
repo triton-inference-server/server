@@ -916,35 +916,9 @@ ModelInferHandler::Execute(InferHandler::State* state)
   if (err == nullptr) {
     TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-    TraceStartOptions start_options;
-    {
-      std::lock_guard<std::mutex> r_lk(r_mu_);
-      auto m_it = trace_manager_->model_settings_.find(model_name);
-      start_options.trace_setting =
-          (m_it == trace_manager_->model_settings_.end()) ? global_setting_
-                                                          : m_it->second;
-    }
-    if (mode == TRACE_MODE_OPENTELEMETRY) {
-#ifndef _WIN32
-      const GrpcServerCarrier carrier(state->context_->ctx_.get());
-      auto prop = otel_cntxt::propagation::GlobalTextMapPropagator::
-          GetGlobalPropagator();
-      auto ctxt = opentelemetry::context::Context();
-      start_options.propagated_context = prop->Extract(carrier, ctxt);
-      otel_trace_api::SpanContext span_context =
-          otel_trace_api::GetSpan(start_options.propagated_context)
-              ->GetContext();
-      if (span_context.IsValid()) {
-        start_options.force_sample = true;
-      }
-#else
-      LOG_ERROR << "Unsupported trace mode: "
-                << TraceManager::InferenceTraceModeString(
-                       start_options.trace_setting->mode_);
-#endif
-    }
-    state->trace_ = std::move(
-        trace_manager_->SampleTrace(request.model_name(), start_options));
+    auto start_options = GetTraceStartOptions(
+        trace_manager_, state->context_->ctx_.get(), request.model_name());
+    state->trace_ = std::move(trace_manager_->SampleTrace(start_options));
     if (state->trace_ != nullptr) {
       triton_trace = state->trace_->trace_;
     }
@@ -1091,5 +1065,36 @@ ModelInferHandler::InferResponseComplete(
     delete response;
   }
 }
+
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+TraceManager::TraceStartOptions
+GetTraceStartOptions(
+    TraceManager* trace_manager, ::grpc::ServerContext* context,
+    const std::string& model_name)
+{
+  TraceManager::TraceStartOptions start_options;
+  trace_manager->GetTraceSetting(model_name, start_options.trace_setting);
+  if (start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
+    const GrpcServerCarrier carrier(context);
+    auto prop =
+        otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
+    auto ctxt = opentelemetry::context::Context();
+    ctxt = prop->Extract(carrier, ctxt);
+    otel_trace_api::SpanContext span_context =
+        otel_trace_api::GetSpan(ctxt)->GetContext();
+    if (span_context.IsValid()) {
+      start_options.propagated_context = ctxt;
+      start_options.force_sample = true;
+    }
+#else
+    LOG_ERROR << "Unsupported trace mode: "
+              << TraceManager::InferenceTraceModeString(
+                     start_options.trace_setting.mode_);
+#endif
+  }
+  return start_options;
+}
+#endif  // TRITON_ENABLE_TRACING
 
 }}}  // namespace triton::server::grpc

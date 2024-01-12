@@ -74,17 +74,6 @@ typedef enum tracemode_enum {
   TRACE_MODE_OPENTELEMETRY = 1
 } InferenceTraceMode;
 
-/// Options required at Trace initialization
-struct TraceStartOptions {
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-  opentelemetry::context::Context propagated_context{
-      opentelemetry::context::Context{}};
-#else
-  void* propagated_context{nullptr};
-#endif
-  std::shared_ptr<TraceSetting> trace_setting{nullptr};
-  bool force_sample{false};
-};
 
 //
 // Manager for tracing to a file.
@@ -139,10 +128,21 @@ class TraceManager {
 
   ~TraceManager() { CleanupTracer(); }
 
+  /// Options required at Trace initialization
+  struct TraceStartOptions {
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+    opentelemetry::context::Context propagated_context{
+        opentelemetry::context::Context{}};
+#else
+    void* propagated_context{nullptr};
+#endif
+    std::shared_ptr<TraceSetting> trace_setting{nullptr};
+    bool force_sample{false};
+  };
+
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
-  std::shared_ptr<Trace> SampleTrace(
-      const std::string& model_name, const TraceStartOptions& start_options);
+  std::shared_ptr<Trace> SampleTrace(const TraceStartOptions& start_options);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -154,7 +154,9 @@ class TraceManager {
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
       std::string* filepath);
 
-  void GetTraceMode(const std::string& model_name, InferenceTraceMode* mode);
+  void GetTraceSetting(
+      const std::string& model_name,
+      std::shared_ptr<TraceSetting>& trace_setting);
 
   // Return the current timestamp.
   static uint64_t CaptureTimestamp()

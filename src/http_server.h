@@ -142,7 +142,12 @@ class HTTPMetricsServer : public HTTPServer {
 };
 #endif  // TRITON_ENABLE_METRICS
 
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#if defined(TRITON_ENABLE_TRACING)
+TraceManager::TraceStartOptions GetTraceStartOptions(
+    TraceManager* trace_manager, evhtp_kvs_t* headers,
+    const std::string& model_name);
+
+#if !defined(_WIN32)
 class HttpTextMapCarrier
     : public opentelemetry::context::propagation::TextMapCarrier {
  public:
@@ -169,6 +174,7 @@ class HttpTextMapCarrier
 
   evhtp_kvs_t* headers_;
 };
+#endif  // _WIN32
 #endif  // TRITON_ENABLE_TRACING
 
 // HTTP API server that implements KFServing community standard inference
