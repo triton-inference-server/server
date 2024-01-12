@@ -300,8 +300,7 @@ TraceManager::GetTraceSetting(
 
 TraceManager::TraceStartOptions
 TraceManager::GetTraceStartOptions(
-    otel_cntxt::propagation::TextMapCarrier& carrier,
-    const std::string& model_name)
+    AbstractCarrier& carrier, const std::string& model_name)
 {
   TraceManager::TraceStartOptions start_options;
   GetTraceSetting(model_name, start_options.trace_setting);
@@ -1073,7 +1072,9 @@ std::shared_ptr<TraceManager::Trace>
 TraceManager::TraceSetting::SampleTrace(bool force_sample)
 {
   bool create_trace = false;
-  // [FIXME] current WAR for initiating trace based on propagated context
+  // [FIXME: DLIS-6033]
+  // A current WAR for initiating trace based on propagated context only
+  // Currently this is implemented through setting trace rate = 0
   if (!force_sample && rate_ != 0) {
     std::lock_guard<std::mutex> lk(mu_);
     if (!Valid()) {

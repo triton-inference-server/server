@@ -55,6 +55,11 @@ namespace triton { namespace server {
 
 using TraceConfig = std::vector<std::pair<std::string, std::string>>;
 using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
+#ifndef _WIN32
+using AbstractCarrier = otel_cntxt::propagation::TextMapCarrier;
+#else
+using AbstractCarrier = void*;
+#endif
 
 // Common OTel span keys to store in OTel context
 // with the corresponding trace id.
@@ -138,8 +143,7 @@ class TraceManager {
   };
 
   TraceStartOptions GetTraceStartOptions(
-      otel_cntxt::propagation::TextMapCarrier& carrier,
-      const std::string& model_name);
+      AbstractCarrier& carriers, const std::string& model_name);
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
@@ -418,6 +422,10 @@ class TraceManager {
         const std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>>&
             streams);
 
+    // Pass `force_sample` = true, when trace needs to be initiated
+    // no matter what `rate` and `count` is.
+    // For example, in OpenTelemetry tracing mode, we always initiate tracing
+    // when OpenTelemetry context was propagated from client.
     std::shared_ptr<Trace> SampleTrace(bool force_sample = false);
 
     const TRITONSERVER_InferenceTraceLevel level_;

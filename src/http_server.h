@@ -169,6 +169,11 @@ class HttpTextMapCarrier : public otel_cntxt::propagation::TextMapCarrier {
 };
 #endif  // TRITON_ENABLE_TRACING
 
+#if defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+using HttpTextMapCarrier = void*;
+#endif
+
+
 // HTTP API server that implements KFServing community standard inference
 // protocols and extensions used by Triton.
 class HTTPAPIServer : public HTTPServer {

@@ -1460,4 +1460,8 @@ class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
 };
 #endif  // TRITON_ENABLE_TRACING
 
+#if defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+using GrpcServerCarrier = void*;
+#endif
+
 }}}  // namespace triton::server::grpc
