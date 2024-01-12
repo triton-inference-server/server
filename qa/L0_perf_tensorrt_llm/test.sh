@@ -132,6 +132,9 @@ function prepare_model_repository {
     replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+
+    # Install perf_analyzer
+    pip3 install tritonclient nvidia-ml-py3
 }
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
