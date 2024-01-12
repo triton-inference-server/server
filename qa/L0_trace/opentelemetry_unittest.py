@@ -87,17 +87,29 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.collector_subprocess = subprocess.Popen(
             ["./otelcol", "--config", "./trace-config.yaml"]
         )
-
         time.sleep(5)
-
         self.filename = "collected_traces.json"
+        # This simulates OTel context being injected on client side.
+        # Format explained here: https://www.w3.org/TR/trace-context/#design-overview
+        # OTel code reference for extraction:
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/c4f39f2be8109fd1a3e047677c09cf47954b92db/api/include/opentelemetry/trace/propagation/http_trace_context.h#L165
+        # Essentially, this is what will be injected to headers/metadata
+        # on the client side. Code reference:
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/c4f39f2be8109fd1a3e047677c09cf47954b92db/api/include/opentelemetry/trace/propagation/http_trace_context.h#L91
+        # Format is: 00-traceId-spanId-traceFlags
+        # By simply adding this header during tests, we imitate
+        # that on client side OTel Propagator injected it to request.
         self.client_headers = dict(
             {"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"}
         )
-
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
+        self.test_models = [
+            self.simple_model_name,
+            self.ensemble_model_name,
+            self.bls_model_name,
+        ]
         self.root_span = "InferRequest"
 
     def tearDown(self):
@@ -177,11 +189,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertFalse(all(entry in events for entry in request_events))
             self.assertFalse(all(entry in events for entry in compute_events))
 
-        elif span_name in [
-            self.simple_model_name,
-            self.ensemble_model_name,
-            self.bls_model_name,
-        ]:
+        elif span_name in self.test_models:
             # Check that all request related events (and only them)
             # are recorded in request span
             self.assertTrue(all(entry in events for entry in request_events))
@@ -544,7 +552,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         inputs = prepare_data(grpcclient)
         triton_client_grpc.async_stream_infer(self.simple_model_name, inputs)
         result = user_data.get()
-        self.assertFalse(result is InferenceServerException)
+        self.assertIsNot(result, InferenceServerException)
         triton_client_grpc.stop_stream()
 
         self._test_simple_trace()
@@ -567,7 +575,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         inputs = prepare_data(grpcclient)
         triton_client_grpc.async_stream_infer(self.simple_model_name, inputs)
         result = user_data.get()
-        self.assertFalse(result is InferenceServerException)
+        self.assertIsNot(result, InferenceServerException)
         triton_client_grpc.stop_stream()
 
         self._test_simple_trace(headers=self.client_headers)

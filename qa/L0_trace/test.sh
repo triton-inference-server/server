@@ -724,7 +724,7 @@ cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
 
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
-                --load-model=simple --load-model="ensemble_add_sub_int32_int32_int32" \
+                --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
