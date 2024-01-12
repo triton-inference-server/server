@@ -167,9 +167,7 @@ class HttpTextMapCarrier : public otel_cntxt::propagation::TextMapCarrier {
 
   evhtp_kvs_t* headers_;
 };
-#endif  // TRITON_ENABLE_TRACING
-
-#if defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#else
 using HttpTextMapCarrier = void*;
 #endif
 

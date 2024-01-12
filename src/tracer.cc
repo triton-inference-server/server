@@ -319,7 +319,7 @@ TraceManager::GetTraceStartOptions(
 #else
     LOG_ERROR << "Unsupported trace mode: "
               << TraceManager::InferenceTraceModeString(
-                     start_options.trace_setting.mode_);
+                     start_options.trace_setting->mode_);
 #endif  // _WIN32
   }
   return start_options;
@@ -408,7 +408,7 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 {
   switch (global_setting_->mode_) {
     case TRACE_MODE_OPENTELEMETRY: {
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#ifndef _WIN32
       otlp::OtlpHttpExporterOptions opts;
       otel_resource::ResourceAttributes attributes = {};
       attributes[otel_resource::SemanticConventions::kServiceName] =
@@ -460,7 +460,7 @@ TraceManager::CleanupTracer()
 {
   switch (global_setting_->mode_) {
     case TRACE_MODE_OPENTELEMETRY: {
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+#ifndef _WIN32
       std::shared_ptr<otel_trace_api::TracerProvider> none;
       otel_trace_api::Provider::SetTracerProvider(none);
       break;

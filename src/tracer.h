@@ -55,7 +55,7 @@ namespace triton { namespace server {
 
 using TraceConfig = std::vector<std::pair<std::string, std::string>>;
 using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 using AbstractCarrier = otel_cntxt::propagation::TextMapCarrier;
 #else
 using AbstractCarrier = void*;
