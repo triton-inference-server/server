@@ -3056,9 +3056,14 @@ HTTPAPIServer::StartTrace(
 {
 #ifdef TRITON_ENABLE_TRACING
   TraceStartOptions start_options;
-  InferenceTraceMode mode = TRACE_MODE_TRITON;
-  trace_manager_->GetTraceMode(model_name, &mode);
-  if (mode == TRACE_MODE_OPENTELEMETRY) {
+  {
+    std::lock_guard<std::mutex> r_lk(r_mu_);
+    auto m_it = trace_manager_->model_settings_.find(model_name);
+    start_options.trace_setting =
+        (m_it == trace_manager_->model_settings_.end()) ? global_setting_
+                                                        : m_it->second;
+  }
+  if (start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
     const HttpTextMapCarrier carrier(req->headers_in);
     auto prop =
@@ -3072,7 +3077,8 @@ HTTPAPIServer::StartTrace(
     }
 #else
     LOG_ERROR << "Unsupported trace mode: "
-              << TraceManager::InferenceTraceModeString(mode);
+              << TraceManager::InferenceTraceModeString(
+                     start_options.trace_setting->mode_);
 #endif
   }
   std::shared_ptr<TraceManager::Trace> trace;

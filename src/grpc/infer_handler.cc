@@ -917,8 +917,13 @@ ModelInferHandler::Execute(InferHandler::State* state)
     TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
     TraceStartOptions start_options;
-    InferenceTraceMode mode = TRACE_MODE_TRITON;
-    trace_manager_->GetTraceMode(request.model_name(), &mode);
+    {
+      std::lock_guard<std::mutex> r_lk(r_mu_);
+      auto m_it = trace_manager_->model_settings_.find(model_name);
+      start_options.trace_setting =
+          (m_it == trace_manager_->model_settings_.end()) ? global_setting_
+                                                          : m_it->second;
+    }
     if (mode == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
       const GrpcServerCarrier carrier(state->context_->ctx_.get());
@@ -934,7 +939,8 @@ ModelInferHandler::Execute(InferHandler::State* state)
       }
 #else
       LOG_ERROR << "Unsupported trace mode: "
-                << TraceManager::InferenceTraceModeString(mode);
+                << TraceManager::InferenceTraceModeString(
+                       start_options.trace_setting->mode_);
 #endif
     }
     state->trace_ = std::move(

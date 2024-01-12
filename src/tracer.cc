@@ -288,35 +288,13 @@ TraceManager::GetTraceSetting(
   *filepath = trace_setting->file_->FileName();
 }
 
-void
-TraceManager::GetTraceMode(
-    const std::string& model_name, InferenceTraceMode* mode)
-{
-  std::shared_ptr<TraceSetting> trace_setting;
-  {
-    std::lock_guard<std::mutex> r_lk(r_mu_);
-    auto m_it = model_settings_.find(model_name);
-    trace_setting =
-        (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
-  }
-  *mode = trace_setting->mode_;
-}
-
 std::shared_ptr<TraceManager::Trace>
-TraceManager::SampleTrace(
-    const std::string& model_name, const TraceStartOptions& start_options)
+TraceManager::SampleTrace(const TraceStartOptions& start_options)
 {
-  std::shared_ptr<TraceSetting> trace_setting;
-  {
-    std::lock_guard<std::mutex> r_lk(r_mu_);
-    auto m_it = model_settings_.find(model_name);
-    trace_setting =
-        (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
-  }
   std::shared_ptr<Trace> ts =
-      trace_setting->SampleTrace(start_options.force_sample);
+      start_options->trace_setting->SampleTrace(start_options.force_sample);
   if (ts != nullptr) {
-    ts->setting_ = trace_setting;
+    ts->setting_ = start_options->trace_setting;
     if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
       auto steady_timestamp_ns =

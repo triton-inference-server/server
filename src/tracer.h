@@ -82,6 +82,7 @@ struct TraceStartOptions {
 #else
   void* propagated_context{nullptr};
 #endif
+  std::shared_ptr<TraceSetting> trace_setting{nullptr};
   bool force_sample{false};
 };
 
