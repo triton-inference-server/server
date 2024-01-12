@@ -275,12 +275,12 @@ class OpenTelemetryTest(tu.TestResultCollector):
                    parents and children in the dictionary form:
                         <parent_span_name> (str) : <children_names> (List[str])
         """
-        seen_spans = dict({})
+        seen_spans = {}
         for span in spans:
             cur_span = span[0]["spanId"]
             seen_spans[cur_span] = span[0]["name"]
 
-        parent_child_dict = dict({})
+        parent_child_dict = {}
         for span in spans:
             cur_parent = span[0]["parentSpanId"]
             cur_span = span[0]["name"]
