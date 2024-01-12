@@ -48,11 +48,7 @@
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_cntxt = opentelemetry::context;
-#elif defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-#include <any>
-using otel_cntxt::propagation::TextMapCarrier = std::any;
 #endif
-
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {

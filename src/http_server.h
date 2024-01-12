@@ -167,8 +167,6 @@ class HttpTextMapCarrier : public otel_cntxt::propagation::TextMapCarrier {
 
   evhtp_kvs_t* headers_;
 };
-#elif defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-using HttpTextMapCarrier = std::any;
 #endif  // TRITON_ENABLE_TRACING
 
 // HTTP API server that implements KFServing community standard inference
