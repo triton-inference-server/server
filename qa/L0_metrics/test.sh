@@ -45,12 +45,13 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_ARGS="${BASE_SERVER_ARGS}"
 SERVER_LOG="./inference_server.log"
+PYTHON_TEST="metrics_config_test.py"
 source ../common/util.sh
 
 CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 function check_unit_test() {
-    if [ $? -ne 0 ]; then
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
@@ -100,8 +101,6 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-### GPU Metrics
-
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR
 model=libtorch_float32_float32_float32
@@ -112,8 +111,41 @@ mkdir -p $MODELDIR/${model}/1 && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
+### Pinned memory metrics tests
+set +e
+CLIENT_PY="./pinned_memory_metrics_test.py"
+SERVER_LOG="pinned_memory_metrics_test_server.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_pinned_memory_metrics_exist -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+CLIENT_LOG="pinned_memory_metrics_test_client.log"
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Custom Pinned memory pool size
+export CUSTOM_PINNED_MEMORY_POOL_SIZE=1024 # bytes
+SERVER_LOG="custom_pinned_memory_test_server.log"
+CLIENT_LOG="custom_pinned_memory_test_client.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE"
+run_and_check_server
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+set -e
+
+
+### GPU Metrics
 set +e
 export CUDA_VISIBLE_DEVICES=0,1,2
+SERVER_LOG="./inference_server.log"
+CLIENT_LOG="client.log"
 run_and_check_server
 
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
@@ -227,7 +259,6 @@ MODELDIR="${PWD}/unit_test_models"
 mkdir -p "${MODELDIR}/identity_cache_on/1"
 mkdir -p "${MODELDIR}/identity_cache_off/1"
 BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
-PYTHON_TEST="metrics_config_test.py"
 
 # Check default settings: Counters should be enabled, summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
