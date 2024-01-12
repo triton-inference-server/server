@@ -56,6 +56,7 @@ To change the interval at which metrics are polled/updated, see the `--metrics-i
 - [Inference Request Metrics](#inference-request-metrics)
 - [GPU Metrics](#gpu-metrics)
 - [CPU Metrics](#cpu-metrics)
+- [Pinned Memory Metrics](#pinned-memory-metrics)
 - [Response Cache Metrics](#response-cache-metrics)
 - [Custom Metrics](#custom-metrics)
 
@@ -281,6 +282,15 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 |CPU Utilization | CPU Utilization | `nv_cpu_utilization` | Total CPU utilization rate [0.0 - 1.0] | Aggregated across all cores since last interval | Per interval |
 |CPU Memory      | CPU Total Memory | `nv_cpu_memory_total_bytes` | Total CPU memory (RAM), in bytes | System-wide | Per interval |
 |                | CPU Used Memory | `nv_cpu_memory_used_bytes` | Used CPU memory (RAM), in bytes | System-wide | Per interval |
+
+## Pinned Memory Metrics
+
+Starting in 24.01, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
+
+|Category        |Metric            |Metric Name                 |Description                                            |Granularity|Frequency    |
+|----------------|------------------|----------------------------|-------------------------------------------------------|-----------|-------------|
+|Pinned Memory   |Total Pinned memory |`nv_pinned_memory_pool_total_bytes`        |Total Pinned memory, in bytes                      |All models    |Per interval |
+|                |Used Pinned memory |`nv_pinned_memory_pool_used_bytes`        |Used Pinned memory, in bytes                      |All models    |Per interval |
 
 ## Response Cache Metrics
 
