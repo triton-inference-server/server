@@ -142,6 +142,7 @@ class TraceManager {
     bool force_sample{false};
   };
 
+  // Returns TraceStartOptions for specified model
   TraceStartOptions GetTraceStartOptions(
       AbstractCarrier& carriers, const std::string& model_name);
 
@@ -159,6 +160,7 @@ class TraceManager {
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
       std::string* filepath);
 
+  // Sets provided TraceSetting with correct trace settings for provided model.
   void GetTraceSetting(
       const std::string& model_name,
       std::shared_ptr<TraceSetting>& trace_setting);
