@@ -29,7 +29,6 @@ import sys
 sys.path.append("../common")
 import json
 import queue
-import re
 import shutil
 import subprocess
 import time
@@ -247,7 +246,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_counts (dict): dictionary, containing expected spans in the form:
                     span_name : #expected_number_of_entries
         """
-        rex_name_field = re.compile("(?<='name': ')[a-zA-Z0-9_\- ]+(?=')")
 
         span_names = []
         for span in spans:
@@ -255,7 +253,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_name = span[0]["name"]
             span_names.append(span_name)
             span_events = span[0]["events"]
-            event_names_only = rex_name_field.findall(str(span_events))
+            event_names_only = [event["name"] for event in span_events]
             self._check_events(span_name, event_names_only)
 
         self.assertEqual(

@@ -1075,7 +1075,7 @@ TraceManager::TraceSetting::SampleTrace(bool force_sample)
   // [FIXME: DLIS-6033]
   // A current WAR for initiating trace based on propagated context only
   // Currently this is implemented through setting trace rate = 0
-  if (!force_sample && rate_ != 0) {
+  if (rate_ != 0) {
     std::lock_guard<std::mutex> lk(mu_);
     if (!Valid()) {
       return nullptr;
