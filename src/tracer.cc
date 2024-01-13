@@ -1071,22 +1071,34 @@ TraceManager::TraceFile::SaveTraces(
 std::shared_ptr<TraceManager::Trace>
 TraceManager::TraceSetting::SampleTrace(bool force_sample)
 {
-  bool create_trace = false;
-  // [FIXME: DLIS-6033]
-  // A current WAR for initiating trace based on propagated context only
-  // Currently this is implemented through setting trace rate = 0
-  if (rate_ != 0) {
+  bool count_rate_hit = false;
+  {
     std::lock_guard<std::mutex> lk(mu_);
-    if (!Valid()) {
-      return nullptr;
-    }
-    create_trace = (((++sample_) % rate_) == 0);
-    if (create_trace && (count_ > 0)) {
-      --count_;
-      ++created_;
+    // [FIXME: DLIS-6033]
+    // A current WAR for initiating trace based on propagated context only
+    // Currently this is implemented through setting trace rate as 0
+    if (rate_ != 0) {
+      // If `count_` hits 0, `Valid()` returns false for this and all
+      // following requests (unless `count_` is updated by a user).
+      // At this point we only trace requests for which
+      // `force_sample` is true.
+      if (!Valid() && !force_sample) {
+        return nullptr;
+      }
+      // `sample_` counts all requests, coming to server.
+      count_rate_hit = (((++sample_) % rate_) == 0);
+      if (count_rate_hit && (count_ > 0)) {
+        --count_;
+        ++created_;
+      } else if (count_rate_hit && (count_ == 0)) {
+        // This condition is reached, when `force_sample` is true,
+        // `count_rate_hit` is true, but `count_` is 0. Due to the
+        // latter, we explicitly set `count_rate_hit` to false.
+        count_rate_hit = false;
+      }
     }
   }
-  if (create_trace || force_sample) {
+  if (count_rate_hit || force_sample) {
     std::shared_ptr<TraceManager::Trace> lts(new Trace());
     // Split 'Trace' management to frontend and Triton trace separately
     // to avoid dependency between frontend request and Triton trace's

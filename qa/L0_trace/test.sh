@@ -756,10 +756,145 @@ else
 fi
 
 set -e
-
 kill $SERVER_PID
 wait $SERVER_PID
+set +e
 
+# Testing OTel WAR with trace rate = 0
+rm collected_traces.json
+
+OTEL_COLLECTOR=./otelcol
+OTEL_COLLECTOR_LOG="./trace_collector_exporter.log"
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=0\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+if [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should be empty, but it is not.\n***"
+    exit 1
+fi
+
+# Send 1 bls request with OTel context to make sure it is traced
+python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+            headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+        )'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should contain OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that only traces with OTel Context are collected after count goes to 0
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=5\
+                --trace-config=count=1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"5\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..20}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+sleep 20
+
+if ! [[ -s collected_traces.json && `grep -c "\"name\":\"InferRequest\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain only 1 trace.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+# Send 4 bls request with OTel context and 4 without to make sure it is traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+                headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+            )'  >> client_update.log 2>&1
+
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32" \
+            )'  >> client_update.log 2>&1
+
+    sleep 10
+done
+
+if ! [[ -s collected_traces.json && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"b7ad6b7169242424\"" ./collected_traces.json` == 10 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain 11 OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
 set +e
 
 exit $RET
