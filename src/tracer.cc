@@ -363,7 +363,7 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
       otlp::OtlpHttpExporterOptions opts;
       otel_resource::ResourceAttributes attributes = {};
       attributes[otel_resource::SemanticConventions::kServiceName] =
-          "triton-inference-server";
+          triton::server::GetEnvironmentVariableOrDefault("OTEL_SERVICE_NAME", "triton-inference-server");
       auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
       auto otel_options_it = config_map.find(mode_key);
       if (otel_options_it != config_map.end()) {
