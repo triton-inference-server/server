@@ -1501,7 +1501,7 @@ CommonHandler::RegisterLogging()
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteLogging = [this](
+  auto OnExecuteLogging = [](
                               inference::LogSettingsRequest& request,
                               inference::LogSettingsResponse* response,
                               ::grpc::Status* status) {

@@ -939,9 +939,9 @@ TRITONBACKEND_ModelInstanceExecute(
                 response_state, &buffer_attributes));
 
         // Testing for the StateBuffer attributes
-        TRITONSERVER_MemoryType ba_memory_type;
-        int64_t ba_memory_type_id;
-        size_t ba_byte_size;
+        TRITONSERVER_MemoryType ba_memory_type = TRITONSERVER_MEMORY_CPU;
+        int64_t ba_memory_type_id = 0;
+        size_t ba_byte_size = 0;
 
         GUARDED_RESPOND_IF_ERROR(
             responses, r, request,
@@ -1046,7 +1046,7 @@ TRITONBACKEND_ModelInstanceExecute(
         }
         TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_CPU;
         int64_t actual_memory_type_id = 0;
-        char* buffer;
+        char* buffer = nullptr;
 
         // Request an output buffer in GPU. This is only for testing purposes
         // to make sure that GPU output buffers can be requested.
@@ -1084,7 +1084,7 @@ TRITONBACKEND_ModelInstanceExecute(
         }
         TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_GPU;
         int64_t actual_memory_type_id = 0;
-        char* buffer;
+        char* buffer = nullptr;
 
         // Request an output buffer in GPU. This is only for testing purposes
         // to make sure that GPU output buffers can be requested.
@@ -1111,7 +1111,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
         actual_memory_type = TRITONSERVER_MEMORY_CPU;
         actual_memory_type_id = 0;
-        char* output_buffer;
+        char* output_buffer = nullptr;
         GUARDED_RESPOND_IF_ERROR(
             responses, r, request,
             TRITONBACKEND_OutputBuffer(
