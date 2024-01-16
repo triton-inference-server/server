@@ -105,24 +105,21 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
     CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
     SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
     for TRIAL in non_decoupled decoupled ; do
+        export BLS_KIND=${TRIAL}
+        SERVER_LOG="./bls_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
+
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        set +e
+
         for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
             export MODEL_NAME=${MODEL_NAME}
-            export BLS_KIND=${TRIAL}
-            SERVER_LOG="./${MODEL_NAME}_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
 
-            run_server
-            if [ "$SERVER_PID" == "0" ]; then
-                echo -e "\n***\n*** Failed to start $SERVER for ${MODEL_NAME} ${TRIAL}\n***"
-                cat $SERVER_LOG
-                # Mark failure, but continue so logs can be collected at the end
-                RET=1
-                continue
-            fi
-
-            set +e
-
-            # FIXME: Seeing intermittent shm leak for bls decoupled:
-            # [bls decoupled] Shared memory leak detected: 129980848 (current) > 129980800 (prev).
             python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
                 echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
@@ -138,15 +135,12 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
                     RET=1
                 fi
             fi
-
-            set -e
-
-            kill $SERVER_PID
-            wait $SERVER_PID
-
-            # Give time for python processes to properly clean up
-            sleep 30
         done
+
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
 
         # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
         if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
