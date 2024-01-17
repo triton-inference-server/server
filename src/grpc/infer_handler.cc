@@ -916,8 +916,10 @@ ModelInferHandler::Execute(InferHandler::State* state)
   if (err == nullptr) {
     TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-    state->trace_ =
-        std::move(trace_manager_->SampleTrace(request.model_name()));
+    GrpcServerCarrier carrier(state->context_->ctx_.get());
+    auto start_options =
+        trace_manager_->GetTraceStartOptions(carrier, request.model_name());
+    state->trace_ = std::move(trace_manager_->SampleTrace(start_options));
     if (state->trace_ != nullptr) {
       triton_trace = state->trace_->trace_;
     }

@@ -34,12 +34,18 @@ receivers:
       http:
         endpoint: 0.0.0.0:10000
 
+processors:
+  batch:
+    send_batch_size: 10
+    timeout: 10s
+
 exporters:
-  logging:
-    verbosity: detailed
+  file:
+    path: ./collected_traces.json
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [logging]
+      processors: [batch]
+      exporters: [file]
