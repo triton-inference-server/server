@@ -44,7 +44,7 @@ class LogTest(tu.TestResultCollector):
 
     def test_log_output(self):
         model_name = "identity_fp32_logging"
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.array([[1.0]], dtype=np.float32)
                 inputs = [

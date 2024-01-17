@@ -68,7 +68,7 @@ class DecoupledTest(tu.TestResultCollector):
         shape = [2, 2]
         number_of_requests = 2
         user_data = UserData()
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
 
@@ -107,7 +107,7 @@ class DecoupledTest(tu.TestResultCollector):
         model_name = "decoupled_bls"
         shape = [1, 2]
         user_data = UserData()
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
 
@@ -144,7 +144,7 @@ class DecoupledTest(tu.TestResultCollector):
         model_name = "decoupled_bls_stream"
         in_values = [4, 2, 0, 1]
         user_data = UserData()
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
                 for i in range(len(in_values)):
@@ -209,7 +209,7 @@ class DecoupledTest(tu.TestResultCollector):
         model_name = "decoupled_return_response_error"
         shape = [16]
         user_data = UserData()
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data_0 = np.random.random(shape).astype(np.float32)
@@ -243,7 +243,7 @@ class DecoupledTest(tu.TestResultCollector):
         model_name = "decoupled_send_after_close_error"
         shape = [16]
         user_data = UserData()
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data_0 = np.random.random(shape).astype(np.float32)
@@ -281,7 +281,7 @@ class DecoupledTest(tu.TestResultCollector):
         shape = [1, 1]
         user_data = UserData()
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data = np.array([[execute_delay]], dtype=np.float32)

@@ -73,18 +73,14 @@ class RestartTest(tu.TestResultCollector):
 
         # The second request should work properly since the stub process should
         # have come alive.
-        with self._shm_leak_detector.Probe(
-            debug_str=f"{model_name} test_restart"
-        ) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             self._infer_helper(model_name, shape, dtype)
 
     def test_infer(self):
         shape = [1, 16]
         model_name = "restart"
         dtype = np.float32
-        with self._shm_leak_detector.Probe(
-            debug_str=f"{model_name} test_infer"
-        ) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             self._infer_helper(model_name, shape, dtype)
 
 

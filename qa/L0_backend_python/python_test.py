@@ -128,7 +128,7 @@ class PythonTest(tu.TestResultCollector):
         shape = [total_byte_size]
         model_name = "identity_uint8_nobatch"
         dtype = np.uint8
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             self._infer_help(model_name, shape, dtype)
 
         # 1 GiB payload leads to error in the main Python backend process.
@@ -154,7 +154,7 @@ class PythonTest(tu.TestResultCollector):
         # Send a small paylaod to make sure it is still working properly
         total_byte_size = 2 * 1024 * 1024
         shape = [total_byte_size]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             self._infer_help(model_name, shape, dtype)
 
     # GPU tensors are not supported on jetson
@@ -165,7 +165,7 @@ class PythonTest(tu.TestResultCollector):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "identity_bool"
-            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     input_data = np.array([[True] * 1000], dtype=bool)
                     inputs = [
@@ -197,7 +197,7 @@ class PythonTest(tu.TestResultCollector):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "dlpack_identity"
-            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     input_data = np.array([[1] * 1000], dtype=np.float32)
                     inputs = [
@@ -237,7 +237,7 @@ class PythonTest(tu.TestResultCollector):
         request_parallelism = 4
         shape = [2, 2]
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient(
                 "localhost:8000", concurrency=request_parallelism
             ) as client:
@@ -337,7 +337,7 @@ class PythonTest(tu.TestResultCollector):
 
     def test_bool(self):
         model_name = "identity_bool"
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.array([[True, False, True]], dtype=bool)
                 inputs = [
@@ -354,7 +354,7 @@ class PythonTest(tu.TestResultCollector):
     def test_infer_pytorch(self):
         model_name = "pytorch_fp32_fp32"
         shape = [1, 1, 28, 28]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.zeros(shape, dtype=np.float32)
                 inputs = [
@@ -388,7 +388,7 @@ class PythonTest(tu.TestResultCollector):
     def test_init_args(self):
         model_name = "init_args"
         shape = [2, 2]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.zeros(shape, dtype=np.float32)
                 inputs = [
@@ -411,7 +411,7 @@ class PythonTest(tu.TestResultCollector):
         # The first run will use np.bytes_ and the second run will use
         # np.object_
         for i in range(2):
-            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     utf8 = "😀"
                     input_data = np.array(
@@ -431,7 +431,7 @@ class PythonTest(tu.TestResultCollector):
     def test_optional_input(self):
         model_name = "optional"
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             for has_input0 in [True, False]:
                 for has_input1 in [True, False]:
                     self._optional_input_infer(model_name, has_input0, has_input1)
@@ -444,7 +444,7 @@ class PythonTest(tu.TestResultCollector):
         # backend. The model will return 4 responses (np.object_ and np.bytes) *
         # (empty output and fixed output)
         for i in range(4):
-            with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+            with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient("localhost:8000") as client:
                     input_data = np.array(["123456"], dtype=np.object_)
                     inputs = [
@@ -467,7 +467,7 @@ class PythonTest(tu.TestResultCollector):
         shape = [2, 10, 11, 6, 5]
         new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_numpy = np.random.rand(*shape)
                 input_numpy = input_numpy.astype(np.float32)

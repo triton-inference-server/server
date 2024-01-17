@@ -74,7 +74,7 @@ class LifecycleTest(tu.TestResultCollector):
             ("CANCELLED", "[StatusCode.CANCELLED]"),
             ("(default)", "[StatusCode.INTERNAL] unrecognized"),
         ]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 for error, expected_grpc_error_start in errors:
                     input_data = np.array([[error]], dtype=np.object_)
@@ -105,7 +105,7 @@ class LifecycleTest(tu.TestResultCollector):
             response["result"] = result
             response["error"] = error
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 input_data = np.array([[execute_delay]], dtype=np.float32)
                 inputs = [
@@ -141,7 +141,7 @@ class LifecycleTest(tu.TestResultCollector):
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             input_datas = []
             for i in range(number_of_requests):
                 input_data = np.random.randn(*shape).astype(np.float32)
@@ -174,7 +174,7 @@ class LifecycleTest(tu.TestResultCollector):
         model_name = "wrong_model"
         shape = [2, 2]
 
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
                 inputs = [
@@ -201,7 +201,7 @@ class LifecycleTest(tu.TestResultCollector):
     def test_incorrect_execute_return(self):
         model_name = "execute_return_error"
         shape = [1, 1]
-        with self._shm_leak_detector.Probe(debug_str=model_name) as shm_probe:
+        with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = (5 * np.random.randn(*shape)).astype(np.float32)
                 inputs = [

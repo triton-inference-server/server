@@ -109,12 +109,12 @@ class IOTest(tu.TestResultCollector):
         # FIXME: This test detects a decrease of 80 bytes, which fails inequality check:
         # [ensemble_io] Shared memory leak detected: 1006976 (current) != 1007056 (prev).
         # so Probe was modified to check for growth instead of inequality.
-        with self._shm_leak_detector.Probe(debug_str=model_name):
+        with self._shm_leak_detector.Probe():
             self._run_ensemble_test(model_name)
 
     def test_empty_gpu_output(self):
         model_name = "dlpack_empty_output"
-        with self._shm_leak_detector.Probe(debug_str=model_name):
+        with self._shm_leak_detector.Probe():
             input_data = np.array([[1.0]], dtype=np.float32)
             inputs = [
                 grpcclient.InferInput(
@@ -129,7 +129,7 @@ class IOTest(tu.TestResultCollector):
 
     def test_variable_gpu_output(self):
         model_name = "variable_gpu_output"
-        with self._shm_leak_detector.Probe(debug_str=model_name):
+        with self._shm_leak_detector.Probe():
             # Input is not important in this test
             input_data = np.array([[1.0]], dtype=np.float32)
             inputs = [
