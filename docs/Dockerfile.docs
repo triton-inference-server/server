@@ -43,7 +43,7 @@ RUN wget https://github.com/pseudomuto/protoc-gen-doc/releases/download/v1.3.2/p
     mv protoc-gen-doc-1.3.2.linux-amd64.go1.12.6/protoc-gen-doc /usr/local/bin/
 
 # install sphinx et al
-RUN pip3 install sphinx==4.5.0 nbclient==0.5.13 \
+RUN pip3 install sphinx>=5.0 nbclient==0.5.13 \
     docutils==0.16 ablog==0.10.33.post1 myst-nb==0.17.2 rst-to-myst==0.3.4 nbsphinx==0.8.8 \
     sphinx-book-theme==0.3.2 sphinx-copybutton==0.5.2 sphinx-design==0.4.1 sphinx-prompt==1.5.0  \
     sphinxcontrib-bibtex==2.5.0 sphinx-tabs==3.2.0 \
