@@ -507,9 +507,9 @@ if(${TRITON_ENABLE_TRACING})
     tracer.cc tracer.h
   )
 
-  if (NOT WIN32)
-    target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 
+  if (NOT WIN32)
     target_include_directories(
       tracing-library
       PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
