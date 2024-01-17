@@ -142,6 +142,36 @@ class HTTPMetricsServer : public HTTPServer {
 };
 #endif  // TRITON_ENABLE_METRICS
 
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+class HttpTextMapCarrier : public otel_cntxt::propagation::TextMapCarrier {
+ public:
+  HttpTextMapCarrier(evhtp_kvs_t* headers) : headers_(headers) {}
+  HttpTextMapCarrier() = default;
+  virtual opentelemetry::nostd::string_view Get(
+      opentelemetry::nostd::string_view key) const noexcept override
+  {
+    std::string key_to_compare = key.data();
+    auto it = evhtp_kv_find(headers_, key_to_compare.c_str());
+    if (it != NULL) {
+      return opentelemetry::nostd::string_view(it);
+    }
+    return "";
+  }
+  // Not required on server side
+  virtual void Set(
+      opentelemetry::nostd::string_view key,
+      opentelemetry::nostd::string_view value) noexcept override
+  {
+    return;
+  }
+
+  evhtp_kvs_t* headers_;
+};
+#else
+using HttpTextMapCarrier = void*;
+#endif
+
+
 // HTTP API server that implements KFServing community standard inference
 // protocols and extensions used by Triton.
 class HTTPAPIServer : public HTTPServer {

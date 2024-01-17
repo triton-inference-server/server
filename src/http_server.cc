@@ -3055,11 +3055,13 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
+  HttpTextMapCarrier carrier(req->headers_in);
+  auto start_options =
+      trace_manager_->GetTraceStartOptions(carrier, model_name);
   std::shared_ptr<TraceManager::Trace> trace;
-  trace = std::move(trace_manager_->SampleTrace(model_name));
+  trace = std::move(trace_manager_->SampleTrace(start_options));
   if (trace != nullptr) {
     *triton_trace = trace->trace_;
-
     // Timestamps from evhtp are capture in 'req'. We record here
     // since this is the first place where we have access to trace
     // manager.
