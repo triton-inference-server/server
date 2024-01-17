@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import time
 from ctypes import *
 from os import listdir
 
@@ -411,24 +412,23 @@ class ShmLeakDetector:
     """Detect shared memory leaks when testing Python backend."""
 
     class ShmLeakProbe:
-        def __init__(self, shm_monitors):
+        def __init__(self, shm_monitors, enter_delay=1, exit_delay=1):
             self._shm_monitors = shm_monitors
+            self._enter_delay = enter_delay  # seconds
+            self._exit_delay = exit_delay  # seconds
 
         def __enter__(self):
             if _test_jetson:
                 return self
-            self._shm_region_free_sizes = {}
-            for shm_region, shm_monitor in self._shm_monitors.items():
-                self._shm_region_free_sizes[shm_region] = shm_monitor.free_memory()
 
+            self._shm_region_free_sizes = self._get_shm_free_sizes(self._enter_delay)
             return self
 
         def __exit__(self, type, value, traceback):
             if _test_jetson:
                 return
-            curr_shm_free_sizes = {}
-            for shm_region, shm_monitor in self._shm_monitors.items():
-                curr_shm_free_sizes[shm_region] = shm_monitor.free_memory()
+
+            curr_shm_free_sizes = self._get_shm_free_sizes(self._exit_delay)
 
             shm_leak_detected = False
             for shm_region in curr_shm_free_sizes:
@@ -440,6 +440,14 @@ class ShmLeakDetector:
                         f"Shared memory leak detected [{shm_region}]: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
                     )
             assert not shm_leak_detected, f"Shared memory leak detected."
+
+        def _get_shm_free_sizes(self, delay_sec=0):
+            if delay_sec > 0:
+                time.sleep(delay_sec)
+            shm_free_sizes = {}
+            for shm_region, shm_monitor in self._shm_monitors.items():
+                shm_free_sizes[shm_region] = shm_monitor.free_memory()
+            return shm_free_sizes
 
     def __init__(self, prefix="triton_python_backend_shm_region"):
         if _test_jetson:
