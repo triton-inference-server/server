@@ -526,11 +526,11 @@ The following table shows available OpenTelemetry trace APIs settings for
 ### OpenTelemetry Context Propagation
 
 Triton supports [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/)
-in OpenTelemetry mode starting 24.01 version. Note, that that every request
+in OpenTelemetry mode starting in version 24.01. Note, that every request
 with propagated OpenTelemetry context will be traced, regardless of `rate` and
-`count` trace settings. If a user wishes to trace only those request, for which
+`count` trace settings. If a user wishes to trace only those requests, for which
 OpenTelemetry context was injected on the client side, please start Triton with
-`rate` = 0:
+`--trace-config rate=0`:
 ```
 $ tritonserver \
     --trace-config rate=0 \
@@ -548,10 +548,10 @@ examples.
 
 For python clients, please make sure to install
 [OpenTelemetry Python](https://github.com/open-telemetry/opentelemetry-python/tree/main?tab=readme-ov-file#install).
-You can then use `opentelemetry.propagate.inject` method to prepare headers to
+You can then use the `opentelemetry.propagate.inject` method to prepare headers to
 pass with the request, as shown [here](https://github.com/open-telemetry/opentelemetry-python/blob/main/docs/examples/auto-instrumentation/client.py#L37-L41).
 Then, you can specify headers in the `infer` method. For references, please
-look at out [tests](https://github.com/triton-inference-server/server/blob/main/qa/L0_trace/opentelemetry_unittest.py),
+look at our [tests](https://github.com/triton-inference-server/server/blob/main/qa/L0_trace/opentelemetry_unittest.py),
 e.g. [http context propagation test](https://github.com/triton-inference-server/server/blob/main/qa/L0_trace/opentelemetry_unittest.py#L494-L508).
 
 ### Limitations
