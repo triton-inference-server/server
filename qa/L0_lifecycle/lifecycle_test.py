@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -3317,14 +3317,14 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Touch the local config.pbtxt and reload the file to ensure the local config
         # is preferred because it has a more recent mtime.
-        Path(os.path.join(model_name, "/config.pbtxt")).touch()
+        Path(os.path.join("models", model_name, "config.pbtxt")).touch()
 
         # Reload the model
         triton_client.load_model(model_name)
 
         # Ensure the model has been loaded w/ the expected (local) config.
         updated_config = triton_client.get_model_config(model_name)
-        self.assertTrue(original_config, updated_config)
+        self.assertEqual(original_config, updated_config)
 
 
 if __name__ == "__main__":
