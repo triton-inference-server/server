@@ -1999,7 +1999,7 @@ cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
     mkdir 1 && mv model.py 1 && \
     echo "    def initialize(self, args):" >> 1/model.py && \
     echo "        import time" >> 1/model.py && \
-    echo "        time.sleep(10)" >> 1/model.py)
+    echo "        time.sleep(5)" >> 1/model.py)
 rm models/${MODEL_NAME}/config.pbtxt
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model ${MODEL_NAME}"
