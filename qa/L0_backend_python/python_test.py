@@ -165,64 +165,72 @@ class PythonTest(tu.TestResultCollector):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "identity_bool"
-            with httpclient.InferenceServerClient("localhost:8000") as client:
-                input_data = np.array([[True] * 1000], dtype=bool)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            with self._shm_leak_detector.Probe() as shm_probe:
+                with httpclient.InferenceServerClient("localhost:8000") as client:
+                    input_data = np.array([[True] * 1000], dtype=bool)
+                    inputs = [
+                        httpclient.InferInput(
+                            "INPUT0",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+
+                    requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+
+                    # intentionally create a shared memory region with not enough size.
+                    client.unregister_cuda_shared_memory()
+                    shm0_handle = self._create_cuda_region(client, 1, "output0_data")
+
+                    requested_outputs[0].set_shared_memory("output0_data", 1)
+                    with self.assertRaises(InferenceServerException) as ex:
+                        client.infer(model_name, inputs, outputs=requested_outputs)
+                    self.assertIn(
+                        "should be at least 1000 bytes to hold the results",
+                        str(ex.exception),
                     )
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-
-                requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-
-                # intentionally create a shared memory region with not enough size.
-                client.unregister_cuda_shared_memory()
-                shm0_handle = self._create_cuda_region(client, 1, "output0_data")
-
-                requested_outputs[0].set_shared_memory("output0_data", 1)
-                with self.assertRaises(InferenceServerException) as ex:
-                    client.infer(model_name, inputs, outputs=requested_outputs)
-                self.assertIn(
-                    "should be at least 1000 bytes to hold the results",
-                    str(ex.exception),
-                )
-                client.unregister_cuda_shared_memory()
-                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
+                    client.unregister_cuda_shared_memory()
+                    cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
         def test_dlpack_tensor_error(self):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 
             model_name = "dlpack_identity"
-            with httpclient.InferenceServerClient("localhost:8000") as client:
-                input_data = np.array([[1] * 1000], dtype=np.float32)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            with self._shm_leak_detector.Probe() as shm_probe:
+                with httpclient.InferenceServerClient("localhost:8000") as client:
+                    input_data = np.array([[1] * 1000], dtype=np.float32)
+                    inputs = [
+                        httpclient.InferInput(
+                            "INPUT0",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
+                        )
+                    ]
+
+                    requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+                    input_data_size = input_data.itemsize * input_data.size
+                    client.unregister_cuda_shared_memory()
+                    input_region = self._create_cuda_region(
+                        client, input_data_size, "input0_data"
                     )
-                ]
+                    inputs[0].set_shared_memory("input0_data", input_data_size)
+                    cuda_shared_memory.set_shared_memory_region(
+                        input_region, [input_data]
+                    )
 
-                requested_outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-                input_data_size = input_data.itemsize * input_data.size
-                client.unregister_cuda_shared_memory()
-                input_region = self._create_cuda_region(
-                    client, input_data_size, "input0_data"
-                )
-                inputs[0].set_shared_memory("input0_data", input_data_size)
-                cuda_shared_memory.set_shared_memory_region(input_region, [input_data])
+                    # Intentionally create a small region to trigger an error
+                    shm0_handle = self._create_cuda_region(client, 1, "output0_data")
+                    requested_outputs[0].set_shared_memory("output0_data", 1)
 
-                # Intentionally create a small region to trigger an error
-                shm0_handle = self._create_cuda_region(client, 1, "output0_data")
-                requested_outputs[0].set_shared_memory("output0_data", 1)
-
-                with self.assertRaises(InferenceServerException) as ex:
-                    client.infer(model_name, inputs, outputs=requested_outputs)
-                self.assertIn(
-                    "should be at least 4000 bytes to hold the results",
-                    str(ex.exception),
-                )
-                client.unregister_cuda_shared_memory()
-                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
+                    with self.assertRaises(InferenceServerException) as ex:
+                        client.infer(model_name, inputs, outputs=requested_outputs)
+                    self.assertIn(
+                        "should be at least 4000 bytes to hold the results",
+                        str(ex.exception),
+                    )
+                    client.unregister_cuda_shared_memory()
+                    cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
     def test_async_infer(self):
         model_name = "identity_uint8"
@@ -459,25 +467,26 @@ class PythonTest(tu.TestResultCollector):
         shape = [2, 10, 11, 6, 5]
         new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_numpy = np.random.rand(*shape)
-            input_numpy = input_numpy.astype(np.float32)
-            inputs = [
-                httpclient.InferInput(
-                    "INPUT0", shape, np_to_triton_dtype(input_numpy.dtype)
-                )
-            ]
-            inputs[0].set_data_from_numpy(input_numpy)
-            result = client.infer(model_name, inputs)
-            output0 = input_numpy.reshape(new_shape)
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input_numpy = np.random.rand(*shape)
+                input_numpy = input_numpy.astype(np.float32)
+                inputs = [
+                    httpclient.InferInput(
+                        "INPUT0", shape, np_to_triton_dtype(input_numpy.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_numpy)
+                result = client.infer(model_name, inputs)
+                output0 = input_numpy.reshape(new_shape)
 
-            # Transpose the tensor to create a non-contiguous tensor.
-            output1 = input_numpy.T
-            output2 = np.transpose(input_numpy, shape_reorder)
+                # Transpose the tensor to create a non-contiguous tensor.
+                output1 = input_numpy.T
+                output2 = np.transpose(input_numpy, shape_reorder)
 
-            self.assertTrue(np.all(output0 == result.as_numpy("OUTPUT0")))
-            self.assertTrue(np.all(output1 == result.as_numpy("OUTPUT1")))
-            self.assertTrue(np.all(output2 == result.as_numpy("OUTPUT2")))
+                self.assertTrue(np.all(output0 == result.as_numpy("OUTPUT0")))
+                self.assertTrue(np.all(output1 == result.as_numpy("OUTPUT1")))
+                self.assertTrue(np.all(output2 == result.as_numpy("OUTPUT2")))
 
 
 if __name__ == "__main__":
