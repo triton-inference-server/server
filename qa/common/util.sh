@@ -468,6 +468,16 @@ function kill_servers () {
     done
 }
 
+# Upload a local directory to a GCS path
+function gcs_upload () {
+    local local_path=$1
+    local gcs_path=$2
+    rm -f gcs_upload.gsutil_cp.log
+    until gsutil -m cp -c -L gcs_upload.gsutil_cp.log -r $local_path $gcs_path; do
+        sleep 1
+    done
+}
+
 # Sort an array
 # Call with sort_array <array_name>
 # Example: sort_array array
