@@ -472,9 +472,17 @@ function kill_servers () {
 function gcs_upload () {
     local local_path=$1
     local gcs_path=$2
-    rm -f gcs_upload.gsutil_cp.log
-    until gsutil -m cp -c -L gcs_upload.gsutil_cp.log -r $local_path $gcs_path; do
+    local retry_left=30
+    local log_file="gcs_upload.gsutil_cp.log"
+    rm -f $log_file && touch $log_file
+    until gsutil -m cp -c -L $log_file -r $local_path $gcs_path; do
         sleep 1
+        ((retry_left--));
+        if [[ $retry_left -eq 0 ]]; then
+            cat $log_file
+            echo -e "=== Failed upload to GCS bucket"
+            return 121  # remote I/O error
+        fi
     done
 }
 
