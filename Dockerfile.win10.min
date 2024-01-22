@@ -105,7 +105,6 @@ RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install \
       b64:x64-windows \
-      boost-filesystem:x64-windows \
       boost-interprocess:x64-windows \
       boost-stacktrace:x64-windows \
       openssl-windows:x64-windows \
