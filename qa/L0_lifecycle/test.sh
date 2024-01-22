@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1939,6 +1939,93 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_load_retry
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+# Start without retry and the server should fail to start
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none \
+             --model-load-retry-count=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# the model should be available/ready
+set +e
+code=`curl -s -w %{http_code} localhost:8000/v2/models/retry_model/ready`
+set -e
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_model_config_overwite
+
+rm -rf models
+mkdir models
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(5)" >> 1/model.py)
+rm models/${MODEL_NAME}/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model ${MODEL_NAME}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_config_overwite >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+### End Test Definitions ###
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

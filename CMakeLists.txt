@@ -30,6 +30,9 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
+# Use C++17 standard as Triton's minimum required.
+set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+
 set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
 
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
@@ -189,7 +192,7 @@ else()
   set(TRITON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-set(TRITON_DEPENDS triton-core protobuf googletest)
+set(TRITON_DEPENDS triton-core protobuf googletest re2)
 if(${TRITON_ENABLE_GCS})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} google-cloud-cpp)
 endif() # TRITON_ENABLE_GCS
@@ -218,6 +221,7 @@ ExternalProject_Add(triton-server
     -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
     -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
     -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
+    -Dre2_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2/${LIB_DIR}/cmake/re2
     -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
     -DCURL_DIR:STRING=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/curl/${LIB_DIR}/cmake/CURL
     -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/${LIB_DIR}/cmake/nlohmann_json
@@ -259,6 +263,7 @@ ExternalProject_Add(triton-server
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
+    -DTRITON_MIN_CXX_STANDARD:STRING=${TRITON_MIN_CXX_STANDARD}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
     -DTRITON_VERSION:STRING=${TRITON_VERSION}
