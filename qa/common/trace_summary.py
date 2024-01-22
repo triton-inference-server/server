@@ -49,19 +49,9 @@ def add_span(span_map, timestamps, span_name, ts_start, ts_end):
 
 
 class AbstractFrontend:
-    _spans_added = False
-
     @property
     def filter_timestamp(self):
         return None
-
-    @property
-    def get_protocol(self):
-        return None
-
-    @property
-    def spans_added(self):
-        return self._spans_added
 
     def add_frontend_span(self, span_map, timestamps):
         pass
@@ -75,10 +65,6 @@ class HttpFrontend(AbstractFrontend):
     def filter_timestamp(self):
         return "HTTP_RECV_START"
 
-    @property
-    def get_protocol(self):
-        return "HTTP"
-
     def add_frontend_span(self, span_map, timestamps):
         if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END" in timestamps):
             add_span(
@@ -90,7 +76,6 @@ class HttpFrontend(AbstractFrontend):
             add_span(
                 span_map, timestamps, "HTTP_SEND", "HTTP_SEND_START", "HTTP_SEND_END"
             )
-            self._spans_added = True
 
     def summarize_frontend_span(self, span_map, cnt):
         if "HTTP_INFER" in span_map:
@@ -120,38 +105,23 @@ class GrpcFrontend(AbstractFrontend):
     def filter_timestamp(self):
         return "GRPC_WAITREAD_START"
 
-    @property
-    def get_protocol(self):
-        return "GRPC"
-
     def add_frontend_span(self, span_map, timestamps):
-        if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END" in timestamps):
+        if ("GRPC_WAITREAD_END" in timestamps) and ("GRPC_SEND_END" in timestamps):
             add_span(
                 span_map,
                 timestamps,
                 "GRPC_INFER",
-                "GRPC_WAITREAD_START",
-                "GRPC_SEND_END",
-            )
-            add_span(
-                span_map,
-                timestamps,
-                "GRPC_WAITREAD",
-                "GRPC_WAITREAD_START",
                 "GRPC_WAITREAD_END",
+                "GRPC_SEND_END",
             )
             add_span(
                 span_map, timestamps, "GRPC_SEND", "GRPC_SEND_START", "GRPC_SEND_END"
             )
-            self._spans_added = True
 
     def summarize_frontend_span(self, span_map, cnt):
         if "GRPC_INFER" in span_map:
             res = "GRPC infer request (avg): {}us\n".format(
                 span_map["GRPC_INFER"] / (cnt * 1000)
-            )
-            res += "\tWait/Read (avg): {}us\n".format(
-                span_map["GRPC_WAITREAD"] / (cnt * 1000)
             )
             res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] / (cnt * 1000))
             return res
@@ -280,7 +250,9 @@ def summarize(frontend, traces):
                     print("\tparent id: {}".format(trace["parent_id"]))
                 ordered_timestamps = list()
                 for ts in trace["timestamps"]:
-                    ordered_timestamps.append((ts["name"], ts["ns"]))
+                    # skip GRPC_WAITREAD
+                    if not ts["name"].startswith("GRPC_WAITREAD"):
+                        ordered_timestamps.append((ts["name"], ts["ns"]))
                 ordered_timestamps.sort(key=lambda tup: tup[1])
 
                 now = None
@@ -345,11 +317,6 @@ def summarize(frontend, traces):
                     model_span_map[key]["COMPUTE_OUTPUT"] / (cnt * 1000)
                 )
             )
-
-    if frontend.get_protocol == "GRPC" and frontend.spans_added:
-        print(
-            "\n*Note: WAIT/READ time includes the time spent by gRPC handler waiting\nfor the request to be received by the server.\n"
-        )
 
 
 def summarize_dataflow(traces):
