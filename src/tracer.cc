@@ -36,19 +36,12 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
-#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
-namespace otlp = opentelemetry::exporter::otlp;
-namespace otel_trace_sdk = opentelemetry::sdk::trace;
-namespace otel_trace_api = opentelemetry::trace;
+#include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
 namespace otel_common = opentelemetry::common;
-namespace otel_resource = opentelemetry::sdk::resource;
 #endif
 
 namespace triton { namespace server {
-
-static const int EXPORT_QUEUE_SIZE = 5000;
-static const int EXPORT_DELAY_MS = 2000;
 
 TRITONSERVER_Error*
 TraceManager::Create(
@@ -412,32 +405,14 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
   switch (global_setting_->mode_) {
     case TRACE_MODE_OPENTELEMETRY: {
 #ifndef _WIN32
-      otlp::OtlpHttpExporterOptions opts;
+      otlp::OtlpHttpExporterOptions exporter_options;
       otel_resource::ResourceAttributes attributes = {};
-      attributes[otel_resource::SemanticConventions::kServiceName] =
-          std::string("triton-inference-server");
-      auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
-      auto otel_options_it = config_map.find(mode_key);
-      if (otel_options_it != config_map.end()) {
-        for (const auto& setting : otel_options_it->second) {
-          // FIXME add more configuration options of OTLP HTTP Exporter
-          if (setting.first == "url") {
-            opts.url = setting.second;
-          }
-          if (setting.first == "resource") {
-            auto pos = setting.second.find('=');
-            auto key = setting.second.substr(0, pos);
-            auto value = setting.second.substr(pos + 1);
-            attributes[key] = value;
-          }
-        }
-      }
-      auto exporter = otlp::OtlpHttpExporterFactory::Create(opts);
       otel_trace_sdk::BatchSpanProcessorOptions processor_options;
-      processor_options.max_queue_size = EXPORT_QUEUE_SIZE;
-      processor_options.max_export_batch_size = EXPORT_QUEUE_SIZE;
-      processor_options.schedule_delay_millis =
-          std::chrono::milliseconds(EXPORT_DELAY_MS);
+
+      ProcessOpenTelemetryParameters(
+          config_map, exporter_options, attributes, processor_options);
+
+      auto exporter = otlp::OtlpHttpExporterFactory::Create(exporter_options);
       auto processor = otel_trace_sdk::BatchSpanProcessorFactory::Create(
           std::move(exporter), processor_options);
       auto resource = otel_resource::Resource::Create(attributes);
@@ -485,6 +460,56 @@ TraceManager::CleanupTracer()
 }
 
 #ifndef _WIN32
+void
+TraceManager::ProcessOpenTelemetryParameters(
+    const triton::server::TraceConfigMap& config_map,
+    otlp::OtlpHttpExporterOptions& exporter_options,
+    otel_resource::ResourceAttributes& attributes,
+    otel_trace_sdk::BatchSpanProcessorOptions& processor_options)
+{
+  processor_options.max_queue_size =
+      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
+          "OTEL_BSP_MAX_QUEUE_SIZE", "2048"));
+  processor_options.max_export_batch_size =
+      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
+          "OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "512"));
+  processor_options.schedule_delay_millis = std::chrono::milliseconds(
+      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
+          "OTEL_BSP_SCHEDULE_DELAY", "5000")));
+
+  attributes[otel_resource::SemanticConventions::kServiceName] =
+      std::string("triton-inference-server");
+  auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
+  auto otel_options_it = config_map.find(mode_key);
+  if (otel_options_it != config_map.end()) {
+    for (const auto& setting : otel_options_it->second) {
+      // FIXME add more configuration options of OTLP HTTP Exporter
+      if (setting.first == "url") {
+        exporter_options.url = setting.second;
+      }
+      if (setting.first == "resource") {
+        auto pos = setting.second.find('=');
+        auto key = setting.second.substr(0, pos);
+        auto value = setting.second.substr(pos + 1);
+        attributes[key] = value;
+      }
+      if (setting.first == "batch-span-processor") {
+        auto pos = setting.second.find('=');
+        auto key = setting.second.substr(0, pos);
+        auto value = setting.second.substr(pos + 1);
+        if (key == "max_queue_size") {
+          processor_options.max_queue_size = std::stoi(value);
+        } else if (key == "schedule_delay_millis") {
+          processor_options.schedule_delay_millis =
+              std::chrono::milliseconds(std::stoi(value));
+        } else if (key == "max_export_batch_size") {
+          processor_options.max_export_batch_size = std::stoi(value);
+        }
+      }
+    }
+  }
+}
+
 void
 TraceManager::Trace::StartSpan(
     std::string span_key, TRITONSERVER_InferenceTrace* trace,
