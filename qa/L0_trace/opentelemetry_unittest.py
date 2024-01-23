@@ -250,9 +250,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
         span_names = []
         for span in spans:
             # Check that collected spans have proper events recorded
-            span_name = span[0]["name"]
+            span_name = span["name"]
             span_names.append(span_name)
-            span_events = span[0]["events"]
+            span_events = span["events"]
             event_names_only = [event["name"] for event in span_events]
             self._check_events(span_name, event_names_only)
 
@@ -283,13 +283,13 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         seen_spans = {}
         for span in spans:
-            cur_span = span[0]["spanId"]
-            seen_spans[cur_span] = span[0]["name"]
+            cur_span = span["spanId"]
+            seen_spans[cur_span] = span["name"]
 
         parent_child_dict = {}
         for span in spans:
-            cur_parent = span[0]["parentSpanId"]
-            cur_span = span[0]["name"]
+            cur_parent = span["parentSpanId"]
+            cur_span = span["name"]
             if cur_parent in seen_spans.keys():
                 parent_name = seen_spans[cur_parent]
                 if parent_name not in parent_child_dict:
@@ -377,16 +377,21 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         time.sleep(COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-        self.assertEqual(len(traces), 1, "Unexpected number of traces collected")
+        expected_traces_number = 1
+        self.assertEqual(
+            len(traces),
+            expected_traces_number,
+            "Unexpected number of traces collected. Expected {}, but got {}".format(
+                expected_traces_number, len(traces)
+            ),
+        )
         self._test_resource_attributes(
             traces[0]["resourceSpans"][0]["resource"]["attributes"]
         )
 
-        parsed_spans = [
-            entry["scopeSpans"][0]["spans"] for entry in traces[0]["resourceSpans"]
-        ]
+        parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
         root_span = [
-            entry[0] for entry in parsed_spans if entry[0]["name"] == "InferRequest"
+            entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
 
