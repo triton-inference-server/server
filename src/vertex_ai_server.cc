@@ -276,7 +276,7 @@ VertexAiAPIServer::Create(
   if (predict_route.empty())
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        "API_PREDICT_ROUTE is not defined for Vertex AI endpoint");
+        "AIP_PREDICT_ROUTE is not defined for Vertex AI endpoint");
   else if (health_route.empty()) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
