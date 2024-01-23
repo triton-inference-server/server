@@ -27,7 +27,6 @@
 
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./custom_metrics_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
@@ -59,13 +58,6 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 
 set -e

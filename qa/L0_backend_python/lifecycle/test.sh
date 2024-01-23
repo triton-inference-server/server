@@ -26,7 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./lifecycle_client.log"
-EXPECTED_NUM_TESTS="5"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -85,13 +84,6 @@ for i in {0..4}; do
         cat $CLIENT_LOG
         echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
         RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
     fi
 done
 

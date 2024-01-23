@@ -27,7 +27,6 @@
 
 UNITTEST_PY=./io_test.py
 CLIENT_LOG="./io_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -89,13 +88,6 @@ for trial in $TRIALS; do
         echo -e "\n***\n*** IOTest.test_ensemble_io FAILED. \n***"
         cat $CLIENT_LOG.test_ensemble_io
         RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG.test_ensemble_io
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
     fi
     set -e
 
@@ -124,13 +116,6 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.test_empty_gpu_output FAILED. \n***"
     cat $CLIENT_LOG.test_empty_gpu_output
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.test_empty_gpu_output
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -158,13 +143,6 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
     cat $CLIENT_LOG.test_variable_gpu_output
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.test_variable_gpu_output
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

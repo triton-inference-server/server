@@ -27,7 +27,6 @@
 
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
-EXPECTED_NUM_TESTS="7"
 TEST_RESULT_FILE='test_results.txt'
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
@@ -100,13 +99,6 @@ python3 -m pytest --junitxml=decoupled.report.xml $CLIENT_PY > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** decoupled test FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

@@ -36,14 +36,13 @@ import unittest
 import numpy as np
 import requests as httpreq
 import shm_util
-import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
 TEST_JETSON = bool(int(os.environ.get("TEST_JETSON", 0)))
 
 
-class PythonTest(tu.TestResultCollector):
+class PythonTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 

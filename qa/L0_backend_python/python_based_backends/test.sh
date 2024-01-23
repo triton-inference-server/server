@@ -38,7 +38,6 @@ CLIENT_LOG="./python_based_backends_client.log"
 TEST_RESULT_FILE="./test_results.txt"
 CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
-EXPECTED_NUM_TESTS=3
 RET=0
 
 rm -rf ${MODEL_REPOSITORY}
@@ -89,12 +88,6 @@ python3 -m pytest --junitxml=python_based_backends.report.xml ${CLIENT_PY} -v > 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Running ${CLIENT_PY} FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Result Verification FAILED.\n***"
-        RET=1
-    fi
 fi
 set -e
 

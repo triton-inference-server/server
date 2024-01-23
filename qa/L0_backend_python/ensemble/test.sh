@@ -26,7 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./ensemble_client.log"
-EXPECTED_NUM_TESTS="2"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -80,13 +79,6 @@ python3 -m pytest --junitxml=ensemble.report.xml ensemble_test.py 2>&1 > $CLIENT
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** ensemble_test.py FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

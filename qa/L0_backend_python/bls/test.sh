@@ -27,7 +27,6 @@
 
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./bls_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
@@ -126,14 +125,6 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
                 cat $SERVER_LOG
                 cat $CLIENT_LOG
                 RET=1
-            else
-                check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-                if [ $? -ne 0 ]; then
-                    cat $SERVER_LOG
-                    cat $CLIENT_LOG
-                    echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
-                    RET=1
-                fi
             fi
         done
 
@@ -260,14 +251,6 @@ else
         cat $CLIENT_LOG
         RET=1
         SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-            SUB_TEST_RET=1
-        fi
     fi
 
     set -e
