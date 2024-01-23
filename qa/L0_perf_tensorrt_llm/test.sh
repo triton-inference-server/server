@@ -38,7 +38,6 @@ TENSORRTLLM_BACKEND_DIR="/opt/tritonserver/tensorrtllm_backend"
 GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
 TOKENIZER_DIR="$GPT_DIR/gpt2"
 ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
-
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
@@ -52,18 +51,69 @@ function clone_tensorrt_llm_backend_repo {
     cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
 }
 
+# Update Open MPI to a version compatible with SLURM.
+function upgrade_openmpi {
+    cd /tmp/
+    local CURRENT_VERSION=$(mpirun --version 2>&1 | awk '/Open MPI/ {gsub(/rc[0-9]+/, "", $NF); print $NF}')
+
+    if [ -n "$CURRENT_VERSION" ] && dpkg --compare-versions "$CURRENT_VERSION" lt "5.0.1"; then
+        # Uninstall the current version of Open MPI
+        wget "https://download.open-mpi.org/release/open-mpi/v$(echo "${CURRENT_VERSION}" | awk -F. '{print $1"."$2}')/openmpi-${CURRENT_VERSION}.tar.gz" || {
+            echo "Failed to download Open MPI ${CURRENT_VERSION}"
+            exit 1
+        }
+        rm -rf "openmpi-${CURRENT_VERSION}" && tar -xzf "openmpi-${CURRENT_VERSION}.tar.gz" && cd "openmpi-${CURRENT_VERSION}" || {
+            echo "Failed to extract Open MPI ${CURRENT_VERSION}"
+            exit 1
+        }
+        unset PMIX_VERSION && ./configure --prefix=/opt/hpcx/ompi/ && make uninstall || {
+            echo "Failed to uninstall Open MPI ${CURRENT_VERSION}"
+            exit 1
+        }
+        rm -rf /opt/hpcx/ompi/ /usr/local/mpi/ || {
+            echo "Failed to remove Open MPI ${CURRENT_VERSION} installation directories"
+            exit 1
+        }
+        cd ../ && rm -r openmpi-${CURRENT_VERSION}
+    else
+        echo "Installed Open MPI version is not less than 5.0.1. Skipping the upgrade."
+        return
+    fi
+
+    # Install SLURM supported Open MPI version
+    wget "https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.1.tar.gz" || {
+        echo "Failed to download Open MPI 5.0.1"
+        exit 1
+    }
+    rm -rf openmpi-5.0.1 && tar -xzf openmpi-5.0.1.tar.gz && cd openmpi-5.0.1 || {
+        echo "Failed to extract Open MPI 5.0.1"
+        exit 1
+    }
+    ./configure --prefix=/opt/hpcx/ompi/ && make && make install || {
+        echo "Failed to install Open MPI 5.0.1"
+        exit 1
+    }
+
+    # Update environment variables
+    if ! grep -q '/opt/hpcx/ompi/bin' ~/.bashrc; then
+        echo 'export PATH=/opt/hpcx/ompi/bin:$PATH' >>~/.bashrc
+    fi
+
+    if ! grep -q '/opt/hpcx/ompi/lib' ~/.bashrc; then
+        echo 'export LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:$LD_LIBRARY_PATH' >>~/.bashrc
+    fi
+    ldconfig
+    source ~/.bashrc
+    cd "$BASE_DIR"
+    mpirun --version
+}
+
 function install_tensorrt_llm {
     # Install CMake
     bash ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/docker/common/install_cmake.sh
     export PATH="/usr/local/cmake/bin:${PATH}"
 
-    # PyTorch needs to be built from source for aarch64
-    ARCH="$(uname -i)"
-    if [ "${ARCH}" = "aarch64" ]; then
-        TORCH_INSTALL_TYPE="src_non_cxx11_abi"
-    else
-        TORCH_INSTALL_TYPE="pypi"
-    fi &&
+    TORCH_INSTALL_TYPE="pypi" &&
         (cd ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm &&
             bash docker/common/install_pytorch.sh $TORCH_INSTALL_TYPE &&
             python3 ./scripts/build_wheel.py --trt_root=/usr/local/tensorrt &&
@@ -71,11 +121,14 @@ function install_tensorrt_llm {
 }
 
 function build_gpt2_base_model {
-    cd ${GPT_DIR}
-
     # Download weights from HuggingFace Transformers
-    rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2
-    pushd gpt2 && rm pytorch_model.bin model.safetensors && wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin && popd
+    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
+    rm pytorch_model.bin model.safetensors
+    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
+        echo "Downloading pytorch_model.bin failed."
+        exit 1
+    fi
+    cd ${GPT_DIR}
 
     # Convert weights from HF Tranformers to FT format
     python3 hf_gpt_convert.py -p 1 -i gpt2 -o ./c-model/gpt2 --tensor-parallelism ${NUM_GPUS} --storage-type float16
@@ -193,6 +246,7 @@ function kill_server {
     done
 }
 
+upgrade_openmpi
 clone_tensorrt_llm_backend_repo
 install_tensorrt_llm
 build_gpt2_base_model
