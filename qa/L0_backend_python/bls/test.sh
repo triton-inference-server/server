@@ -119,7 +119,7 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
         for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
             export MODEL_NAME=${MODEL_NAME}
 
-            python3 -m pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
+            python3 -m pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
                 echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                 cat $SERVER_LOG
