@@ -48,7 +48,7 @@ fi
 
 set +e
 SUBTEST="test_infer"
-python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py RestartTest.${SUBTEST} >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::RestartTest::${SUBTEST} >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
@@ -66,7 +66,7 @@ for proc in $triton_procs; do
 done
 
 SUBTEST="test_restart"
-python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py RestartTest.${SUBTEST} >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::RestartTest::${SUBTEST} >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG

@@ -83,10 +83,10 @@ for trial in $TRIALS; do
 
     set +e
     SUBTEST="test_ensemble_io"
-    python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+    python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} >> ${CLIENT_LOG}.${SUBTEST}
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** IOTest.test_ensemble_io FAILED. \n***"
-        cat $CLIENT_LOG.test_ensemble_io
+        echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+        cat $CLIENT_LOG.${SUBTEST}
         RET=1
     fi
     set -e
@@ -110,11 +110,11 @@ fi
 
 set +e
 SUBTEST="test_empty_gpu_output"
-python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST}> ${CLIENT_LOG}.${SUBTEST}
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** IOTest.test_empty_gpu_output FAILED. \n***"
-    cat $CLIENT_LOG.test_empty_gpu_output
+    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+    cat $CLIENT_LOG.${SUBTEST}
     RET=1
 fi
 set -e
@@ -137,11 +137,11 @@ fi
 
 set +e
 SUBTEST="test_variable_gpu_output"
-python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST}> ${CLIENT_LOG}.${SUBTEST}
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
-    cat $CLIENT_LOG.test_variable_gpu_output
+    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+    cat $CLIENT_LOG.${SUBTEST}
     RET=1
 fi
 set -e
