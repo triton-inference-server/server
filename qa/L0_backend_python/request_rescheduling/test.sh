@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
+CLIENT_PY="../python_unittest.py"
 CLIENT_LOG="./request_rescheduling_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
@@ -68,7 +68,7 @@ fi
 export MODEL_NAME='bls_request_rescheduling'
 
 set +e
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** bls_request_rescheduling test FAILED. \n***"
     cat $CLIENT_LOG
