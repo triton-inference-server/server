@@ -87,7 +87,7 @@ fi
 ### UNIT TESTS
 
 TEST_LOG="./metrics_api_test.log"
-UNIT_TEST=./metrics_api_test
+UNIT_TEST="./metrics_api_test --gtest_output=xml:metrics_api.report.xml"
 
 rm -fr *.log
 

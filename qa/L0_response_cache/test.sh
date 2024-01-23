@@ -28,7 +28,7 @@
 RET=0
 
 TEST_LOG="./response_cache_test.log"
-UNIT_TEST=./response_cache_test
+UNIT_TEST="./response_cache_test --gtest_output=xml:response_cache.report.xml"
 export CUDA_VISIBLE_DEVICES=0
 
 # Only localhost supported in this test for now, but in future could make
