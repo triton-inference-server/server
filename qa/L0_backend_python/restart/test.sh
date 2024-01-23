@@ -48,7 +48,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 restart_test.py RestartTest.test_infer >> $CLIENT_LOG 2>&1
+SUBTEST="test_infer"
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py RestartTest.${SUBTEST} >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
@@ -65,7 +66,9 @@ for proc in $triton_procs; do
     kill -9 $proc
 done
 
-python3 restart_test.py RestartTest.test_restart >> $CLIENT_LOG 2>&1
+SUBTEST="test_restart"
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py RestartTest.${SUBTEST} >> $CLIENT_LOG 2>&1
+
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG

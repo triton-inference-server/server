@@ -111,7 +111,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="default"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -152,7 +153,8 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="verbose"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -197,7 +199,8 @@ for BOOL_PARAM in $BOOL_PARAMS; do
     fi
 done
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="disabled"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"

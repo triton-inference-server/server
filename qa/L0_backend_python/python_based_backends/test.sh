@@ -84,10 +84,10 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY -v >$CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=python_based_backends.report.xml ${CLIENT_PY} -v > ${CLIENT_LOG} 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Running $CLIENT_PY FAILED. \n***"
+    echo -e "\n***\n*** Running ${CLIENT_PY} FAILED. \n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS

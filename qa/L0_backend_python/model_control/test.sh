@@ -53,7 +53,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 model_control_test.py 2>&1 > $CLIENT_LOG
+python3 -m pytest --junitxml=model_control.report.xml model_control_test.py 2>&1 > $CLIENT_LOG
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** model_control_test.py FAILED. \n***"

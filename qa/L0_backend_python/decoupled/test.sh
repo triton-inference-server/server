@@ -95,7 +95,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=decoupled.report.xml $CLIENT_PY > $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** decoupled test FAILED. \n***"

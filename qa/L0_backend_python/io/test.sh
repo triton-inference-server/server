@@ -83,7 +83,8 @@ for trial in $TRIALS; do
     fi
 
     set +e
-    python3 $UNITTEST_PY IOTest.test_ensemble_io > $CLIENT_LOG.test_ensemble_io
+    SUBTEST="test_ensemble_io"
+    python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** IOTest.test_ensemble_io FAILED. \n***"
         cat $CLIENT_LOG.test_ensemble_io
@@ -116,7 +117,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $UNITTEST_PY IOTest.test_empty_gpu_output > $CLIENT_LOG.test_empty_gpu_output
+SUBTEST="test_empty_gpu_output"
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST}> ${CLIENT_LOG}.${SUBTEST}
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.test_empty_gpu_output FAILED. \n***"
     cat $CLIENT_LOG.test_empty_gpu_output
@@ -148,7 +151,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $UNITTEST_PY IOTest.test_variable_gpu_output > $CLIENT_LOG.test_variable_gpu_output
+SUBTEST="test_variable_gpu_output"
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY} IOTest.${SUBTEST}> ${CLIENT_LOG}.${SUBTEST}
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
     cat $CLIENT_LOG.test_variable_gpu_output
