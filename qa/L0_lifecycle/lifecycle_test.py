@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,7 @@ import time
 import unittest
 from builtins import range
 from functools import partial
+from pathlib import Path
 
 import infer_util as iu
 import numpy as np
@@ -2380,20 +2381,15 @@ class LifeCycleTest(tu.TestResultCollector):
                     model_shape,
                 )
 
-                # request without additional config will load with default
-                # config and expect to fail, and version 2 will not be unloaded.
+                # request without additional config will load retain the provided
+                # config and expect to not fail, and version 2 will not be loaded.
                 try:
                     triton_client.load_model(model_name)
-                    self.assertTrue(
-                        False, "expected fail to load '{}'".format(model_name)
-                    )
                 except Exception as ex:
-                    self.assertIn(
-                        "load failed for model '{}'".format(model_name), ex.message()
-                    )
-                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
-                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
-                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
 
                 # Unload model for the next client iteration
                 try:
@@ -2539,8 +2535,9 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # Reset model for the next client iteration
                 try:
-                    # Load model again and the original model repository will
-                    # be use
+                    # Unload and load the model again and the original model repository will
+                    # be used
+                    triton_client.unload_model(model_name)
                     triton_client.load_model(model_name)
                     triton_client.unload_model(override_model_name)
                 except Exception as ex:
@@ -3270,6 +3267,64 @@ class LifeCycleTest(tu.TestResultCollector):
                         triton_client.get_model_repository_index(),
                     )
                     self.assertTrue(triton_client.is_server_ready())
+
+    def test_model_config_overwite(self):
+        model_name = "identity_fp32"
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = self._get_client()
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load the model from disk w/o any special configuration settings.
+        original_config = triton_client.get_model_config(model_name)
+
+        # The instance_group[0].count is set to 2 instead of the default 1.
+        # This enough of a delta to ensure the correct model configuration
+        # has been applied to the model.
+        override_config = """
+{
+  "name": "identity_fp32",
+  "backend": "identity",
+  "instance_group": [
+    {
+      "count": 2,
+      "kind" : "KIND_CPU"
+    }
+  ]
+}
+"""
+
+        # Ensure the model has been loaded w/ the expected (different from override) config.
+        self.assertTrue(original_config != None and original_config != override_config)
+
+        # Reload the model with the overriding configuration value.
+        triton_client.load_model(model_name, config=override_config)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config = triton_client.get_model_config(model_name)
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config2 = triton_client.get_model_config(model_name)
+        self.assertEqual(updated_config, updated_config2)
+
+        # Touch the local config.pbtxt and reload the file to ensure the local config
+        # is preferred because it has a more recent mtime.
+        Path(os.path.join("models", model_name, "config.pbtxt")).touch()
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (local) config.
+        updated_config = triton_client.get_model_config(model_name)
+        self.assertEqual(original_config, updated_config)
 
 
 if __name__ == "__main__":

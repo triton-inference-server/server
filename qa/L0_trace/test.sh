@@ -698,68 +698,40 @@ set +e
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
-export TRITON_OPENTELEMETRY_TEST='false'
 OTLP_PORT=10000
-OTEL_COLLECTOR_DIR=./opentelemetry-collector
-OTEL_COLLECTOR=./opentelemetry-collector/bin/otelcorecol_*
+OTEL_COLLECTOR=./otelcol
 OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 
-# Building the latest version of the OpenTelemetry collector.
+# Installing OpenTelemetry collector (v0.91.0).
 # Ref: https://opentelemetry.io/docs/collector/getting-started/#local
-if [ -d "$OTEL_COLLECTOR_DIR" ]; then rm -Rf $OTEL_COLLECTOR_DIR; fi
-git clone --depth 1 --branch v0.82.0 https://github.com/open-telemetry/opentelemetry-collector.git
-cd $OTEL_COLLECTOR_DIR
-make install-tools
-make otelcorecol
-cd ..
-$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+curl --proto '=https' --tlsv1.2 -fOL https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.91.0/otelcol_0.91.0_linux_amd64.tar.gz
+tar -xvf otelcol_0.91.0_linux_amd64.tar.gz
 
-
-SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=100 --trace-config=mode=opentelemetry \
-                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
-                --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_otel_http_exporter.log"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-$SIMPLE_HTTP_CLIENT >>$CLIENT_LOG 2>&1
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
-
-set +e
-
-if ! [[ -s $OTEL_COLLECTOR_LOG && `grep -c 'InstrumentationScope triton-server' $OTEL_COLLECTOR_LOG` == 3 ]] ; then
-    echo -e "\n***\n*** HTTP exporter test failed.\n***"
-    cat $OTEL_COLLECTOR_LOG
-    exit 1
-fi
-
-
+rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="3"
+EXPECTED_NUM_TESTS="13"
 
-export TRITON_OPENTELEMETRY_TEST='true'
+# Set up repo and args for SageMaker
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
+MODEL_PATH="/opt/ml/models/123456789abcdefghi/model"
+rm -r ${MODEL_PATH}
+mkdir -p "${MODEL_PATH}"
+cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
+    rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
+        sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
 
-SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=100 --trace-config=mode=opentelemetry \
+
+SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
+                --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
+                --load-model=bls_simple --trace-config=level=TIMESTAMPS \
+                --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
                 --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_otel_ostream_exporter.log"
+SERVER_LOG="./inference_server_otel_otelcol_exporter.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -769,29 +741,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-# Preparing traces for unittest.
-# Note: running this separately, so that I could extract spans with `grep`
-# from server log later.
-python -c 'import opentelemetry_unittest; \
-        opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 
-sleep 5
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-
-grep -z -o -P '({\n(?s).*}\n)' $SERVER_LOG >> trace_collector.log
-
-if ! [ -s trace_collector.log ] ; then
-    echo -e "\n***\n*** $SERVER_LOG did not contain any OpenTelemetry spans.\n***"
-    exit 1
-fi
-
-# Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $OPENTELEMETRY_LOG
@@ -804,5 +754,147 @@ else
         RET=1
     fi
 fi
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Testing OTel WAR with trace rate = 0
+rm collected_traces.json
+
+OTEL_COLLECTOR=./otelcol
+OTEL_COLLECTOR_LOG="./trace_collector_exporter.log"
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=0\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+if [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should be empty, but it is not.\n***"
+    exit 1
+fi
+
+# Send 1 bls request with OTel context to make sure it is traced
+python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+            headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+        )'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should contain OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that only traces with OTel Context are collected after count goes to 0
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=5\
+                --trace-config=count=1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"5\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..20}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+sleep 20
+
+if ! [[ -s collected_traces.json && `grep -c "\"name\":\"InferRequest\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain only 1 trace.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+# Send 4 bls request with OTel context and 4 without to make sure it is traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+                headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+            )'  >> client_update.log 2>&1
+
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32" \
+            )'  >> client_update.log 2>&1
+
+    sleep 10
+done
+
+if ! [[ -s collected_traces.json && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"b7ad6b7169242424\"" ./collected_traces.json` == 10 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain 11 OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
 
 exit $RET
