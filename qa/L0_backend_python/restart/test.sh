@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,7 +52,7 @@ python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::Rest
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** test_infer test FAILED. \n***"
+    echo -e "\n***\n*** ${SUBTEST} test FAILED. \n***"
     RET=1
 fi
 set -e
@@ -71,7 +71,7 @@ python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::Rest
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** test_restart test FAILED. \n***"
+    echo -e "\n***\n*** ${SUBTEST} test FAILED. \n***"
     RET=1
 fi
 set -e
