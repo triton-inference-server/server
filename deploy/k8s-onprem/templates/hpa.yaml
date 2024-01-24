@@ -31,7 +31,7 @@
 # autoscaling tag is set to true.
 
 {{- if .Values.tags.autoscaling }}
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: triton-hpa

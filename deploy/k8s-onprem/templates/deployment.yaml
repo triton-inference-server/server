@@ -53,10 +53,8 @@ spec:
     spec:
       volumes:
         - name: models
-          nfs:
-            server: {{ .Values.image.modelRepositoryServer }}
+          hostPath:
             path: {{ .Values.image.modelRepositoryPath }}
-            readOnly: false
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageName }}"

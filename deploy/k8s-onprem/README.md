@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -99,6 +99,34 @@ give you a quick setup.
 If you are currently using Helm v2 and would like to migrate to Helm v3,
 see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
 
+## Setting up the Network File System (NFS) Server on Ubuntu
+
+For the model repository, this tutorial requires setting up an NFS server.
+First, we need to install the `nfs-kernel-server` package.
+
+```bash
+sudo apt update && sudo apt install nfs-kernel-server
+```
+
+Next, we will create the directory that the NFS server will be using.
+```bash
+sudo mkdir /model_repository && sudo chmod 777 /model_repository
+```
+
+Then, we will add this directory to the list of directories that we want
+to share.
+
+```bash
+sudo bash -c "echo '/model_repository *(ro,sync,no_subtree_check)' >> /etc/exports"
+```
+
+Once you've defined the exports, we can export them and start the NFS service:
+
+```bash
+sudo exportfs -a && sudo systemctl start nfs-kernel-server.service
+```
+
+
 ## Model Repository
 If you already have a model repository, you may use that with this Helm
 chart. If you do not have a model repository, you can check out a local
@@ -116,8 +144,9 @@ placing our model files there. See the
 supported locations.
 
 Following the [QuickStart](../../docs/getting_started/quickstart.md), download the
-example model repository to your system and copy it onto your NFS server.
-Then, add the url or IP address of your NFS server and the server path of your
+example model repository to your system and copy it onto the NFS server created
+in the stage before.
+Then, add the URL or IP address of your NFS server and the server path of your
 model repository to `values.yaml`.
 
 
