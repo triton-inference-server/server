@@ -37,7 +37,7 @@ import tritonclient.http as httpclient
 from tritonclient.utils import *
 
 
-class LogTest:
+class LogTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
