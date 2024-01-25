@@ -35,13 +35,23 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+export WINDOWS=0
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    export DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    export TRITON_DIR=${TRITON_DIR:=/mnt/c/tritonserver/}
+    export SERVER=${TRITON_DIR}/bin/tritonserver.exe
+    export BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    WINDOWS=1
+else
+    export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    export SERVER=${TRITON_DIR}/bin/tritonserver
+    export BACKEND_DIR=${TRITON_DIR}/backends
+fi
 export REPO_VERSION=$REPO_VERSION
-export DATADIR=$DATADIR
-
-export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-export BACKEND_DIR=${TRITON_DIR}/backends
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
@@ -147,7 +157,7 @@ mkdir -p models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
-if [ "$TEST_JETSON" == "0" ]; then
+if [[ "$TEST_JETSON" == "0" ]] && [[ ${WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
@@ -226,7 +236,7 @@ set -e
 #
 # Test KIND_GPU
 # Disable env test for Jetson since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ]; then
+if [[ "$TEST_JETSON" == "0" ]] || [[ ${WINDOWS} == 1 ]]; then
   rm -rf models/
   mkdir -p models/add_sub_gpu/1/
   cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -394,8 +404,12 @@ fi
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
-if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble io bls decoupled variants python_based_backends"
+if [[ "$TEST_JETSON" == "0" ]]; then
+    SUBTESTS="ensemble bls decoupled variants python_based_backends"
+    # FIXME: Only test io if platform is not windows
+    if [[ ${WINDOWS} == 0 ]]; then
+        SUBTESTS="${SUBTESTS} io"
+
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.

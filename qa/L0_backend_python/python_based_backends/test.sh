@@ -27,9 +27,6 @@
 
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
 QA_MODELS_PATH="../../python_models"
 MODEL_REPOSITORY="$(pwd)/models"
 SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"

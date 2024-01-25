@@ -29,14 +29,15 @@ CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
 EXPECTED_NUM_TESTS="7"
 TEST_RESULT_FILE='test_results.txt'
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./decoupled_server.log"
 
 pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${WINDOWS} == 1 ]]; then
+  pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+else
+  pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
 RET=0
 source ../../common/util.sh
@@ -45,10 +46,6 @@ rm -fr *.log
 mkdir -p models/identity_fp32/1/
 cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
 cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32/
-
-mkdir -p models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
 mkdir -p models/execute_cancel/1/
 cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
@@ -59,6 +56,13 @@ git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_B
 mkdir -p models/square_int32/1/
 cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
 cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
+
+# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+if [[ {WINDOWS} == 0 ]]; then
+  mkdir -p models/dlpack_add_sub/1/
+  cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
+  cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
+if
 
 function verify_log_counts () {
   if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then

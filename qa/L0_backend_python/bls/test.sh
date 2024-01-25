@@ -31,133 +31,132 @@ EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-
 RET=0
 rm -fr *.log ./models *.txt
 
-pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+# FIXME: Until Windows supports GPU tensors, only test CPU
+if [[ ${WINDOWS} == 0 ]]; then
+    pip3 uninstall -y torch
+    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
-mkdir -p models/bls/1/
-cp ../../python_models/bls/model.py models/bls/1/
-cp ../../python_models/bls/config.pbtxt models/bls
+    mkdir -p models/bls/1/
+    cp ../../python_models/bls/model.py models/bls/1/
+    cp ../../python_models/bls/config.pbtxt models/bls
 
-mkdir -p models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub
+    mkdir -p models/dlpack_add_sub/1/
+    cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
+    cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub
 
-mkdir -p models/bls_async/1/
-cp ../../python_models/bls_async/model.py models/bls_async/1/
-cp ../../python_models/bls_async/config.pbtxt models/bls_async
+    mkdir -p models/bls_async/1/
+    cp ../../python_models/bls_async/model.py models/bls_async/1/
+    cp ../../python_models/bls_async/config.pbtxt models/bls_async
 
-mkdir -p models/bls_memory/1/
-cp ../../python_models/bls_memory/model.py models/bls_memory/1/
-cp ../../python_models/bls_memory/config.pbtxt models/bls_memory
+    mkdir -p models/bls_memory/1/
+    cp ../../python_models/bls_memory/model.py models/bls_memory/1/
+    cp ../../python_models/bls_memory/config.pbtxt models/bls_memory
 
-mkdir -p models/bls_memory_async/1/
-cp ../../python_models/bls_memory_async/model.py models/bls_memory_async/1/
-cp ../../python_models/bls_memory_async/config.pbtxt models/bls_memory_async
+    mkdir -p models/bls_memory_async/1/
+    cp ../../python_models/bls_memory_async/model.py models/bls_memory_async/1/
+    cp ../../python_models/bls_memory_async/config.pbtxt models/bls_memory_async
 
-mkdir -p models/add_sub/1/
-cp ../../python_models/add_sub/model.py models/add_sub/1/
-cp ../../python_models/add_sub/config.pbtxt models/add_sub
+    mkdir -p models/add_sub/1/
+    cp ../../python_models/add_sub/model.py models/add_sub/1/
+    cp ../../python_models/add_sub/config.pbtxt models/add_sub
 
-mkdir -p models/execute_error/1/
-cp ../../python_models/execute_error/model.py models/execute_error/1/
-cp ../../python_models/execute_error/config.pbtxt models/execute_error
+    mkdir -p models/execute_error/1/
+    cp ../../python_models/execute_error/model.py models/execute_error/1/
+    cp ../../python_models/execute_error/config.pbtxt models/execute_error
 
-mkdir -p models/identity_fp32/1/
-cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
-cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
+    mkdir -p models/identity_fp32/1/
+    cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
+    cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
 
-mkdir -p models/dlpack_identity/1/
-cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
-cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
+    mkdir -p models/dlpack_identity/1/
+    cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
+    cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
 
-cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
 
-git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
-mkdir -p models/square_int32/1/
-cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
-cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
+    git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
+    mkdir -p models/square_int32/1/
+    cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
+    cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
 
-mkdir -p models/dlpack_square/1/
-cp ../../python_models/dlpack_square/model.py models/dlpack_square/1/
-cp ../../python_models/dlpack_square/config.pbtxt models/dlpack_square
+    mkdir -p models/dlpack_square/1/
+    cp ../../python_models/dlpack_square/model.py models/dlpack_square/1/
+    cp ../../python_models/dlpack_square/config.pbtxt models/dlpack_square
 
-mkdir -p models/identity_fp32_timeout/1/
-cp ../../python_models/identity_fp32_timeout/model.py models/identity_fp32_timeout/1/
-cp ../../python_models/identity_fp32_timeout/config.pbtxt models/identity_fp32_timeout
+    mkdir -p models/identity_fp32_timeout/1/
+    cp ../../python_models/identity_fp32_timeout/model.py models/identity_fp32_timeout/1/
+    cp ../../python_models/identity_fp32_timeout/config.pbtxt models/identity_fp32_timeout
 
-cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_gpu && \
-    sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_gpu/' models/libtorch_gpu/config.pbtxt && \
-    echo "instance_group [ { kind: KIND_GPU} ]" >> models/libtorch_gpu/config.pbtxt
+    cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_gpu && \
+        sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_gpu/' models/libtorch_gpu/config.pbtxt && \
+        echo "instance_group [ { kind: KIND_GPU} ]" >> models/libtorch_gpu/config.pbtxt
 
-cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_cpu && \
-    sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_cpu/' models/libtorch_cpu/config.pbtxt && \
-    echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
+    cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_cpu && \
+        sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_cpu/' models/libtorch_cpu/config.pbtxt && \
+        echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
 
-# Test with different sizes of CUDA memory pool
-for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
-    CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
-    SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
-    for TRIAL in non_decoupled decoupled ; do
-        export BLS_KIND=${TRIAL}
-        SERVER_LOG="./bls_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
+    # Test with different sizes of CUDA memory pool
+    for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
+        CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
+        SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
+        for TRIAL in non_decoupled decoupled ; do
+            export BLS_KIND=${TRIAL}
+            SERVER_LOG="./bls_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
 
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
-
-        set +e
-
-        for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
-            export MODEL_NAME=${MODEL_NAME}
-
-            python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
+            run_server
+            if [ "$SERVER_PID" == "0" ]; then
+                echo -e "\n***\n*** Failed to start $SERVER\n***"
                 cat $SERVER_LOG
-                cat $CLIENT_LOG
-                RET=1
-            else
-                check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+                exit 1
+            fi
+
+            set +e
+
+            for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
+                export MODEL_NAME=${MODEL_NAME}
+
+                python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
                 if [ $? -ne 0 ]; then
+                    echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
-                    echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
+                    RET=1
+                else
+                    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+                    if [ $? -ne 0 ]; then
+                        cat $SERVER_LOG
+                        cat $CLIENT_LOG
+                        echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
+                        RET=1
+                    fi
+                fi
+            done
+
+            set -e
+
+            kill $SERVER_PID
+            wait $SERVER_PID
+
+            # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
+            if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
+                echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
+                cat $SERVER_LOG
+                RET=1
+            fi
+
+            if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
+                if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
+                    echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
+                    cat $SERVER_LOG
                     RET=1
                 fi
             fi
         done
-
-        set -e
-
-        kill $SERVER_PID
-        wait $SERVER_PID
-
-        # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
-        if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
-            echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
-            cat $SERVER_LOG
-            RET=1
-        fi
-
-        if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
-            if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
-                echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
-                cat $SERVER_LOG
-                RET=1
-            fi
-        fi
     done
-done
+fi
 
 # Test error handling when BLS is used in "initialize" or "finalize" function
 ERROR_MESSAGE="BLS is only supported during the 'execute' function."

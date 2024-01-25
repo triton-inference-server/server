@@ -27,9 +27,6 @@
 
 CLIENT_LOG="./restart_client.log"
 EXPECTED_NUM_TESTS="7"
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./restart_server.log"
 source ../../common/util.sh

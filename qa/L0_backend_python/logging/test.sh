@@ -43,25 +43,6 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-export CUDA_VISIBLE_DEVICES=0
-
-# On windows the paths invoked by the script (running in WSL) must use
-# /mnt/c when needed but the paths on the tritonserver command-line
-# must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    MODELDIR=${MODELDIR:=C:/models}
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
-    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
-    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
-    export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
-else
-    MODELDIR=${MODELDIR:=`pwd`}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-    SERVER=${TRITON_DIR}/bin/tritonserver
-    BACKEND_DIR=${TRITON_DIR}/backends
-fi
-
 MODELSDIR=`pwd`/models
 source ../../common/util.sh
 
