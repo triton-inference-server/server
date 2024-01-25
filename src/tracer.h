@@ -34,6 +34,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 #include "opentelemetry/context/propagation/global_propagator.h"
@@ -56,7 +57,8 @@ namespace otel_resource = opentelemetry::sdk::resource;
 
 namespace triton { namespace server {
 
-using TraceConfig = std::vector<std::pair<std::string, std::string>>;
+using TraceConfig = std::vector<
+    std::pair<std::string, std::variant<std::string, int, uint32_t>>>;
 using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 using AbstractCarrier = otel_cntxt::propagation::TextMapCarrier;

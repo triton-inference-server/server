@@ -467,16 +467,6 @@ TraceManager::ProcessOpenTelemetryParameters(
     otel_resource::ResourceAttributes& attributes,
     otel_trace_sdk::BatchSpanProcessorOptions& processor_options)
 {
-  processor_options.max_queue_size =
-      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
-          "OTEL_BSP_MAX_QUEUE_SIZE", "2048"));
-  processor_options.max_export_batch_size =
-      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
-          "OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "512"));
-  processor_options.schedule_delay_millis = std::chrono::milliseconds(
-      std::stoi(triton::server::GetEnvironmentVariableOrDefault(
-          "OTEL_BSP_SCHEDULE_DELAY", "5000")));
-
   attributes[otel_resource::SemanticConventions::kServiceName] =
       std::string("triton-inference-server");
   auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
@@ -485,26 +475,25 @@ TraceManager::ProcessOpenTelemetryParameters(
     for (const auto& setting : otel_options_it->second) {
       // FIXME add more configuration options of OTLP HTTP Exporter
       if (setting.first == "url") {
-        exporter_options.url = setting.second;
+        exporter_options.url = std::get<std::string>(setting.second);
       }
       if (setting.first == "resource") {
-        auto pos = setting.second.find('=');
-        auto key = setting.second.substr(0, pos);
-        auto value = setting.second.substr(pos + 1);
+        auto user_setting = std::get<std::string>(setting.second);
+        auto pos = user_setting.find('=');
+        auto key = user_setting.substr(0, pos);
+        auto value = user_setting.substr(pos + 1);
         attributes[key] = value;
       }
-      if (setting.first == "batch-span-processor") {
-        auto pos = setting.second.find('=');
-        auto key = setting.second.substr(0, pos);
-        auto value = setting.second.substr(pos + 1);
-        if (key == "max_queue_size") {
-          processor_options.max_queue_size = std::stoi(value);
-        } else if (key == "schedule_delay_millis") {
-          processor_options.schedule_delay_millis =
-              std::chrono::milliseconds(std::stoi(value));
-        } else if (key == "max_export_batch_size") {
-          processor_options.max_export_batch_size = std::stoi(value);
-        }
+      if (setting.first == "bsp_max_queue_size") {
+        processor_options.max_queue_size = std::get<uint32_t>(setting.second);
+      }
+      if (setting.first == "bsp_schedule_delay") {
+        processor_options.schedule_delay_millis =
+            std::chrono::milliseconds(std::get<uint32_t>(setting.second));
+      }
+      if (setting.first == "bsp_max_export_batch_size") {
+        processor_options.max_export_batch_size =
+            std::get<uint32_t>(setting.second);
       }
     }
   }
