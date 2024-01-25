@@ -390,8 +390,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
-        virtualenv --system-site-packages venv
-        source venv/bin/activate
+        setup_virtualenv
 
         (cd ${TEST} && bash -ex test.sh)
         if [ $? -ne 0 ]; then
@@ -399,8 +398,7 @@ if [ "$TEST_JETSON" == "0" ]; then
         RET=1
         fi
 
-        deactivate
-        rm -fr venv
+        deactivate_virtualenv
     done
 
     if [ ${PYTHON_ENV_VERSION} = "10" ]; then
@@ -418,8 +416,7 @@ SUBTESTS="lifecycle restart model_control examples argument_validation logging c
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
-    virtualenv --system-site-packages venv
-    source venv/bin/activate
+    setup_virtualenv
 
     (cd ${TEST} && bash -ex test.sh)
 
@@ -428,8 +425,7 @@ for TEST in ${SUBTESTS}; do
         RET=1
     fi
 
-    deactivate
-    rm -fr venv
+    deactivate_virtualenv
 done
 
 if [ $RET -eq 0 ]; then
