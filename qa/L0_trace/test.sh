@@ -897,4 +897,132 @@ kill $SERVER_PID
 wait $SERVER_PID
 set +e
 
+################################################################################
+# Tests to make sure BatchSpanProcessor's arguments are propagated from cmd    #
+# to trace initialization step.                                                #
+################################################################################
+
+# bsp_max_queue_size = 1
+# We are sending a bls request, that results in a trace with 6 spans,
+# but because `bsp_max_queue_size` is 1, OTel should drop some of them
+# and print a warning in a log.
+EXPECTED_WARNING="BatchSpanProcessor queue is full - dropping span."
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_queue_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_queue_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [[ `grep -c "$EXPECTED_WARNING" $SERVER_LOG` > 0 ]] ; then
+    echo -e "\n***\n*** $SERVER_LOG does not contain expected BSP warning.\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_schedule_delay = 0
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_schedule_delay` is 0, so OTel should export traces in batches of random
+# size, that translates into random number of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_schedule_delay=0
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_schedule_delay.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` > 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_max_export_batch_size = 1
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_max_export_batch_size` is 1, so OTel should export traces in batches of
+# size 1, that translates into 6 entries of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_export_batch_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_export_batch_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` == 6 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
 exit $RET
