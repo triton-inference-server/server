@@ -297,6 +297,8 @@ GRPC infer request (avg): 383.601us
   			Output (avg): 63.902us
 ```
 
+Note: The "Receive (avg)" metric is not included in the gRPC summary as gRPC library does not provide any non-intrusive hooks to detect time spent in reading a message from the wire. Tracing an HTTP request will provide an accurate measurement of time spent reading a request from the network.
+
 Use the -t option to get a summary for each trace in the file. This
 summary shows the time, in microseconds, between different points in
 the processing of an inference request. For example, the below output
