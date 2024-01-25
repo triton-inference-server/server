@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,6 @@ CLIENT_LOG="./python_based_backends_client.log"
 TEST_RESULT_FILE="./test_results.txt"
 CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
-EXPECTED_NUM_TESTS=3
 RET=0
 
 rm -rf ${MODEL_REPOSITORY}
@@ -84,17 +83,11 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY -v >$CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=python_based_backends.report.xml ${CLIENT_PY} -v > ${CLIENT_LOG} 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Running $CLIENT_PY FAILED. \n***"
+    echo -e "\n***\n*** Running ${CLIENT_PY} FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Result Verification FAILED.\n***"
-        RET=1
-    fi
 fi
 set -e
 
