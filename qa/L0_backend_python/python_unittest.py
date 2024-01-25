@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,12 +34,11 @@ import os
 import unittest
 
 import shm_util
-import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
 
-class PythonUnittest(tu.TestResultCollector):
+class PythonUnittest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 

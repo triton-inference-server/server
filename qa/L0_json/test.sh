@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 RET=0
-UNIT_TEST="./triton_json_test"
+UNIT_TEST="./triton_json_test --gtest_output=xml:triton_json.report.xml"
 TEST_LOG="./triton_json_test.log"
 $UNIT_TEST >> $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
