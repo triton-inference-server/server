@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -111,19 +111,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="default"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -152,19 +146,13 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="verbose"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -197,19 +185,13 @@ for BOOL_PARAM in $BOOL_PARAMS; do
     fi
 done
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="disabled"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
