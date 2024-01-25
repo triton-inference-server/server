@@ -41,7 +41,7 @@ fi
 export WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     export DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
-    export TRITON_DIR=${TRITON_DIR:=/mnt/c/tritonserver/}
+    export TRITON_DIR=${TRITON_DIR:=/mnt/c/tritonserver}
     export SERVER=${TRITON_DIR}/bin/tritonserver.exe
     export BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     WINDOWS=1
@@ -153,9 +153,12 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
-mkdir -p models/dlpack_identity/1/
-cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
-cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${WINDOWS} == 0 ]]; then
+    mkdir -p models/dlpack_identity/1/
+    cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
+    cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+fi
 
 if [[ "$TEST_JETSON" == "0" ]] && [[ ${WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html

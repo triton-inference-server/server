@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
@@ -36,10 +37,18 @@ def check_init_args(args):
         "model_instance_name": "init_args_0_0",
         "model_instance_kind": "CPU",
         "model_instance_device_id": "0",
-        "model_repository": os.getenv("TRITON_DIR", "/opt/tritonserver")
-        + "/qa/L0_backend_python/models/init_args",
         "model_version": "1",
     }
+    if sys.platform == "win32":
+        expected_args["model_repository"] = (
+            os.getenv("TRITON_DIR", "/mnt/c/tritonserver/")
+            + "/qa/L0_backend_python/models/init_args"
+        )
+    else:
+        expected_args["model_repository"] = (
+            os.getenv("TRITON_DIR", "/opt/tritonserver")
+            + "/qa/L0_backend_python/models/init_args"
+        )
 
     for arg in expected_args:
         if args[arg] != expected_args[arg]:
