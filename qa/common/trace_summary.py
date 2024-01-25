@@ -106,20 +106,13 @@ class GrpcFrontend(AbstractFrontend):
         return "GRPC_WAITREAD_START"
 
     def add_frontend_span(self, span_map, timestamps):
-        if ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END" in timestamps):
+        if ("GRPC_WAITREAD_END" in timestamps) and ("GRPC_SEND_END" in timestamps):
             add_span(
                 span_map,
                 timestamps,
                 "GRPC_INFER",
-                "GRPC_WAITREAD_START",
-                "GRPC_SEND_END",
-            )
-            add_span(
-                span_map,
-                timestamps,
-                "GRPC_WAITREAD",
-                "GRPC_WAITREAD_START",
                 "GRPC_WAITREAD_END",
+                "GRPC_SEND_END",
             )
             add_span(
                 span_map, timestamps, "GRPC_SEND", "GRPC_SEND_START", "GRPC_SEND_END"
@@ -130,19 +123,7 @@ class GrpcFrontend(AbstractFrontend):
             res = "GRPC infer request (avg): {}us\n".format(
                 span_map["GRPC_INFER"] / (cnt * 1000)
             )
-            res += "\tWait/Read (avg): {}us\n".format(
-                span_map["GRPC_WAITREAD"] / (cnt * 1000)
-            )
             res += "\tSend (avg): {}us\n".format(span_map["GRPC_SEND"] / (cnt * 1000))
-            res += "\tOverhead (avg): {}us\n".format(
-                (
-                    span_map["GRPC_INFER"]
-                    - span_map["REQUEST"]
-                    - span_map["GRPC_WAITREAD"]
-                    - span_map["GRPC_SEND"]
-                )
-                / (cnt * 1000)
-            )
             return res
         else:
             return None
@@ -269,7 +250,9 @@ def summarize(frontend, traces):
                     print("\tparent id: {}".format(trace["parent_id"]))
                 ordered_timestamps = list()
                 for ts in trace["timestamps"]:
-                    ordered_timestamps.append((ts["name"], ts["ns"]))
+                    # skip GRPC_WAITREAD
+                    if not ts["name"].startswith("GRPC_WAITREAD"):
+                        ordered_timestamps.append((ts["name"], ts["ns"]))
                 ordered_timestamps.sort(key=lambda tup: tup[1])
 
                 now = None
