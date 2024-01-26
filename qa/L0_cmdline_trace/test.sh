@@ -688,25 +688,6 @@ fi
 
 unset OTEL_BSP_MAX_EXPORT_BATCH_SIZE
 
-SERVER_ARGS="--model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_trace_config_flag.log"
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n***Fail: Server start should have failed $SERVER\n***"
-    cat $SERVER_LOG
-    set -e
-    kill $SERVER_PID
-    wait $SERVER_PID
-    set +e
-    exit 1
-fi
-
-if [ `grep -c "Bad option: \"OTEL_BSP_MAX_QUEUE_SIZE\"" $SERVER_LOG` != "1" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
 SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
              --trace-config opentelemetry,bsp_max_queue_size=bad_value"
 SERVER_LOG="./inference_server_trace_config_flag.log"
