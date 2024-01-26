@@ -520,6 +520,45 @@ The following table shows available OpenTelemetry trace APIs settings for
       environment variable.
     </td>
     </tr>
+    <tr>
+    <td><a href="https://opentelemetry.io/docs/specs/otel/trace/sdk/#batching-processor">
+      Batch Span Processor</a>
+    </td>
+    <td></td><td></td>
+    </tr>
+    <tr>
+    <td><code>bsp_max_queue_size</code></td>
+    <td align="center">2048</td>
+    <td>
+      Maximum queue size. <br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_MAX_QUEUE_SIZE</a>
+      environment variable.
+    </td>
+    </tr>
+    <tr>
+    <td><code>bsp_schedule_delay</code></td>
+    <td align="center">5000</td>
+    <td>
+      Delay interval (in milliseconds) between two consecutive exports. <br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_SCHEDULE_DELAY</a>
+      environment variable.
+    </td>
+    </tr>
+    <tr>
+    <td><code>bsp_max_export_batch_size</code></td>
+    <td align="center">512</td>
+    <td>
+      Maximum batch size. Must be less than or equal to `bsp_max_queue_size`.<br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE</a>
+      environment variable.
+    </td>
+    </tr>
   </tbody>
 </table>
 
