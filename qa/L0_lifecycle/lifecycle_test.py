@@ -3347,6 +3347,18 @@ class LifeCycleTest(tu.TestResultCollector):
         # The server will shutdown after this sub-test exits. The server must shutdown
         # without any hang or runtime error.
 
+    def test_shutdown_while_loading(self):
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Load the model which will load for at least 10 seconds.
+        model_name = "identity_fp32"
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(triton_client.load_model, model_name)
+        self.assertFalse(triton_client.is_model_ready(model_name))
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
 
 if __name__ == "__main__":
     unittest.main()
