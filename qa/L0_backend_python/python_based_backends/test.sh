@@ -28,7 +28,7 @@
 source ../../common/util.sh
 
 QA_MODELS_PATH="../../python_models"
-MODEL_REPOSITORY="$(pwd)/models"
+MODEL_REPOSITORY="${MODELDIR}/models"
 SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
 SERVER_LOG="./python_based_backends_server.log"
 CLIENT_LOG="./python_based_backends_client.log"

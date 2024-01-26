@@ -43,7 +43,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-MODELSDIR=`pwd`/models
+MODELSDIR=${MODELDIR}/models
 source ../../common/util.sh
 
 function verify_log_counts () {
@@ -75,15 +75,15 @@ function verify_log_counts () {
 rm -f *.log
 
 # set up simple repository MODELBASE
-rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
+rm -fr ${MODELSDIR} && mkdir -p ${MODELSDIR} && \
     python_model="identity_fp32_logging"
     mkdir -p models/$python_model/1/
-    cp ../../python_models/$python_model/config.pbtxt models/$python_model/config.pbtxt
-    cp ../../python_models/$python_model/model.py models/$python_model/1/
+    cp ../../python_models/${python_model}/config.pbtxt models/${python_model}/config.pbtxt
+    cp ../../python_models/${python_model}/model.py models/${python_model}/1/
 RET=0
 
 #Run Server with Default Log Settings
-SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS="--model-repository=${MODELSDIR} --backend-directory=${BACKEND_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

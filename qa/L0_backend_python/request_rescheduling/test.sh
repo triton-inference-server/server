@@ -52,7 +52,7 @@ cp ../../python_models/wrong_return_type/model.py models/wrong_return_type/1/
 cp ../../python_models/wrong_return_type/config.pbtxt models/wrong_return_type
 
 SERVER_LOG="./request_rescheduling_server.log"
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

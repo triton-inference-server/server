@@ -29,12 +29,12 @@ CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
 EXPECTED_NUM_TESTS="7"
 TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./decoupled_server.log"
 
 pip3 uninstall -y torch
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${WINDOWS} == 1 ]]; then
+if [[ ${TEST_WINDOWS} == 1 ]]; then
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
 else
   pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
@@ -58,7 +58,7 @@ cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model
 cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ {WINDOWS} == 0 ]]; then
+if [[ ${TEST_WINDOWS} == 0 ]]; then
   mkdir -p models/dlpack_add_sub/1/
   cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
   cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/

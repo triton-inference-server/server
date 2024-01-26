@@ -28,7 +28,7 @@
 CLIENT_LOG="./model_control_client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./model_control_server.log"
 
 RET=0

@@ -31,13 +31,13 @@ source ../common.sh
 source ../../common/util.sh
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${WINDOWS} == 1 ]]; then
+if [[ ${TEST_WINDOWS} == 1 ]]; then
     EXPECTED_NUM_TESTS="1"
 else
     EXPECTED_NUM_TESTS="2"
 fi
 
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./ensemble_server.log"
 
 RET=0
@@ -56,7 +56,7 @@ cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_2/
 cp ../../python_models/add_sub/model.py ./models/add_sub_2/1/
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${WINDOWS} == 0 ]]; then
+if [[ ${TEST_WINDOWS} == 0 ]]; then
     # Ensemble GPU Model
     mkdir -p models/ensemble_gpu/1/
     cp ../../python_models/ensemble_gpu/config.pbtxt ./models/ensemble_gpu
@@ -83,7 +83,7 @@ fi
 set +e
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${WINDOWS} == 0 ]]; then
+if [[ ${TEST_WINDOWS} == 0 ]]; then
     python3 ensemble_test.py 2>&1 > $CLIENT_LOG
 else
     python3 ensemble_test.py EnsembleTest.test_ensemble

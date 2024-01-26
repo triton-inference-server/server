@@ -38,25 +38,28 @@ fi
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-export WINDOWS=0
+export TEST_WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    export DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
-    export TRITON_DIR=${TRITON_DIR:=/mnt/c/tritonserver}
-    export SERVER=${TRITON_DIR}/bin/tritonserver.exe
-    export BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
-    WINDOWS=1
+    export DATADIR=${DATADIR:="/c/data/inferenceserver/${REPO_VERSION}"}
+    export TRITON_DIR=${TRITON_DIR:=/c/opt/tritonserver}
+    export SERVER=${SERVER:=${TRITON_DIR}/bin/tritonserver.exe}
+    export BACKEND_DIR=${BACKEND_DIR:=/c/opt/tritonserver/backends}
+    export MODELDIR=${MODELDIR:=c:/}
+    pip install requests
+    TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     export SERVER=${TRITON_DIR}/bin/tritonserver
     export BACKEND_DIR=${TRITON_DIR}/backends
+    export MODELDIR=${MODELDIR:=`pwd`}
 fi
 export REPO_VERSION=$REPO_VERSION
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
 
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
@@ -121,11 +124,6 @@ mv ./models/default_model_name/1/model.py ./models/default_model_name/1/mymodel.
     sed -i "s/^name:.*/name: \"default_model_name\"/" config.pbtxt && \
     echo "default_model_filename: \"mymodel.py\"" >> config.pbtxt )
 
-mkdir -p models/pytorch_fp32_fp32/1/
-cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
-cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
-(cd models/pytorch_fp32_fp32 && \
-          sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
 mkdir -p models/delayed_model/1/
 cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
@@ -154,17 +152,24 @@ cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${WINDOWS} == 0 ]]; then
+if [[ ${TEST_WINDOWS} == 0 ]]; then
     mkdir -p models/dlpack_identity/1/
     cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
     cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+
+    # TODO: Investigate why torch is not installed when running on Windows
+    mkdir -p models/pytorch_fp32_fp32/1/
+    cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
+    cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
+    (cd models/pytorch_fp32_fp32 && \
+            sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 fi
 
-if [[ "$TEST_JETSON" == "0" ]] && [[ ${WINDOWS} == 0 ]]; then
+if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-  # GPU tensor tests are disabled on jetson
+  # GPU tensor tests are disabled on jetson and windows
   EXPECTED_NUM_TESTS=9
 fi
 
@@ -239,7 +244,7 @@ set -e
 #
 # Test KIND_GPU
 # Disable env test for Jetson since GPU Tensors are not supported
-if [[ "$TEST_JETSON" == "0" ]] || [[ ${WINDOWS} == 1 ]]; then
+if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 1 ]]; then
   rm -rf models/
   mkdir -p models/add_sub_gpu/1/
   cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -410,10 +415,15 @@ fi
 if [[ "$TEST_JETSON" == "0" ]]; then
     SUBTESTS="ensemble bls decoupled variants python_based_backends"
     # FIXME: Only test io if platform is not windows
-    if [[ ${WINDOWS} == 0 ]]; then
-        SUBTESTS="${SUBTESTS} io"
+    if [[ ${TEST_WINDOWS} == 0 ]]; then
+        SUBTESTS+=" io"
 
     for TEST in ${SUBTESTS}; do
+        # FIXME: Find a more elegant way to do this. 'pwd' will not work on
+        # windows systems because it will create a path prefixed with /mnt/c
+        # which will not work for the reason listed above.
+        MODELDIR_BACKUP=${MODELDIR}
+        MODELDIR+=/${TEST}
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
         virtualenv --system-site-packages venv
@@ -427,9 +437,11 @@ if [[ "$TEST_JETSON" == "0" ]]; then
 
         deactivate
         rm -fr venv
+        MODELDIR=${MODELDIR_BACKUP}
     done
 
-    if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+    # [DLIS-5969]: Incorporate env test for windows
+    if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
         (cd env && bash -ex test.sh)
@@ -442,6 +454,11 @@ fi
 
 SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics request_rescheduling"
 for TEST in ${SUBTESTS}; do
+    # FIXME: Find a more elegant way to do this. 'pwd' will not work on
+    # windows systems because it will create a path prefixed with /mnt/c
+    # which will not work for the reason listed above.
+    MODELDIR_BACKUP=${MODELDIR}
+    MODELDIR+=/${TEST}
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
     virtualenv --system-site-packages venv
@@ -456,6 +473,7 @@ for TEST in ${SUBTESTS}; do
 
     deactivate
     rm -fr venv
+    MODELDIR=${MODELDIR_BACKUP}
 done
 
 if [ $RET -eq 0 ]; then

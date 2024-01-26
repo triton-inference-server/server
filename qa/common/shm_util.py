@@ -39,6 +39,7 @@ from tritonclient.utils import *
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 _test_jetson = bool(int(os.environ.get("TEST_JETSON", 0)))
+_test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 def _range_repr_dtype(dtype):
@@ -418,14 +419,14 @@ class ShmLeakDetector:
             self._exit_delay = exit_delay  # seconds
 
         def __enter__(self):
-            if _test_jetson:
+            if _test_jetson or _test_windows:
                 return self
 
             self._shm_region_free_sizes = self._get_shm_free_sizes(self._enter_delay)
             return self
 
         def __exit__(self, type, value, traceback):
-            if _test_jetson:
+            if _test_jetson or _test_windows:
                 return
 
             curr_shm_free_sizes = self._get_shm_free_sizes(self._exit_delay)
@@ -450,7 +451,7 @@ class ShmLeakDetector:
             return shm_free_sizes
 
     def __init__(self, prefix="triton_python_backend_shm_region"):
-        if _test_jetson:
+        if _test_jetson or _test_windows:
             return
         import triton_shm_monitor
 
@@ -466,7 +467,7 @@ class ShmLeakDetector:
         # Jetson cleanup takes too long and results in false positives.
         # Do not use the shared memory check on Jetson.
         # [DLIS-4876] Investigate how to re-enable shared memory check on Jetson.
-        if _test_jetson:
+        if _test_jetson or _test_windows:
             return self.ShmLeakProbe(None)
         else:
             return self.ShmLeakProbe(self._shm_monitors)
