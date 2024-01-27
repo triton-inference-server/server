@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -38,6 +39,10 @@ import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class EnsembleTest(tu.TestResultCollector):
     def setUp(self):
@@ -46,7 +51,9 @@ class EnsembleTest(tu.TestResultCollector):
     def infer(self, model_name):
         shape = [16]
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data_0 = np.random.random(shape).astype(np.float32)
                 input_data_1 = np.random.random(shape).astype(np.float32)
                 inputs = [

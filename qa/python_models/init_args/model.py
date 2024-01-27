@@ -40,9 +40,9 @@ def check_init_args(args):
         "model_version": "1",
     }
     if sys.platform == "win32":
+        TRITON_DIR = os.getenv("TRITON_DIR", "c:\\tritonserver").replace("/", "\\")
         expected_args["model_repository"] = (
-            os.getenv("TRITON_DIR", "/mnt/c/tritonserver/")
-            + "/qa/L0_backend_python/models/init_args"
+            TRITON_DIR + "\\qa\\L0_backend_python\\models\\init_args"
         )
     else:
         expected_args["model_repository"] = (

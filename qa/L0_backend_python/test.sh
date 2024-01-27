@@ -41,9 +41,14 @@ fi
 export TEST_WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     export DATADIR=${DATADIR:="/c/data/inferenceserver/${REPO_VERSION}"}
-    export TRITON_DIR=${TRITON_DIR:=/c/opt/tritonserver}
-    export SERVER=${SERVER:=${TRITON_DIR}/bin/tritonserver.exe}
-    export BACKEND_DIR=${BACKEND_DIR:=/c/opt/tritonserver/backends}
+    export TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
+    # This will run in WSL, but Triton will run in windows, so environment
+    # variables meant for loaded models must be exported using WSLENV.
+    # The /w flag indicates the value should only be included when invoking
+    # Win32 from WSL.
+    export WSLENV=TRITON_DIR/w
+    export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
+    export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
     pip install requests
     TEST_WINDOWS=1
@@ -128,10 +133,11 @@ mv ./models/default_model_name/1/model.py ./models/default_model_name/1/mymodel.
 mkdir -p models/delayed_model/1/
 cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
 cp ../python_models/delayed_model/config.pbtxt ./models/delayed_model/
-
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
+sed -i "s|TRITON_DIR_PATH|${TRITON_DIR}|" ./models/init_args/config.pbtxt
+
 
 mkdir -p models/optional/1/
 cp ../python_models/optional/model.py ./models/optional/1/
@@ -151,13 +157,15 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
-# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
-if [[ ${TEST_WINDOWS} == 0 ]]; then
-    mkdir -p models/dlpack_identity/1/
-    cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
-    cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+mkdir -p models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
-    # TODO: Investigate why torch is not installed when running on Windows
+
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    # FIXME: This model requires torch. Because windows tests are not run in a docker
+    # environment with torch installed, we need to think about how we want to install
+    # the package. Do we install it on the runners? Within the model?
     mkdir -p models/pytorch_fp32_fp32/1/
     cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
     cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
@@ -196,8 +204,7 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -220,7 +227,7 @@ fi
 
 sleep 5
 
-triton_procs=`pgrep --parent $SERVER_PID`
+readarray -t triton_procs < <(pgrep --parent ${SERVER_PID})
 
 set +e
 
@@ -243,8 +250,8 @@ set -e
 
 #
 # Test KIND_GPU
-# Disable env test for Jetson since GPU Tensors are not supported
-if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 1 ]]; then
+# Disable env test for Jetson & Windows since GPU Tensors are not supported
+if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   rm -rf models/
   mkdir -p models/add_sub_gpu/1/
   cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -264,8 +271,7 @@ if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 1 ]]; then
       RET=1
   fi
 
-  kill $SERVER_PID
-  wait $SERVER_PID
+  kill_server
 
   current_num_pages=`get_shm_pages`
   if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -300,8 +306,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -320,6 +325,14 @@ cp ../python_models/model_env/model.py ./models/model_env/1/
 cp ../python_models/model_env/config.pbtxt ./models/model_env/
 
 export MY_ENV="MY_ENV"
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    # This will run in WSL, but Triton will run in windows, so environment
+    # variables meant for loaded models must be exported using WSLENV.
+    # The /w flag indicates the value should only be included when invoking
+    # Win32 from WSL.
+    export WSLENV=MY_ENV/w
+fi
+
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -329,8 +342,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -370,8 +382,7 @@ $page_size."
     fi
 done
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Test model getting killed during initialization
 rm -fr ./models
@@ -386,8 +397,7 @@ run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
     RET=1
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 else
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
