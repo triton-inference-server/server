@@ -1990,8 +1990,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_model_config_overwite
-
+# LifeCycleTest.test_model_config_overwrite
 rm -rf models
 mkdir models
 MODEL_NAME="identity_fp32"
@@ -2025,7 +2024,43 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-### End Test Definitions ###
+# LifeCycleTest.test_shutdown_while_background_unloading
+rm -rf models
+mkdir models
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def finalize(self):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model ${MODEL_NAME} --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_shutdown_while_background_unloading >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+NUMBER_OF_MODELS_UNLOADED=`grep -o "successfully unloaded" $SERVER_LOG | wc -l`
+if [ $NUMBER_OF_MODELS_UNLOADED -ne 2 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Unexpected number of successfully unloaded models\n***"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
