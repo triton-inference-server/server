@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,6 @@
 
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
-EXPECTED_NUM_TESTS="7"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_ARGS="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./decoupled_server.log"
@@ -99,18 +98,11 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=decoupled.report.xml $CLIENT_PY > $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** decoupled test FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

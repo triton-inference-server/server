@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
+CLIENT_PY="../python_unittest.py"
 CLIENT_LOG="./request_rescheduling_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
@@ -64,37 +63,22 @@ fi
 export MODEL_NAME='bls_request_rescheduling'
 
 set +e
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** bls_request_rescheduling test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
 GRPC_TEST_PY=./grpc_endpoint_test.py
-EXPECTED_NUM_TESTS="2"
 
 set +e
-python3 $GRPC_TEST_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="grpc_request_reschedule.report.xml" ${GRPC_TEST_PY} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** GRPC Endpoint test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

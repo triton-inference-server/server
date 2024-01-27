@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,6 @@ import unittest
 import numpy as np
 import requests as httpreq
 import shm_util
-import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
@@ -48,7 +47,7 @@ TEST_JETSON = bool(int(os.environ.get("TEST_JETSON", 0)))
 TEST_WINDOWS = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
-class PythonTest(tu.TestResultCollector):
+class PythonTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 

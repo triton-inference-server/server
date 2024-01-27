@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -84,7 +84,7 @@ set +e
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 0 ]]; then
-    python3 ensemble_test.py 2>&1 > $CLIENT_LOG
+    python3 -m pytest --junitxml=ensemble.report.xml ensemble_test.py 2>&1 > $CLIENT_LOG
 else
     python3 ensemble_test.py EnsembleTest.test_ensemble
 fi
@@ -92,13 +92,6 @@ fi
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** ensemble_test.py FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

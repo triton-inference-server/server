@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./restart_client.log"
-EXPECTED_NUM_TESTS="7"
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./restart_server.log"
 source ../../common/util.sh
@@ -45,11 +44,12 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 restart_test.py RestartTest.test_infer >> $CLIENT_LOG 2>&1
+SUBTEST="test_infer"
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::RestartTest::${SUBTEST} >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** test_infer test FAILED. \n***"
+    echo -e "\n***\n*** ${SUBTEST} test FAILED. \n***"
     RET=1
 fi
 set -e
@@ -62,11 +62,13 @@ for proc in $triton_procs; do
     kill -9 $proc
 done
 
-python3 restart_test.py RestartTest.test_restart >> $CLIENT_LOG 2>&1
+SUBTEST="test_restart"
+python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::RestartTest::${SUBTEST} >> $CLIENT_LOG 2>&1
+
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** test_restart test FAILED. \n***"
+    echo -e "\n***\n*** ${SUBTEST} test FAILED. \n***"
     RET=1
 fi
 set -e

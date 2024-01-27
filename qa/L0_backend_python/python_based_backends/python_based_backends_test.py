@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,14 +34,13 @@ import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
 sys.path.append("../../common")
-from test_util import TestResultCollector
 
 # By default, find tritonserver on "localhost", but for windows tests
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
-class PythonBasedBackendsTest(TestResultCollector):
+class PythonBasedBackendsTest(unittest.TestCase):
     def setUp(self):
         self.triton_client = grpcclient.InferenceServerClient(
             url=f"{_tritonserver_ipaddr}:8001"

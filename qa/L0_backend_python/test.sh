@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -72,7 +72,6 @@ SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=524
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="11"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -176,9 +175,8 @@ fi
 if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
+  # GPU tensor tests are disabled on jetson
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-  # GPU tensor tests are disabled on jetson and windows
-  EXPECTED_NUM_TESTS=9
 fi
 
 prev_num_pages=`get_shm_pages`
@@ -190,17 +188,10 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=L0_backend_python.report.xml $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,6 @@ import unittest
 
 import numpy as np
 import shm_util
-import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
@@ -44,7 +43,7 @@ from tritonclient.utils import *
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
-class RestartTest(tu.TestResultCollector):
+class RestartTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
