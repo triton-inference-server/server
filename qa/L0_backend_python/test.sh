@@ -50,7 +50,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
-    pip install requests
+    pip install requests virtualenv
     TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -63,13 +63,13 @@ export REPO_VERSION=$REPO_VERSION
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
+export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
-PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
 TEST_RESULT_FILE='test_results.txt'
@@ -414,10 +414,11 @@ fi
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [[ "$TEST_JETSON" == "0" ]]; then
-    SUBTESTS="ensemble bls decoupled variants python_based_backends"
+    SUBTESTS="ensemble bls decoupled"
     # FIXME: Only test io if platform is not windows
     if [[ ${TEST_WINDOWS} == 0 ]]; then
-        SUBTESTS+=" io"
+        SUBTESTS+=" variants io python_based_backends"
+    fi
 
     for TEST in ${SUBTESTS}; do
         # FIXME: Find a more elegant way to do this. 'pwd' will not work on
@@ -428,7 +429,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
         virtualenv --system-site-packages venv
-        source venv/bin/activate
+        source ./venv/bin/activate
 
         (cd ${TEST} && bash -ex test.sh)
         if [ $? -ne 0 ]; then

@@ -303,48 +303,49 @@ class PythonTest(unittest.TestCase):
                     batch_stat["batch_size"] != 8,
                     f"error: expected batch_size == 8, got {batch_stat['batch_size']}",
                 )
-                if not TEST_WINDOWS:
-                    # Check metrics to make sure they are reported correctly
-                    metrics = httpreq.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
-                    print(metrics.text)
+                # Check metrics to make sure they are reported correctly
+                metrics = httpreq.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
+                print(metrics.text)
 
-                    success_str = 'nv_inference_request_success{model="identity_uint8",version="1"}'
-                    infer_count_str = (
-                        'nv_inference_count{model="identity_uint8",version="1"}'
-                    )
-                    infer_exec_str = (
-                        'nv_inference_exec_count{model="identity_uint8",version="1"}'
-                    )
+                success_str = (
+                    'nv_inference_request_success{model="identity_uint8",version="1"}'
+                )
+                infer_count_str = (
+                    'nv_inference_count{model="identity_uint8",version="1"}'
+                )
+                infer_exec_str = (
+                    'nv_inference_exec_count{model="identity_uint8",version="1"}'
+                )
 
-                    success_val = None
-                    infer_count_val = None
-                    infer_exec_val = None
-                    for line in metrics.text.splitlines():
-                        if line.startswith(success_str):
-                            success_val = float(line[len(success_str) :])
-                        if line.startswith(infer_count_str):
-                            infer_count_val = float(line[len(infer_count_str) :])
-                        if line.startswith(infer_exec_str):
-                            infer_exec_val = float(line[len(infer_exec_str) :])
+                success_val = None
+                infer_count_val = None
+                infer_exec_val = None
+                for line in metrics.text.splitlines():
+                    if line.startswith(success_str):
+                        success_val = float(line[len(success_str) :])
+                    if line.startswith(infer_count_str):
+                        infer_count_val = float(line[len(infer_count_str) :])
+                    if line.startswith(infer_exec_str):
+                        infer_exec_val = float(line[len(infer_exec_str) :])
 
-                    self.assertFalse(
-                        success_val != 4,
-                        "error: expected metric {} == 4, got {}".format(
-                            success_str, success_val
-                        ),
-                    )
-                    self.assertFalse(
-                        infer_count_val != 8,
-                        "error: expected metric {} == 8, got {}".format(
-                            infer_count_str, infer_count_val
-                        ),
-                    )
-                    self.assertFalse(
-                        infer_exec_val != 1,
-                        "error: expected metric {} == 1, got {}".format(
-                            infer_exec_str, infer_exec_val
-                        ),
-                    )
+                self.assertFalse(
+                    success_val != 4,
+                    "error: expected metric {} == 4, got {}".format(
+                        success_str, success_val
+                    ),
+                )
+                self.assertFalse(
+                    infer_count_val != 8,
+                    "error: expected metric {} == 8, got {}".format(
+                        infer_count_str, infer_count_val
+                    ),
+                )
+                self.assertFalse(
+                    infer_exec_val != 1,
+                    "error: expected metric {} == 1, got {}".format(
+                        infer_exec_str, infer_exec_val
+                    ),
+                )
 
     def test_bool(self):
         model_name = "identity_bool"

@@ -33,6 +33,10 @@ source ../../common/util.sh
 RET=0
 rm -fr *.log ./models *.txt
 
+if [[ ${WINDOWS} == 1 ]]; then
+    pip install numpy
+fi
+
 # FIXME: Until Windows supports GPU tensors, only test CPU
 if [[ ${WINDOWS} == 0 ]]; then
     pip3 uninstall -y torch
@@ -100,7 +104,7 @@ if [[ ${WINDOWS} == 0 ]]; then
     # Test with different sizes of CUDA memory pool
     for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
         CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
-        SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
+        SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
         for TRIAL in non_decoupled decoupled ; do
             export BLS_KIND=${TRIAL}
             SERVER_LOG="./bls_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
@@ -136,8 +140,7 @@ if [[ ${WINDOWS} == 0 ]]; then
 
             set -e
 
-            kill $SERVER_PID
-            wait $SERVER_PID
+            kill_server
 
             # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
             if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
@@ -157,6 +160,7 @@ if [[ ${WINDOWS} == 0 ]]; then
     done
 fi
 
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Test error handling when BLS is used in "initialize" or "finalize" function
 ERROR_MESSAGE="BLS is only supported during the 'execute' function."
 
@@ -173,8 +177,7 @@ if [ "$SERVER_PID" != "0" ]; then
     echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
     RET=1
     SUB_TEST_RET=1
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 else
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
@@ -203,8 +206,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     RET=1
 else
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
@@ -231,7 +233,7 @@ cp -fr ${DATADIR}/qa_model_repository/onnx_int32_int32_int32 models/.
 rm -rf models/onnx_int32_int32_int32/1
 
 SERVER_LOG="./bls_model_loading_server.log"
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -262,8 +264,7 @@ else
 
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 
     if [ $SUB_TEST_RET -eq 1 ]; then
         cat $CLIENT_LOG
@@ -311,8 +312,7 @@ else
         SUB_TEST_RET=1
     fi
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 
     if [ $SUB_TEST_RET -eq 1 ]; then
         cat $CLIENT_LOG
@@ -328,7 +328,7 @@ cp ../../python_models/bls_parameters/config.pbtxt ./params_models/bls_parameter
 TEST_LOG="./bls_parameters.log"
 SERVER_LOG="./bls_parameters.server.log"
 
-SERVER_ARGS="--model-repository=`pwd`/params_models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/params_models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -345,8 +345,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 if [ $RET -eq 1 ]; then
     echo -e "\n***\n*** BLS test FAILED. \n***"

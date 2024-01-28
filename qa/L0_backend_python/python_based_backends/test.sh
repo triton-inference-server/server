@@ -88,8 +88,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 rm -rf ${MODEL_REPOSITORY} ${GEN_PYTORCH_MODEL_PY}
 
 if [ $RET -eq 1 ]; then

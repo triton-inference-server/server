@@ -35,8 +35,10 @@ pip3 uninstall -y torch
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 1 ]]; then
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+  pip3 install pytest
 else
   pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+fi
 
 RET=0
 source ../../common/util.sh
@@ -61,7 +63,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
   mkdir -p models/dlpack_add_sub/1/
   cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
   cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
-if
+fi
 
 function verify_log_counts () {
   if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then
@@ -106,8 +108,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 verify_log_counts
 

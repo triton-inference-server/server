@@ -26,13 +26,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./ensemble_client.log"
-TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 1 ]]; then
     EXPECTED_NUM_TESTS="1"
+    pip install numpy tritonclient pytest
 else
     EXPECTED_NUM_TESTS="2"
 fi
@@ -86,7 +86,7 @@ set +e
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     python3 -m pytest --junitxml=ensemble.report.xml ensemble_test.py 2>&1 > $CLIENT_LOG
 else
-    python3 ensemble_test.py EnsembleTest.test_ensemble
+    python3 ensemble_test.py EnsembleTest.test_ensemble 2>&1 > $CLIENT_LOG
 fi
 
 if [ $? -ne 0 ]; then
@@ -95,8 +95,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
