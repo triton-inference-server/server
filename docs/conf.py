@@ -39,12 +39,17 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+import sys
 
 from docutils import nodes
 from sphinx import search
 
-# import sys
+sys.path.insert(
+    0, os.path.abspath("/usr/local/lib/python3.10/dist-packages/tritonserver")
+)
+
 # sys.path.insert(0, os.path.abspath('.'))
+
 
 # -- Project information -----------------------------------------------------
 
@@ -74,6 +79,9 @@ extensions = [
     # "sphinxcontrib.bibtex",
     "sphinx_tabs.tabs",
     "sphinx_sitemap",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx_markdown_builder",
 ]
 
 suppress_warnings = ["myst.domains", "ref.ref"]
