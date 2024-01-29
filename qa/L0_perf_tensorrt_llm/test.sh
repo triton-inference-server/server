@@ -146,7 +146,6 @@ function build_gpt2_tensorrt_engine {
         --paged_kv_cache \
         --use_gemm_plugin float16 \
         --remove_input_padding \
-        --use_layernorm_plugin float16 \
         --hidden_act gelu \
         --parallel_build \
         --output_dir="${ENGINES_DIR}"
@@ -185,9 +184,6 @@ function prepare_model_repository {
     replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-
-    # Install perf_analyzer
-    pip3 install tritonclient nvidia-ml-py3
 }
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -252,6 +248,9 @@ install_tensorrt_llm
 build_gpt2_base_model
 build_gpt2_tensorrt_engine
 prepare_model_repository
+
+# Install perf_analyzer
+pip3 install tritonclient nvidia-ml-py3
 
 ARCH="amd64"
 STATIC_BATCH=1
