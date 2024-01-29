@@ -153,6 +153,8 @@ else
   # GPU tensor tests are disabled on jetson
 fi
 
+pip3 install pytest
+
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
