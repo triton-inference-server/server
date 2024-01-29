@@ -274,30 +274,30 @@ GRPC inference requests are reported separately.
 ```
 File: trace.json
 Summary for simple (-1): trace count = 1
-HTTP infer request (avg): 378us
-	Receive (avg): 21us
-	Send (avg): 7us
-	Overhead (avg): 79us
-	Handler (avg): 269us
-  		Overhead (avg): 11us
-  		Queue (avg): 15us
-  		Compute (avg): 242us
-  			Input (avg): 18us
-  			Infer (avg): 208us
-  			Output (avg): 15us
+HTTP infer request (avg): 403.578us
+	Receive (avg): 20.555us
+	Send (avg): 4.52us
+	Overhead (avg): 24.592us
+	Handler (avg): 353.911us
+  		Overhead (avg): 23.675us
+  		Queue (avg): 18.019us
+  		Compute (avg): 312.217us
+  			Input (avg): 24.151us
+  			Infer (avg): 244.186us
+  			Output (avg): 43.88us
 Summary for simple (-1): trace count = 1
-GRPC infer request (avg): 21441us
-	Wait/Read (avg): 20923us
-	Send (avg): 74us
-	Overhead (avg): 46us
-	Handler (avg): 395us
-  		Overhead (avg): 16us
-  		Queue (avg): 47us
-  		Compute (avg): 331us
-  			Input (avg): 30us
-  			Infer (avg): 286us
-  			Output (avg): 14us
+GRPC infer request (avg): 383.601us
+	Send (avg): 62.816us
+	Handler (avg): 392.924us
+  		Overhead (avg): 51.968us
+  		Queue (avg): 21.45us
+  		Compute (avg): 319.506us
+  			Input (avg): 27.76us
+  			Infer (avg): 227.844us
+  			Output (avg): 63.902us
 ```
+
+Note: The "Receive (avg)" metric is not included in the gRPC summary as gRPC library does not provide any non-intrusive hooks to detect time spent in reading a message from the wire. Tracing an HTTP request will provide an accurate measurement of time spent reading a request from the network.
 
 Use the -t option to get a summary for each trace in the file. This
 summary shows the time, in microseconds, between different points in
@@ -309,10 +309,6 @@ the request was enqueued in the scheduling queue.
 $ trace_summary.py -t <trace file>
 ...
 simple (-1):
-  	grpc wait/read start
-  		26529us
-  	grpc wait/read end
-  		39us
   	request handler start
   		15us
   	queue start
@@ -375,20 +371,13 @@ Data Flow:
 
 The meaning of the trace timestamps is:
 
-* GRPC Request Wait/Read: Collected only for inference requests that use the
-  GRPC protocol. The time spent waiting for a request to arrive at the
-  server and for that request to be read. Because wait time is
-  included in the time it is not a useful measure of how much time is
-  spent reading a request from the network. Tracing an HTTP request
-  will provide an accurate measure of the read time.
-
 * HTTP Request Receive: Collected only for inference requests that use the
   HTTP protocol. The time required to read the inference request from
   the network.
 
 * Send: The time required to send the inference response.
 
-* Overhead: Additional time required in the HTTP or GRPC endpoint to
+* Overhead: Additional time required in the HTTP endpoint to
   process the inference request and response.
 
 * Handler: The total time spent handling the inference request, not

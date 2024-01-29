@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,10 +33,9 @@ import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
 sys.path.append("../../common")
-from test_util import TestResultCollector
 
 
-class PythonBasedBackendsTest(TestResultCollector):
+class PythonBasedBackendsTest(unittest.TestCase):
     def setUp(self):
         self.triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
         self.add_sub_model_1 = "add"

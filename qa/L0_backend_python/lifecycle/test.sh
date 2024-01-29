@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./lifecycle_client.log"
-EXPECTED_NUM_TESTS="5"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -80,18 +79,11 @@ set +e
 
 # Run this multiple times to catch any intermittent segfault.
 for i in {0..4}; do
-    python3 lifecycle_test.py > $CLIENT_LOG 2>&1
+    python3 -m pytest --junitxml=lifecycle.iter${i}.report.xml lifecycle_test.py >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
         RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
     fi
 done
 

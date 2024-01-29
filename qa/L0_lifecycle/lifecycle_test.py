@@ -3326,6 +3326,27 @@ class LifeCycleTest(tu.TestResultCollector):
         updated_config = triton_client.get_model_config(model_name)
         self.assertEqual(original_config, updated_config)
 
+    def test_shutdown_while_background_unloading(self):
+        model_name = "identity_fp32"
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Check the Python version of the model is loaded.
+        self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        python_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(python_model_config["backend"], "python")
+        # Load the Identity version, which will put the Python version into the
+        # background and unload it, the unload will take at least 10 seconds.
+        override_config = "{\n"
+        override_config += '"name": "identity_fp32",\n'
+        override_config += '"backend": "identity"\n'
+        override_config += "}"
+        triton_client.load_model(model_name, config=override_config)
+        identity_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(identity_model_config["backend"], "identity")
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
 
 if __name__ == "__main__":
     unittest.main()

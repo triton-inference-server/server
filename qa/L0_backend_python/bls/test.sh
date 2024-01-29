@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,6 @@
 
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./bls_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
@@ -120,20 +119,12 @@ for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
         for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
             export MODEL_NAME=${MODEL_NAME}
 
-            python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+            python3 -m pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
                 echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                 cat $SERVER_LOG
                 cat $CLIENT_LOG
                 RET=1
-            else
-                check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-                if [ $? -ne 0 ]; then
-                    cat $SERVER_LOG
-                    cat $CLIENT_LOG
-                    echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
-                    RET=1
-                fi
             fi
         done
 
@@ -254,20 +245,12 @@ else
 
     set +e
 
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+    python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
         cat $CLIENT_LOG
         RET=1
         SUB_TEST_RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-            SUB_TEST_RET=1
-        fi
     fi
 
     set -e

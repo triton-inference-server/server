@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,6 @@ from functools import partial
 
 import numpy as np
 import shm_util
-import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
@@ -57,7 +56,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class IOTest(tu.TestResultCollector):
+class IOTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
         self._client = grpcclient.InferenceServerClient("localhost:8001")
