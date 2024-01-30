@@ -179,6 +179,8 @@ else
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
+pip3 install pytest
+
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -430,8 +432,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
         MODELDIR+=/${TEST}
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
-        virtualenv --system-site-packages venv
-        source ./venv/bin/activate
+        setup_virtualenv
 
         (cd ${TEST} && bash -ex test.sh)
             if [ $? -ne 0 ]; then
@@ -439,8 +440,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
             RET=1
         fi
 
-        deactivate
-        rm -fr venv
+        deactivate_virtualenv
         MODELDIR=${MODELDIR_BACKUP}
     done
 
@@ -471,8 +471,7 @@ for TEST in ${SUBTESTS}; do
     MODELDIR+=/${TEST}
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
-    virtualenv --system-site-packages venv
-    source venv/bin/activate
+    setup_virtualenv
 
     (cd ${TEST} && bash -ex test.sh)
 
@@ -481,8 +480,7 @@ for TEST in ${SUBTESTS}; do
         RET=1
     fi
 
-    deactivate
-    rm -fr venv
+    deactivate_virtualenv
     MODELDIR=${MODELDIR_BACKUP}
 done
 
