@@ -3317,6 +3317,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Touch the local config.pbtxt and reload the file to ensure the local config
         # is preferred because it has a more recent mtime.
+        time.sleep(0.1)
         Path(os.path.join("models", model_name, "config.pbtxt")).touch()
 
         # Reload the model
