@@ -55,7 +55,7 @@ metrics reported by the inference server.
 
 When creating your node pool, the default value for the boot volume is 46.6GB.
 Due to the size of the server container, it is recommended to increase this value
-to 150GB and set a [cloud-init script to increase the partition] (https://blogs.oracle.com/ateam/post/oke-node-sizing-for-very-large-container-images):
+to 150GB and set a [cloud-init script to increase the partition](https://blogs.oracle.com/ateam/post/oke-node-sizing-for-very-large-container-images):
 
 ```
 #!/bin/bash
