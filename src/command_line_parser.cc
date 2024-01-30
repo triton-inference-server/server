@@ -2143,44 +2143,44 @@ TritonParser::SetGlobalTraceArgs(
     bool trace_rate_present, bool trace_count_present,
     bool explicit_disable_trace)
 {
-  for (const auto& global_setting : lparams.trace_config_map_[""]) {
-    auto user_setting = std::get<std::string>(global_setting.second);
+  for (const auto& [setting, value_variant] : lparams.trace_config_map_[""]) {
+    auto value = std::get<std::string>(value_variant);
     try {
-      if (global_setting.first == "rate") {
+      if (setting == "rate") {
         if (trace_rate_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-rate' "
                        "in favor of provided rate value in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_rate_ = ParseOption<int>(user_setting);
+        lparams.trace_rate_ = ParseOption<int>(value);
       }
-      if (global_setting.first == "level") {
+      if (setting == "level") {
         if (trace_level_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-level' "
                        "in favor of provided level in --trace-config!"
                     << std::endl;
         }
-        auto parsed_level_config = ParseTraceLevelOption(user_setting);
+        auto parsed_level_config = ParseTraceLevelOption(value);
         explicit_disable_trace |=
             (parsed_level_config == TRITONSERVER_TRACE_LEVEL_DISABLED);
         lparams.trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
             lparams.trace_level_ | parsed_level_config);
       }
-      if (global_setting.first == "mode") {
-        lparams.trace_mode_ = ParseTraceModeOption(user_setting);
+      if (setting == "mode") {
+        lparams.trace_mode_ = ParseTraceModeOption(value);
       }
-      if (global_setting.first == "count") {
+      if (setting == "count") {
         if (trace_count_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-count' "
                        "in favor of provided count in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_count_ = ParseOption<int>(user_setting);
+        lparams.trace_count_ = ParseOption<int>(value);
       }
     }
     catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "Bad option: \"--trace-config " << global_setting.first << "\".\n"
+      ss << "Bad option: \"--trace-config " << setting << "\".\n"
          << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
@@ -2192,30 +2192,29 @@ TritonParser::SetTritonTraceArgs(
     TritonServerParameters& lparams, bool trace_filepath_present,
     bool trace_log_frequency_present)
 {
-  for (const auto& mode_setting :
+  for (const auto& [setting, value_variant] :
        lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
-    auto user_setting = std::get<std::string>(mode_setting.second);
+    auto value = std::get<std::string>(value_variant);
     try {
-      if (mode_setting.first == "file") {
+      if (setting == "file") {
         if (trace_filepath_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-file' "
                        "in favor of provided file in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_filepath_ = user_setting;
-      } else if (mode_setting.first == "log-frequency") {
+        lparams.trace_filepath_ = value;
+      } else if (setting == "log-frequency") {
         if (trace_log_frequency_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-file' "
                        "in favor of provided file in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_log_frequency_ = ParseOption<int>(user_setting);
+        lparams.trace_log_frequency_ = ParseOption<int>(value);
       }
     }
     catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "Bad option: \"--trace-config triton," << mode_setting.first
-         << "\".\n"
+      ss << "Bad option: \"--trace-config triton," << setting << "\".\n"
          << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
@@ -2265,24 +2264,23 @@ TritonParser::ProcessOpenTelemetryBatchSpanProcessorArgs(
 
   // Process cmd args and convert string arguments to integers.
   // Throw a ParseException for invalid arguments
-  for (auto& mode_setting : otel_trace_settings) {
+  for (auto& [setting, value_variant] : otel_trace_settings) {
     try {
-      auto user_setting = std::get<std::string>(mode_setting.second);
-      if (mode_setting.first == "bsp_max_queue_size") {
-        mode_setting.second = ParseOption<uint32_t>(user_setting);
+      auto value = std::get<std::string>(value_variant);
+      if (setting == "bsp_max_queue_size") {
+        value_variant = ParseOption<uint32_t>(value);
         otel_bsp_default_settings.erase("bsp_max_queue_size");
-      } else if (mode_setting.first == "bsp_schedule_delay") {
-        mode_setting.second = ParseOption<uint32_t>(user_setting);
+      } else if (setting == "bsp_schedule_delay") {
+        value_variant = ParseOption<uint32_t>(value);
         otel_bsp_default_settings.erase("bsp_schedule_delay");
-      } else if (mode_setting.first == "bsp_max_export_batch_size") {
-        mode_setting.second = ParseOption<uint32_t>(user_setting);
+      } else if (setting == "bsp_max_export_batch_size") {
+        value_variant = ParseOption<uint32_t>(value);
         otel_bsp_default_settings.erase("bsp_max_export_batch_size");
       }
     }
     catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "Bad option: \"--trace-config opentelemetry," << mode_setting.first
-         << "\".\n"
+      ss << "Bad option: \"--trace-config opentelemetry," << setting << "\".\n"
          << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
@@ -2290,15 +2288,15 @@ TritonParser::ProcessOpenTelemetryBatchSpanProcessorArgs(
   // If not all BSP settings were provided through cmd,
   // populate OpenTelemetry's trace settings with the default value.
   if (!otel_bsp_default_settings.empty()) {
-    for (const auto& setting : otel_bsp_default_settings) {
+    for (const auto& [setting, value] : otel_bsp_default_settings) {
       try {
-        otel_trace_settings.push_back(std::make_pair(
-            setting.first, ParseOption<uint32_t>(setting.second)));
+        otel_trace_settings.push_back(
+            std::make_pair(setting, ParseOption<uint32_t>(value)));
       }
       catch (const ParseException& pe) {
         std::stringstream ss;
         ss << "Bad option: \"OTEL_";
-        for (auto& ch : setting.first) {
+        for (auto& ch : setting) {
           ss << static_cast<char>(std::toupper(ch));
         }
         ss << "\".\n" << pe.what() << std::endl;

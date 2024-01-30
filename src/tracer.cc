@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -471,30 +471,30 @@ TraceManager::ProcessOpenTelemetryParameters(
       std::string("triton-inference-server");
   auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
   auto otel_options_it = config_map.find(mode_key);
-  if (otel_options_it != config_map.end()) {
-    for (const auto& setting : otel_options_it->second) {
-      // FIXME add more configuration options of OTLP HTTP Exporter
-      if (setting.first == "url") {
-        exporter_options.url = std::get<std::string>(setting.second);
-      }
-      if (setting.first == "resource") {
-        auto user_setting = std::get<std::string>(setting.second);
-        auto pos = user_setting.find('=');
-        auto key = user_setting.substr(0, pos);
-        auto value = user_setting.substr(pos + 1);
-        attributes[key] = value;
-      }
-      if (setting.first == "bsp_max_queue_size") {
-        processor_options.max_queue_size = std::get<uint32_t>(setting.second);
-      }
-      if (setting.first == "bsp_schedule_delay") {
-        processor_options.schedule_delay_millis =
-            std::chrono::milliseconds(std::get<uint32_t>(setting.second));
-      }
-      if (setting.first == "bsp_max_export_batch_size") {
-        processor_options.max_export_batch_size =
-            std::get<uint32_t>(setting.second);
-      }
+  if (otel_options_it == config_map.end()) {
+    return;
+  }
+  for (const auto& [setting, value] : otel_options_it->second) {
+    // FIXME add more configuration options of OTLP HTTP Exporter
+    if (setting == "url") {
+      exporter_options.url = std::get<std::string>(value);
+    }
+    if (setting == "resource") {
+      auto user_setting = std::get<std::string>(value);
+      auto pos = user_setting.find('=');
+      auto key = user_setting.substr(0, pos);
+      auto value = user_setting.substr(pos + 1);
+      attributes[key] = value;
+    }
+    if (setting == "bsp_max_queue_size") {
+      processor_options.max_queue_size = std::get<uint32_t>(value);
+    }
+    if (setting == "bsp_schedule_delay") {
+      processor_options.schedule_delay_millis =
+          std::chrono::milliseconds(std::get<uint32_t>(value));
+    }
+    if (setting == "bsp_max_export_batch_size") {
+      processor_options.max_export_batch_size = std::get<uint32_t>(value);
     }
   }
 }

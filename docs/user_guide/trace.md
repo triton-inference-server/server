@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -467,6 +467,32 @@ flag as follows:
 $ tritonserver --trace-config mode=opentelemetry \
     --trace-config opentelemetry,url=<endpoint> ...
 ```
+
+Triton's OpenTelemetry trace mode uses
+[Batch Span Processor](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor),
+which batches ended spans and sends them in bulk. Batching helps
+with data compression and reduces the number of outgoing connections
+required to transmit the data. This processor supports both size and
+time based batching. Size-based batching is controlled by 2 parameters:
+`bsp_max_export_batch_size` and `bsp_max_queue_size`, while time-based batching
+is controlled by `bsp_schedule_delay`. Collected spans will be exported when
+the batch size reaches `bsp_max_export_batch_size`, or delay since last export
+reaches `bsp_schedule_delay`, whatever comes first. Additionally, user should
+make sure that `bsp_max_export_batch_size` is always less than
+`bsp_max_queue_size`, otherwise the excessive spans will be dropped
+and trace data will be lost.
+
+Default parameters for the Batch Span Processor are provided in
+[`OpenTelemetry trace APIs settings`](#opentelemetry-trace-apis-settings).
+As a general recommendation, make sure that `bsp_max_queue_size` is large enough
+to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
+exports, which will affect Triton Server's latency. Also, users should keep
+in mind that minimal number of produced spans on Trton Server side is 3:
+The `InferRequest` span, which collects timestamps for when request was received
+by Triton, and when the request was sent; the request span, which is named
+after the model the request was sent to and records when request was started and
+ended; the `compute` span, which records compute timestamps.
+
 ### Differences in trace contents from Triton's trace [output](#json-trace-output)
 
 OpenTelemetry APIs produce [spans](https://opentelemetry.io/docs/concepts/observability-primer/#spans)
@@ -552,7 +578,8 @@ The following table shows available OpenTelemetry trace APIs settings for
     <td><code>bsp_max_export_batch_size</code></td>
     <td align="center">512</td>
     <td>
-      Maximum batch size. Must be less than or equal to `bsp_max_queue_size`.<br/>
+      Maximum batch size. Must be less than or equal to
+      <code>bsp_max_queue_size</code>.<br/>
       This setting can also be specified through <br/>
       <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
       OTEL_BSP_MAX_EXPORT_BATCH_SIZE</a>
