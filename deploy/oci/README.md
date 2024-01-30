@@ -103,7 +103,7 @@ If you run into any issues, you can refer to the official installation guide [he
 If you already have a model repository you may use that with this helm
 chart. If you do not have a model repository, you can checkout a local
 copy of the inference server source repository to create an example
-model repository::
+model repository:
 
 ```
 $ git clone https://github.com/triton-inference-server/server.git
