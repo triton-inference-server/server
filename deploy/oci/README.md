@@ -39,7 +39,7 @@ This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prometheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
 must be configured to contain the desired number of GPU nodes (A10 GPU instances recommended)
@@ -69,7 +69,7 @@ sudo /usr/libexec/oci-growfs -y
 
 ### Using Cloud Shell from OCI Web Console
 
-It is possible to access your OKE Cluster [directly from the OCI Web Console] (https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm). 
+It is possible to access your OKE Cluster [directly from the OCI Web Console](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm). 
 Helm v3 is already available from the Cloud Shell.
 
 ### Helm v3
