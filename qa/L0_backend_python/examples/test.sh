@@ -34,9 +34,13 @@ SERVER_LOG="./examples_server.log"
 RET=0
 rm -fr *.log python_backend/
 
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest tritonclient[all]
+fi
+
 # Install torch
 pip3 uninstall -y torch
-if [ "$TEST_JETSON" == "0" ]; then
+if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
 else
     pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
@@ -80,8 +84,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 2
 CLIENT_LOG="./examples_pytorch_client.log"
@@ -110,8 +113,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 3
 
@@ -144,8 +146,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Example 4
@@ -177,8 +178,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 5
 
@@ -209,8 +209,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 6
 
@@ -241,8 +240,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 #
 # BLS Async
@@ -278,8 +276,7 @@ if [ "$TEST_JETSON" == "0" ]; then
 
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Auto Complete Model Configuration Example
@@ -313,8 +310,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # BLS Decoupled Sync
 CLIENT_LOG="./examples_bls_decoupled_sync_client.log"
@@ -343,8 +339,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # BLS Decoupled Async
 if [ "$TEST_JETSON" == "0" ]; then
@@ -375,8 +370,7 @@ if [ "$TEST_JETSON" == "0" ]; then
 
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Example 7
@@ -408,8 +402,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Custom Metrics
 CLIENT_LOG="./examples_custom_metrics_client.log"
@@ -438,8 +431,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 0 ]; then

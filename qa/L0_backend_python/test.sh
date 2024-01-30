@@ -415,7 +415,9 @@ fi
 # Disable decoupled test because it uses GPU tensors
 if [[ "$TEST_JETSON" == "0" ]]; then
     SUBTESTS="ensemble bls decoupled"
-    # FIXME: Only test io if platform is not windows
+    # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
+    # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
+    # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
     if [[ ${TEST_WINDOWS} == 0 ]]; then
         SUBTESTS+=" variants io python_based_backends"
     fi
@@ -423,7 +425,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
     for TEST in ${SUBTESTS}; do
         # FIXME: Find a more elegant way to do this. 'pwd' will not work on
         # windows systems because it will create a path prefixed with /mnt/c
-        # which will not work for the reason listed above.
+        # which will not work because cmd line args must be prefixed with 'c:/'.
         MODELDIR_BACKUP=${MODELDIR}
         MODELDIR+=/${TEST}
         # Run each subtest in a separate virtual environment to avoid conflicts
@@ -432,9 +434,9 @@ if [[ "$TEST_JETSON" == "0" ]]; then
         source ./venv/bin/activate
 
         (cd ${TEST} && bash -ex test.sh)
-        if [ $? -ne 0 ]; then
-        echo "Subtest ${TEST} FAILED"
-        RET=1
+            if [ $? -ne 0 ]; then
+            echo "Subtest ${TEST} FAILED"
+            RET=1
         fi
 
         deactivate
@@ -454,7 +456,13 @@ if [[ "$TEST_JETSON" == "0" ]]; then
     fi
 fi
 
-SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics request_rescheduling"
+SUBTESTS="lifecycle argument_validation logging custom_metrics"
+# [DLIS-6124] Disable restart test for Windows since it requires more investigation
+# [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
+# [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    SUBTESTS+=" restart model_control examples request_rescheduling"
+fi
 for TEST in ${SUBTESTS}; do
     # FIXME: Find a more elegant way to do this. 'pwd' will not work on
     # windows systems because it will create a path prefixed with /mnt/c

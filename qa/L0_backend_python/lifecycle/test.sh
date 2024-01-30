@@ -33,6 +33,10 @@ source ../../common/util.sh
 SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./lifecycle_server.log"
 
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest tritonclient[all]
+fi
+
 RET=0
 rm -fr *.log ./models
 
@@ -86,8 +90,7 @@ done
 
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -129,41 +132,44 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-rm -rf models/
-mkdir -p models/fini_error/1/
-cp ../../python_models/fini_error/model.py ./models/fini_error/1/
-cp ../../python_models/fini_error/config.pbtxt ./models/fini_error/
+# FIXME: Until we find a way to simulate Ctrl^C on windows, this
+# test will not pass.
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    rm -rf models/
+    mkdir -p models/fini_error/1/
+    cp ../../python_models/fini_error/model.py ./models/fini_error/1/
+    cp ../../python_models/fini_error/config.pbtxt ./models/fini_error/
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+
+    kill_server
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $CLIENT_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        RET=1
+    fi
+
+    set +e
+    grep "name 'undefined_variable' is not defined" $SERVER_LOG
+
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** fini_error model test failed \n***"
+        RET=1
+    fi
+    set -e
 fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-set +e
-grep "name 'undefined_variable' is not defined" $SERVER_LOG
-
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** fini_error model test failed \n***"
-    RET=1
-fi
-set -e
 
 rm -rf models/
 mkdir -p models/auto_complete_error/1/

@@ -30,8 +30,12 @@ CLIENT_LOG="./custom_metrics_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
-SERVER_ARGS="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./custom_metrics_server.log"
+
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest numpy tritonclient[all]
+fi
 
 RET=0
 rm -fr *.log ./models *.txt
@@ -59,8 +63,7 @@ fi
 
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 1 ]; then

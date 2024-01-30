@@ -26,12 +26,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./restart_client.log"
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./restart_server.log"
 source ../../common/util.sh
 source ../common.sh
 
 rm -fr *.log free_memory.txt
+
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest tritonclient[all]
+fi
 
 RET=0
 
@@ -54,13 +58,29 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-triton_procs=`pgrep --parent $SERVER_PID`
-echo $triton_procs
+# NOTE: with the current setup, tritonserver is launched within wsl, but the stub is started
+# in Windows. Therefore, finding the PID of the stub requires a bit more work.
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq triton_python_backend_stub.exe' /FO CSV)
+    taskcount=$(echo "$tasklist" | grep -c triton_python_backend_stub)
+    if [[ $taskcount > 0 ]]; then
+        echo "$tasklist" | while IFS=, read -r taskname taskpid taskrest; do
+            if [[ "$taskname" == "\"triton_python_backend_stub.exe\"" ]]; then
+                taskpid="${taskpid%\"}"
+                taskpid="${taskpid#\"}"
+                /mnt/c/windows/system32/taskkill.exe /PID $taskpid /F /T
+            fi
+        done
+    fi
+else
+    triton_procs=$(pgrep --parent $SERVER_PID)
+    echo $triton_procs
+    for proc in $triton_procs; do
+        kill -9 $proc
+    done
+fi
 
 set +e
-for proc in $triton_procs; do
-    kill -9 $proc
-done
 
 SUBTEST="test_restart"
 python3 -m pytest --junitxml=restart.${SUBTEST}.report.xml restart_test.py::RestartTest::${SUBTEST} >> $CLIENT_LOG 2>&1
@@ -73,8 +93,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -105,8 +124,7 @@ for proc in $triton_procs; do
 done
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then

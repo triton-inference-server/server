@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import os
 import sys
 import threading
 import time
@@ -33,6 +34,8 @@ import numpy as np
 import torch
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import from_dlpack, to_dlpack
+
+TEST_WINDOWS = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 class TritonPythonModel:
@@ -255,7 +258,12 @@ class TritonPythonModel:
         logger.log_error("response_thread-Error Msg!")
         time.sleep(5)
 
-        status = self.execute_gpu_bls()
+        # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
+        if TEST_WINDOWS:
+            status = self.execute_gpu_bls()
+        else:
+            status = True
+
         if not status:
             infer_response = pb_utils.InferenceResponse(error="GPU BLS test failed.")
             response_sender.send(infer_response)

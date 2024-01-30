@@ -33,12 +33,12 @@ source ../../common/util.sh
 RET=0
 rm -fr *.log ./models *.txt
 
-if [[ ${WINDOWS} == 1 ]]; then
-    pip install numpy
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install numpy tritonclient[all] pytest
 fi
 
-# FIXME: Until Windows supports GPU tensors, only test CPU
-if [[ ${WINDOWS} == 0 ]]; then
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
+if [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 uninstall -y torch
     pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
@@ -193,130 +193,134 @@ if [ $SUB_TEST_RET -eq 1 ]; then
     cat $SERVER_LOG
 fi
 
-rm -fr ./models
-mkdir -p models/bls_finalize_error/1/
-cp ../../python_models/bls_finalize_error/model.py models/bls_finalize_error/1/
-cp ../../python_models/bls_finalize_error/config.pbtxt models/bls_finalize_error/
-SERVER_LOG="./bls_finalize_error_server.log"
-SUB_TEST_RET=0
+# FIXME: [DLIS-6122] Requires support for model load/unload
+# Until we can simulate Ctrl^C bls_finialize_error will not pass.
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    rm -fr ./models
+    mkdir -p models/bls_finalize_error/1/
+    cp ../../python_models/bls_finalize_error/model.py models/bls_finalize_error/1/
+    cp ../../python_models/bls_finalize_error/config.pbtxt models/bls_finalize_error/
+    SERVER_LOG="./bls_finalize_error_server.log"
+    SUB_TEST_RET=0
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
-else
-    kill_server
-
-    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
     else
-        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
+        kill_server
+
+        if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+            echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        else
+            echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+            RET=1
+            SUB_TEST_RET=1
+        fi
+
+        if [ $SUB_TEST_RET -eq 1 ]; then
+            cat $CLIENT_LOG
+            cat $SERVER_LOG
+        fi
     fi
 
-    if [ $SUB_TEST_RET -eq 1 ]; then
-        cat $CLIENT_LOG
+    # Test model loading API with BLS
+    SUB_TEST_RET=0
+    rm -fr ./models
+    mkdir -p models/bls_model_loading/1/
+    cp ../../python_models/bls_model_loading/model.py models/bls_model_loading/1/
+    cp ../../python_models/bls_model_loading/config.pbtxt models/bls_model_loading/
+    cp -fr ${DATADIR}/qa_model_repository/onnx_int32_int32_int32 models/.
+    # Make only version 2, 3 is valid version directory
+    rm -rf models/onnx_int32_int32_int32/1
+
+    SERVER_LOG="./bls_model_loading_server.log"
+    SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
-    fi
-fi
-
-# Test model loading API with BLS
-SUB_TEST_RET=0
-rm -fr ./models
-mkdir -p models/bls_model_loading/1/
-cp ../../python_models/bls_model_loading/model.py models/bls_model_loading/1/
-cp ../../python_models/bls_model_loading/config.pbtxt models/bls_model_loading/
-cp -fr ${DATADIR}/qa_model_repository/onnx_int32_int32_int32 models/.
-# Make only version 2, 3 is valid version directory
-rm -rf models/onnx_int32_int32_int32/1
-
-SERVER_LOG="./bls_model_loading_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
-else
-    export MODEL_NAME='bls_model_loading'
-
-    set +e
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-    set -e
-    if [ "$code" == "400" ]; then
-        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
         RET=1
-        SUB_TEST_RET=1
+    else
+        export MODEL_NAME='bls_model_loading'
+
+        set +e
+        code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/models/${MODEL_NAME}/load`
+        set -e
+        if [ "$code" == "400" ]; then
+            echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+            RET=1
+            SUB_TEST_RET=1
+        fi
+
+        set +e
+
+        python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
+            cat $CLIENT_LOG
+            RET=1
+            SUB_TEST_RET=1
     fi
 
-    set +e
+        set -e
 
-    python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
-        cat $CLIENT_LOG
-        RET=1
-        SUB_TEST_RET=1
-  fi
+        kill_server
 
-    set -e
+        if [ $SUB_TEST_RET -eq 1 ]; then
+            cat $CLIENT_LOG
+            cat $SERVER_LOG
+        fi
+    fi
 
-    kill_server
+    # Test model loading API with BLS warmup
+    (cd models/bls_model_loading && \
+            echo "model_warmup [{" >> config.pbtxt && \
+            echo "    name : \"regular sample\"" >> config.pbtxt && \
+            echo "    batch_size: 1" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"INPUT0\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+            echo "            dims: 4" >> config.pbtxt && \
+            echo "            zero_data: false" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"INPUT1\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+            echo "            dims: 4" >> config.pbtxt && \
+            echo "            zero_data: false" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "}]" >> config.pbtxt )
 
-    if [ $SUB_TEST_RET -eq 1 ]; then
-        cat $CLIENT_LOG
+    SUB_TEST_RET=0
+    SERVER_LOG="./bls_model_loading_server_warmup.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
-    fi
-fi
-
-# Test model loading API with BLS warmup
-(cd models/bls_model_loading && \
-        echo "model_warmup [{" >> config.pbtxt && \
-        echo "    name : \"regular sample\"" >> config.pbtxt && \
-        echo "    batch_size: 1" >> config.pbtxt && \
-        echo "    inputs {" >> config.pbtxt && \
-        echo "        key: \"INPUT0\"" >> config.pbtxt && \
-        echo "        value: {" >> config.pbtxt && \
-        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
-        echo "            dims: 4" >> config.pbtxt && \
-        echo "            zero_data: false" >> config.pbtxt && \
-        echo "        }" >> config.pbtxt && \
-        echo "    }" >> config.pbtxt && \
-        echo "    inputs {" >> config.pbtxt && \
-        echo "        key: \"INPUT1\"" >> config.pbtxt && \
-        echo "        value: {" >> config.pbtxt && \
-        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
-        echo "            dims: 4" >> config.pbtxt && \
-        echo "            zero_data: false" >> config.pbtxt && \
-        echo "        }" >> config.pbtxt && \
-        echo "    }" >> config.pbtxt && \
-        echo "}]" >> config.pbtxt )
-
-SUB_TEST_RET=0
-SERVER_LOG="./bls_model_loading_server_warmup.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
-else
-    set +e
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
-    set -e
-    if [ "$code" == "400" ]; then
-        echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
         RET=1
-        SUB_TEST_RET=1
-    fi
+    else
+        set +e
+        code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/models/${MODEL_NAME}/load`
+        set -e
+        if [ "$code" == "400" ]; then
+            echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+            RET=1
+            SUB_TEST_RET=1
+        fi
 
-    kill_server
+        kill_server
 
-    if [ $SUB_TEST_RET -eq 1 ]; then
-        cat $CLIENT_LOG
-        cat $SERVER_LOG
+        if [ $SUB_TEST_RET -eq 1 ]; then
+            cat $CLIENT_LOG
+            cat $SERVER_LOG
+        fi
     fi
 fi
 

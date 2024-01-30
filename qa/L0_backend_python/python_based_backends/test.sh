@@ -37,6 +37,15 @@ CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
 RET=0
 
+# FIXME: Find a more elegant way to do this. mkdir commands on windows require the
+# path to be prefixed with `/mnt/c`, however, as a command line arg, windows will
+# require the model repo to be prefixed with 'c:/'.
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    BACKUP_MODEL_REPOSITORY=${MODEL_REPOSITORY}
+    MODEL_REPOSITORY=${MODEL_REPOSITORY/'c:/'/'/mnt/c/'}
+    pip install pytest numpy tritonclient[all]
+fi
+
 rm -rf ${MODEL_REPOSITORY}
 pip3 install torch
 
@@ -65,6 +74,10 @@ GEN_PYTORCH_MODEL_PY=./gen_qa_pytorch_model.py
 
 set +e
 python3 ${GEN_PYTORCH_MODEL_PY} -m ${MODEL_REPOSITORY}
+
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    MODEL_REPOSITORY=${BACKUP_MODEL_REPOSITORY}
+fi
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Running ${GEN_PYTORCH_MODEL_PY} FAILED. \n***"

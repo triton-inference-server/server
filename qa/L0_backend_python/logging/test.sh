@@ -43,6 +43,10 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest numpy tritonclient[all]
+fi
+
 MODELSDIR=${MODELDIR}/models
 source ../../common/util.sh
 
@@ -102,11 +106,22 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Check if correct # log messages are present [ non-verbose-msg-cnt | verbose-msg-cnt ]
-verify_log_counts 4 0
+# NOTE: Windows does not seem to have a way to send a true SIGINT signal
+# to tritonserver. Instead, it seems required to use taskkill.exe with /F (force)
+# to kill the running program. This means the server terminates immediately,
+# instead of shutting down how it would if Ctrl^C was invoked from the terminal.
+# To properly test functionality, we need a WAR. In the meantime, we will subtract
+# 1 from the expected values to account for the fact that no logs will be emitted
+# from the finalize function.
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    verify_log_counts 3 0
+else
+    verify_log_counts 4 0
+fi
+
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -119,7 +134,7 @@ fi
 
 set +e
 # Enable verbose logging
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":1}' localhost:8000/v2/logging`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":1}' ${TRITONSERVER_IPADDR}:8000/v2/logging`
 
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -137,12 +152,15 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Verbose only 3 because model must initialize before
 # log settings can be modified
-verify_log_counts 4 3
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    verify_log_counts 3 2
+else
+    verify_log_counts 4 3
+fi
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -158,7 +176,7 @@ set +e
 BOOL_PARAMS=${BOOL_PARAMS:="log_info log_warning log_error"}
 for BOOL_PARAM in $BOOL_PARAMS; do
     # Attempt to use integer instead of bool
-    code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":false}' localhost:8000/v2/logging`
+    code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":false}' ${TRITONSERVER_IPADDR}:8000/v2/logging`
     if [ "$code" != "200" ]; then
         cat ./curl.out
         echo -e "\n***\n*** Test Failed: Could not Change Log Settings\n***"
@@ -176,12 +194,13 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Will have 1 occurrence of each non-verbose log type
 # because the server must initialize before log settings
 # can be modified
+# Same count for both Unix and Windows because this does
+# not test log output in the finalize step.
 verify_log_counts 1 0
 
 

@@ -29,10 +29,10 @@ CLIENT_LOG="./ensemble_client.log"
 source ../common.sh
 source ../../common/util.sh
 
-# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 1 ]]; then
     EXPECTED_NUM_TESTS="1"
-    pip install numpy tritonclient pytest
+    pip install numpy tritonclient[all] pytest
 else
     EXPECTED_NUM_TESTS="2"
 fi
@@ -55,7 +55,7 @@ mkdir -p models/add_sub_2/1/
 cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_2/
 cp ../../python_models/add_sub/model.py ./models/add_sub_2/1/
 
-# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     # Ensemble GPU Model
     mkdir -p models/ensemble_gpu/1/
@@ -82,7 +82,7 @@ fi
 
 set +e
 
-# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     python3 -m pytest --junitxml=ensemble.report.xml ensemble_test.py 2>&1 > $CLIENT_LOG
 else

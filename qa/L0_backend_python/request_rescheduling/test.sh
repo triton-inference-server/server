@@ -30,6 +30,10 @@ CLIENT_LOG="./request_rescheduling_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    pip install pytest numpy tritonclient[all]
+fi
+
 RET=0
 
 rm -fr *.log ./models *.txt
@@ -82,8 +86,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 1 ]; then
