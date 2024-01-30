@@ -39,7 +39,7 @@ This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prometheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
 must be configured to contain the desired number of GPU nodes (A10 GPU instances recommended)
@@ -55,7 +55,7 @@ metrics reported by the inference server.
 
 When creating your node pool, the default value for the boot volume is 46.6GB.
 Due to the size of the server container, it is recommended to increase this value
-to 150GB and set a [cloud-init script to increase the partition] (https://blogs.oracle.com/ateam/post/oke-node-sizing-for-very-large-container-images):
+to 150GB and set a [cloud-init script to increase the partition](https://blogs.oracle.com/ateam/post/oke-node-sizing-for-very-large-container-images):
 
 ```
 #!/bin/bash
