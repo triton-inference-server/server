@@ -69,7 +69,7 @@ sudo /usr/libexec/oci-growfs -y
 
 ### Using Cloud Shell from OCI Web Console
 
-It is possible to access your OKE Cluster [directly from the OCI Web Console] (https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm). 
+It is possible to access your OKE Cluster [directly from the OCI Web Console](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm). 
 Helm v3 is already available from the Cloud Shell.
 
 ### Helm v3
@@ -138,6 +138,12 @@ echo -n 'SECRECT_KEY_ID' | base64
 echo -n 'SECRET_ACCESS_KEY' | base64
 ```
 
+You also need to adapt _modelRepositoryPath_ in values.yaml to your [namespace](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/understandingnamespaces.htm) and [OCI region](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm) 
+
+```
+s3://https://<OCI_NAMESPACE>.compat.objectstorage.<OCI_REGION>.oraclecloud.com:443/triton-inference-server-repository
+```
+
 ## Deploy Prometheus and Grafana
 
 The inference server metrics are collected by Prometheus and viewable
@@ -165,12 +171,24 @@ Now you should be able to navigate in your browser to localhost:8080
 and see the Grafana login page. Use username=admin and
 password=prom-operator to login.
 
-Note that it is also possible to set a load balancer service for the grafana
+Note that it is also possible to set a load balancer service for the grafana dashboard
 by running:
 
 ```
 $ helm install example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false --set grafana.service.type=LoadBalancer prometheus-community/kube-prometheus-stack
 ```
+
+You can then see the Public IP of you grafana dashboard by running:
+
+```
+$ kubectl get svc
+NAME                                       TYPE           CLUSTER-IP     EXTERNAL-IP       PORT(S)                      AGE
+alertmanager-operated                      ClusterIP      None           <none>            9093/TCP,9094/TCP,9094/UDP   2m33s
+example-metrics-grafana                    LoadBalancer   10.96.82.33    141.145.220.114   80:31005/TCP                 2m38s
+```
+
+The default load balancer created comes with a fixed shape and a bandwidth of 100Mbps. You can switch to a [flexible](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingloadbalancers-subtopic.htm#contengcreatingloadbalancers_subtopic) shape and adapt the bandwidth according to your OCI limits in case the bandwidth is a bottleneck.
+
 
 An example Grafana dashboard is available in dashboard.json. Use the
 import function in Grafana to import and view this dashboard.
@@ -215,7 +233,7 @@ $ cat << EOF > config.yaml
 namespace: MyCustomNamespace
 image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
-  modelRepositoryPath: gs://my_model_repository
+  modelRepositoryPath: s3://https://<OCI_NAMESPACE>.compat.objectstorage.<OCI_REGION>.oraclecloud.com:443/triton-inference-server-repository
 EOF
 $ helm install example -f config.yaml .
 ```
@@ -284,5 +302,5 @@ You may also want to delete the OCI bucket you created to hold the
 model repository.
 
 ```
-$ oci os bucket delete --bucket-name triton-inference-server-repository
+$ oci os bucket delete --bucket-name triton-inference-server-repository --empty
 ```
