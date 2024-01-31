@@ -509,3 +509,16 @@ remove_array_outliers() {
 
     arr=("${arr[@]:$start_index:$end_index}")
 }
+
+function setup_virtualenv() {
+    # Create and activate virtual environment
+    virtualenv --system-site-packages venv
+    source venv/bin/activate
+    pip install pytest
+}
+
+function deactivate_virtualenv() {
+    # Deactivate virtual environment and clean up
+    deactivate
+    rm -fr venv
+}
