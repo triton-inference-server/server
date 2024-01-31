@@ -487,7 +487,15 @@ Default parameters for the Batch Span Processor are provided in
 As a general recommendation, make sure that `bsp_max_queue_size` is large enough
 to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
 exports, which will affect Triton Server's latency. Also, users should keep
-in mind that minimal number of produced spans on Trton Server side is 3:
+in mind that at minimum Triton collects 3 levels of spans:
+
+* Top level. The top-level span collects timestamps for when request was received
+by Triton, and when the response was sent.
+* Mid level
+* Low level
+
+
+minimal number of produced spans on Trton Server side is 3:
 The `InferRequest` span, which collects timestamps for when request was received
 by Triton, and when the response was sent; the request span, which is named
 after the model the request was sent to and records when request was started and
