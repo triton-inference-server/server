@@ -42,7 +42,8 @@ import os
 import sys
 
 from docutils import nodes
-from sphinx import search
+from sphinx import addnodes, package_dir, search
+from sphinx.util import split_into
 
 sys.path.insert(
     0, os.path.abspath("/usr/local/lib/python3.10/dist-packages/tritonserver")
@@ -64,6 +65,59 @@ release = os.getenv("TRITON_VERSION", "dev")
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
 master_doc = "contents"
+
+# -- Autodoc configuration ---------------------------------------------------
+autodoc_class_signature = "separated"
+autodoc_default_options = {"members": True}
+default_role = "any"
+autodoc_typehints_format = "short"
+python_use_unqualified_type_names = True
+
+# Rename module from internal modules
+# Due to how we are aliasing objects from the bindings
+# We have to fix up the naming for documentation
+class_names = [
+    "LogFormat",
+    "ModelLoadDeviceLimit",
+    "MemoryType",
+    "DataType",
+    "LogLevel",
+    "MetricFormat",
+    "ModelControlMode",
+    "RateLimitMode",
+    "RateLimiterResource",
+]
+
+type_aliases = {name: name for name in class_names}
+napoleon_type_aliases = type_aliases
+autodoc_type_aliases = type_aliases
+
+import tritonserver
+
+methods_to_skip = []
+for class_name in class_names:
+    _class = getattr(tritonserver, class_name)
+    _class.__module__ = "tritonserver"
+    _class.__name__ = class_name
+    init_method = getattr(_class, "__init__", None)
+    name_method = getattr(_class, "name", None)
+    if init_method:
+        methods_to_skip.append(init_method)
+    if name_method:
+        methods_to_skip.append(name_method)
+
+
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    if obj in methods_to_skip:
+        return True
+
+
+def autodoc_before_process_signature(app, obj, bound_method):
+    for key, annotation in obj.__annotations__.items():
+        name = getattr(annotation, "__name__", None)
+        if name and name == "LogLevel":
+            obj.__annotations__[key] = "tritonserver.LogLevel"
+
 
 # -- General configuration ---------------------------------------------------
 
@@ -195,9 +249,17 @@ jupyter_execute_notebooks = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
 
+def autodoc_process_docstring(app, what, name, obj, options, lines):
+    print(what)
+    print(name)
+    print(obj)
+
+
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
     app.connect("source-read", ultimateReplace)
+    app.connect("autodoc-before-process-signature", autodoc_before_process_signature)
+    app.connect("autodoc-skip-member", autodoc_skip_member)
     app.add_js_file("https://js.hcaptcha.com/1/api.js")
 
     visitor_script = (
@@ -244,6 +306,8 @@ def sphinxSearchIndexFeed(
 
     _filter = self.lang.word_filter
 
+    self._all_titles[docname] = visitor.found_titles
+
     for word in visitor.found_title_words:
         stemmed_word = stem(word)
         if len(stemmed_word) > 3 and _filter(stemmed_word):
@@ -259,6 +323,38 @@ def sphinxSearchIndexFeed(
         already_indexed = docname in self._title_mapping.get(stemmed_word, set())
         if _filter(stemmed_word) and not already_indexed:
             self._mapping.setdefault(stemmed_word, set()).add(docname)
+
+    # find explicit entries within index directives
+    _index_entries: Set[Tuple[str, str, str]] = set()
+    for node in doctree.findall(addnodes.index):
+        for entry_type, value, tid, main, *index_key in node["entries"]:
+            tid = tid or ""
+            try:
+                if entry_type == "single":
+                    try:
+                        entry, subentry = split_into(2, "single", value)
+                    except ValueError:
+                        (entry,) = split_into(1, "single", value)
+                        subentry = ""
+                    _index_entries.add((entry, tid, main))
+                    if subentry:
+                        _index_entries.add((subentry, tid, main))
+                elif entry_type == "pair":
+                    first, second = split_into(2, "pair", value)
+                    _index_entries.add((first, tid, main))
+                    _index_entries.add((second, tid, main))
+                elif entry_type == "triple":
+                    first, second, third = split_into(3, "triple", value)
+                    _index_entries.add((first, tid, main))
+                    _index_entries.add((second, tid, main))
+                    _index_entries.add((third, tid, main))
+                elif entry_type in {"see", "seealso"}:
+                    first, second = split_into(2, "see", value)
+                    _index_entries.add((first, tid, main))
+            except ValueError:
+                pass
+
+    self._index_entries[docname] = sorted(_index_entries)
 
 
 search.IndexBuilder.feed = sphinxSearchIndexFeed

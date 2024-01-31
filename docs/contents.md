@@ -102,3 +102,10 @@ customization_guide/test
 examples/jetson/README
 examples/jetson/concurrency_and_dynamic_batching/README
 ```
+
+```{toctree}
+:maxdepth: 1
+:caption: API Docs
+
+api-docs/python_in_process_api
+```
