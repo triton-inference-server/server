@@ -28,7 +28,7 @@
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./arg_validation_client.log"
 TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/argument_validation/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./arg_validation_server.log"
 
 if [[ ${TEST_WINDOWS} == 1 ]]; then

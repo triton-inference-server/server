@@ -37,7 +37,7 @@ else
     EXPECTED_NUM_TESTS="2"
 fi
 
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/ensemble/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./ensemble_server.log"
 
 RET=0
