@@ -489,7 +489,7 @@ to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
 exports, which will affect Triton Server's latency. Also, users should keep
 in mind that minimal number of produced spans on Trton Server side is 3:
 The `InferRequest` span, which collects timestamps for when request was received
-by Triton, and when the request was sent; the request span, which is named
+by Triton, and when the response was sent; the request span, which is named
 after the model the request was sent to and records when request was started and
 ended; the `compute` span, which records compute timestamps.
 
