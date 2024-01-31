@@ -28,7 +28,7 @@
 source ../common.sh
 source ../../common/util.sh
 
-SERVER_ARGS="--model-repository=${MODELDIR}/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/examples/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./examples_server.log"
 
 RET=0

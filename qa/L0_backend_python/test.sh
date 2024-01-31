@@ -417,11 +417,6 @@ if [[ "$TEST_JETSON" == "0" ]]; then
     fi
 
     for TEST in ${SUBTESTS}; do
-        # FIXME: Find a more elegant way to do this. 'pwd' will not work on
-        # windows systems because it will create a path prefixed with /mnt/c
-        # which will not work because cmd line args must be prefixed with 'c:/'.
-        MODELDIR_BACKUP=${MODELDIR}
-        MODELDIR+=/${TEST}
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
         setup_virtualenv
@@ -433,7 +428,6 @@ if [[ "$TEST_JETSON" == "0" ]]; then
         fi
 
         deactivate_virtualenv
-        MODELDIR=${MODELDIR_BACKUP}
     done
 
     # [DLIS-5969]: Incorporate env test for windows
@@ -456,11 +450,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     SUBTESTS+=" restart model_control examples request_rescheduling"
 fi
 for TEST in ${SUBTESTS}; do
-    # FIXME: Find a more elegant way to do this. 'pwd' will not work on
-    # windows systems because it will create a path prefixed with /mnt/c
-    # which will not work for the reason listed above.
-    MODELDIR_BACKUP=${MODELDIR}
-    MODELDIR+=/${TEST}
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
     setup_virtualenv
@@ -473,7 +462,6 @@ for TEST in ${SUBTESTS}; do
     fi
 
     deactivate_virtualenv
-    MODELDIR=${MODELDIR_BACKUP}
 done
 
 if [ $RET -eq 0 ]; then

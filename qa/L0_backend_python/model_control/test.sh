@@ -27,7 +27,7 @@
 
 CLIENT_LOG="./model_control_client.log"
 TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=${MODELDIR}/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/model_control/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./model_control_server.log"
 
 if [[ ${TEST_WINDOWS} == 1 ]]; then

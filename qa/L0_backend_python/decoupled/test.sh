@@ -28,7 +28,7 @@
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
 TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/decoupled/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./decoupled_server.log"
 
 pip3 uninstall -y torch

@@ -104,7 +104,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     # Test with different sizes of CUDA memory pool
     for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
         CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
-        SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
+        SERVER_ARGS="--model-repository=${MODELDIR}/bls/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
         for TRIAL in non_decoupled decoupled ; do
             export BLS_KIND=${TRIAL}
             SERVER_LOG="./bls_${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.inference_server.log"
@@ -152,7 +152,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     done
 fi
 
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/bls/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Test error handling when BLS is used in "initialize" or "finalize" function
 ERROR_MESSAGE="BLS is only supported during the 'execute' function."
 
@@ -228,7 +228,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     rm -rf models/onnx_int32_int32_int32/1
 
     SERVER_LOG="./bls_model_loading_server.log"
-    SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
+    SERVER_ARGS="--model-repository=${MODELDIR}/bls/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -324,7 +324,7 @@ cp ../../python_models/bls_parameters/config.pbtxt ./params_models/bls_parameter
 TEST_LOG="./bls_parameters.log"
 SERVER_LOG="./bls_parameters.server.log"
 
-SERVER_ARGS="--model-repository=${MODELDIR}/params_models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/bls/params_models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

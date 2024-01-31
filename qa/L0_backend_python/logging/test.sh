@@ -47,7 +47,7 @@ if [[ ${TEST_WINDOWS} == 1 ]]; then
     pip install pytest numpy tritonclient[all]
 fi
 
-MODELSDIR=${MODELDIR}/models
+MODELSDIR=${MODELDIR}/logging/models
 source ../../common/util.sh
 
 function verify_log_counts () {

@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./restart_client.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/restart/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./restart_server.log"
 source ../../common/util.sh
 source ../common.sh
