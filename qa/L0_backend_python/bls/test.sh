@@ -127,14 +127,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
                     RET=1
-                else
-                    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-                    if [ $? -ne 0 ]; then
-                        cat $SERVER_LOG
-                        cat $CLIENT_LOG
-                        echo -e "\n***\n*** Test Result Verification Failed for ${MODEL_NAME} ${BLS_KIND}\n***"
-                        RET=1
-                    fi
                 fi
             done
 

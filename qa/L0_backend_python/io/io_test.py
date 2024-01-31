@@ -32,7 +32,6 @@ import sys
 sys.path.append("../../common")
 
 import itertools
-import os
 import queue
 import unittest
 from functools import partial

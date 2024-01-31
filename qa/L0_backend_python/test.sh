@@ -50,7 +50,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
-    pip install requests virtualenv
+    pip install requests virtualenv pytest
     TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -128,6 +128,11 @@ mv ./models/default_model_name/1/model.py ./models/default_model_name/1/mymodel.
     sed -i "s/^name:.*/name: \"default_model_name\"/" config.pbtxt && \
     echo "default_model_filename: \"mymodel.py\"" >> config.pbtxt )
 
+mkdir -p models/pytorch_fp32_fp32/1/
+    cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
+    cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
+    (cd models/pytorch_fp32_fp32 && \
+            sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
 mkdir -p models/delayed_model/1/
 cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
@@ -161,25 +166,12 @@ cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
 
-if [[ ${TEST_WINDOWS} == 0 ]]; then
-    # FIXME: This model requires torch. Because windows tests are not run in a docker
-    # environment with torch installed, we need to think about how we want to install
-    # the package. Do we install it on the runners? Within the model?
-    mkdir -p models/pytorch_fp32_fp32/1/
-    cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
-    cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
-    (cd models/pytorch_fp32_fp32 && \
-            sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
-fi
-
 if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # GPU tensor tests are disabled on jetson
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
 fi
-
-pip3 install pytest
 
 prev_num_pages=`get_shm_pages`
 run_server
