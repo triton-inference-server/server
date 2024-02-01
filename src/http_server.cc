@@ -183,6 +183,11 @@ SetTritonParameterFromJsonParameter(
     RETURN_IF_ERR(value.AsBool(&bool_value));
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
         irequest, parameter.c_str(), bool_value));
+  } else if (value.IsNumber()) {
+    double double_value;
+    RETURN_IF_ERR(value.AsDouble(&double_value));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetDoubleParameter(
+        irequest, parameter.c_str(), double_value));
   } else {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
@@ -3816,6 +3821,10 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
           RETURN_IF_ERR(params_json.AddStringRef(
               name, reinterpret_cast<const char*>(vvalue)));
           break;
+        case TRITONSERVER_PARAMETER_DOUBLE:
+          RETURN_IF_ERR(params_json.AddDouble(
+              name, *(reinterpret_cast<const double*>(vvalue))));
+          break;
         case TRITONSERVER_PARAMETER_BYTES:
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,
@@ -4271,6 +4280,7 @@ HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
         case TRITONSERVER_PARAMETER_BOOL:
         case TRITONSERVER_PARAMETER_INT:
         case TRITONSERVER_PARAMETER_STRING:
+        case TRITONSERVER_PARAMETER_DOUBLE:
           triton_outputs.emplace(
               name, TritonOutput(TritonOutput::Type::PARAMETER, pidx));
           break;
@@ -4442,6 +4452,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
         case TRITONSERVER_PARAMETER_STRING:
           RETURN_IF_ERR(generate_response->AddStringRef(
               name, reinterpret_cast<const char*>(vvalue)));
+          break;
+        case TRITONSERVER_PARAMETER_DOUBLE:
+          RETURN_IF_ERR(generate_response->AddDouble(
+              name, *(reinterpret_cast<const double*>(vvalue))));
           break;
         case TRITONSERVER_PARAMETER_BYTES:
           return TRITONSERVER_ErrorNew(

@@ -276,11 +276,13 @@ if __name__ == "__main__":
                 param0 = params["param0"]
                 param1 = params["param1"]
                 param2 = params["param2"]
+                param3 = params["param3"]
             else:
                 params = response.parameters
                 param0 = params["param0"].string_param
                 param1 = params["param1"].int64_param
                 param2 = params["param2"].bool_param
+                param3 = params["param3"].double_param
 
             if param0 != "an example string parameter":
                 print("error: expected 'param0' == 'an example string parameter'")
@@ -290,4 +292,7 @@ if __name__ == "__main__":
                 sys.exit(1)
             if param2 != False:
                 print("error: expected 'param2' == False")
+                sys.exit(1)
+            if param3 != 123.123:
+                print("error: expected 'param3' == 123.123")
                 sys.exit(1)
