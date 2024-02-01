@@ -4489,13 +4489,13 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
           *generate_response, triton::common::TritonJson::ValueType::ARRAY);
       RETURN_IF_ERR(WriteDataToJson(
           &data_json, cname, datatype, base, byte_size, element_count));
-      if (element_count > 1) {
-        RETURN_IF_ERR(generate_response->Add(cname, std::move(data_json)));
-      } else {
+      if (element_count == 1) {
         // if only 1 element, strip out the array
         triton::common::TritonJson::Value el;
         RETURN_IF_ERR(data_json.At(0, &el));
         RETURN_IF_ERR(generate_response->Add(cname, std::move(el)));
+      } else {
+        RETURN_IF_ERR(generate_response->Add(cname, std::move(data_json)));
       }
       break;
     }

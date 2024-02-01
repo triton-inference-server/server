@@ -70,7 +70,7 @@ def collect_gpu_metrics(data):
         handle = pynvml.nvmlDeviceGetHandleByIndex(i)
 
         # Get GPU name
-        gpu_name = pynvml.nvmlDeviceGetName(handle).decode("utf-8")
+        gpu_name = str(pynvml.nvmlDeviceGetName(handle))
         unique_gpu_models.add(gpu_name)
 
         # Get GPU memory information

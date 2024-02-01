@@ -2062,6 +2062,46 @@ if [ $NUMBER_OF_MODELS_UNLOADED -ne 2 ]; then
     RET=1
 fi
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_while_loading
+rm -rf models
+mkdir models
+cp -r ../python_models/identity_fp32 models/ && (cd models/identity_fp32 && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_shutdown_while_loading >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+ACTUAL_LOAD_UNLOAD_ORDER="`grep -o -e 'AsyncUnload()' -e 'OnLoadFinal()' $SERVER_LOG`"
+EXPECTED_LOAD_UNLOAD_ORDER="`echo -e 'OnLoadFinal()\nAsyncUnload()'`"
+if [ "$ACTUAL_LOAD_UNLOAD_ORDER" != "$EXPECTED_LOAD_UNLOAD_ORDER" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Failed assert load finish before unload\n***"
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else

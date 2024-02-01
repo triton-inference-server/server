@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@ get_shm_pages() {
 
 install_conda() {
   rm -rf ./miniconda
-  file_name="Miniconda3-py310_23.3.1-0-Linux-x86_64.sh"
+  file_name="Miniconda3-py310_23.11.0-2-Linux-x86_64.sh"
   wget https://repo.anaconda.com/miniconda/$file_name
 
   # install miniconda in silent mode
