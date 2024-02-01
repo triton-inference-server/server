@@ -503,7 +503,7 @@ A general rule is any base model - a single model that performs computations -
 produces 1 model span and one compute span. For ensembles, every composing
 model produces model and compute spans in addition to one model span for the
 ensemble. [BLS](#tracing-for-bls-models) models produce the same number of
-model an compute spans as the total amount of involved in BLS request models,
+model and compute spans as the total amount of models involved in the BLS request,
 including the main BLS model.
 
 
