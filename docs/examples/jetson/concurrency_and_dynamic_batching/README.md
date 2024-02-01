@@ -223,13 +223,13 @@ instance_group [
 ]
 ```
 
-You can change the count of allowed inferences for the same model instance and observe how it affects performance in _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_. Note that on Jetson we dont recommend setting values too high: for instance, on a device like a Jetson Xavier AGX we don't recommend setting the number larger than 6. The values in the range 1-3 are optimal.
+You can change the count of allowed inferences for the same model instance and observe how it affects performance in _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_. Note that on Jetson we don't recommend setting values too high: for instance, on a device like a Jetson Xavier AGX we don't recommend setting the number larger than 6. The values in the range 1-3 are optimal.
 
 While trying out different values, note how it affects total inference time as well as some inference statistics (like queue and compute times)
 
 ## Demonstration case 2: Dynamic batching
 
-For models that support batching, Triton implements multiple scheduling and batching algorithms that combine individual inference requests together to improve inference throughput. In this example, we want to demonstrate how enbling automatic dynamic batching affects inference performance.
+For models that support batching, Triton implements multiple scheduling and batching algorithms that combine individual inference requests together to improve inference throughput. In this example, we want to demonstrate how enabling automatic dynamic batching affects inference performance.
 
 ### Running the sample
 
@@ -317,7 +317,7 @@ Take a look at _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_ to see the e
 TOTAL INFERENCE TIME: 162ms
 ```
 
-Notice that this time the model was executed only twice (as indicated by `execution_count`). Also, unlike in the previous example, the `batch_stats` part of the statitstics looks different: we see that our model was executed one time with `batch = 1` and the second time with `batch = 5`. It helped to decrease the total inference time.
+Notice that this time the model was executed only twice (as indicated by `execution_count`). Also, unlike in the previous example, the `batch_stats` part of the statistics looks different: we see that our model was executed one time with `batch = 1` and the second time with `batch = 5`. It helped to decrease the total inference time.
 
 In order to enable dynamic batching, the following is present in the model config `trtis_model_repo_sample_2/peoplenet/config.pbtxt`:
 
