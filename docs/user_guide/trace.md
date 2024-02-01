@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -274,30 +274,30 @@ GRPC inference requests are reported separately.
 ```
 File: trace.json
 Summary for simple (-1): trace count = 1
-HTTP infer request (avg): 378us
-	Receive (avg): 21us
-	Send (avg): 7us
-	Overhead (avg): 79us
-	Handler (avg): 269us
-  		Overhead (avg): 11us
-  		Queue (avg): 15us
-  		Compute (avg): 242us
-  			Input (avg): 18us
-  			Infer (avg): 208us
-  			Output (avg): 15us
+HTTP infer request (avg): 403.578us
+	Receive (avg): 20.555us
+	Send (avg): 4.52us
+	Overhead (avg): 24.592us
+	Handler (avg): 353.911us
+  		Overhead (avg): 23.675us
+  		Queue (avg): 18.019us
+  		Compute (avg): 312.217us
+  			Input (avg): 24.151us
+  			Infer (avg): 244.186us
+  			Output (avg): 43.88us
 Summary for simple (-1): trace count = 1
-GRPC infer request (avg): 21441us
-	Wait/Read (avg): 20923us
-	Send (avg): 74us
-	Overhead (avg): 46us
-	Handler (avg): 395us
-  		Overhead (avg): 16us
-  		Queue (avg): 47us
-  		Compute (avg): 331us
-  			Input (avg): 30us
-  			Infer (avg): 286us
-  			Output (avg): 14us
+GRPC infer request (avg): 383.601us
+	Send (avg): 62.816us
+	Handler (avg): 392.924us
+  		Overhead (avg): 51.968us
+  		Queue (avg): 21.45us
+  		Compute (avg): 319.506us
+  			Input (avg): 27.76us
+  			Infer (avg): 227.844us
+  			Output (avg): 63.902us
 ```
+
+Note: The "Receive (avg)" metric is not included in the gRPC summary as gRPC library does not provide any non-intrusive hooks to detect time spent in reading a message from the wire. Tracing an HTTP request will provide an accurate measurement of time spent reading a request from the network.
 
 Use the -t option to get a summary for each trace in the file. This
 summary shows the time, in microseconds, between different points in
@@ -309,10 +309,6 @@ the request was enqueued in the scheduling queue.
 $ trace_summary.py -t <trace file>
 ...
 simple (-1):
-  	grpc wait/read start
-  		26529us
-  	grpc wait/read end
-  		39us
   	request handler start
   		15us
   	queue start
@@ -375,20 +371,13 @@ Data Flow:
 
 The meaning of the trace timestamps is:
 
-* GRPC Request Wait/Read: Collected only for inference requests that use the
-  GRPC protocol. The time spent waiting for a request to arrive at the
-  server and for that request to be read. Because wait time is
-  included in the time it is not a useful measure of how much time is
-  spent reading a request from the network. Tracing an HTTP request
-  will provide an accurate measure of the read time.
-
 * HTTP Request Receive: Collected only for inference requests that use the
   HTTP protocol. The time required to read the inference request from
   the network.
 
 * Send: The time required to send the inference response.
 
-* Overhead: Additional time required in the HTTP or GRPC endpoint to
+* Overhead: Additional time required in the HTTP endpoint to
   process the inference request and response.
 
 * Handler: The total time spent handling the inference request, not
@@ -467,6 +456,46 @@ flag as follows:
 $ tritonserver --trace-config mode=opentelemetry \
     --trace-config opentelemetry,url=<endpoint> ...
 ```
+
+Triton's OpenTelemetry trace mode uses
+[Batch Span Processor](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor),
+which batches ended spans and sends them in bulk. Batching helps
+with data compression and reduces the number of outgoing connections
+required to transmit the data. This processor supports both size and
+time based batching. Size-based batching is controlled by 2 parameters:
+`bsp_max_export_batch_size` and `bsp_max_queue_size`, while time-based batching
+is controlled by `bsp_schedule_delay`. Collected spans will be exported when
+the batch size reaches `bsp_max_export_batch_size`, or delay since last export
+reaches `bsp_schedule_delay`, whatever comes first. Additionally, user should
+make sure that `bsp_max_export_batch_size` is always less than
+`bsp_max_queue_size`, otherwise the excessive spans will be dropped
+and trace data will be lost.
+
+Default parameters for the Batch Span Processor are provided in
+[`OpenTelemetry trace APIs settings`](#opentelemetry-trace-apis-settings).
+As a general recommendation, make sure that `bsp_max_queue_size` is large enough
+to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
+exports, which will affect Triton Server's latency. A minimal Triton trace
+consists of 3 spans: top level span, model span, and compute span.
+
+* __Top level span__: The top-level span collects timestamps for when
+request was received by Triton, and when the response was sent. Any Triton
+trace contains only 1 top level span.
+* __Model span__: Model spans collect information, when request for
+this model was started, when it was placed in a queue, and when it was ended.
+A minimal Triton trace contains 1 model span.
+* __Compute span__: Compute spans record compute timestamps. A minimal
+Triton trace contains 1 compute span.
+
+The total amount of spans depends on the complexity of your model.
+A general rule is any base model - a single model that performs computations -
+produces 1 model span and one compute span. For ensembles, every composing
+model produces model and compute spans in addition to one model span for the
+ensemble. [BLS](#tracing-for-bls-models) models produce the same number of
+model and compute spans as the total amount of models involved in the BLS request,
+including the main BLS model.
+
+
 ### Differences in trace contents from Triton's trace [output](#json-trace-output)
 
 OpenTelemetry APIs produce [spans](https://opentelemetry.io/docs/concepts/observability-primer/#spans)
@@ -517,6 +546,46 @@ The following table shows available OpenTelemetry trace APIs settings for
       Alternatively, key-vaue attributes can be specified through <br/>
       <a href="https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_resource_attributes">
       OTEL_RESOURCE_ATTRIBUTES</a>
+      environment variable.
+    </td>
+    </tr>
+    <tr>
+    <td><a href="https://opentelemetry.io/docs/specs/otel/trace/sdk/#batching-processor">
+      Batch Span Processor</a>
+    </td>
+    <td></td><td></td>
+    </tr>
+    <tr>
+    <td><code>bsp_max_queue_size</code></td>
+    <td align="center">2048</td>
+    <td>
+      Maximum queue size. <br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_MAX_QUEUE_SIZE</a>
+      environment variable.
+    </td>
+    </tr>
+    <tr>
+    <td><code>bsp_schedule_delay</code></td>
+    <td align="center">5000</td>
+    <td>
+      Delay interval (in milliseconds) between two consecutive exports. <br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_SCHEDULE_DELAY</a>
+      environment variable.
+    </td>
+    </tr>
+    <tr>
+    <td><code>bsp_max_export_batch_size</code></td>
+    <td align="center">512</td>
+    <td>
+      Maximum batch size. Must be less than or equal to
+      <code>bsp_max_queue_size</code>.<br/>
+      This setting can also be specified through <br/>
+      <a href="https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#batch-span-processor">
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE</a>
       environment variable.
     </td>
     </tr>

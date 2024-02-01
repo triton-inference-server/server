@@ -3317,6 +3317,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Touch the local config.pbtxt and reload the file to ensure the local config
         # is preferred because it has a more recent mtime.
+        time.sleep(0.1)  # make sure timestamps are different
         Path(os.path.join("models", model_name, "config.pbtxt")).touch()
 
         # Reload the model
@@ -3325,6 +3326,39 @@ class LifeCycleTest(tu.TestResultCollector):
         # Ensure the model has been loaded w/ the expected (local) config.
         updated_config = triton_client.get_model_config(model_name)
         self.assertEqual(original_config, updated_config)
+
+    def test_shutdown_while_background_unloading(self):
+        model_name = "identity_fp32"
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Check the Python version of the model is loaded.
+        self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        python_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(python_model_config["backend"], "python")
+        # Load the Identity version, which will put the Python version into the
+        # background and unload it, the unload will take at least 10 seconds.
+        override_config = "{\n"
+        override_config += '"name": "identity_fp32",\n'
+        override_config += '"backend": "identity"\n'
+        override_config += "}"
+        triton_client.load_model(model_name, config=override_config)
+        identity_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(identity_model_config["backend"], "identity")
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
+    def test_shutdown_while_loading(self):
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Load the model which will load for at least 10 seconds.
+        model_name = "identity_fp32"
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(triton_client.load_model, model_name)
+        self.assertFalse(triton_client.is_model_ready(model_name))
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
 
 
 if __name__ == "__main__":

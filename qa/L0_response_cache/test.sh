@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 RET=0
 
 TEST_LOG="./response_cache_test.log"
-UNIT_TEST=./response_cache_test
+UNIT_TEST="./response_cache_test --gtest_output=xml:response_cache.report.xml"
 export CUDA_VISIBLE_DEVICES=0
 
 # Only localhost supported in this test for now, but in future could make

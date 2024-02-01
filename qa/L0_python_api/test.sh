@@ -33,7 +33,7 @@ rm -f $BINDING_TEST_LOG
 
 set +e
 
-python test_binding.py > $BINDING_TEST_LOG 2>&1
+python -m pytest --junitxml=test_binding_report.xml test_binding.py > $BINDING_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $BINDING_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -42,7 +42,7 @@ fi
 
 API_TEST_LOG="./python_api.log"
 
-python -m pytest test_api.py > $API_TEST_LOG 2>&1
+python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $API_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"

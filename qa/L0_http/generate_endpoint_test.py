@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -413,6 +413,27 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 "Converting keyword: 'parameters': parameter 'nested' has invalid type.",
                 r.json()["error"],
             )
+
+    def test_0_dimension_output(self):
+        # With the trtllm backend, if the end token is predicted at the first
+        # step, the output tensors will have the shapes with 0 dimension.
+        text = "hello world"
+        inputs = {
+            "PROMPT": text,
+            "STREAM": False,
+            "REPETITION": 0,
+            "OUTPUT_0_DIM": True,
+        }
+
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("TEXT", data)
+        self.assertEqual([], data["TEXT"])
 
 
 if __name__ == "__main__":
