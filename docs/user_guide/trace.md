@@ -489,13 +489,13 @@ to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
 exports, which will affect Triton Server's latency. A minimal Triton trace
 consists of 3 spans: top level span, model span, and compute span.
 
-* __Top level span__. The top-level span collects timestamps for when
+* __Top level span__: The top-level span collects timestamps for when
 request was received by Triton, and when the response was sent. Any Triton
 trace contains only 1 top level span.
-* __Model span__. Model spans collect information, when request for
+* __Model span__: Model spans collect information, when request for
 this model was started, when it was placed in a queue, and when it was ended.
 A minimal Triton trace contains 1 model span.
-* __Compute span__. Compute spans record compute timestamps. A minimal
+* __Compute span__: Compute spans record compute timestamps. A minimal
 Triton trace contains 1 compute span.
 
 The total amount of spans depends on the complexity of your model.
