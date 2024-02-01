@@ -327,6 +327,12 @@ SetInferenceRequestMetadata(
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
             inference_request, param.first.c_str(),
             infer_param.string_param().c_str()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kDoubleParam) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetDoubleParameter(
+            inference_request, param.first.c_str(),
+            infer_param.double_param()));
       } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
