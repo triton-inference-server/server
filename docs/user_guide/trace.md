@@ -486,20 +486,26 @@ Default parameters for the Batch Span Processor are provided in
 [`OpenTelemetry trace APIs settings`](#opentelemetry-trace-apis-settings).
 As a general recommendation, make sure that `bsp_max_queue_size` is large enough
 to hold all collected spans, and `bsp_schedule_delay` does not cause frequent
-exports, which will affect Triton Server's latency. Also, users should keep
-in mind that at minimum Triton collects 3 levels of spans:
+exports, which will affect Triton Server's latency. A minimal Triton trace
+consists of 3 spans: top level span, model span, and compute span.
 
-* Top level. The top-level span collects timestamps for when request was received
-by Triton, and when the response was sent.
-* Mid level
-* Low level
+* __Top level span__. The top-level span collects timestamps for when
+request was received by Triton, and when the response was sent. Any Triton
+trace contains only 1 top level span.
+* __Model span__. Model spans collect information, when request for
+this model was started, when it was placed in a queue, and when it was ended.
+A minimal Triton trace contains 1 model span.
+* __Compute span__. Compute spans record compute timestamps. A minimal
+Triton trace contains 1 compute span.
 
+The total amount of spans depends on the complexity of your model.
+A general rule is any base model - a single model that performs computations -
+produces 1 model span and one compute span. For ensembles, every composing
+model produces model and compute spans in addition to one model span for the
+ensemble. [BLS](#tracing-for-bls-models) models produce the same number of
+model an compute spans as the total amount of involved in BLS request models,
+including the main BLS model.
 
-minimal number of produced spans on Trton Server side is 3:
-The `InferRequest` span, which collects timestamps for when request was received
-by Triton, and when the response was sent; the request span, which is named
-after the model the request was sent to and records when request was started and
-ended; the `compute` span, which records compute timestamps.
 
 ### Differences in trace contents from Triton's trace [output](#json-trace-output)
 
