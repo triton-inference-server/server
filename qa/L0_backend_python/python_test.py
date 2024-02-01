@@ -43,8 +43,8 @@ from tritonclient.utils import *
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
-TEST_JETSON = bool(int(os.environ.get("TEST_JETSON", 0)))
-TEST_WINDOWS = bool(int(os.environ.get("TEST_WINDOWS", 0)))
+_test_jetson = bool(int(os.environ.get("TEST_JETSON", 0)))
+_test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 class PythonTest(unittest.TestCase):
@@ -130,7 +130,7 @@ class PythonTest(unittest.TestCase):
         # NOTE: Windows tests are not running in a docker container. Consequently, we
         # do not specify a --shm-size to use a basis to grow. Therefore, this test does
         # not apply for Windows.
-        if not TEST_WINDOWS:
+        if not _test_windows:
             # 2 MiBs
             total_byte_size = 2 * 1024 * 1024
             shape = [total_byte_size]
@@ -167,7 +167,7 @@ class PythonTest(unittest.TestCase):
 
     # GPU tensors are not supported on jetson
     # CUDA Shared memory is not supported on jetson
-    if not TEST_JETSON and not TEST_WINDOWS:
+    if not _test_jetson and not _test_windows:
 
         def test_gpu_tensor_error(self):
             import tritonclient.utils.cuda_shared_memory as cuda_shared_memory

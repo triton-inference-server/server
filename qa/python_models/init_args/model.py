@@ -39,16 +39,14 @@ def check_init_args(args):
         "model_instance_device_id": "0",
         "model_version": "1",
     }
-    if sys.platform == "win32":
-        TRITON_DIR = os.getenv("TRITON_DIR", "c:\\tritonserver").replace("/", "\\")
-        expected_args["model_repository"] = (
-            TRITON_DIR + "\\qa\\L0_backend_python\\models\\init_args"
-        )
-    else:
-        expected_args["model_repository"] = (
-            os.getenv("TRITON_DIR", "/opt/tritonserver")
-            + "/qa/L0_backend_python/models/init_args"
-        )
+    is_win = sys.platform == "win32"
+    triton_dir = os.getenv(
+        "TRITON_DIR", "c:\\tritonserver" if is_win else "/opt/tritonserver"
+    )
+    repo_path = triton_dir + "/qa/L0_backend_python/models/init_args"
+    expected_args["model_repository"] = (
+        repo_path.replace("/", "\\") if is_win else repo_path
+    )
 
     for arg in expected_args:
         if args[arg] != expected_args[arg]:

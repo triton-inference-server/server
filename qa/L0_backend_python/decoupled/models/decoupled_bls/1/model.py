@@ -35,7 +35,7 @@ import torch
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import from_dlpack, to_dlpack
 
-TEST_WINDOWS = bool(int(os.environ.get("TEST_WINDOWS", 0)))
+_test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 class TritonPythonModel:
@@ -259,7 +259,7 @@ class TritonPythonModel:
         time.sleep(5)
 
         # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
-        if TEST_WINDOWS:
+        if not _test_windows:
             status = self.execute_gpu_bls()
         else:
             status = True
