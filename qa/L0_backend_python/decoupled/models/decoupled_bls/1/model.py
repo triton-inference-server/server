@@ -1,4 +1,4 @@
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,8 +34,6 @@ import numpy as np
 import torch
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import from_dlpack, to_dlpack
-
-_test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 class TritonPythonModel:
@@ -259,7 +257,7 @@ class TritonPythonModel:
         time.sleep(5)
 
         # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
-        if not _test_windows:
+        if sys.platform != "win32":
             status = self.execute_gpu_bls()
         else:
             status = True

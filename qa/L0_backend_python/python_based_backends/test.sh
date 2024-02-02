@@ -37,10 +37,6 @@ CLIENT_PY="./python_based_backends_test.py"
 GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
 RET=0
 
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    pip install pytest numpy tritonclient[all]
-fi
-
 rm -rf ${MODEL_REPOSITORY}
 pip3 install torch
 

@@ -43,10 +43,6 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    pip install pytest numpy tritonclient[all]
-fi
-
 MODELSDIR=${MODELDIR}/logging/models
 source ../../common/util.sh
 

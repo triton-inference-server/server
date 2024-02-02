@@ -32,7 +32,6 @@ source ../../common/util.sh
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 1 ]]; then
     EXPECTED_NUM_TESTS="1"
-    pip install numpy tritonclient[all] pytest
 else
     EXPECTED_NUM_TESTS="2"
 fi

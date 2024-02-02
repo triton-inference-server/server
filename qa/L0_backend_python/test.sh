@@ -422,7 +422,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
         setup_virtualenv
 
         (cd ${TEST} && bash -ex test.sh)
-            if [ $? -ne 0 ]; then
+        if [ $? -ne 0 ]; then
             echo "Subtest ${TEST} FAILED"
             RET=1
         fi

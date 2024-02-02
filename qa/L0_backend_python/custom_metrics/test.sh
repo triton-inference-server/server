@@ -33,10 +33,6 @@ source ../../common/util.sh
 SERVER_ARGS="--model-repository=${MODELDIR}/custom_metrics/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./custom_metrics_server.log"
 
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    pip install pytest numpy tritonclient[all]
-fi
-
 RET=0
 rm -fr *.log ./models *.txt
 

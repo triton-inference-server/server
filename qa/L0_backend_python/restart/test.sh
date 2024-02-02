@@ -33,10 +33,6 @@ source ../common.sh
 
 rm -fr *.log free_memory.txt
 
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    pip install pytest tritonclient[all]
-fi
-
 RET=0
 
 prev_num_pages=`get_shm_pages`

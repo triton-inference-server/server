@@ -33,10 +33,6 @@ source ../../common/util.sh
 RET=0
 rm -fr *.log ./models *.txt
 
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    pip install numpy tritonclient[all] pytest
-fi
-
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 uninstall -y torch
