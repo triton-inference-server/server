@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1098,6 +1098,96 @@ CommonHandler::RegisterModelStatistics()
           GOTO_IF_ERR(err, earlyexit);
           statistics->mutable_inference_stats()->mutable_cache_miss()->set_ns(
               ucnt);
+        }
+
+        {
+          triton::common::TritonJson::Value responses_json;
+          err = model_stat.MemberAsObject("response_stats", &responses_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          std::vector<std::string> keys;
+          err = responses_json.Members(&keys);
+          GOTO_IF_ERR(err, earlyexit);
+
+          for (const auto& key : keys) {
+            triton::common::TritonJson::Value res_json;
+            err = responses_json.MemberAsObject(key.c_str(), &res_json);
+            GOTO_IF_ERR(err, earlyexit);
+
+            inference::InferResponseStatistics res;
+
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("compute_infer", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_compute_infer()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_compute_infer()->set_ns(val);
+            }
+
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("compute_output", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_compute_output()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_compute_output()->set_ns(val);
+            }
+
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("success", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_success()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_success()->set_ns(val);
+            }
+
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("fail", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_fail()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_fail()->set_ns(val);
+            }
+
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("empty_response", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_empty_response()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_empty_response()->set_ns(val);
+            }
+
+            (*statistics->mutable_response_stats())[key] = std::move(res);
+          }
         }
 
         triton::common::TritonJson::Value batches_json;
