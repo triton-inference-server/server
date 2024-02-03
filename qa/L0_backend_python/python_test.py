@@ -369,7 +369,7 @@ class PythonTest(unittest.TestCase):
         # FIXME: This model requires torch. Because windows tests are not run in a docker
         # environment with torch installed, we need to think about how we want to install
         # the package. Do we install it on the runners? Within the model?
-        if not TEST_WINDOWS:
+        if not _test_windows:
             model_name = "pytorch_fp32_fp32"
             shape = [1, 1, 28, 28]
             with self._shm_leak_detector.Probe() as shm_probe:
