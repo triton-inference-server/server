@@ -352,6 +352,7 @@ enum TritonOptionId {
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
   OPTION_STARTUP_MODEL,
+  OPTION_CUSTOM_MODEL_CONFIG_PREFIX,
   OPTION_RATE_LIMIT,
   OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
@@ -438,6 +439,17 @@ TritonParser::SetupOptions()
        "Specifying --load-model=* in conjunction with another --load-model "
        "argument will result in error. Note that this option will only take "
        "effect if --model-control-mode=explicit is true."});
+  model_repo_options_.push_back(
+      {OPTION_CUSTOM_MODEL_CONFIG_PREFIX, "model-config-prefix", Option::ArgStr,
+       "Prefix of the model configuration for the models that are loaded to "
+       "use. For example: --model-config-prefix=simple_model,custom. "
+       "It may be specified multiple times to add different prefixes for "
+       "different models. To load ALL models with a certain model config "
+       "prefix, specify '*'. For example --model-config-prefix=*,custom "
+       "to load all models with model configuration named custom_config.pbtxt"
+       "If none are specified for a model then Triton will look for default "
+       "config.pbtxt model configuration file. Triton will issue a warning if "
+       "multiple prefixes are specified for the same model name."});
   model_repo_options_.push_back(
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
@@ -1008,6 +1020,13 @@ TritonServerParameters::BuildTritonServerOptions()
         ParseException,
         TRITONSERVER_ServerOptionsSetStartupModel(loptions, model.c_str()),
         "setting startup model");
+  }
+  for (const auto& [model_name, config_prefix] : model_config_prefixes_) {
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetConfigPrefix(
+            loptions, model_name.c_str(), config_prefix.c_str()),
+        "setting model configuration prefix for model");
   }
   THROW_IF_ERR(
       ParseException,
@@ -1581,6 +1600,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_STARTUP_MODEL:
           lparams.startup_models_.insert(optarg);
+          break;
+        case OPTION_CUSTOM_MODEL_CONFIG_PREFIX:
+          lparams.model_config_prefixes_.insert(optarg);
           break;
         case OPTION_MODEL_CONTROL_MODE: {
           std::string mode_str(optarg);
