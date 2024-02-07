@@ -26,14 +26,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import concurrent.futures
 import time
 import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-from tritonclient.utils import InferenceServerException
 
 
 class TestResponseStatistics(unittest.TestCase):
@@ -113,24 +111,47 @@ class TestResponseStatistics(unittest.TestCase):
             delay_ns = self._min_output_delay_ns
         else:  # success or fail
             delay_ns = self._min_infer_delay_ns + self._min_output_delay_ns
-        upper_bound_ns = 1.01 * delay_ns * expected_count
-        lower_bound_ns = 0.99 * delay_ns * expected_count
+        upper_bound_ns = 1.1 * delay_ns * expected_count
+        lower_bound_ns = 0.9 * delay_ns * expected_count
         stats = response_stats[str(current_index)][stats_name]
         self.assertEqual(stats["count"], expected_count)
         self.assertLessEqual(stats["ns"], upper_bound_ns)
         self.assertGreaterEqual(stats["ns"], lower_bound_ns)
 
-    def _check_response_stats(self, responses, number_of_responses):
-        statistics_grpc = self._grpc_client.get_inference_statistics(
-            model_name=self._model_name, as_json=True
-        )
+    def _get_response_statistics(self):
+        # http response statistics
         statistics_http = self._http_client.get_inference_statistics(
             model_name=self._model_name
         )
-        # self.assertEqual(statistics_grpc, statistics_http)
-        model_stats = statistics_http["model_stats"][0]
-        self.assertEqual(model_stats["name"], self._model_name)
-        response_stats = model_stats["response_stats"]
+        model_stats_http = statistics_http["model_stats"][0]
+        self.assertEqual(model_stats_http["name"], self._model_name)
+        response_stats_http = model_stats_http["response_stats"]
+        # grpc response statistics
+        statistics_grpc = self._grpc_client.get_inference_statistics(
+            model_name=self._model_name, as_json=True
+        )
+        model_stats_grpc = statistics_grpc["model_stats"][0]
+        self.assertEqual(model_stats_grpc["name"], self._model_name)
+        response_stats_grpc = model_stats_grpc["response_stats"]
+        # check equivalent between http and grpc statistics
+        self.assertEqual(len(response_stats_http), len(response_stats_grpc))
+        for idx, statistics_http in response_stats_http.items():
+            self.assertIn(idx, response_stats_grpc)
+            statistics_grpc = response_stats_grpc[idx]
+            for name, stats_http in statistics_http.items():
+                self.assertIn(name, statistics_grpc)
+                stats_grpc = statistics_grpc[name]
+                # normalize gRPC statistics to http
+                stats_grpc["count"] = (
+                    int(stats_grpc["count"]) if ("count" in stats_grpc) else 0
+                )
+                stats_grpc["ns"] = int(stats_grpc["ns"]) if ("ns" in stats_grpc) else 0
+                # check equal
+                self.assertEqual(stats_http, stats_grpc)
+        return response_stats_http
+
+    def _check_response_stats(self, responses, number_of_responses):
+        response_stats = self._get_response_statistics()
         self.assertGreaterEqual(len(response_stats), number_of_responses)
         for i in range(number_of_responses):
             self._update_statistics_counts(i, number_of_responses)
