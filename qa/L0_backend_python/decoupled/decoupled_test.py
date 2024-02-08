@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -39,6 +40,10 @@ import numpy as np
 import shm_util
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class UserData:
@@ -68,7 +73,9 @@ class DecoupledTest(unittest.TestCase):
         number_of_requests = 2
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
 
                 input_datas = []
@@ -107,7 +114,9 @@ class DecoupledTest(unittest.TestCase):
         shape = [1, 2]
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
 
                 input_datas = []
@@ -144,7 +153,9 @@ class DecoupledTest(unittest.TestCase):
         in_values = [4, 2, 0, 1]
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as triton_client:
                 triton_client.start_stream(callback=partial(callback, user_data))
                 for i in range(len(in_values)):
                     input_data = np.array([in_values[i]], dtype=np.int32)
@@ -209,7 +220,9 @@ class DecoupledTest(unittest.TestCase):
         shape = [16]
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data_0 = np.random.random(shape).astype(np.float32)
                 input_data_1 = np.random.random(shape).astype(np.float32)
@@ -243,7 +256,9 @@ class DecoupledTest(unittest.TestCase):
         shape = [16]
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data_0 = np.random.random(shape).astype(np.float32)
                 input_data_1 = np.random.random(shape).astype(np.float32)
@@ -281,7 +296,9 @@ class DecoupledTest(unittest.TestCase):
         user_data = UserData()
 
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
                 client.start_stream(callback=partial(callback, user_data))
                 input_data = np.array([[execute_delay]], dtype=np.float32)
                 inputs = [
@@ -315,7 +332,9 @@ class DecoupledTest(unittest.TestCase):
         shape = [2, 2]
         number_of_requests = 10
         user_data = UserData()
-        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+        with grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001"
+        ) as triton_client:
             triton_client.start_stream(callback=partial(callback, user_data))
 
             input_datas = []

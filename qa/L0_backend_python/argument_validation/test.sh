@@ -28,10 +28,7 @@
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./arg_validation_client.log"
 TEST_RESULT_FILE='test_results.txt'
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/argument_validation/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./arg_validation_server.log"
 
 RET=0
@@ -56,8 +53,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
