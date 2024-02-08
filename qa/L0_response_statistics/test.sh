@@ -47,7 +47,6 @@ RET=0
 
 rm -rf models && mkdir models
 mkdir -p models/square_int32/1 && (cd models/square_int32 && \
-    echo 'name: "square_int32"' >> config.pbtxt && \
     echo 'backend: "square"' >> config.pbtxt && \
     echo 'max_batch_size: 0' >> config.pbtxt && \
     echo 'model_transaction_policy { decoupled: True }' >> config.pbtxt && \
