@@ -47,14 +47,19 @@ class TestResponseStatistics(unittest.TestCase):
         )
         self._http_client = httpclient.InferenceServerClient("localhost:8000")
 
+    # Return a coupled (callback, response) pair for gRPC stream infer.
     def _generate_streaming_callback_and_response_pair(self):
-        response = []  # [{"result": result, "error": error}, ...]
+        # [{"result": result, "error": error}, ...]
+        response = []
 
         def callback(result, error):
             response.append({"result": result, "error": error})
 
         return callback, response
 
+    # Send an infer request and return its responses. 'number_of_responses' is the sum
+    # of success, fail and empty responses the model should return for this request.
+    # This function waits until all success and fail responses are received.
     def _stream_infer(self, number_of_responses):
         callback, responses = self._generate_streaming_callback_and_response_pair()
         self._grpc_client.start_stream(callback)
@@ -70,6 +75,9 @@ class TestResponseStatistics(unittest.TestCase):
         self._grpc_client.stop_stream()
         return responses
 
+    # Update expected statistics counts for the response at 'current_index'.
+    # 'number_of_responses' is the sum of success, fail and empty responses expected
+    # from this inference request.
     def _update_statistics_counts(self, current_index, number_of_responses):
         if current_index >= len(self._statistics_counts):
             self._statistics_counts.append(
@@ -101,6 +109,7 @@ class TestResponseStatistics(unittest.TestCase):
             self._statistics_counts[current_index]["compute_infer"] += 1
             self._statistics_counts[current_index]["empty_response"] += 1
 
+    # Check the 'response_stats' at 'current_index' for 'stats_name' is valid.
     def _check_statistics_count_and_duration(
         self, response_stats, current_index, stats_name
     ):
@@ -118,6 +127,8 @@ class TestResponseStatistics(unittest.TestCase):
         self.assertLessEqual(stats["ns"], upper_bound_ns)
         self.assertGreaterEqual(stats["ns"], lower_bound_ns)
 
+    # Fetch and return the response statistics from both gRPC and HTTP endpoints, and
+    # check they are equivalent before returning.
     def _get_response_statistics(self):
         # http response statistics
         statistics_http = self._http_client.get_inference_statistics(
@@ -150,6 +161,8 @@ class TestResponseStatistics(unittest.TestCase):
                 self.assertEqual(stats_http, stats_grpc)
         return response_stats_http
 
+    # Check the response statistics is valid for a given infer request, providing its
+    # 'responses' and 'number_of_responses'.
     def _check_response_stats(self, responses, number_of_responses):
         response_stats = self._get_response_statistics()
         self.assertGreaterEqual(len(response_stats), number_of_responses)
@@ -167,6 +180,7 @@ class TestResponseStatistics(unittest.TestCase):
                 response_stats, i, "empty_response"
             )
 
+    # Test response statistics. The statistics must be valid over two or more infers.
     def test_response_statistics(self):
         number_of_responses = 4
         responses = self._stream_infer(number_of_responses)
