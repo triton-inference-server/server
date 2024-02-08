@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -36,6 +37,10 @@ import shm_util
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class LogTest(unittest.TestCase):
     def setUp(self):
@@ -44,7 +49,9 @@ class LogTest(unittest.TestCase):
     def test_log_output(self):
         model_name = "identity_fp32_logging"
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data = np.array([[1.0]], dtype=np.float32)
                 inputs = [
                     httpclient.InferInput(

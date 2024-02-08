@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -40,6 +41,10 @@ import shm_util
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class UserData:
@@ -74,7 +79,9 @@ class LifecycleTest(unittest.TestCase):
             ("(default)", "[StatusCode.INTERNAL] unrecognized"),
         ]
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
                 for error, expected_grpc_error_start in errors:
                     input_data = np.array([[error]], dtype=np.object_)
                     inputs = [
@@ -105,7 +112,9 @@ class LifecycleTest(unittest.TestCase):
             response["error"] = error
 
         with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
                 input_data = np.array([[execute_delay]], dtype=np.float32)
                 inputs = [
                     grpcclient.InferInput(
@@ -137,7 +146,7 @@ class LifecycleTest(unittest.TestCase):
         shape = [2, 2]
         number_of_requests = 3
         user_data = UserData()
-        triton_client = grpcclient.InferenceServerClient("localhost:8001")
+        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
 
         with self._shm_leak_detector.Probe() as shm_probe:
@@ -174,7 +183,9 @@ class LifecycleTest(unittest.TestCase):
         shape = [2, 2]
 
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
                 inputs = [
                     httpclient.InferInput(
@@ -201,7 +212,9 @@ class LifecycleTest(unittest.TestCase):
         model_name = "execute_return_error"
         shape = [1, 1]
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data = (5 * np.random.randn(*shape)).astype(np.float32)
                 inputs = [
                     httpclient.InferInput(

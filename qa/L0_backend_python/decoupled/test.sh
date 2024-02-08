@@ -28,14 +28,16 @@
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
 TEST_RESULT_FILE='test_results.txt'
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/decoupled/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./decoupled_server.log"
 
 pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+# FIXME: Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+  pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+else
+  pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+fi
 
 RET=0
 source ../../common/util.sh
@@ -45,19 +47,20 @@ mkdir -p models/identity_fp32/1/
 cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
 cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32/
 
-mkdir -p models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
-cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
-
 mkdir -p models/execute_cancel/1/
 cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
 cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
 echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/config.pbtxt
 
+rm -fr python_backend
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 mkdir -p models/square_int32/1/
 cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
 cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
+
+mkdir -p models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
 function verify_log_counts () {
   if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then
@@ -76,13 +79,20 @@ function verify_log_counts () {
     echo -e "\n***\n*** Test Failed: Error Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 3 ]; then
-    echo -e "\n***\n*** Test Failed: 'Finalize invoked' message missing\n***"
-    RET=1
-  fi
-  if [ `grep -c "Finalize complete..." $SERVER_LOG` -ne 3 ]; then
-    echo -e "\n***\n*** Test Failed: 'Finalize complete...' message missing\n***"
-    RET=1
+  # NOTE: Windows does not seem to have a way to send a true SIGINT signal
+  # to tritonserver. Instead, it seems required to use taskkill.exe with /F (force)
+  # to kill the running program. This means the server terminates immediately,
+  # instead of shutting down how it would if Ctrl^C was invoked from the terminal.
+  # To properly test functionality, we need a WAR.
+  if [[ ${TEST_WINDOWS} == 0 ]]; then
+    if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 3 ]; then
+      echo -e "\n***\n*** Test Failed: 'Finalize invoked' message missing\n***"
+      RET=1
+    fi
+    if [ `grep -c "Finalize complete..." $SERVER_LOG` -ne 3 ]; then
+      echo -e "\n***\n*** Test Failed: 'Finalize complete...' message missing\n***"
+      RET=1
+    fi
   fi
 }
 
@@ -102,8 +112,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 verify_log_counts
 
