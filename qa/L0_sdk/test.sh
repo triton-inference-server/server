@@ -155,7 +155,7 @@ fi
 # Check wheels, note that even TRITON_VERSION is passed as version field for
 # wheel generation. The version number will be normalized by setuptools, so
 # we need to replace the text here as well to match the normalized version.
-WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev\./\.dev/'`
+WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
 if [[ "aarch64" != $(uname -m) ]] ; then
     WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
           tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"

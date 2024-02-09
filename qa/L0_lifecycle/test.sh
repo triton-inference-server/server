@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1057,6 +1057,12 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+# check server log for the error messages to make sure they're printed
+if [ `grep -c "model not found in any model repository" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not print model load failure for non-existent model\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -1384,7 +1390,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/unload`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1405,7 +1411,7 @@ rm models/graphdef_float32_float32_float32/*/*
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/load`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1445,7 +1451,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/notapi/v2`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1453,7 +1459,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/notapi`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1461,7 +1467,7 @@ fi
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/notapi/foo`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "404" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -1526,6 +1532,8 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_file_override >>$CLIENT_LOG 2>&1
+check_unit_test
+python $LC_TEST LifeCycleTest.test_file_override_security >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 
@@ -1713,7 +1721,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load_speedup
+# LifeCycleTest.test_concurrent_model_load_speedup
 rm -rf models
 mkdir models
 MODEL_NAME="identity_zero_1_int32"
@@ -1743,7 +1751,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load_speedup >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load_speedup >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1756,7 +1764,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load
+# LifeCycleTest.test_concurrent_model_load
 rm -rf models models_v1 models_v2
 mkdir models models_v2
 cp -r identity_zero_1_int32 models/identity_model && \
@@ -1778,7 +1786,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1791,7 +1799,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# LifeCycleTest.test_concurrent_load_unload
+# LifeCycleTest.test_concurrent_model_load_unload
 rm -rf models
 mkdir models
 cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
@@ -1813,7 +1821,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $LC_TEST LifeCycleTest.test_concurrent_load_unload >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_concurrent_model_load_unload >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -1824,8 +1832,280 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_same_model_load_unload_stress
+rm -rf models
+mkdir models
+cp -r identity_zero_1_int32 models && \
+    (cd models/identity_zero_1_int32 && \
+        mkdir 1 && \
+        sed -i "s/string_value: \"10\"/string_value: \"0\"/" config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-thread-count=32 --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_same_model_load_unload_stress >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    cat ./test_concurrent_same_model_load_unload_stress.statistics.log
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_model_instance_load_speedup
+rm -rf models
+mkdir models
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+rm models/${MODEL_NAME}/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_model_instance_load_speedup >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_model_instance_load_sanity
+rm -rf models
+mkdir models
+# Sanity check loading multiple instances in parallel for each supported backend
+PARALLEL_BACKENDS="python onnx"
+for backend in ${PARALLEL_BACKENDS} ; do
+    model="${backend}_float32_float32_float32"
+    model_dir="models/${model}"
+    if [[ $backend == "python" ]]; then
+      cp -r ../python_models/identity_fp32 ${model_dir}
+      mkdir ${model_dir}/1 && mv ${model_dir}/model.py ${model_dir}/1
+      rm ${model_dir}/config.pbtxt
+    else
+      mkdir models/${model}
+      cp -r $DATADIR/qa_model_repository/${model}/1 models/${model}/1
+    fi
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+PARALLEL_BACKENDS=${PARALLEL_BACKENDS} python $LC_TEST LifeCycleTest.test_concurrent_model_instance_load_sanity >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_load_retry
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+# Start without retry and the server should fail to start
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r retry_model models/.
+
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=none \
+             --model-load-retry-count=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# the model should be available/ready
+set +e
+code=`curl -s -w %{http_code} localhost:8000/v2/models/retry_model/ready`
+set -e
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_model_config_overwrite
+rm -rf models
+mkdir models
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(5)" >> 1/model.py)
+rm models/${MODEL_NAME}/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model ${MODEL_NAME}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_config_overwite >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_while_background_unloading
+rm -rf models
+mkdir models
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models/ && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def finalize(self):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model ${MODEL_NAME} --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_shutdown_while_background_unloading >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+NUMBER_OF_MODELS_UNLOADED=`grep -o "successfully unloaded" $SERVER_LOG | wc -l`
+if [ $NUMBER_OF_MODELS_UNLOADED -ne 2 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Unexpected number of successfully unloaded models\n***"
+    RET=1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_while_loading
+rm -rf models
+mkdir models
+cp -r ../python_models/identity_fp32 models/ && (cd models/identity_fp32 && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=2"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_shutdown_while_loading >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+ACTUAL_LOAD_UNLOAD_ORDER="`grep -o -e 'AsyncUnload()' -e 'OnLoadFinal()' $SERVER_LOG`"
+EXPECTED_LOAD_UNLOAD_ORDER="`echo -e 'OnLoadFinal()\nAsyncUnload()'`"
+if [ "$ACTUAL_LOAD_UNLOAD_ORDER" != "$EXPECTED_LOAD_UNLOAD_ORDER" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Failed assert load finish before unload\n***"
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET

@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -226,9 +226,21 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
             evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
             return;
           }
-          LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path"
-                         << std::endl;
-          SageMakerMMEHandleInfer(req, multi_model_name, model_version_str_);
+          LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path";
+
+          /* Extract targetModel to log the associated archive */
+          const char* target_model =
+              evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
+
+          /* If target_model is not available (e.g., in local testing) use
+           * model_name_hash as target_model) */
+          if (target_model == nullptr) {
+            target_model = multi_model_name.c_str();
+          }
+
+          LOG_INFO << "Invoking SageMaker TargetModel: " << target_model;
+
+          SageMakerMMEHandleInfer(req, target_model, model_version_str_);
           return;
         }
         if (action.empty()) {
@@ -330,17 +342,22 @@ SagemakerAPIServer::ParseSageMakerRequest(
   if (action == "load") {
     (*parse_map)["url"] = url_string.c_str();
   }
-  (*parse_map)["model_name"] = model_name_string.c_str();
+  (*parse_map)["model_name_hash"] = model_name_string.c_str();
 
-  /* Extract targetModel to log the associated archive */
-
-  /* Read headers*/
-  (*parse_map)["TargetModel"] = "targetModel.tar.gz";
-
-  const char* targetModel =
+  /* Extract target_model, specified in header, to log the associated archive */
+  const char* target_model =
       evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
 
-  LOG_INFO << "Loading SageMaker TargetModel: " << targetModel << std::endl;
+
+  /* If target_model is not available (e.g., in local testing) use
+   * model_name_hash as target_model) */
+  if (target_model != nullptr) {
+    (*parse_map)["target_model"] = target_model;
+  } else {
+    (*parse_map)["target_model"] = model_name_string.c_str();
+  }
+
+  LOG_INFO << "Loading SageMaker TargetModel: " << target_model;
 
   return;
 }
@@ -356,7 +373,7 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   // appropriately if connection closed or last response sent.
   //
   // But for now userp is the InferRequestClass object and the end of
-  // its life is in the OK or BAD ReplyCallback.
+  // its life is in the ReplyCallback.
 
   SagemakerAPIServer::SagemakeInferRequestClass* infer_request =
       reinterpret_cast<SagemakerAPIServer::SagemakeInferRequestClass*>(userp);
@@ -390,47 +407,25 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  if (err == nullptr) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else {
+  if (err != nullptr) {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    // [FIXME] In http_server.cc, error handling is enhanced to reporting
+    // different error code according to the Triton error code, holding
+    // the change from SageMaker endpoint as it may not fit their SLA.
+    infer_request->response_code_ = EVHTP_RES_BADREQ;
     if (SageMakerMMECheckOOMError(err) == true) {
       LOG_VERBOSE(1)
           << "Received an OOM error during INVOKE MODEL. Returning a 507."
           << std::endl;
-      evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
-    } else {
-      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+      infer_request->response_code_ = 507;
     }
     TRITONSERVER_ErrorDelete(err);
   }
+  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
-}
-
-void
-SagemakerAPIServer::BADReplyCallback507(evthr_t* thr, void* arg, void* shared)
-{
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
-
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, 507);
-
-  evhtp_request_resume(request);
-
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_START", request->send_start_ns);
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_END", request->send_end_ns);
-  }
-#endif  // TRITON_ENABLE_TRACING
-
-  delete infer_request;
 }
 
 void
@@ -442,11 +437,6 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
-
-  /* Extract targetModel to log the associated archive */
-  const char* targetModel =
-      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-  LOG_INFO << "Invoking SageMaker TargetModel: " << targetModel << std::endl;
 
   bool connection_paused = false;
 
@@ -469,30 +459,25 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-  std::shared_ptr<TraceManager::Trace> trace;
-  if (err == nullptr) {
-    trace = std::move(trace_manager_->SampleTrace(model_name));
-    if (trace != nullptr) {
-      triton_trace = trace->trace_;
-
-      // Timestamps from evhtp are capture in 'req'. We record here
-      // since this is the first place where we have access to trace
-      // manager.
-      trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
-      trace->CaptureTimestamp("HTTP_RECV_END", req->recv_end_ns);
-    }
-  }
-#endif  // TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace =
+      StartTrace(req, model_name, &triton_trace);
 
   // Create the inference request object which provides all information needed
   // for an inference.
   TRITONSERVER_InferenceRequest* irequest = nullptr;
+  std::shared_ptr<TRITONSERVER_InferenceRequest> irequest_shared = nullptr;
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, server_.get(), model_name.c_str(), requested_model_version);
   }
-
+  if (err == nullptr) {
+    irequest_shared = std::shared_ptr<TRITONSERVER_InferenceRequest>(
+        irequest, [](TRITONSERVER_InferenceRequest* request) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(request),
+              "deleting HTTP/REST inference request");
+        });
+  }
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
   if (err == nullptr) {
@@ -554,7 +539,10 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
   if (err == nullptr) {
     connection_paused = true;
 
-    auto infer_request = CreateInferRequest(req);
+    auto infer_request = CreateInferRequest(req, irequest_shared);
+    auto request_release_payload = std::make_unique<RequestReleasePayload>(
+        irequest_shared, decompressed_buffer);
+
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
@@ -577,7 +565,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          decompressed_buffer);
+          request_release_payload.get());
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -599,6 +587,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       }
       if (err == nullptr) {
         infer_request.release();
+        request_release_payload.release();
       }
     }
   }
@@ -621,10 +610,6 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
     }
 #endif  // TRITON_ENABLE_TRACING
-
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(irequest),
-        "deleting HTTP/REST inference request");
   }
 }
 
@@ -687,7 +672,7 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
 
           LOG_VERBOSE(1) << "Discovered model: " << name
                          << ", version: " << version << " in state: " << state
-                         << "for the reason: " << reason;
+                         << " for the reason: " << reason;
 
           break;
         }
@@ -700,19 +685,27 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
 
 void
 SagemakerAPIServer::SageMakerMMEUnloadModel(
-    evhtp_request_t* req, const char* model_name)
+    evhtp_request_t* req, const char* model_name_hash)
 {
-  if (sagemaker_models_list_.find(model_name) == sagemaker_models_list_.end()) {
-    LOG_VERBOSE(1) << "Model " << model_name << " is not loaded." << std::endl;
+  /* Extract targetModel to log the associated archive */
+  const char* target_model =
+      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
+
+  /* If target_model is not available (e.g., in local testing) use
+   * model_name_hash as target_model) */
+  if (target_model == nullptr) {
+    target_model = model_name_hash;
+  }
+
+  if (sagemaker_models_list_.find(model_name_hash) ==
+      sagemaker_models_list_.end()) {
+    LOG_VERBOSE(1) << "Model " << target_model << " with model hash "
+                   << model_name_hash << " is not loaded." << std::endl;
     evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
     return;
   }
 
-  /* Extract targetModel to log the associated archive */
-  const char* targetModel =
-      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-
-  LOG_INFO << "Unloading SageMaker TargetModel: " << targetModel << std::endl;
+  LOG_INFO << "Unloading SageMaker TargetModel: " << target_model << std::endl;
 
   auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -720,7 +713,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
    * ensemble */
   TRITONSERVER_Error* unload_err = nullptr;
   unload_err =
-      TRITONSERVER_ServerUnloadModelAndDependents(server_.get(), model_name);
+      TRITONSERVER_ServerUnloadModelAndDependents(server_.get(), target_model);
 
   if (unload_err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, unload_err);
@@ -728,7 +721,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
     LOG_ERROR
         << "Error when unloading SageMaker Model with dependents for model: "
-        << model_name << std::endl;
+        << target_model << std::endl;
 
     TRITONSERVER_ErrorDelete(unload_err);
     return;
@@ -745,13 +738,13 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   succeeded.*/
   if (unload_err == nullptr) {
     LOG_VERBOSE(1) << "Using Model Repository Index during UNLOAD to check for "
-                      "status of model: "
-                   << model_name;
+                      "status of model hash: "
+                   << model_name_hash << " for model: " << target_model;
     while (is_model_unavailable == false &&
            unload_time_in_secs < UNLOAD_TIMEOUT_SECS_) {
       LOG_VERBOSE(1) << "In the loop to wait for model to be unavailable";
       unload_err = SageMakerMMECheckUnloadedModelIsUnavailable(
-          model_name, &is_model_unavailable);
+          target_model, &is_model_unavailable);
       if (unload_err != nullptr) {
         LOG_ERROR << "Error: Received non-zero exit code on checking for "
                      "model unavailability. "
@@ -767,7 +760,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
                                 end_time - start_time)
                                 .count();
     }
-    LOG_INFO << "UNLOAD for model " << model_name << " completed in "
+    LOG_INFO << "UNLOAD for model " << target_model << " completed in "
              << unload_time_in_secs << " seconds.";
     TRITONSERVER_ErrorDelete(unload_err);
   }
@@ -780,7 +773,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
                  "result in SageMaker UNLOAD timeout.";
   }
 
-  std::string repo_parent_path = sagemaker_models_list_.at(model_name);
+  std::string repo_parent_path = sagemaker_models_list_.at(model_name_hash);
 
   TRITONSERVER_Error* unregister_err = nullptr;
 
@@ -799,7 +792,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   TRITONSERVER_ErrorDelete(unregister_err);
 
   std::lock_guard<std::mutex> lock(models_list_mutex_);
-  sagemaker_models_list_.erase(model_name);
+  sagemaker_models_list_.erase(model_name_hash);
 }
 
 void
@@ -946,7 +939,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     const std::unordered_map<std::string, std::string> parse_map)
 {
   std::string repo_path = parse_map.at("url");
-  std::string model_name = parse_map.at("model_name");
+  std::string model_name_hash = parse_map.at("model_name_hash");
+  std::string target_model = parse_map.at("target_model");
 
   /* Check subdirs for models and find ensemble model within the repo_path
    * If only 1 model, that will be selected as model_subdir
@@ -1043,7 +1037,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   }
 
   auto param = TRITONSERVER_ParameterNew(
-      model_subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
+      model_subdir.c_str(), TRITONSERVER_PARAMETER_STRING,
+      target_model.c_str());
 
   if (param != nullptr) {
     subdir_modelname_map.emplace_back(param);
@@ -1076,7 +1071,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     return;
   }
 
-  err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
+  err = TRITONSERVER_ServerLoadModel(server_.get(), target_model.c_str());
 
   /* Unlikely after duplicate repo check, but in case Load Model also returns
    * ALREADY_EXISTS error */
@@ -1091,7 +1086,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   } else {
     std::lock_guard<std::mutex> lock(models_list_mutex_);
 
-    sagemaker_models_list_.emplace(model_name, repo_parent_path);
+    /* Use model name hash as expected in SageMaker MME contract */
+    sagemaker_models_list_.emplace(model_name_hash, repo_parent_path);
     evhtp_send_reply(req, EVHTP_RES_OK);
   }
 
@@ -1101,7 +1097,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
         server_.get(), repo_parent_path.c_str());
     LOG_VERBOSE(1)
         << "Unregistered model repository due to load failure for model: "
-        << model_name << std::endl;
+        << target_model << std::endl;
   }
 
   if (err != nullptr) {

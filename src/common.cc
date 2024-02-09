@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "restricted_features.h"
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
@@ -99,16 +100,6 @@ bool
 Contains(const std::vector<std::string>& vec, const std::string& str)
 {
   return std::find(vec.begin(), vec.end(), str) != vec.end();
-}
-
-std::string
-Join(const std::vector<std::string>& vec, const std::string& delim)
-{
-  std::stringstream ss;
-  std::copy(
-      vec.begin(), vec.end(),
-      std::ostream_iterator<std::string>(ss, delim.c_str()));
-  return ss.str();
 }
 
 }}  // namespace triton::server

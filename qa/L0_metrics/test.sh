@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,17 +45,18 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_ARGS="${BASE_SERVER_ARGS}"
 SERVER_LOG="./inference_server.log"
+PYTHON_TEST="metrics_config_test.py"
 source ../common/util.sh
 
 CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 function check_unit_test() {
-    if [ $? -ne 0 ]; then
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else
-	EXPECTED_NUM_TESTS=1
+        EXPECTED_NUM_TESTS="${1:-1}"
         check_test_results ${TEST_RESULT_FILE} ${EXPECTED_NUM_TESTS}
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
@@ -77,10 +78,16 @@ function run_and_check_server() {
 rm -f $SERVER_LOG
 RET=0
 
+if [ `ps | grep -c "tritonserver"` != "0" ]; then
+    echo -e "Tritonserver already running"
+    echo -e `ps | grep tritonserver`
+    exit 1
+fi
+
 ### UNIT TESTS
 
 TEST_LOG="./metrics_api_test.log"
-UNIT_TEST=./metrics_api_test
+UNIT_TEST="./metrics_api_test --gtest_output=xml:metrics_api.report.xml"
 
 rm -fr *.log
 
@@ -94,8 +101,6 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-### GPU Metrics
-
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR
 model=libtorch_float32_float32_float32
@@ -106,8 +111,41 @@ mkdir -p $MODELDIR/${model}/1 && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
+### Pinned memory metrics tests
+set +e
+CLIENT_PY="./pinned_memory_metrics_test.py"
+SERVER_LOG="pinned_memory_metrics_test_server.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_pinned_memory_metrics_exist -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+CLIENT_LOG="pinned_memory_metrics_test_client.log"
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Custom Pinned memory pool size
+export CUSTOM_PINNED_MEMORY_POOL_SIZE=1024 # bytes
+SERVER_LOG="custom_pinned_memory_test_server.log"
+CLIENT_LOG="custom_pinned_memory_test_client.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE"
+run_and_check_server
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+set -e
+
+
+### GPU Metrics
 set +e
 export CUDA_VISIBLE_DEVICES=0,1,2
+SERVER_LOG="./inference_server.log"
+CLIENT_LOG="client.log"
 run_and_check_server
 
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
@@ -221,18 +259,17 @@ MODELDIR="${PWD}/unit_test_models"
 mkdir -p "${MODELDIR}/identity_cache_on/1"
 mkdir -p "${MODELDIR}/identity_cache_off/1"
 BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
-PYTHON_TEST="metrics_test.py"
 
 # Check default settings: Counters should be enabled, summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -240,13 +277,13 @@ wait $SERVER_PID
 # Enable summaries, counters still enabled by default
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -254,13 +291,13 @@ wait $SERVER_PID
 # Enable summaries, disable counters
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config counter_latencies=false"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -269,15 +306,15 @@ wait $SERVER_PID
 CACHE_ARGS="--cache-config local,size=1048576"
 SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=true --metrics-config counter_latencies=true"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 # DLIS-4762: Asserts that request summary is not published when cache is
 # enabled for a model, until this if fixed.
-python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
@@ -286,10 +323,67 @@ wait $SERVER_PID
 export SUMMARY_QUANTILES="0.1:0.0.1,0.7:0.01,0.75:0.01"
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config summary_quantiles=${SUMMARY_QUANTILES}"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
+
+### Pending Request Count (Queue Size) Metric Behavioral Tests ###
+MODELDIR="${PWD}/queue_size_models"
+SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
+PYTHON_TEST="metrics_queue_size_test.py"
+rm -rf "${MODELDIR}"
+mkdir -p "${MODELDIR}"
+
+# Re-use an identity model that sleeps during execution for N seconds for the
+# batch of requests. Then we can confirm queue size behaviors for various
+# scheduling/batching strategies.
+BASE_MODEL="identity_delay"
+# Don't use special debug env var for this, just set sufficient parameters for
+# each scheduler to let them fill batches when possible.
+unset TRITONSERVER_DELAY_SCHEDULER
+export MAX_BATCH_SIZE=4
+# Delay up to 100ms to form batches up to MAX_BATCH_SIZE
+export MAX_QUEUE_DELAY_US=100000
+
+# Create a model per scheduler type
+DEFAULT_MODEL="${MODELDIR}/default"
+cp -r "${BASE_MODEL}" "${DEFAULT_MODEL}"
+mkdir -p "${DEFAULT_MODEL}/1"
+sed -i "s/^max_batch_size.*/max_batch_size: ${MAX_BATCH_SIZE}/" "${DEFAULT_MODEL}/config.pbtxt"
+
+DYNAMIC_MODEL="${MODELDIR}/dynamic"
+cp -r "${DEFAULT_MODEL}" "${DYNAMIC_MODEL}"
+echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US} }\n" >> "${DYNAMIC_MODEL}/config.pbtxt"
+
+MAX_QUEUE_SIZE_MODEL="${MODELDIR}/max_queue_size"
+cp -r "${DEFAULT_MODEL}" "${MAX_QUEUE_SIZE_MODEL}"
+echo -e "\ndynamic_batching { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US} default_queue_policy { max_queue_size: 4 } }\n" >> "${MAX_QUEUE_SIZE_MODEL}/config.pbtxt"
+
+SEQUENCE_DIRECT_MODEL="${MODELDIR}/sequence_direct"
+cp -r "${DEFAULT_MODEL}" "${SEQUENCE_DIRECT_MODEL}"
+echo -e "\nsequence_batching { direct { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US}, minimum_slot_utilization: 1.0 } }\n" >> "${SEQUENCE_DIRECT_MODEL}/config.pbtxt"
+
+SEQUENCE_OLDEST_MODEL="${MODELDIR}/sequence_oldest"
+cp -r "${DEFAULT_MODEL}" "${SEQUENCE_OLDEST_MODEL}"
+echo -e "\nsequence_batching { oldest { max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_US}, max_candidate_sequences: ${MAX_BATCH_SIZE} } }\n" >> "${SEQUENCE_OLDEST_MODEL}/config.pbtxt"
+
+BASE_ENSEMBLE="ensemble_delay"
+ENSEMBLE_MODEL="${MODELDIR}/ensemble"
+cp -r "${BASE_ENSEMBLE}" "${ENSEMBLE_MODEL}"
+mkdir -p "${ENSEMBLE_MODEL}/1"
+# Use uniquely named composing models to avoid clashing
+# metric values with individual and ensemble tests.
+cp -r "${DEFAULT_MODEL}" "${MODELDIR}/default_composing"
+cp -r "${DYNAMIC_MODEL}" "${MODELDIR}/dynamic_composing"
+
+
+run_and_check_server
+python3 ${PYTHON_TEST} 2>&1 | tee ${CLIENT_LOG}
+kill $SERVER_PID
+wait $SERVER_PID
+expected_tests=6
+check_unit_test "${expected_tests}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

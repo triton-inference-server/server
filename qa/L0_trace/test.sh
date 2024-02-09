@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,10 +34,6 @@ CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 EXPECTED_NUM_TESTS="6"
 
-TRACE_COLLECTOR=trace_collector.py
-TRACE_COLLECTOR_LOG="trace_collector.log"
-OTLP_PORT=10000
-
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -55,6 +51,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
+BLSDIR=../python_models/bls_simple
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
@@ -78,12 +75,82 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
             sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
-            sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt)
+            sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt) && \
+    mkdir -p $MODELSDIR/bls_simple/1 && cp $BLSDIR/bls_simple.py $MODELSDIR/bls_simple/1/model.py
 
 RET=0
 
+# Helpers =======================================
+function assert_curl_success {
+  message="${1}"
+  if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+
+function assert_curl_failure {
+  message="${1}"
+  if [ "$code" == "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** ${message} : line ${BASH_LINENO}\n***"
+    RET=1
+  fi
+}
+
+function get_global_trace_setting {
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/trace/setting`
+  set -e
+}
+
+function get_trace_setting {
+  model_name="${1}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/${model_name}/trace/setting`
+  set -e
+}
+
+function update_global_trace_setting {
+  settings="${1}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/trace/setting -d ${settings}`
+  set -e
+}
+
+function update_trace_setting {
+  model_name="${1}"
+  settings="${2}"
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${model_name}/trace/setting -d ${settings}`
+  set -e
+}
+
+function send_inference_requests {
+    log_file="${1}"
+    upper_bound="${2}"
+    for (( p = 1; p <= $upper_bound; p++ )) do
+        $SIMPLE_HTTP_CLIENT >> ${log_file} 2>&1
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+
+        $SIMPLE_GRPC_CLIENT >> ${log_file} 2>&1
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    done
+}
+
+#=======================================
+
 # start with trace-level=OFF
-SERVER_ARGS="--trace-file=trace_off_to_min.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=trace_off_to_min.log --trace-config level=OFF --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -94,28 +161,10 @@ fi
 
 set +e
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_off.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_off.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
-
 # Enable via trace API and send again
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_level":["TIMESTAMPS"]}' localhost:8000/v2/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_global_trace_setting '{"trace_level":["TIMESTAMPS"]}'
+assert_curl_success "Failed to modify global trace settings"
+
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
@@ -130,17 +179,7 @@ if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; th
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_min.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_min.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_min.log" 10
 
 set -e
 
@@ -167,7 +206,7 @@ fi
 set -e
 
 # Add model specific setting
-SERVER_ARGS="--trace-file=global_trace.log --trace-level=TIMESTAMPS --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TIMESTAMPS --trace-config rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -179,15 +218,9 @@ fi
 set +e
 
 # Add trace setting for 'simple' via trace API, first use the same trace file
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"global_trace.log"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"global_trace.log"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
+
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
@@ -203,15 +236,8 @@ if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Use a different name
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"simple_trace.log","log_frequency":"2"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"simple_trace.log","log_frequency":"2"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -230,17 +256,7 @@ if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_simple.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_simple.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_simple.log" 10
 
 set -e
 
@@ -285,7 +301,7 @@ fi
 set -e
 
 # Update and clear model specific setting
-SERVER_ARGS="--trace-file=global_trace.log --trace-level=TIMESTAMPS --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TIMESTAMPS --trace-config rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -297,25 +313,11 @@ fi
 set +e
 
 # Add model setting and update it
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_rate":"1"}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_rate":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_level":["OFF"]}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_level":["OFF"]}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"OFF\"\]" ./curl.out` != "1" ]; then
@@ -335,31 +337,14 @@ if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where trace is explicitly disabled
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 rm -f ./curl.out
 set +e
 
 # Clear trace setting by explicitly asking removal for every field except 'trace_rate'
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_trace_setting "simple" '{"trace_file":null,"trace_level":null}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting (global) is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -379,17 +364,7 @@ if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where now uses global setting
-for p in {1..5}; do
-    $SIMPLE_HTTP_CLIENT >> client_clear.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_clear.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_clear.log" 5
 
 set -e
 
@@ -420,7 +395,7 @@ fi
 set -e
 
 # Update trace count
-SERVER_ARGS="--trace-file=global_count.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_count.log --trace-config level=TIMESTAMPS --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -432,30 +407,14 @@ fi
 set +e
 
 # Send requests without trace count
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 set -e
 
 # Check the current setting
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -473,15 +432,8 @@ if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Set trace count
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"5"}' localhost:8000/v2/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+update_global_trace_setting '{"trace_count":"5"}'
+assert_curl_success "Failed to modify global trace settings"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
@@ -501,28 +453,12 @@ if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
 fi
 
 # Send requests to simple where trace is explicitly disabled
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-
-    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+send_inference_requests "client_update.log" 10
 
 # Check the current setting again and expect 'trace_count' becomes 0
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -544,6 +480,14 @@ if [ -f ./global_trace.log.0 ]; then
     echo -e "\n***\n*** Test Failed, expect generation of global_trace.log.0 before stopping server\n***"
     RET=1
 fi
+
+SETTINGS="trace_count trace_rate log_frequency"
+
+for SETTING in $SETTINGS; do
+    # Check `out of range` errors
+    update_trace_setting "simple" '{"'${SETTING}'":"10000000000"}'
+    assert_curl_failure "Server modified '${SETTING}' with an out of range value."
+done
 
 set -e
 
@@ -585,7 +529,7 @@ fi
 set -e
 
 # Test Python client library
-SERVER_ARGS="--trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config triton,file=global_unittest.log --trace-config level=TIMESTAMPS --trace-config rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_unittest.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -618,7 +562,7 @@ wait $SERVER_PID
 
 
 # Check `--trace-config` sets arguments properly
-SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
+SERVER_ARGS="--trace-config=triton,file=bls_trace.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=4 --trace-config=count=6 --trace-config=mode=triton --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
 run_server
@@ -628,15 +572,9 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-rm -f ./curl.out
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
-set -e
-if [ "$code" != "200" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -649,11 +587,108 @@ fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"some_file.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"bls_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
+set +e
+# Send bls requests to make sure simple model is traced
+for p in {1..4}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t bls_trace.log > summary_bls.log
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_bls.log` != "2" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "COMPUTE_INPUT_END" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c ^ensemble_add_sub_int32_int32_int32 summary_bls.log` != "1" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: BLS child ensemble model wasn't traced. \n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_bls.log` != "1" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: ensemble's model 'simple' wasn't traced. \n***"
+    RET=1
+fi
+
+if [ `grep -o 'parent_id' bls_trace.log | wc -l` != "2" ]; then
+    cat bls_trace.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
+    RET=1
+fi
+
+# Attempt to trace non-existent model
+SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_nonexistent_model.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Explicitly load model
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+assert_curl_success "Failed to load 'simple' model"
+
+# Non-existent model (get)
+get_trace_setting "does-not-exist"
+assert_curl_failure "Server returned trace settings for a non-existent model"
+
+# Non-existent model (post)
+update_trace_setting "does-not-exist" '{"log_frequency":"1"}'
+assert_curl_failure "Server modified trace settings for a non-existent model"
+
+# Local model (get)
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+# Local model (post)
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
+
+# Local model (unload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/unload`
+set -e
+assert_curl_success "Failed to unload 'simple' model"
+
+get_trace_setting "simple"
+assert_curl_failure "Server returned trace settings for an unloaded model"
+
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_failure "Server modified trace settings for an unloaded model"
+
+# Local model (reload)
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/simple/load`
+set -e
+assert_curl_success "Failed to load 'simple' model"
+
+get_trace_setting "simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+update_trace_setting "simple" '{"log_frequency":"1"}'
+assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 kill $SERVER_PID
 wait $SERVER_PID
@@ -663,23 +698,40 @@ set +e
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
-# Unittests then check that produced spans have expected format and events
-# FIXME: Redesign this test to remove time sensitivity
+OTLP_PORT=10000
+OTEL_COLLECTOR=./otelcol
+OTEL_COLLECTOR_LOG="./trace_collector_http_exporter.log"
 
+# Installing OpenTelemetry collector (v0.91.0).
+# Ref: https://opentelemetry.io/docs/collector/getting-started/#local
+curl --proto '=https' --tlsv1.2 -fOL https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.91.0/otelcol_0.91.0_linux_amd64.tar.gz
+tar -xvf otelcol_0.91.0_linux_amd64.tar.gz
+
+rm collected_traces.json*
+# Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="2"
+EXPECTED_NUM_TESTS="13"
 
-SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
-                --trace-config=count=100 --trace-config=mode=opentelemetry \
-                --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
+# Set up repo and args for SageMaker
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
+MODEL_PATH="/opt/ml/models/123456789abcdefghi/model"
+rm -r ${MODEL_PATH}
+mkdir -p "${MODEL_PATH}"
+cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
+    rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
+        sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
+
+
+SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
+                --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
+                --load-model=bls_simple --trace-config=level=TIMESTAMPS \
+                --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,resource=test.key=test.value \
+                --trace-config=opentelemetry,resource=service.name=test_triton \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
                 --model-repository=$MODELSDIR"
-SERVER_LOG="./inference_server_trace_config.log"
-
-# Increasing OTLP timeout, since we don't use a valid OTLP collector
-# and don't send a proper signal back.
-export OTEL_EXPORTER_OTLP_TIMEOUT=50000
-export OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=50000
+SERVER_LOG="./inference_server_otel_otelcol_exporter.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -688,19 +740,8 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Using netcat as trace collector
-apt-get update && apt-get install -y netcat
-nc -l -k 127.0.0.1 $OTLP_PORT >> $TRACE_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
-
 set +e
-# Preparing traces for unittest.
-# Note: need to run this separately, to speed up trace collection.
-# Otherwise internal (opentelemetry_unittest.OpenTelemetryTest.setUp) check
-# will slow down collection.
-python -c 'import opentelemetry_unittest; \
-        opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 
-# Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $OPENTELEMETRY_LOG
@@ -714,12 +755,274 @@ else
     fi
 fi
 
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
-
 set -e
-
 kill $SERVER_PID
 wait $SERVER_PID
+set +e
+
+# Testing OTel WAR with trace rate = 0
+rm collected_traces.json
+
+OTEL_COLLECTOR=./otelcol
+OTEL_COLLECTOR_LOG="./trace_collector_exporter.log"
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=0\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+if [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should be empty, but it is not.\n***"
+    exit 1
+fi
+
+# Send 1 bls request with OTel context to make sure it is traced
+python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+            headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+        )'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [ -s collected_traces.json ] ; then
+    echo -e "\n***\n*** collected_traces.json should contain OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that only traces with OTel Context are collected after count goes to 0
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=5\
+                --trace-config=count=1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_otel_WAR.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+get_trace_setting "bls_simple"
+assert_curl_success "Failed to obtain trace settings for 'simple' model"
+
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"5\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+set +e
+# Send bls requests to make sure bls_simple model is NOT traced
+for p in {1..20}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+done
+
+sleep 20
+
+if ! [[ -s collected_traces.json && `grep -c "\"name\":\"InferRequest\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain only 1 trace.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+# Send 4 bls request with OTel context and 4 without to make sure it is traced
+for p in {1..10}; do
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32", \
+                headers={"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"} \
+            )'  >> client_update.log 2>&1
+
+    python -c 'import opentelemetry_unittest; \
+            opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32" \
+            )'  >> client_update.log 2>&1
+
+    sleep 10
+done
+
+if ! [[ -s collected_traces.json && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"b7ad6b7169242424\"" ./collected_traces.json` == 10 ]] ; then
+    echo -e "\n***\n*** collected_traces.json should contain 11 OTel trace, but it is not. \n***"
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+################################################################################
+# Tests to make sure BatchSpanProcessor's arguments are propagated from cmd    #
+# to trace initialization step.                                                #
+################################################################################
+
+# bsp_max_queue_size = 1
+# We are sending a bls request, that results in a trace with 6 spans,
+# but because `bsp_max_queue_size` is 1, OTel should drop some of them
+# and print a warning in a log.
+EXPECTED_WARNING="BatchSpanProcessor queue is full - dropping span."
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_queue_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_queue_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [[ `grep -c "$EXPECTED_WARNING" $SERVER_LOG` > 0 ]] ; then
+    echo -e "\n***\n*** $SERVER_LOG does not contain expected BSP warning.\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_schedule_delay = 0
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_schedule_delay` is 0, so OTel should export traces in batches of random
+# size, that translates into random number of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_schedule_delay=0
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_schedule_delay.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` > 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_max_export_batch_size = 1
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_max_export_batch_size` is 1, so OTel should export traces in batches of
+# size 1, that translates into 6 entries of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_export_batch_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_export_batch_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` == 6 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
 
 exit $RET

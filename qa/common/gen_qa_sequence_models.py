@@ -31,126 +31,16 @@ import os
 
 import gen_ensemble_model_utils as emu
 import numpy as np
+from gen_common import (
+    np_to_model_dtype,
+    np_to_onnx_dtype,
+    np_to_tf_dtype,
+    np_to_torch_dtype,
+    np_to_trt_dtype,
+)
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-
-
-def np_to_model_dtype(np_dtype):
-    if np_dtype == bool:
-        return "TYPE_BOOL"
-    elif np_dtype == np.int8:
-        return "TYPE_INT8"
-    elif np_dtype == np.int16:
-        return "TYPE_INT16"
-    elif np_dtype == np.int32:
-        return "TYPE_INT32"
-    elif np_dtype == np.int64:
-        return "TYPE_INT64"
-    elif np_dtype == np.uint8:
-        return "TYPE_UINT8"
-    elif np_dtype == np.uint16:
-        return "TYPE_UINT16"
-    elif np_dtype == np.float16:
-        return "TYPE_FP16"
-    elif np_dtype == np.float32:
-        return "TYPE_FP32"
-    elif np_dtype == np.float64:
-        return "TYPE_FP64"
-    elif np_dtype == np_dtype_string:
-        return "TYPE_STRING"
-    return None
-
-
-def np_to_tf_dtype(np_dtype):
-    if np_dtype == bool:
-        return tf.bool
-    elif np_dtype == np.int8:
-        return tf.int8
-    elif np_dtype == np.int16:
-        return tf.int16
-    elif np_dtype == np.int32:
-        return tf.int32
-    elif np_dtype == np.int64:
-        return tf.int64
-    elif np_dtype == np.uint8:
-        return tf.uint8
-    elif np_dtype == np.uint16:
-        return tf.uint16
-    elif np_dtype == np.float16:
-        return tf.float16
-    elif np_dtype == np.float32:
-        return tf.float32
-    elif np_dtype == np.float64:
-        return tf.float64
-    elif np_dtype == np_dtype_string:
-        return tf.string
-    return None
-
-
-def np_to_trt_dtype(np_dtype):
-    if np_dtype == bool:
-        return trt.bool
-    elif np_dtype == np.int8:
-        return trt.int8
-    elif np_dtype == np.int32:
-        return trt.int32
-    elif np_dtype == np.float16:
-        return trt.float16
-    elif np_dtype == np.float32:
-        return trt.float32
-    return None
-
-
-def np_to_onnx_dtype(np_dtype):
-    if np_dtype == bool:
-        return onnx.TensorProto.BOOL
-    elif np_dtype == np.int8:
-        return onnx.TensorProto.INT8
-    elif np_dtype == np.int16:
-        return onnx.TensorProto.INT16
-    elif np_dtype == np.int32:
-        return onnx.TensorProto.INT32
-    elif np_dtype == np.int64:
-        return onnx.TensorProto.INT64
-    elif np_dtype == np.uint8:
-        return onnx.TensorProto.UINT8
-    elif np_dtype == np.uint16:
-        return onnx.TensorProto.UINT16
-    elif np_dtype == np.float16:
-        return onnx.TensorProto.FLOAT16
-    elif np_dtype == np.float32:
-        return onnx.TensorProto.FLOAT
-    elif np_dtype == np.float64:
-        return onnx.TensorProto.DOUBLE
-    elif np_dtype == np_dtype_string:
-        return onnx.TensorProto.STRING
-
-
-def np_to_torch_dtype(np_dtype):
-    if np_dtype == bool:
-        return torch.bool
-    elif np_dtype == np.int8:
-        return torch.int8
-    elif np_dtype == np.int16:
-        return torch.int16
-    elif np_dtype == np.int32:
-        return torch.int
-    elif np_dtype == np.int64:
-        return torch.long
-    elif np_dtype == np.uint8:
-        return torch.uint8
-    elif np_dtype == np.uint16:
-        return None  # Not supported in Torch
-    elif np_dtype == np.float16:
-        return None
-    elif np_dtype == np.float32:
-        return torch.float
-    elif np_dtype == np.float64:
-        return torch.double
-    elif np_dtype == np_dtype_string:
-        return None  # Not supported in Torch
-    return None
 
 
 def create_tf_modelfile(

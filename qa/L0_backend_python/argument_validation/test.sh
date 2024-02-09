@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,14 +26,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="1"
+CLIENT_LOG="./arg_validation_client.log"
 TEST_RESULT_FILE='test_results.txt'
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/argument_validation/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_LOG="./arg_validation_server.log"
 
 RET=0
 source ../../common/util.sh
@@ -49,23 +45,15 @@ fi
 
 set +e
 export MODEL_NAME="argument_validation"
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** python_unittest.py FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG

@@ -1,4 +1,4 @@
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,7 +255,12 @@ class TritonPythonModel:
         logger.log_error("response_thread-Error Msg!")
         time.sleep(5)
 
-        status = self.execute_gpu_bls()
+        # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
+        if sys.platform != "win32":
+            status = self.execute_gpu_bls()
+        else:
+            status = True
+
         if not status:
             infer_response = pb_utils.InferenceResponse(error="GPU BLS test failed.")
             response_sender.send(infer_response)

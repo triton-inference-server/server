@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -466,4 +466,63 @@ function kill_servers () {
         kill ${!server_pid[$i]}
         wait ${!server_pid[$i]}
     done
+}
+
+# Upload a local directory to a GCS path
+function gcs_upload () {
+    local local_path=$1
+    local gcs_path=$2
+    gsutil cp -r $local_path $gcs_path
+}
+
+# Sort an array
+# Call with sort_array <array_name>
+# Example: sort_array array
+sort_array() {
+    local -n arr=$1
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    IFS=$'\n' sorted_arr=($(sort -n <<<"${arr[*]}"))
+    unset IFS
+    arr=("${sorted_arr[@]}")
+}
+
+# Remove an array's outliers
+# Call with remove_array_outliers <array_name> <percent to trim from both sides>
+# Example: remove_array_outliers array 5
+remove_array_outliers() {
+    local -n arr=$1
+    local percent=$2
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    local trim_count=$((length * percent / 100))
+    local start_index=$trim_count
+    local end_index=$((length - (trim_count*2)))
+
+    arr=("${arr[@]:$start_index:$end_index}")
+}
+
+function setup_virtualenv() {
+    # Create and activate virtual environment
+    virtualenv --system-site-packages venv
+    source venv/bin/activate
+    pip install pytest
+
+    if [[ ${TEST_WINDOWS} == 1 ]]; then
+        pip3 install numpy tritonclient[all]
+    fi
+}
+
+function deactivate_virtualenv() {
+    # Deactivate virtual environment and clean up
+    deactivate
+    rm -fr venv
 }

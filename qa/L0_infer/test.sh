@@ -38,6 +38,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+ldconfig || true
+
 export CUDA_VISIBLE_DEVICES=0
 
 TEST_RESULT_FILE='test_results.txt'
@@ -78,8 +80,8 @@ TF_VERSION=${TF_VERSION:=2}
 TEST_JETSON=${TEST_JETSON:=0}
 
 # Default size (in MB) of shared memory to be used by each python model
-# instance (Default is 64MB)
-DEFAULT_SHM_SIZE_MB=${DEFAULT_SHM_SIZE_MB:=64}
+# instance (Default is 1MB)
+DEFAULT_SHM_SIZE_MB=${DEFAULT_SHM_SIZE_MB:=1}
 DEFAULT_SHM_SIZE_BYTES=$((1024*1024*$DEFAULT_SHM_SIZE_MB))
 
 # On windows the paths invoked by the script (running in WSL) must use
@@ -141,12 +143,10 @@ BATCH=${BATCH:="1"}
 export BATCH
 
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
-    if [ "$TEST_JETSON" == "0" ]; then
-        if [[ "aarch64" != $(uname -m) ]] ; then
-            pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-        else
-            pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-        fi
+    if [[ "aarch64" != $(uname -m) ]] ; then
+        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    else
+        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
     fi
 fi
 
@@ -350,12 +350,10 @@ done
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
   EXPECTED_NUM_TESTS=42
-  if [ "$TEST_JETSON" == "0" ]; then
-    if [[ "aarch64" != $(uname -m) ]] ; then
-        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-    else
-        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-    fi
+  if [[ "aarch64" != $(uname -m) ]] ; then
+      pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  else
+      pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
   fi
 
   for BACKENDS in $TESTING_BACKENDS; do

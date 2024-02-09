@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,6 +55,9 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
     async def test_get_server_metadata(self):
         ret = await self._triton_client.get_server_metadata()
         self.assertEqual(ret.name, "triton")
+
+        ret = await self._triton_client.get_server_metadata(as_json=True)
+        self.assertEqual(ret["name"], "triton")
 
     async def test_get_model_metadata(self):
         ret = await self._triton_client.get_model_metadata("simple")

@@ -79,12 +79,25 @@ spec:
             - containerPort: 8002
               name: metrics
           livenessProbe:
+            initialDelaySeconds: 15
+            failureThreshold: 3
+            periodSeconds: 10
             httpGet:
               path: /v2/health/live
               port: http
           readinessProbe:
             initialDelaySeconds: 5
             periodSeconds: 5
+            failureThreshold: 3
+            httpGet:
+              path: /v2/health/ready
+              port: http
+          startupProbe:
+            # allows Triton to load the models during 30*10 = 300 sec = 5 min
+            # starts checking the other probes only after the success of this one
+            # for details, see https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
+            periodSeconds: 10
+            failureThreshold: 30
             httpGet:
               path: /v2/health/ready
               port: http

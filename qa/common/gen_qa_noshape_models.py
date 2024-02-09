@@ -31,61 +31,10 @@ import os
 from builtins import range
 
 import numpy as np
+from gen_common import np_to_model_dtype, np_to_tf_dtype
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-
-
-def np_to_model_dtype(np_dtype):
-    if np_dtype == bool:
-        return "TYPE_BOOL"
-    elif np_dtype == np.int8:
-        return "TYPE_INT8"
-    elif np_dtype == np.int16:
-        return "TYPE_INT16"
-    elif np_dtype == np.int32:
-        return "TYPE_INT32"
-    elif np_dtype == np.int64:
-        return "TYPE_INT64"
-    elif np_dtype == np.uint8:
-        return "TYPE_UINT8"
-    elif np_dtype == np.uint16:
-        return "TYPE_UINT16"
-    elif np_dtype == np.float16:
-        return "TYPE_FP16"
-    elif np_dtype == np.float32:
-        return "TYPE_FP32"
-    elif np_dtype == np.float64:
-        return "TYPE_FP64"
-    elif np_dtype == np_dtype_string:
-        return "TYPE_STRING"
-    return None
-
-
-def np_to_tf_dtype(np_dtype):
-    if np_dtype == bool:
-        return tf.bool
-    elif np_dtype == np.int8:
-        return tf.int8
-    elif np_dtype == np.int16:
-        return tf.int16
-    elif np_dtype == np.int32:
-        return tf.int32
-    elif np_dtype == np.int64:
-        return tf.int64
-    elif np_dtype == np.uint8:
-        return tf.uint8
-    elif np_dtype == np.uint16:
-        return tf.uint16
-    elif np_dtype == np.float16:
-        return tf.float16
-    elif np_dtype == np.float32:
-        return tf.float32
-    elif np_dtype == np.float64:
-        return tf.float64
-    elif np_dtype == np_dtype_string:
-        return tf.string
-    return None
 
 
 def create_savedmodel_modelfile(

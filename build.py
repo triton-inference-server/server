@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import importlib.util
 import multiprocessing
 import os
 import os.path
@@ -35,6 +36,8 @@ import stat
 import subprocess
 import sys
 from inspect import getsourcefile
+
+import requests
 
 #
 # Build Triton Inference Server.
@@ -67,14 +70,15 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.37.0dev": (
-        "23.08dev",  # triton container
-        "23.06",  # upstream container
-        "1.15.0",  # ORT
+    "2.43.0dev": (
+        "24.02dev",  # triton container
+        "24.01",  # upstream container
+        "1.16.3",  # ORT
         "2023.0.0",  # ORT OpenVINO
         "2023.0.0",  # Standalone OpenVINO
-        "2.4.7",  # DCGM version
+        "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
+        "0.3.0",  # vLLM version
     )
 }
 
@@ -286,15 +290,10 @@ class BuildScript:
         self.cmd(f'cmake {" ".join(env_args)} {" ".join(args)}', check_exitcode=True)
 
     def makeinstall(self, target="install"):
-        if target_platform() == "windows":
-            verbose_flag = "" if self._verbose else "-clp:ErrorsOnly"
-            self.cmd(
-                f"msbuild.exe -m:{FLAGS.build_parallel} {verbose_flag} -p:Configuration={FLAGS.build_type} {target}.vcxproj",
-                check_exitcode=True,
-            )
-        else:
-            verbose_flag = "VERBOSE=1" if self._verbose else "VERBOSE=0"
-            self.cmd(f"make -j{FLAGS.build_parallel} {verbose_flag} {target}")
+        verbose_flag = "-v" if self._verbose else ""
+        self.cmd(
+            f"cmake --build . --config {FLAGS.build_type} -j{FLAGS.build_parallel} {verbose_flag} -t {target}"
+        )
 
     def gitclone(self, repo, tag, subdir, org):
         clone_dir = subdir
@@ -564,6 +563,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = fastertransformer_cmake_args()
     elif be == "tensorrt":
         args = tensorrt_cmake_args()
+    elif be == "tensorrtllm":
+        args = tensorrtllm_cmake_args(images)
     else:
         args = []
 
@@ -593,58 +594,39 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
             "Warning: Detected docker build is used for Windows, backend utility 'device memory tracker' will be disabled due to missing library in CUDA Windows docker image."
         )
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", False))
-    elif target_platform() == "jetpack":
+    elif target_platform() == "igpu":
         print(
-            "Warning: Detected Jetpack build, backend utility 'device memory tracker' will be disabled as Jetpack doesn't contain required version of the library."
+            "Warning: Detected iGPU build, backend utility 'device memory tracker' will be disabled as iGPU doesn't contain required version of the library."
         )
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", False))
     elif FLAGS.enable_gpu:
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", True))
 
     cargs += cmake_backend_extra_args(be)
-    cargs.append("..")
+    if be == "tensorrtllm":
+        cargs.append("-S ../inflight_batcher_llm -B .")
+
+    else:
+        cargs.append("..")
     return cargs
 
 
 def pytorch_cmake_args(images):
-    # If platform is jetpack do not use docker based build
-    if target_platform() == "jetpack":
-        if "pytorch" not in library_paths:
-            raise Exception(
-                "Must specify library path for pytorch using --library-paths=pytorch:<path_to_pytorch>"
-            )
-        pt_lib_path = library_paths["pytorch"] + "/lib"
-        pt_include_paths = ""
-        for suffix in [
-            "include/torch",
-            "include/torch/torch/csrc/api/include",
-            "include/torchvision",
-        ]:
-            pt_include_paths += library_paths["pytorch"] + "/" + suffix + ";"
-        cargs = [
-            cmake_backend_arg(
-                "pytorch", "TRITON_PYTORCH_INCLUDE_PATHS", None, pt_include_paths
-            ),
-            cmake_backend_arg("pytorch", "TRITON_PYTORCH_LIB_PATHS", None, pt_lib_path),
-        ]
+    if "pytorch" in images:
+        image = images["pytorch"]
     else:
-        if "pytorch" in images:
-            image = images["pytorch"]
-        else:
-            image = "nvcr.io/nvidia/pytorch:{}-py3".format(
-                FLAGS.upstream_container_version
-            )
-        cargs = [
-            cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
-        ]
+        image = "nvcr.io/nvidia/pytorch:{}-py3".format(FLAGS.upstream_container_version)
+    cargs = [
+        cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
+    ]
 
-        if FLAGS.enable_gpu:
-            cargs.append(
-                cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
-            )
+    if FLAGS.enable_gpu:
         cargs.append(
-            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
+            cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
         )
+    cargs.append(
+        cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
+    )
     return cargs
 
 
@@ -666,69 +648,56 @@ def onnxruntime_cmake_args(images, library_paths):
             )
         )
 
-    # If platform is jetpack do not use docker based build
-    if target_platform() == "jetpack":
-        if "onnxruntime" not in library_paths:
-            raise Exception(
-                "Must specify library path for onnxruntime using --library-paths=onnxruntime:<path_to_onnxruntime>"
+    if target_platform() == "windows":
+        if "base" in images:
+            cargs.append(
+                cmake_backend_arg(
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                )
             )
-        ort_lib_path = library_paths["onnxruntime"] + "/lib"
-        ort_include_path = library_paths["onnxruntime"] + "/include"
-        cargs += [
-            cmake_backend_arg(
-                "onnxruntime",
-                "TRITON_ONNXRUNTIME_INCLUDE_PATHS",
-                None,
-                ort_include_path,
-            ),
-            cmake_backend_arg(
-                "onnxruntime", "TRITON_ONNXRUNTIME_LIB_PATHS", None, ort_lib_path
-            ),
-            cmake_backend_enable(
-                "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", False
-            ),
-        ]
     else:
-        if target_platform() == "windows":
-            if "base" in images:
-                cargs.append(
-                    cmake_backend_arg(
-                        "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-                    )
+        if "base" in images:
+            cargs.append(
+                cmake_backend_arg(
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
                 )
+            )
         else:
-            if "base" in images:
-                cargs.append(
-                    cmake_backend_arg(
-                        "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-                    )
+            cargs.append(
+                cmake_backend_arg(
+                    "onnxruntime",
+                    "TRITON_BUILD_CONTAINER_VERSION",
+                    None,
+                    TRITON_VERSION_MAP[FLAGS.version][1],
                 )
-            else:
-                cargs.append(
-                    cmake_backend_arg(
-                        "onnxruntime",
-                        "TRITON_BUILD_CONTAINER_VERSION",
-                        None,
-                        TRITON_VERSION_MAP[FLAGS.version][1],
-                    )
-                )
+            )
 
-            if (target_machine() != "aarch64") and (
-                TRITON_VERSION_MAP[FLAGS.version][3] is not None
-            ):
-                cargs.append(
-                    cmake_backend_enable(
-                        "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", True
-                    )
+        if (target_machine() != "aarch64") and (
+            TRITON_VERSION_MAP[FLAGS.version][3] is not None
+        ):
+            cargs.append(
+                cmake_backend_enable(
+                    "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", True
                 )
-                cargs.append(
-                    cmake_backend_arg(
-                        "onnxruntime",
-                        "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
-                        None,
-                        TRITON_VERSION_MAP[FLAGS.version][3],
-                    )
+            )
+            cargs.append(
+                cmake_backend_arg(
+                    "onnxruntime",
+                    "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
+                    None,
+                    TRITON_VERSION_MAP[FLAGS.version][3],
                 )
+            )
+
+        if target_platform() == "igpu":
+            cargs.append(
+                cmake_backend_arg(
+                    "onnxruntime",
+                    "TRITON_BUILD_TARGET_PLATFORM",
+                    None,
+                    target_platform(),
+                )
+            )
 
     return cargs
 
@@ -784,36 +753,18 @@ def tensorrt_cmake_args():
 
 def tensorflow_cmake_args(images, library_paths):
     backend_name = "tensorflow"
-
-    # If platform is jetpack do not use docker images
     extra_args = []
-    if target_platform() == "jetpack":
-        if backend_name in library_paths:
-            extra_args = [
-                cmake_backend_arg(
-                    backend_name,
-                    "TRITON_TENSORFLOW_LIB_PATHS",
-                    None,
-                    library_paths[backend_name],
-                )
-            ]
-        else:
-            raise Exception(
-                f"Must specify library path for {backend_name} using --library-paths={backend_name}:<path_to_{backend_name}>"
-            )
+
+    # If a specific TF image is specified use it, otherwise pull from NGC.
+    if backend_name in images:
+        image = images[backend_name]
     else:
-        # If a specific TF image is specified use it, otherwise pull from NGC.
-        if backend_name in images:
-            image = images[backend_name]
-        else:
-            image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
-                FLAGS.upstream_container_version
-            )
-        extra_args = [
-            cmake_backend_arg(
-                backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image
-            )
-        ]
+        image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
+            FLAGS.upstream_container_version
+        )
+    extra_args = [
+        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
+    ]
     return extra_args
 
 
@@ -856,6 +807,22 @@ def fastertransformer_cmake_args():
         ),
         cmake_backend_arg("fastertransformer", "ENABLE_FP8", None, "OFF"),
     ]
+    return cargs
+
+
+def tensorrtllm_cmake_args(images):
+    cargs = [
+        cmake_backend_arg(
+            "tensorrtllm",
+            "TRT_LIB_DIR",
+            None,
+            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
+        ),
+        cmake_backend_arg(
+            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
+        ),
+    ]
+    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     return cargs
 
 
@@ -919,7 +886,7 @@ RUN wget "{miniconda_url}" -O miniconda.sh -q && \
     find /opt/conda/ -follow -type f -name '*.a' -delete && \
     find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
     /opt/conda/bin/conda clean -afy
-ENV PATH /opt/conda/bin:${{PATH}}
+ENV PATH ${{PATH}}:/opt/conda/bin
 """
 
 
@@ -950,18 +917,30 @@ SHELL ["cmd", "/S", "/C"]
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Install docker docker buildx
+RUN apt-get update \
+        && apt-get install -y ca-certificates curl gnupg \
+        && install -m 0755 -d /etc/apt/keyrings \
+        && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+        && chmod a+r /etc/apt/keyrings/docker.gpg \
+        && echo \
+            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null \
+        && apt-get update \
+        && apt-get install -y docker.io docker-buildx-plugin
+
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
             ca-certificates \
             autoconf \
             automake \
             build-essential \
-            docker.io \
             git \
             gperf \
             libre2-dev \
@@ -983,8 +962,9 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             libxml2-dev \
-            libnuma-dev && \
-    rm -rf /var/lib/apt/lists/*
+            libnuma-dev \
+            wget \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
@@ -992,20 +972,18 @@ RUN pip3 install --upgrade pip && \
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
 RUN wget -O /tmp/boost.tar.gz \
-        https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz && \
+        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \
     (cd /tmp && tar xzf boost.tar.gz) && \
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
-RUN apt update && apt install -y gpg wget && \
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-        gpg --dearmor - |  \
-        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    . /etc/os-release && \
-    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
-    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends cmake cmake-data
+RUN apt update -q=2 \\
+    && apt install -y gpg wget \\
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
+    && . /etc/os-release \\
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
+    && apt-get update -q=2 \\
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
 
         if FLAGS.enable_gpu:
@@ -1131,7 +1109,31 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
         df += """
 RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
 """
+    if "tensorrtllm" in backends:
+        df += """
+# Remove TRT contents that are not needed in runtime
+RUN ARCH="$(uname -i)" \\
+    && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
+    && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
+    && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
 
+# Install required packages for TRT-LLM models
+RUN python3 -m pip install --upgrade pip \\
+    && pip3 install transformers
+
+# Uninstall unused nvidia packages
+RUN if pip freeze | grep -q "nvidia.*"; then \\
+        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
+    fi
+RUN pip cache purge
+
+# Drop the static libs
+RUN ARCH="$(uname -i)" \\
+    && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
+          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
+
+ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+"""
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1149,6 +1151,9 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
+# Remove once https://github.com/openucx/ucx/pull/9148 is available
+# in the min container.
+ENV UCX_MEM_EVENTS no
 """
 
     # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
@@ -1198,21 +1203,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            software-properties-common \
-            libb64-0d \
-            libcurl4-openssl-dev \
-            libre2-9 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+            clang \
+            curl \
+            dirmngr \
             git \
             gperf \
-            dirmngr \
+            libb64-0d \
+            libcurl4-openssl-dev \
             libgoogle-perftools-dev \
-            libnuma-dev \
-            curl \
             libjemalloc-dev \
-            {backend_dependencies} && \
-    rm -rf /var/lib/apt/lists/*
+            libnuma-dev \
+            libre2-9 \
+            software-properties-common \
+            wget \
+            {backend_dependencies} \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
@@ -1222,10 +1229,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if "fastertransformer" in backends:
         be = "fastertransformer"
-        import importlib.util
-
-        import requests
-
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
             backends[be]
         )
@@ -1263,6 +1266,16 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 """
+
+    if "vllm" in backends:
+        # [DLIS-5606] Build Conda environment for vLLM backend
+        # Remove Pip install once vLLM backend moves to Conda environment.
+        df += """
+# vLLM needed for vLLM backend
+RUN pip3 install vllm=={}
+""".format(
+            TRITON_VERSION_MAP[FLAGS.version][7]
+        )
 
     df += """
 WORKDIR /opt/tritonserver
@@ -1312,10 +1325,10 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -1564,7 +1577,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             docker_script.cmd(["docker", "rm", "tritonserver_builder"])
         else:
             docker_script._file.write(
-                'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm tritonserver_builder; fi\n'
+                'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm -f tritonserver_builder; fi\n'
             )
 
         docker_script.cmd(runargs, check_exitcode=True)
@@ -1668,6 +1681,13 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
+    # [FIXME] Placing the Triton server wheel file in 'python' for now, should
+    # have been upload to pip registry and be able to install directly
+    cmake_script.mkdir(os.path.join(install_dir, "python"))
+    cmake_script.cp(
+        os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+        os.path.join(install_dir, "python"),
+    )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
@@ -1704,6 +1724,12 @@ def core_build(
     cmake_script.blankln()
 
 
+def tensorrtllm_prebuild(cmake_script):
+    # Export the TRT_ROOT environment variable
+    cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
+    cmake_script.cmd("export ARCH=$(uname -m)")
+
+
 def backend_build(
     be,
     cmake_script,
@@ -1726,6 +1752,9 @@ def backend_build(
     cmake_script.cwd(build_dir)
     cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
+    if be == "tensorrtllm":
+        tensorrtllm_prebuild(cmake_script)
+
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
     cmake_script.cmake(
@@ -1735,6 +1764,7 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
+
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
         os.path.join(install_dir, "backends"),
@@ -1744,6 +1774,39 @@ def backend_build(
     cmake_script.comment(f"end '{be}' backend")
     cmake_script.commentln(8)
     cmake_script.blankln()
+
+
+def backend_clone(
+    be,
+    clone_script,
+    tag,
+    build_dir,
+    install_dir,
+    github_organization,
+):
+    clone_script.commentln(8)
+    clone_script.comment(f"'{be}' backend")
+    clone_script.comment("Delete this section to remove backend from build")
+    clone_script.comment()
+    clone_script.mkdir(build_dir)
+    clone_script.cwd(build_dir)
+    clone_script.gitclone(backend_repo(be), tag, be, github_organization)
+
+    repo_target_dir = os.path.join(install_dir, "backends")
+    clone_script.mkdir(repo_target_dir)
+    backend_dir = os.path.join(repo_target_dir, be)
+    clone_script.rmdir(backend_dir)
+    clone_script.mkdir(backend_dir)
+
+    clone_script.cp(
+        os.path.join(build_dir, be, "src", "model.py"),
+        backend_dir,
+    )
+
+    clone_script.comment()
+    clone_script.comment(f"end '{be}' backend")
+    clone_script.commentln(8)
+    clone_script.blankln()
 
 
 def repo_agent_build(
@@ -1839,7 +1902,7 @@ def cibase_build(
         os.path.join(repo_dir, "src", "test", "models"),
         os.path.join(ci_dir, "src", "test"),
     )
-    # Skip copying the artifacts in the bin and lib as those directories will
+    # Skip copying the artifacts in the bin, lib, and python as those directories will
     # be missing when the core build is not enabled.
     if not FLAGS.no_core_build:
         cmake_script.cpdir(os.path.join(repo_install_dir, "bin"), ci_dir)
@@ -1848,6 +1911,7 @@ def cibase_build(
             os.path.join(repo_install_dir, "lib", "libtritonrepoagent_relocation.so"),
             os.path.join(ci_dir, "lib"),
         )
+        cmake_script.cpdir(os.path.join(repo_install_dir, "python"), ci_dir)
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, "backends"))
@@ -1868,6 +1932,7 @@ def cibase_build(
         "sequence",
         "dyna_sequence",
         "distributed_addsub",
+        "iterative_sequence",
     ):
         be_install_dir = os.path.join(repo_install_dir, "backends", be)
         if target_platform() == "windows":
@@ -1885,14 +1950,15 @@ def cibase_build(
     if "onnxruntime" in backends:
         ort_install_dir = os.path.join(build_dir, "onnxruntime", "install")
         cmake_script.mkdir(os.path.join(ci_dir, "qa", "L0_custom_ops"))
-        cmake_script.cp(
-            os.path.join(ort_install_dir, "test", "libcustom_op_library.so"),
-            os.path.join(ci_dir, "qa", "L0_custom_ops"),
-        )
-        cmake_script.cp(
-            os.path.join(ort_install_dir, "test", "custom_op_test.onnx"),
-            os.path.join(ci_dir, "qa", "L0_custom_ops"),
-        )
+        if target_platform() != "igpu":
+            cmake_script.cp(
+                os.path.join(ort_install_dir, "test", "libcustom_op_library.so"),
+                os.path.join(ci_dir, "qa", "L0_custom_ops"),
+            )
+            cmake_script.cp(
+                os.path.join(ort_install_dir, "test", "custom_op_test.onnx"),
+                os.path.join(ci_dir, "qa", "L0_custom_ops"),
+            )
         # [WIP] other way than wildcard?
         backend_tests = os.path.join(build_dir, "onnxruntime", "test", "*")
         cmake_script.cpdir(backend_tests, os.path.join(ci_dir, "qa"))
@@ -2054,7 +2120,7 @@ if __name__ == "__main__":
         "--target-platform",
         required=False,
         default=None,
-        help='Target platform for build, can be "linux", "windows" or "jetpack". If not specified, build targets the current platform.',
+        help='Target platform for build, can be "linux", "windows" or "igpu". If not specified, build targets the current platform.',
     )
     parser.add_argument(
         "--target-machine",
@@ -2410,6 +2476,15 @@ if __name__ == "__main__":
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
+    if "vllm" in backends:
+        if "python" not in backends:
+            log(
+                "vLLM backend requires Python backend, adding Python backend with tag {}".format(
+                    backends["vllm"]
+                )
+            )
+            backends["python"] = backends["vllm"]
+
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
     for be in FLAGS.repoagent:
@@ -2597,17 +2672,27 @@ if __name__ == "__main__":
             else:
                 github_organization = FLAGS.github_organization
 
-            backend_build(
-                be,
-                cmake_script,
-                backends[be],
-                script_build_dir,
-                script_install_dir,
-                github_organization,
-                images,
-                components,
-                library_paths,
-            )
+            if be == "vllm":
+                backend_clone(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                )
+            else:
+                backend_build(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                    images,
+                    components,
+                    library_paths,
+                )
 
         # Commands to build each repo agent...
         for ra in repoagents:

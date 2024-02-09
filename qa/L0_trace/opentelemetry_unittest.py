@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,42 +28,122 @@ import sys
 
 sys.path.append("../common")
 import json
+import queue
+import shutil
+import subprocess
 import time
 import unittest
+from functools import partial
 
 import numpy as np
+import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
-EXPECTED_NUM_SPANS = 10
+NO_PARENT_SPAN_ID = ""
+COLLECTOR_TIMEOUT = 10
+
+
+def callback(user_data, result, error):
+    if error:
+        user_data.put(error)
+    else:
+        user_data.put(result)
+
+
+def prepare_data(client, is_binary=True):
+    inputs = []
+    dim = 16
+    input_data = np.arange(dim, dtype=np.int32)
+    inputs.append(client.InferInput("INPUT0", [1, dim], "INT32"))
+    inputs.append(client.InferInput("INPUT1", [1, dim], "INT32"))
+
+    # Initialize the data
+    input_data = np.expand_dims(input_data, axis=0)
+
+    if is_binary:
+        inputs[0].set_data_from_numpy(input_data)
+        inputs[1].set_data_from_numpy(input_data)
+    else:
+        inputs[0].set_data_from_numpy(input_data, binary_data=is_binary)
+        inputs[1].set_data_from_numpy(input_data, binary_data=is_binary)
+
+    return inputs
+
+
+def send_bls_request(model_name="simple", headers=None):
+    with httpclient.InferenceServerClient("localhost:8000") as client:
+        inputs = prepare_data(httpclient)
+        inputs.append(httpclient.InferInput("MODEL_NAME", [1], "BYTES"))
+        inputs[-1].set_data_from_numpy(np.array([model_name], dtype=np.object_))
+        client.infer("bls_simple", inputs, headers=headers)
 
 
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
-        while True:
-            with open("trace_collector.log", "rt") as f:
-                data = f.read()
-                if data.count("resource_spans") != EXPECTED_NUM_SPANS:
-                    time.sleep(5)
-                    continue
-                else:
-                    break
-
-        data = data.split("\n")
-        full_spans = [
-            entry.split("POST")[0] for entry in data if "resource_spans" in entry
-        ]
-        self.spans = []
-        for span in full_spans:
-            span = json.loads(span)
-            self.spans.append(span["resource_spans"][0]["scope_spans"][0]["spans"][0])
-
+        self.collector_subprocess = subprocess.Popen(
+            ["./otelcol", "--config", "./trace-config.yaml"]
+        )
+        time.sleep(5)
+        self.filename = "collected_traces.json"
+        # This simulates OTel context being injected on client side.
+        # Format explained here: https://www.w3.org/TR/trace-context/#design-overview
+        # OTel code reference for extraction:
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/c4f39f2be8109fd1a3e047677c09cf47954b92db/api/include/opentelemetry/trace/propagation/http_trace_context.h#L165
+        # Essentially, this is what will be injected to headers/metadata
+        # on the client side. Code reference:
+        # https://github.com/open-telemetry/opentelemetry-cpp/blob/c4f39f2be8109fd1a3e047677c09cf47954b92db/api/include/opentelemetry/trace/propagation/http_trace_context.h#L91
+        # Format is: 00-traceId-spanId-traceFlags
+        # By simply adding this header during tests, we imitate
+        # that on client side OTel Propagator injected it to request.
+        self.client_headers = dict(
+            {"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"}
+        )
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
+        self.bls_model_name = "bls_simple"
+        self.test_models = [
+            self.simple_model_name,
+            self.ensemble_model_name,
+            self.bls_model_name,
+        ]
         self.root_span = "InferRequest"
 
+    def tearDown(self):
+        self.collector_subprocess.kill()
+        self.collector_subprocess.wait()
+        time.sleep(5)
+        test_name = unittest.TestCase.id(self).split(".")[-1]
+        shutil.copyfile(self.filename, self.filename + "_" + test_name + ".log")
+
+    def _parse_trace_log(self, trace_log):
+        """
+        Helper function that parses file, containing collected traces.
+
+        Args:
+            trace_log (str): Name of a file, containing all traces.
+
+        Returns:
+            traces (List[dict]): List of json objects, representing each span.
+        """
+        traces = []
+        with open(trace_log) as f:
+            for json_obj in f:
+                entry = json.loads(json_obj)
+                traces.append(entry)
+
+        return traces
+
     def _check_events(self, span_name, events):
+        """
+        Helper function that verifies passed events contain expected entries.
+
+        Args:
+            span_name (str): name of a span.
+            events (List[str]): list of event names, collected for the span with the name `span_name`.
+        """
         root_events_http = [
             "HTTP_RECV_START",
             "HTTP_RECV_END",
@@ -108,7 +188,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertFalse(all(entry in events for entry in request_events))
             self.assertFalse(all(entry in events for entry in compute_events))
 
-        elif span_name == self.simple_model_name:
+        elif span_name in self.test_models:
             # Check that all request related events (and only them)
             # are recorded in request span
             self.assertTrue(all(entry in events for entry in request_events))
@@ -117,102 +197,564 @@ class OpenTelemetryTest(tu.TestResultCollector):
             )
             self.assertFalse(all(entry in events for entry in compute_events))
 
-    def _check_parent(self, child_span, parent_span):
-        # Check that child and parent span have the same trace_id
-        # and child's `parent_span_id` is the same as parent's `span_id`
-        self.assertEqual(child_span["trace_id"], parent_span["trace_id"])
+    def _test_resource_attributes(self, attributes):
+        """
+        Helper function that verifies passed span attributes.
+        Currently only test 2 attributes, specified upon tritonserver start:
+
+        --trace-config=opentelemetry,resource=test.key=test.value
+        and
+        --trace-config=opentelemetry,resource=service.name=test_triton
+
+        Args:
+            attributes (List[dict]): list of attributes, collected for a span.
+        """
+        expected_service_name = dict(
+            {"key": "service.name", "value": {"stringValue": "test_triton"}}
+        )
+        expected_test_key_value = dict(
+            {"key": "test.key", "value": {"stringValue": "test.value"}}
+        )
         self.assertIn(
-            "parent_span_id",
-            child_span,
-            "child span does not have parent span id specified",
+            expected_service_name,
+            attributes,
+            "Expected entry: {}, was not found in the set of collected attributes: {}".format(
+                expected_service_name, attributes
+            ),
         )
-        self.assertEqual(child_span["parent_span_id"], parent_span["span_id"])
+        self.assertIn(
+            expected_test_key_value,
+            attributes,
+            "Expected entry: {}, was not found in the set of collected attributes: {}".format(
+                expected_test_key_value, attributes
+            ),
+        )
 
-    def test_spans(self):
-        parsed_spans = []
+    def _verify_contents(self, spans, expected_counts):
+        """
+        Helper function that:
+         * iterates over `spans` and for every span it verifies that proper events are collected
+         * verifies that `spans` has expected number of total spans collected
+         * verifies that `spans` contains expected number different spans,
+           specified in `expected_counts` in the form:
+                    span_name : #expected_number_of_entries
 
-        # Check that collected spans have proper events recorded
-        for span in self.spans:
+        Args:
+            spans (List[dict]): list of json objects, extracted from the trace and
+                   containing span info. For this test `name`
+                   and `events` are required.
+            expected_counts (dict): dictionary, containing expected spans in the form:
+                    span_name : #expected_number_of_entries
+        """
+
+        span_names = []
+        for span in spans:
+            # Check that collected spans have proper events recorded
             span_name = span["name"]
-            self._check_events(span_name, json.dumps(span["events"]))
-            parsed_spans.append(span_name)
+            span_names.append(span_name)
+            span_events = span["events"]
+            event_names_only = [event["name"] for event in span_events]
+            self._check_events(span_name, event_names_only)
 
-        # There should be 6 spans in total:
-        # 3 for http request, 3 for grpc request, 4 for ensemble
-        self.assertEqual(len(self.spans), 10)
-        # We should have 3 compute spans
-        self.assertEqual(parsed_spans.count("compute"), 3)
-        # 4 request spans (3 named simple - same as our model name, 1 ensemble)
-        self.assertEqual(parsed_spans.count(self.simple_model_name), 3)
-        self.assertEqual(parsed_spans.count(self.ensemble_model_name), 1)
-        # 3 root spans
-        self.assertEqual(parsed_spans.count(self.root_span), 3)
+        self.assertEqual(
+            len(span_names),
+            sum(expected_counts.values()),
+            "Unexpeced number of span names collected",
+        )
+        for name, count in expected_counts.items():
+            self.assertEqual(
+                span_names.count(name),
+                count,
+                "Unexpeced number of " + name + " spans collected",
+            )
 
-    def test_nested_spans(self):
-        # First 3 spans in `self.spans` belong to HTTP request
-        # They are recorded in the following order:
-        # compute_span [idx 0] , request_span [idx 1], root_span [idx 2].
-        # compute_span should be a child of request_span
-        # request_span should be a child of root_span
-        for child, parent in zip(self.spans[:3], self.spans[1:3]):
-            self._check_parent(child, parent)
+    def _verify_nesting(self, spans, expected_parent_span_dict):
+        """
+        Helper function that checks parent-child relationships between
+        collected spans are the same as in `expected_parent_span_dict`.
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[2], "root span has a parent_span_id specified"
+        Args:
+            spans (List[dict]): list of json objects, extracted from the trace and
+                   containing span info. For this test `name`
+                   and `events` are required.
+            expected_parent_span_dict (dict): dictionary, containing expected
+                   parents and children in the dictionary form:
+                        <parent_span_name> (str) : <children_names> (List[str])
+        """
+        seen_spans = {}
+        for span in spans:
+            cur_span = span["spanId"]
+            seen_spans[cur_span] = span["name"]
+
+        parent_child_dict = {}
+        for span in spans:
+            cur_parent = span["parentSpanId"]
+            cur_span = span["name"]
+            if cur_parent in seen_spans.keys():
+                parent_name = seen_spans[cur_parent]
+                if parent_name not in parent_child_dict:
+                    parent_child_dict[parent_name] = []
+                parent_child_dict[parent_name].append(cur_span)
+
+        for key in parent_child_dict.keys():
+            parent_child_dict[key].sort()
+
+        self.assertDictEqual(parent_child_dict, expected_parent_span_dict)
+
+    def _verify_headers_propagated_from_client_if_any(self, root_span, headers):
+        """
+        Helper function that checks traceparent's ids, passed in clients
+        headers/metadata was picked up on the server side.
+        If `headers` are None, checks that `root_span` does not have
+        `parentSpanId` specified.
+
+        Args:
+            root_span (List[dict]): a json objects, extracted from the trace and
+                   containing root span info. For this test `traceID`
+                   and `parentSpanId` are required.
+            expected_parent_span_dict (dict): dictionary, containing expected
+                   parents and children in the dictionary form:
+                        <parent_span_name> (str) : <children_names> (List[str])
+        """
+        parent_span_id = NO_PARENT_SPAN_ID
+
+        if headers != None:
+            parent_span_id = headers["traceparent"].split("-")[2]
+            parent_trace_id = headers["traceparent"].split("-")[1]
+            self.assertEqual(
+                root_span["traceId"],
+                parent_trace_id,
+                "Child and parent trace ids do not match! child's trace id = {} , expected trace id = {}".format(
+                    root_span["traceId"], parent_trace_id
+                ),
+            )
+
+        self.assertEqual(
+            root_span["parentSpanId"],
+            parent_span_id,
+            "Child and parent span ids do not match! child's parentSpanId = {} , expected parentSpanId {}".format(
+                root_span["parentSpanId"], parent_span_id
+            ),
         )
 
-        # Next 3 spans in `self.spans` belong to GRPC request
-        # Order of spans and their relationship described earlier
-        for child, parent in zip(self.spans[3:6], self.spans[4:6]):
-            self._check_parent(child, parent)
+    def _test_trace(
+        self,
+        headers,
+        expected_number_of_spans,
+        expected_counts,
+        expected_parent_span_dict,
+    ):
+        """
+        Helper method that defines the general test scenario for a trace,
+        described as follows.
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[5], "root span has a parent_span_id specified"
+        1. Parse trace log, exported by OTel collector in self.filename.
+        2. For each test we re-start OTel collector, so trace log should
+           have only 1 trace.
+        3. Test that reported resource attributes contain manually specified
+           at `tritonserver` start time. Currently only test 2 attributes,
+           specified upon tritonserver start:
+
+            --trace-config=opentelemetry,resource=test.key=test.value
+            and
+            --trace-config=opentelemetry,resource=service.name=test_triton
+        4. Verifies that every collected span, has expected contents
+        5. Verifies parent - child span relationships
+        6. Verifies that OTel context was propagated from client side
+           to server side through headers. For cases, when headers for
+           context propagation were not specified, checks that root_span has
+           no `parentSpanId` specified.
+
+        Args:
+            headers (dict | None): dictionary, containing OTel headers,
+                specifying OTel context.
+            expected_number_of_spans (int): expected number of collected spans.
+            expected_counts(dict): dictionary, containing expected spans in the form:
+                    span_name : #expected_number_of_entries
+            expected_parent_span_dict (dict): dictionary, containing expected
+                   parents and children in the dictionary form:
+                        <parent_span_name> (str) : <children_names> (List[str])
+        """
+        time.sleep(COLLECTOR_TIMEOUT)
+        traces = self._parse_trace_log(self.filename)
+        expected_traces_number = 1
+        self.assertEqual(
+            len(traces),
+            expected_traces_number,
+            "Unexpected number of traces collected. Expected {}, but got {}".format(
+                expected_traces_number, len(traces)
+            ),
+        )
+        self._test_resource_attributes(
+            traces[0]["resourceSpans"][0]["resource"]["attributes"]
         )
 
-        # Final 4 spans in `self.spans` belong to ensemble request
-        # Order of spans: compute span - request span - request span - root span
-        for child, parent in zip(self.spans[6:10], self.spans[7:10]):
-            self._check_parent(child, parent)
+        parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        root_span = [
+            entry for entry in parsed_spans if entry["name"] == "InferRequest"
+        ][0]
+        self.assertEqual(len(parsed_spans), expected_number_of_spans)
 
-        # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[9], "root span has a parent_span_id specified"
+        self._verify_contents(parsed_spans, expected_counts)
+        self._verify_nesting(parsed_spans, expected_parent_span_dict)
+        self._verify_headers_propagated_from_client_if_any(root_span, headers)
+
+    def _test_simple_trace(self, headers=None):
+        """
+        Helper function, that specifies expected parameters to evaluate trace,
+        collected from running 1 inference request for `simple` model.
+        """
+        expected_number_of_spans = 3
+        expected_counts = dict(
+            {"compute": 1, self.simple_model_name: 1, self.root_span: 1}
+        )
+        expected_parent_span_dict = dict(
+            {"InferRequest": ["simple"], "simple": ["compute"]}
+        )
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
         )
 
+    def _test_bls_trace(self, headers=None):
+        """
+        Helper function, that specifies expected parameters to evaluate trace,
+        collected from running 1 inference request for `bls_simple` model.
+        """
+        expected_number_of_spans = 6
+        expected_counts = dict(
+            {
+                "compute": 2,
+                self.simple_model_name: 1,
+                self.ensemble_model_name: 1,
+                self.bls_model_name: 1,
+                self.root_span: 1,
+            }
+        )
+        expected_parent_span_dict = dict(
+            {
+                "InferRequest": ["bls_simple"],
+                "bls_simple": ["compute", "ensemble_add_sub_int32_int32_int32"],
+                "ensemble_add_sub_int32_int32_int32": ["simple"],
+                "simple": ["compute"],
+            }
+        )
+        for key in expected_parent_span_dict.keys():
+            expected_parent_span_dict[key].sort()
 
-def prepare_data(client):
-    inputs = []
-    input0_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
-    input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
 
-    inputs.append(client.InferInput("INPUT0", [1, 16], "INT32"))
-    inputs.append(client.InferInput("INPUT1", [1, 16], "INT32"))
+    def _test_ensemble_trace(self, headers=None):
+        """
+        Helper function, that specifies expected parameters to evaluate trace,
+        collected from running 1 inference request for an
+        `ensemble_add_sub_int32_int32_int32` model.
+        """
+        expected_number_of_spans = 4
+        expected_counts = dict(
+            {
+                "compute": 1,
+                self.simple_model_name: 1,
+                self.ensemble_model_name: 1,
+                self.root_span: 1,
+            }
+        )
+        expected_parent_span_dict = dict(
+            {
+                "InferRequest": ["ensemble_add_sub_int32_int32_int32"],
+                "ensemble_add_sub_int32_int32_int32": ["simple"],
+                "simple": ["compute"],
+            }
+        )
+        for key in expected_parent_span_dict.keys():
+            expected_parent_span_dict[key].sort()
 
-    # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data)
-    inputs[1].set_data_from_numpy(input1_data)
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
 
-    return inputs
+    def test_http_trace_simple_model(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model and HTTP client.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        inputs = prepare_data(httpclient)
+        triton_client_http.infer(self.simple_model_name, inputs)
 
+        self._test_simple_trace()
 
-def prepare_traces():
-    triton_client_http = httpclient.InferenceServerClient(
-        "localhost:8000", verbose=True
-    )
-    triton_client_grpc = grpcclient.InferenceServerClient(
-        "localhost:8001", verbose=True
-    )
-    inputs = prepare_data(httpclient)
-    triton_client_http.infer("simple", inputs)
+    def test_http_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, HTTP client and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        inputs = prepare_data(httpclient)
+        triton_client_http.infer(
+            self.simple_model_name, inputs, headers=self.client_headers
+        )
 
-    inputs = prepare_data(grpcclient)
-    triton_client_grpc.infer("simple", inputs)
+        self._test_simple_trace(headers=self.client_headers)
 
-    inputs = prepare_data(httpclient)
-    triton_client_http.infer("ensemble_add_sub_int32_int32_int32", inputs)
+    def test_grpc_trace_simple_model(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model and GRPC client.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        inputs = prepare_data(grpcclient)
+        triton_client_grpc.infer(self.simple_model_name, inputs)
+
+        self._test_simple_trace()
+
+    def test_grpc_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, GRPC client and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        inputs = prepare_data(grpcclient)
+        triton_client_grpc.infer(
+            self.simple_model_name, inputs, headers=self.client_headers
+        )
+
+        self._test_simple_trace(headers=self.client_headers)
+
+    def test_streaming_grpc_trace_simple_model(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model and GRPC streaming client.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        user_data = queue.Queue()
+        triton_client_grpc.start_stream(callback=partial(callback, user_data))
+
+        inputs = prepare_data(grpcclient)
+        triton_client_grpc.async_stream_infer(self.simple_model_name, inputs)
+        result = user_data.get()
+        self.assertIsNot(result, InferenceServerException)
+        triton_client_grpc.stop_stream()
+
+        self._test_simple_trace()
+
+    def test_streaming_grpc_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, GRPC streaming client and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        user_data = queue.Queue()
+        triton_client_grpc.start_stream(
+            callback=partial(callback, user_data),
+            headers=self.client_headers,
+        )
+
+        inputs = prepare_data(grpcclient)
+        triton_client_grpc.async_stream_infer(self.simple_model_name, inputs)
+        result = user_data.get()
+        self.assertIsNot(result, InferenceServerException)
+        triton_client_grpc.stop_stream()
+
+        self._test_simple_trace(headers=self.client_headers)
+
+    def test_http_trace_bls_model(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `bls_simple` model and HTTP client.
+        """
+        send_bls_request(model_name=self.ensemble_model_name)
+
+        self._test_bls_trace()
+
+    def test_http_trace_bls_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `bls_simple` model, HTTP client and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        send_bls_request(
+            model_name=self.ensemble_model_name, headers=self.client_headers
+        )
+
+        self._test_bls_trace(headers=self.client_headers)
+
+    def test_http_trace_ensemble_model(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `ensemble_add_sub_int32_int32_int32` model and HTTP client.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        inputs = prepare_data(httpclient)
+        triton_client_http.infer(self.ensemble_model_name, inputs)
+
+        self._test_ensemble_trace()
+
+    def test_http_trace_ensemble_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `ensemble_add_sub_int32_int32_int32` model, HTTP client
+        and context propagation, i.e. client specifies OTel headers,
+        defined in `self.client_headers`.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        inputs = prepare_data(httpclient)
+        triton_client_http.infer(
+            self.ensemble_model_name, inputs, headers=self.client_headers
+        )
+
+        self._test_ensemble_trace(headers=self.client_headers)
+
+    def test_http_trace_triggered(self):
+        triton_client_http = httpclient.InferenceServerClient("localhost:8000")
+        triton_client_http.update_trace_settings(settings={"trace_rate": "5"})
+
+        expected_trace_rate = "5"
+        simple_model_trace_settings = triton_client_http.get_trace_settings(
+            model_name=self.simple_model_name
+        )
+
+        self.assertEqual(
+            expected_trace_rate,
+            simple_model_trace_settings["trace_rate"],
+            "Unexpected model trace rate settings after its update. Expected {}, but got {}".format(
+                expected_trace_rate, simple_model_trace_settings["trace_rate"]
+            ),
+        )
+
+        inputs = prepare_data(httpclient)
+        for _ in range(5):
+            triton_client_http.infer(self.ensemble_model_name, inputs)
+            time.sleep(COLLECTOR_TIMEOUT)
+
+        expected_accumulated_traces = 1
+        traces = self._parse_trace_log(self.filename)
+        # Should only be 1 trace collected
+        self.assertEqual(
+            len(traces),
+            expected_accumulated_traces,
+            "Unexpected number of traces collected",
+        )
+
+        for _ in range(5):
+            triton_client_http.infer(
+                self.ensemble_model_name, inputs, headers=self.client_headers
+            )
+            expected_accumulated_traces += 1
+            time.sleep(COLLECTOR_TIMEOUT)
+
+        traces = self._parse_trace_log(self.filename)
+        # Should only be 1 trace collected
+        self.assertEqual(
+            len(traces),
+            expected_accumulated_traces,
+            "Unexpected number of traces collected",
+        )
+
+        # Restore trace rate to 1
+        triton_client_http.update_trace_settings(settings={"trace_rate": "1"})
+        expected_trace_rate = "1"
+        simple_model_trace_settings = triton_client_http.get_trace_settings(
+            model_name=self.simple_model_name
+        )
+
+        self.assertEqual(
+            expected_trace_rate,
+            simple_model_trace_settings["trace_rate"],
+            "Unexpected model trace rate settings after its update. Expected {}, but got {}".format(
+                expected_trace_rate, simple_model_trace_settings["trace_rate"]
+            ),
+        )
+
+    def test_sagemaker_invocation_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, SageMaker (invocations) and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        inputs = prepare_data(httpclient, is_binary=False)
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(inputs)
+        self.client_headers["Content-Type"] = "application/json"
+        r = requests.post(
+            "http://localhost:8080/invocations",
+            data=request_body,
+            headers=self.client_headers,
+        )
+        r.raise_for_status()
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+        self._test_simple_trace(headers=self.client_headers)
+
+    def test_sagemaker_invoke_trace_simple_model_context_propagation(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model, SageMaker (invoke) and context propagation,
+        i.e. client specifies OTel headers, defined in `self.client_headers`.
+        """
+        # Loading model for this test
+        model_url = "/opt/ml/models/123456789abcdefghi/model"
+        request_body = {"model_name": self.simple_model_name, "url": model_url}
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(
+            "http://localhost:8080/models",
+            data=json.dumps(request_body),
+            headers=headers,
+        )
+        time.sleep(5)  # wait for model to load
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+
+        inputs = prepare_data(httpclient, is_binary=False)
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(inputs)
+
+        self.client_headers["Content-Type"] = "application/json"
+        invoke_url = "{}/{}/invoke".format(
+            "http://localhost:8080/models", self.simple_model_name
+        )
+        r = requests.post(invoke_url, data=request_body, headers=self.client_headers)
+        r.raise_for_status()
+        self.assertEqual(
+            r.status_code,
+            200,
+            "Expected status code 200, received {}".format(r.status_code),
+        )
+        time.sleep(5)
+        self._test_simple_trace(headers=self.client_headers)
 
 
 if __name__ == "__main__":

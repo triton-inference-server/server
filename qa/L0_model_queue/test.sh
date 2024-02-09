@@ -82,7 +82,7 @@ rm -fr models && mkdir models && \
         echo "    }" >> config.pbtxt && \
         echo "}" >> config.pbtxt && \
         echo "parameters [" >> config.pbtxt && \
-        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
 TEST_CASE=test_max_queue_size

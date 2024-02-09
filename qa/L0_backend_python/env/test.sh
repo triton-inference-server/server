@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +25,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
+CLIENT_LOG="./env_client.log"
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/env/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
-SERVER_LOG="./inference_server.log"
+SERVER_LOG="./env_server.log"
 
 RET=0
 
@@ -108,6 +107,7 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+conda deactivate
 
 # Test conda env without custom Python backend stub This environment should
 # always use the default Python version shipped in the container. For Ubuntu 22.04
@@ -126,6 +126,7 @@ cp python3.10.tar.gz models/python_3_10/python_3_10_environment.tar.gz
           sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
 cp ../../python_models/python_version/model.py ./models/python_3_10/1/
+conda deactivate
 rm -rf ./miniconda
 
 run_server
