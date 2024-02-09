@@ -69,7 +69,7 @@ sudo /usr/libexec/oci-growfs -y
 
 ### Using Cloud Shell from OCI Web Console
 
-It is possible to access your OKE Cluster [directly from the OCI Web Console](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm). 
+It is possible to access your OKE Cluster [directly from the OCI Web Console](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaccessingclusterkubectl.htm).
 Helm v3 is already available from the Cloud Shell.
 
 ### Helm v3
