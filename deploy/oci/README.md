@@ -138,7 +138,7 @@ echo -n 'SECRECT_KEY_ID' | base64
 echo -n 'SECRET_ACCESS_KEY' | base64
 ```
 
-You also need to adapt _modelRepositoryPath_ in values.yaml to your [namespace](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/understandingnamespaces.htm) and [OCI region](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm) 
+You also need to adapt _modelRepositoryPath_ in values.yaml to your [namespace](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/understandingnamespaces.htm) and [OCI region](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm).
 
 ```
 s3://https://<OCI_NAMESPACE>.compat.objectstorage.<OCI_REGION>.oraclecloud.com:443/triton-inference-server-repository
