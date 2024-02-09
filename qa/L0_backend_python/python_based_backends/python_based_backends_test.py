@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 import unittest
 from random import randint
@@ -34,10 +35,16 @@ from tritonclient.utils import *
 
 sys.path.append("../../common")
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class PythonBasedBackendsTest(unittest.TestCase):
     def setUp(self):
-        self.triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
+        self.triton_client = grpcclient.InferenceServerClient(
+            url=f"{_tritonserver_ipaddr}:8001"
+        )
         self.add_sub_model_1 = "add"
         self.add_sub_model_2 = "sub"
         self.python_model = "add_sub"

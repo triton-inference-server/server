@@ -3317,6 +3317,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Touch the local config.pbtxt and reload the file to ensure the local config
         # is preferred because it has a more recent mtime.
+        time.sleep(0.1)  # make sure timestamps are different
         Path(os.path.join("models", model_name, "config.pbtxt")).touch()
 
         # Reload the model
@@ -3344,6 +3345,18 @@ class LifeCycleTest(tu.TestResultCollector):
         triton_client.load_model(model_name, config=override_config)
         identity_model_config = triton_client.get_model_config(model_name)
         self.assertEqual(identity_model_config["backend"], "identity")
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
+    def test_shutdown_while_loading(self):
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Load the model which will load for at least 10 seconds.
+        model_name = "identity_fp32"
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(triton_client.load_model, model_name)
+        self.assertFalse(triton_client.is_model_ready(model_name))
         # The server will shutdown after this sub-test exits. The server must shutdown
         # without any hang or runtime error.
 

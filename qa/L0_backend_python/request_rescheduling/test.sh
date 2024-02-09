@@ -30,10 +30,6 @@ CLIENT_LOG="./request_rescheduling_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-
 RET=0
 
 rm -fr *.log ./models *.txt
@@ -55,7 +51,7 @@ cp ../../python_models/wrong_return_type/model.py models/wrong_return_type/1/
 cp ../../python_models/wrong_return_type/config.pbtxt models/wrong_return_type
 
 SERVER_LOG="./request_rescheduling_server.log"
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/request_rescheduling/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -86,8 +82,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 1 ]; then
