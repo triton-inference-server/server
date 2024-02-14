@@ -187,12 +187,12 @@ class TestResponseStatistics(unittest.TestCase):
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
         # Send a request that generates 6 responses, and make sure the
-        # statistics are aggregrated with the previous request.
+        # statistics are aggregated with the previous request.
         number_of_responses = 6
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
         # Send a request that generates 3 responses, and make sure the
-        # statistics are aggregrated with the previous requests.
+        # statistics are aggregated with the previous requests.
         number_of_responses = 3
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
