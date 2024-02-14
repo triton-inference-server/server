@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 import argparse
 from builtins import range
 
+import time
 import numpy as np
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
@@ -71,13 +72,13 @@ if __name__ == "__main__":
         required=True,
         help="Number of asynchronous requests to launch.",
     )
-    parser.add_argument(
-        "-d",
-        "--delay",
-        type=int,
-        required=True,
-        help="Number of delay cycles to use as input to model.",
-    )
+    # parser.add_argument(
+    #     "-d",
+    #     "--delay",
+    #     type=int,
+    #     required=True,
+    #     help="Number of delay cycles to use as input to model.",
+    # )
 
     FLAGS = parser.parse_args()
     if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
@@ -92,17 +93,18 @@ if __name__ == "__main__":
     model_name = FLAGS.model
 
     # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose, concurrency=100)
 
     # Collect async requests here
     requests = []
 
-    # Create the data for the one input tensor
-    input_data = np.array([FLAGS.delay], dtype=np.int32)
+    # Create the data for the input tensor. Creating tensor size with 50 MB.
+    tensor_size = [1, 5*1024*1024]
+    input_data = np.random.randn(*tensor_size).astype(np.float32)
 
     inputs = [
         client_util.InferInput(
-            "in", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
         )
     ]
     inputs[0].set_data_from_numpy(input_data)
@@ -110,8 +112,9 @@ if __name__ == "__main__":
     # Send requests
     for i in range(FLAGS.num_requests):
         requests.append(client.async_infer(model_name, inputs))
-        print("Sent request %d" % i)
+        time.sleep(0.5)
+        print("Sent request %d" % i, flush=True)
     # wait for requests to finish
     for i in range(len(requests)):
         requests[i].get_result()
-        print("Received result %d" % i)
+        print("Received result %d" % i, flush=True)
