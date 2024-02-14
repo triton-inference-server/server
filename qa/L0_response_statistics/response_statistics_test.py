@@ -182,14 +182,17 @@ class TestResponseStatistics(unittest.TestCase):
 
     # Test response statistics. The statistics must be valid over two or more infers.
     def test_response_statistics(self):
+        # Send a request that generates 4 responses.
         number_of_responses = 4
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
-
+        # Send a request that generates 6 responses, and make sure the
+        # statistics are aggregrated with the previous request.
         number_of_responses = 6
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
-
+        # Send a request that generates 3 responses, and make sure the
+        # statistics are aggregrated with the previous requests.
         number_of_responses = 3
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
