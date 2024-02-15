@@ -119,12 +119,14 @@ StringTo(const std::string& arg)
   return std::stoi(arg);
 }
 
+#ifdef TRITON_ENABLE_TRACING
 template <>
 uint32_t
 StringTo(const std::string& arg)
 {
   return std::stoul(arg);
 }
+#endif  // TRITON_ENABLE_TRACING
 
 template <>
 uint64_t

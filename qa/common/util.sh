@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -515,6 +515,10 @@ function setup_virtualenv() {
     virtualenv --system-site-packages venv
     source venv/bin/activate
     pip install pytest
+
+    if [[ ${TEST_WINDOWS} == 1 ]]; then
+        pip3 install numpy tritonclient[all]
+    fi
 }
 
 function deactivate_virtualenv() {
