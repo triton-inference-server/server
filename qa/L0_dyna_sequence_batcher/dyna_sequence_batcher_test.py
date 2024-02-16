@@ -47,6 +47,7 @@ NO_BATCHING = int(os.environ.get("NO_BATCHING", 0)) == 1
 BACKENDS = os.environ.get(
     "BACKENDS", "graphdef savedmodel libtorch onnx plan custom custom_string"
 )
+BACKENDS = BACKENDS.replace("onnx ", "")
 IMPLICIT_STATE = int(os.environ["IMPLICIT_STATE"]) == 1
 
 _trials = BACKENDS.split(" ")

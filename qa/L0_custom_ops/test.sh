@@ -233,7 +233,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-'
+
 
 set -e
 
@@ -243,5 +243,6 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+'
 
 exit $RET
