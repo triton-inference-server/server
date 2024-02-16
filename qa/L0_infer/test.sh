@@ -210,7 +210,9 @@ function generate_model_repository() {
       elif [ "$BACKEND" == "plan" ] && [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         # skip plan_tensorrt models since they don't run on CPU only containers
         continue
-      elif [ "$BACKEND" != "onnx" ]
+      elif [ "$BACKEND" == "onnx" ]; then
+        continue
+      else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
       fi
