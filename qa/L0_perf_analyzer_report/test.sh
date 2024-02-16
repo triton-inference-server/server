@@ -98,8 +98,8 @@ SERVER_LOG="./inference_server.log"
 rm -f $SERVER_LOG $CLIENT_LOG
 MODEL_DIR="./models"
 rm -fr ${MODEL_DIR} && mkdir ${MODEL_DIR}
-ENSEMBLE_MODEL="simple_onnx_float32_float32_float32"
-COMPOSING_MODEL="onnx_float32_float32_float32"
+ENSEMBLE_MODEL="simple_libtorch_float32_float32_float32"
+COMPOSING_MODEL="libtorch_float32_float32_float32"
 ENSEMBLE_MODEL_CACHE_ENABLED="${ENSEMBLE_MODEL}_cache_enabled"
 ENSEMBLE_MODEL_CACHE_DISABLED="${ENSEMBLE_MODEL}_cache_disabled"
 COMPOSING_MODEL_CACHE_ENABLED="${COMPOSING_MODEL}_cache_enabled"

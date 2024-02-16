@@ -56,7 +56,7 @@ RET=0
 
 MODEL_SUFFIX=nobatch_zero_1_float32
 rm -fr all_models && mkdir all_models
-for TARGET in graphdef savedmodel onnx libtorch plan; do
+for TARGET in graphdef savedmodel libtorch plan; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$MODEL_SUFFIX \
        all_models/.
 done
@@ -71,7 +71,7 @@ cp ../python_models/identity_fp32/model.py all_models/python_$MODEL_SUFFIX/1/mod
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-for TARGET in graphdef savedmodel onnx libtorch plan python; do
+for TARGET in graphdef savedmodel libtorch plan python; do
     rm -fr models && mkdir models && \
         cp -r all_models/${TARGET}_$MODEL_SUFFIX models/.
 

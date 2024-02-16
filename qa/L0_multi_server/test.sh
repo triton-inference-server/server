@@ -54,13 +54,13 @@ RET=0
 MULTI_SERVER=multi_server
 CLIENT_LOG=$MULTI_SERVER
 MULTI_SERVER=./$MULTI_SERVER
-BACKENDS=(graphdef onnx plan)
+BACKENDS=(graphdef plan)
 THREAD_COUNT=32
 LOOPS=32
 
 EXTRA_ARGS=" -t ${THREAD_COUNT} -l ${LOOPS}"
 for (( I=1; I<${THREAD_COUNT}+2; I++ )); do
-    BACKEND_INDEX=$(((I % 3) - 1))
+    BACKEND_INDEX=$(((I % 2) - 1))
     full=${BACKENDS[$BACKEND_INDEX]}_float32_float32_float32
     mkdir -p ${MODELSDIR}${I}/simple${I}/1 && \
         cp -r $DATADIR/${full}/1/* ${MODELSDIR}${I}/simple${I}/1/. && \

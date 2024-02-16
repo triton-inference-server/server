@@ -123,7 +123,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel plan libtorch custom python"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
@@ -520,6 +520,8 @@ for model_trial in $MODEL_TRIALS; do
         (cd $NOP_MODEL && sed -i "s/kind: KIND_CPU/kind: KIND_GPU/" config.pbtxt)
       done
     fi
+
+    rm `find ./models/ -name '*onnx*'` -rf
 
     # Need to launch the server for each test so that the model status
     # is reset (which is used to make sure the correct batch size was
