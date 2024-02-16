@@ -75,7 +75,7 @@ for i in {0..2}; do
   set +e
   TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
+      cat $CLIENT_LOG
       echo -e "\n***\n*** Test Failed\n***"
       RET=1
   fi
