@@ -54,12 +54,14 @@ mkdir -p "${MODELDIR}/ensemble/1"
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
 RET=0
-for i in {0..1}; do
+for i in {0..2}; do
 
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   if [ $i == 1 ]; then
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
+  elif [ $i == 2 ]; then
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern MY_HEADER.* --http-header-forward-pattern MY_HEADER.*"
   else
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
   fi
@@ -73,7 +75,7 @@ for i in {0..1}; do
   set +e
   TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
-      cat $CLIENT_LOG
+        cat $CLIENT_LOG
       echo -e "\n***\n*** Test Failed\n***"
       RET=1
   fi
