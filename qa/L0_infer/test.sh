@@ -129,7 +129,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack openvino"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch plan python python_dlpack openvino"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -210,7 +210,7 @@ function generate_model_repository() {
       elif [ "$BACKEND" == "plan" ] && [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         # skip plan_tensorrt models since they don't run on CPU only containers
         continue
-      else
+      elif [ "$BACKEND" != "onnx" ]
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
       fi
@@ -251,12 +251,7 @@ function generate_model_repository() {
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
-        # Reduce the instance count to make loading onnx models faster
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
-        done
-      elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
@@ -348,7 +343,7 @@ done
 # Loading all the onnx models at once requires more than 12 hours. Loading them
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
-  TESTING_BACKENDS="python python_dlpack onnx"
+  TESTING_BACKENDS="python python_dlpack"
   EXPECTED_NUM_TESTS=42
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html

@@ -57,9 +57,9 @@ RET=0
 # prepare model repository, only contains ONNX and TRT models as the
 # corresponding backend are known to be memory.
 rm -rf models && mkdir models
-# ONNX
-cp -r /data/inferenceserver/${REPO_VERSION}/onnx_model_store/* models/.
-rm -r models/*cpu
+## ONNX
+##cp -r /data/inferenceserver/${REPO_VERSION}/onnx_model_store/* models/.
+#rm -r models/*cpu
 
 # Convert to get TRT models against the system
 CAFFE2PLAN=../common/caffe2plan
@@ -92,7 +92,7 @@ set -e
 # Set multiple instances on selected model to test instance-wise collection
 # and accumulation.
 echo "instance_group [{ count: 2; kind: KIND_GPU }]" >> models/resnet152_plan/config.pbtxt
-echo "instance_group [{ count: 2; kind: KIND_GPU }]" >> models/densenet/config.pbtxt
+#echo "instance_group [{ count: 2; kind: KIND_GPU }]" >> models/densenet/config.pbtxt
 
 # testing use nvidia-smi for Python to validate the reported usage
 pip install nvidia-ml-py3

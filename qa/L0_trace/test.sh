@@ -52,7 +52,7 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
-MODELBASE=onnx_int32_int32_int32
+MODELBASE=libtorch_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
@@ -70,7 +70,7 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     cp -r $MODELSDIR/simple $MODELSDIR/global_simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
-    cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+    cp -r $ENSEMBLEDIR/simple_libtorch_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
@@ -720,7 +720,7 @@ rm -r ${MODEL_PATH}
 mkdir -p "${MODEL_PATH}"
 cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
     rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
-        sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
+        sed -i "s/libtorch_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
 
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \

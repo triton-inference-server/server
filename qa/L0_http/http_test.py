@@ -66,20 +66,20 @@ class HttpTest(tu.TestResultCollector):
         )
 
     def test_raw_binary(self):
-        model = "onnx_zero_1_float32"
+        model = "savedmodel_zero_1_float32"
         input_bytes = np.arange(8, dtype=np.float32).tobytes()
         self._raw_binary_helper(model, input_bytes, input_bytes)
 
     def test_raw_binary_longer(self):
         # Similar to test_raw_binary but test with different data size
-        model = "onnx_zero_1_float32"
+        model = "savedmodel_zero_1_float32"
         input_bytes = np.arange(32, dtype=np.float32).tobytes()
         self._raw_binary_helper(model, input_bytes, input_bytes)
 
     def test_byte(self):
         # Select model that satisfies constraints for raw binary request
         # i.e. BYTE type the element count must be 1
-        model = "onnx_zero_1_object_1_element"
+        model = "savedmodel_zero_1_object_1_element"
         input = "427"
         headers = {"Inference-Header-Content-Length": "0"}
         r = requests.post(self._get_infer_url(model), data=input, headers=headers)
@@ -100,7 +100,7 @@ class HttpTest(tu.TestResultCollector):
     def test_byte_too_many_elements(self):
         # Select model that doesn't satisfy constraints for raw binary request
         # i.e. BYTE type the element count must be 1
-        model = "onnx_zero_1_object"
+        model = "savedmodel_zero_1_object"
         input = "427"
         headers = {"Inference-Header-Content-Length": "0"}
         r = requests.post(self._get_infer_url(model), data=input, headers=headers)
@@ -119,7 +119,7 @@ class HttpTest(tu.TestResultCollector):
     def test_multi_variable_dimensions(self):
         # Select model that doesn't satisfy constraints for raw binary request
         # i.e. this model has multiple variable-sized dimensions
-        model = "onnx_zero_1_float16"
+        model = "savedmodel_zero_1_float16"
         input = np.ones([2, 2], dtype=np.float16)
         headers = {"Inference-Header-Content-Length": "0"}
         r = requests.post(
@@ -140,7 +140,7 @@ class HttpTest(tu.TestResultCollector):
     def test_multi_inputs(self):
         # Select model that doesn't satisfy constraints for raw binary request
         # i.e. input count must be 1
-        model = "onnx_zero_3_float32"
+        model = "savedmodel_zero_3_float32"
         # Use one numpy array, after tobytes() it can be seen as three inputs
         # each with 8 elements (this ambiguity is why this is not allowed)
         input = np.arange(24, dtype=np.float32)
@@ -167,7 +167,7 @@ class HttpTest(tu.TestResultCollector):
     def test_content_encoding_chunked_manually(self):
         # Similar to test_raw_binary but test with extra headers
         extra_headers = {"Transfer-Encoding": "chunked"}
-        model = "onnx_zero_1_float32"
+        model = "savedmodel_zero_1_float32"
         input_bytes = np.arange(8, dtype=np.float32).tobytes()
         # Encode input into a single chunk (for simplicity) following chunked
         # encoding format: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
@@ -189,7 +189,7 @@ class HttpTest(tu.TestResultCollector):
             with self.subTest(encoding=encoding):
                 headers = {"Transfer-Encoding": encoding}
                 np_input = np.arange(8, dtype=np.float32).reshape(1, -1)
-                model = "onnx_zero_1_float32"
+                model = "savedmodel_zero_1_float32"
                 # Setup inputs
                 inputs = []
                 inputs.append(
@@ -208,7 +208,7 @@ class HttpTest(tu.TestResultCollector):
                         client.infer(model_name=model, inputs=inputs, headers=headers)
 
     def test_descriptive_status_code(self):
-        model = "onnx_zero_1_float32_queue"
+        model = "savedmodel_zero_1_float32_queue"
         input_bytes = np.arange(8, dtype=np.float32).tobytes()
 
         # Send two requests to model that only queues 1 request at the maximum,
