@@ -412,14 +412,14 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test the libtorch model to verify that the memory type of the output tensor
+# Test the tensorrt model to verify that the memory type of the output tensor
 # remains unchanged with the warmup setting
 pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
 rm -fr models && mkdir models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_nobatch_float32_float32_float32 models/.
-(cd models/libtorch_nobatch_float32_float32_float32 && \
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_nobatch_float32_float32_float32 models/.
+(cd models/plan_nobatch_float32_float32_float32 && \
             echo "" >> config.pbtxt && \
             echo 'instance_group [{' >> config.pbtxt && \
             echo '    kind : KIND_GPU' >> config.pbtxt && \
@@ -445,9 +445,10 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_nobatch
             echo '    }' >> config.pbtxt && \
             echo '}]' >> config.pbtxt )
 
-mkdir -p models/bls_libtorch_warmup/1/
-cp ../python_models/bls_libtorch_warmup/model.py models/bls_libtorch_warmup/1/
-cp ../python_models/bls_libtorch_warmup/config.pbtxt models/bls_libtorch_warmup/.
+mkdir -p models/bls_plan_warmup/1/
+cp ../python_models/bls_onnx_warmup/model.py models/bls_plan_warmup/1/
+cp ../python_models/bls_onnx_warmup/config.pbtxt models/bls_plan_warmup/.
+sed -i -e 's/onnx/plan/g'  models/bls_plan_warmup/1/model.py
 
 cp ../L0_backend_python/python_unittest.py .
 sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' python_unittest.py
@@ -461,10 +462,10 @@ fi
 
 set +e
 
-export MODEL_NAME='bls_libtorch_warmup'
+export MODEL_NAME='bls_plan_warmup'
 python3 -m pytest --junitxml=warmup.report.xml $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_libtorch_warmup' test FAILED. \n***"
+    echo -e "\n***\n*** 'bls_plan_warmup' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
 fi
