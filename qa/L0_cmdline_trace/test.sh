@@ -58,7 +58,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-MODELBASE=onnx_int32_int32_int32
+MODELBASE=savedmodel_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
@@ -77,6 +77,8 @@ rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
             sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt)
 
 RET=0
+
+ls $MODELSDIR
 
 # trace-level=OFF make sure no tracing
 SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
