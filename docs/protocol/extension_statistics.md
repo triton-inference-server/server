@@ -78,8 +78,8 @@ $model_stat =
   "inference_count" : $number,
   "execution_count" : $number,
   "inference_stats" : $inference_stats,
-  "response_stats" : { $string : $response_stat, ... },
-  "batch_stats" : [ $batch_stat, ... ],
+  "response_stats" : { $string : $response_stats, ... },
+  "batch_stats" : [ $batch_stats, ... ],
   "memory_usage" : [ $memory_usage, ...]
 }
 ```
