@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,8 +34,7 @@ fi
 source common.sh
 source ../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
@@ -132,8 +131,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
@@ -153,9 +151,8 @@ apt-get update && apt-get -y install \
                             "python3.${PYTHON_ENV_VERSION}-distutils" \
                             libboost-dev
 rm -f /usr/bin/python3 && \
-ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3 && \
-rm -r /usr/bin/python3.10
-pip3 install --upgrade install requests numpy virtualenv
+ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3
+pip3 install --upgrade install requests numpy virtualenv protobuf
 find /opt/tritonserver/qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade

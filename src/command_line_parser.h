@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -132,6 +132,7 @@ struct TritonServerParameters {
   int32_t repository_poll_secs_{15};
   // Number of threads to use for concurrently loading models
   uint32_t model_load_thread_count_{4};
+  uint32_t model_load_retry_count_{0};
   std::map<int, double> load_gpu_limit_;
 
   // Rate limiter configuration
@@ -301,13 +302,16 @@ class TritonParser {
   void SetTritonTraceArgs(
       TritonServerParameters& lparams, bool trace_filepath_present,
       bool trace_log_frequency_present);
-  void VerifyOpentelemetryTraceArgs(
-      bool trace_filepath_present, bool trace_log_frequency_present);
+  void SetOpenTelemetryTraceArgs(
+      TritonServerParameters& lparams, bool trace_filepath_present,
+      bool trace_log_frequency_present);
   void PostProcessTraceArgs(
       TritonServerParameters& lparams, bool trace_level_present,
       bool trace_rate_present, bool trace_count_present,
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
+  void ProcessOpenTelemetryBatchSpanProcessorArgs(
+      TraceConfig& otel_trace_settings);
 #endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format

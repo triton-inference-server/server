@@ -34,7 +34,7 @@ find_package(GTest REQUIRED)
 #
 # caffe2plan
 #
-if(${TRITON_ENABLE_TENSORRT})
+if(${TRITON_ENABLE_TENSORRT} AND NOT ${TRITON_IGPU_BUILD})
   add_executable(caffe2plan caffe2plan.cc)
   target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
   target_link_libraries(
@@ -101,7 +101,7 @@ add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
 
 add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(dyna_sequence dyna_sequence)
-add_subdirectory(generative_sequence generative_sequence)
+add_subdirectory(iterative_sequence iterative_sequence)
 add_subdirectory(query_backend query_backend)
 
 if(${TRITON_ENABLE_GPU})

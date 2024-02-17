@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -118,6 +118,15 @@ StringTo(const std::string& arg)
 {
   return std::stoi(arg);
 }
+
+#ifdef TRITON_ENABLE_TRACING
+template <>
+uint32_t
+StringTo(const std::string& arg)
+{
+  return std::stoul(arg);
+}
+#endif  // TRITON_ENABLE_TRACING
 
 template <>
 uint64_t
@@ -310,6 +319,8 @@ enum TritonOptionId {
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
   OPTION_GRPC_RESTRICTED_PROTOCOL,
+  OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS,
+  OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
@@ -357,6 +368,7 @@ enum TritonOptionId {
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_MODEL_LOAD_THREAD_COUNT,
+  OPTION_MODEL_LOAD_RETRY_COUNT,
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
@@ -433,6 +445,10 @@ TritonParser::SetupOptions()
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
        "model repositories. Default is 4."});
+  model_repo_options_.push_back(
+      {OPTION_MODEL_LOAD_RETRY_COUNT, "model-load-retry-count", Option::ArgInt,
+       "The number of retry to load a model in "
+       "model repositories. Default is 0."});
   model_repo_options_.push_back(
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
@@ -568,6 +584,16 @@ TritonParser::SetupOptions()
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings. Default is 2."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS, "grpc-max-connection-age",
+       Option::ArgInt,
+       "Maximum time that a channel may exist in milliseconds."
+       "Default is undefined."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS,
+       "grpc-max-connection-age-grace", Option::ArgInt,
+       "Grace period after the channel reaches its max age. "
+       "Default is undefined."});
   grpc_options_.push_back(
       {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
        "<string>:<string>=<string>",
@@ -1053,6 +1079,11 @@ TritonServerParameters::BuildTritonServerOptions()
       "setting model load thread count");
   THROW_IF_ERR(
       ParseException,
+      TRITONSERVER_ServerOptionsSetModelLoadRetryCount(
+          loptions, std::max(0u, model_load_retry_count_)),
+      "setting model load retry count");
+  THROW_IF_ERR(
+      ParseException,
       TRITONSERVER_ServerOptionsSetModelNamespacing(
           loptions, enable_model_namespacing_),
       "setting model namespacing");
@@ -1436,6 +1467,14 @@ TritonParser::Parse(int argc, char** argv)
           lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
               ParseOption<int>(optarg);
           break;
+        case OPTION_GRPC_ARG_MAX_CONNECTION_AGE_MS:
+          lgrpc_options.keep_alive_.max_connection_age_ms_ =
+              ParseOption<int>(optarg);
+          break;
+        case OPTION_GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS:
+          lgrpc_options.keep_alive_.max_connection_age_grace_ms_ =
+              ParseOption<int>(optarg);
+          break;
         case OPTION_GRPC_RESTRICTED_PROTOCOL: {
           ParseRestrictedFeatureOption(
               optarg, long_options[option_index].name,
@@ -1639,6 +1678,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_MODEL_LOAD_THREAD_COUNT:
           lparams.model_load_thread_count_ = ParseOption<int>(optarg);
+          break;
+        case OPTION_MODEL_LOAD_RETRY_COUNT:
+          lparams.model_load_retry_count_ = ParseOption<int>(optarg);
           break;
         case OPTION_BACKEND_CONFIG:
           lparams.backend_config_settings_.push_back(
@@ -2103,43 +2145,44 @@ TritonParser::SetGlobalTraceArgs(
     bool trace_rate_present, bool trace_count_present,
     bool explicit_disable_trace)
 {
-  for (const auto& global_setting : lparams.trace_config_map_[""]) {
+  for (const auto& [setting, value_variant] : lparams.trace_config_map_[""]) {
+    auto value = std::get<std::string>(value_variant);
     try {
-      if (global_setting.first == "rate") {
+      if (setting == "rate") {
         if (trace_rate_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-rate' "
                        "in favor of provided rate value in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_rate_ = ParseOption<int>(global_setting.second);
+        lparams.trace_rate_ = ParseOption<int>(value);
       }
-      if (global_setting.first == "level") {
+      if (setting == "level") {
         if (trace_level_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-level' "
                        "in favor of provided level in --trace-config!"
                     << std::endl;
         }
-        auto parsed_level_config = ParseTraceLevelOption(global_setting.second);
+        auto parsed_level_config = ParseTraceLevelOption(value);
         explicit_disable_trace |=
             (parsed_level_config == TRITONSERVER_TRACE_LEVEL_DISABLED);
         lparams.trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
             lparams.trace_level_ | parsed_level_config);
       }
-      if (global_setting.first == "mode") {
-        lparams.trace_mode_ = ParseTraceModeOption(global_setting.second);
+      if (setting == "mode") {
+        lparams.trace_mode_ = ParseTraceModeOption(value);
       }
-      if (global_setting.first == "count") {
+      if (setting == "count") {
         if (trace_count_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-count' "
                        "in favor of provided count in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_count_ = ParseOption<int>(global_setting.second);
+        lparams.trace_count_ = ParseOption<int>(value);
       }
     }
     catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "Bad option: \"--trace-config " << global_setting.first << "\".\n"
+      ss << "Bad option: \"--trace-config " << setting << "\".\n"
          << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
@@ -2151,29 +2194,29 @@ TritonParser::SetTritonTraceArgs(
     TritonServerParameters& lparams, bool trace_filepath_present,
     bool trace_log_frequency_present)
 {
-  for (const auto& mode_setting :
+  for (const auto& [setting, value_variant] :
        lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
+    auto value = std::get<std::string>(value_variant);
     try {
-      if (mode_setting.first == "file") {
+      if (setting == "file") {
         if (trace_filepath_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-file' "
                        "in favor of provided file in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_filepath_ = mode_setting.second;
-      } else if (mode_setting.first == "log-frequency") {
+        lparams.trace_filepath_ = value;
+      } else if (setting == "log-frequency") {
         if (trace_log_frequency_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-file' "
                        "in favor of provided file in --trace-config!"
                     << std::endl;
         }
-        lparams.trace_log_frequency_ = ParseOption<int>(mode_setting.second);
+        lparams.trace_log_frequency_ = ParseOption<int>(value);
       }
     }
     catch (const ParseException& pe) {
       std::stringstream ss;
-      ss << "Bad option: \"--trace-config triton," << mode_setting.first
-         << "\".\n"
+      ss << "Bad option: \"--trace-config triton," << setting << "\".\n"
          << pe.what() << std::endl;
       throw ParseException(ss.str());
     }
@@ -2181,8 +2224,9 @@ TritonParser::SetTritonTraceArgs(
 }
 
 void
-TritonParser::VerifyOpentelemetryTraceArgs(
-    bool trace_filepath_present, bool trace_log_frequency_present)
+TritonParser::SetOpenTelemetryTraceArgs(
+    TritonServerParameters& lparams, bool trace_filepath_present,
+    bool trace_log_frequency_present)
 {
   if (trace_filepath_present) {
     std::cerr << "Warning: '--trace-file' is deprecated and will "
@@ -2193,6 +2237,74 @@ TritonParser::VerifyOpentelemetryTraceArgs(
     std::cerr << "Warning: '--trace-log-frequency' is deprecated "
                  "and will be ignored with opentelemetry tracing mode."
               << std::endl;
+  }
+  triton::server::TraceConfig& otel_trace_settings =
+      lparams.trace_config_map_[std::to_string(TRACE_MODE_OPENTELEMETRY)];
+  ProcessOpenTelemetryBatchSpanProcessorArgs(otel_trace_settings);
+}
+
+void
+TritonParser::ProcessOpenTelemetryBatchSpanProcessorArgs(
+    TraceConfig& otel_trace_settings)
+{
+  std::unordered_map<std::string, std::string> otel_bsp_default_settings = {};
+  // Set up default BatchSpanProcessor parameters, or use
+  // parameters, specified by environment variables
+  auto env_bsp_max_queue_size = triton::server::GetEnvironmentVariableOrDefault(
+      "OTEL_BSP_MAX_QUEUE_SIZE", "2048");
+  otel_bsp_default_settings.insert(std::make_pair(
+      std::string("bsp_max_queue_size"), env_bsp_max_queue_size));
+  auto env_bsp_schedule_delay = triton::server::GetEnvironmentVariableOrDefault(
+      "OTEL_BSP_SCHEDULE_DELAY", "5000");
+  otel_bsp_default_settings.insert(std::make_pair(
+      std::string("bsp_schedule_delay"), env_bsp_schedule_delay));
+  auto env_bsp_max_export_batch_size =
+      triton::server::GetEnvironmentVariableOrDefault(
+          "OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "512");
+  otel_bsp_default_settings.insert(std::make_pair(
+      std::string("bsp_max_export_batch_size"), env_bsp_max_export_batch_size));
+
+  // Process cmd args and convert string arguments to integers.
+  // Throw a ParseException for invalid arguments
+  for (auto& [setting, value_variant] : otel_trace_settings) {
+    try {
+      auto value = std::get<std::string>(value_variant);
+      if (setting == "bsp_max_queue_size") {
+        value_variant = ParseOption<uint32_t>(value);
+        otel_bsp_default_settings.erase("bsp_max_queue_size");
+      } else if (setting == "bsp_schedule_delay") {
+        value_variant = ParseOption<uint32_t>(value);
+        otel_bsp_default_settings.erase("bsp_schedule_delay");
+      } else if (setting == "bsp_max_export_batch_size") {
+        value_variant = ParseOption<uint32_t>(value);
+        otel_bsp_default_settings.erase("bsp_max_export_batch_size");
+      }
+    }
+    catch (const ParseException& pe) {
+      std::stringstream ss;
+      ss << "Bad option: \"--trace-config opentelemetry," << setting << "\".\n"
+         << pe.what() << std::endl;
+      throw ParseException(ss.str());
+    }
+  }
+  // If not all BSP settings were provided through cmd,
+  // populate OpenTelemetry's trace settings with the default value.
+  if (!otel_bsp_default_settings.empty()) {
+    for (const auto& [setting, value] : otel_bsp_default_settings) {
+      try {
+        otel_trace_settings.push_back(
+            std::make_pair(setting, ParseOption<uint32_t>(value)));
+      }
+      catch (const ParseException& pe) {
+        std::stringstream ss;
+        ss << "Bad option: \"OTEL_";
+        for (auto& ch : setting) {
+          ss << static_cast<char>(std::toupper(ch));
+        }
+        ss << "\".\n" << pe.what() << std::endl;
+        throw ParseException(ss.str());
+      }
+    }
   }
 }
 
@@ -2208,8 +2320,8 @@ TritonParser::PostProcessTraceArgs(
       explicit_disable_trace);
 
   if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
-    VerifyOpentelemetryTraceArgs(
-        trace_filepath_present, trace_log_frequency_present);
+    SetOpenTelemetryTraceArgs(
+        lparams, trace_filepath_present, trace_log_frequency_present);
   } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
     SetTritonTraceArgs(
         lparams, trace_filepath_present, trace_log_frequency_present);

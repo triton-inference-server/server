@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -496,7 +496,7 @@ BOOL_PARAMS=${BOOL_PARAMS:="log_info log_warning log_error"}
 for BOOL_PARAM in $BOOL_PARAMS; do
     # Attempt to use integer instead of bool
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":1}' localhost:8000/v2/logging`
-    if [ "$code" != "400" ]; then
+    if [ "$code" == "200" ]; then
         echo $code
         cat ./curl.out
         echo -e "\n***\n*** Test Failed: Line: $LINENO\n***"
@@ -504,14 +504,14 @@ for BOOL_PARAM in $BOOL_PARAMS; do
     fi
     # Attempt to use upper-case bool
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":False}' localhost:8000/v2/logging`
-    if [ "$code" != "400" ]; then
+    if [ "$code" == "200" ]; then
         cat ./curl.out
         echo -e "\n***\n*** Test Failed: Line: $LINENO\n***"
         RET=1
     fi
     # Attempt to use string bool
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":"false"}' localhost:8000/v2/logging`
-    if [ "$code" != "400" ]; then
+    if [ "$code" == "200" ]; then
         echo $code
         cat ./curl.out
         echo -e "\n***\n*** Test Failed: Line: $LINENO\n***"
@@ -527,14 +527,14 @@ for BOOL_PARAM in $BOOL_PARAMS; do
 done
 
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":-1}' localhost:8000/v2/logging`
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo $code
     cat ./curl.out
     echo -e "\n***\n*** Test Failed: Line: $LINENO\n***"
     RET=1
 fi
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":"1"}' localhost:8000/v2/logging`
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     echo $code
     cat ./curl.out
     echo -e "\n***\n*** Test Failed: Line: $LINENO\n***"

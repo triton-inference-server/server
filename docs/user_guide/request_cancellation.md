@@ -82,6 +82,7 @@ at various points. However, once a request has been given to the backend
 for execution, it is up to the individual backends to detect and handle
 request termination.
 Currently, the following backends support early termination:
+- [TensorRT-LLM backend](https://github.com/triton-inference-server/tensorrtllm_backend)
 - [vLLM backend](https://github.com/triton-inference-server/vllm_backend)
 - [python backend](https://github.com/triton-inference-server/python_backend)
 

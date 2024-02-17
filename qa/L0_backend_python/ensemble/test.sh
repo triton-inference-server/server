@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,15 +26,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 CLIENT_LOG="./ensemble_client.log"
-EXPECTED_NUM_TESTS="2"
-TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    EXPECTED_NUM_TESTS="1"
+else
+    EXPECTED_NUM_TESTS="2"
+fi
+
+SERVER_ARGS="--model-repository=${MODELDIR}/ensemble/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./ensemble_server.log"
 
 RET=0
@@ -52,18 +54,21 @@ mkdir -p models/add_sub_2/1/
 cp ../../python_models/add_sub/config.pbtxt ./models/add_sub_2/
 cp ../../python_models/add_sub/model.py ./models/add_sub_2/1/
 
-# Ensemble GPU Model
-mkdir -p models/ensemble_gpu/1/
-cp ../../python_models/ensemble_gpu/config.pbtxt ./models/ensemble_gpu
-cp -r ${DATADIR}/qa_model_repository/libtorch_float32_float32_float32/ ./models
-(cd models/libtorch_float32_float32_float32 && \
-          echo "instance_group [ { kind: KIND_GPU }]" >> config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 0/" config.pbtxt)
-(cd models/libtorch_float32_float32_float32 && \
-          sed -i "s/^version_policy:.*//" config.pbtxt)
-rm -rf models/libtorch_float32_float32_float32/2
-rm -rf models/libtorch_float32_float32_float32/3
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    # Ensemble GPU Model
+    mkdir -p models/ensemble_gpu/1/
+    cp ../../python_models/ensemble_gpu/config.pbtxt ./models/ensemble_gpu
+    cp -r ${DATADIR}/qa_model_repository/libtorch_float32_float32_float32/ ./models
+    (cd models/libtorch_float32_float32_float32 && \
+            echo "instance_group [ { kind: KIND_GPU }]" >> config.pbtxt)
+    (cd models/libtorch_float32_float32_float32 && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 0/" config.pbtxt)
+    (cd models/libtorch_float32_float32_float32 && \
+            sed -i "s/^version_policy:.*//" config.pbtxt)
+    rm -rf models/libtorch_float32_float32_float32/2
+    rm -rf models/libtorch_float32_float32_float32/3
+fi
 
 prev_num_pages=`get_shm_pages`
 
@@ -75,23 +80,21 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 ensemble_test.py 2>&1 > $CLIENT_LOG
+
+# FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU scenarios
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    python3 -m pytest --junitxml=ensemble.report.xml ensemble_test.py 2>&1 > $CLIENT_LOG
+else
+    python3 ensemble_test.py EnsembleTest.test_ensemble 2>&1 > $CLIENT_LOG
+fi
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** ensemble_test.py FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then

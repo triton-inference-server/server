@@ -265,6 +265,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
 
     if (err == nullptr) {
+      state->inference_request_ = {
+          irequest, [](TRITONSERVER_InferenceRequest* request) {
+            LOG_TRITONSERVER_ERROR(
+                TRITONSERVER_InferenceRequestDelete(request),
+                "deleting gRPC inference request");
+          }};
       err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
     }
 
@@ -285,9 +291,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           tritonserver_, shm_manager_, request, std::move(serialized_data),
           response_queue_, &state->alloc_payload_);
     }
+
+    auto request_release_payload =
+        std::make_unique<RequestReleasePayload>(state->inference_request_);
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */);
+          irequest, InferRequestComplete,
+          request_release_payload.get() /* request_release_userp */);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -299,8 +309,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-      state->trace_ =
-          std::move(trace_manager_->SampleTrace(request.model_name()));
+      GrpcServerCarrier carrier(state->context_->ctx_.get());
+      auto start_options =
+          trace_manager_->GetTraceStartOptions(carrier, request.model_name());
+      state->trace_ = std::move(trace_manager_->SampleTrace(start_options));
       if (state->trace_ != nullptr) {
         triton_trace = state->trace_->trace_;
       }
@@ -317,7 +329,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
     // irequest to handle gRPC stream cancellation.
     if (err == nullptr) {
-      state->context_->InsertInflightState(state, irequest);
+      state->context_->InsertInflightState(state);
+      // The payload will be cleaned in request release callback.
+      request_release_payload.release();
     } else {
       // If there was an error then enqueue the error response and show
       // it to be ready for writing.
@@ -336,10 +350,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       }
       LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
 
       ::grpc::Status status;
       GrpcStatusUtil::Create(&status, err);

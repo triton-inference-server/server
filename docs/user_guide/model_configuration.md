@@ -980,6 +980,74 @@ indicating sequence start, end, ready and correlation ID. See
 [Stateful Models](architecture.md#stateful-models) for more
 information and examples.
 
+#### Iterative Sequences
+
+> [!NOTE]
+> Iterative sequences are *provisional* and likely to change in future versions.
+
+The sequence batcher supports stateful execution of "iterative
+sequences" where a single request is processed over a number of
+scheduling iterations. "Iterative sequences" enable the scheduler to
+batch multiple inflight requests at each step and allow the model or
+backend to complete a request at any iteration.
+
+For models and backends that support "iterative sequences", users can
+enable support in the sequence batcher by specifying:
+
+```
+  sequence_batching {
+    iterative_sequence: true
+  }
+```
+
+An "iterative sequence" refers to stateful models that iteratively
+process a single request until a complete response is generated.  When
+iterative sequence is enabled, the sequence scheduler will expect a
+single incoming request to initiate the sequence. Backends that
+support iterative sequences can then yield back to the sequence
+batcher to reschedule the request for further execution in a future
+batch.
+
+Because only one request is used to represent the "iterative
+sequence", the user doesn't need to set [control
+inputs](architecture.md#control-inputs) mentioned in the previous
+section. They will be filled internally by the scheduler.
+
+"Iterative sequences" can be [decoupled](#decoupled) where more than
+one response can be generated during execution or non-decoupled where
+a single response is generated when the full response is complete.
+
+The main advantage of "iterative sequences" is the ability to use
+Triton's native batching capabilities to form batches of requests at
+different iteration stages without having to maintain additional state
+in the backend. Typically batches executed by backends are completed
+in the same execution which can waste resources if the execution of
+one of the requests in the batch takes much longer than the rest. With
+"iterative sequences", processing for each request in a batch can be
+broken down into multiple iterations and a backend can start
+processing new requests as soon as any request is complete.
+
+##### Continuous/Inflight Batching with Iterative Sequences
+
+Continuous batching, iteration level batching, and inflight batching
+are terms used in large language model (LLM) inferencing to describe
+batching strategies that form batches of requests at each iteration
+step. By forming batches "continuously" inference servers can increase
+throughput by reusing batch slots as soon as they are free without
+waiting for all requests in a batch to complete.
+
+As the number of steps required to process a request can vary
+significantly, batching existing requests and new requests continuously
+can have a significant improvement on throughput and latency.
+
+To achieve inflight batching with iterative sequences, the backend
+should break request processing into a number of steps, where each
+step corresponds to one Triton model instance execution. At the end of
+each step, the model instance will release requests that have been
+completed and reschedule requests that are still inflight. Triton will
+then form and schedule the next batch of requests that mixes new and
+rescheduled requests.
+
 ### Ensemble Scheduler
 
 The ensemble scheduler must be used for [ensemble

@@ -32,6 +32,7 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITONTMP_DIR=/tmp
+ARG IGPU_BUILD=0
 
 ############################################################################
 ## Test artifacts built as part of the tritonserver build are
@@ -44,6 +45,7 @@ ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
+ARG IGPU_BUILD
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -62,15 +64,13 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools
 
-RUN apt update && apt install -y gpg wget && \
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-        gpg --dearmor - |  \
-        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    . /etc/os-release && \
-    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
-    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends cmake cmake-data
+RUN apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -132,8 +132,8 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_query/models/query/1 && \
     cp tritonbuild/tritonserver/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
     cp bin/query_test qa/L0_query/. && \
-    mkdir qa/L0_generative_sequence/models/generative_sequence/1 && \
-    cp tritonbuild/tritonserver/backends/generative_sequence/libtriton_generative_sequence.so qa/L0_generative_sequence/models/generative_sequence/1/. && \
+    mkdir qa/L0_iterative_sequence/models/iterative_sequence/1 && \
+    cp tritonbuild/tritonserver/backends/iterative_sequence/libtriton_iterative_sequence.so qa/L0_iterative_sequence/models/iterative_sequence/1/. && \
     cp bin/register_api_test qa/L0_register/. && \
     cp bin/async_work_queue_test qa/L0_async_work_queue/. && \
     cp tritonbuild/tritonserver/backends/implicit_state/libtriton_implicit_state.so \
@@ -150,7 +150,7 @@ RUN mkdir -p qa/common && \
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
-    cp python/test_binding.py qa/L0_python_api/.
+    cp -rf python/test/. qa/L0_python_api/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f bin/caffe2plan ]; then \
@@ -239,20 +239,22 @@ RUN if [ -d qa/L0_model_control_stress ]; then \
             cp -r qa/L0_model_control_stress/. qa/L0_model_control_stress_valgrind_massif; \
     fi
 
-RUN cp backends/repeat/libtriton_repeat.so qa/L0_model_config/.
-
 RUN mkdir -p qa/L0_decoupled/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_decoupled/models/repeat_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/square_int32/1 && \
-    cp backends/square/libtriton_square.so \
-        qa/L0_decoupled/models/square_int32/1/.
-RUN mkdir -p qa/L0_decoupled/models/identity_int32/1
-RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
+    mkdir -p qa/L0_decoupled/models/square_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/identity_int32/1 && \
+    mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/fan_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
-    mkdir -p qa/L0_decoupled/models/nested_square/1
+    mkdir -p qa/L0_decoupled/models/nested_square/1 && \
+    mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1
+
+RUN if [ "$IGPU_BUILD" == "0" ]; then \
+        cp backends/repeat/libtriton_repeat.so qa/L0_model_config && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_decoupled/models/repeat_int32/1 && \
+        cp backends/repeat/libtriton_repeat.so qa/L0_grpc_state_cleanup/models/repeat_int32/1/. && \
+        cp backends/square/libtriton_square.so qa/L0_decoupled/models/square_int32/1; \
+    fi
 
 RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
@@ -263,10 +265,6 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
         qa/L0_decoupled/python_models/square_int32/1/. && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
         qa/L0_decoupled/python_models/square_int32/.
-
-RUN mkdir -p qa/L0_grpc_state_cleanup/models/repeat_int32/1 && \
-    cp backends/repeat/libtriton_repeat.so \
-        qa/L0_grpc_state_cleanup/models/repeat_int32/1/.
 
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
@@ -384,7 +382,7 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
 
 # Install Triton Python API
 RUN find qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonserver-*.whl" | xargs pip3 install --upgrade
+    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 

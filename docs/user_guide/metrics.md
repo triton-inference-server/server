@@ -56,6 +56,7 @@ To change the interval at which metrics are polled/updated, see the `--metrics-i
 - [Inference Request Metrics](#inference-request-metrics)
 - [GPU Metrics](#gpu-metrics)
 - [CPU Metrics](#cpu-metrics)
+- [Pinned Memory Metrics](#pinned-memory-metrics)
 - [Response Cache Metrics](#response-cache-metrics)
 - [Custom Metrics](#custom-metrics)
 
@@ -282,6 +283,15 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 |CPU Memory      | CPU Total Memory | `nv_cpu_memory_total_bytes` | Total CPU memory (RAM), in bytes | System-wide | Per interval |
 |                | CPU Used Memory | `nv_cpu_memory_used_bytes` | Used CPU memory (RAM), in bytes | System-wide | Per interval |
 
+## Pinned Memory Metrics
+
+Starting in 24.01, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
+
+|Category        |Metric            |Metric Name                 |Description                                            |Granularity|Frequency    |
+|----------------|------------------|----------------------------|-------------------------------------------------------|-----------|-------------|
+|Pinned Memory   |Total Pinned memory |`nv_pinned_memory_pool_total_bytes`        |Total Pinned memory, in bytes                      |All models    |Per interval |
+|                |Used Pinned memory |`nv_pinned_memory_pool_used_bytes`        |Used Pinned memory, in bytes                      |All models    |Per interval |
+
 ## Response Cache Metrics
 
 Cache metrics can be reported in two ways:
@@ -343,3 +353,9 @@ demonstrates a practical example of adding a custom metric to a backend.
 Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
 `TRITONSERVER_Metric*` API annotations in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
+### TensorRT-LLM Backend Metrics
+
+The TRT-LLM backend uses the custom metrics API to track and expose specific metrics about
+LLMs, KV Cache, and Inflight Batching to Triton:
+https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#triton-metrics

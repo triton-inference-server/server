@@ -38,6 +38,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+ldconfig || true
+
 export CUDA_VISIBLE_DEVICES=0
 
 TEST_RESULT_FILE='test_results.txt'
@@ -141,12 +143,10 @@ BATCH=${BATCH:="1"}
 export BATCH
 
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
-    if [ "$TEST_JETSON" == "0" ]; then
-        if [[ "aarch64" != $(uname -m) ]] ; then
-            pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-        else
-            pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-        fi
+    if [[ "aarch64" != $(uname -m) ]] ; then
+        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    else
+        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
     fi
 fi
 
@@ -350,12 +350,10 @@ done
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
   EXPECTED_NUM_TESTS=42
-  if [ "$TEST_JETSON" == "0" ]; then
-    if [[ "aarch64" != $(uname -m) ]] ; then
-        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-    else
-        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
-    fi
+  if [[ "aarch64" != $(uname -m) ]] ; then
+      pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  else
+      pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
   fi
 
   for BACKENDS in $TESTING_BACKENDS; do

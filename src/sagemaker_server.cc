@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -373,7 +373,7 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   // appropriately if connection closed or last response sent.
   //
   // But for now userp is the InferRequestClass object and the end of
-  // its life is in the OK or BAD ReplyCallback.
+  // its life is in the ReplyCallback.
 
   SagemakerAPIServer::SagemakeInferRequestClass* infer_request =
       reinterpret_cast<SagemakerAPIServer::SagemakeInferRequestClass*>(userp);
@@ -407,47 +407,25 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  if (err == nullptr) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else {
+  if (err != nullptr) {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    // [FIXME] In http_server.cc, error handling is enhanced to reporting
+    // different error code according to the Triton error code, holding
+    // the change from SageMaker endpoint as it may not fit their SLA.
+    infer_request->response_code_ = EVHTP_RES_BADREQ;
     if (SageMakerMMECheckOOMError(err) == true) {
       LOG_VERBOSE(1)
           << "Received an OOM error during INVOKE MODEL. Returning a 507."
           << std::endl;
-      evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
-    } else {
-      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+      infer_request->response_code_ = 507;
     }
     TRITONSERVER_ErrorDelete(err);
   }
+  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
-}
-
-void
-SagemakerAPIServer::BADReplyCallback507(evthr_t* thr, void* arg, void* shared)
-{
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
-
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, 507);
-
-  evhtp_request_resume(request);
-
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_START", request->send_start_ns);
-    infer_request->trace_->CaptureTimestamp(
-        "HTTP_SEND_END", request->send_end_ns);
-  }
-#endif  // TRITON_ENABLE_TRACING
-
-  delete infer_request;
 }
 
 void
@@ -481,30 +459,25 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-  std::shared_ptr<TraceManager::Trace> trace;
-  if (err == nullptr) {
-    trace = std::move(trace_manager_->SampleTrace(model_name));
-    if (trace != nullptr) {
-      triton_trace = trace->trace_;
-
-      // Timestamps from evhtp are capture in 'req'. We record here
-      // since this is the first place where we have access to trace
-      // manager.
-      trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
-      trace->CaptureTimestamp("HTTP_RECV_END", req->recv_end_ns);
-    }
-  }
-#endif  // TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace =
+      StartTrace(req, model_name, &triton_trace);
 
   // Create the inference request object which provides all information needed
   // for an inference.
   TRITONSERVER_InferenceRequest* irequest = nullptr;
+  std::shared_ptr<TRITONSERVER_InferenceRequest> irequest_shared = nullptr;
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, server_.get(), model_name.c_str(), requested_model_version);
   }
-
+  if (err == nullptr) {
+    irequest_shared = std::shared_ptr<TRITONSERVER_InferenceRequest>(
+        irequest, [](TRITONSERVER_InferenceRequest* request) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(request),
+              "deleting HTTP/REST inference request");
+        });
+  }
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
   if (err == nullptr) {
@@ -566,7 +539,10 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
   if (err == nullptr) {
     connection_paused = true;
 
-    auto infer_request = CreateInferRequest(req);
+    auto infer_request = CreateInferRequest(req, irequest_shared);
+    auto request_release_payload = std::make_unique<RequestReleasePayload>(
+        irequest_shared, decompressed_buffer);
+
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
@@ -589,7 +565,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          decompressed_buffer);
+          request_release_payload.get());
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -611,6 +587,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       }
       if (err == nullptr) {
         infer_request.release();
+        request_release_payload.release();
       }
     }
   }
@@ -633,10 +610,6 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
     }
 #endif  // TRITON_ENABLE_TRACING
-
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(irequest),
-        "deleting HTTP/REST inference request");
   }
 }
 

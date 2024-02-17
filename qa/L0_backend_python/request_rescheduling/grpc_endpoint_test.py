@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -35,9 +36,12 @@ import unittest
 from functools import partial
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class UserData:
@@ -52,13 +56,15 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class GrpcEndpointTest(tu.TestResultCollector):
+class GrpcEndpointTest(unittest.TestCase):
     def test_grpc_decoupled(self, sequence_id=0, sequence_start=False):
         user_data = UserData()
-        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+        with grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001"
+        ) as triton_client:
             # Reload the model to reset the flag
-            triton_client.unload_model("generative_sequence")
-            triton_client.load_model("generative_sequence")
+            triton_client.unload_model("iterative_sequence")
+            triton_client.load_model("iterative_sequence")
 
             triton_client.start_stream(callback=partial(callback, user_data))
             inputs = []
@@ -66,7 +72,7 @@ class GrpcEndpointTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(np.array([3], dtype=np.int32))
 
             triton_client.async_stream_infer(
-                model_name="generative_sequence",
+                model_name="iterative_sequence",
                 inputs=inputs,
                 sequence_id=sequence_id,
                 sequence_start=sequence_start,
@@ -82,7 +88,9 @@ class GrpcEndpointTest(tu.TestResultCollector):
             self.assertEqual(0, res_count)
 
     def test_grpc_non_decoupled(self, sequence_id=0, sequence_start=False):
-        with grpcclient.InferenceServerClient("localhost:8001") as triton_client:
+        with grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001"
+        ) as triton_client:
             # Reload the model to reset the flag
             triton_client.unload_model("request_rescheduling_addsub")
             triton_client.load_model("request_rescheduling_addsub")

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,6 +71,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
         r = requests.post(
             url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
         )
+        # Content-Type header should always be JSON for errors
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
         try:
             r.raise_for_status()
             self.assertTrue(False, f"Expected failure, success for {inputs}")
@@ -79,6 +82,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
 
     def generate_stream_expect_failure(self, model_name, inputs, msg):
         r = self.generate_stream(model_name, inputs)
+        # Content-Type header should always be JSON for errors
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
         try:
             r.raise_for_status()
             self.assertTrue(False, f"Expected failure, success for {inputs}")
@@ -95,7 +101,9 @@ class GenerateEndpointTest(tu.TestResultCollector):
     def check_sse_responses(self, res, expected_res):
         # Validate SSE format
         self.assertIn("Content-Type", res.headers)
-        self.assertIn("text/event-stream", res.headers["Content-Type"])
+        self.assertEqual(
+            "text/event-stream; charset=utf-8", res.headers["Content-Type"]
+        )
 
         # SSE format (data: []) is hard to parse, use helper library for simplicity
         client = sseclient.SSEClient(res)
@@ -128,7 +136,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         r.raise_for_status()
 
         self.assertIn("Content-Type", r.headers)
-        self.assertIn("application/json", r.headers["Content-Type"])
+        self.assertEqual(r.headers["Content-Type"], "application/json")
 
         data = r.json()
         self.assertIn("TEXT", data)
@@ -335,7 +343,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         inputs = {
             "PROMPT": "hello world",
             "STREAM": True,
-            "PARAMS": {"PARAM_0": 0, "PARAM_1": True},
+            "PARAMS": {"PARAM_0": 0, "PARAM_1": True, "PARAM_2": 123.123},
         }
         r = self.generate(self._model_name, inputs)
         try:
@@ -355,6 +363,18 @@ class GenerateEndpointTest(tu.TestResultCollector):
             self.assertIn(
                 "attempt to access JSON non-string as string", r.json()["error"]
             )
+
+    def test_close_connection_during_streaming(self):
+        # verify the responses are streamed as soon as it is generated
+        text = "hello world"
+        rep_count = 3
+        inputs = {"PROMPT": [text], "STREAM": True, "REPETITION": rep_count, "DELAY": 2}
+        res = self.generate_stream(self._model_name, inputs, stream=True)
+        # close connection while the responses are being generated
+        res.close()
+        # check server healthiness
+        health_url = "http://localhost:8000/v2/health/live"
+        requests.get(health_url).raise_for_status()
 
     def test_parameters(self):
         # Test reserved nested object for parameters
@@ -393,6 +413,27 @@ class GenerateEndpointTest(tu.TestResultCollector):
                 "Converting keyword: 'parameters': parameter 'nested' has invalid type.",
                 r.json()["error"],
             )
+
+    def test_0_dimension_output(self):
+        # With the trtllm backend, if the end token is predicted at the first
+        # step, the output tensors will have the shapes with 0 dimension.
+        text = "hello world"
+        inputs = {
+            "PROMPT": text,
+            "STREAM": False,
+            "REPETITION": 0,
+            "OUTPUT_0_DIM": True,
+        }
+
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("TEXT", data)
+        self.assertEqual([], data["TEXT"])
 
 
 if __name__ == "__main__":

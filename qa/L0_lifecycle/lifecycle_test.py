@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@ sys.path.append("../common")
 import base64
 import concurrent.futures
 import json
+import multiprocessing
 import os
 import shutil
 import signal
@@ -41,6 +42,7 @@ import time
 import unittest
 from builtins import range
 from functools import partial
+from pathlib import Path
 
 import infer_util as iu
 import numpy as np
@@ -2379,20 +2381,15 @@ class LifeCycleTest(tu.TestResultCollector):
                     model_shape,
                 )
 
-                # request without additional config will load with default
-                # config and expect to fail, and version 2 will not be unloaded.
+                # request without additional config will load retain the provided
+                # config and expect to not fail, and version 2 will not be loaded.
                 try:
                     triton_client.load_model(model_name)
-                    self.assertTrue(
-                        False, "expected fail to load '{}'".format(model_name)
-                    )
                 except Exception as ex:
-                    self.assertIn(
-                        "load failed for model '{}'".format(model_name), ex.message()
-                    )
-                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
-                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
-                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
 
                 # Unload model for the next client iteration
                 try:
@@ -2538,8 +2535,9 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # Reset model for the next client iteration
                 try:
-                    # Load model again and the original model repository will
-                    # be use
+                    # Unload and load the model again and the original model repository will
+                    # be used
+                    triton_client.unload_model(model_name)
                     triton_client.load_model(model_name)
                     triton_client.unload_model(override_model_name)
                 except Exception as ex:
@@ -2995,6 +2993,16 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
+    # TODO: Consider revisiting this test
+    # The goal of this test is only to ensure the server does not crash when
+    # bombarded with concurrent load/unload requests for the same model.
+    # Some clean-up:
+    # 1. Improve core logic so all load/unload requests will always success, so
+    #    'load_fail_reasons' and 'unload_fail_reasons' can be removed.
+    # 2. Is it still necessary to track the ability to replicate a load while
+    #    async unloading?
+    # 3. What is the ideal number of threads and iterations, across different
+    #    machines, that the server is sufficiently stressed?
     def test_concurrent_same_model_load_unload_stress(self):
         model_name = "identity_zero_1_int32"
         num_threads = 32
@@ -3062,10 +3070,16 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
-        self.assertTrue(
-            load_before_unload_finish[0],
-            "The test case did not replicate a load while async unloading. Consider increase concurrency.",
-        )
+
+        # This test can replicate a load while async unloading on machines with
+        # sufficient concurrency. Regardless on whether it is replicated or not,
+        # the server must not crash.
+        if load_before_unload_finish[0] == False:
+            # Track non-replication on test printout via statistics.
+            warning_msg = "Cannot replicate a load while async unloading. CPU count: {}. num_threads: {}.".format(
+                multiprocessing.cpu_count(), num_threads
+            )
+            global_exception_stats[warning_msg] = 1
 
         stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
         with open(stats_path, mode="w", encoding="utf-8") as f:
@@ -3253,6 +3267,98 @@ class LifeCycleTest(tu.TestResultCollector):
                         triton_client.get_model_repository_index(),
                     )
                     self.assertTrue(triton_client.is_server_ready())
+
+    def test_model_config_overwite(self):
+        model_name = "identity_fp32"
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = self._get_client()
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load the model from disk w/o any special configuration settings.
+        original_config = triton_client.get_model_config(model_name)
+
+        # The instance_group[0].count is set to 2 instead of the default 1.
+        # This enough of a delta to ensure the correct model configuration
+        # has been applied to the model.
+        override_config = """
+{
+  "name": "identity_fp32",
+  "backend": "identity",
+  "instance_group": [
+    {
+      "count": 2,
+      "kind" : "KIND_CPU"
+    }
+  ]
+}
+"""
+
+        # Ensure the model has been loaded w/ the expected (different from override) config.
+        self.assertTrue(original_config != None and original_config != override_config)
+
+        # Reload the model with the overriding configuration value.
+        triton_client.load_model(model_name, config=override_config)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config = triton_client.get_model_config(model_name)
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config2 = triton_client.get_model_config(model_name)
+        self.assertEqual(updated_config, updated_config2)
+
+        # Touch the local config.pbtxt and reload the file to ensure the local config
+        # is preferred because it has a more recent mtime.
+        time.sleep(0.1)  # make sure timestamps are different
+        Path(os.path.join("models", model_name, "config.pbtxt")).touch()
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (local) config.
+        updated_config = triton_client.get_model_config(model_name)
+        self.assertEqual(original_config, updated_config)
+
+    def test_shutdown_while_background_unloading(self):
+        model_name = "identity_fp32"
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Check the Python version of the model is loaded.
+        self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        python_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(python_model_config["backend"], "python")
+        # Load the Identity version, which will put the Python version into the
+        # background and unload it, the unload will take at least 10 seconds.
+        override_config = "{\n"
+        override_config += '"name": "identity_fp32",\n'
+        override_config += '"backend": "identity"\n'
+        override_config += "}"
+        triton_client.load_model(model_name, config=override_config)
+        identity_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(identity_model_config["backend"], "identity")
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
+    def test_shutdown_while_loading(self):
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Load the model which will load for at least 10 seconds.
+        model_name = "identity_fp32"
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(triton_client.load_model, model_name)
+        self.assertFalse(triton_client.is_model_ready(model_name))
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
 
 
 if __name__ == "__main__":

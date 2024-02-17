@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,11 +74,13 @@ class TritonPythonModel:
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
             fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
             delay = params["DELAY"] if "DELAY" in params else None
+            output_0_dim = params["OUTPUT_0_DIM"] if "OUTPUT_0_DIM" in params else False
 
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
             stream_np = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()
-            out_tensor = pb_utils.Tensor("TEXT", input_np)
+            out_value = np.array([]) if output_0_dim else input_np
+            out_tensor = pb_utils.Tensor("TEXT", out_value)
             response = pb_utils.InferenceResponse([out_tensor])
             # If stream enabled, just send multiple copies of response
             # FIXME: Could split up response string into tokens, but this is simpler for now.
@@ -87,7 +89,10 @@ class TritonPythonModel:
                 for _ in range(rep_count):
                     if delay is not None:
                         time.sleep(delay)
-                    sender.send(response)
+                    if not sender.is_cancelled():
+                        sender.send(response)
+                    else:
+                        break
                 sender.send(
                     None
                     if not fail_last

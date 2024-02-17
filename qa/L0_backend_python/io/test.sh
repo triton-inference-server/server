@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,16 +27,11 @@
 
 UNITTEST_PY=./io_test.py
 CLIENT_LOG="./io_client.log"
-EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/io/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./io_server.log"
 
 RET=0
@@ -83,18 +78,12 @@ for trial in $TRIALS; do
     fi
 
     set +e
-    python3 $UNITTEST_PY IOTest.test_ensemble_io > $CLIENT_LOG.test_ensemble_io
+    SUBTEST="test_ensemble_io"
+    python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} >> ${CLIENT_LOG}.${SUBTEST}
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** IOTest.test_ensemble_io FAILED. \n***"
-        cat $CLIENT_LOG.test_ensemble_io
+        echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+        cat $CLIENT_LOG.${SUBTEST}
         RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG.test_ensemble_io
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
     fi
     set -e
 
@@ -116,18 +105,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $UNITTEST_PY IOTest.test_empty_gpu_output > $CLIENT_LOG.test_empty_gpu_output
+SUBTEST="test_empty_gpu_output"
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** IOTest.test_empty_gpu_output FAILED. \n***"
-    cat $CLIENT_LOG.test_empty_gpu_output
+    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+    cat $CLIENT_LOG.${SUBTEST}
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.test_empty_gpu_output
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -148,18 +132,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $UNITTEST_PY IOTest.test_variable_gpu_output > $CLIENT_LOG.test_variable_gpu_output
+SUBTEST="test_variable_gpu_output"
+python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
-    cat $CLIENT_LOG.test_variable_gpu_output
+    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+    cat $CLIENT_LOG.${SUBTEST}
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.test_variable_gpu_output
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 

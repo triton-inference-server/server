@@ -29,12 +29,11 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:23.10-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.01-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
-ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
@@ -88,16 +87,14 @@ RUN apt-get update && \
 
 # Client build requires recent version of CMake (FetchContent required)
 # Using CMAKE installation instruction from:: https://apt.kitware.com/
-RUN apt update && apt install -y gpg wget && \
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-        gpg --dearmor - |  \
-        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    . /etc/os-release && \
-    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
-    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends cmake cmake-data && \
-    cmake --version
+RUN apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7* \
+    && cmake --version
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -107,7 +104,6 @@ RUN rm -f /usr/bin/python && \
 ARG TRITON_CLIENT_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
-ARG TRITON_BACKEND_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
@@ -123,7 +119,6 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-          -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
           -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
