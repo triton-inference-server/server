@@ -54,6 +54,7 @@ SKIP_PATHS = (
     "deploy/gke-marketplace-app/server-deployer/chart/.helmignore",
     "deploy/gcp/.helmignore",
     "deploy/aws/.helmignore",
+    "deploy/oci/.helmignore",
     "deploy/fleetcommand/.helmignore",
     "docs/.gitignore",
     "docs/_static/.gitattributes",
