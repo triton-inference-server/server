@@ -26,6 +26,7 @@
 
 import os
 import signal
+import sys
 import time
 
 
@@ -34,7 +35,15 @@ class TritonPythonModel:
         time.sleep(3)
         # Simulate the case that the model goes out of memory and gets killed
         # by the OOM killer
-        os.kill(os.getpid(), signal.SIGKILL)
+        # NOTE: Windows runners use python 3.8 which do not have access to SIGKILL.
+        # We should remove this condition check when we upgrade the version of python.
+        # Online forums suggest 'CTRL_C_EVENT' should be the equivalent event, however,
+        # using this signal terminates the entire test, not just the server. SIGINT
+        # seems to work in the meantime.
+        if sys.platform == "win32":
+            os.kill(os.getpid(), signal.SIGINT)
+        else:
+            os.kill(os.getpid(), signal.SIGKILL)
 
     def execute(self, requests):
         pass

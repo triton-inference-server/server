@@ -27,11 +27,8 @@
 
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
 QA_MODELS_PATH="../../python_models"
-MODEL_REPOSITORY="$(pwd)/models"
+MODEL_REPOSITORY="${MODELDIR}/python_based_backends/models"
 SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
 SERVER_LOG="./python_based_backends_server.log"
 CLIENT_LOG="./python_based_backends_client.log"
@@ -91,8 +88,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 rm -rf ${MODEL_REPOSITORY} ${GEN_PYTORCH_MODEL_PY}
 
 if [ $RET -eq 1 ]; then

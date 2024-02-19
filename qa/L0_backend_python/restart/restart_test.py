@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -37,13 +38,17 @@ import shm_util
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class RestartTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
     def _infer_helper(self, model_name, shape, data_type):
-        with httpclient.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000") as client:
             input_data_0 = np.array(np.random.randn(*shape), dtype=data_type)
             inputs = [
                 httpclient.InferInput(

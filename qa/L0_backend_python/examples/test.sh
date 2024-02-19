@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,10 +28,7 @@
 source ../common.sh
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/examples/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./examples_server.log"
 
 RET=0
@@ -39,7 +36,7 @@ rm -fr *.log python_backend/
 
 # Install torch
 pip3 uninstall -y torch
-if [ "$TEST_JETSON" == "0" ]; then
+if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
 else
     pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
@@ -83,8 +80,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 2
 CLIENT_LOG="./examples_pytorch_client.log"
@@ -113,8 +109,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 3
 
@@ -147,8 +142,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Example 4
@@ -180,8 +174,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 5
 
@@ -212,8 +205,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Example 6
 
@@ -244,8 +236,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 #
 # BLS Async
@@ -281,8 +272,7 @@ if [ "$TEST_JETSON" == "0" ]; then
 
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Auto Complete Model Configuration Example
@@ -316,8 +306,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # BLS Decoupled Sync
 CLIENT_LOG="./examples_bls_decoupled_sync_client.log"
@@ -346,8 +335,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # BLS Decoupled Async
 if [ "$TEST_JETSON" == "0" ]; then
@@ -378,8 +366,7 @@ if [ "$TEST_JETSON" == "0" ]; then
 
     set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 fi
 
 # Example 7
@@ -411,8 +398,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Custom Metrics
 CLIENT_LOG="./examples_custom_metrics_client.log"
@@ -441,8 +427,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 0 ]; then

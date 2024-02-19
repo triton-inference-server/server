@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,49 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./custom_metrics_client.log"
-TEST_RESULT_FILE='test_results.txt'
-source ../../common/util.sh
-
-SERVER_ARGS="--model-repository=${MODELDIR}/custom_metrics/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./custom_metrics_server.log"
-
-RET=0
-rm -fr *.log ./models *.txt
-
-mkdir -p models/custom_metrics/1/
-cp ../../python_models/custom_metrics/model.py models/custom_metrics/1/
-cp ../../python_models/custom_metrics/config.pbtxt models/custom_metrics
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-
-export MODEL_NAME='custom_metrics'
-python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
-
-set -e
-
-kill_server
-
-
-if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Custom Metrics test FAILED. \n***"
-else
-    echo -e "\n***\n*** Custom Metrics test PASSED. \n***"
-fi
-
-exit $RET
+apiVersion: v1
+appVersion: "1.0"
+description: Triton Inference Server
+name: triton-inference-server
+version: 1.0.0

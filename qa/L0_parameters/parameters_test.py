@@ -56,6 +56,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.parameter_list = []
         self.parameter_list.append({"key1": "value1", "key2": "value2"})
         self.parameter_list.append({"key1": 1, "key2": 2})
+        self.parameter_list.append({"key1": 123.123, "key2": 321.321})
         self.parameter_list.append({"key1": True, "key2": "value2"})
         self.parameter_list.append({"triton_": True, "key2": "value2"})
 

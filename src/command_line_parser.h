@@ -302,13 +302,16 @@ class TritonParser {
   void SetTritonTraceArgs(
       TritonServerParameters& lparams, bool trace_filepath_present,
       bool trace_log_frequency_present);
-  void VerifyOpentelemetryTraceArgs(
-      bool trace_filepath_present, bool trace_log_frequency_present);
+  void SetOpenTelemetryTraceArgs(
+      TritonServerParameters& lparams, bool trace_filepath_present,
+      bool trace_log_frequency_present);
   void PostProcessTraceArgs(
       TritonServerParameters& lparams, bool trace_level_present,
       bool trace_rate_present, bool trace_count_present,
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
+  void ProcessOpenTelemetryBatchSpanProcessorArgs(
+      TraceConfig& otel_trace_settings);
 #endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format

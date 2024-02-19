@@ -474,6 +474,9 @@ InferResponseCompleteCommon(
       case TRITONSERVER_PARAMETER_STRING:
         param.set_string_param(reinterpret_cast<const char*>(vvalue));
         break;
+      case TRITONSERVER_PARAMETER_DOUBLE:
+        param.set_double_param(*(reinterpret_cast<const double*>(vvalue)));
+        break;
       case TRITONSERVER_PARAMETER_BYTES:
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_UNSUPPORTED,
