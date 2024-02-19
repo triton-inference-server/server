@@ -55,15 +55,24 @@ CACHE_COUNTER_PATTERNS = [
     "nv_cache_hit_duration_per_model",
     "nv_cache_miss_duration_per_model",
 ]
+PINNED_MEMORY_PATTERNS = [
+    "nv_pinned_memory_pool_total_bytes",
+    "nv_pinned_memory_pool_used_bytes",
+]
 CACHE_SUMMARY_PATTERNS = ["nv_cache_hit_summary", "nv_cache_miss_summary"]
 
 
-class MetricsTest(tu.TestResultCollector):
+class MetricsConfigTest(tu.TestResultCollector):
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
         r = requests.get(metrics_url)
         r.raise_for_status()
         return r.text
+
+    def test_pinned_memory_metrics_exist(self):
+        metrics = self._get_metrics()
+        for metric in PINNED_MEMORY_PATTERNS:
+            self.assertIn(metric, metrics)
 
     # Counters
     def test_inf_counters_exist(self):

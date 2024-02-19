@@ -48,14 +48,14 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.06}
+TRITON_VERSION=${TRITON_VERSION:=24.01}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.13.0
 ONNX_OPSET=0
 
 # OPENVINO version
-OPENVINO_VERSION=2023.0.0
+OPENVINO_VERSION=2023.3.0
 
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
@@ -91,6 +91,7 @@ HOST_VARIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_
 HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
 HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
+HOST_SCALARMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
@@ -99,6 +100,7 @@ rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
 rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
 rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
+rm -rf $HOST_SCALARMODELSDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -123,6 +125,7 @@ mkdir -p $HOST_VARIMPLICITSEQDESTDIR
 mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_TORCHTRTDESTDIR
+mkdir -p $HOST_SCALARMODELSDESTDIR
 
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
@@ -154,6 +157,8 @@ cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
+cp ./gen_common.py $HOST_SRCDIR/.
+cp ./gen_qa_ort_scalar_models.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
@@ -185,6 +190,7 @@ RAGGEDDESTDIR=/tmp/raggedmodels
 FORMATDESTDIR=/tmp/formatmodels
 DATADEPENDENTDIR=/tmp/datadependentmodels
 TORCHTRTDESTDIR=/tmp/torchtrtmodels
+SCALARMODELSDESTDIR=/tmp/scalarmodels
 
 # OPENVINO
 #
@@ -203,8 +209,6 @@ apt-get update && \
             protobuf-compiler python3 python3-dev python3-pip wget gnupg2 \
             software-properties-common
 ln -s /usr/bin/python3 /usr/bin/python
-
-pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
 
 pip3 install  "numpy<=1.23.5" setuptools
 
@@ -242,6 +246,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$OPENVINOSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+       --mount type=bind,source=$HOST_SCALARMODELSDESTDIR,target=$SCALARMODELSDESTDIR \
        $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -292,6 +297,8 @@ python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONN
 chmod -R 777 $DYNASEQIMPLICITDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
+python3 $SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$SCALARMODELSDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$ONNXSCRIPT
@@ -316,6 +323,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_VARINITIALSTATEIMPLICITSEQDESTDIR,target=$VARINITIALSTATEIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_INITIALSTATEIMPLICITSEQDESTDIR,target=$INITIALSTATEIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_SCALARMODELSDESTDIR,target=$SCALARMODELSDESTDIR \
        $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -386,6 +394,10 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 set -x
+# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
+# Upgrade protobuf version to fix the issue.
+pip3 install "protobuf>4.24.0"
+
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
@@ -462,6 +474,7 @@ chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
 chmod -R 777 $IDENTITYBIGDESTDIR

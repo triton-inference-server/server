@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,26 +43,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-export CUDA_VISIBLE_DEVICES=0
-
-# On windows the paths invoked by the script (running in WSL) must use
-# /mnt/c when needed but the paths on the tritonserver command-line
-# must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    MODELDIR=${MODELDIR:=C:/models}
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
-    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
-    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
-    export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
-else
-    MODELDIR=${MODELDIR:=`pwd`}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-    SERVER=${TRITON_DIR}/bin/tritonserver
-    BACKEND_DIR=${TRITON_DIR}/backends
-fi
-
-MODELSDIR=`pwd`/models
+MODELSDIR=${MODELDIR}/logging/models
 source ../../common/util.sh
 
 function verify_log_counts () {
@@ -94,15 +75,15 @@ function verify_log_counts () {
 rm -f *.log
 
 # set up simple repository MODELBASE
-rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
+rm -fr ${MODELSDIR} && mkdir -p ${MODELSDIR} && \
     python_model="identity_fp32_logging"
     mkdir -p models/$python_model/1/
-    cp ../../python_models/$python_model/config.pbtxt models/$python_model/config.pbtxt
-    cp ../../python_models/$python_model/model.py models/$python_model/1/
+    cp ../../python_models/${python_model}/config.pbtxt models/${python_model}/config.pbtxt
+    cp ../../python_models/${python_model}/model.py models/${python_model}/1/
 RET=0
 
 #Run Server with Default Log Settings
-SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS="--model-repository=${MODELSDIR} --backend-directory=${BACKEND_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -111,27 +92,32 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="default"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Check if correct # log messages are present [ non-verbose-msg-cnt | verbose-msg-cnt ]
-verify_log_counts 4 0
+# NOTE: Windows does not seem to have a way to send a true SIGINT signal
+# to tritonserver. Instead, it seems required to use taskkill.exe with /F (force)
+# to kill the running program. This means the server terminates immediately,
+# instead of shutting down how it would if Ctrl^C was invoked from the terminal.
+# To properly test functionality, we need a WAR. In the meantime, we will subtract
+# 1 from the expected values to account for the fact that no logs will be emitted
+# from the finalize function.
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    verify_log_counts 3 0
+else
+    verify_log_counts 4 0
+fi
+
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -144,7 +130,7 @@ fi
 
 set +e
 # Enable verbose logging
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":1}' localhost:8000/v2/logging`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":1}' ${TRITONSERVER_IPADDR}:8000/v2/logging`
 
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -152,28 +138,25 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="verbose"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Verbose only 3 because model must initialize before
 # log settings can be modified
-verify_log_counts 4 3
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    verify_log_counts 3 2
+else
+    verify_log_counts 4 3
+fi
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -189,7 +172,7 @@ set +e
 BOOL_PARAMS=${BOOL_PARAMS:="log_info log_warning log_error"}
 for BOOL_PARAM in $BOOL_PARAMS; do
     # Attempt to use integer instead of bool
-    code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":false}' localhost:8000/v2/logging`
+    code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":false}' ${TRITONSERVER_IPADDR}:8000/v2/logging`
     if [ "$code" != "200" ]; then
         cat ./curl.out
         echo -e "\n***\n*** Test Failed: Could not Change Log Settings\n***"
@@ -197,28 +180,23 @@ for BOOL_PARAM in $BOOL_PARAMS; do
     fi
 done
 
-python3 $LOG_TEST >>$CLIENT_LOG 2>&1
+SUBTEST="disabled"
+python3 -m pytest --junitxml=log_test.${SUBTEST}.report.xml ${LOG_TEST} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Will have 1 occurrence of each non-verbose log type
 # because the server must initialize before log settings
 # can be modified
+# Same count for both Unix and Windows because this does
+# not test log output in the finalize step.
 verify_log_counts 1 0
 
 
@@ -227,7 +205,5 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** Logging test FAILED. \n***"
 fi
-
-collect_artifacts_from_subdir
 
 exit $RET

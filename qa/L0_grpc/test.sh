@@ -613,7 +613,24 @@ SERVER_ARGS="--model-repository=${MODELDIR} \
              --grpc-restricted-protocol=model-repository,health:k1=v1 \
              --grpc-restricted-protocol=metadata,health:k2=v2"
 run_server
-EXPECTED_MSG="protocol 'health' can not be specified in multiple config group"
+EXPECTED_MSG="protocol 'health' can not be specified in multiple config groups"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+# Unknown protocol, not allowed
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-reposit,health:k1=v1 \
+             --grpc-restricted-protocol=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="unknown restricted protocol 'model-reposit'"
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Expect fail to start $SERVER\n***"
     kill $SERVER_PID

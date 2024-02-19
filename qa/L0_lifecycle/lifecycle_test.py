@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,8 +30,10 @@ import sys
 
 sys.path.append("../common")
 
+import base64
 import concurrent.futures
 import json
+import multiprocessing
 import os
 import shutil
 import signal
@@ -40,6 +42,7 @@ import time
 import unittest
 from builtins import range
 from functools import partial
+from pathlib import Path
 
 import infer_util as iu
 import numpy as np
@@ -2378,20 +2381,15 @@ class LifeCycleTest(tu.TestResultCollector):
                     model_shape,
                 )
 
-                # request without additional config will load with default
-                # config and expect to fail, and version 2 will not be unloaded.
+                # request without additional config will load retain the provided
+                # config and expect to not fail, and version 2 will not be loaded.
                 try:
                     triton_client.load_model(model_name)
-                    self.assertTrue(
-                        False, "expected fail to load '{}'".format(model_name)
-                    )
                 except Exception as ex:
-                    self.assertIn(
-                        "load failed for model '{}'".format(model_name), ex.message()
-                    )
-                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
-                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
-                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
 
                 # Unload model for the next client iteration
                 try:
@@ -2537,8 +2535,9 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # Reset model for the next client iteration
                 try:
-                    # Load model again and the original model repository will
-                    # be use
+                    # Unload and load the model again and the original model repository will
+                    # be used
+                    triton_client.unload_model(model_name)
                     triton_client.load_model(model_name)
                     triton_client.unload_model(override_model_name)
                 except Exception as ex:
@@ -2553,6 +2552,83 @@ class LifeCycleTest(tu.TestResultCollector):
                     (3,),
                     model_shape,
                 )
+
+    # Test that model load API file override can't be used to create files
+    # outside of any model directory.
+    def test_file_override_security(self):
+        # When using model load API, temporary model directories are created in
+        # a randomly generated /tmp/folderXXXXXX directory for the life of the
+        # model, and cleaned up on model unload.
+        model_basepath = "/tmp/folderXXXXXX"
+        if os.path.exists(model_basepath) and os.path.isdir(model_basepath):
+            shutil.rmtree(model_basepath)
+        os.makedirs(model_basepath)
+
+        # Set file override paths that try to escape out of model directory,
+        # and test both pre-existing and non-existent files.
+        root_home_dir = "/root"
+
+        # Relative paths
+        escape_dir_rel = os.path.join("..", "..", "root")
+        escape_dir_full = os.path.join(model_basepath, escape_dir_rel)
+        self.assertEqual(os.path.abspath(escape_dir_full), root_home_dir)
+
+        new_file_rel = os.path.join(escape_dir_rel, "new_dir", "test.txt")
+        self.assertFalse(os.path.exists(os.path.join(model_basepath, new_file_rel)))
+        existing_file_rel = os.path.join(escape_dir_rel, ".bashrc")
+        self.assertTrue(os.path.exists(os.path.join(model_basepath, existing_file_rel)))
+
+        # Symlinks
+        ## No easy way to inject symlink into generated temp model dir, so for
+        ## testing sake, make a fixed symlink path in /tmp.
+        escape_dir_symlink_rel = os.path.join("..", "escape_symlink")
+        escape_dir_symlink_full = "/tmp/escape_symlink"
+        self.assertEqual(
+            os.path.abspath(os.path.join(model_basepath, escape_dir_symlink_rel)),
+            escape_dir_symlink_full,
+        )
+        if os.path.exists(escape_dir_symlink_full):
+            os.unlink(escape_dir_symlink_full)
+        os.symlink(root_home_dir, escape_dir_symlink_full)
+        self.assertTrue(os.path.abspath(escape_dir_symlink_full), root_home_dir)
+
+        symlink_new_file_rel = os.path.join(
+            escape_dir_symlink_rel, "new_dir", "test.txt"
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(model_basepath, symlink_new_file_rel))
+        )
+        symlink_existing_file_rel = os.path.join(escape_dir_symlink_rel, ".bashrc")
+        self.assertTrue(
+            os.path.exists(os.path.join(model_basepath, symlink_existing_file_rel))
+        )
+
+        # Contents to try writing to file, though it should fail to be written
+        new_contents = "This shouldn't exist"
+        new_contents_b64 = base64.b64encode(new_contents.encode())
+
+        new_files = [new_file_rel, symlink_new_file_rel]
+        existing_files = [existing_file_rel, symlink_existing_file_rel]
+        all_files = new_files + existing_files
+        for filepath in all_files:
+            # minimal config to create a new model
+            config = json.dumps({"backend": "identity"})
+            files = {f"file:{filepath}": new_contents_b64}
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                with self.assertRaisesRegex(InferenceServerException, "failed to load"):
+                    client.load_model("new_model", config=config, files=files)
+
+        for rel_path in new_files:
+            # Assert new file wasn't created
+            self.assertFalse(os.path.exists(os.path.join(model_basepath, rel_path)))
+
+        for rel_path in existing_files:
+            # Read the existing file and make sure it's contents weren't overwritten
+            existing_file = os.path.join(model_basepath, rel_path)
+            self.assertTrue(os.path.exists(existing_file))
+            with open(existing_file) as f:
+                contents = f.read()
+                self.assertNotEqual(contents, new_contents)
 
     def test_shutdown_dynamic(self):
         model_shape = (1, 1)
@@ -2917,6 +2993,98 @@ class LifeCycleTest(tu.TestResultCollector):
             for model_name in model_names:
                 self.assertEqual(is_load, triton_client.is_model_ready(model_name))
 
+    # TODO: Consider revisiting this test
+    # The goal of this test is only to ensure the server does not crash when
+    # bombarded with concurrent load/unload requests for the same model.
+    # Some clean-up:
+    # 1. Improve core logic so all load/unload requests will always success, so
+    #    'load_fail_reasons' and 'unload_fail_reasons' can be removed.
+    # 2. Is it still necessary to track the ability to replicate a load while
+    #    async unloading?
+    # 3. What is the ideal number of threads and iterations, across different
+    #    machines, that the server is sufficiently stressed?
+    def test_concurrent_same_model_load_unload_stress(self):
+        model_name = "identity_zero_1_int32"
+        num_threads = 32
+        num_iterations = 1024
+        try:
+            triton_client = grpcclient.InferenceServerClient(
+                "localhost:8001", verbose=True
+            )
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        load_fail_reasons = [
+            "unexpected miss in global map",
+            "no version is available",
+            "failed to poll from model repository",
+        ]
+        unload_fail_reasons = ["versions that are still available: 1"]
+        load_fail_messages = [
+            ("failed to load '" + model_name + "', " + reason)
+            for reason in load_fail_reasons
+        ]
+        unload_fail_messages = [
+            ("failed to unload '" + model_name + "', " + reason)
+            for reason in unload_fail_reasons
+        ]
+        global_exception_stats = {}  # { "exception message": number of occurrence }
+        load_before_unload_finish = [False]  # use list to access by reference
+
+        def _load_unload():
+            exception_stats = {}  # { "exception message": number of occurrence }
+            for i in range(num_iterations):
+                try:
+                    triton_client.load_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for an unload to happen after a load completes, only
+                    # before the load can verify its load state.
+                    error_message = ex.message()
+                    self.assertIn(error_message, load_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                try:
+                    triton_client.unload_model(model_name)
+                except InferenceServerException as ex:
+                    # Acceptable for a load to happen after an unload completes, only
+                    # before the unload can verify its unload state.
+                    error_message = ex.message()
+                    self.assertIn(error_message, unload_fail_messages)
+                    if error_message not in exception_stats:
+                        exception_stats[error_message] = 0
+                    exception_stats[error_message] += 1
+                    load_before_unload_finish[0] = True
+            return exception_stats
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            threads = []
+            for i in range(num_threads):
+                threads.append(pool.submit(_load_unload))
+            for t in threads:
+                exception_stats = t.result()
+                for key, count in exception_stats.items():
+                    if key not in global_exception_stats:
+                        global_exception_stats[key] = 0
+                    global_exception_stats[key] += count
+
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+
+        # This test can replicate a load while async unloading on machines with
+        # sufficient concurrency. Regardless on whether it is replicated or not,
+        # the server must not crash.
+        if load_before_unload_finish[0] == False:
+            # Track non-replication on test printout via statistics.
+            warning_msg = "Cannot replicate a load while async unloading. CPU count: {}. num_threads: {}.".format(
+                multiprocessing.cpu_count(), num_threads
+            )
+            global_exception_stats[warning_msg] = 1
+
+        stats_path = "./test_concurrent_same_model_load_unload_stress.statistics.log"
+        with open(stats_path, mode="w", encoding="utf-8") as f:
+            f.write(str(global_exception_stats) + "\n")
+
     def test_concurrent_model_instance_load_speedup(self):
         # Initialize client
         try:
@@ -3099,6 +3267,98 @@ class LifeCycleTest(tu.TestResultCollector):
                         triton_client.get_model_repository_index(),
                     )
                     self.assertTrue(triton_client.is_server_ready())
+
+    def test_model_config_overwite(self):
+        model_name = "identity_fp32"
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = self._get_client()
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load the model from disk w/o any special configuration settings.
+        original_config = triton_client.get_model_config(model_name)
+
+        # The instance_group[0].count is set to 2 instead of the default 1.
+        # This enough of a delta to ensure the correct model configuration
+        # has been applied to the model.
+        override_config = """
+{
+  "name": "identity_fp32",
+  "backend": "identity",
+  "instance_group": [
+    {
+      "count": 2,
+      "kind" : "KIND_CPU"
+    }
+  ]
+}
+"""
+
+        # Ensure the model has been loaded w/ the expected (different from override) config.
+        self.assertTrue(original_config != None and original_config != override_config)
+
+        # Reload the model with the overriding configuration value.
+        triton_client.load_model(model_name, config=override_config)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config = triton_client.get_model_config(model_name)
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (override) config.
+        updated_config2 = triton_client.get_model_config(model_name)
+        self.assertEqual(updated_config, updated_config2)
+
+        # Touch the local config.pbtxt and reload the file to ensure the local config
+        # is preferred because it has a more recent mtime.
+        time.sleep(0.1)  # make sure timestamps are different
+        Path(os.path.join("models", model_name, "config.pbtxt")).touch()
+
+        # Reload the model
+        triton_client.load_model(model_name)
+
+        # Ensure the model has been loaded w/ the expected (local) config.
+        updated_config = triton_client.get_model_config(model_name)
+        self.assertEqual(original_config, updated_config)
+
+    def test_shutdown_while_background_unloading(self):
+        model_name = "identity_fp32"
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Check the Python version of the model is loaded.
+        self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        python_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(python_model_config["backend"], "python")
+        # Load the Identity version, which will put the Python version into the
+        # background and unload it, the unload will take at least 10 seconds.
+        override_config = "{\n"
+        override_config += '"name": "identity_fp32",\n'
+        override_config += '"backend": "identity"\n'
+        override_config += "}"
+        triton_client.load_model(model_name, config=override_config)
+        identity_model_config = triton_client.get_model_config(model_name)
+        self.assertEqual(identity_model_config["backend"], "identity")
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
+
+    def test_shutdown_while_loading(self):
+        triton_client = self._get_client()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        # Load the model which will load for at least 10 seconds.
+        model_name = "identity_fp32"
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            pool.submit(triton_client.load_model, model_name)
+        self.assertFalse(triton_client.is_model_ready(model_name))
+        # The server will shutdown after this sub-test exits. The server must shutdown
+        # without any hang or runtime error.
 
 
 if __name__ == "__main__":

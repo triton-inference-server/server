@@ -43,7 +43,7 @@ cp -rf `pwd`/client/src/c++/perf_analyzer/docs .
 # This breaks all links to cli commands throughout the docs. This will iterate over all
 # files in the docs directory and remove -- and - at the start of options, which allows the
 # tool to check links for correctness.
-for file in `pwd`/docs/*
+for file in `pwd`/docs/*.md
 do
   echo $file
   sed -i 's/`-*/`/g' $file

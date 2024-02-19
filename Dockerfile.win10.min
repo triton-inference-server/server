@@ -39,6 +39,23 @@ RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Loca
 RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
 RUN choco install git docker unzip -y
 
+#
+# Installing CMake
+#
+ARG CMAKE_VERSION=3.27.1
+ARG CMAKE_FILE=cmake-${CMAKE_VERSION}-windows-x86_64
+ARG CMAKE_SOURCE=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_FILE}.zip
+
+ADD ${CMAKE_SOURCE} ${CMAKE_FILE}.zip
+RUN unzip %CMAKE_FILE%.zip
+RUN move %CMAKE_FILE% "c:\CMake"
+RUN setx PATH "c:\CMake\bin;%PATH%"
+
+ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV VCPKG_TARGET_TRIPLET x64-windows
+
+LABEL CMAKE_VERSION=${CMAKE_VERSION}
+
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
 ARG PYTHON_VERSION=3.8.10
@@ -51,32 +68,50 @@ RUN pip install grpcio-tools
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
 
-# Download and install Build Tools for Visual Studio. The use of
-# powershell for the install seems to be required to make the command
-# wait for the install to complete before continuing. To avoid failures
-# caused by VS regressions we want to stick with a working
-# compiler. Currently this is 16.11.21. This page contains download
-# links for buildtools.
-# https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
-ARG BUILDTOOLS_VERSION=16.11.21
-ARG BUILDTOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/8f1eb024-006a-43f6-a372-0721f71058b3/cc5cc690ac094fbfa78dfb8e40089ba52056026579e8d8dc31e95e8ea5466df5/vs_BuildTools.exe
-ADD ${BUILDTOOLS_SOURCE} vs_buildtools.exe
-ARG VS_INSTALL_PATH_WP="C:\BuildTools"
-RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--addProductLang","En-us","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
+#
+# Installing Visual Studio BuildTools: VS17 2022
+#
+ARG BUILDTOOLS_VERSION
+# Download collect.exe in case of an install failure.
+ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
-LABEL BUILDTOOLS_VERSION=16.11.21
+# Use the latest release channel. For more control, specify the location of an internal layout.
+ARG CHANNEL_URL=https://aka.ms/vs/17/release/channel
+ADD ${CHANNEL_URL} "C:\tmp\VisualStudio.chman"
+# Download the Build Tools bootstrapper.
+ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
+ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
+# Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
+ARG VS_INSTALL_PATH_WP="C:\BuildTools"
+RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
+      --installPath %VS_INSTALL_PATH_WP% \
+      --channelUri "C:\tmp\VisualStudio.chman" \
+      --installChannelUri "C:\tmp\VisualStudio.chman" \
+      --add Microsoft.VisualStudio.Workload.VCTools \
+      --includeRecommended \
+      --locale "En-us"
+
+LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
 WORKDIR /
 
 #
 # Installing Vcpkg
 #
-ARG VCPGK_VERSION=2022.11.14
+ARG VCPGK_VERSION=2023.11.20
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe install \
+      b64:x64-windows \
+      boost-interprocess:x64-windows \
+      boost-stacktrace:x64-windows \
+      openssl-windows:x64-windows \
+      openssl:x64-windows \
+      pthread:x64-windows \
+      rapidjson:x64-windows \
+      zlib:x64-windows
 RUN vcpkg.exe integrate install
 
 LABEL VCPGK_VERSION=${VCPGK_VERSION}
@@ -84,28 +119,11 @@ LABEL VCPGK_VERSION=${VCPGK_VERSION}
 WORKDIR /
 
 #
-# Installing CMake
-#
-ARG CMAKE_VERSION=3.26.1
-ARG CMAKE_FILE=cmake-${CMAKE_VERSION}-windows-x86_64
-ARG CMAKE_SOURCE=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_FILE}.zip
-
-ADD ${CMAKE_SOURCE} ${CMAKE_FILE}.zip
-RUN unzip %CMAKE_FILE%.zip
-RUN move %CMAKE_FILE% CMake
-RUN setx PATH "c:\CMake\bin;%PATH%"
-
-ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
-ENV VCPKG_TARGET_TRIPLET x64-windows
-
-LABEL CMAKE_VERSION=${CMAKE_VERSION}
-
-#
 # Installing CUDA
 #
 ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=1
-ARG CUDA_PATCH=1
+ARG CUDA_MINOR=3
+ARG CUDA_PATCH=2
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -126,14 +144,14 @@ ADD ${CUDA_SOURCE} cuda_${CUDA_VERSION}_windows_network.exe
 RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 # Copy the CUDA visualstudio integration from where it was installed
 # into the appropriate place in BuildTools
-RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v160\BuildCustomizations"
+RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v170\BuildCustomizations"
 
 RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
 
 LABEL CUDA_VERSION="${CUDA_VERSION}"
 
 #
-# Installing Tensorrt
+# Installing TensorRT
 #
 ARG TENSORRT_VERSION=8.6.1.6
 ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.0.zip"
@@ -151,9 +169,9 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 
 
 #
-# Installing CUDNN
+# Installing cuDNN
 #
-ARG CUDNN_VERSION=8.9.3.28
+ARG CUDNN_VERSION=8.9.7.29
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=${CUDNN_ZIP}
 

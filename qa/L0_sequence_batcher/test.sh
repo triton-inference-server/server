@@ -42,6 +42,8 @@ TEST_RESULT_FILE='test_results.txt'
 
 # Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
+ldconfig || true
+
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
@@ -90,12 +92,14 @@ TF_VERSION=${TF_VERSION:=2}
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
+WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER:TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    WINDOWS=1
 else
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -166,6 +170,10 @@ export INITIAL_STATE_FILE
 # If INITIAL_STATE_ZERO is not specified, set to 0
 INITIAL_STATE_ZERO=${INITIAL_STATE_ZERO:="0"}
 export INITIAL_STATE_ZERO
+
+# If USE_SINGLE_BUFFER is not specified, set to 0
+USE_SINGLE_BUFFER=${USE_SINGLE_BUFFER:="0"}
+export USE_SINGLE_BUFFER
 
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:
@@ -330,6 +338,23 @@ for MODEL in $MODELS; do
       (cd queue_delay_models/$(basename $MODEL)_full && \
         sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
         sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
+
+    # TODO: Enable single state buffer testing for sequence batcher
+    # if [ "$USE_SINGLE_BUFFER" == "1" && "$IMPLICIT_STATE" == "1" ]; then
+    #   SED_REPLACE_PATTERN="N;N;N;N;N;/state.*dims:.*/a use_single_buffer: true"
+    #   (cd models0/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models1/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models2/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd models4/$(basename $MODEL) && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd queue_delay_models/$(basename $MODEL)_full && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    #   (cd queue_delay_models/$(basename $MODEL)_half && \
+    #     sed -i "$SED_REPLACE_PATTERN" config.pbtxt)
+    # fi
   else
     cp -r $MODEL queue_delay_models/$(basename $MODEL)_full && \
       (cd queue_delay_models/$(basename $MODEL)_full && \
@@ -799,6 +824,85 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
     fi
     set -e
 fi
+
+### Start Preserve Ordering Tests ###
+
+# Test only supported on windows currently due to use of python backend models
+if [ ${WINDOWS} -ne 1 ]; then
+    # Test preserve ordering true/false and decoupled/non-decoupled
+    TEST_CASE=SequenceBatcherPreserveOrderingTest
+    MODEL_PATH=preserve_ordering_models
+    BASE_MODEL="../python_models/sequence_py"
+    rm -rf ${MODEL_PATH}
+
+    # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
+    # stream are done out of order in server, so decoupled tests are disabled.
+    MODES="decoupled nondecoupled"
+    for mode in $MODES; do
+        NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
+        mkdir -p ${NO_PRESERVE}/1
+        cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
+        cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+
+        PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
+        cp -r ${NO_PRESERVE} ${PRESERVE}
+        sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+
+        if [ ${mode} == "decoupled" ]; then
+          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
+          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
+        fi
+    done
+
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else
+        run_server
+    fi
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
+
+    set +e
+    python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
+        RET=1
+    else
+        # 2 for preserve_ordering = True/False
+        check_test_results $TEST_RESULT_FILE 2
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill_server
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
+fi
+
+### End Preserve Ordering Tests ###
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

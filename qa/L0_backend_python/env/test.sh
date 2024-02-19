@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,7 @@ CLIENT_LOG="./env_client.log"
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/env/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./env_server.log"
@@ -314,7 +313,5 @@ else
   cat $SERVER_LOG
   echo -e "\n***\n*** Env Manager Test FAILED.\n***"
 fi
-
-collect_artifacts_from_subdir
 
 exit $RET

@@ -5,3 +5,4 @@
 __pycache__
 tmp
 *.log
+test_results.txt

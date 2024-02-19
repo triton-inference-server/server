@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@ get_shm_pages() {
 
 install_conda() {
   rm -rf ./miniconda
-  file_name="Miniconda3-py310_23.3.1-0-Linux-x86_64.sh"
+  file_name="Miniconda3-py310_23.11.0-2-Linux-x86_64.sh"
   wget https://repo.anaconda.com/miniconda/$file_name
 
   # install miniconda in silent mode
@@ -45,15 +45,13 @@ install_conda() {
 install_build_deps() {
   apt update && apt install software-properties-common rapidjson-dev -y
   # Using CMAKE installation instruction from:: https://apt.kitware.com/
-  apt install -y gpg wget && \
-      wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-            gpg --dearmor - |  \
-            tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-      . /etc/os-release && \
-      echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
-      tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends cmake cmake-data
+  apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 }
 
 create_conda_env() {

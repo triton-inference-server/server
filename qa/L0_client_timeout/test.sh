@@ -39,10 +39,12 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 export CUDA_VISIBLE_DEVICES=0
-
+TIMEOUT_VALUE=100000000
+SHORT_TIMEOUT_VALUE=1000
 RET=0
 
-CLIENT_TIMEOUT_TEST=client_timeout_test.py
+CLIENT_INFER_TIMEOUT_TEST=client_infer_timeout_test.py
+CLIENT_NON_INFER_TIMEOUT_TEST=client_non_infer_timeout_test.py
 CLIENT_TIMEOUT_TEST_CPP=../clients/client_timeout_test
 TEST_RESULT_FILE='test_results.txt'
 
@@ -50,14 +52,21 @@ rm -f *.log
 rm -f *.log.*
 
 CLIENT_LOG=`pwd`/client.log
+CLIENT_GRPC_TIMEOUTS_LOG=`pwd`/client.log.grpc
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --load-model=custom_identity_int32 --log-verbose 2"
 source ../common/util.sh
 
 mkdir -p $DATADIR/custom_identity_int32/1
 
+# Test all APIs apart from Infer.
+export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
 run_server
+if [ $? -eq 1 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC non-infer APIs\n***"
+    RET=1
+fi
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -65,12 +74,40 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
+# Expect timeout for everything
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -i grpc -p >> ${CLIENT_LOG}.c++.grpc_non_infer_apis 2>&1
+if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_non_infer_apis` != "18" ]; then
+    cat ${CLIENT_LOG}.c++.grpc_non_infer_apis
+    echo -e "\n***\n*** Test Failed. Expected 18 failed\n***"
+    RET=1
+fi
+# Test all APIs with long timeout
+$CLIENT_TIMEOUT_TEST_CPP -t $TIMEOUT_VALUE -v -i grpc -p >> ${CLIENT_LOG} 2>&1
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Test Failed: GRPC non-infer APIs\n***"
+    RET=1
+fi
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test infer APIs
+unset TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose 2"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
 
 # CASE 1: Provide too small a timeout and expect a failure.
 # Note, the custom_identity_int32 is configured with a delay
 # of 3 sec.
 # Test request timeout in grpc synchronous inference
-$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc >> ${CLIENT_LOG}.c++.grpc_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -i grpc >> ${CLIENT_LOG}.c++.grpc_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -81,7 +118,7 @@ if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_infer` != "1" ]; then
 fi
 
 # Test request timeout in grpc asynchronous inference
-$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc -a >> ${CLIENT_LOG}.c++.grpc_async_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -i grpc -a >> ${CLIENT_LOG}.c++.grpc_async_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -92,7 +129,7 @@ if [ `grep -c "Deadline Exceeded" ${CLIENT_LOG}.c++.grpc_async_infer` != "1" ]; 
 fi
 
 # Test stream timeout in grpc asynchronous streaming inference
-$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -i grpc -s >> ${CLIENT_LOG}.c++.grpc_async_stream_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -i grpc -s >> ${CLIENT_LOG}.c++.grpc_async_stream_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -103,7 +140,7 @@ if [ `grep -c "Stream has been closed" ${CLIENT_LOG}.c++.grpc_async_stream_infer
 fi
 
 # Test request timeout in http synchronous inference
-$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v >> ${CLIENT_LOG}.c++.http_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -115,7 +152,7 @@ fi
 
 
 # Test request timeout in http asynchronous inference
-$CLIENT_TIMEOUT_TEST_CPP -t 1000 -v -a >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
+$CLIENT_TIMEOUT_TEST_CPP -t $SHORT_TIMEOUT_VALUE -v -a >> ${CLIENT_LOG}.c++.http_async_infer 2>&1
 if [ $? -eq 0 ]; then
     RET=1
 fi
@@ -136,7 +173,6 @@ fi
 
 
 # CASE 2: Provide sufficiently large timeout value
-TIMEOUT_VALUE=100000000
 set +e
 
 echo "TEST:  GRPC Synchronous" >> ${CLIENT_LOG}
@@ -174,7 +210,6 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-
 echo "TEST:  Python Library" >> ${CLIENT_LOG}
 
 # CASE 3: Python Library
@@ -185,7 +220,7 @@ for i in test_grpc_infer \
     test_http_infer \
     test_http_async_infer \
    ; do
-    python $CLIENT_TIMEOUT_TEST ClientTimeoutTest.$i >>$CLIENT_LOG 2>&1
+    python $CLIENT_INFER_TIMEOUT_TEST ClientInferTimeoutTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
@@ -204,6 +239,28 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test all APIs other than infer
+export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
+SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model=custom_identity_int32 --log-verbose 2"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+
+python $CLIENT_NON_INFER_TIMEOUT_TEST >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+    echo -e "\n***\n*** Test $i Failed\n***"
+    RET=1
+fi
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
@@ -211,4 +268,5 @@ else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
+set +e
 exit $RET

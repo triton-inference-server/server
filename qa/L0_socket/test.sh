@@ -310,13 +310,13 @@ SERVER2_LOG="./inference_server2.log"
 for p in http grpc; do
     # error if servers bind to the same http/grpc port without setting the reuse flag
     if [ "$p" == "http" ]; then
-        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-grpc-port=1"
-        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-grpc-port=1"
-        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=1"
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-grpc-port=true"
+        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-grpc-port=true"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=true"
     else
-        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1"
-        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=1"
-        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=1"
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=true"
+        SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=true"
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=true"
     fi
     # make sure the first server is launched successfully, then run the other
     # two servers and expect them to fail
@@ -357,9 +357,9 @@ for p in http grpc; do
     #   (a) Test default metrics-address being same as http-address
     #   (b) Test setting metrics-address explicitly to 0.0.0.0
     #   (c) Test setting metrics-address explicitly to 127.0.0.1
-    SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1 --reuse-grpc-port=1"
-    SERVER1_ARGS="--model-repository=$DATADIR --metrics-address 0.0.0.0 --metrics-port 8003 --reuse-http-port=1 --reuse-grpc-port=1"
-    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.2 --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=true --reuse-grpc-port=true"
+    SERVER1_ARGS="--model-repository=$DATADIR --metrics-address 0.0.0.0 --metrics-port 8003 --reuse-http-port=true --reuse-grpc-port=true"
+    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.2 --metrics-port 8004 --reuse-http-port=true --reuse-grpc-port=true"
     run_multiple_servers_nowait 3
     sleep 15
     if [ "$SERVER0_PID" == "0" ]; then

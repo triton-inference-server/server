@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "restricted_features.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #ifdef TRITON_ENABLE_GRPC
@@ -62,13 +63,13 @@
 #define no_argument 2
 struct option {
   option(const char* name, int has_arg, int* flag, int val)
-      : name_(name), has_arg_(has_arg), flag_(flag), val_(val)
+      : name(name), has_arg(has_arg), flag(flag), val(val)
   {
   }
-  const char* name_;
-  int has_arg_;
-  int* flag_;
-  int val_;
+  const char* name;
+  int has_arg;
+  int* flag;
+  int val;
 };
 #endif
 #ifdef TRITON_ENABLE_TRACING
@@ -131,6 +132,7 @@ struct TritonServerParameters {
   int32_t repository_poll_secs_{15};
   // Number of threads to use for concurrently loading models
   uint32_t model_load_thread_count_{4};
+  uint32_t model_load_retry_count_{0};
   std::map<int, double> load_gpu_limit_;
 
   // Rate limiter configuration
@@ -144,6 +146,7 @@ struct TritonServerParameters {
   // memory pool configuration
   int64_t pinned_memory_pool_byte_size_{1 << 28};
   std::list<std::pair<int, uint64_t>> cuda_pools_;
+  std::list<std::pair<int, size_t>> cuda_virtual_address_size_;
 
   // [FIXME] this option is broken after backend separation: this should have
   // controlled backend copy behavior but not properly propagate to backend
@@ -189,6 +192,7 @@ struct TritonServerParameters {
   std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
+  RestrictedFeatures http_restricted_apis_{};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
@@ -281,8 +285,10 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
       const std::string& arg);
-  std::tuple<std::string, std::string, std::string>
-  ParseGrpcRestrictedProtocolOption(const std::string& arg);
+  void ParseRestrictedFeatureOption(
+      const std::string& arg, const std::string& option_name,
+      const std::string& header_prefix, const std::string& feature_type,
+      RestrictedFeatures& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
   InferenceTraceMode ParseTraceModeOption(std::string arg);
@@ -296,19 +302,23 @@ class TritonParser {
   void SetTritonTraceArgs(
       TritonServerParameters& lparams, bool trace_filepath_present,
       bool trace_log_frequency_present);
-  void VerifyOpentelemetryTraceArgs(
-      bool trace_filepath_present, bool trace_log_frequency_present);
+  void SetOpenTelemetryTraceArgs(
+      TritonServerParameters& lparams, bool trace_filepath_present,
+      bool trace_log_frequency_present);
   void PostProcessTraceArgs(
       TritonServerParameters& lparams, bool trace_level_present,
       bool trace_rate_present, bool trace_count_present,
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
+  void ProcessOpenTelemetryBatchSpanProcessorArgs(
+      TraceConfig& otel_trace_settings);
 #endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
   std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
       const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim);
+      const std::string& second_delim, const std::string& option_name,
+      const std::string& config_name);
 
   // Initialize individual option groups
   void SetupOptions();

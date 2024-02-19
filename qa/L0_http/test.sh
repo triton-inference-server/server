@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@ RET=0
 
 CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
 BASIC_AUTH_TEST="./http_basic_auth_test.py"
+RESTRICTED_API_TEST="./http_restricted_api_test.py"
 NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
@@ -243,7 +244,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+python $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin
     RET=1
@@ -254,7 +255,7 @@ echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
-python3 $BASIC_AUTH_TEST
+python $BASIC_AUTH_TEST
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
@@ -459,7 +460,7 @@ rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -472,7 +473,7 @@ rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" == "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -588,15 +589,28 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Run python unit test
-rm -r ${MODELDIR}/*
+MODELDIR=python_unit_test_models
+mkdir -p $MODELDIR
+rm -rf ${MODELDIR}/*
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_object ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float16 ${MODELDIR}/.
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_3_float32 ${MODELDIR}/.
 cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element && \
-    (cd models/onnx_zero_1_object_1_element && \
+    (cd $MODELDIR/onnx_zero_1_object_1_element && \
         sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
         sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
+# Model for error code test
+cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
+    (cd $MODELDIR/onnx_zero_1_float32_queue && \
+        sed -i "s/onnx_zero_1_float32/onnx_zero_1_float32_queue/" config.pbtxt && \
+        echo "dynamic_batching { " >> config.pbtxt && \
+        echo "    max_queue_delay_microseconds: 1000000" >> config.pbtxt && \
+        echo "    preferred_batch_size: [ 8 ]" >> config.pbtxt && \
+        echo "    default_queue_policy {" >> config.pbtxt && \
+        echo "        max_queue_size: 1" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "}" >> config.pbtxt)
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
@@ -610,9 +624,9 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=8
+EXPECTED_NUM_TESTS=9
 set +e
-python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
+python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
@@ -628,6 +642,112 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+### LLM / Generate REST API Endpoint Tests ###
+
+# Helper library to parse SSE events
+# https://github.com/mpetazzoni/sseclient
+pip install sseclient-py
+
+SERVER_ARGS="--model-repository=`pwd`/generate_models"
+SERVER_LOG="./inference_server_generate_endpoint_test.log"
+CLIENT_LOG="./generate_endpoint_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+## Python Unit Tests
+TEST_RESULT_FILE='test_results.txt'
+PYTHON_TEST=generate_endpoint_test.py
+EXPECTED_NUM_TESTS=15
+set +e
+python $PYTHON_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+### Test Restricted  APIs ###
+### Repeated API not allowed
+
+MODELDIR="`pwd`/models"
+SERVER_ARGS="--model-repository=${MODELDIR}
+             --http-restricted-api=model-repository,health:k1=v1 \
+             --http-restricted-api=metadata,health:k2=v2"
+SERVER_LOG="./http_restricted_endpoint_test.log"
+CLIENT_LOG="./http_restricted_endpoint_test.log"
+run_server
+EXPECTED_MSG="api 'health' can not be specified in multiple config groups"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+### Test Unknown Restricted  API###
+### Unknown API not allowed
+
+MODELDIR="`pwd`/models"
+SERVER_ARGS="--model-repository=${MODELDIR}
+             --http-restricted-api=model-reposit,health:k1=v1 \
+             --http-restricted-api=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="unknown restricted api 'model-reposit'"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+### Test Restricted  APIs ###
+### Restricted model-repository, metadata, and inference
+
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --http-restricted-api=model-repository:admin-key=admin-value \
+             --http-restricted-api=inference,metadata:infer-key=infer-value"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+
+python $RESTRICTED_API_TEST RestrictedAPITest > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python HTTP Restricted Protocol Test Failed\n***"
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+###
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

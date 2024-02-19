@@ -1,4 +1,4 @@
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
@@ -36,10 +37,16 @@ def check_init_args(args):
         "model_instance_name": "init_args_0_0",
         "model_instance_kind": "CPU",
         "model_instance_device_id": "0",
-        "model_repository": os.getenv("TRITON_DIR", "/opt/tritonserver")
-        + "/qa/L0_backend_python/models/init_args",
         "model_version": "1",
     }
+    is_win = sys.platform == "win32"
+    triton_dir = os.getenv(
+        "TRITON_DIR", "c:\\tritonserver" if is_win else "/opt/tritonserver"
+    )
+    repo_path = triton_dir + "/qa/L0_backend_python/models/init_args"
+    expected_args["model_repository"] = (
+        repo_path.replace("/", "\\") if is_win else repo_path
+    )
 
     for arg in expected_args:
         if args[arg] != expected_args[arg]:

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -462,18 +462,11 @@ fi
 set +e
 
 export MODEL_NAME='bls_onnx_warmup'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml=warmup.report.xml $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'bls_onnx_warmup' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 
 set -e

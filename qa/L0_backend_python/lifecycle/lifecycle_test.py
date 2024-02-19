@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,20 +26,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
 
 import queue
+import time
 import unittest
 from functools import partial
 
 import numpy as np
 import shm_util
-import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class UserData:
@@ -54,9 +59,83 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class LifecycleTest(tu.TestResultCollector):
+class LifecycleTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
+
+    def test_error_code(self):
+        model_name = "error_code"
+        shape = [1, 1]
+        # [(Triton error, expected gRPC error message starting), ...]
+        errors = [
+            ("UNKNOWN", "[StatusCode.UNKNOWN]"),
+            ("INTERNAL", "[StatusCode.INTERNAL]"),
+            ("NOT_FOUND", "[StatusCode.NOT_FOUND]"),
+            ("INVALID_ARG", "[StatusCode.INVALID_ARGUMENT]"),
+            ("UNAVAILABLE", "[StatusCode.UNAVAILABLE]"),
+            ("UNSUPPORTED", "[StatusCode.UNIMPLEMENTED]"),
+            ("ALREADY_EXISTS", "[StatusCode.ALREADY_EXISTS]"),
+            ("CANCELLED", "[StatusCode.CANCELLED]"),
+            ("(default)", "[StatusCode.INTERNAL] unrecognized"),
+        ]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
+                for error, expected_grpc_error_start in errors:
+                    input_data = np.array([[error]], dtype=np.object_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "ERROR_CODE", shape, np_to_triton_dtype(input_data.dtype)
+                        )
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    with self.assertRaises(InferenceServerException) as e:
+                        client.infer(model_name, inputs)
+                    # e.g. [StatusCode.UNKNOWN] error code: TRITONSERVER_ERROR_UNKNOWN
+                    # e.g. [StatusCode.INTERNAL] unrecognized error code: (default)
+                    self.assertEqual(
+                        str(e.exception),
+                        expected_grpc_error_start + " error code: " + error,
+                    )
+
+    def test_execute_cancel(self):
+        model_name = "execute_cancel"
+        log_path = "lifecycle_server.log"
+        execute_delay = 4.0  # seconds
+        shape = [1, 1]
+        response = {"responded": False, "result": None, "error": None}
+
+        def callback(result, error):
+            response["responded"] = True
+            response["result"] = result
+            response["error"] = error
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            ) as client:
+                input_data = np.array([[execute_delay]], dtype=np.float32)
+                inputs = [
+                    grpcclient.InferInput(
+                        "EXECUTE_DELAY", shape, np_to_triton_dtype(input_data.dtype)
+                    )
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                exec_future = client.async_infer(model_name, inputs, callback)
+                time.sleep(2)  # ensure the request is executing
+                self.assertFalse(response["responded"])
+                exec_future.cancel()
+                time.sleep(2)  # ensure the cancellation is delivered
+                self.assertTrue(response["responded"])
+
+        self.assertEqual(response["result"], None)
+        self.assertIsInstance(response["error"], InferenceServerException)
+        self.assertEqual(response["error"].status(), "StatusCode.CANCELLED")
+        with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
+            log_text = f.read()
+            self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
+            self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
@@ -67,7 +146,7 @@ class LifecycleTest(tu.TestResultCollector):
         shape = [2, 2]
         number_of_requests = 3
         user_data = UserData()
-        triton_client = grpcclient.InferenceServerClient("localhost:8001")
+        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
 
         with self._shm_leak_detector.Probe() as shm_probe:
@@ -104,7 +183,9 @@ class LifecycleTest(tu.TestResultCollector):
         shape = [2, 2]
 
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
                 inputs = [
                     httpclient.InferInput(
@@ -131,7 +212,9 @@ class LifecycleTest(tu.TestResultCollector):
         model_name = "execute_return_error"
         shape = [1, 1]
         with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
                 input_data = (5 * np.random.randn(*shape)).astype(np.float32)
                 inputs = [
                     httpclient.InferInput(
