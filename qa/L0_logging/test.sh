@@ -50,7 +50,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
-MODELBASE=onnx_int32_int32_int32
+MODELBASE=savedmodel_int32_int32_int32
 
 MODELSDIR=`pwd`/log_models
 
