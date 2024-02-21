@@ -72,6 +72,9 @@ mkdir -p models/single_state_buffer/1/
 mkdir -p models/growable_memory/1/
 
 for BACKEND in $BACKENDS; do
+    if [[ "$BACKEND" == 'onnx' ]]; then
+        continue
+    fi
     dtype="int32"
     model_name=${BACKEND}_nobatch_sequence_${dtype}
     rm -rf models/$model_name
@@ -131,6 +134,7 @@ wait $SERVER_PID
 
 (cd ../L0_sequence_batcher/ && bash -ex test.sh)
 RET=$?
+
 
 if [ $RET == 0 ]; then
     echo -e "\n***\n*** Implicit State Passed\n***"

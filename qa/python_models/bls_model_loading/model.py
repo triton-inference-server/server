@@ -33,7 +33,7 @@ import triton_python_backend_utils as pb_utils
 
 class PBBLSModelLoadingTest(unittest.TestCase):
     def setUp(self):
-        self.model_name = "onnx_int32_int32_int32"
+        self.model_name = "plan_int32_int32_int32"
 
     def tearDown(self):
         # The unload call does not wait for the requested model to be fully
@@ -57,7 +57,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         self.assertTrue(pb_utils.is_model_ready(self.model_name))
 
         # Send the config with the wrong format
-        wrong_config = '"parameters": {"config": {{"backend":"onnxruntime", "version_policy":{"specific":{"versions":[2]}}}}}'
+        wrong_config = '"parameters": {"config": {{"backend":"tensorrt", "version_policy":{"specific":{"versions":[2]}}}}}'
         with self.assertRaises(pb_utils.TritonModelException):
             pb_utils.load_model(model_name=self.model_name, config=wrong_config)
         # The model should not be changed after a failed load model request
@@ -70,7 +70,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
 
         # Send the config with the correct format
         config = (
-            '{"backend":"onnxruntime", "version_policy":{"specific":{"versions":[2]}}}'
+            '{"backend":"tensorrt", "version_policy":{"specific":{"versions":[2]}}}'
         )
         pb_utils.load_model(self.model_name, config=config)
         # The model should be changed after a successful load model request
@@ -83,10 +83,10 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         self.assertTrue(pb_utils.is_model_ready(self.model_name))
 
         override_name = "override_model"
-        config = '{"backend":"onnxruntime"}'
-        with open("models/onnx_int32_int32_int32/3/model.onnx", "rb") as file:
+        config = '{"backend":"tensorrt"}'
+        with open("models/plan_int32_int32_int32/3/model.plan", "rb") as file:
             data = file.read()
-        files = {"file:1/model.onnx": data}
+        files = {"file:1/model.plan": data}
 
         # Request to load the model with override file, should fail without
         # providing override config.

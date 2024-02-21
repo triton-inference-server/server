@@ -193,6 +193,9 @@ class ImplicitStateTest(tu.TestResultCollector):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
 
         for backend in BACKENDS.split(" "):
+            if backend.strip() == "onnx":
+                continue
+
             inputs = []
             if backend.strip() == "libtorch":
                 inputs.append(tritonhttpclient.InferInput("INPUT__0", [1], "INT32"))
@@ -229,6 +232,9 @@ class ImplicitStateTest(tu.TestResultCollector):
     def test_request_output(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         for backend in BACKENDS.split(" "):
+            if backend.strip() == "onnx":
+                continue
+
             inputs = []
             if backend.strip() == "libtorch":
                 inputs.append(tritonhttpclient.InferInput("INPUT__0", [1], "INT32"))

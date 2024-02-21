@@ -220,9 +220,9 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     mkdir -p models/bls_model_loading/1/
     cp ../../python_models/bls_model_loading/model.py models/bls_model_loading/1/
     cp ../../python_models/bls_model_loading/config.pbtxt models/bls_model_loading/
-    #cp -fr ${DATADIR}/qa_model_repository/onnx_int32_int32_int32 models/.
-    ## Make only version 2, 3 is valid version directory
-    #rm -rf models/onnx_int32_int32_int32/1
+    cp -fr ${DATADIR}/qa_model_repository/plan_int32_int32_int32 models/.
+    # Make only version 2, 3 is valid version directory
+    rm -rf models/plan_int32_int32_int32/1
 
     SERVER_LOG="./bls_model_loading_server.log"
     SERVER_ARGS="--model-repository=${MODELDIR}/bls/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
