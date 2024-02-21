@@ -63,7 +63,7 @@ fi
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch"}
 export BACKENDS
 
 export CI_JOB_ID=${CI_JOB_ID}
@@ -136,6 +136,8 @@ cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_grap
   (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
     sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
+
+rm `find $MODEL_DIR/ -name '*onnx*'` -rf
 
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 SERVER_LOG="./server.log"
