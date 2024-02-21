@@ -24,14 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import time
+
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
     """
-    This model calls sleep intentionally in order to force requests to sit in the queue, and result 
-    in memory growth.
+    This model calls sleep for the first request in order to force requests to
+    sit in the queue, and result in memory growth.
     """
+
     def initialize(self, args):
         self.sleep = True
 

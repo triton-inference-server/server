@@ -100,136 +100,131 @@ fi
 export MAX_ALLOWED_ALLOC="100"
 
 # Create local model repository
-# mkdir -p models/
-# cp -r $DATADIR/perf_model_store/resnet50* models/
+mkdir -p models/
+cp -r $DATADIR/perf_model_store/resnet50* models/
 
-# # Copy and prepare trt model
-# cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/resnet50_fp16_plan
-# mkdir -p models/resnet50_fp16_plan/1
-# sed -i "s/^name:.*/name: \"resnet50_fp16_plan\"/" models/resnet50_fp16_plan/config.pbtxt
+# Copy and prepare trt model
+cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/resnet50_fp16_plan
+mkdir -p models/resnet50_fp16_plan/1
+sed -i "s/^name:.*/name: \"resnet50_fp16_plan\"/" models/resnet50_fp16_plan/config.pbtxt
 
-# set +e
+set +e
 
-# # Create the PLAN
-# $CAFFE2PLAN -h -b ${STATIC_BATCH} \
-#     -n prob -o models/resnet50_fp16_plan/1/model.plan \
-#     $DATADIR/caffe_models/resnet50.prototxt $DATADIR/caffe_models/resnet50.caffemodel
-# if [ $? -ne 0 ]; then
-#     echo -e "\n***\n*** Failed to generate resnet50 PLAN\n***"
-#     exit 1
-# fi
+# Create the PLAN
+$CAFFE2PLAN -h -b ${STATIC_BATCH} \
+    -n prob -o models/resnet50_fp16_plan/1/model.plan \
+    $DATADIR/caffe_models/resnet50.prototxt $DATADIR/caffe_models/resnet50.caffemodel
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to generate resnet50 PLAN\n***"
+    exit 1
+fi
 
-# set -e
+set -e
 
 RET=0
 
-# for MODEL in $(ls models); do
-#     # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
-#     # Tracked here: https://nvbugs/3954104
-#     if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
-#         continue
-#     fi
+for MODEL in $(ls models); do
+    # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
+    # Tracked here: https://nvbugs/3954104
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+        continue
+    fi
 
-#     # Create temporary model repository and copy only the model being tested
-#     rm -rf test_repo && mkdir test_repo
-#     cp -r models/$MODEL test_repo/
+    # Create temporary model repository and copy only the model being tested
+    rm -rf test_repo && mkdir test_repo
+    cp -r models/$MODEL test_repo/
 
-#     # Set server, client and valgrind arguments
-#     SERVER_ARGS="--model-repository=`pwd`/test_repo"
-#     LEAKCHECK_LOG="test_${MODEL}.valgrind.log"
-#     MASSIF_LOG="test_${MODEL}.massif"
-#     GRAPH_LOG="memory_growth_${MODEL}.log"
-#     LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
-#     SERVER_LOG="test_$MODEL.server.log"
-#     CLIENT_LOG="test_$MODEL.client.log"
+    # Set server, client and valgrind arguments
+    SERVER_ARGS="--model-repository=`pwd`/test_repo"
+    LEAKCHECK_LOG="test_${MODEL}.valgrind.log"
+    MASSIF_LOG="test_${MODEL}.massif"
+    GRAPH_LOG="memory_growth_${MODEL}.log"
+    LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
+    SERVER_LOG="test_$MODEL.server.log"
+    CLIENT_LOG="test_$MODEL.client.log"
 
-#     # Enable dynamic batching, set max batch size and instance count
-#     if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
-#         sed -i "s/^max_batch_size:.*/max_batch_size: 32/" test_repo/$MODEL/config.pbtxt
-#     else
-#         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
-#     fi
-#     echo "dynamic_batching {}" >> test_repo/$MODEL/config.pbtxt
-#     echo "instance_group [{ count: ${INSTANCE_CNT} }]" >> test_repo/$MODEL/config.pbtxt
+    # Enable dynamic batching, set max batch size and instance count
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+        sed -i "s/^max_batch_size:.*/max_batch_size: 32/" test_repo/$MODEL/config.pbtxt
+    else
+        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
+    fi
+    echo "dynamic_batching {}" >> test_repo/$MODEL/config.pbtxt
+    echo "instance_group [{ count: ${INSTANCE_CNT} }]" >> test_repo/$MODEL/config.pbtxt
 
-#     # Run the server
-#     run_server_leakcheck
-#     if [ "$SERVER_PID" == "0" ]; then
-#         echo -e "\n***\n*** Failed to start $SERVER\n***"
-#         cat $SERVER_LOG
-#         exit 1
-#     fi
+    # Run the server
+    run_server_leakcheck
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-#     set +e
+    set +e
 
-#     TEMP_CLIENT_LOG=temp_client.log
-#     TEMP_RET=0
+    TEMP_CLIENT_LOG=temp_client.log
+    TEMP_RET=0
 
-#     SECONDS=0
-#     # Run the perf analyzer 'REPETITION' times
-#     for ((i=1; i<=$REPETITION; i++)); do
-#         # [TMA-621] Use --no-stability mode in perf analyzer when available
-#         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
-#         PA_RET=$?
-#         # Success
-#         if [ ${PA_RET} -eq 0 ]; then
-#           continue
-#         # Unstable measurement: OK for this test
-#         elif [ ${PA_RET} -eq 2 ]; then
-#           continue
-#         # Other failures unexpected, report error
-#         else
-#             cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
-#             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
-#             RET=1
-#         fi
-#     done
-#     TEST_DURATION=$SECONDS
+    SECONDS=0
+    # Run the perf analyzer 'REPETITION' times
+    for ((i=1; i<=$REPETITION; i++)); do
+        # [TMA-621] Use --no-stability mode in perf analyzer when available
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
+        PA_RET=$?
+        # Success
+        if [ ${PA_RET} -eq 0 ]; then
+          continue
+        # Unstable measurement: OK for this test
+        elif [ ${PA_RET} -eq 2 ]; then
+          continue
+        # Other failures unexpected, report error
+        else
+            cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
+            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
+            RET=1
+        fi
+    done
+    TEST_DURATION=$SECONDS
 
-#     set -e
+    set -e
 
-#     # Stop Server
-#     kill $SERVER_PID
-#     wait $SERVER_PID
+    # Stop Server
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-#     set +e
+    set +e
 
-#     # Log test duration and the graph for memory growth
-#     hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
-#     mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
-#     secs=$(printf "%02d" $((TEST_DURATION % 60)))
-#     echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
-#     ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
-#     cat ${GRAPH_LOG}
-#     # Check the massif output
-#     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
-#     if [ $? -ne 0 ]; then
-#         cat $CLIENT_LOG
-#         echo -e "\n***\n*** Test for $MODEL Failed.\n***"
-#         RET=1
-#     fi
-#     # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
-#     grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
-#     set -e
-# done
+    # Log test duration and the graph for memory growth
+    hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+    mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+    secs=$(printf "%02d" $((TEST_DURATION % 60)))
+    echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
+    ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+    cat ${GRAPH_LOG}
+    # Check the massif output
+    python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test for $MODEL Failed.\n***"
+        RET=1
+    fi
+    # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
+    grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
+    set -e
+done
 
-# Next perform a test that has unbound memory growth. Use the busy op model
-# with a high delay in order to force requests to sit in the queue, and result
+# Next perform a test that has unbound memory growth. Use the busy op Python model
+# with a sleep function in order to force requests to sit in the queue, and result
 # in memory growth.
 BUSY_OP_TEST=busy_op_test.py
-# DELAY_CYCLES=2100000000
 NUM_REQUESTS=100
 
 rm -rf test_repo && mkdir test_repo
-# cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
 mkdir -p test_repo/busy_op/1/
 cp ../python_models/busy_op/model.py test_repo/busy_op/1/
 cp ../python_models/busy_op/config.pbtxt test_repo/busy_op
 
-# Explicitly set library path so custom ops can find TF
-# LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow:$LD_LIBRARY_PATH
-SERVER_ARGS="--model-repository=`pwd`/test_repo --log-ver 1"
-# SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+SERVER_ARGS="--model-repository=`pwd`/test_repo"
 
 LEAKCHECK_LOG="test_busyop.valgrind.log"
 MASSIF_LOG="test_busyop.massif"
@@ -257,12 +252,11 @@ set +e
 # Run the busy_op test if no PTX issue was observed when launching server
 if [ $SKIP_BUSYOP -ne 1 ]; then
     SECONDS=0
-    # python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
-    python $BUSY_OP_TEST -m busy_op -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+    python $BUSY_OP_TEST -v -m busy_op -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
     TEST_RETCODE=$?
     TEST_DURATION=$SECONDS
     if [ ${TEST_RETCODE} -ne 0 ]; then
-        # cat $CLIENT_LOG
+        cat $CLIENT_LOG
         echo -e "\n***\n*** busy_op_test.py Failed\n***"
         RET=1
     fi
@@ -287,7 +281,7 @@ if [ $SKIP_BUSYOP -ne 1 ]; then
     # intentionally testing unbounded growth. If it returns success for some
     # reason, raise error.
     if [ $? -ne 1 ]; then
-        # cat $CLIENT_LOG
+        cat $CLIENT_LOG
         echo -e "\n***\n*** Massif test for graphdef_busyop Failed\n***"
         echo -e "\n***\n*** Expected unbounded growth, but found acceptable growth within ${MAX_ALLOWED_ALLOC} MB\n***"
         RET=1
@@ -295,12 +289,13 @@ if [ $SKIP_BUSYOP -ne 1 ]; then
     # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
     grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
 fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Test Failed\n***"
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
