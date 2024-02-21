@@ -1051,8 +1051,7 @@ ModelInferHandler::InferResponseComplete(
     response->Clear();
   }
 
-  ::grpc::Status status;
-  GrpcStatusUtil::Create(&status, err);
+  GrpcStatusUtil::Create(&state->status_, err);
   TRITONSERVER_ErrorDelete(err);
 
   LOG_TRITONSERVER_ERROR(
@@ -1061,7 +1060,7 @@ ModelInferHandler::InferResponseComplete(
 
   // Defer sending the response until FINAL flag is seen or
   // there is error
-  if (status.ok() && (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
 
@@ -1071,7 +1070,7 @@ ModelInferHandler::InferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   state->step_ = COMPLETE;
-  state->context_->responder_->Finish(*response, status, state);
+  state->context_->responder_->Finish(*response, state->status_, state);
   if (response_created) {
     delete response;
   }

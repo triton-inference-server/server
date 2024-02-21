@@ -406,11 +406,6 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
 
-  // Defer sending the response until FINAL flag is seen or
-  // there is error
-  if ((err == nullptr) && (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
-    return;
-  }
 
   if (err != nullptr) {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
@@ -425,6 +420,11 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
       infer_request->response_code_ = 507;
     }
     TRITONSERVER_ErrorDelete(err);
+  }
+
+  // Defer sending the response until FINAL flag is seen
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    return;
   }
   evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 }
