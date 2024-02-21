@@ -47,13 +47,19 @@ NO_BATCHING = int(os.environ.get("NO_BATCHING", 0)) == 1
 BACKENDS = os.environ.get(
     "BACKENDS", "graphdef savedmodel libtorch onnx plan custom custom_string"
 )
-BACKENDS = BACKENDS.replace("onnx ", "")
+
 IMPLICIT_STATE = int(os.environ["IMPLICIT_STATE"]) == 1
 
 _trials = BACKENDS.split(" ")
+if "onnx" in _trials:
+    _trials.remove("onnx")
 for backend in BACKENDS.split(" "):
     if NO_BATCHING:
-        if (backend != "custom") and (backend != "custom_string"):
+        if (
+            (backend != "custom")
+            and (backend != "custom_string")
+            and (backend != "onnx")
+        ):
             _trials += (backend + "_nobatch",)
 
 _ragged_batch_supported_trials = []

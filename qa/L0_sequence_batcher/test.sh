@@ -521,7 +521,7 @@ for model_trial in $MODEL_TRIALS; do
       done
     fi
 
-    rm `find ./models/ -name '*onnx*'` -rf
+    rm `find ./$MODEL_PATH/ -name '*onnx*'` -rf
 
     # Need to launch the server for each test so that the model status
     # is reset (which is used to make sure the correct batch size was
@@ -715,6 +715,7 @@ fi
 MODEL_PATH=queue_delay_models
 # remove ensemble models from the test model repo
 rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
+rm `find ./queue_delay_models/ -name '*onnx*'` -rf
 for i in $QUEUE_DELAY_TESTS ; do
     export NO_BATCHING=0
     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
