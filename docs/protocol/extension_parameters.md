@@ -98,6 +98,11 @@ value. For example to forward all the headers that start with 'PREFIX_' from
 both HTTP and GRPC, you should add `--http-header-forward-pattern PREFIX_.*
 --grpc-header-forward-pattern PREFIX_.*` to your `tritonserver` command.
 
+By default, the regular expression pattern matches headers with case-insensitive
+mode according to the HTTP protocol. If you want to enforce case-sensitive mode,
+simplying adding the `(?-i)` prefix which turns off case-insensitive mode, e.g.
+`--http-header-forward-pattern (?-i)PREFIX_.*`.
+
 The forwarded headers can be accessed using the
 [Python](https://github.com/triton-inference-server/python_backend#inference-request-parameters)
 or C Backend APIs as inference request parameters.
