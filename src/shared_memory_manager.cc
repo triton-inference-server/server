@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -346,11 +346,22 @@ SharedMemoryManager::GetMemoryInfo(
         std::string("Unable to find shared memory region: '" + name + "'")
             .c_str());
   }
+
+  size_t max_offset = 0;
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
                                it->second->offset_ + offset);
+    max_offset = it->second->offset_ + it->second->byte_size_;
   } else {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
+    max_offset = it->second->byte_size_;
+  }
+  if (offset > max_offset) {
+    *shm_mapped_addr = nullptr;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("Invalid offset for shared memory region: '" + name + "'")
+            .c_str());
   }
 
   *memory_type = it->second->kind_;
