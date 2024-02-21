@@ -53,7 +53,6 @@ function check_unit_test() {
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-        exit $RET
     else
         check_test_results $TEST_RESULT_FILE 1
         if [ $? -ne 0 ]; then
