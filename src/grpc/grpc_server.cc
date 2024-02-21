@@ -1186,6 +1186,20 @@ CommonHandler::RegisterModelStatistics()
               res.mutable_empty_response()->set_ns(val);
             }
 
+            {
+              triton::common::TritonJson::Value stat_json;
+              err = res_json.MemberAsObject("cancel", &stat_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              uint64_t val;
+              err = stat_json.MemberAsUInt("count", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_cancel()->set_count(val);
+              err = stat_json.MemberAsUInt("ns", &val);
+              GOTO_IF_ERR(err, earlyexit);
+              res.mutable_cancel()->set_ns(val);
+            }
+
             (*statistics->mutable_response_stats())[key] = std::move(res);
           }
         }
