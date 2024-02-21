@@ -93,7 +93,6 @@ if __name__ == "__main__":
     # Send requests
     for i in range(FLAGS.num_requests):
         requests.append(client.async_infer(model_name, inputs))
-        time.sleep(0.5)
         print("Sent request %d" % i, flush=True)
     # wait for requests to finish
     for i in range(len(requests)):
