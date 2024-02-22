@@ -39,7 +39,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 SERVER=/opt/tritonserver/bin/tritonserver

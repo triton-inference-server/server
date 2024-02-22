@@ -144,9 +144,9 @@ export BATCH
 
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
     if [[ "aarch64" != $(uname -m) ]] ; then
-        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+        pip3 install torch==2.2.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
     else
-        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+        pip3 install torch==2.2.0 -f https://download.pytorch.org/whl/torch_stable.html
     fi
 fi
 
@@ -348,7 +348,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack"
   EXPECTED_NUM_TESTS=42
   if [[ "aarch64" != $(uname -m) ]] ; then
-      pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      pip3 install torch==2.2.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
       pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
   fi
