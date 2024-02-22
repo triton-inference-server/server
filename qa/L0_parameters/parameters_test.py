@@ -61,7 +61,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.parameter_list.append({"triton_": True, "key2": "value2"})
 
         # Only test 0 tests parameters without headers.
-        test_header = (TEST_HEADER != "0")
+        test_header = TEST_HEADER != "0"
         if test_header:
             self.headers = {
                 "header_1": "value_1",
