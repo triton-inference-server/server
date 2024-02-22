@@ -107,7 +107,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch plan python"}
 export BACKENDS
 
 # Basic batcher tests
@@ -237,6 +237,7 @@ if [[ $BACKENDS == *"plan"* ]]; then
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
 
+: '
 if [[ $BACKENDS == *"onnx"* ]]; then
     # Use nobatch model to match the ragged test requirement
     cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32 var_models/onnx_zero_1_float32 && \
@@ -249,6 +250,7 @@ if [[ $BACKENDS == *"onnx"* ]]; then
                                     source_input: \"INPUT0\" }] \
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
+'
 
 if [[ $BACKENDS == *"libtorch"* ]]; then
     # Use nobatch model to match the ragged test requirement

@@ -232,7 +232,7 @@ class BatcherTest(tu.TestResultCollector):
         # Send 12 requests with batch size 1. The max_queue_delay is set
         # to non-zero. Depending upon the timing of the requests arrival
         # there can be either 4-6 model executions.
-        model_base = "onnx"
+        model_base = "savedmodel"
         dtype = np.float16
         shapes = (
             [

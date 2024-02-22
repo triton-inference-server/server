@@ -156,11 +156,11 @@ class ServerMetadataTest(tu.TestResultCollector):
     def test_model_latest_infer(self):
         input_size = 16
         tensor_shape = (1, input_size)
-        platform_name = {"graphdef": "tensorflow_graphdef", "onnx": "onnxruntime_onnx"}
+        platform_name = {"graphdef": "tensorflow_graphdef"}
 
         # There are 3 versions of *_int32_int32_int32 and all
         # should be available.
-        for platform in ("graphdef", "onnx"):
+        for platform in ("graphdef",):
             model_name = platform + "_int32_int32_int32"
 
             # Initially there should be no version stats..
@@ -316,7 +316,7 @@ class ServerMetadataTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
-        for platform in ("graphdef", "onnx", "plan"):
+        for platform in ("graphdef", "plan"):
             tensor_shape = (1, input_size)
             model_name = platform + "_float32_float32_float32"
 
@@ -439,7 +439,7 @@ class ModelMetadataTest(tu.TestResultCollector):
         # version 3 was executed once. Version 2 and 3 models were
         # deleted from the model repository so now only expect version 1 to
         # be ready and show stats.
-        for platform in ("graphdef", "onnx"):
+        for platform in ("graphdef",):
             model_name = platform + "_int32_int32_int32"
 
             try:
@@ -615,7 +615,7 @@ class ModelMetadataTest(tu.TestResultCollector):
         # version 3 was executed once. Version 2 and 3 models were
         # deleted from the model repository so now only expect version 1 to
         # be ready and show infer stats.
-        for platform in ("graphdef", "onnx"):
+        for platform in ("graphdef",):
             model_name = platform + "_int32_int32_int32"
 
             try:
@@ -723,8 +723,8 @@ class ModelMetadataTest(tu.TestResultCollector):
                     stats = infer_stats.model_stats
                 self.assertEqual(
                     len(stats),
-                    219,
-                    "expected 219 infer stats for all ready versions of all model",
+                    173,
+                    "expected 173 infer stats for all ready versions of all model",
                 )
 
         except InferenceServerException as ex:

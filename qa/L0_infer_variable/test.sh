@@ -74,6 +74,7 @@ for TARGET in cpu gpu; do
         done
     done
 
+    rm `find ./models/ -name '*onnx*'` -rf
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

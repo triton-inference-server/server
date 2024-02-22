@@ -45,7 +45,7 @@ ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py
 MOD_OP_TEST=mod_op_test.py
 VISION_OP_TEST=vision_op_test.py
-ONNX_OP_TEST=onnx_op_test.py
+#ONNX_OP_TEST=onnx_op_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
@@ -204,6 +204,7 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+: '
 # ONNX
 rm -rf onnx_custom_ops && \
     mkdir -p onnx_custom_ops/custom_op/1 && \
@@ -233,6 +234,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+
 set -e
 
 if [ $RET -eq 0 ]; then
@@ -241,5 +243,6 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+'
 
 exit $RET

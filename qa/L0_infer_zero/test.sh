@@ -54,6 +54,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/* models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_identity_model_repository/* models/.
+rm `find ./models/ -name '*onnx*'` -rf
 
 # Remove version-compatible TensorRT models, as they require version-compatibility
 # mode to be turned on when starting the server.

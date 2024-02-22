@@ -504,7 +504,8 @@ wait $SERVER_PID
 
 # Run cpp client unit test
 rm -rf unit_test_models && mkdir unit_test_models
-cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r $DATADIR/qa_model_repository/plan_int32_int32_int32 unit_test_models/client_test_simple
+sed -i "s/plan_int32_int32_int32/client_test_simple/g" unit_test_models/client_test_simple/config.pbtxt
 cp -r ${MODELDIR}/simple unit_test_models/.
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
@@ -532,14 +533,15 @@ wait $SERVER_PID
 
 # Run cpp client load API unit test
 rm -rf unit_test_models && mkdir unit_test_models
-cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r $DATADIR/qa_model_repository/plan_int32_int32_int32 unit_test_models/client_test_simple/
+sed -i "s/plan_int32_int32_int32/client_test_simple/g" unit_test_models/client_test_simple/config.pbtxt
 # Make only version 2, 3 is valid version directory while config requests 1, 3
-rm -rf unit_test_models/onnx_int32_int32_int32/1
+rm -rf unit_test_models/client_test_simple/1
 
-# Start with EXPLICIT mode and load onnx_float32_float32_float32
+# Start with EXPLICIT mode and load client_test_simple
 SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
              --model-control-mode=explicit \
-             --load-model=onnx_int32_int32_int32 \
+             --load-model=client_test_simple \
              --strict-model-config=false"
 SERVER_LOG="./inference_server_cc_unit_test.load.log"
 CLIENT_LOG="./cc_unit_test.load.log"
@@ -592,18 +594,18 @@ wait $SERVER_PID
 MODELDIR=python_unit_test_models
 mkdir -p $MODELDIR
 rm -rf ${MODELDIR}/*
-cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
-cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_object ${MODELDIR}/.
-cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float16 ${MODELDIR}/.
-cp -r $DATADIR/qa_identity_model_repository/onnx_zero_3_float32 ${MODELDIR}/.
-cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element && \
-    (cd $MODELDIR/onnx_zero_1_object_1_element && \
-        sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
+cp -r $DATADIR/qa_identity_model_repository/savedmodel_zero_1_float32 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/savedmodel_zero_1_object ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/savedmodel_zero_1_float16 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/savedmodel_zero_3_float32 ${MODELDIR}/.
+cp -r ${MODELDIR}/savedmodel_zero_1_object ${MODELDIR}/savedmodel_zero_1_object_1_element && \
+    (cd $MODELDIR/savedmodel_zero_1_object_1_element && \
+        sed -i "s/savedmodel_zero_1_object/savedmodel_zero_1_object_1_element/" config.pbtxt && \
         sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
 # Model for error code test
-cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
-    (cd $MODELDIR/onnx_zero_1_float32_queue && \
-        sed -i "s/onnx_zero_1_float32/onnx_zero_1_float32_queue/" config.pbtxt && \
+cp -r ${MODELDIR}/savedmodel_zero_1_float32 ${MODELDIR}/savedmodel_zero_1_float32_queue && \
+    (cd $MODELDIR/savedmodel_zero_1_float32_queue && \
+        sed -i "s/savedmodel_zero_1_float32/savedmodel_zero_1_float32_queue/" config.pbtxt && \
         echo "dynamic_batching { " >> config.pbtxt && \
         echo "    max_queue_delay_microseconds: 1000000" >> config.pbtxt && \
         echo "    preferred_batch_size: [ 8 ]" >> config.pbtxt && \

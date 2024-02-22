@@ -48,7 +48,7 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
-TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx pytorch_libtorch"
+TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan pytorch_libtorch"
 
 # Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \
@@ -275,9 +275,9 @@ cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/plan_zero_4
     autofill_noplatform_success/tensorrt/reshape_config_provided/1
 
 # Copy identity model into onnx test directories
-mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
-    autofill_noplatform_success/onnx/cpu_instance/1
+#mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
+#cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
+#    autofill_noplatform_success/onnx/cpu_instance/1
 
 # Copy openvino models into test directories
 for modelpath in \

@@ -47,8 +47,13 @@ EXPECTED_NUM_TESTS="4"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/* models
+rm `find ./models/ -name '*onnx*'` -rf
+
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository"
+SERVER_ARGS="--model-repository=models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

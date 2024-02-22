@@ -47,7 +47,7 @@ JAVACPP_BRANCH_TAG=${JAVACPP_BRANCH_TAG:="master"}
 # Create local model repository
 mkdir -p ${MODEL_REPO}
 # TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
-for BACKEND in _fp32_libtorch _fp32_onnx; do
+for BACKEND in _fp32_libtorch ; do
     cp -r $DATADIR/perf_model_store/resnet50${BACKEND} ${MODEL_REPO}/
     echo ${MODEL_REPO}/resnet50${BACKEND}/config.pbtxt
     sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" ${MODEL_REPO}/resnet50${BACKEND}/config.pbtxt
@@ -78,7 +78,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # TODO: fix build to support GPU only resnet so can test TF as well
-for BACKEND in ONNX TORCH; do
+for BACKEND in TORCH; do
     if [ `grep -c "${BACKEND} test PASSED" ${CLIENT_LOG}` != "1" ]; then
         echo -e "\n***\n*** ${BACKEND} backend test FAILED. Expected '${BACKEND} test PASSED'\n***"
         RET=1

@@ -39,7 +39,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 export ENSEMBLES=0
-BACKENDS=${BACKENDS:="onnx plan"}
+BACKENDS=${BACKENDS:="plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
 

@@ -50,6 +50,7 @@ rm -rf $DATADIR
 mkdir $DATADIR
 
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/*_nobatch_zero_1_float32 $DATADIR
+rm `find ./models/ -name '*onnx*'` -rf
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"

@@ -236,6 +236,8 @@ else
 
 fi
 
+: '
+# Disabling onnxruntime tests for r24.02 release
 # Onnxruntime: Batching ON
 rm -rf ./models/
 mkdir -p ./models/no_config
@@ -306,17 +308,18 @@ else
     wait $SERVER_PID
 
 fi
+'
 
 #
 # General backend tests
 #
 
 # We want to make sure that backend configurations
-# are not lost. For this purpose we are using only onnx backend
+# are not lost. For this purpose we are using only tensorflow backend
 
 rm -rf ./models/
 mkdir -p ./models/no_config/
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
 
 # First getting a baseline for the number of default configs
 # added during a server set up
@@ -351,7 +354,7 @@ fi
 # One of defaultconfigs is `min-compute-capability`. This test
 # checks if it is properlly overridden.
 MIN_COMPUTE_CAPABILITY=XX
-SERVER_ARGS="--backend-config=onnxruntime,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
+SERVER_ARGS="--backend-config=tensorflow,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.global_configs.log
 run_server
 
@@ -374,7 +377,7 @@ else
 
 fi
 # Now make sure that specific backend configs are not lost.
-SERVER_ARGS="--backend-config=onnxruntime,a=0 --backend-config=onnxruntime,y=0 --backend-config=onnxruntime,z=0 $COMMON_ARGS"
+SERVER_ARGS="--backend-config=tensorflow,a=0 --backend-config=tensorflow,y=0 --backend-config=tensorflow,z=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.specific_configs.log
 EXPECTED_CONFIG_COUNT=$(($DEFAULT_CONFIG_COUNT+3))
 run_server
@@ -397,7 +400,6 @@ else
     wait $SERVER_PID
 
 fi
-
 
 # Print test outcome
 if [ $RET -eq 0 ]; then

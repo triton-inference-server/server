@@ -60,6 +60,9 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 for BACKEND in $BACKENDS; do
+    if [[ "$BACKEND" == 'onnx' ]]; then
+        continue
+    fi
     rm -rf models && mkdir models
     cp -r $DATADIR/${BACKEND}_batch_input models/ragged_element_count_acc_zero
     (cd models/ragged_element_count_acc_zero && \

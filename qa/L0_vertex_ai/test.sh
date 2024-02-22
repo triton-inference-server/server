@@ -59,12 +59,12 @@ source ../common/util.sh
 
 # Set up the multi model repository with the swap and non-swap versions
 mkdir multi_models && \
-    cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 multi_models/addsub && \
+    cp -r $DATADIR/qa_model_repository/plan_int32_int32_int32 multi_models/addsub && \
     rm -r multi_models/addsub/2 && rm -r multi_models/addsub/3 && \
-    sed -i "s/onnx_int32_int32_int32/addsub/" multi_models/addsub/config.pbtxt && \
-    cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 multi_models/subadd && \
+    sed -i "s/plan_int32_int32_int32/addsub/" multi_models/addsub/config.pbtxt && \
+    cp -r $DATADIR/qa_model_repository/plan_int32_int32_int32 multi_models/subadd && \
     rm -r multi_models/subadd/1 && rm -r multi_models/subadd/2 && \
-    sed -i "s/onnx_int32_int32_int32/subadd/" multi_models/subadd/config.pbtxt
+    sed -i "s/plan_int32_int32_int32/subadd/" multi_models/subadd/config.pbtxt
 mkdir single_model && \
     cp -r multi_models/addsub single_model/.
 

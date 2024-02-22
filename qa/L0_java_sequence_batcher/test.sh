@@ -62,7 +62,7 @@ sed -i 's/Simple/SequenceTest/g' $SAMPLES_REPO/pom.xml
 rm -f *.log
 RET=0
 
-for BACKEND in graphdef libtorch onnx savedmodel; do
+for BACKEND in graphdef libtorch savedmodel; do
     # Create local model repository
     mkdir -p ${MODEL_REPO}
     MODEL=${BACKEND}_nobatch_sequence_int32

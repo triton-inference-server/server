@@ -46,7 +46,7 @@ BATCH_CUSTOM_TEST=batch_custom_test.py
 CLIENT_LOG_BASE="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 EXPECTED_NUM_TESTS="1"
-MODEL_NAME="onnx_zero_1_float16"
+MODEL_NAME="savedmodel_zero_1_float16"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose 1"
 SERVER_LOG_BASE="./inference_server.log"
@@ -101,7 +101,7 @@ cp -r backend/examples/batching_strategies/single_batching/build/libtriton_singl
 
 # Run a test to validate the single batching strategy example.
 # Then, run tests to validate the volume batching example being passed in via the backend dir, model dir, version dir, and model config.
-BACKEND_DIR="/opt/tritonserver/backends/onnxruntime"
+BACKEND_DIR="/opt/tritonserver/backends/tensorflow"
 MODEL_DIR="models/$MODEL_NAME"
 VERSION_DIR="$MODEL_DIR/1/"
 
