@@ -36,7 +36,7 @@ image:
   numGpus: 1
 
 # add server args here e.g. --grpc-use-ssl, --grpc-server-certs, repository-poll-secs, etc
-serverArgs: 
+serverArgs:
   - '--model-repository=/models'
 
 traefik:
