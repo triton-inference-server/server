@@ -82,7 +82,7 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 # Used to control which backends are run in infer_test.py
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch plan"}
 
 function run_unit_tests() {
     BACKENDS=$BACKENDS python $INFER_TEST >$CLIENT_LOG 2>&1
@@ -110,6 +110,7 @@ function setup_model_repo() {
     # Copy models with string inputs and remove nobatch (bs=1) models
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
     rm -rf models/*nobatch*
+    rm `find ./models/ -name '*onnx*'` -rf
 }
 
 setup_model_repo

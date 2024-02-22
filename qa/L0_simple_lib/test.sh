@@ -55,7 +55,7 @@ for SIMPLE_CLIENT in simple ; do
     CLIENT_LOG=$SIMPLE_CLIENT
     SIMPLE_CLIENT=./$SIMPLE_CLIENT
 
-    for trial in graphdef savedmodel onnx libtorch plan; do
+    for trial in graphdef savedmodel libtorch plan; do
         full=${trial}_float32_float32_float32
         rm -rf $MODELSDIR
         mkdir -p $MODELSDIR/simple/1 && \

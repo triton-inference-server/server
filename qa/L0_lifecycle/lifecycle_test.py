@@ -205,7 +205,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # And other models should be loaded successfully
         try:
-            for base_name in ["savedmodel", "onnx"]:
+            for base_name in ["savedmodel", "libtorch"]:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
                     grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -268,7 +268,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # And other models should be loaded successfully
         try:
-            for base_name in ["savedmodel", "onnx"]:
+            for base_name in ["savedmodel", "libtorch"]:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
                     grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -324,7 +324,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # And other models should be loaded successfully
         try:
-            for base_name in ["savedmodel", "onnx"]:
+            for base_name in ["savedmodel", "libtorch"]:
                 model_name = tu.get_model_name(
                     base_name, np.float32, np.float32, np.float32
                 )
@@ -356,7 +356,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertFalse(triton_client.is_server_ready())
 
                 # one model uses sequence batcher while the other uses dynamic batcher
-                model_names = ["onnx_sequence_int32", "onnx_int32_int32_int32"]
+                model_names = ["libtorch_sequence_int32", "libtorch_int32_int32_int32"]
                 for model_name in model_names:
                     self.assertFalse(triton_client.is_model_ready(model_name))
 
@@ -365,7 +365,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
             # And other models should be loaded successfully
             try:
-                for base_name in ["graphdef", "savedmodel", "onnx"]:
+                for base_name in ["graphdef", "savedmodel", "libtorch"]:
                     model_name = tu.get_model_name(
                         base_name, np.float32, np.float32, np.float32
                     )
@@ -375,7 +375,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         try:
             tensor_shape = (1, 16)
-            for base_name in ["graphdef", "savedmodel", "onnx"]:
+            for base_name in ["graphdef", "savedmodel", "libtorch"]:
                 iu.infer_exact(
                     self,
                     base_name,
@@ -411,7 +411,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
             # Sanity check that other models are loaded properly
             try:
-                for base_name in ["savedmodel", "onnx"]:
+                for base_name in ["savedmodel", "libtorch"]:
                     model_name = tu.get_model_name(
                         base_name, np.float32, np.float32, np.float32
                     )
@@ -425,7 +425,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         try:
-            for base_name in ["savedmodel", "onnx"]:
+            for base_name in ["savedmodel", "libtorch"]:
                 iu.infer_exact(
                     self,
                     base_name,
@@ -535,7 +535,9 @@ class LifeCycleTest(tu.TestResultCollector):
         savedmodel_name = tu.get_model_name(
             "savedmodel", np.float32, np.float32, np.float32
         )
-        onnx_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        libtorch_name = tu.get_model_name(
+            "libtorch", np.float32, np.float32, np.float32
+        )
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
@@ -548,8 +550,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -566,8 +568,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -642,8 +644,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -682,8 +684,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
 
             triton_client = httpclient.InferenceServerClient(
                 "localhost:8000", verbose=True
@@ -712,10 +714,10 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove onnx model from the model repository and give it
+        # Remove libtorch model from the model repository and give it
         # time to unload. Make sure that it is unavailable.
         try:
-            shutil.rmtree("models/" + onnx_name)
+            shutil.rmtree("models/" + libtorch_name)
             time.sleep(5)  # wait for model to unload
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -725,8 +727,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertFalse(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertFalse(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -734,7 +736,7 @@ class LifeCycleTest(tu.TestResultCollector):
         try:
             iu.infer_exact(
                 self,
-                "onnx",
+                "libtorch",
                 tensor_shape,
                 1,
                 np.float32,
@@ -742,10 +744,12 @@ class LifeCycleTest(tu.TestResultCollector):
                 np.float32,
                 swap=True,
             )
-            self.assertTrue(False, "expected error for unavailable model " + onnx_name)
+            self.assertTrue(
+                False, "expected error for unavailable model " + libtorch_name
+            )
         except Exception as ex:
             self.assertIn(
-                "Request for unknown model: 'onnx_float32_float32_float32' has no available versions",
+                "Request for unknown model: 'libtorch_float32_float32_float32' has no available versions",
                 ex.message(),
             )
 
@@ -754,7 +758,9 @@ class LifeCycleTest(tu.TestResultCollector):
         savedmodel_name = tu.get_model_name(
             "savedmodel", np.float32, np.float32, np.float32
         )
-        onnx_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        libtorch_name = tu.get_model_name(
+            "libtorch", np.float32, np.float32, np.float32
+        )
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
@@ -767,8 +773,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -785,8 +791,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -814,7 +820,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # Remove one of the original models from the model repository.
         # Unloading is disabled so it should remain available in the status.
         try:
-            shutil.rmtree("models/" + onnx_name)
+            shutil.rmtree("models/" + libtorch_name)
             time.sleep(5)  # wait for model to unload (but it shouldn't)
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -824,8 +830,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -834,7 +840,7 @@ class LifeCycleTest(tu.TestResultCollector):
         try:
             iu.infer_exact(
                 self,
-                "onnx",
+                "libtorch",
                 tensor_shape,
                 1,
                 np.float32,
@@ -1279,7 +1285,7 @@ class LifeCycleTest(tu.TestResultCollector):
             (1,),
             model_shape,
         )
-        self._infer_success_models(["graphdef", "onnx"], (1, 3), model_shape)
+        self._infer_success_models(["graphdef", "libtorch"], (1, 3), model_shape)
 
         # Add the savedmodel to the second model repository, should cause
         # it to be unloaded due to duplication
@@ -1297,7 +1303,7 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        self._infer_success_models(["graphdef", "onnx"], (1, 3), model_shape)
+        self._infer_success_models(["graphdef", "libtorch"], (1, 3), model_shape)
 
         # Remove the savedmodel from the first model repository, the
         # model from the second model repository should be loaded
@@ -1306,7 +1312,7 @@ class LifeCycleTest(tu.TestResultCollector):
         shutil.rmtree("models/" + savedmodel_name)
         time.sleep(5)  # wait for model to unload
         self._infer_success_models(
-            ["savedmodel", "graphdef", "onnx"], (1, 3), model_shape
+            ["savedmodel", "graphdef", "libtorch"], (1, 3), model_shape
         )
 
     def test_multiple_model_repository_control(self):
@@ -1316,7 +1322,7 @@ class LifeCycleTest(tu.TestResultCollector):
         savedmodel_name = tu.get_model_name(
             "savedmodel", np.float32, np.float32, np.float32
         )
-        model_bases = ["savedmodel", "graphdef", "onnx"]
+        model_bases = ["savedmodel", "graphdef", "libtorch"]
 
         # Initially models are not loaded
         for base in model_bases:
@@ -1353,7 +1359,7 @@ class LifeCycleTest(tu.TestResultCollector):
             (1,),
             model_shape,
         )
-        self._infer_success_models(["graphdef", "onnx"], (1, 3), model_shape)
+        self._infer_success_models(["graphdef", "libtorch"], (1, 3), model_shape)
 
         # Add the savedmodel to the second model repository. Because
         # not polling this doesn't change any model state, all models
@@ -1366,7 +1372,7 @@ class LifeCycleTest(tu.TestResultCollector):
             (1,),
             model_shape,
         )
-        self._infer_success_models(["graphdef", "onnx"], (1, 3), model_shape)
+        self._infer_success_models(["graphdef", "libtorch"], (1, 3), model_shape)
 
         # Load savedmodel again which should fail because it is now duplicated
         # in 2 model repositories. Use HTTP here.
@@ -1394,7 +1400,7 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        self._infer_success_models(["graphdef", "onnx"], (1, 3), model_shape)
+        self._infer_success_models(["graphdef", "libtorch"], (1, 3), model_shape)
 
         # Remove the savedmodel from the first model repository and
         # explicitly load savedmodel. The savedmodel from the second
@@ -1413,18 +1419,18 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertIn("failed to load '{}'".format(savedmodel_name), ex.message())
 
         self._infer_success_models(
-            ["savedmodel", "graphdef", "onnx"], (1, 3), model_shape
+            ["savedmodel", "graphdef", "libtorch"], (1, 3), model_shape
         )
 
     def test_model_control(self):
         model_shape = (1, 16)
-        onnx_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        libtorch_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
 
         ensemble_prefix = "simple_"
-        ensemble_name = ensemble_prefix + onnx_name
+        ensemble_name = ensemble_prefix + libtorch_name
 
         # Make sure no models are loaded
-        for model_name in (onnx_name, ensemble_name):
+        for model_name in (libtorch_name, ensemble_name):
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1462,44 +1468,44 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_plan",
             ],
             (1, 3),
             model_shape,
             swap=True,
         )
 
-        # Delete model configuration for onnx, which will cause
+        # Delete model configuration for libtorch, which will cause
         # the autofiller to use the latest version policy so that only
         # version 3 will be available if the models are re-loaded
-        for model_name in (onnx_name,):
+        for model_name in (libtorch_name,):
             os.remove("models/" + model_name + "/config.pbtxt")
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_plan",
             ],
             (1, 3),
             model_shape,
             swap=True,
         )
 
-        # Reload models, only version 3 should be available for onnx
-        for model_name in (onnx_name, ensemble_name):
+        # Reload models, only version 3 should be available for libtorch
+        for model_name in (libtorch_name, ensemble_name):
             try:
                 triton_client = grpcclient.InferenceServerClient(
                     "localhost:8001", verbose=True
@@ -1510,21 +1516,21 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (3,),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_plan",
             ],
             (1, 3),
             model_shape,
             swap=True,
         )
 
-        for model_name in (onnx_name,):
+        for model_name in (libtorch_name,):
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1552,11 +1558,11 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client = httpclient.InferenceServerClient(
                 "localhost:8000", verbose=True
             )
-            triton_client.unload_model(onnx_name)
+            triton_client.unload_model(libtorch_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        for model_name in (onnx_name, ensemble_name):
+        for model_name in (libtorch_name, ensemble_name):
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1577,13 +1583,13 @@ class LifeCycleTest(tu.TestResultCollector):
                 "localhost:8000", verbose=True
             )
             triton_client.unload_model(ensemble_name)
-            triton_client.load_model(onnx_name)
+            triton_client.load_model(libtorch_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (3,),
             model_shape,
@@ -1602,7 +1608,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_control_fail(self):
-        model_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        model_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
 
         # Make sure no models are loaded
         try:
@@ -1639,13 +1645,15 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_model_control_ensemble(self):
         model_shape = (1, 16)
-        onnx_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        libtorch_name = tu.get_model_name(
+            "savedmodel", np.float32, np.float32, np.float32
+        )
 
         ensemble_prefix = "simple_"
-        ensemble_name = ensemble_prefix + onnx_name
+        ensemble_name = ensemble_prefix + libtorch_name
 
         # Make sure no models are loaded
-        for model_name in (onnx_name, ensemble_name):
+        for model_name in (libtorch_name, ensemble_name):
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1669,14 +1677,14 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self._infer_success_models(
             [
-                "onnx",
+                "savedmodel",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_savedmodel",
             ],
             (1, 3),
             model_shape,
@@ -1691,7 +1699,7 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client.unload_model(ensemble_name, unload_dependents=True)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-        for model_name in (onnx_name, ensemble_name):
+        for model_name in (libtorch_name, ensemble_name):
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1717,7 +1725,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         self._infer_success_models(
             [
-                "onnx",
+                "savedmodel",
             ],
             (1, 3),
             model_shape,
@@ -1732,8 +1740,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(ensemble_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(ensemble_name, "3"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(libtorch_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2030,11 +2038,13 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_multiple_model_repository_control_startup_models(self):
         model_shape = (1, 16)
-        onnx_name = tu.get_model_name("onnx", np.float32, np.float32, np.float32)
+        graphdef_name = tu.get_model_name(
+            "graphdef", np.float32, np.float32, np.float32
+        )
         plan_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
 
         ensemble_prefix = "simple_"
-        onnx_ensemble_name = ensemble_prefix + onnx_name
+        graphdef_ensemble_name = ensemble_prefix + graphdef_name
         plan_ensemble_name = ensemble_prefix + plan_name
 
         # Make sure unloaded models are not in the status
@@ -2055,14 +2065,14 @@ class LifeCycleTest(tu.TestResultCollector):
         # And loaded models work properly
         self._infer_success_models(
             [
-                "onnx",
+                "graphdef",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_graphdef",
             ],
             (1, 3),
             model_shape,
@@ -2119,43 +2129,43 @@ class LifeCycleTest(tu.TestResultCollector):
         # Delete model configuration, which will cause the autofiller
         # to use the latest version policy so that only version 3 will
         # be available if the models are re-loaded
-        os.remove("models/" + onnx_name + "/config.pbtxt")
+        os.remove("models/" + plan_name + "/config.pbtxt")
 
         self._infer_success_models(
             [
-                "plan",
+                "graphdef",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_plan",
+                "simple_graphdef",
             ],
             (1, 3),
             model_shape,
             swap=True,
         )
 
-        # Reload onnx, only version 3 should be available
+        # Reload plan model, only version 3 should be available
         try:
             triton_client = grpcclient.InferenceServerClient(
                 "localhost:8001", verbose=True
             )
-            triton_client.load_model(onnx_name)
+            triton_client.load_model(plan_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (3,),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_onnx",
+                "simple_plan",
             ],
             (1, 3),
             model_shape,
@@ -2169,7 +2179,7 @@ class LifeCycleTest(tu.TestResultCollector):
             ):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertFalse(triton_client.is_model_ready(onnx_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(plan_name, "1"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2183,17 +2193,17 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Unload the onnx, as side effect, the ensemble model
+        # Unload the plan, as side effect, the ensemble model
         # will be forced to be unloaded
         try:
             triton_client = httpclient.InferenceServerClient(
                 "localhost:8000", verbose=True
             )
-            triton_client.unload_model(onnx_name)
+            triton_client.unload_model(plan_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        for model_name in [onnx_name, onnx_ensemble_name]:
+        for model_name in [plan_name, plan_ensemble_name]:
             try:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -2206,35 +2216,35 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Explicitly unload the onnx ensemble and load the
+        # Explicitly unload the plan ensemble and load the
         # depending model. The ensemble model should not be reloaded
         # because it was explicitly unloaded.
         try:
             triton_client = httpclient.InferenceServerClient(
                 "localhost:8000", verbose=True
             )
-            triton_client.unload_model(onnx_ensemble_name)
-            triton_client.load_model(onnx_name)
+            triton_client.unload_model(plan_ensemble_name)
+            triton_client.load_model(plan_name)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         self._infer_success_models(
             [
-                "onnx",
+                "plan",
             ],
             (3,),
             model_shape,
         )
         self._infer_success_models(
             [
-                "plan",
+                "graphdef",
             ],
             (1, 3),
             model_shape,
         )
         self._infer_success_models(
             [
-                "simple_plan",
+                "simple_graphdef",
             ],
             (1, 3),
             model_shape,
@@ -2248,8 +2258,8 @@ class LifeCycleTest(tu.TestResultCollector):
             ):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertFalse(triton_client.is_model_ready(onnx_ensemble_name, "1"))
-                self.assertFalse(triton_client.is_model_ready(onnx_ensemble_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(plan_ensemble_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(plan_ensemble_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2280,7 +2290,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # All models should be in ready state except onnx_float32_float32_float32
+        # All models should be in ready state except libtorch_float32_float32_float32
         # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:
@@ -2292,7 +2302,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertEqual(len(index), 8)
             for i in index:
                 indexed.append(i["name"])
-                if i["name"] == "onnx_float32_float32_float32":
+                if i["name"] == "libtorch_float32_float32_float32":
                     self.assertEqual(i["state"], "UNAVAILABLE")
                     self.assertEqual(
                         i["reason"], "model appears in two or more repositories"
@@ -2311,7 +2321,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertEqual(len(index.models), 8)
             for i in index.models:
                 indexed.append(i.name)
-                if i.name == "onnx_float32_float32_float32":
+                if i.name == "libtorch_float32_float32_float32":
                     self.assertEqual(i.state, "UNAVAILABLE")
                     self.assertEqual(
                         i.reason, "model appears in two or more repositories"
@@ -2332,7 +2342,7 @@ class LifeCycleTest(tu.TestResultCollector):
             httpclient.InferenceServerClient("localhost:8000", verbose=True),
             grpcclient.InferenceServerClient("localhost:8001", verbose=True),
         ):
-            for base in (("onnx", "onnxruntime"),):
+            for base in (("plan", "tensorrt"),):
                 model_name = tu.get_model_name(
                     base[0], np.float32, np.float32, np.float32
                 )
@@ -2404,7 +2414,7 @@ class LifeCycleTest(tu.TestResultCollector):
         model_shape = (1, 16)
         override_base = "override_model"
 
-        for base in (("onnx", "onnxruntime"),):
+        for base in (("plan", "tensorrt"),):
             model_name = tu.get_model_name(base[0], np.float32, np.float32, np.float32)
             override_model_name = tu.get_model_name(
                 override_base, np.float32, np.float32, np.float32
@@ -2432,7 +2442,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 # not be used.
                 try:
                     triton_client.load_model(
-                        model_name, files={"file:1/model.onnx": file_content}
+                        model_name, files={"file:1/model.plan": file_content}
                     )
                     self.assertTrue(False, "expected error on missing override config")
                 except InferenceServerException as ex:
@@ -2464,7 +2474,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     triton_client.load_model(
                         override_model_name,
                         config="""{{"backend":"{backend}" }}""".format(backend=base[1]),
-                        files={"file:1/model.onnx": file_content},
+                        files={"file:1/model.plan": file_content},
                     )
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
@@ -2501,7 +2511,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     triton_client.load_model(
                         model_name,
                         config="""{{"backend":"{backend}" }}""".format(backend=base[1]),
-                        files={"file:1/model.onnx": file_content},
+                        files={"file:1/model.plan": file_content},
                     )
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))

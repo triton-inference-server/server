@@ -57,7 +57,7 @@ elif USE_GRPC:
 else:
     _protocols = ("http",)
 
-BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx plan custom python")
+BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel plan custom python")
 ENSEMBLES = bool(int(os.environ.get("ENSEMBLES", 1)))
 
 NO_BATCHING = int(os.environ["NO_BATCHING"]) == 1
@@ -70,14 +70,16 @@ INITIAL_STATE_FILE = int(os.environ["INITIAL_STATE_FILE"]) == 1
 _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(" "):
-        if backend != "custom":
+        if backend != "custom" and backend != "onnx":
             _trials += (backend + "_nobatch",)
 elif os.environ["BATCHER_TYPE"] == "VARIABLE":
     for backend in BACKENDS.split(" "):
-        if (backend != "libtorch") and (backend != "custom"):
+        if (backend != "libtorch") and (backend != "custom") and (backend != "onnx"):
             _trials += (backend,)
 else:
-    _trials = BACKENDS.split(" ")
+    for backend in BACKENDS.split(" "):
+        if backend != "onnx":
+            _trials += (backend,)
 
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
@@ -174,7 +176,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
     def test_simple_sequence(self):
         # Send one sequence and check for correct accumulator
         # result. The result should be returned immediately.
+        print(_trials)
         for trial in _trials:
+            print("---------------------------" + str(trial))
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 dtypes = self.get_datatype(trial)

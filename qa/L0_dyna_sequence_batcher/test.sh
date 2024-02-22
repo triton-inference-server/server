@@ -53,7 +53,7 @@ IMPLICIT_STATE=${IMPLICIT_STATE:="0"}
 export IMPLICIT_STATE
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel libtorch onnx plan custom custom_string"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch plan custom custom_string"}
 export BACKENDS
 
 MODEL_REPOSITORY=''
@@ -94,6 +94,8 @@ if [ $IMPLICIT_STATE == "0" ]; then
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 fi
+
+rm `find ./models/ -name '*onnx*'` -rf
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used

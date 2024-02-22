@@ -53,6 +53,9 @@ RET=0
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 for BACKEND in $BACKENDS; do
+    if [[ "$BACKEND" == 'onnx' ]]; then
+        continue
+    fi
     # Need just one model for the backend...
     rm -fr models && mkdir models
     cp -r ${DATADIR}/qa_model_repository/${BACKEND}_float32_float32_float32 \

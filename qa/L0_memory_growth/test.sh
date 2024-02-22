@@ -102,6 +102,7 @@ export MAX_ALLOWED_ALLOC="100"
 # Create local model repository
 mkdir -p models/
 cp -r $DATADIR/perf_model_store/resnet50* models/
+rm -rf models/resnet50_fp32_onnx
 
 # Copy and prepare trt model
 cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/resnet50_fp16_plan

@@ -96,7 +96,6 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
-
 # LifeCycleTest.test_parse_error_noexit
 SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=false \
              --exit-on-error=false"
@@ -336,7 +335,7 @@ mkdir models models_0
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in onnx plan ; do
+for i in plan libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 # Change the model files so that multiple versions will be loaded, and one of
@@ -398,7 +397,7 @@ mkdir models models_0
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in onnx plan ; do
+for i in plan libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 rm models/graphdef_float32_float32_float32/config.pbtxt
@@ -439,14 +438,14 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models models_0
 mkdir models models_0
-cp -r $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 models/.
-cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models_0/.
-sed -i "s/OUTPUT/_OUTPUT/" models/onnx_sequence_int32/config.pbtxt
-sed -i "s/OUTPUT/_OUTPUT/" models_0/onnx_int32_int32_int32/config.pbtxt
-for i in graphdef savedmodel; do
+cp -r $DATADIR/qa_sequence_model_repository/savedmodel_sequence_int32 models/.
+cp -r $DATADIR/qa_model_repository/savedmodel_int32_int32_int32 models_0/.
+sed -i "s/OUTPUT/_OUTPUT/" models/savedmodel_sequence_int32/config.pbtxt
+sed -i "s/OUTPUT/_OUTPUT/" models_0/savedmodel_int32_int32_int32/config.pbtxt
+for i in graphdef libtorch; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in onnx ; do
+for i in savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
@@ -477,7 +476,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_model_no_version
 rm -fr models
 mkdir models
-for i in savedmodel onnx plan ; do
+for i in savedmodel libtorch plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 mkdir -p models/graphdef_float32_float32_float32
@@ -581,7 +580,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_load_unload
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
-for i in graphdef onnx plan ; do
+for i in graphdef libtorch plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -610,7 +609,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
-for i in graphdef onnx plan; do
+for i in graphdef libtorch plan; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -762,7 +761,7 @@ mkdir models models_0
 for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in onnx ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -796,7 +795,7 @@ mkdir models models_0
 for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-for i in onnx ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
@@ -829,7 +828,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_model_control
 rm -fr models config.pbtxt.*
 mkdir models
-for i in onnx ; do
+for i in plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -861,7 +860,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_model_control_fail
 rm -fr models config.pbtxt.*
 mkdir models
-for i in onnx ; do
+for i in plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     # Remove all model files so the model will fail to load
     rm models/${i}_float32_float32_float32/*/*
@@ -893,7 +892,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_model_control_ensemble
 rm -fr models config.pbtxt.*
 mkdir models
-for i in onnx ; do
+for i in savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -926,7 +925,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
 # Ensemble models in the second repository
-for i in plan onnx ; do
+for i in plan graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -945,7 +944,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --strict-model-config=false --exit-on-error=false \
              --load-model=savedmodel_float32_float32_float32 \
              --load-model=plan_float32_float32_float32 \
-             --load-model=simple_onnx_float32_float32_float32"
+             --load-model=simple_graphdef_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -971,7 +970,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
 # Ensemble models in the second repository
-for i in plan onnx ; do
+for i in plan graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -1012,7 +1011,7 @@ LOG_IDX=$((LOG_IDX+1))
 # an additional --load-model argument, it should fail
 rm -fr models
 mkdir models
-for i in onnx ; do
+for i in plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
 done
@@ -1024,7 +1023,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --strict-readiness=true \
              --exit-on-error=true \
              --load-model=* \
-             --load-model=onnx_float32_float32_float32"
+             --load-model=plan_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
@@ -1057,6 +1056,7 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
 # check server log for the error messages to make sure they're printed
 if [ `grep -c "model not found in any model repository" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not print model load failure for non-existent model\n***"
@@ -1075,8 +1075,8 @@ for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
 done
 
-# onnx doesn't load because it is duplicated in 2 repositories
-for i in onnx ; do
+# libtorch doesn't load because it is duplicated in 2 repositories
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -1085,7 +1085,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
-             --load-model=onnx_float32_float32_float32 \
+             --load-model=libtorch_float32_float32_float32 \
              --load-model=graphdef_float32_float32_float32 \
              --load-model=simple_savedmodel_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -1369,7 +1369,7 @@ done
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
 mkdir models
-for i in graphdef savedmodel onnx plan ; do
+for i in graphdef savedmodel libtorch plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
@@ -1480,10 +1480,10 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_config_override
 rm -fr models config.pbtxt.*
 mkdir models
-cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
+cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models/.
 # Make only version 2 is valid version directory while config requests 1, 3
-rm models/onnx_float32_float32_float32/1/*
-rm models/onnx_float32_float32_float32/3/*
+rm models/plan_float32_float32_float32/1/*
+rm models/plan_float32_float32_float32/3/*
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models \
              --model-control-mode=explicit \
@@ -1512,14 +1512,14 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_file_override
 rm -fr models config.pbtxt.*
 mkdir models
-cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
+cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models/.
 # Make only version 2, 3 is valid version directory while config requests 1, 3
-rm -rf models/onnx_float32_float32_float32/1
+rm -rf models/plan_float32_float32_float32/1
 
-# Start with EXPLICIT mode and load onnx_float32_float32_float32
+# Start with EXPLICIT mode and load plan_float32_float32_float32
 SERVER_ARGS="--model-repository=`pwd`/models \
              --model-control-mode=explicit \
-             --load-model=onnx_float32_float32_float32 \
+             --load-model=plan_float32_float32_float32 \
              --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -1905,7 +1905,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -rf models
 mkdir models
 # Sanity check loading multiple instances in parallel for each supported backend
-PARALLEL_BACKENDS="python onnx"
+PARALLEL_BACKENDS="python"
 for backend in ${PARALLEL_BACKENDS} ; do
     model="${backend}_float32_float32_float32"
     model_dir="models/${model}"

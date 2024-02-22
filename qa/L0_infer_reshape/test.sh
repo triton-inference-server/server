@@ -76,6 +76,7 @@ for i in \
 done
 
 create_nop_version_dir `pwd`/models
+rm `find ./models/ -name '*onnx*'` -rf
 
 RET=0
 

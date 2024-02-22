@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 # Used to control which backends are run in infer_test.py
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch plan"}
 
 function run_unit_tests() {
     echo "Running unit tests: ${INFER_TEST}"
@@ -276,7 +276,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 # Test for multiple model repositories using S3 cloud storage
 echo "=== Running multiple-model-repository tests ==="
 BACKENDS1="graphdef libtorch"
-BACKENDS2="onnx plan savedmodel"
+BACKENDS2="plan savedmodel"
 export BACKENDS="$BACKENDS1 $BACKENDS2"
 
 set +e

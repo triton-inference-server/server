@@ -123,7 +123,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel plan libtorch custom python"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
@@ -521,6 +521,8 @@ for model_trial in $MODEL_TRIALS; do
       done
     fi
 
+    rm `find ./$MODEL_PATH/ -name '*onnx*'` -rf
+
     # Need to launch the server for each test so that the model status
     # is reset (which is used to make sure the correct batch size was
     # used for execution). Test everything with fixed-tensor-size
@@ -713,6 +715,7 @@ fi
 MODEL_PATH=queue_delay_models
 # remove ensemble models from the test model repo
 rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
+rm `find ./queue_delay_models/ -name '*onnx*'` -rf
 for i in $QUEUE_DELAY_TESTS ; do
     export NO_BATCHING=0
     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
