@@ -73,7 +73,7 @@ class TestResponseStatistics(unittest.TestCase):
         self._grpc_client.async_stream_infer(
             model_name=self._model_name, inputs=inputs, outputs=outputs
         )
-        if cancel_at_response_size == None:
+        if cancel_at_response_size is None:
             # poll until all expected responses are received
             while len(responses) < (
                 number_of_responses - self._number_of_empty_responses
