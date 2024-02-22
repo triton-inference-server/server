@@ -54,14 +54,15 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.async_grpc = asyncgrpcclient.InferenceServerClient(url="localhost:8001")
 
         self.parameter_list = []
-        if TEST_HEADER in ["0", "1"]:
-            self.parameter_list.append({"key1": "value1", "key2": "value2"})
-            self.parameter_list.append({"key1": 1, "key2": 2})
-            self.parameter_list.append({"key1": 123.123, "key2": 321.321})
-            self.parameter_list.append({"key1": True, "key2": "value2"})
-            self.parameter_list.append({"triton_": True, "key2": "value2"})
+        self.parameter_list.append({"key1": "value1", "key2": "value2"})
+        self.parameter_list.append({"key1": 1, "key2": 2})
+        self.parameter_list.append({"key1": 123.123, "key2": 321.321})
+        self.parameter_list.append({"key1": True, "key2": "value2"})
+        self.parameter_list.append({"triton_": True, "key2": "value2"})
 
-        if TEST_HEADER in ["1", "2"]:
+        # Only test 0 tests parameters without headers.
+        test_header = (TEST_HEADER != "0")
+        if test_header:
             self.headers = {
                 "header_1": "value_1",
                 "header_2": "value_2",
