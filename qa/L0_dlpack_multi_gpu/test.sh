@@ -41,7 +41,7 @@ source ../common/util.sh
 
 # Uninstall the non CUDA version of PyTorch
 pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
 pip3 install tensorflow
 
 # Install CuPy for testing non_blocking compute streams

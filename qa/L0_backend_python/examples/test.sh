@@ -37,9 +37,9 @@ rm -fr *.log python_backend/
 # Install torch
 pip3 uninstall -y torch
 if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 0 ]]; then
-    pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
+    pip3 install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.16.0+cu121
 else
-    pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
+    pip3 install torch==2.2.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.16.0
 fi
 
 # Install `validators` for Model Instance Kind example
