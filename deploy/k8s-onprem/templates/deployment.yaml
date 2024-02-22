@@ -69,7 +69,7 @@ spec:
             limits:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
 
-          args: 
+          args:
             - tritonserver
             {{- range .Values.serverArgs }}
             - {{ . }}
