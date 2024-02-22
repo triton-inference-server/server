@@ -211,7 +211,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
-            exit $SUB_TEST_RET
         fi
     fi
 
@@ -262,7 +261,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
-            exit $SUB_TEST_RET
         fi
     fi
 
@@ -311,7 +309,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
-            exit $SUB_TEST_RET
         fi
     fi
 fi
@@ -337,7 +334,6 @@ python3 bls_parameters_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** bls_parameters_test.py FAILED. \n***"
     cat $TEST_LOG
-    exit $SUB_TEST_RET
     RET=1
 fi
 set -e
