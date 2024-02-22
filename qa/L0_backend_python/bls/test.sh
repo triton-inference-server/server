@@ -41,6 +41,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     mkdir -p models/bls/1/
     cp ../../python_models/bls/model.py models/bls/1/
     cp ../../python_models/bls/config.pbtxt models/bls
+    sed -i 's/onnx_nobatch_sequence_int32/plan_nobatch_sequence_int32/g' models/bls/1/model.py
 
     mkdir -p models/dlpack_add_sub/1/
     cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
@@ -74,8 +75,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
     cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
 
-    #Disabling onnxruntime tests for 24.02
-    #cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/plan_nobatch_sequence_int32/ ./models
 
     git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
     mkdir -p models/square_int32/1/
@@ -211,6 +211,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
+            exit $SUB_TEST_RET
         fi
     fi
 
@@ -261,6 +262,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
+            exit $SUB_TEST_RET
         fi
     fi
 
@@ -309,6 +311,7 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         if [ $SUB_TEST_RET -eq 1 ]; then
             cat $CLIENT_LOG
             cat $SERVER_LOG
+            exit $SUB_TEST_RET
         fi
     fi
 fi
@@ -334,6 +337,7 @@ python3 bls_parameters_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** bls_parameters_test.py FAILED. \n***"
     cat $TEST_LOG
+    exit $SUB_TEST_RET
     RET=1
 fi
 set -e
