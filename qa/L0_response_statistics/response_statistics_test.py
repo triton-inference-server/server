@@ -132,8 +132,6 @@ class TestResponseStatistics(unittest.TestCase):
     def _check_statistics_count_and_duration(
         self, response_stats, current_index, stats_name
     ):
-        print(self._statistics_counts)
-        print(response_stats)
         expected_count = self._statistics_counts[current_index][stats_name]
         if stats_name == "compute_infer" or stats_name == "empty_response":
             delay_ns = self._min_infer_delay_ns
