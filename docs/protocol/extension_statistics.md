@@ -195,7 +195,7 @@ $response_stats =
   "compute_output" : $duration_stat,
   "success" : $duration_stat,
   "fail" : $duration_stat,
-  "empty_response" : $duration_stat
+  "empty_response" : $duration_stat,
   "cancel" : $duration_stat
 }
 ```
