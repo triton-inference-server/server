@@ -63,7 +63,7 @@ class TestResponseStatistics(unittest.TestCase):
     # 'cancel_at_response_size' will cancel the stream when the number of responses
     # received equals the size, set to None if cancellation is not required. This
     # function waits until all success and fail responses are received, or cancelled.
-    def _stream_infer(self, number_of_responses, cancel_at_response_size):
+    def _stream_infer(self, number_of_responses, cancel_at_response_size=None):
         callback, responses = self._generate_streaming_callback_and_response_pair()
         self._grpc_client.start_stream(callback)
         input_data = np.array([number_of_responses], dtype=np.int32)
@@ -188,7 +188,9 @@ class TestResponseStatistics(unittest.TestCase):
 
     # Check the response statistics is valid for a given infer request, providing its
     # 'responses', expected 'number_of_responses' and 'cancel_at_index'.
-    def _check_response_stats(self, responses, number_of_responses, cancel_at_index):
+    def _check_response_stats(
+        self, responses, number_of_responses, cancel_at_index=None
+    ):
         response_stats = self._get_response_statistics()
         self.assertGreaterEqual(len(response_stats), number_of_responses)
         for i in range(number_of_responses):
@@ -215,18 +217,18 @@ class TestResponseStatistics(unittest.TestCase):
         self._number_of_empty_responses = 1
         # Send a request that generates 4 responses.
         number_of_responses = 4
-        responses = self._stream_infer(number_of_responses, None)
-        self._check_response_stats(responses, number_of_responses, None)
+        responses = self._stream_infer(number_of_responses)
+        self._check_response_stats(responses, number_of_responses)
         # Send a request that generates 6 responses, and make sure the statistics are
         # aggregated with the previous request.
         number_of_responses = 6
-        responses = self._stream_infer(number_of_responses, None)
-        self._check_response_stats(responses, number_of_responses, None)
+        responses = self._stream_infer(number_of_responses)
+        self._check_response_stats(responses, number_of_responses)
         # Send a request that generates 3 responses, and make sure the statistics are
         # aggregated with the previous requests.
         number_of_responses = 3
-        responses = self._stream_infer(number_of_responses, None)
-        self._check_response_stats(responses, number_of_responses, None)
+        responses = self._stream_infer(number_of_responses)
+        self._check_response_stats(responses, number_of_responses)
 
     # Test response statistics with cancellation.
     def test_response_statistics_cancel(self):
@@ -237,8 +239,8 @@ class TestResponseStatistics(unittest.TestCase):
 
         # Send a request that generates 4 responses.
         number_of_responses = 4
-        responses = self._stream_infer(number_of_responses, None)
-        self._check_response_stats(responses, number_of_responses, None)
+        responses = self._stream_infer(number_of_responses)
+        self._check_response_stats(responses, number_of_responses)
 
         # Send a request that generates 4 responses, and cancel on the 3rd response.
         # Make sure the statistics are aggregated with the previous request.
