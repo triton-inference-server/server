@@ -87,7 +87,7 @@ RUN choco install git docker unzip -y
 #
 # Installing python
 #
-ARG PYTHON_VERSION=3.10.11
+ARG PYTHON_VERSION=3.8.10
 ARG PYTHON_SOURCE=https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-amd64.exe
 ADD ${PYTHON_SOURCE} python-${PYTHON_VERSION}-amd64.exe
 RUN python-%PYTHON_VERSION%-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0 TargetDir="C:\python%PYTHON_VERSION%"
