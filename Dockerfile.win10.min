@@ -87,7 +87,7 @@ RUN choco install git docker unzip -y
 #
 # Installing python
 #
-ARG PYTHON_VERSION=3.10.11
+ARG PYTHON_VERSION=3.8.10
 ARG PYTHON_SOURCE=https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-amd64.exe
 ADD ${PYTHON_SOURCE} python-${PYTHON_VERSION}-amd64.exe
 RUN python-%PYTHON_VERSION%-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0 TargetDir="C:\python%PYTHON_VERSION%"
@@ -101,9 +101,17 @@ LABEL PYTHON_VERSION=${PYTHON_VERSION}
 # Installing CMake
 #
 ARG CMAKE_VERSION=3.27.1
-RUN pip install cmake==%CMAKE_VERSION%
+ARG CMAKE_FILE=cmake-${CMAKE_VERSION}-windows-x86_64
+ARG CMAKE_SOURCE=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_FILE}.zip
+
+ADD ${CMAKE_SOURCE} ${CMAKE_FILE}.zip
+RUN unzip %CMAKE_FILE%.zip
+RUN move %CMAKE_FILE% "c:\CMake"
+RUN setx PATH "c:\CMake\bin;%PATH%"
+
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
+
 LABEL CMAKE_VERSION=${CMAKE_VERSION}
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
