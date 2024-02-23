@@ -68,7 +68,7 @@ for i in "${all_tests[@]}"; do
   elif [ $i == "test_header_forward_pattern_case_insensitive" ]; then
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern MY_HEADER.* --http-header-forward-pattern MY_HEADER.*"
   elif [ $i == "test_grpc_header_forward_pattern_case_sensitive" ]; then
-    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern (?-i)MY_HEADER.*
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern (?-i)MY_HEADER.*"
   else
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
   fi
