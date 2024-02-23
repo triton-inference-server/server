@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -213,20 +213,18 @@ for MODEL in $(ls models); do
     set -e
 done
 
-# Next perform a test that has unbound memory growth. Use the busy op model
-# with a high delay in order to force requests to sit in the queue, and result
+# Next perform a test that has unbound memory growth. Use the busy op Python model
+# with a sleep function in order to force requests to sit in the queue, and result
 # in memory growth.
 BUSY_OP_TEST=busy_op_test.py
-DELAY_CYCLES=2100000000
 NUM_REQUESTS=100
 
 rm -rf test_repo && mkdir test_repo
-cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
+mkdir -p test_repo/busy_op/1/
+cp ../python_models/busy_op/model.py test_repo/busy_op/1/
+cp ../python_models/busy_op/config.pbtxt test_repo/busy_op
 
-# Explicitly set library path so custom ops can find TF
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow:$LD_LIBRARY_PATH
 SERVER_ARGS="--model-repository=`pwd`/test_repo"
-SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
 LEAKCHECK_LOG="test_busyop.valgrind.log"
 MASSIF_LOG="test_busyop.massif"
@@ -254,12 +252,12 @@ set +e
 # Run the busy_op test if no PTX issue was observed when launching server
 if [ $SKIP_BUSYOP -ne 1 ]; then
     SECONDS=0
-    python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+    python $BUSY_OP_TEST -v -m busy_op -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
     TEST_RETCODE=$?
     TEST_DURATION=$SECONDS
     if [ ${TEST_RETCODE} -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** busy_op_test.py Failed\n***"
         RET=1
     fi
     set -e
@@ -291,12 +289,13 @@ if [ $SKIP_BUSYOP -ne 1 ]; then
     # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
     grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
 fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Test Failed\n***"
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
