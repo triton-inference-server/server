@@ -53,17 +53,22 @@ mkdir -p "${MODELDIR}/ensemble/1"
 # TODO: Add support and testing for C++ client parameters:
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
+all_tests=("test_params"
+           "test_parameters_and_headers"
+           "test_header_forward_pattern_case_insensitive"
+           "test_header_forward_pattern_case_sensitive")
+
 RET=0
-for i in {0..3}; do
+for i in "${all_tests[@]}"; do
 
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
-  if [ $i == 1 ]; then
+  if [ $i == "test_parameters_and_headers" ]; then
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
-  elif [ $i == 2 ]; then
+  elif [ $i == "test_header_forward_pattern_case_insensitive" ]; then
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern MY_HEADER.* --http-header-forward-pattern MY_HEADER.*"
-  elif [ $i == 3 ]; then
-    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern (?-i)my_header.* --http-header-forward-pattern (?-i)my_header.*"
+  elif [ $i == "test_grpc_header_forward_pattern_case_sensitive" ]; then
+    SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --grpc-header-forward-pattern (?-i)MY_HEADER.*
   else
     SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
   fi

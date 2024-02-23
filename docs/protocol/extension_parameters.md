@@ -101,7 +101,8 @@ both HTTP and GRPC, you should add `--http-header-forward-pattern PREFIX_.*
 By default, the regular expression pattern matches headers with case-insensitive
 mode according to the HTTP protocol. If you want to enforce case-sensitive mode,
 simplying adding the `(?-i)` prefix which turns off case-insensitive mode, e.g.
-`--http-header-forward-pattern (?-i)PREFIX_.*`.
+`--http-header-forward-pattern (?-i)PREFIX_.*`. Note `(?-i)` prefix does not work
+with HTTP Python Client.
 
 The forwarded headers can be accessed using the
 [Python](https://github.com/triton-inference-server/python_backend#inference-request-parameters)

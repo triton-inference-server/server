@@ -60,9 +60,8 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.parameter_list.append({"key1": True, "key2": "value2"})
         self.parameter_list.append({"triton_": True, "key2": "value2"})
 
-        # Only test 0 tests parameters without headers.
-        test_header = TEST_HEADER != "0"
-        if test_header:
+        # Only "test_params" tests parameters without headers.
+        if TEST_HEADER != "test_params":
             self.headers = {
                 "header_1": "value_1",
                 "header_2": "value_2",
@@ -72,11 +71,20 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             }
 
             # only these headers should be forwarded to the model.
-            self.expected_headers = {
-                "my_header_1": "my_value_1",
-                "my_header_2": "my_value_2",
-                "my_header_3": 'This is a "quoted" string with a backslash\ ',
-            }
+            if TEST_HEADER == "test_header_forward_pattern_case_insensitive":
+                self.expected_headers = {
+                    "my_header_1": "my_value_1",
+                    "my_header_2": "my_value_2",
+                    "my_header_3": 'This is a "quoted" string with a backslash\ ',
+                }
+            elif TEST_HEADER == "test_header_forward_pattern_case_sensitive":
+                self.expected_headers = {}
+            else:
+                self.expected_headers = {
+                    "my_header_1": "my_value_1",
+                    "my_header_2": "my_value_2",
+                    "my_header_3": 'This is a "quoted" string with a backslash\ ',
+                }
         else:
             self.headers = {}
             self.expected_headers = {}
