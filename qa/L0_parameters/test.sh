@@ -63,14 +63,14 @@ for i in "${all_tests[@]}"; do
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
-  if [ $i == "test_parameters_and_headers" ]; then
+  if [ "$i" == "test_parameters_and_headers" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern my_header.*"
     SERVER_ARGS+=" --http-header-forward-pattern my_header.*"
-  elif [ $i == "test_header_forward_pattern_case_insensitive" ]; then
+  elif [ "$i" == "test_header_forward_pattern_case_insensitive" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern MY_HEADER.*"
     SERVER_ARGS+=" --http-header-forward-pattern MY_HEADER.*"
-  elif [ $i == "test_grpc_header_forward_pattern_case_sensitive" ]; then
-    SERVER_ARGS+=" --grpc-header-forward-pattern (?-i)MY_HEADER.*"    
+  elif [ "$i" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
+    SERVER_ARGS+=" --grpc-header-forward-pattern (?-i)MY_HEADER.*"
   fi
   run_server
   if [ "$SERVER_PID" == "0" ]; then
@@ -80,7 +80,7 @@ for i in "${all_tests[@]}"; do
   fi
 
   set +e
-  TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
+  TEST_HEADER="$i" python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
       cat $CLIENT_LOG
       echo -e "\n***\n*** Test Failed\n***"
