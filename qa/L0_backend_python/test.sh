@@ -50,7 +50,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
-    pip install requests virtualenv pytest
     TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -172,6 +171,8 @@ else
   # GPU tensor tests are disabled on jetson
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
 fi
+
+pip3 install pytest requests virtualenv
 
 prev_num_pages=`get_shm_pages`
 run_server

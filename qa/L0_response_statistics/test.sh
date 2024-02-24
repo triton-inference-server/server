@@ -56,6 +56,15 @@ mkdir -p models/square_int32/1 && (cd models/square_int32 && \
     echo -e 'parameters [{ key: "CUSTOM_OUTPUT_DELAY_NS" \n value: { string_value: "200000000" } }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "CUSTOM_FAIL_COUNT" \n value: { string_value: "2" } }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "CUSTOM_EMPTY_COUNT" \n value: { string_value: "1" } }]' >> config.pbtxt)
+mkdir -p models/square_int32_slow/1 && (cd models/square_int32_slow && \
+    echo 'backend: "square"' >> config.pbtxt && \
+    echo 'max_batch_size: 0' >> config.pbtxt && \
+    echo 'model_transaction_policy { decoupled: True }' >> config.pbtxt && \
+    echo -e 'input [{ name: "IN" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUT" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "CUSTOM_INFER_DELAY_NS" \n value: { string_value: "1200000000" } }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "CUSTOM_OUTPUT_DELAY_NS" \n value: { string_value: "800000000" } }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "CUSTOM_CANCEL_DELAY_NS" \n value: { string_value: "400000000" } }]' >> config.pbtxt)
 
 TEST_LOG="response_statistics_test.log"
 SERVER_LOG="./response_statistics_test.server.log"
