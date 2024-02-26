@@ -78,7 +78,7 @@ TRITON_VERSION_MAP = {
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "0.3.0",  # vLLM version
+        "0.3.2",  # vLLM version
     )
 }
 
