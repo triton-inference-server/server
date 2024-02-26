@@ -70,7 +70,7 @@ for i in "${all_tests[@]}"; do
     SERVER_ARGS+=" --grpc-header-forward-pattern MY_HEADER.*"
     SERVER_ARGS+=" --http-header-forward-pattern MY_HEADER.*"
   # NOTE: headers sent through the python HTTP client may be automatically
-  # lowercased by internal libraries like geventhttpclient, so we only test 
+  # lowercased by internal libraries like geventhttpclient, so we only test
   # GRPC client for case-sensitivity here:
   # https://github.com/geventhttpclient/geventhttpclient/blob/d1e14356c3b02099c879cf9b3bdb684a0cbd8bf5/src/geventhttpclient/header.py#L62-L63
   elif [ "$i" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
