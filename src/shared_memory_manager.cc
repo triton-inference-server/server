@@ -347,14 +347,17 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
 
+  // populate 'shm_mapped_addr'
   size_t max_offset = 0;
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
                                it->second->offset_ + offset);
-    max_offset = it->second->offset_ + it->second->byte_size_;
+    max_offset = it->second->offset_;
   } else {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
-    max_offset = it->second->byte_size_;
+  }
+  if (it->second->byte_size_ > 0) {
+    max_offset += it->second->byte_size_ - 1;
   }
   if (offset > max_offset) {
     *shm_mapped_addr = nullptr;

@@ -329,9 +329,12 @@ class SharedMemoryTest(tu.TestResultCollector):
         error_msg = []
         shm_handles = self._configure_sever()
         if _protocol == "http":
-            offset = 18446744073709551584  # -0x20 in int64_t
+            # -0x20 in int64_t
+            offset = 18446744073709551584
         else:
-            offset = 9223372036854775807  # grpc will throw if > int64
+            # grpc will throw if > int64, instead test for exceed shm region
+            # size by 1 byte, given its size is 64 bytes
+            offset = 64
         self._basic_inference(
             shm_handles[0],
             shm_handles[1],
