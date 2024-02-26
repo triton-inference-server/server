@@ -71,13 +71,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             }
 
             # only these headers should be forwarded to the model.
-            if TEST_HEADER == "test_header_forward_pattern_case_insensitive":
-                self.expected_headers = {
-                    "my_header_1": "my_value_1",
-                    "my_header_2": "my_value_2",
-                    "my_header_3": 'This is a "quoted" string with a backslash\ ',
-                }
-            elif TEST_HEADER == "test_header_forward_pattern_case_sensitive":
+            if TEST_HEADER == "test_grpc_header_forward_pattern_case_sensitive":
                 self.expected_headers = {}
             else:
                 self.expected_headers = {

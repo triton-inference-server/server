@@ -54,21 +54,25 @@ mkdir -p "${MODELDIR}/ensemble/1"
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
 all_tests=("test_params"
-           "test_parameters_and_headers"
+           "test_headers"
            "test_header_forward_pattern_case_insensitive"
-           "test_header_forward_pattern_case_sensitive")
+           "test_grpc_header_forward_pattern_case_sensitive")
 
 RET=0
 for i in "${all_tests[@]}"; do
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
-  if [ "$i" == "test_parameters_and_headers" ]; then
+  if [ "$i" == "test_headers" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern my_header.*"
     SERVER_ARGS+=" --http-header-forward-pattern my_header.*"
   elif [ "$i" == "test_header_forward_pattern_case_insensitive" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern MY_HEADER.*"
     SERVER_ARGS+=" --http-header-forward-pattern MY_HEADER.*"
+  # NOTE: headers sent through the python HTTP client may be automatically
+  # lowercased by internal libraries like geventhttpclient, so we only test 
+  # GRPC client for case-sensitivity here:
+  # https://github.com/geventhttpclient/geventhttpclient/blob/d1e14356c3b02099c879cf9b3bdb684a0cbd8bf5/src/geventhttpclient/header.py#L62-L63
   elif [ "$i" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern (?-i)MY_HEADER.*"
   fi
