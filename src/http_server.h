@@ -100,6 +100,9 @@ class HTTPServer {
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
+  static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
+  static evhtp_res FiniConnection();
+
   int32_t port_;
   bool reuse_port_;
   std::string address_;

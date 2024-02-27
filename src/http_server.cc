@@ -212,6 +212,7 @@ HTTPServer::Start()
       evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
     }
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
+    evhtp_set_post_accept_cb(htp_, HTTPServer::NewConnection, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
       return TRITONSERVER_ErrorNew(
@@ -265,6 +266,22 @@ void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
   (static_cast<HTTPServer*>(arg))->Handle(req);
+}
+
+evhtp_res
+HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
+{
+  LOG_INFO << "HTTPServer::NewConnection()";
+  evhtp_connection_set_hook(
+      conn, evhtp_hook_on_connection_fini, HTTPServer::FiniConnection, nullptr);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::FiniConnection()
+{
+  LOG_INFO << "HTTPServer::FiniConnection()";
+  return EVHTP_RES_OK;
 }
 
 #ifdef TRITON_ENABLE_METRICS
