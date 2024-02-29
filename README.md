@@ -189,17 +189,17 @@ configuration](docs/user_guide/model_configuration.md) for the model.
 #### Backend Support Matrix
 This is a list of all current Nvidia supported Backends, this does not include Third Party or demonstration backends.
 
-| Backend      | Link                                                                   | Status         | Usage Example                                                                                                |
-|--------------|------------------------------------------------------------------------|----------------|--------------------------------------------------------------------------------------------------------------|
-| Python       | [link](https://github.com/triton-inference-server/python_backend)      | 🟢 Recommended | Todo                                                                                                          |
-| Pytorch      | [link](https://github.com/triton-inference-server/pytorch_backend)     | 🟡 Ready       | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/PyTorch/README.md)    |
-| Tensorflow   | [link](https://github.com/triton-inference-server/tensorflow_backend)  | 🟡 Ready       | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/TensorFlow/README.md) |
-| ONNX         | [link](https://github.com/triton-inference-server/onnxruntime_backend) | 🟢 Recommended | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/ONNX/README.md)       |
-| vLLM         | [link](https://github.com/triton-inference-server/vllm_backend)        | 🟡 Ready        | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/vLLM/README.md)       |
-| TensorRT     | [link](https://github.com/triton-inference-server/tensorrt_backend)    | 🟢 Recommended | [tutorial](https://github.com/NVIDIA/TensorRT/tree/main/quickstart/deploy_to_triton)                         |
-| TensorRT-LLM | [link](https://github.com/triton-inference-server/tensorrtllm_backend) | 🟢 Recommended | Todo                                                                                                         |
-| OpenVINO     | [link](https://github.com/triton-inference-server/openvino_backend)    | 🟠 Alpha       | Todo                                                                                                           |
-| FIL          | [link](https://github.com/triton-inference-server/fil_backend)         | 🟡 Ready        | Todo                                                                                                           |
+| Backend                                                                        | Status         | Usage Example                                                                                                |
+|--------------------------------------------------------------------------------|----------------|--------------------------------------------------------------------------------------------------------------|
+| [Python](https://github.com/triton-inference-server/python_backend)            | 🟢 Recommended | Todo                                                                                                          |
+| [Pytorch](https://github.com/triton-inference-server/pytorch_backend)          | 🟡 Ready       | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/PyTorch/README.md)    |
+| [Tensorflow](https://github.com/triton-inference-server/tensorflow_backend)    | 🟡 Ready       | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/TensorFlow/README.md) |
+| [ONNX](https://github.com/triton-inference-server/onnxruntime_backen)          | 🟢 Recommended | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/ONNX/README.md)       |
+| [vLLM](https://github.com/triton-inference-server/vllm_backend)                | 🟡 Ready       | [tutorial](https://github.com/triton-inference-server/tutorials/blob/main/Quick_Deploy/vLLM/README.md)       |
+| [TensorRT](https://github.com/triton-inference-server/tensorrt_backend)        | 🟢 Recommended | [tutorial](https://github.com/NVIDIA/TensorRT/tree/main/quickstart/deploy_to_triton)                         |
+| [TensorRT-LLM](https://github.com/triton-inference-server/tensorrtllm_backend) | 🟢 Recommended | Todo                                                                                                         |
+| [OpenVINO](https://github.com/triton-inference-server/openvino_backend)        | 🟠 Beta        | Todo                                                                                                           |
+| [FIL](https://github.com/triton-inference-server/fil_backend)                  | 🟡 Ready       | Todo                                                                                                           |
 
 #### Client Support and Examples
 
