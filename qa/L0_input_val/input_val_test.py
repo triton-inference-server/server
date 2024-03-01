@@ -70,8 +70,6 @@ class InputValTest(tu.TestResultCollector):
             err_str,
         )
 
-
-
     def test_input_validation_required_missing(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
