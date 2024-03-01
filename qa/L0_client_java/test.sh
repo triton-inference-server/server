@@ -40,6 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-inference-server}
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
 RET=0
@@ -49,7 +50,7 @@ rm -f *.log.*
 # Get the proto files from the common repo
 rm -fr common
 git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
-    https://github.com/triton-inference-server/common.git
+    ${TRITON_REPO_ORGANIZATION}/common.git
 cp common/protobuf/*.proto java/library/src/main/proto/.
 
 # Compile library
