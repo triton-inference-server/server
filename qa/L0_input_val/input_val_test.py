@@ -77,7 +77,6 @@ class InputValTest(tu.TestResultCollector):
 
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
         inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
 
         infer_response = triton_client.infer("input_optional", inputs=inputs)
         self.assertTrue(infer_response.has_error())
