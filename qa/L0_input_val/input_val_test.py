@@ -42,7 +42,6 @@ from tritonclient.utils import InferenceServerException
 
 
 class InputValTest(tu.TestResultCollector):
-
     def test_input_validation_required_empty(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
@@ -61,7 +60,7 @@ class InputValTest(tu.TestResultCollector):
 
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
         inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        
+
         infer_response = triton_client.infer("input_all_required", inputs=inputs)
         self.assertTrue(infer_response.has_error())
         self.assertIn(
@@ -73,19 +72,20 @@ class InputValTest(tu.TestResultCollector):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
         inputs.append(tritonhttpclient.InferInput("INPUT0", [1], "FP32"))
-        #Option Input is added, required is missing
+        # Option Input is added, required is missing
         inputs.append(tritonhttpclient.InferInput("INPUT3", [1], "FP32"))
 
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
         inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
         inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        
+
         infer_response = triton_client.infer("input_optional", inputs=inputs)
         self.assertTrue(infer_response.has_error())
         self.assertIn(
             "expected number of inputs between 4 and 3 but got 2 inputs for model 'input_val_output'. Got inputs ['INPUT0','INPUT3'], but missing required inputs ['INPUT1','INPUT2']",
             infer_response.error().message(),
         )
+
 
 if __name__ == "__main__":
     unittest.main()
