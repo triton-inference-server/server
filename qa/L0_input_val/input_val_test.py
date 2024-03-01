@@ -45,44 +45,68 @@ class InputValTest(tu.TestResultCollector):
     def test_input_validation_required_empty(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        infer_response = triton_client.infer("input_all_required", inputs=inputs)
-        self.assertTrue(infer_response.has_error())
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name="input_all_required",
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
         self.assertIn(
-            "expected 3 required inputs but got 0 inputs for model 'input_val_output'. Got inputs [], but missing ['INPUT0','INPUT1','INPUT2']",
-            infer_response.error().message(),
+            "expected 3 inputs but got 0 inputs for model 'input_all_required'. Got inputs [], but missing required inputs ['INPUT0','INPUT1','INPUT2']",
+            err_str,
         )
+
+    def test_input_validation_optional_empty(self):
+        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        inputs = []
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name="input_optional",
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
+        self.assertIn(
+            "expected number of inputs between 3 and 4 but got 0 inputs for model 'input_optional'. Got inputs [], but missing required inputs ['INPUT0','INPUT1','INPUT2']",
+            err_str,
+        )
+
+
 
     def test_input_validation_required_missing(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        inputs.append(tritonhttpclient.InferInput("INPUT0", [1], "FP32"))
-        inputs.append(tritonhttpclient.InferInput("INPUT1", [1], "FP32"))
+        inputs.append(tritongrpcclient.InferInput("INPUT0", [1], "FP32"))
 
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
 
-        infer_response = triton_client.infer("input_all_required", inputs=inputs)
-        self.assertTrue(infer_response.has_error())
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name="input_all_required",
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
         self.assertIn(
-            "expected 3 inputs but got 2 inputs for model 'input_all_required'. Got inputs ['INPUT0','INPUT1], but missing ['INPUT2']",
-            infer_response.error().message(),
+            "expected 3 inputs but got 1 inputs for model 'input_all_required'. Got inputs ['INPUT0'], but missing required inputs ['INPUT1','INPUT2']",
+            err_str,
         )
 
     def test_input_validation_optional(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        inputs.append(tritonhttpclient.InferInput("INPUT0", [1], "FP32"))
-        # Option Input is added, required is missing
-        inputs.append(tritonhttpclient.InferInput("INPUT3", [1], "FP32"))
+        inputs.append(tritongrpcclient.InferInput("INPUT0", [1], "FP32"))
+        # Option Input is added, 2 required are missing
 
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
 
-        infer_response = triton_client.infer("input_optional", inputs=inputs)
-        self.assertTrue(infer_response.has_error())
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name="input_optional",
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
         self.assertIn(
-            "expected number of inputs between 4 and 3 but got 2 inputs for model 'input_val_output'. Got inputs ['INPUT0','INPUT3'], but missing required inputs ['INPUT1','INPUT2']",
-            infer_response.error().message(),
+            "expected number of inputs between 3 and 4 but got 1 inputs for model 'input_optional'. Got inputs ['INPUT0'], but missing required inputs ['INPUT1','INPUT2']",
+            err_str,
         )
 
 

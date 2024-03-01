@@ -44,8 +44,8 @@ RET=0
 
 CLIENT_LOG="./input_val_client.log"
 TEST_PY=./input_val_test.py
-EXPECTED_NUM_TESTS="3"
-TEST_RESULT_FILE='test_results.txt'
+EXPECTED_NUM_TESTS="4"
+TEST_RESULT_FILE='./test_results.txt'
 
 export CUDA_VISIBLE_DEVICES=0
 
