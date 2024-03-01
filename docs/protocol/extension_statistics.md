@@ -195,7 +195,8 @@ $response_stats =
   "compute_output" : $duration_stat,
   "success" : $duration_stat,
   "fail" : $duration_stat,
-  "empty_response" : $duration_stat
+  "empty_response" : $duration_stat,
+  "cancel" : $duration_stat
 }
 ```
 
@@ -208,6 +209,8 @@ $response_stats =
   is the sum of infer and output durations.
 - "empty_response" : The count and cumulative duration of an inference with an
   empty / no response. The duration is infer durations.
+- "cancel" : The count and cumulative duration of a inference cancellation. The
+  duration is for cleaning up resources held by cancelled inference requests.
 
 
 ```

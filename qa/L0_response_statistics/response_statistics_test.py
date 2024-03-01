@@ -36,11 +36,12 @@ import tritonclient.http as httpclient
 
 class TestResponseStatistics(unittest.TestCase):
     def setUp(self):
-        self._model_name = "square_int32"
-        self._min_infer_delay_ns = 400000000
-        self._min_output_delay_ns = 200000000
-        self._number_of_fail_responses = 2
-        self._number_of_empty_responses = 1
+        self._model_name = "set_by_test_case"
+        self._min_infer_delay_ns = 0
+        self._min_output_delay_ns = 0
+        self._min_cancel_delay_ns = 0
+        self._number_of_fail_responses = 0
+        self._number_of_empty_responses = 0
         self._statistics_counts = []
         self._grpc_client = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
@@ -59,8 +60,10 @@ class TestResponseStatistics(unittest.TestCase):
 
     # Send an infer request and return its responses. 'number_of_responses' is the sum
     # of success, fail and empty responses the model should return for this request.
-    # This function waits until all success and fail responses are received.
-    def _stream_infer(self, number_of_responses):
+    # 'cancel_at_response_size' will cancel the stream when the number of responses
+    # received equals the size, set to None if cancellation is not required. This
+    # function waits until all success and fail responses are received, or cancelled.
+    def _stream_infer(self, number_of_responses, cancel_at_response_size=None):
         callback, responses = self._generate_streaming_callback_and_response_pair()
         self._grpc_client.start_stream(callback)
         input_data = np.array([number_of_responses], dtype=np.int32)
@@ -70,15 +73,27 @@ class TestResponseStatistics(unittest.TestCase):
         self._grpc_client.async_stream_infer(
             model_name=self._model_name, inputs=inputs, outputs=outputs
         )
-        while len(responses) < (number_of_responses - self._number_of_empty_responses):
-            time.sleep(0.1)  # poll until all expected responses are received
-        self._grpc_client.stop_stream()
+        if cancel_at_response_size is None:
+            # poll until all expected responses are received
+            while len(responses) < (
+                number_of_responses - self._number_of_empty_responses
+            ):
+                time.sleep(0.1)
+            self._grpc_client.stop_stream(cancel_requests=False)
+        else:
+            # poll until cancellation response size is reached
+            while len(responses) < cancel_at_response_size:
+                time.sleep(0.1)
+            self._grpc_client.stop_stream(cancel_requests=True)
         return responses
 
     # Update expected statistics counts for the response at 'current_index'.
     # 'number_of_responses' is the sum of success, fail and empty responses expected
-    # from this inference request.
-    def _update_statistics_counts(self, current_index, number_of_responses):
+    # from this inference request. 'cancel_at_index' is the index at which the request
+    # should be cancelled.
+    def _update_statistics_counts(
+        self, current_index, number_of_responses, cancel_at_index
+    ):
         if current_index >= len(self._statistics_counts):
             self._statistics_counts.append(
                 {
@@ -87,9 +102,13 @@ class TestResponseStatistics(unittest.TestCase):
                     "success": 0,
                     "fail": 0,
                     "empty_response": 0,
+                    "cancel": 0,
                 }
             )
-        if (
+        if current_index == cancel_at_index:
+            # cancel
+            self._statistics_counts[current_index]["cancel"] += 1
+        elif (
             current_index
             + self._number_of_fail_responses
             + self._number_of_empty_responses
@@ -118,10 +137,16 @@ class TestResponseStatistics(unittest.TestCase):
             delay_ns = self._min_infer_delay_ns
         elif stats_name == "compute_output":
             delay_ns = self._min_output_delay_ns
+        elif stats_name == "cancel":
+            delay_ns = self._min_cancel_delay_ns
         else:  # success or fail
             delay_ns = self._min_infer_delay_ns + self._min_output_delay_ns
-        upper_bound_ns = 1.1 * delay_ns * expected_count
-        lower_bound_ns = 0.9 * delay_ns * expected_count
+        if delay_ns == 0:
+            upper_bound_ns = 10000000 * expected_count
+            lower_bound_ns = 0
+        else:
+            upper_bound_ns = 1.1 * delay_ns * expected_count
+            lower_bound_ns = 0.9 * delay_ns * expected_count
         stats = response_stats[str(current_index)][stats_name]
         self.assertEqual(stats["count"], expected_count)
         self.assertLessEqual(stats["ns"], upper_bound_ns)
@@ -162,12 +187,14 @@ class TestResponseStatistics(unittest.TestCase):
         return response_stats_http
 
     # Check the response statistics is valid for a given infer request, providing its
-    # 'responses' and 'number_of_responses'.
-    def _check_response_stats(self, responses, number_of_responses):
+    # 'responses', expected 'number_of_responses' and 'cancel_at_index'.
+    def _check_response_stats(
+        self, responses, number_of_responses, cancel_at_index=None
+    ):
         response_stats = self._get_response_statistics()
         self.assertGreaterEqual(len(response_stats), number_of_responses)
         for i in range(number_of_responses):
-            self._update_statistics_counts(i, number_of_responses)
+            self._update_statistics_counts(i, number_of_responses, cancel_at_index)
             self._check_statistics_count_and_duration(
                 response_stats, i, "compute_infer"
             )
@@ -179,23 +206,56 @@ class TestResponseStatistics(unittest.TestCase):
             self._check_statistics_count_and_duration(
                 response_stats, i, "empty_response"
             )
+            self._check_statistics_count_and_duration(response_stats, i, "cancel")
 
     # Test response statistics. The statistics must be valid over two or more infers.
     def test_response_statistics(self):
+        self._model_name = "square_int32"
+        self._min_infer_delay_ns = 400000000
+        self._min_output_delay_ns = 200000000
+        self._number_of_fail_responses = 2
+        self._number_of_empty_responses = 1
         # Send a request that generates 4 responses.
         number_of_responses = 4
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
-        # Send a request that generates 6 responses, and make sure the
-        # statistics are aggregated with the previous request.
+        # Send a request that generates 6 responses, and make sure the statistics are
+        # aggregated with the previous request.
         number_of_responses = 6
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
-        # Send a request that generates 3 responses, and make sure the
-        # statistics are aggregated with the previous requests.
+        # Send a request that generates 3 responses, and make sure the statistics are
+        # aggregated with the previous requests.
         number_of_responses = 3
         responses = self._stream_infer(number_of_responses)
         self._check_response_stats(responses, number_of_responses)
+
+    # Test response statistics with cancellation.
+    def test_response_statistics_cancel(self):
+        self._model_name = "square_int32_slow"
+        self._min_infer_delay_ns = 1200000000
+        self._min_output_delay_ns = 800000000
+        self._min_cancel_delay_ns = 400000000
+
+        # Send a request that generates 4 responses.
+        number_of_responses = 4
+        responses = self._stream_infer(number_of_responses)
+        self._check_response_stats(responses, number_of_responses)
+
+        # Send a request that generates 4 responses, and cancel on the 3rd response.
+        # Make sure the statistics are aggregated with the previous request.
+        responses = self._stream_infer(number_of_responses=4, cancel_at_response_size=1)
+        # There is an infer and output delay on the 1st and 2nd response, and a cancel
+        # delay on the 3rd response.
+        min_total_delay_ns = (
+            self._min_infer_delay_ns + self._min_output_delay_ns
+        ) * 2 + self._min_cancel_delay_ns
+        # Make sure the inference and cancellation is completed before checking.
+        time.sleep(min_total_delay_ns * 1.5 / 1000000000)
+        # The request is cancelled when the 2nd response is computing, so the
+        # cancellation should be received at the 3rd response (index 2), making a total
+        # of 3 responses on the statistics.
+        self._check_response_stats(responses, number_of_responses=3, cancel_at_index=2)
 
 
 if __name__ == "__main__":

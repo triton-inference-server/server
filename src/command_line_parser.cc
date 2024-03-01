@@ -1235,6 +1235,11 @@ TritonParser::Parse(int argc, char** argv)
   triton::server::grpc::Options& lgrpc_options = lparams.grpc_options_;
 #endif  // TRITON_ENABLE_GRPC
 
+#if defined TRITON_ENABLE_HTTP || defined TRITON_ENABLE_GRPC
+  // According to HTTP specification header names are case-insensitive.
+  const std::string case_insensitive_prefix{"(?i)"};
+#endif  // TRITON_ENABLE_HTTP || TRITON_ENABLE_GRPC
+
 #ifdef TRITON_ENABLE_VERTEX_AI
   // Set different default value if specific flag is set
   {
@@ -1345,7 +1350,8 @@ TritonParser::Parse(int argc, char** argv)
           lparams.http_address_ = optarg;
           break;
         case OPTION_HTTP_HEADER_FORWARD_PATTERN:
-          lparams.http_forward_header_pattern_ = optarg;
+          lparams.http_forward_header_pattern_ =
+              std::move(case_insensitive_prefix + optarg);
           break;
           break;
         case OPTION_HTTP_THREAD_COUNT:
@@ -1484,7 +1490,8 @@ TritonParser::Parse(int argc, char** argv)
           break;
         }
         case OPTION_GRPC_HEADER_FORWARD_PATTERN:
-          lgrpc_options.forward_header_pattern_ = optarg;
+          lgrpc_options.forward_header_pattern_ =
+              std::move(case_insensitive_prefix + optarg);
           break;
 #endif  // TRITON_ENABLE_GRPC
 
