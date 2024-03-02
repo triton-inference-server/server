@@ -61,7 +61,7 @@ bash gen_go_stubs.sh
 popd
 
 # Copy packages to GOPATH, where Go expects to find packages.
-PACKAGE_PATH="${GOPATH}/src/${TRITON_REPO_ORGANIZATION}"
+PACKAGE_PATH="${GOPATH}/src/github.com/triton-inference-server"
 rm -rf ${PACKAGE_PATH}/client
 mkdir -p ${PACKAGE_PATH}
 cp -r client $PACKAGE_PATH
