@@ -580,7 +580,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cmake_backend_arg(be, "CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_backend_arg(
             be, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
-        ),        cmake_backend_arg(be, "TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
+        ),
+        cmake_backend_arg(be, "TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_backend_arg(be, "TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_backend_arg(
             be, "TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]
