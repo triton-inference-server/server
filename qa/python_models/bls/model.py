@@ -186,7 +186,7 @@ class PBBLSTest(unittest.TestCase):
             for infer_response in infer_responses:
                 self.assertTrue(infer_response.has_error())
                 self.assertIn(
-                    "expected 1 inputs but got 0 inputs for model 'square_int32'. Got inputs [], but missing ['IN']",
+                    "expected 1 inputs but got 0 inputs for model 'square_int32'. Got input(s) [], but missing required input(s) ['IN']. Please provide all required input(s).",
                     infer_response.error().message(),
                 )
                 self.assertTrue(len(infer_response.output_tensors()) == 0)
