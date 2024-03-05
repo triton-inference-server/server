@@ -102,3 +102,68 @@ customization_guide/test
 examples/jetson/README
 examples/jetson/concurrency_and_dynamic_batching/README
 ```
+
+```{toctree}
+:maxdepth: 1
+:caption: Client
+
+client/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Performance Analyzer
+
+client/src/c++/perf_analyzer/docs/measurements_metrics
+client/src/c++/perf_analyzer/docs/install
+client/src/c++/perf_analyzer/docs/quick_start
+client/src/c++/perf_analyzer/docs/benchmarking
+client/src/c++/perf_analyzer/docs/input_data
+client/src/c++/perf_analyzer/docs/inference_load_modes
+client/src/c++/perf_analyzer/docs/cli
+client/src/c++/perf_analyzer/docs/README
+client/src/c++/perf_analyzer/docs/llm
+client/src/c++/perf_analyzer/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Performance Analyzer
+
+client/src/grpc_generated/go/README
+client/src/grpc_generated/javascript/README
+client/src/grpc_generated/java/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Java
+
+client/src/java/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Python Backend
+
+python_backend/README.md
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Python Backend Inferentia
+python_backend/inferentia/README.md
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Python Backend Examples
+python_backend/examples/instance_kind/README.md
+python_backend/examples/custom_metrics/README.md
+python_backend/examples/bls/README.md
+python_backend/examples/decoupled/README.md
+python_backend/examples/bls_decoupled/README.md
+python_backend/examples/jax/README.md
+python_backend/examples/auto_complete/README.md
+python_backend/examples/preprocessing/README.md
+```
