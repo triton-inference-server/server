@@ -42,8 +42,8 @@ source ../common/util.sh
 
 RET=0
 
-CLIENT_LOG="./input_val_client.log"
-TEST_PY=./input_val_test.py
+CLIENT_LOG="./input_validation_client.log"
+TEST_PY=./input_validation_test.py
 EXPECTED_NUM_TESTS="4"
 TEST_RESULT_FILE='./test_results.txt'
 

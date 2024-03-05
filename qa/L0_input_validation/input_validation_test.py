@@ -29,15 +29,11 @@ import sys
 
 sys.path.append("../common")
 
-import json
-import traceback
 import unittest
 
 import numpy as np
-import requests
 import test_util as tu
 import tritonclient.grpc as tritongrpcclient
-import tritonclient.http as tritonhttpclient
 from tritonclient.utils import InferenceServerException
 
 
@@ -52,7 +48,7 @@ class InputValTest(tu.TestResultCollector):
             )
         err_str = str(e.exception)
         self.assertIn(
-            "expected 3 inputs but got 0 inputs for model 'input_all_required'. Got inputs [], but missing required inputs ['INPUT0','INPUT1','INPUT2']",
+            "expected 3 inputs but got 0 inputs for model 'input_all_required'. Got input(s) [], but missing required input(s) ['INPUT0','INPUT1','INPUT2']. Please provide all required input(s).",
             err_str,
         )
 
@@ -66,7 +62,7 @@ class InputValTest(tu.TestResultCollector):
             )
         err_str = str(e.exception)
         self.assertIn(
-            "expected number of inputs between 3 and 4 but got 0 inputs for model 'input_optional'. Got inputs [], but missing required inputs ['INPUT0','INPUT1','INPUT2']",
+            "expected number of inputs between 3 and 4 but got 0 inputs for model 'input_optional'. Got input(s) [], but missing required input(s) ['INPUT0','INPUT1','INPUT2']. Please provide all required input(s).",
             err_str,
         )
 
@@ -84,7 +80,7 @@ class InputValTest(tu.TestResultCollector):
             )
         err_str = str(e.exception)
         self.assertIn(
-            "expected 3 inputs but got 1 inputs for model 'input_all_required'. Got inputs ['INPUT0'], but missing required inputs ['INPUT1','INPUT2']",
+            "expected 3 inputs but got 1 inputs for model 'input_all_required'. Got input(s) ['INPUT0'], but missing required input(s) ['INPUT1','INPUT2']. Please provide all required input(s).",
             err_str,
         )
 
@@ -103,7 +99,7 @@ class InputValTest(tu.TestResultCollector):
             )
         err_str = str(e.exception)
         self.assertIn(
-            "expected number of inputs between 3 and 4 but got 1 inputs for model 'input_optional'. Got inputs ['INPUT0'], but missing required inputs ['INPUT1','INPUT2']",
+            "expected number of inputs between 3 and 4 but got 1 inputs for model 'input_optional'. Got input(s) ['INPUT0'], but missing required input(s) ['INPUT1','INPUT2']. Please provide all required input(s).",
             err_str,
         )
 
