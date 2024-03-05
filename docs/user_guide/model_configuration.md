@@ -723,7 +723,7 @@ The above configuration creates 3 model instances, one on each device
 themselves as "R1" is local for their own device, however, they will
 contend for "R2" because it is specified as a global resource which
 means "R2" is shared across the system. Though these instances don't
-contend for "R1" among themsleves, but they will contend for "R1"
+contend for "R1" among themselves, but they will contend for "R1"
 with other model instances which includes "R1" in their resource
 requirements and run on the same device as them.
 
