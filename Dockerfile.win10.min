@@ -81,7 +81,7 @@ ADD ${PYTHON_SOURCE} python-${PYTHON_VERSION}-amd64.exe
 RUN python-%PYTHON_VERSION%-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0 TargetDir="C:\python%PYTHON_VERSION%"
 RUN mklink "C:\python%PYTHON_VERSION%\python3.exe" "C:\python%PYTHON_VERSION%\python.exe"
 RUN pip install --upgrade wheel setuptools docker
-RUN pip install grpcio-tools
+RUN pip install grpcio-tools psutil
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
 
