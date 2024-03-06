@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,12 +32,11 @@ sys.path.append("../common")
 import unittest
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as tritongrpcclient
 from tritonclient.utils import InferenceServerException
 
 
-class InputValTest(tu.TestResultCollector):
+class InputValTest(unittest.TestCase):
     def test_input_validation_required_empty(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
@@ -102,6 +101,16 @@ class InputValTest(tu.TestResultCollector):
             "expected number of inputs between 3 and 4 but got 1 inputs for model 'input_optional'. Got input(s) ['INPUT0'], but missing required input(s) ['INPUT1','INPUT2']. Please provide all required input(s).",
             err_str,
         )
+
+    def test_input_validation_all_optional(self):
+        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        inputs = []
+        result = triton_client.infer(
+            model_name="input_all_optional",
+            inputs=inputs,
+        )
+        response = result.get_response()
+        self.assertIn(str(response.outputs[0].name), "OUTPUT0")
 
 
 if __name__ == "__main__":
