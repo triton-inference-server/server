@@ -3745,12 +3745,6 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
     err = infer_request->FinalizeResponse(response);
   }
 
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
-  }
-#endif  // TRITON_ENABLE_TRACING
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
@@ -3766,6 +3760,12 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+  }
+#endif  // TRITON_ENABLE_TRACING
   evthr_defer(
       infer_request->thread_, InferRequestClass::ReplyCallback, infer_request);
 }
