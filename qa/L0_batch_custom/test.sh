@@ -51,6 +51,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose 1"
 SERVER_LOG_BASE="./inference_server.log"
 TEST_RESULT_FILE='test_results.txt'
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
 
@@ -80,19 +81,21 @@ echo "parameters { key: \"MAX_BATCH_VOLUME_BYTES\" value: {string_value: \"96\"}
 
 # Create custom batching libraries
 git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
-    https://github.com/triton-inference-server/backend.git
+    ${TRITON_REPO_ORGANIZATION}/backend.git
 
 (cd backend/examples/batching_strategies/volume_batching &&
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
+      -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+      -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
  (cd backend/examples/batching_strategies/single_batching &&
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
@@ -161,7 +164,8 @@ sed -i "s/${OLD_STRING}/${NEW_STRING}/g" ${FILE_PATH}
 (cd backend/examples/batching_strategies/volume_batching &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
+      -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+      -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
 cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models/${MODEL_NAME}/libtriton_volumebatching.so
