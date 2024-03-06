@@ -217,7 +217,7 @@ with the --dryrun flag, and then looking in the build subdirectory at
 Dockerfile.buildbase.
 
 ```bash
-$ ./build.py -v --enable-all
+$ ./build.py --dryrun
 ```
 
 From Dockerfile.buildbase you can see what dependencies you need to
