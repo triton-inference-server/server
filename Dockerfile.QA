@@ -140,6 +140,8 @@ RUN mkdir -p qa/common && \
     cp bin/async_work_queue_test qa/L0_async_work_queue/. && \
     cp tritonbuild/tritonserver/backends/implicit_state/libtriton_implicit_state.so \
        qa/L0_implicit_state/. && \
+    cp tritonbuild/tritonserver/backends/trace/libtriton_trace.so \
+       qa/L0_cmdline_trace/. && \
     mkdir qa/L0_data_compression/models && \
     cp -r docs/examples/model_repository/simple qa/L0_data_compression/models && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
