@@ -88,8 +88,37 @@ class ArgumentValidationTest(unittest.TestCase):
                 requested_output_names=requested_output_names,
                 inputs=inputs,
                 model_name=model_name,
-                correleation_id=None,
+                correlation_id=None,
             )
+
+        # correlation_id set to an integer
+        infer_request_test = pb_utils.InferenceRequest(
+            requested_output_names=requested_output_names,
+            inputs=inputs,
+            model_name=model_name,
+            correlation_id=5,
+        )
+        self.assertIsInstance(infer_request_test.correlation_id(), int)
+        self.assertEqual(infer_request_test.correlation_id(), 5)
+
+        # correlation_id set to string
+        infer_request_test = pb_utils.InferenceRequest(
+            requested_output_names=requested_output_names,
+            inputs=inputs,
+            model_name=model_name,
+            correlation_id="test_str_id-5",
+        )
+        self.assertIsInstance(infer_request_test.correlation_id(), str)
+        self.assertEqual(infer_request_test.correlation_id(), "test_str_id-5")
+
+        # correlation_id default
+        infer_request_test = pb_utils.InferenceRequest(
+            requested_output_names=requested_output_names,
+            inputs=inputs,
+            model_name=model_name,
+        )
+        self.assertIsInstance(infer_request_test.correlation_id(), int)
+        self.assertEqual(infer_request_test.correlation_id(), 0)
 
         # request_id set to None
         with self.assertRaises(TypeError) as e:
