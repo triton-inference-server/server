@@ -992,11 +992,6 @@ ModelInferHandler::InferResponseComplete(
     state->context_->EraseInflightState(state);
   }
 
-#ifdef TRITON_ENABLE_TRACING
-  state->trace_timestamps_.emplace_back(std::make_pair(
-      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
-
   // If gRPC Stream is cancelled then no need of forming and returning
   // a response.
   if (state->IsGrpcContextCancelled()) {
@@ -1063,6 +1058,11 @@ ModelInferHandler::InferResponseComplete(
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
+
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(std::make_pair(
+      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(
