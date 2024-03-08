@@ -27,6 +27,7 @@
 ARG BASE_IMAGE=tritonserver
 ARG CIBASE_IMAGE=tritonserver_cibase
 ARG SDK_IMAGE=tritonserver_sdk
+ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
@@ -41,6 +42,7 @@ ARG IGPU_BUILD=0
 FROM ${CIBASE_IMAGE} AS cibase
 
 ARG TRITONTMP_DIR
+ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
@@ -183,6 +185,7 @@ RUN cd tritonbuild/identity && \
     rm -rf install build && mkdir build && cd build && \
     cmake -DTRITON_ENABLE_GPU=OFF \
         -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/identity/install \
+        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
         -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
         -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG} \
@@ -193,6 +196,7 @@ RUN cd tritonbuild/identity && \
 RUN cd tritonbuild/python && \
     rm -rf install build && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/python/install \
+        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
         -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
         -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \

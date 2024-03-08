@@ -72,6 +72,7 @@ option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
 
 # Repo tags
+set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
     "Tag for triton-inference-server/third_party repo")
 set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
@@ -113,12 +114,12 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
 FetchContent_Declare(
   repo-third-party
-  GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
+  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/third_party.git
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
 
@@ -237,6 +238,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+    -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
     -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
