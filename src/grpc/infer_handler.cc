@@ -1040,6 +1040,10 @@ ModelInferHandler::InferResponseComplete(
   } else if (iresponse != nullptr) {
     err = InferResponseCompleteCommon<inference::ModelInferResponse>(
         state->tritonserver_, iresponse, *response, state->alloc_payload_);
+#ifdef TRITON_ENABLE_TRACING
+    state->trace_timestamps_.emplace_back(std::make_pair(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
   }
 
   if (err != nullptr) {
@@ -1059,10 +1063,6 @@ ModelInferHandler::InferResponseComplete(
     return;
   }
 
-#ifdef TRITON_ENABLE_TRACING
-  state->trace_timestamps_.emplace_back(std::make_pair(
-      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(
