@@ -1032,6 +1032,7 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
+    status_ = ::grpc::Status{};
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
@@ -1100,6 +1101,7 @@ class InferHandlerState {
   bool is_decoupled_ = false;
   StateParameters parameters_;
 
+  ::grpc::Status status_;
   std::atomic<uint32_t> cb_count_;
   bool complete_;
 
