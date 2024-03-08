@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -162,6 +162,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         error_msg,
         big_shm_name="",
         big_shm_size=64,
+        shm_output_offset=0,
     ):
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -191,8 +192,8 @@ class SharedMemoryTest(tu.TestResultCollector):
         else:
             inputs[1].set_shared_memory("input1_data", 64)
 
-        outputs[0].set_shared_memory("output0_data", 64)
-        outputs[1].set_shared_memory("output1_data", 64)
+        outputs[0].set_shared_memory("output0_data", 64, offset=shm_output_offset)
+        outputs[1].set_shared_memory("output1_data", 64, offset=shm_output_offset)
 
         try:
             results = triton_client.infer(
@@ -321,6 +322,30 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertTrue(len(status_after) == 0)
         else:
             self.assertTrue(len(status_after.regions) == 0)
+        self._cleanup_server(shm_handles)
+
+    def test_infer_offset_out_of_bound(self):
+        # Shared memory offset outside output region - Throws error
+        error_msg = []
+        shm_handles = self._configure_sever()
+        if _protocol == "http":
+            # -32 when placed in an int64 signed type, to get a negative offset
+            # by overflowing
+            offset = 2**64 - 32
+        else:
+            # gRPC will throw an error if > 2**63 - 1, so instead test for
+            # exceeding shm region size by 1 byte, given its size is 64 bytes
+            offset = 64
+        self._basic_inference(
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
+            shm_output_offset=offset,
+        )
+        self.assertEqual(len(error_msg), 1)
+        self.assertIn("Invalid offset for shared memory region", error_msg[0])
         self._cleanup_server(shm_handles)
 
 
