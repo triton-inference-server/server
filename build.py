@@ -439,6 +439,7 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
         cmake_core_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_core_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_core_arg("TRITON_VERSION", "STRING", FLAGS.version),
+        cmake_core_arg("TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization),
         cmake_core_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_core_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_core_arg("TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]),
@@ -503,6 +504,9 @@ def repoagent_cmake_args(images, components, ra, install_dir):
     cargs = args + [
         cmake_repoagent_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_repoagent_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_repoagent_arg(
+            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_repoagent_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_repoagent_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
     ]
@@ -524,6 +528,9 @@ def cache_cmake_args(images, components, cache, install_dir):
     cargs = args + [
         cmake_cache_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_cache_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_cache_arg(
+            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_cache_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_cache_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
     ]
@@ -571,6 +578,9 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     cargs = args + [
         cmake_backend_arg(be, "CMAKE_BUILD_TYPE", None, cmake_build_type),
         cmake_backend_arg(be, "CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_backend_arg(
+            be, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_backend_arg(be, "TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_backend_arg(be, "TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_backend_arg(

@@ -1,4 +1,4 @@
-// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -378,34 +378,33 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   SagemakerAPIServer::SagemakeInferRequestClass* infer_request =
       reinterpret_cast<SagemakerAPIServer::SagemakeInferRequestClass*>(userp);
 
-  auto response_count = infer_request->IncrementResponseCount();
-
-  // Defer to the callback with the final response
-  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
-    LOG_ERROR << "[INTERNAL] received a response without FINAL flag";
-    return;
+  if (response != nullptr) {
+    ++infer_request->response_count_;
   }
 
   TRITONSERVER_Error* err = nullptr;
-  if (response_count != 0) {
+  if (infer_request->response_count_ != 1) {
     err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "expected a single response, got " +
-                                         std::to_string(response_count + 1))
-                                         .c_str());
-  } else if (response == nullptr) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
-  } else {
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "expected a single response, got " +
+            std::to_string(infer_request->response_count_))
+            .c_str());
+  } else if (response != nullptr) {
     err = infer_request->FinalizeResponse(response);
+#ifdef TRITON_ENABLE_TRACING
+    if (infer_request->trace_ != nullptr) {
+      infer_request->trace_->CaptureTimestamp(
+          "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+    }
+#endif  // TRITON_ENABLE_TRACING
   }
 
-#ifdef TRITON_ENABLE_TRACING
-  if (infer_request->trace_ != nullptr) {
-    infer_request->trace_->CaptureTimestamp(
-        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
-  }
-#endif  // TRITON_ENABLE_TRACING
+
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseDelete(response),
+      "deleting inference response");
+
 
   if (err != nullptr) {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
@@ -421,11 +420,12 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
     }
     TRITONSERVER_ErrorDelete(err);
   }
-  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceResponseDelete(response),
-      "deleting inference response");
+  // Defer sending the response until FINAL flag is seen
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    return;
+  }
+  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
 }
 
 void
