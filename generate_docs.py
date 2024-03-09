@@ -41,7 +41,7 @@ def run_command(command):
 
 def build_docker_image(tag):
     log_message("Running Docker Build")
-    command = f"docker build -t i_docs:1.0 ."
+    command = f"docker build -f Dockerfile.docs -t i_docs:1.0 ."
     run_command(command)
 
 def run_docker_image(tag, host_dir, container_dir):
