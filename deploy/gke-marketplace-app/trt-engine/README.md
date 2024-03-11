@@ -57,7 +57,7 @@ mkdir -p engines
 
 python3 builder.py -m models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/model.ckpt -o engines/bert_large_int8_bs1_s128.engine -b 1 -s 128 -c models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/ -v models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/vocab.txt --int8 --fp16 --strict --calib-num 1 -iln -imh
 
-gsutil cp bert_large_int8_bs1_s128.engine gs://triton_sample_models/23_12/bert/1/model.plan
+gsutil cp bert_large_int8_bs1_s128.engine gs://triton_sample_models/24_03/bert/1/model.plan
 ```
 
-For each Triton upgrade, container version used to generate the model, and the model path in GCS `gs://triton_sample_models/23_12/` should be updated accordingly with the correct version.
+For each Triton upgrade, container version used to generate the model, and the model path in GCS `gs://triton_sample_models/24_03/` should be updated accordingly with the correct version.

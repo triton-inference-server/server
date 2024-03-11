@@ -31,7 +31,7 @@ maxReplicaCount: 3
 tritonProtocol: HTTP
 # HPA GPU utilization autoscaling target
 HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/23_12
+modelRepositoryPath: gs://triton_sample_models/24_03
 publishedVersion: '2.44.0'
 gcpMarketplace: true
 
