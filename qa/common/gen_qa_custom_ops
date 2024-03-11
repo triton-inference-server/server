@@ -130,7 +130,6 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py310_cu123/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 
