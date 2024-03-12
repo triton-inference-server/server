@@ -79,23 +79,23 @@ function run_data_compression_infer_client() {
     local python_or_cpp=`echo -n "$client_path" | tail -c 3`
     if [ "$python_or_cpp" == ".py" ]; then
         local infer_client="python $client_path"
-        local request_algorithm_parameter="--request-compression-algorithm $request_algorithm"
-        local response_algorithm_parameter="--response-compression-algorithm $response_algorithm"
-    else  # C++
+        local request_cmd_option="--request-compression-algorithm $request_algorithm"
+        local response_cmd_option="--response-compression-algorithm $response_algorithm"
+    else  # C++ if not end with ".py"
         local infer_client=$client_path
-        local request_algorithm_parameter="-i $request_algorithm"
-        local response_algorithm_parameter="-o $response_algorithm"
+        local request_cmd_option="-i $request_algorithm"
+        local response_cmd_option="-o $response_algorithm"
     fi
 
-    if [ "$request_algorithm" != "" ] && [ "$response_algorithm" == "" ]; then
-        $infer_client -v $request_algorithm_parameter >> $log_path 2>&1
-        return $?
+    local cmd_options="-v"
+    if [ "$request_algorithm" != "" ]; then
+        cmd_options+=" $request_cmd_option"
     fi
-    if [ "$request_algorithm" == "" ] && [ "$response_algorithm" != "" ]; then
-        $infer_client -v $response_algorithm_parameter >> $log_path 2>&1
-        return $?
+    if [ "$response_algorithm" != "" ]; then
+        cmd_options+=" $response_cmd_option"
     fi
-    $infer_client -v $request_algorithm_parameter $response_algorithm_parameter >> $log_path 2>&1
+
+    $infer_client $cmd_options >> $log_path 2>&1
     return $?
 }
 
