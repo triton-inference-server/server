@@ -45,7 +45,8 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
+  #GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_REPOSITORY  oandreeva@172.17.0.1:/home/oandreeva/Code/core
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
 FetchContent_Declare(
@@ -525,6 +526,7 @@ if(${TRITON_ENABLE_TRACING})
     tracing-library
     PUBLIC
       triton-common-logging    # from repo-common
+      triton-common-json      # from repo-common
       triton-core-serverapi    # from repo-core
       triton-core-serverstub   # from repo-core
   )
