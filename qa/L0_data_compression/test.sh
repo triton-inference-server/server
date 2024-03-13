@@ -70,7 +70,37 @@ fi
 set -e
 
 # End-to-end testing with simple model
+function run_data_compression_infer_client() {
+    local client_path=$1
+    local request_algorithm=$2
+    local response_algorithm=$3
+    local log_path=$4
+
+    local python_or_cpp=`echo -n "$client_path" | tail -c 3`
+    if [ "$python_or_cpp" == ".py" ]; then
+        local infer_client="python $client_path"
+        local request_cmd_option="--request-compression-algorithm $request_algorithm"
+        local response_cmd_option="--response-compression-algorithm $response_algorithm"
+    else  # C++ if not end with ".py"
+        local infer_client=$client_path
+        local request_cmd_option="-i $request_algorithm"
+        local response_cmd_option="-o $response_algorithm"
+    fi
+
+    local cmd_options="-v"
+    if [ "$request_algorithm" != "" ]; then
+        cmd_options+=" $request_cmd_option"
+    fi
+    if [ "$response_algorithm" != "" ]; then
+        cmd_options+=" $response_cmd_option"
+    fi
+
+    $infer_client $cmd_options >> $log_path 2>&1
+    return $?
+}
+
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
 SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
 
 CLIENT_LOG=`pwd`/client.log
@@ -85,68 +115,22 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-set +e
-# Test various combinations
-python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+for INFER_CLIENT in "$SIMPLE_INFER_CLIENT_PY" "$SIMPLE_AIO_INFER_CLIENT_PY" "$SIMPLE_INFER_CLIENT"; do
+    for REQUEST_ALGORITHM in "deflate" "gzip" ""; do
+        for RESPONSE_ALGORITHM in "deflate" "gzip" ""; do
+            if [ "$REQUEST_ALGORITHM" == "$RESPONSE_ALGORITHM" ]; then
+                continue
+            fi
 
-python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-python $SIMPLE_INFER_CLIENT_PY -v --response-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-python $SIMPLE_INFER_CLIENT_PY -v --response-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm deflate --response-compression-algorithm gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-python $SIMPLE_INFER_CLIENT_PY -v --request-compression-algorithm gzip --response-compression-algorithm deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -i deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -i gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -o deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -o gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -i deflate -o gzip >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-$SIMPLE_INFER_CLIENT -v -i gzip -o deflate >> "${CLIENT_LOG}" 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-set -e
+            set +e
+            run_data_compression_infer_client "$INFER_CLIENT" "$REQUEST_ALGORITHM" "$RESPONSE_ALGORITHM" "$CLIENT_LOG"
+            if [ $? -ne 0 ]; then
+                RET=1
+            fi
+            set -e
+        done
+    done
+done
 
 kill $SERVER_PID
 wait $SERVER_PID
