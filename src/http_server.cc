@@ -212,6 +212,7 @@ HTTPServer::Start()
       evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
     }
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
+    evhtp_set_pre_accept_cb(htp_, HTTPServer::PreConnection, this);
     evhtp_set_post_accept_cb(htp_, HTTPServer::NewConnection, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
@@ -269,18 +270,32 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 }
 
 evhtp_res
-HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
+HTTPServer::PreConnection(evhtp_connection_t* conn, void* arg)
 {
-  LOG_INFO << "HTTPServer::NewConnection()";
-  evhtp_connection_set_hook(
-      conn, evhtp_hook_on_connection_fini, HTTPServer::FiniConnection, nullptr);
+  LOG_INFO << "HTTPServer::PreConnection()";
+  if ((static_cast<HTTPServer*>(arg))->conn_cnt_ >= 1) {
+    LOG_INFO << "connection rejected, conn_cnt_ >= 1";
+    return EVHTP_RES_SERVUNAVAIL;
+  }
   return EVHTP_RES_OK;
 }
 
 evhtp_res
-HTTPServer::FiniConnection()
+HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
+{
+  LOG_INFO << "HTTPServer::NewConnection()";
+  evhtp_connection_set_hook(
+      conn, evhtp_hook_on_connection_fini,
+      (evhtp_hook)(void*)HTTPServer::FiniConnection, arg);
+  (static_cast<HTTPServer*>(arg))->conn_cnt_++;
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::FiniConnection(evhtp_connection_t* conn, void* arg)
 {
   LOG_INFO << "HTTPServer::FiniConnection()";
+  (static_cast<HTTPServer*>(arg))->conn_cnt_--;
   return EVHTP_RES_OK;
 }
 

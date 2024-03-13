@@ -88,7 +88,8 @@ class HTTPServer {
       const std::string& header_forward_pattern, const int thread_cnt)
       : port_(port), reuse_port_(reuse_port), address_(address),
         header_forward_pattern_(header_forward_pattern),
-        thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_)
+        thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_),
+        conn_cnt_(0)
   {
   }
 
@@ -100,8 +101,9 @@ class HTTPServer {
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
+  static evhtp_res PreConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
-  static evhtp_res FiniConnection();
+  static evhtp_res FiniConnection(evhtp_connection_t* conn, void* arg);
 
   int32_t port_;
   bool reuse_port_;
@@ -115,6 +117,8 @@ class HTTPServer {
   std::thread worker_;
   evutil_socket_t fds_[2];
   event* break_ev_;
+
+  int conn_cnt_;
 };
 
 #ifdef TRITON_ENABLE_METRICS
