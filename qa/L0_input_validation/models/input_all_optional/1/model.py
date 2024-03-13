@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,21 +24,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Building a CPU build of Python backend
-TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-inference-server}
+import json
 
-source ../common.sh
-install_build_deps
-rm -rf python_backend
+import numpy as np
+import triton_python_backend_utils as pb_utils
 
-git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
-(cd python_backend/ && mkdir builddir && cd builddir && \
-  cmake -DTRITON_ENABLE_GPU=OFF -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
-  make -j18 install)
 
-if [ $? == 0 ]; then
-  echo -e "\n***\n*** No CPU build test PASSED.\n***"
-else
-  echo -e "\n***\n*** No CPU build test FAILED.\n***"
-fi
+class TritonPythonModel:
+    def initialize(self, args):
+        self.model_config = json.loads(args["model_config"])
 
+    def execute(self, requests):
+        """This function is called on inference request."""
+
+        responses = []
+        for _ in requests:
+            # Include one of each specially parsed JSON value: nan, inf, and -inf
+            out_0 = np.array([1], dtype=np.float32)
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+
+        return responses

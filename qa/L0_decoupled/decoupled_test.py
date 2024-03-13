@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -589,6 +589,58 @@ class DecoupledTest(tu.TestResultCollector):
         self.assertIn(
             "expected IN and DELAY shape to match, got [1] and [2]", str(cm.exception)
         )
+
+
+class NonDecoupledTest(tu.TestResultCollector):
+    def setUp(self):
+        self.model_name_ = "repeat_int32"
+        self.input_data = {
+            "IN": np.array([1], dtype=np.int32),
+            "DELAY": np.array([0], dtype=np.uint32),
+            "WAIT": np.array([0], dtype=np.uint32),
+        }
+
+    def test_grpc(self):
+        inputs = [
+            grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                self.input_data["IN"]
+            ),
+            grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                self.input_data["DELAY"]
+            ),
+            grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                self.input_data["WAIT"]
+            ),
+        ]
+
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
+        # Expect the inference is successful
+        res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
+        self.assertEqual(1, res.as_numpy("OUT")[0])
+        self.assertEqual(0, res.as_numpy("IDX")[0])
+
+    def test_http(self):
+        inputs = [
+            httpclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                self.input_data["IN"]
+            ),
+            httpclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                self.input_data["DELAY"]
+            ),
+            httpclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                self.input_data["WAIT"]
+            ),
+        ]
+
+        triton_client = httpclient.InferenceServerClient(
+            url="localhost:8000", verbose=True
+        )
+        # Expect the inference is successful
+        res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
+        self.assertEqual(1, res.as_numpy("OUT")[0])
+        self.assertEqual(0, res.as_numpy("IDX")[0])
 
 
 if __name__ == "__main__":

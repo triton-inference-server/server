@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,36 +38,21 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-export CUDA_VISIBLE_DEVICES=0
-
-TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-inference-server}
-TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
+source ../common/util.sh
 
 RET=0
 
-rm -f *.log.*
+CLIENT_LOG="./input_validation_client.log"
+TEST_PY=./input_validation_test.py
+TEST_RESULT_FILE='./test_results.txt'
 
-# Get the proto files from the common repo
-rm -fr common
-git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
-    ${TRITON_REPO_ORGANIZATION}/common.git
-cp common/protobuf/*.proto java/library/src/main/proto/.
+export CUDA_VISIBLE_DEVICES=0
 
-# Compile library
-(cd java/library && \
-    mvn compile && \
-    cp -R target/generated-sources/protobuf/java/inference ../examples/src/main/java/inference && \
-    cp -r target/generated-sources/protobuf/grpc-java/inference/*.java ../examples/src/main/java/inference/)
+rm -fr *.log
 
-# Build simple java and scala client example
-(cd java/examples && mvn clean install)
-
-CLIENT_LOG=`pwd`/client.log
-DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
-source ../common/util.sh
-
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -76,45 +61,23 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-pushd java/examples
+python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY >> $CLIENT_LOG 2>&1
 
-# Test grpc_generated simple java client example
-mvn exec:java -Dexec.mainClass=clients.SimpleJavaClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.java 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.java
+    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
     RET=1
 fi
-
-# Test grpc_generated simple scala client example
-mvn exec:java -Dexec.mainClass=clients.SimpleClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.scala 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.scala
-    RET=1
-fi
-
-popd
-
-# Test simple infer java client
-SIMPLE_INFER_JAVA_CLIENT=../clients/SimpleInferClient.jar
-
-pushd ../clients
-
-java -jar ${SIMPLE_INFER_JAVA_CLIENT} >> ${CLIENT_LOG}.simple_infer_java 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.simple_infer_java
-    RET=1
-fi
-
-popd
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Input Validation Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Input Validation Test FAILED\n***"
 fi
 
 exit $RET
