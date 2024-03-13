@@ -3,6 +3,13 @@ import sys
 import subprocess
 import os
 import logging
+import argparse
+from collections import defaultdict
+
+parser = argparse.ArgumentParser(description="Process some arguments.")
+parser.add_argument('--repo-tag', action='append', help='Repository tags in format key:value')
+parser.add_argument('--backend', action='append', help='Repository tags in format key:value')
+parser.add_argument('--github-organization', help='GitHub organization name')
 
 def setup_logger():
     # Create a custom logger
@@ -31,6 +38,7 @@ def log_message(message):
     logger.info(message)
 
 def run_command(command):
+    print(command)
     try:
         result = subprocess.run(command, shell=True, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         log_message(result.stdout)
@@ -52,10 +60,10 @@ def run_docker_image(tag, host_dir, container_dir):
 def clone_from_github(repo, tag, org):
     # Construct the full GitHub repository URL
     repo_url = f"https://github.com/{org}/{repo}.git"
-
+    print(repo_url)
     # Construct the git clone command
     if tag:
-        clone_command = ["git", "clone", "--branch", tag, "--single-branch", repo_url]
+        clone_command = ["git", "clone", "--branch", tag[0], "--single-branch", repo_url]
     else:
         clone_command = ["git", "clone", repo_url]
 
@@ -66,17 +74,32 @@ def clone_from_github(repo, tag, org):
     except subprocess.CalledProcessError as e:
         log_message(f"Failed to clone {repo}. Error: {e}")
 
+def parse_repo_tag(repo_tags):
+    repo_dict = defaultdict(list)
+    for tag in repo_tags:
+        key, value = tag.split(':', 1)
+        repo_dict[key].append(value)
+    return dict(repo_dict)
+
 def main():
-    # Deserialize the JSON string back to Python data structure
-    repo_data = json.loads(sys.argv[1])
+    args = parser.parse_args()
+    repo_tags = parse_repo_tag(args.repo_tag) if args.repo_tag else {}
+    backend_tags = parse_repo_tag(args.backend) if args.backend else {}
+    github_org = args.github_organization
+    print("Parsed repository tags:", repo_tags)
+    print("Parsed repository tags:", backend_tags)
     current_directory = os.getcwd()
     docs_dir_name = "docs"
     # Path
     os.chdir(docs_dir_name)
 
-    for item in repo_data:
-        clone_from_github(item['repo'], item['tag'], item['org'])
-
+    if 'client' in repo_tags:
+        clone_from_github('client', repo_tags['client'], github_org)
+    if 'core' in repo_tags:
+        clone_from_github('core', repo_tags['core'], github_org)
+    if 'python_backend' in backend_tags:
+        clone_from_github('python_backend', backend_tags['python_backend'], github_org)
+ 
     tag = "i_docs" # image tag
     host_dir = current_directory # The directory on the host to mount
     container_dir = "/mnt" # The mount point inside the container
