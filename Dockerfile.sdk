@@ -144,6 +144,10 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
+RUN pip3 install hatch build \
+    && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
+    && hatch version $(cat /workspace/TRITON_VERSION) \
+    && python3 -m build --wheel --outdir /workspace/install/python
 ############################################################################
 ## Create sdk container
 ############################################################################
@@ -210,6 +214,8 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
+
+RUN pip3 install install/python/genai_perf-*.whl
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
