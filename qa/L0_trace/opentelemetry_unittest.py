@@ -29,6 +29,7 @@ import sys
 sys.path.append("../common")
 import json
 import queue
+import re
 import shutil
 import subprocess
 import time
@@ -40,7 +41,7 @@ import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-from tritonclient.utils import InferenceServerException
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 NO_PARENT_SPAN_ID = ""
 COLLECTOR_TIMEOUT = 10
@@ -755,6 +756,22 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         time.sleep(5)
         self._test_simple_trace(headers=self.client_headers)
+
+    def test_trace_context_exposed_to_pbe(self):
+        """
+        Tests trace context, propagated to python backend.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        xs = np.zeros((1, 1)).astype(np.float32)
+        inputs = httpclient.InferInput("INPUT0", xs.shape, np_to_triton_dtype(xs.dtype))
+        result = triton_client_http.infer(
+            self.ensemble_model_name, inputs, headers=self.client_headers
+        )
+        context = result.as_numpy("OUTPUT0")
+        context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
+        self.assertIsNotNone(re.match(context_pattern, context))
 
 
 if __name__ == "__main__":

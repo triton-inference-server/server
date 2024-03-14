@@ -722,6 +722,9 @@ cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
     rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
         sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
 
+# Add model to test trace context exposed to python backend
+mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_context/1/model.py
+
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
