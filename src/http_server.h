@@ -28,6 +28,7 @@
 #include <evhtp/evhtp.h>
 #include <re2/re2.h>
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <memory>
@@ -82,13 +83,17 @@ class HTTPServer {
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
 
+  void StopAcceptingNewConnection() { accept_new_conn_ = false; }
+  uint32_t ConnectionCount() { return conn_cnt_; }
+
  protected:
   explicit HTTPServer(
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt)
       : port_(port), reuse_port_(reuse_port), address_(address),
         header_forward_pattern_(header_forward_pattern),
-        thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_)
+        thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_),
+        accept_new_conn_(true), conn_cnt_(0)
   {
   }
 
@@ -99,6 +104,9 @@ class HTTPServer {
   virtual void Handle(evhtp_request_t* req) = 0;
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
+
+  static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
+  static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
 
   int32_t port_;
   bool reuse_port_;
@@ -112,6 +120,9 @@ class HTTPServer {
   std::thread worker_;
   evutil_socket_t fds_[2];
   event* break_ev_;
+
+  std::atomic<bool> accept_new_conn_;
+  std::atomic<uint32_t> conn_cnt_;
 };
 
 #ifdef TRITON_ENABLE_METRICS

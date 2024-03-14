@@ -1,4 +1,4 @@
-// Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -45,6 +45,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <thread>
 
 #include "triton_signal.h"
@@ -299,6 +300,42 @@ StartEndpoints(
   return true;
 }
 
+uint32_t
+PrepareStopEndpoints(uint32_t timeout_secs)
+{
+  // Instruct endpoints to stop accepting new connections
+#ifdef TRITON_ENABLE_HTTP
+  if (g_http_service) {
+    g_http_service->StopAcceptingNewConnection();
+  }
+#endif  // TRITON_ENABLE_HTTP
+
+  // Poll until endpoints have zero live connections, or timeout
+  while (timeout_secs > 0) {
+    uint32_t live_connections = 0;
+    std::string found_connections;
+
+#ifdef TRITON_ENABLE_HTTP
+    if (g_http_service) {
+      uint32_t count = g_http_service->ConnectionCount();
+      live_connections += count;
+      found_connections += " " + std::to_string(count) + " HTTP connections";
+    }
+#endif  // TRITON_ENABLE_HTTP
+
+    if (live_connections == 0) {
+      break;
+    }
+    LOG_INFO << "Timeout " << timeout_secs << ": Found" << found_connections;
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    timeout_secs--;
+  }
+
+  // Return timeout remaining
+  return timeout_secs;
+}
+
 bool
 StopEndpoints()
 {
@@ -509,7 +546,11 @@ main(int argc, char** argv)
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
+  uint32_t exit_timeout_secs =
+      PrepareStopEndpoints(g_triton_params.exit_timeout_secs_);
+
+  TRITONSERVER_Error* stop_err =
+      TRITONSERVER_ServerStopWithTimeout(server_ptr, exit_timeout_secs);
 
   // If unable to gracefully stop the server then Triton threads and
   // state are potentially in an invalid state, so just exit
