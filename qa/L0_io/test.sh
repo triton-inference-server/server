@@ -54,7 +54,7 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 rm -f $CLIENT_LOG*
 
 # PyTorch is required for the Python backend dlpack add sub models
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
 RET=0
 
 # Prepare float32 models with basic config

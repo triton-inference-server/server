@@ -415,7 +415,7 @@ wait $SERVER_PID
 # Test the onnx model to verify that the memory type of the output tensor
 # remains unchanged with the warmup setting
 pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
 
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
