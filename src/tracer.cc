@@ -38,7 +38,6 @@
 #ifndef _WIN32
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
 #include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
-
 namespace otel_common = opentelemetry::common;
 #endif
 
@@ -563,7 +562,6 @@ TraceManager::Trace::StartSpan(
     if (std::string(request_id) != "") {
       span->SetAttribute("triton.request_id", request_id);
     }
-
     triton::common::TritonJson::WriteBuffer buffer;
     PrepareTraceContext(span, &buffer);
     TRITONSERVER_InferenceTraceSetContext(trace, buffer.Contents().c_str());
