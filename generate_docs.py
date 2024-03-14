@@ -95,10 +95,10 @@ def main():
 
     if 'client' in repo_tags:
         clone_from_github('client', repo_tags['client'], github_org)
-    if 'core' in repo_tags:
-        clone_from_github('core', repo_tags['core'], github_org)
-    if 'python_backend' in backend_tags:
-        clone_from_github('python_backend', backend_tags['python_backend'], github_org)
+    if 'python_backend' in repo_tags:
+        clone_from_github('python_backend', repo_tags['python_backend'], github_org)
+    if 'custom_backend' in backend_tags:
+        clone_from_github('custom_backend', backend_tags['custom_backend'], github_org)
  
     tag = "i_docs" # image tag
     host_dir = current_directory # The directory on the host to mount
