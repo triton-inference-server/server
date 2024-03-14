@@ -58,15 +58,19 @@ sections below for more details.
 
 ### Enable Caching on Server-side
 
-The response cache is enabled on the server-side by specifying a
-`<cache_implementation>` and corresponding configuration when starting
+The response cache is enabled on the server-side by specifying a cache
+implementation name `<cache>` and corresponding configuration when starting
 the Triton server.
 
 Through the CLI, this translates to setting
-`tritonserver --cache-config <cache_implementation>,<key>=<value> ...`. For example:
+`tritonserver --cache-config <cache>,<key>=<value> ...`. For example:
 ```
 tritonserver --cache-config local,size=1048576
 ```
+
+> [!NOTE]
+> If using a non-interactive shell, you may need to specify the argument without
+> the space like so: `--cache-config=<cache>,<key>=<value>`.
 
 For in-process C API applications, this translates to calling
 `TRITONSERVER_SetCacheConfig(const char* cache_implementation, const char* config_json)`.

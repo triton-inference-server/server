@@ -543,7 +543,7 @@ The following table shows available OpenTelemetry trace APIs settings for
       For example:<br/>
       <code>--trace-config opentelemetry,resource=service.name=triton</code><br/>
       <code>--trace-config opentelemetry,resource=service.version=1</code><br/>
-      Alternatively, key-vaue attributes can be specified through <br/>
+      Alternatively, key-value attributes can be specified through <br/>
       <a href="https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_resource_attributes">
       OTEL_RESOURCE_ATTRIBUTES</a>
       environment variable.
@@ -595,7 +595,7 @@ The following table shows available OpenTelemetry trace APIs settings for
 ### OpenTelemetry Context Propagation
 
 Triton supports [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/)
-in OpenTelemetry mode starting in version 24.01. Note, that every request
+in OpenTelemetry mode starting in version 24.02. Note, that every request
 with propagated OpenTelemetry context will be traced, regardless of `rate` and
 `count` trace settings. If a user wishes to trace only those requests, for which
 OpenTelemetry context was injected on the client side, please start Triton with
