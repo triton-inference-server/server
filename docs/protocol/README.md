@@ -105,16 +105,16 @@ $ curl -6 --verbose "http://[::1]:8000/v2/health/ready"
 ## Mapping Triton Server Error Codes to HTTP Status Codes
 
 This table maps various Triton Server error codes to their corresponding HTTP status
-codes and provides a brief description of each mapping. It can be used as a reference
-guide for understanding how Triton Server errors are handled in HTTP responses.
+codes. It can be used as a reference guide for understanding how Triton Server errors
+are handled in HTTP responses.
 
 
-| Triton Server Error Code                      | HTTP Status Code   | Description                                |
-| ---------------------------------------------| --------------------| --------------------------------------------|
-| `TRITONSERVER_ERROR_INTERNAL`                 | 500                | Internal Server Error                        |
-| `TRITONSERVER_ERROR_NOT_FOUND`                | 404                | Not Found                                    |
-| `TRITONSERVER_ERROR_UNAVAILABLE`              | 503                | Service Unavailable                          |
-| `TRITONSERVER_ERROR_UNSUPPORTED`              | 501                | Not Implemented                              |
+| Triton Server Error Code                      | HTTP Status Code   | Description          |
+| ----------------------------------------------| -------------------| ---------------------|
+| `TRITONSERVER_ERROR_INTERNAL`                 | 500                | Internal Server Error|
+| `TRITONSERVER_ERROR_NOT_FOUND`                | 404                | Not Found            |
+| `TRITONSERVER_ERROR_UNAVAILABLE`              | 503                | Service Unavailable  |
+| `TRITONSERVER_ERROR_UNSUPPORTED`              | 501                | Not Implemented      |
 | `TRITONSERVER_ERROR_UNKNOWN`,<br>`TRITONSERVER_ERROR_INVALID_ARG`,<br>`TRITONSERVER_ERROR_ALREADY_EXISTS`,<br>`TRITONSERVER_ERROR_CANCELLED` | `400` | Bad Request (default for other errors)      |
 
 
