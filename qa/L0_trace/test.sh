@@ -739,7 +739,8 @@ mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_co
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
-                --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --load-model=trace_context --trace-config=rate=1 \
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
