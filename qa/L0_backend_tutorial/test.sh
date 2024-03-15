@@ -27,6 +27,7 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
@@ -53,7 +54,7 @@ cmake --version
 
 rm -fr *.log ./backend
 git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
-    https://github.com/triton-inference-server/backend.git
+    ${TRITON_REPO_ORGANIZATION}/backend.git
 
 #
 # Minimal backend
@@ -62,6 +63,7 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
        -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
        -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
@@ -139,6 +141,7 @@ rm -fr /opt/tritonserver/backends/minimal
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
        -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
        -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
