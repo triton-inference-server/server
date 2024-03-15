@@ -105,6 +105,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
+        self.trace_context_model = "trace_context"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
@@ -764,14 +765,19 @@ class OpenTelemetryTest(tu.TestResultCollector):
         triton_client_http = httpclient.InferenceServerClient(
             "localhost:8000", verbose=True
         )
-        xs = np.zeros((1, 1)).astype(np.float32)
-        inputs = httpclient.InferInput("INPUT0", xs.shape, np_to_triton_dtype(xs.dtype))
-        result = triton_client_http.infer(
-            self.ensemble_model_name, inputs, headers=self.client_headers
-        )
-        context = result.as_numpy("OUTPUT0")
+        expect_none = np.array([False], dtype=bool)
+        inputs = httpclient.InferInput("expect_none", [1], "BOOL")
+        inputs.set_data_from_numpy(expect_none)
+        try:
+            result = triton_client_http.infer(self.trace_context_model, inputs=[inputs])
+        except InferenceServerException as e:
+            self.fail(e.message())
+
+        context = result.as_numpy("OUTPUT0")[()].decode("utf-8")
+        context = json.loads(context)
+        self.assertIn("traceparent", context.keys())
         context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
-        self.assertIsNotNone(re.match(context_pattern, context))
+        self.assertIsNotNone(re.match(context_pattern, context["traceparent"]))
 
 
 if __name__ == "__main__":

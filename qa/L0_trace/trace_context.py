@@ -1,6 +1,3 @@
-import json
-import time
-
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
@@ -8,7 +5,7 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
-        inputs = [{"name": "INPUT0", "data_type": "TYPE_FP32", "dims": [1]}]
+        inputs = [{"name": "expect_none", "data_type": "TYPE_BOOL", "dims": [1]}]
         outputs = [{"name": "OUTPUT0", "data_type": "TYPE_STRING", "dims": [-1]}]
 
         config = auto_complete_model_config.as_dict()
@@ -26,19 +23,20 @@ class TritonPythonModel:
             if output["name"] not in output_names:
                 auto_complete_model_config.add_output(output)
 
-        auto_complete_model_config.set_max_batch_size(1)
-
         return auto_complete_model_config
-
-    def initialize(self, args):
-        self.model_config = json.loads(args["model_config"])
-        output_config = pb_utils.get_output_config_by_name(self.model_config, "OUTPUT0")
-        self.output_dtype = pb_utils.triton_string_to_numpy(output_config["data_type"])
 
     def execute(self, requests):
         responses = []
         for request in requests:
-            context = request.trace().get_context(mode="opentelemetry")
+            expect_none = pb_utils.get_input_tensor_by_name(
+                request, "expect_none"
+            ).as_numpy()[0]
+            context = request.trace().get_context()
+            if expect_none and context is not None:
+                raise pb_utils.TritonModelException("Context should be None")
+            if not expect_none and context is None:
+                raise pb_utils.TritonModelException("Context should NOT be None")
+
             output_tensor = pb_utils.Tensor(
                 "OUTPUT0", np.array(context).astype(np.bytes_)
             )

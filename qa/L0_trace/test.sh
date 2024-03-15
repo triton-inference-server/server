@@ -131,6 +131,16 @@ function update_trace_setting {
   set -e
 }
 
+function check_pbe_trace_context {
+  model_name="${1}"
+  expect_none="${2}"
+  data='{"inputs":[{"name":"expect_none","datatype":"BOOL","shape":[1],"data":['${expect_none}']}]}'
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${model_name}/infer -d ${data}`
+  set -e
+}
+
 function send_inference_requests {
     log_file="${1}"
     upper_bound="${2}"
@@ -1024,6 +1034,49 @@ fi
 set -e
 kill $COLLECTOR_PID
 wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that PBE returns None as trace context in trace mode Triton
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=triton \
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_triton_trace_context.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+check_pbe_trace_context "trace_context" true
+assert_curl_success "PBE trace context is not None"
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that PBE returns None as trace context in trace mode OpenTelemetry,
+# but traceing is OFF.
+SERVER_ARGS="--trace-config=level=OFF --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_triton_trace_context.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+check_pbe_trace_context "trace_context" true
+assert_curl_success "PBE trace context is not None"
+
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
