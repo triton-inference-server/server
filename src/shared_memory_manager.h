@@ -41,9 +41,11 @@
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
+#ifdef _WIN32
+#include <windows.h>
+#endif  // _WIN32
 
 namespace triton { namespace server {
-
 class SharedMemoryManager {
  public:
   SharedMemoryManager() = default;
@@ -53,7 +55,7 @@ class SharedMemoryManager {
   /// (CPU) memory to the manager. Return TRITONSERVER_ERROR_ALREADY_EXISTS
   /// if a shared memory block of the same name already exists in the manager.
   /// \param name The name of the memory block.
-  /// \param shm_key The name of the posix shared memory object
+  /// \param shm_key The name of the shared memory object
   /// containing the block of memory.
   /// \param offset The offset within the shared memory object to the
   /// start of the block.
@@ -62,21 +64,6 @@ class SharedMemoryManager {
   TRITONSERVER_Error* RegisterSystemSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size);
-
-#ifdef TRITON_ENABLE_GPU
-  /// Add a shared memory block representing shared memory in CUDA
-  /// (GPU) memory to the manager. Return TRITONSERVER_ERROR_ALREADY_EXISTS
-  /// if a shared memory block of the same name already exists in the manager.
-  /// \param name The name of the memory block.
-  /// \param cuda_shm_handle The unique memory handle to the cuda shared
-  /// memory block.
-  /// \param byte_size The size, in bytes of the block.
-  /// \param device id The GPU number the shared memory region is in.
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* RegisterCUDASharedMemory(
-      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
-      const size_t byte_size, const int device_id);
-#endif  // TRITON_ENABLE_GPU
 
   /// Get the access information for the shared memory block
   /// with the specified name. Return TRITONSERVER_ERROR_NOT_FOUND
@@ -92,17 +79,6 @@ class SharedMemoryManager {
   TRITONSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, void** shm_mapped_addr,
       TRITONSERVER_MemoryType* memory_type, int64_t* device_id);
-
-#ifdef TRITON_ENABLE_GPU
-  /// Get the CUDA memory handle associated with the block name.
-  /// Return TRITONSERVER_ERROR_NOT_FOUND if named block doesn't exist.
-  /// \param name The name of the shared memory block to get.
-  /// \param cuda_mem_handle Returns the cuda memory handle with the memory
-  /// block.
-  /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* GetCUDAHandle(
-      const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle);
-#endif
 
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all
@@ -130,14 +106,61 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
 
+#ifdef TRITON_ENABLE_GPU
+  /// Add a shared memory block representing shared memory in CUDA
+  /// (GPU) memory to the manager. Return TRITONSERVER_ERROR_ALREADY_EXISTS
+  /// if a shared memory block of the same name already exists in the manager.
+  /// \param name The name of the memory block.
+  /// \param cuda_shm_handle The unique memory handle to the cuda shared
+  /// memory block.
+  /// \param byte_size The size, in bytes of the block.
+  /// \param device id The GPU number the shared memory region is in.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* RegisterCUDASharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+      const size_t byte_size, const int device_id);
+
+  /// Get the CUDA memory handle associated with the block name.
+  /// Return TRITONSERVER_ERROR_NOT_FOUND if named block doesn't exist.
+  /// \param name The name of the shared memory block to get.
+  /// \param cuda_mem_handle Returns the cuda memory handle with the memory
+  /// block.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* GetCUDAHandle(
+      const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle);
+#endif  // TRITON_ENABLE_GPU
+
  private:
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
       const std::string& name, TRITONSERVER_MemoryType memory_type);
 
-  /// A struct that records the shared memory regions registered by the shared
-  /// memory manager.
+/// A struct that records the shared memory regions registered by the shared
+/// memory manager.
+#ifdef _WIN32
+  struct SharedMemoryInfo {
+    SharedMemoryInfo(
+        const std::string& name, const std::string& shm_key,
+        const size_t offset, const size_t byte_size, HANDLE shm_handle,
+        void* mapped_addr, const TRITONSERVER_MemoryType kind,
+        const int64_t device_id)
+        : name_(name), shm_key_(shm_key), offset_(offset),
+          byte_size_(byte_size), shm_handle_(shm_handle),
+          mapped_addr_(mapped_addr), kind_(kind), device_id_(device_id)
+    {
+    }
+
+    std::string name_;
+    std::string shm_key_;
+    size_t offset_;
+    size_t byte_size_;
+    HANDLE shm_handle_;
+    void* mapped_addr_;
+    TRITONSERVER_MemoryType kind_;
+    int64_t device_id_;
+  };
+#else
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
@@ -159,6 +182,7 @@ class SharedMemoryManager {
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
   };
+#endif
 
 #ifdef TRITON_ENABLE_GPU
   struct CUDASharedMemoryInfo : SharedMemoryInfo {

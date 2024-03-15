@@ -42,6 +42,15 @@ from tritonclient import utils
 
 
 class SharedMemoryTest(tu.TestResultCollector):
+    def setUp(self):
+        self._protocol = os.environ.get("CLIENT_TYPE", "http")
+        self._tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+        self._test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
+        if self._protocol == "http":
+            self._url = self._tritonserver_ipaddr + ":8000"
+        else:
+            self._url = self._tritonserver_ipaddr + ":8001"
+
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid system shared memory region
         try:
@@ -50,21 +59,24 @@ class SharedMemoryTest(tu.TestResultCollector):
             )
             shm.destroy_shared_memory_region(shm_op0_handle)
         except Exception as ex:
-            self.assertTrue(str(ex) == "unable to initialize the size")
+            if self._test_windows:
+                self.assertTrue(str(ex) == "unable to create file mapping")
+            else:
+                self.assertTrue(str(ex) == "unable to initialize the size")
 
     def test_valid_create_set_register(self):
         # Create a valid system shared memory region, fill data in it and register
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
         shm.set_shared_memory_region(
             shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
         )
         triton_client.register_system_shared_memory("dummy_data", "/dummy_data", 8)
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 1)
         else:
             self.assertTrue(len(shm_status.regions) == 1)
@@ -72,14 +84,14 @@ class SharedMemoryTest(tu.TestResultCollector):
 
     def test_unregister_before_register(self):
         # Create a valid system shared memory region and unregister before register
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
         triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 0)
         else:
             self.assertTrue(len(shm_status.regions) == 0)
@@ -87,15 +99,15 @@ class SharedMemoryTest(tu.TestResultCollector):
 
     def test_unregister_after_register(self):
         # Create a valid system shared memory region and unregister after register
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
         triton_client.register_system_shared_memory("dummy_data", "/dummy_data", 8)
         triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 0)
         else:
             self.assertTrue(len(shm_status.regions) == 0)
@@ -103,10 +115,10 @@ class SharedMemoryTest(tu.TestResultCollector):
 
     def test_reregister_after_register(self):
         # Create a valid system shared memory region and unregister after register
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
         triton_client.register_system_shared_memory("dummy_data", "/dummy_data", 8)
         try:
@@ -116,7 +128,7 @@ class SharedMemoryTest(tu.TestResultCollector):
                 "shared memory region 'dummy_data' already in manager" in str(ex)
             )
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 1)
         else:
             self.assertTrue(len(shm_status.regions) == 1)
@@ -139,10 +151,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         input1_data = np.ones(shape=16, dtype=np.int32)
         shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
         shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         triton_client.register_system_shared_memory("input0_data", "/input0_data", 64)
         triton_client.register_system_shared_memory("input1_data", "/input1_data", 64)
         triton_client.register_system_shared_memory("output0_data", "/output0_data", 64)
@@ -168,8 +180,8 @@ class SharedMemoryTest(tu.TestResultCollector):
         input1_data = np.ones(shape=16, dtype=np.int32)
         inputs = []
         outputs = []
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
             inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
             inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(httpclient.InferRequestedOutput("OUTPUT0", binary_data=True))
@@ -177,7 +189,7 @@ class SharedMemoryTest(tu.TestResultCollector):
                 httpclient.InferRequestedOutput("OUTPUT1", binary_data=False)
             )
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
             inputs.append(grpcclient.InferInput("INPUT0", [1, 16], "INT32"))
             inputs.append(grpcclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
@@ -200,7 +212,7 @@ class SharedMemoryTest(tu.TestResultCollector):
                 "simple", inputs, model_version="", outputs=outputs
             )
             output = results.get_output("OUTPUT0")
-            if _protocol == "http":
+            if self._protocol == "http":
                 output_datatype = output["datatype"]
                 output_shape = output["shape"]
             else:
@@ -226,13 +238,13 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         triton_client.unregister_system_shared_memory("output0_data")
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 3)
         else:
             self.assertTrue(len(shm_status.regions) == 3)
@@ -242,10 +254,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         # Register after inference
         error_msg = []
         shm_handles = self._configure_sever()
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         self._basic_inference(
             shm_handles[0], shm_handles[1], shm_handles[2], shm_handles[3], error_msg
         )
@@ -256,7 +268,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         triton_client.register_system_shared_memory("input2_data", "/input2_data", 64)
         shm_status = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(shm_status) == 5)
         else:
             self.assertTrue(len(shm_status.regions) == 5)
@@ -270,10 +282,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         shm_ip2_handle = shm.create_shared_memory_region(
             "input2_data", "/input2_data", 128
         )
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         triton_client.register_system_shared_memory("input2_data", "/input2_data", 128)
         self._basic_inference(
             shm_handles[0],
@@ -307,18 +319,18 @@ class SharedMemoryTest(tu.TestResultCollector):
     def test_unregisterall(self):
         # Unregister all shared memory blocks
         shm_handles = self._configure_sever()
-        if _protocol == "http":
-            triton_client = httpclient.InferenceServerClient(_url, verbose=True)
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         status_before = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(status_before) == 4)
         else:
             self.assertTrue(len(status_before.regions) == 4)
         triton_client.unregister_system_shared_memory()
         status_after = triton_client.get_system_shared_memory_status()
-        if _protocol == "http":
+        if self._protocol == "http":
             self.assertTrue(len(status_after) == 0)
         else:
             self.assertTrue(len(status_after.regions) == 0)
@@ -328,7 +340,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         # Shared memory offset outside output region - Throws error
         error_msg = []
         shm_handles = self._configure_sever()
-        if _protocol == "http":
+        if self._protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
             offset = 2**64 - 32
@@ -350,9 +362,4 @@ class SharedMemoryTest(tu.TestResultCollector):
 
 
 if __name__ == "__main__":
-    _protocol = os.environ.get("CLIENT_TYPE", "http")
-    if _protocol == "http":
-        _url = "localhost:8000"
-    else:
-        _url = "localhost:8001"
     unittest.main()

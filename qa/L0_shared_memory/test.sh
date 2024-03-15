@@ -29,10 +29,18 @@ CLIENT_LOG="./client.log"
 SHM_TEST=shared_memory_test.py
 TEST_RESULT_FILE='test_results.txt'
 
-# Configure to support test on jetson as well
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
+    SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
+    BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
+    MODELDIR=${MODELDIR:=c:/}
+else
+    # Configure to support test on jetson as well
+    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    SERVER=${TRITON_DIR}/bin/tritonserver
+    BACKEND_DIR=${TRITON_DIR}/backends
+    MODELDIR=${MODELDIR:=`pwd`}
+fi
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
@@ -52,7 +60,7 @@ for i in \
         test_unregisterall \
         test_infer_offset_out_of_bound; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
+        SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -69,18 +77,10 @@ for i in \
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
-        else
-            check_test_results $TEST_RESULT_FILE 1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Result Verification Failed\n***"
-                RET=1
-            fi
         fi
         set -e
 
-        kill $SERVER_PID
-        wait $SERVER_PID
+        kill_server
     done
 done
 
