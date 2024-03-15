@@ -41,7 +41,7 @@ import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-from tritonclient.utils import InferenceServerException, np_to_triton_dtype
+from tritonclient.utils import InferenceServerException
 
 NO_PARENT_SPAN_ID = ""
 COLLECTOR_TIMEOUT = 10
