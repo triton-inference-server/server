@@ -35,7 +35,6 @@ import platform
 import stat
 import subprocess
 import sys
-import json
 from inspect import getsourcefile
 
 import requests
@@ -2359,37 +2358,8 @@ if __name__ == "__main__":
         required=False,
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
-    parser.add_argument(
-        "--docs",
-        action="store_true",
-        required=False,
-        help="Execute a script for documentation generation."
-    )
-    FLAGS = parser.parse_args()
 
-    if FLAGS.docs:
-        log("Calling the documentation generation script...")
-        script_path = os.path.join(THIS_SCRIPT_DIR, "generate_docs.py")
-        cmd = [
-            "python3",
-            script_path,
-            "--server-tag", str(FLAGS.version),
-            "--backend-tag", str(FLAGS.build_dir)
-        ]
-        # TODO: Make this dynamic or make it read a config file
-        repo_details = [
-            {'repo': 'client', 'tag': 'main', 'org': 'triton-inference-server'},
-        ]
-        repo_details_str = json.dumps(repo_details)
-        result = subprocess.run(['python3', script_path, repo_details_str], text=True, capture_output=True)
-        if result.returncode == 0:
-            log("Documentation generation completed successfully.")
-        else:
-            log("Documentation generation failed.")
-            log(result.stdout)
-            log(result.stderr)
-        # TODO: Think about cleanup of all the cloned repos
-        sys.exit(1)
+    FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
         FLAGS.image = []
