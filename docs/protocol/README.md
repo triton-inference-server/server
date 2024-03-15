@@ -116,7 +116,3 @@ are handled in HTTP responses.
 | `TRITONSERVER_ERROR_UNAVAILABLE`              | 503                | Service Unavailable  |
 | `TRITONSERVER_ERROR_UNSUPPORTED`              | 501                | Not Implemented      |
 | `TRITONSERVER_ERROR_UNKNOWN`,<br>`TRITONSERVER_ERROR_INVALID_ARG`,<br>`TRITONSERVER_ERROR_ALREADY_EXISTS`,<br>`TRITONSERVER_ERROR_CANCELLED` | `400` | Bad Request (default for other errors)      |
-
-
-
-
