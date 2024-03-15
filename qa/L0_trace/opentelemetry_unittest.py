@@ -29,6 +29,7 @@ import sys
 sys.path.append("../common")
 import json
 import queue
+import re
 import shutil
 import subprocess
 import time
@@ -104,6 +105,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
+        self.trace_context_model = "trace_context"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
@@ -755,6 +757,27 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         time.sleep(5)
         self._test_simple_trace(headers=self.client_headers)
+
+    def test_trace_context_exposed_to_pbe(self):
+        """
+        Tests trace context, propagated to python backend.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        expect_none = np.array([False], dtype=bool)
+        inputs = httpclient.InferInput("expect_none", [1], "BOOL")
+        inputs.set_data_from_numpy(expect_none)
+        try:
+            result = triton_client_http.infer(self.trace_context_model, inputs=[inputs])
+        except InferenceServerException as e:
+            self.fail(e.message())
+
+        context = result.as_numpy("OUTPUT0")[()].decode("utf-8")
+        context = json.loads(context)
+        self.assertIn("traceparent", context.keys())
+        context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
+        self.assertIsNotNone(re.match(context_pattern, context["traceparent"]))
 
 
 if __name__ == "__main__":
