@@ -3360,6 +3360,39 @@ class LifeCycleTest(tu.TestResultCollector):
         # The server will shutdown after this sub-test exits. The server must shutdown
         # without any hang or runtime error.
 
+    def test_shutdown_with_live_connection(self):
+        model_name = "add_sub"
+        model_shape = (16,)
+        from geventhttpclient.response import HTTPConnectionClosed
+
+        input_data = np.ones(shape=model_shape, dtype=np.float32)
+        inputs = [
+            httpclient.InferInput("INPUT0", model_shape, "FP32"),
+            httpclient.InferInput("INPUT1", model_shape, "FP32"),
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        inputs[1].set_data_from_numpy(input_data)
+
+        # start connection 1
+        conn_1 = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        conn_1.infer(model_name, inputs)
+
+        # shutdown the server
+        os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(2)
+
+        # cannot start new connection
+        conn_2 = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        with self.assertRaises(HTTPConnectionClosed, msg="connection closed."):
+            conn_2.infer(model_name, inputs)
+        conn_2.close()
+
+        # connection 1 should still work
+        conn_1.infer(model_name, inputs)
+
+        # close connection 1
+        conn_1.close()
+
 
 if __name__ == "__main__":
     unittest.main()

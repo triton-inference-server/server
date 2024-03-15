@@ -2102,6 +2102,35 @@ if [ "$ACTUAL_LOAD_UNLOAD_ORDER" != "$EXPECTED_LOAD_UNLOAD_ORDER" ]; then
     RET=1
 fi
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_with_live_connection
+rm -rf models
+mkdir models
+cp -r ../python_models/add_sub models/ && (cd models/add_sub && \
+    mkdir 1 && mv model.py 1)
+
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_with_live_connection >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
