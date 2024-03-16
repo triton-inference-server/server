@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from functools import partial
 
 parser = argparse.ArgumentParser(description="Process some arguments.")
 parser.add_argument(
@@ -17,12 +18,14 @@ parser.add_argument("--github-organization", help="GitHub organization name")
 
 SERVER_REPO_DIR = os.getcwd()
 SERVER_DOCS_DIR = os.path.join(os.getcwd(), "docs")
-DOMAIN_REG = "https://github.com/triton-inference-server"
+HTTP_REG = r"https?://"
+DOMAIN_REG = rf"{HTTP_REG}github.com/triton-inference-server"
 TAG_REG = "/(blob|tree)/main"
-DOC_FILE_PATH_REG = (
+DOC_FILE_URL_REG = (
     rf"(?<=\()\s*{DOMAIN_REG}/([\w\-]+)({TAG_REG})/*([\w\-/]+.md)\s*(?=[\)#])"
 )
-DOC_DIR_PATH_REG = rf"(?<=\()\s*{DOMAIN_REG}/([\w\-]+)({TAG_REG})?/*([\w\-/]*)(?=#)"
+DOC_DIR_URL_REG = rf"(?<=\()\s*{DOMAIN_REG}/([\w\-]+)({TAG_REG})?/*([\w\-/]*)(?=#)"
+REL_PATH_REG = rf"]\s*\(\s*([^)]+)\)"
 
 
 def setup_logger():
@@ -118,6 +121,49 @@ def parse_repo_tag(repo_tags):
     return dict(repo_dict)
 
 
+def replace_url_with_relpath(m, src_doc_path):
+    target_repo_name, target_path_from_its_repo = m.group(1), os.path.normpath(
+        m.group(4)
+    )
+
+    if target_repo_name != "server":
+        target_path = os.path.join(
+            SERVER_DOCS_DIR, target_repo_name, target_path_from_its_repo
+        )
+    else:
+        target_path = os.path.join(SERVER_REPO_DIR, target_path_from_its_repo)
+
+    # check if file or directory exists
+    if os.path.isfile(target_path):
+        pass
+    elif os.path.isdir(target_path) and os.path.isfile(
+        os.path.join(target_path, "README.md")
+    ):
+        target_path = os.path.join(target_path, "README.md")
+    else:
+        return m.group(0)
+
+    # target_path must be a file at this line
+    rel_path = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
+
+    return rel_path
+
+
+def replace_relpath_with_url(m, target_repo_name, src_doc_path):
+    reference = m.group(1)
+    target_path = os.path.join(os.path.dirname(src_doc_path), reference)
+    target_path = os.path.normpath(target_path)
+
+    # check if file or directory exists
+    if os.path.isdir(target_path):
+        targe_repo_dir = os.path.join(SERVER_DOCS_DIR, target_repo_name)
+        target_path_from_its_repo = os.path.relpath(target_path, start=targe_repo_dir)
+        url = f"https://github.com/triton-inference-server/{target_repo_name}/blob/main/{target_path_from_its_repo}/"
+        return f"]({url})"
+    else:
+        return m.group(0)
+
+
 def preprocess_docs(repo):
     cmd = ["find", repo, "-name", "*.md"]
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -129,35 +175,23 @@ def preprocess_docs(repo):
         with open(doc_path, "r") as f:
             filedata = f.read()
 
-        def replace_url_with_relpath(m):
-            target_repo_name, target_path_from_its_repo = m.group(1), os.path.normpath(
-                m.group(4)
-            )
-
-            if target_repo_name != "server":
-                target_path = os.path.join(
-                    SERVER_DOCS_DIR, target_repo_name, target_path_from_its_repo
-                )
-            else:
-                target_path = os.path.join(SERVER_REPO_DIR, target_path_from_its_repo)
-
-            # check if file or directory exists
-            if os.path.isfile(target_path):
-                pass
-            elif os.path.isdir(target_path) and os.path.isfile(
-                os.path.join(target_path, "README.md")
-            ):
-                target_path = os.path.join(target_path, "README.md")
-            else:
-                return m.group(0)
-
-            # target_path must be a file at this line
-            rel_path = os.path.relpath(target_path, start=os.path.dirname(doc_path))
-
-            return rel_path
-
-        filedata = re.sub(DOC_FILE_PATH_REG, replace_url_with_relpath, filedata)
-        filedata = re.sub(DOC_DIR_PATH_REG, replace_url_with_relpath, filedata)
+        filedata = re.sub(
+            DOC_FILE_URL_REG,
+            partial(replace_url_with_relpath, src_doc_path=doc_path),
+            filedata,
+        )
+        filedata = re.sub(
+            DOC_DIR_URL_REG,
+            partial(replace_url_with_relpath, src_doc_path=doc_path),
+            filedata,
+        )
+        filedata = re.sub(
+            REL_PATH_REG,
+            partial(
+                replace_relpath_with_url, target_repo_name=repo, src_doc_path=doc_path
+            ),
+            filedata,
+        )
 
         with open(doc_path, "w") as f:
             f.write(filedata)
