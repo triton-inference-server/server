@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '2.18.0'
+  publishedVersion: '2.43.0'
   publishedVersionMetadata:
     releaseNote: >-
       Initial release.
@@ -66,30 +66,30 @@ properties:
     type: string
     x-google-marketplace:
       type: NAMESPACE
-  initReplicaCount: 
+  initReplicaCount:
     title: Initial number of Triton pod instances to deploy.
     type: integer
     default: 1
-  minReplicaCount: 
+  minReplicaCount:
     title: Minimum number of Triton pod instances in the deployment for autoscaling.
     type: integer
     default: 1
-  maxReplicaCount: 
+  maxReplicaCount:
     title: Maximum number of Triton pod instances in the deployment for autoscaling.
     type: integer
     default: 3
-  tritonProtocol: 
+  tritonProtocol:
     title: Request protocol to send data to Triton, choose from gRPC and HTTP.
     type: string
     default: HTTP
-  HPATargetAverageValue: 
-    title: HPA autoscaling target, GKE currently support Duty Cycle which is GPU utilization, when target is reached, Triton Server service will create another pod instance. We ask user to analyze model inference to associate appropriate GPU metric target based on latency requirement. We also recommend to leave some room to mitigate transient load effect. For user interested in customizing autoscaling metrics, we recommends GPU Power (Percentage of Power), Queue time or SLA measurements such as latency. 
+  HPATargetAverageValue:
+    title: HPA autoscaling target, GKE currently support Duty Cycle which is GPU utilization, when target is reached, Triton Server service will create another pod instance. We ask user to analyze model inference to associate appropriate GPU metric target based on latency requirement. We also recommend to leave some room to mitigate transient load effect. For user interested in customizing autoscaling metrics, we recommends GPU Power (Percentage of Power), Queue time or SLA measurements such as latency.
     type: integer
-    default: 85      
+    default: 85
   modelRepositoryPath:
     type: string
     title: Bucket where models are stored. Please make sure the user/service account to create the GKE app has permission to this GCS bucket. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
-    default: gs://triton_sample_models/22_01
+    default: gs://triton_sample_models/models
   image.ldPreloadPath:
     type: string
     title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
@@ -97,7 +97,7 @@ properties:
   image.logVerboseLevel:
     type: integer
     title: Set verbose logging level. Zero (0) disables verbose logging and values >= 1 enable verbose logging, this is helpful when user unsure if the model is compatible with Triton or for general debug.
-    default: 0 
+    default: 0
   image.strictModelConfig:
     type: boolean
     title: Leave this unchecked by default. When strictModelConfig is not checked(False), Triton will try to infer the config file from model file, when checked(True), user need to provide config.pbtxt in model repository.
@@ -105,14 +105,14 @@ properties:
   image.allowGPUMetrics:
     type: boolean
     title: Select by default. When use A100 MIG, unselect to disable GPU Memory metrics reported by Triton, as current GPU metrics not support on A100 MIG.
-    default: True  
+    default: True
   istioEnabled:
     type: boolean
     x-google-marketplace:
       type: ISTIO_ENABLED
     default: True
 
-  
+
 required:
 - name
 - namespace

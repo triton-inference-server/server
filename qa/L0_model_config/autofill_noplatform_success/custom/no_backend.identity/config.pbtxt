@@ -1,0 +1,15 @@
+max_batch_size: 64
+input [
+ {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1000 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1000 ]
+  }
+]

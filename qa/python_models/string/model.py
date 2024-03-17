@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,15 +35,15 @@ class TritonPythonModel:
 
     def initialize(self, args):
         self._index = 0
-        self._dtypes = [np.bytes_, np.object_, np.object]
+        self._dtypes = [np.bytes_, np.object_]
 
     def execute(self, requests):
         responses = []
         for request in requests:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             out_tensor_0 = pb_utils.Tensor(
-                "OUTPUT0",
-                in_0.as_numpy().astype(self._dtypes[self._index]))
+                "OUTPUT0", in_0.as_numpy().astype(self._dtypes[self._index])
+            )
             self._index += 1
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses

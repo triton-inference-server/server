@@ -1,4 +1,6 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,38 +27,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import test_util as tu
+
 import numpy as np
+import test_util as tu
+from gen_common import np_to_model_dtype
 
 BASIC_ENSEMBLE_TYPES = ["simple", "sequence", "fan"]
 
 np_dtype_string = np.dtype(object)
-
-
-def np_to_model_dtype(np_dtype):
-    if np_dtype == bool:
-        return "TYPE_BOOL"
-    elif np_dtype == np.int8:
-        return "TYPE_INT8"
-    elif np_dtype == np.int16:
-        return "TYPE_INT16"
-    elif np_dtype == np.int32:
-        return "TYPE_INT32"
-    elif np_dtype == np.int64:
-        return "TYPE_INT64"
-    elif np_dtype == np.uint8:
-        return "TYPE_UINT8"
-    elif np_dtype == np.uint16:
-        return "TYPE_UINT16"
-    elif np_dtype == np.float16:
-        return "TYPE_FP16"
-    elif np_dtype == np.float32:
-        return "TYPE_FP32"
-    elif np_dtype == np.float64:
-        return "TYPE_FP64"
-    elif np_dtype == np_dtype_string:
-        return "TYPE_STRING"
-    return None
 
 
 def fixed_to_variable_size(shape):
@@ -64,11 +42,13 @@ def fixed_to_variable_size(shape):
 
 
 def platform_types_and_validation():
-    res = [("graphdef", tu.validate_for_tf_model),
-           ("savedmodel", tu.validate_for_tf_model),
-           ("plan", tu.validate_for_trt_model),
-           ("onnx", tu.validate_for_onnx_model),
-           ("libtorch", tu.validate_for_libtorch_model)]
+    res = [
+        ("graphdef", tu.validate_for_tf_model),
+        ("savedmodel", tu.validate_for_tf_model),
+        ("plan", tu.validate_for_trt_model),
+        ("onnx", tu.validate_for_onnx_model),
+        ("libtorch", tu.validate_for_libtorch_model),
+    ]
     return res
 
 
@@ -86,32 +66,52 @@ class AddSubEnsembleSchedule:
         else:
             self._get_schedule = AddSubEnsembleSchedule._get_simple_ensemble_schedule
 
-    def get_schedule(self, base_model_name, input_shape, output0_shape,
-                     output1_shape, input_model_dtype, output0_model_dtype,
-                     output1_model_dtype):
-        return self._get_schedule(base_model_name, input_shape, output0_shape,
-                                  output1_shape, input_model_dtype,
-                                  output0_model_dtype, output1_model_dtype)
+    def get_schedule(
+        self,
+        base_model_name,
+        input_shape,
+        output0_shape,
+        output1_shape,
+        input_model_dtype,
+        output0_model_dtype,
+        output1_model_dtype,
+    ):
+        return self._get_schedule(
+            base_model_name,
+            input_shape,
+            output0_shape,
+            output1_shape,
+            input_model_dtype,
+            output0_model_dtype,
+            output1_model_dtype,
+        )
 
     @classmethod
-    def _get_simple_ensemble_schedule(cls, base_model_name, input_shape,
-                                      output0_shape, output1_shape, input_dtype,
-                                      output0_dtype, output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+    def _get_simple_ensemble_schedule(
+        cls,
+        base_model_name,
+        input_shape,
+        output0_shape,
+        output1_shape,
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+    ):
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> addsub -> ensemble output
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "INPUT0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "INPUT1"
       }}
       output_map {{
@@ -125,19 +125,27 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(base_model_name, delimiter=index_delimiter)
+""".format(
+            base_model_name, delimiter=output_index_delimiter
+        )
         return schedule
 
     @classmethod
-    def _get_sequence_ensemble_schedule(cls, base_model_name, input_shape,
-                                        output0_shape, output1_shape,
-                                        input_dtype, output0_dtype,
-                                        output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+    def _get_sequence_ensemble_schedule(
+        cls,
+        base_model_name,
+        input_shape,
+        output0_shape,
+        output1_shape,
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+    ):
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> addsub -> ensemble output
         nop_input_shape = fixed_to_variable_size(input_shape)
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
@@ -164,11 +172,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "same_input1"
       }}
       output_map {{
@@ -182,25 +190,34 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(input_dtype,
-           tu.shape_to_dims_str(nop_input_shape),
-           base_model_name,
-           delimiter=index_delimiter)
+""".format(
+            input_dtype,
+            tu.shape_to_dims_str(nop_input_shape),
+            base_model_name,
+            delimiter=output_index_delimiter,
+        )
         return schedule
 
     @classmethod
-    def _get_fan_ensemble_schedule(cls, base_model_name, input_shape,
-                                   output0_shape, output1_shape, input_dtype,
-                                   output0_dtype, output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+    def _get_fan_ensemble_schedule(
+        cls,
+        base_model_name,
+        input_shape,
+        output0_shape,
+        output1_shape,
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+    ):
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
 
         # ensemble input -> nop -> addsub ->
         # nop (fan out, one output send to one nop) -> ensemble output (fan in)
         nop_input_shape = fixed_to_variable_size(input_shape)
         nop_output0_shape = fixed_to_variable_size(output0_shape)
         nop_output1_shape = fixed_to_variable_size(output1_shape)
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
@@ -227,11 +244,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "same_input1"
       }}
       output_map {{
@@ -277,14 +294,16 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(input_dtype,
-           tu.shape_to_dims_str(nop_input_shape),
-           base_model_name,
-           output0_dtype,
-           tu.shape_to_dims_str(nop_output0_shape),
-           output1_dtype,
-           tu.shape_to_dims_str(nop_output1_shape),
-           delimiter=index_delimiter)
+""".format(
+            input_dtype,
+            tu.shape_to_dims_str(nop_input_shape),
+            base_model_name,
+            output0_dtype,
+            tu.shape_to_dims_str(nop_output0_shape),
+            output1_dtype,
+            tu.shape_to_dims_str(nop_output1_shape),
+            delimiter=output_index_delimiter,
+        )
         return schedule
 
 
@@ -299,25 +318,45 @@ class IdentityEnsembleSchedule:
         if ensemble_type == "fan":
             self._get_schedule = IdentityEnsembleSchedule._get_fan_ensemble_schedule
         elif ensemble_type == "sequence":
-            self._get_schedule = IdentityEnsembleSchedule._get_sequence_ensemble_schedule
+            self._get_schedule = (
+                IdentityEnsembleSchedule._get_sequence_ensemble_schedule
+            )
         else:
             self._get_schedule = IdentityEnsembleSchedule._get_simple_ensemble_schedule
 
-    def get_schedule(self, dtype, input_shapes, input_model_shapes,
-                     output_shapes, output_model_shapes):
-        return self._get_schedule(dtype, input_shapes, input_model_shapes,
-                                  output_shapes, output_model_shapes,
-                                  self._test_type)
+    def get_schedule(
+        self,
+        dtype,
+        input_shapes,
+        input_model_shapes,
+        output_shapes,
+        output_model_shapes,
+    ):
+        return self._get_schedule(
+            dtype,
+            input_shapes,
+            input_model_shapes,
+            output_shapes,
+            output_model_shapes,
+            self._test_type,
+        )
 
     @classmethod
-    def _get_simple_ensemble_schedule(cls, dtype, input_shapes,
-                                      input_model_shapes, output_shapes,
-                                      output_model_shapes, test_type):
+    def _get_simple_ensemble_schedule(
+        cls,
+        dtype,
+        input_shapes,
+        input_model_shapes,
+        output_shapes,
+        output_model_shapes,
+        test_type,
+    ):
         # ensemble reshaped input -> nop with reshaped tensor shape -> ensemble
         # reshaped output (actual ensemble input/output is not visible in schedule)
         steps = []
         for idx in range(len(input_shapes)):
-            steps.append('''
+            steps.append(
+                """
     {{
       model_name: "nop_{}_{}"
       model_version: -1
@@ -334,30 +373,45 @@ class IdentityEnsembleSchedule:
         value: "OUTPUT{}"
       }}
     }}
-'''.format(np_to_model_dtype(dtype),
-            tu.shape_to_dims_str(input_model_shapes[idx]), idx, idx, idx))
+""".format(
+                    np_to_model_dtype(dtype),
+                    tu.shape_to_dims_str(input_model_shapes[idx]),
+                    idx,
+                    idx,
+                    idx,
+                )
+            )
 
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
 {}
   ]
 }}
-'''.format(",".join(steps))
+""".format(
+            ",".join(steps)
+        )
 
         return schedule
 
     @classmethod
-    def _get_sequence_ensemble_schedule(cls, dtype, input_shapes,
-                                        input_model_shapes, output_shapes,
-                                        output_model_shapes, test_type):
+    def _get_sequence_ensemble_schedule(
+        cls,
+        dtype,
+        input_shapes,
+        input_model_shapes,
+        output_shapes,
+        output_model_shapes,
+        test_type,
+    ):
         in_str = "tunnel_in_" if test_type == "reshape" else ""
         out_str = "tunnel_out_" if test_type == "reshape" else ""
         # ensemble reshaped input -> nop with another input only reshape ->
         # nop with output only reshape -> ensemble reshaped output
         steps = []
         for idx in range(len(input_shapes)):
-            steps.append('''
+            steps.append(
+                """
     {{
       model_name: "nop_{in_str}{type}_{shape}"
       model_version: -1
@@ -390,26 +444,37 @@ ensemble_scheduling {{
         value: "OUTPUT{idx}"
       }}
     }}
-'''.format(type=np_to_model_dtype(dtype),
-            in_str=in_str,
-            out_str=out_str,
-            idx=idx,
-            shape=tu.shape_to_dims_str(input_model_shapes[idx])))
+""".format(
+                    type=np_to_model_dtype(dtype),
+                    in_str=in_str,
+                    out_str=out_str,
+                    idx=idx,
+                    shape=tu.shape_to_dims_str(input_model_shapes[idx]),
+                )
+            )
 
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
 {}
   ]
 }}
-'''.format(",".join(steps))
+""".format(
+            ",".join(steps)
+        )
 
         return schedule
 
     @classmethod
-    def _get_fan_ensemble_schedule(cls, dtype, input_shapes, input_model_shapes,
-                                   output_shapes, output_model_shapes,
-                                   test_type):
+    def _get_fan_ensemble_schedule(
+        cls,
+        dtype,
+        input_shapes,
+        input_model_shapes,
+        output_shapes,
+        output_model_shapes,
+        test_type,
+    ):
         # Note that the simple and sequence test already test "fan" in some
         # degree, because there is no direct match from nop input/output
         # like what is in addsub-like ensemble.
@@ -426,7 +491,8 @@ ensemble_scheduling {{
             intermediate_shapes = [[-1]] * len(input_model_shapes)
         steps = []
         for idx in range(len(input_shapes)):
-            steps.append('''
+            steps.append(
+                """
     {{
       model_name: "nop_{in_str}{type}_{shape}"
       model_version: -1
@@ -475,20 +541,25 @@ ensemble_scheduling {{
         value: "OUTPUT{idx}"
       }}
     }}
-'''.format(type=np_to_model_dtype(dtype),
-            in_str=in_str,
-            out_str=out_str,
-            intermediate_shape=tu.shape_to_dims_str(intermediate_shapes[idx]),
-            idx=idx,
-            shape=tu.shape_to_dims_str(input_model_shapes[idx])))
+""".format(
+                    type=np_to_model_dtype(dtype),
+                    in_str=in_str,
+                    out_str=out_str,
+                    intermediate_shape=tu.shape_to_dims_str(intermediate_shapes[idx]),
+                    idx=idx,
+                    shape=tu.shape_to_dims_str(input_model_shapes[idx]),
+                )
+            )
 
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
 {}
   ]
 }}
-'''.format(",".join(steps))
+""".format(
+            ",".join(steps)
+        )
 
         return schedule
 
@@ -503,7 +574,9 @@ class SequenceEnsembleSchedule:
         if ensemble_type == "fan":
             self._get_schedule = SequenceEnsembleSchedule._get_fan_ensemble_schedule
         elif ensemble_type == "sequence":
-            self._get_schedule = SequenceEnsembleSchedule._get_sequence_ensemble_schedule
+            self._get_schedule = (
+                SequenceEnsembleSchedule._get_sequence_ensemble_schedule
+            )
         else:
             self._get_schedule = SequenceEnsembleSchedule._get_simple_ensemble_schedule
 
@@ -515,7 +588,7 @@ class SequenceEnsembleSchedule:
         # libtorch model uses other naming convention
         index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> sequence -> ensemble output
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
@@ -532,22 +605,24 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(base_model_name, index=index_suffix)
+""".format(
+            base_model_name, index=index_suffix
+        )
         return schedule
 
     @classmethod
-    def _get_sequence_ensemble_schedule(cls, base_model_name, shape,
-                                        model_dtype):
+    def _get_sequence_ensemble_schedule(cls, base_model_name, shape, model_dtype):
         # nop cannot handle STRING data type, fall back to simple
         if model_dtype == "TYPE_STRING":
             return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
-                base_model_name, shape, model_dtype)
+                base_model_name, shape, model_dtype
+            )
 
         # libtorch model uses other naming convention
         index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> sequence -> ensemble output
         nop_input_shape = fixed_to_variable_size(shape)
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
@@ -580,10 +655,12 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(model_dtype,
-           tu.shape_to_dims_str(nop_input_shape),
-           base_model_name,
-           index=index_suffix)
+""".format(
+            model_dtype,
+            tu.shape_to_dims_str(nop_input_shape),
+            base_model_name,
+            index=index_suffix,
+        )
         return schedule
 
     @classmethod
@@ -591,14 +668,15 @@ ensemble_scheduling {{
         # nop cannot handle STRING data type, fall back to simple
         if model_dtype == "TYPE_STRING":
             return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
-                base_model_name, shape, model_dtype)
+                base_model_name, shape, model_dtype
+            )
 
         # libtorch model uses other naming convention
         index_suffix = "__0" if "libtorch" in base_model_name else ""
         # Not a "fan" due to configuration of base sequence model
         # ensemble input -> nop -> sequence -> nop -> ensemble output
         nop_shape = fixed_to_variable_size(shape)
-        schedule = '''
+        schedule = """
 ensemble_scheduling {{
   step [
     {{
@@ -647,37 +725,41 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(model_dtype,
-           tu.shape_to_dims_str(nop_shape),
-           base_model_name,
-           model_dtype,
-           tu.shape_to_dims_str(nop_shape),
-           index=index_suffix)
+""".format(
+            model_dtype,
+            tu.shape_to_dims_str(nop_shape),
+            base_model_name,
+            model_dtype,
+            tu.shape_to_dims_str(nop_shape),
+            index=index_suffix,
+        )
         return schedule
 
 
-def create_ensemble_modelfile(base_model,
-                              models_dir,
-                              max_batch,
-                              model_version,
-                              input_shape,
-                              output0_shape,
-                              output1_shape,
-                              input_dtype,
-                              output0_dtype,
-                              output1_dtype,
-                              swap=False):
-
+def create_ensemble_modelfile(
+    base_model,
+    models_dir,
+    max_batch,
+    model_version,
+    input_shape,
+    output0_shape,
+    output1_shape,
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    swap=False,
+):
     # No actual model file in ensemble model
 
     # Use a different model name for the non-batching variant
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
         ensemble_model_name = "{}_{}{}".format(
-            ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
-        model_name = tu.get_model_name(ensemble_model_name, input_dtype,
-                                       output0_dtype, output1_dtype)
-        model_version_dir = models_dir + "/" + model_name + "/" + str(
-            model_version)
+            ensemble_type, base_model, "_nobatch" if max_batch == 0 else ""
+        )
+        model_name = tu.get_model_name(
+            ensemble_model_name, input_dtype, output0_dtype, output1_dtype
+        )
+        model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
         try:
             os.makedirs(model_version_dir)
@@ -685,12 +767,20 @@ def create_ensemble_modelfile(base_model,
             pass  # ignore existing dir
 
 
-def create_ensemble_modelconfig(base_model, models_dir, max_batch,
-                                model_version, input_shape, output0_shape,
-                                output1_shape, input_dtype, output0_dtype,
-                                output1_dtype, output0_label_cnt,
-                                version_policy):
-
+def create_ensemble_modelconfig(
+    base_model,
+    models_dir,
+    max_batch,
+    model_version,
+    input_shape,
+    output0_shape,
+    output1_shape,
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    output0_label_cnt,
+    version_policy,
+):
     # No validation as long as the base model supports the type and shape
 
     input_model_dtype = np_to_model_dtype(input_dtype)
@@ -705,29 +795,43 @@ def create_ensemble_modelconfig(base_model, models_dir, max_batch,
 
         # Use a different model name for the non-batching variant
         ensemble_model_name = "{}_{}{}".format(
-            ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
-        model_name = tu.get_model_name(ensemble_model_name, input_dtype,
-                                       output0_dtype, output1_dtype)
+            ensemble_type, base_model, "_nobatch" if max_batch == 0 else ""
+        )
+        model_name = tu.get_model_name(
+            ensemble_model_name, input_dtype, output0_dtype, output1_dtype
+        )
         base_model_name = tu.get_model_name(
             "{}{}".format(base_model, "_nobatch" if max_batch == 0 else ""),
-            input_dtype, output0_dtype, output1_dtype)
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+        )
 
         ensemble_schedule = AddSubEnsembleSchedule(ensemble_type).get_schedule(
-            base_model_name, input_shape, output0_shape, output1_shape,
-            input_model_dtype, output0_model_dtype, output1_model_dtype)
+            base_model_name,
+            input_shape,
+            output0_shape,
+            output1_shape,
+            input_model_dtype,
+            output0_model_dtype,
+            output1_model_dtype,
+        )
 
         config_dir = models_dir + "/" + model_name
-        config = create_general_modelconfig(model_name,
-                                            "ensemble",
-                                            max_batch,
-                                            repeat(input_dtype, 2),
-                                            repeat(input_shape, 2),
-                                            repeat(None, 2),
-                                            [output0_dtype, output1_dtype],
-                                            [output0_shape, output1_shape],
-                                            repeat(None, 2), [labels, None],
-                                            version_policy=version_policy,
-                                            force_tensor_number_suffix=True)
+        config = create_general_modelconfig(
+            model_name,
+            "ensemble",
+            max_batch,
+            repeat(input_dtype, 2),
+            repeat(input_shape, 2),
+            repeat(None, 2),
+            [output0_dtype, output1_dtype],
+            [output0_shape, output1_shape],
+            repeat(None, 2),
+            [labels, None],
+            version_policy=version_policy,
+            force_tensor_number_suffix=True,
+        )
         config += ensemble_schedule
 
         try:
@@ -744,19 +848,24 @@ def create_ensemble_modelconfig(base_model, models_dir, max_batch,
                     lfile.write("label" + str(l) + "\n")
 
 
-def create_identity_ensemble_modelfile(ensemble_test_type, models_dir,
-                                       model_version, max_batch, dtype,
-                                       input_shapes, output_shapes):
+def create_identity_ensemble_modelfile(
+    ensemble_test_type,
+    models_dir,
+    model_version,
+    max_batch,
+    dtype,
+    input_shapes,
+    output_shapes,
+):
     io_cnt = len(input_shapes)
 
     # Use a different model name for the non-batching variant
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
         ensemble_prefix = "{}_{}".format(ensemble_type, ensemble_test_type)
         model_name = tu.get_zero_model_name(
-            ensemble_prefix + ("_nobatch" if max_batch == 0 else ""), io_cnt,
-            dtype)
-        model_version_dir = models_dir + "/" + model_name + "/" + str(
-            model_version)
+            ensemble_prefix + ("_nobatch" if max_batch == 0 else ""), io_cnt, dtype
+        )
+        model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
         try:
             os.makedirs(model_version_dir)
@@ -764,37 +873,46 @@ def create_identity_ensemble_modelfile(ensemble_test_type, models_dir,
             pass  # ignore existing dir
 
 
-def create_identity_ensemble_modelconfig(ensemble_test_type, models_dir,
-                                         model_version, max_batch, dtype,
-                                         input_shapes, input_model_shapes,
-                                         output_shapes, output_model_shapes):
+def create_identity_ensemble_modelconfig(
+    ensemble_test_type,
+    models_dir,
+    model_version,
+    max_batch,
+    dtype,
+    input_shapes,
+    input_model_shapes,
+    output_shapes,
+    output_model_shapes,
+):
     io_cnt = len(input_shapes)
 
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
         # Use a different model name for the non-batching variant
         ensemble_prefix = "{}_{}".format(ensemble_type, ensemble_test_type)
         model_name = tu.get_zero_model_name(
-            ensemble_prefix + ("_nobatch" if max_batch == 0 else ""), io_cnt,
-            dtype)
+            ensemble_prefix + ("_nobatch" if max_batch == 0 else ""), io_cnt, dtype
+        )
 
         ensemble_schedule = IdentityEnsembleSchedule(
-            ensemble_type,
-            ensemble_test_type).get_schedule(dtype, input_shapes,
-                                             input_model_shapes, output_shapes,
-                                             output_model_shapes)
+            ensemble_type, ensemble_test_type
+        ).get_schedule(
+            dtype, input_shapes, input_model_shapes, output_shapes, output_model_shapes
+        )
 
         config_dir = models_dir + "/" + model_name
-        config = create_general_modelconfig(model_name,
-                                            "ensemble",
-                                            max_batch,
-                                            repeat(dtype, io_cnt),
-                                            input_shapes,
-                                            input_model_shapes,
-                                            repeat(dtype, io_cnt),
-                                            output_shapes,
-                                            output_model_shapes,
-                                            repeat(None, io_cnt),
-                                            force_tensor_number_suffix=True)
+        config = create_general_modelconfig(
+            model_name,
+            "ensemble",
+            max_batch,
+            repeat(dtype, io_cnt),
+            input_shapes,
+            input_model_shapes,
+            repeat(dtype, io_cnt),
+            output_shapes,
+            output_model_shapes,
+            repeat(None, io_cnt),
+            force_tensor_number_suffix=True,
+        )
         config += ensemble_schedule
 
         try:
@@ -806,18 +924,18 @@ def create_identity_ensemble_modelconfig(ensemble_test_type, models_dir,
             cfile.write(config)
 
 
-def create_sequence_ensemble_modelfile(base_model, models_dir, max_batch,
-                                       model_version, shape, dtype):
-
+def create_sequence_ensemble_modelfile(
+    base_model, models_dir, max_batch, model_version, shape, dtype
+):
     # No actual model file in ensemble model
 
     # Use a different model name for the non-batching variant
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
         ensemble_model_name = "{}_{}{}".format(
-            ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
+            ensemble_type, base_model, "_nobatch" if max_batch == 0 else ""
+        )
         model_name = tu.get_sequence_model_name(ensemble_model_name, dtype)
-        model_version_dir = models_dir + "/" + model_name + "/" + str(
-            model_version)
+        model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
         try:
             os.makedirs(model_version_dir)
@@ -825,9 +943,9 @@ def create_sequence_ensemble_modelfile(base_model, models_dir, max_batch,
             pass  # ignore existing dir
 
 
-def create_sequence_ensemble_modelconfig(base_model, models_dir, max_batch,
-                                         model_version, shape, dtype):
-
+def create_sequence_ensemble_modelconfig(
+    base_model, models_dir, max_batch, model_version, shape, dtype
+):
     # No validation as long as the base model supports the type and shape
 
     model_dtype = np_to_model_dtype(dtype)
@@ -835,19 +953,30 @@ def create_sequence_ensemble_modelconfig(base_model, models_dir, max_batch,
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
         # Use a different model name for the non-batching variant
         ensemble_model_name = "{}_{}{}".format(
-            ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
+            ensemble_type, base_model, "_nobatch" if max_batch == 0 else ""
+        )
         model_name = tu.get_sequence_model_name(ensemble_model_name, dtype)
         base_model_name = tu.get_sequence_model_name(
-            "{}{}".format(base_model, "_nobatch" if max_batch == 0 else ""),
-            dtype)
+            "{}{}".format(base_model, "_nobatch" if max_batch == 0 else ""), dtype
+        )
 
-        ensemble_schedule = SequenceEnsembleSchedule(
-            ensemble_type).get_schedule(base_model_name, shape, model_dtype)
+        ensemble_schedule = SequenceEnsembleSchedule(ensemble_type).get_schedule(
+            base_model_name, shape, model_dtype
+        )
 
         config_dir = models_dir + "/" + model_name
-        config = create_general_modelconfig(model_name, "ensemble", max_batch,
-                                            [dtype], [shape], [None], [dtype],
-                                            [shape], [None], [None])
+        config = create_general_modelconfig(
+            model_name,
+            "ensemble",
+            max_batch,
+            [dtype],
+            [shape],
+            [None],
+            [dtype],
+            [shape],
+            [None],
+            [None],
+        )
         config += ensemble_schedule
 
         try:
@@ -859,12 +988,12 @@ def create_sequence_ensemble_modelconfig(base_model, models_dir, max_batch,
             cfile.write(config)
 
 
-def create_nop_modelconfig(models_dir,
-                           tensor_shape,
-                           tensor_dtype,
-                           tensor_model_shape=None):
-    model_name = "nop_{}_{}".format(dtype_str(tensor_dtype),
-                                    tu.shape_to_dims_str(tensor_shape))
+def create_nop_modelconfig(
+    models_dir, tensor_shape, tensor_dtype, tensor_model_shape=None
+):
+    model_name = "nop_{}_{}".format(
+        dtype_str(tensor_dtype), tu.shape_to_dims_str(tensor_shape)
+    )
     # Make [] to [1].
     # Note that this doesn't affect the naming ("nop_{}_" instead of "nop_{}_1")
     if len(tensor_shape) == 0:
@@ -883,7 +1012,8 @@ def create_nop_modelconfig(models_dir,
         repeat(tensor_model_shape, 2),
         repeat(None, 2),
         backend="identity",
-        instance_group_str="instance_group [ { kind: KIND_CPU } ]")
+        instance_group_str="instance_group [ { kind: KIND_CPU } ]",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -897,9 +1027,11 @@ def create_nop_modelconfig(models_dir,
 def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
     # Must be fixed size
     in_model_name = "nop_tunnel_in_{}_{}".format(
-        dtype_str(tensor_dtype), tu.shape_to_dims_str(tensor_shape))
+        dtype_str(tensor_dtype), tu.shape_to_dims_str(tensor_shape)
+    )
     out_model_name = "nop_tunnel_out_{}_{}".format(
-        dtype_str(tensor_dtype), tu.shape_to_dims_str(tensor_shape))
+        dtype_str(tensor_dtype), tu.shape_to_dims_str(tensor_shape)
+    )
     # Make [] to [1].
     # Note that this doesn't affect the naming ("nop_{}_" instead of "nop_{}_1")
     if len(tensor_shape) == 0:
@@ -907,8 +1039,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
     internal_shape = 1
     for dim in tensor_shape:
         if dim < 0:
-            raise Exception(
-                "Must specify fixed size input / output for nop tunnel")
+            raise Exception("Must specify fixed size input / output for nop tunnel")
         internal_shape *= dim
 
     # Tunnel in nop (reshape to one dimension)
@@ -925,7 +1056,8 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat(None, 2),
         repeat(None, 2),
         backend="identity",
-        instance_group_str="instance_group [ { kind: KIND_CPU } ]")
+        instance_group_str="instance_group [ { kind: KIND_CPU } ]",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -949,7 +1081,8 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         repeat(None, 2),
         repeat(None, 2),
         backend="identity",
-        instance_group_str="instance_group [ { kind: KIND_CPU } ]")
+        instance_group_str="instance_group [ { kind: KIND_CPU } ]",
+    )
 
     try:
         os.makedirs(config_dir)
@@ -960,21 +1093,23 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
         cfile.write(config)
 
 
-def create_general_modelconfig(model_name,
-                               platform,
-                               max_batch,
-                               input_dtypes,
-                               input_shapes,
-                               input_model_shapes,
-                               output_dtypes,
-                               output_shapes,
-                               output_model_shapes,
-                               label_filenames,
-                               backend=None,
-                               version_policy=None,
-                               default_model_filename=None,
-                               instance_group_str="",
-                               force_tensor_number_suffix=False):
+def create_general_modelconfig(
+    model_name,
+    platform,
+    max_batch,
+    input_dtypes,
+    input_shapes,
+    input_model_shapes,
+    output_dtypes,
+    output_shapes,
+    output_model_shapes,
+    label_filenames,
+    backend=None,
+    version_policy=None,
+    default_model_filename=None,
+    instance_group_str="",
+    force_tensor_number_suffix=False,
+):
     assert len(input_dtypes) == len(input_shapes)
     assert len(input_model_shapes) == len(input_shapes)
     assert len(output_dtypes) == len(output_shapes)
@@ -985,10 +1120,9 @@ def create_general_modelconfig(model_name,
     version_policy_str = "{ latest { num_versions: 1 }}"
     if version_policy is not None:
         type, val = version_policy
-        if type == 'latest':
-            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(
-                val)
-        elif type == 'specific':
+        if type == "latest":
+            version_policy_str = "{{ latest {{ num_versions: {} }}}}".format(val)
+        elif type == "specific":
             version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
         else:
             version_policy_str = "{ all { }}"
@@ -996,7 +1130,8 @@ def create_general_modelconfig(model_name,
     default_model_filename_str = ""
     if default_model_filename is not None:
         default_model_filename_str = 'default_model_filename: "{}"'.format(
-            default_model_filename)
+            default_model_filename
+        )
 
     # If backend is specified use backend instead of platform
     if backend is not None:
@@ -1006,21 +1141,28 @@ def create_general_modelconfig(model_name,
         key = "platform"
         val = platform
 
-    config = '''
+    config = """
 name: "{}"
 {}: "{}"
 max_batch_size: {}
 version_policy: {}
 {}
 {}
-'''.format(model_name, key, val, max_batch, version_policy_str,
-           default_model_filename_str, instance_group_str)
+""".format(
+        model_name,
+        key,
+        val,
+        max_batch,
+        version_policy_str,
+        default_model_filename_str,
+        instance_group_str,
+    )
 
     for idx in range(len(input_dtypes)):
         idx_str = ""
         if len(input_dtypes) != 1 or force_tensor_number_suffix:
             idx_str = str(idx)
-        config += '''
+        config += """
 input [
   {{
     name: "INPUT{}"
@@ -1028,15 +1170,18 @@ input [
     dims: [ {} ]
     {}
   }}
-]'''.format(idx_str, dtype_str(input_dtypes[idx]),
+]""".format(
+            idx_str,
+            dtype_str(input_dtypes[idx]),
             tu.shape_to_dims_str(input_shapes[idx]),
-            reshape_str(input_shapes[idx], input_model_shapes[idx]))
+            reshape_str(input_shapes[idx], input_model_shapes[idx]),
+        )
 
     for idx in range(len(output_dtypes)):
         idx_str = ""
         if len(input_dtypes) != 1 or force_tensor_number_suffix:
             idx_str = str(idx)
-        config += '''
+        config += """
 output [
   {{
     name: "OUTPUT{}"
@@ -1045,10 +1190,13 @@ output [
     {}
     {}
   }}
-]'''.format(idx_str, dtype_str(output_dtypes[idx]),
+]""".format(
+            idx_str,
+            dtype_str(output_dtypes[idx]),
             tu.shape_to_dims_str(output_shapes[idx]),
             reshape_str(output_shapes[idx], output_model_shapes[idx]),
-            label_str(label_filenames[idx]))
+            label_str(label_filenames[idx]),
+        )
     return config
 
 
@@ -1063,8 +1211,7 @@ def dtype_str(dtype):
 def reshape_str(shape, model_shape):
     if model_shape is None or shape == model_shape:
         return ""
-    return "reshape: {{ shape: [ {} ] }}".format(
-        tu.shape_to_dims_str(model_shape))
+    return "reshape: {{ shape: [ {} ] }}".format(tu.shape_to_dims_str(model_shape))
 
 
 def label_str(label):

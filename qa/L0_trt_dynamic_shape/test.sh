@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -276,7 +276,7 @@ SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false --strict-readines
 CLIENT_LOG="./test_load_wrong_optimization_profile.client.log"
 SERVER_LOG="./test_load_wrong_optimization_profile.inference_server.log"
 cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
-sed -i "s/profile:.*/profile: [\"10\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+sed -i "s/profile:.*/profile: [\"100\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -305,7 +305,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-# Adding test cases for mulitple optimization profiles with static shapes.
+# Adding test cases for multiple optimization profiles with static shapes.
 # Will load only the following profiles with the static shapes:
 # Profile 7: [1, 33]
 # Profile 8: [3, 33]
@@ -354,6 +354,44 @@ if [ $(cat ${CLIENT_LOG}_static_bs_2 | grep "model expected the shape of dimensi
     RET=1
 fi
 
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Tests for multiple optimization profile with static shapes and dynamic batching.
+# Profile 10: [1, 1], [1, 16], [1, 33]
+# Profile 11: [2, 1], [2, 16], [2, 33]
+# Profile 12: [3, 1], [3, 16], [3, 33]
+# Profile 13: [4, 1], [4, 16], [4, 33]
+# Profile 14: [5, 1], [5, 16], [5, 33]
+# Profile 15: [6, 1], [6, 16], [6, 33]
+# Profile 16: [7, 1], [7, 16], [7, 33]
+# Profile 17: [8, 1], [8, 16], [8, 33]
+
+(cd  ${DATADIR}/plan_float32_float32_float32/ && \
+            rm -f config.pbtxt && \
+            echo "instance_group { profile : [" >> config.pbtxt && \
+            for i in {10..16}; do echo "\"${i}\"," >> config.pbtxt; done && \
+            echo " \"17\"] }" >> config.pbtxt && \
+            echo "dynamic_batching {}" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=$DATADIR --strict-model-config=false"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+$PERF_CLIENT -v -i grpc -u localhost:8001 -m plan_float32_float32_float32 --shape INPUT0:33 --shape INPUT1:33 -t 16 -p2000 > ${CLIENT_LOG}_db_pass 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}_db_pass
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 set -e
 

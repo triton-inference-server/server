@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/data_compressor.h"
+#include "gtest/gtest.h"
 
 // Undefine the FAIL() macro inside Triton code to avoid redefine error
 // from gtest. Okay as FAIL() is not used in data_compressor
@@ -32,9 +32,8 @@
 #undef FAIL
 #endif
 
-#include "gtest/gtest.h"
-
 #include <event2/buffer.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <fstream>
@@ -46,7 +45,9 @@
 #include <thread>
 #include <vector>
 
-namespace ni = nvidia::inferenceserver;
+#include "data_compressor.h"
+
+namespace ni = triton::server;
 
 namespace {
 
@@ -141,8 +142,8 @@ class DataCompressorTest : public ::testing::Test {
       : raw_data_length_(0), deflate_compressed_length_(0),
         gzip_compressed_length_(0)
   {
-    std::vector<std::string> files{"raw_data", "deflate_compressed_data",
-                                   "gzip_compressed_data"};
+    std::vector<std::string> files{
+        "raw_data", "deflate_compressed_data", "gzip_compressed_data"};
     for (const auto& file : files) {
       std::fstream fs(file);
       // get length of file

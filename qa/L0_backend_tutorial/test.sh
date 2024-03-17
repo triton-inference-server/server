@@ -27,6 +27,7 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
@@ -40,19 +41,20 @@ source ../common/util.sh
 RET=0
 
 # Client build requires recent version of CMake (FetchContent required)
-wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-    gpg --dearmor - |  \
-    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-            cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1 \
+# Using CMAKE installation instruction from:: https://apt.kitware.com/
+apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7* \
             rapidjson-dev
 cmake --version
 
 rm -fr *.log ./backend
 git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
-    https://github.com/triton-inference-server/backend.git
+    ${TRITON_REPO_ORGANIZATION}/backend.git
 
 #
 # Minimal backend
@@ -61,6 +63,7 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
        -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
        -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
@@ -111,6 +114,7 @@ fi
 grep "model batching: requests in batch 2" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify minimal server log. \n***"
+    cat $SERVER_LOG
     cat $MINIMAL_LOG
     RET=1
 fi
@@ -118,6 +122,7 @@ fi
 grep "batched IN0 value: \[ 10, 11, 12, 13, 20, 21, 22, 23 \]" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify minimal server log. \n***"
+    cat $SERVER_LOG
     cat $MINIMAL_LOG
     RET=1
 fi
@@ -136,6 +141,7 @@ rm -fr /opt/tritonserver/backends/minimal
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
        -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
        -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
@@ -179,13 +185,23 @@ fi
 grep "model batching: requests in batch 2" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify recommended server log. \n***"
+    cat $SERVER_LOG
     cat $RECOMMENDED_LOG
     RET=1
 fi
 
+FOUND_MATCH=0
 grep "batched INPUT value: \[ 1.000000, 1.100000, 1.200000, 1.300000, 2.000000, 2.100000, 2.200000, 2.300000, 3.000000, 3.100000, 3.200000, 3.300000, 4.000000, 4.100000, 4.200000, 4.300000, 10.000000, 10.100000, 10.200000, 10.300000, 20.000000, 20.100000, 20.200001, 20.299999, 30.000000, 30.100000, 30.200001, 30.299999, 40.000000, 40.099998, 40.200001, 40.299999 \]" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    FOUND_MATCH=1
+fi
+grep "batched INPUT value: \[ 10.000000, 10.100000, 10.200000, 10.300000, 20.000000, 20.100000, 20.200001, 20.299999, 30.000000, 30.100000, 30.200001, 30.299999, 40.000000, 40.099998, 40.200001, 40.299999, 1.000000, 1.100000, 1.200000, 1.300000, 2.000000, 2.100000, 2.200000, 2.300000, 3.000000, 3.100000, 3.200000, 3.300000, 4.000000, 4.100000, 4.200000, 4.300000 \]" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    FOUND_MATCH=1
+fi
+if [ $FOUND_MATCH -eq 0 ]; then
     echo -e "\n***\n*** Failed to verify recommended server log. \n***"
+    cat $SERVER_LOG
     cat $RECOMMENDED_LOG
     RET=1
 fi

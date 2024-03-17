@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,9 +38,9 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
-PROTOCOLS="grpc http"
+PROTOCOLS="grpc http triton_c_api"
 
 TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
@@ -66,13 +66,14 @@ STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
 
-# Only TF, Onnx and TRT are supported on Jetson
+# Disable TF-TRT test on Jetson due to Segfault
+# Disable ORT-TRT test on Jetson due to support being disabled
 if [ "$ARCH" == "aarch64" ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
-    OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
-    CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
+    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME}"
+    CAFFE2PLAN=${TRITON_DIR}/bin/caffe2plan
 else
-    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
+    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
     CAFFE2PLAN=../common/caffe2plan
 fi
@@ -109,7 +110,8 @@ done
 rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
@@ -166,7 +168,8 @@ CONCURRENCY=4
 rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \

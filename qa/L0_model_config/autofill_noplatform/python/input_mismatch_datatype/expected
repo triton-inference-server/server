@@ -1,0 +1,1 @@
+unable to load model 'input_mismatch_datatype', configuration expects datatype TYPE_INT32 for input 'INPUT1', model provides TYPE_FP32

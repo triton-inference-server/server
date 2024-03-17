@@ -1,1 +1,1 @@
-unexpected platform type '' for no_version
+Invalid model name: Could not determine backend for model 'no_version' with no backend in model configuration. Expected model name of the form 'model.<backend_name>'.

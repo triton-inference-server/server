@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,83 +27,73 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import numpy as np
 from builtins import range
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import np_to_triton_dtype
+
+import numpy as np
+import tritonclient.http as httpclient
+from tritonclient.utils import np_to_triton_dtype
 
 FLAGS = None
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument(
-        '-i',
-        '--protocol',
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-u",
+        "--url",
         type=str,
         required=False,
-        default='http',
-        help='Protocol ("http"/"grpc") used to ' +
-        'communicate with inference service. Default is "http".')
-    parser.add_argument('-m',
-                        '--model',
-                        type=str,
-                        required=True,
-                        help='Name of model.')
-    parser.add_argument('-n',
-                        '--num-requests',
-                        type=int,
-                        required=True,
-                        help='Number of asynchronous requests to launch.')
-    parser.add_argument('-d',
-                        '--delay',
-                        type=int,
-                        required=True,
-                        help='Number of delay cycles to use as input to model.')
+        default="localhost:8000",
+        help="Inference server URL. Default is localhost:8000.",
+    )
+    parser.add_argument("-m", "--model", type=str, required=True, help="Name of model.")
+    parser.add_argument(
+        "-n",
+        "--num-requests",
+        type=int,
+        required=True,
+        help="Number of asynchronous requests to launch.",
+    )
 
     FLAGS = parser.parse_args()
-    if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
-            FLAGS.protocol))
-        exit(1)
-
-    client_util = httpclient if FLAGS.protocol == "http" else grpcclient
 
     # Run the busyop model which takes a delay as input.
     model_name = FLAGS.model
 
-    # Create the inference context for the model.
-    client = client_util.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
+    # Create the inference context for the model. Need to set the concurrency
+    # based on the number of requests so that the delivery of the async
+    # requests is not blocked.
+    # See the comment for more details: https://github.com/triton-inference-server/client/blob/r24.02/src/python/library/tritonclient/http/_client.py#L1501
+    client = httpclient.InferenceServerClient(
+        FLAGS.url, verbose=FLAGS.verbose, concurrency=FLAGS.num_requests
+    )
 
     # Collect async requests here
     requests = []
 
-    # Create the data for the one input tensor
-    input_data = np.array([FLAGS.delay], dtype=np.int32)
+    # Create the data for the input tensor. Creating tensor size with 5 MB.
+    tensor_size = [1, 5 * 1024 * 1024]
+    input_data = np.random.randn(*tensor_size).astype(np.float32)
 
     inputs = [
-        client_util.InferInput("in", input_data.shape,
-                               np_to_triton_dtype(input_data.dtype))
+        httpclient.InferInput(
+            "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+        )
     ]
     inputs[0].set_data_from_numpy(input_data)
 
     # Send requests
     for i in range(FLAGS.num_requests):
         requests.append(client.async_infer(model_name, inputs))
-        print("Sent request %d" % i)
+        print("Sent request %d" % i, flush=True)
     # wait for requests to finish
     for i in range(len(requests)):
         requests[i].get_result()
-        print("Received result %d" % i)
+        print("Received result %d" % i, flush=True)

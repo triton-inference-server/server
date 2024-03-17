@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,9 +27,8 @@
 
 #include <iostream>
 #include <string>
-#include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+#include "triton/core/tritonserver.h"
 
 #define RETURN_IF_ERR(X)             \
   do {                               \
@@ -105,5 +104,3 @@ namespace nvidia { namespace inferenceserver {
 /// convert to valid version.
 TRITONSERVER_Error* GetModelVersionFromString(
     const std::string& version_string, int64_t* version);
-
-}}  // namespace nvidia::inferenceserver

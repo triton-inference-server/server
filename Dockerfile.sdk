@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,27 +24,36 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#
+# Multistage build.
+#
+
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.01-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.02-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
-ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
-ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
+ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
+ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 
-FROM ${BASE_IMAGE}
+# DCGM version to install for Model Analyzer
+ARG DCGM_VERSION=3.2.6
 
-ARG TARGETPLATFORM
+ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
+ARG NVIDIA_BUILD_ID=unknown
+
+############################################################################
+##  Build image
+############################################################################
+
+FROM ${BASE_IMAGE} AS sdk_build
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-
-# DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.2.9
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -55,7 +64,9 @@ RUN apt-get update && \
             build-essential \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -68,43 +79,37 @@ RUN apt-get update && \
             vim \
             wget \
             python3-pdfkit \
-            maven \
-            default-jdk && \
+            openjdk-11-jdk \
+            maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
 
-ARG CMAKE_UBUNTU_VERSION
 # Client build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
-      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1; \
-    elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
-      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
-    else \
-      echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
-    fi && \
-    cmake --version
+# Using CMAKE installation instruction from:: https://apt.kitware.com/
+RUN apt update -q=2 \
+    && apt install -y gpg wget \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -q=2 \
+    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7* \
+    && cmake --version
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
+ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CLIENT_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
-ARG TRITON_BACKEND_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
+ARG JAVA_BINDINGS_MAVEN_VERSION
+ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
+ARG TARGETPLATFORM
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -113,28 +118,91 @@ COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 WORKDIR /workspace/build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-          -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
           -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
     rm -fr ~/.m2
 
+# Install Java API Bindings
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
+        --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
+        --core-tag ${TRITON_CORE_REPO_TAG} \
+        --javacpp-tag ${JAVA_BINDINGS_JAVACPP_PRESETS_TAG} \
+        --jar-install-path /workspace/install/java-api-bindings; \
+    fi
+
+RUN pip3 install hatch build \
+    && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
+    && hatch version $(cat /workspace/TRITON_VERSION) \
+    && python3 -m build --wheel --outdir /workspace/install/python
+############################################################################
+## Create sdk container
+############################################################################
+FROM ${BASE_IMAGE}
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG DCGM_VERSION
+ARG TRITON_REPO_ORGANIZATION
+ARG TRITON_CORE_REPO_TAG
+ARG TARGETPLATFORM
+ARG TRITON_ENABLE_GPU
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            software-properties-common \
+            curl \
+            git \
+            gperf \
+            libb64-dev \
+            libgoogle-perftools-dev \
+            libopencv-dev \
+            libopencv-core-dev \
+            libssl-dev \
+            libtool \
+            python3 \
+            python3-pip \
+            python3-dev \
+            vim \
+            wget \
+            python3-pdfkit \
+            maven \
+            default-jdk && \
+    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade grpcio-tools && \
+    pip3 install --upgrade pip
+
 WORKDIR /workspace
+COPY TRITON_VERSION .
+COPY NVIDIA_Deep_Learning_Container_License.pdf .
+COPY --from=sdk_build /workspace/client/ client/
+COPY --from=sdk_build /workspace/install/ install/
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
-# For CI testing need to install a test script.
-COPY qa/L0_sdk/test.sh /tmp/test.sh
-COPY qa/L0_sdk/grpc_test.cc /tmp/grpc_test.cc
-COPY qa/L0_sdk/http_test.cc /tmp/http_test.cc
+# For CI testing need to copy over L0_sdk test and L0_client_build_variants test.
+RUN mkdir qa
+COPY qa/L0_sdk qa/L0_sdk
+COPY qa/L0_client_build_variants qa/L0_client_build_variants
+
+# Create a directory for all the python client tests to enable unit testing
+RUN mkdir -p qa/python_client_unit_tests/
+COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_client_unit_tests/
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
@@ -147,35 +215,43 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
+RUN pip3 install install/python/genai_perf-*.whl
+
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
-      if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-ubuntu2004.pin && \
-        mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/7fa2af80.pub && \
-        add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/ /" && \
+        [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
+        curl -o /tmp/cuda-keyring.deb \
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/$arch/cuda-keyring_1.0-1_all.deb \
+        && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
-      else \
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
-        mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
-        add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
-        apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
-      fi \
     fi
+
+# Build expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python3 /usr/bin/python
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
-ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+ARG TRITON_MODEL_ANALYZER_REPO="${TRITON_REPO_ORGANIZATION}/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
 RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 # Entrypoint Banner
-ARG NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION=unknown
-ARG NVIDIA_BUILD_ID=unknown
+ENV NVIDIA_PRODUCT_NAME="Triton Server SDK"
+COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
+RUN sed 's/Server/Server SDK/' /opt/nvidia/entrypoint.d/10-banner.txt | \
+    sed 's/^===/=======/' > /opt/nvidia/entrypoint.d/10-banner.new && \
+    mv /opt/nvidia/entrypoint.d/10-banner.new /opt/nvidia/entrypoint.d/10-banner.txt
 
-ENV NVIDIA_PRODUCT_NAME="Triton Inference Server SDK"
-ENV NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION=${NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION}
+ARG NVIDIA_TRITON_SERVER_SDK_VERSION
+ARG NVIDIA_BUILD_ID
+ENV NVIDIA_TRITON_SERVER_SDK_VERSION=${NVIDIA_TRITON_SERVER_SDK_VERSION}
 ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+
+# DLIS-3631: Needed to run Perf Analyzer CI tests correctly
+ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
+
+# Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
+ENV TCMALLOC_RELEASE_RATE 200

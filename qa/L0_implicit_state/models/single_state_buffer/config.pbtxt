@@ -1,0 +1,97 @@
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+name: "single_state_buffer"
+backend: "implicit_state"
+max_batch_size: 0
+sequence_batching {
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "END"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+  state [
+    {
+        input_name: "INPUT_STATE"
+        output_name: "OUTPUT_STATE"
+        data_type: TYPE_INT32
+        dims: 1
+        use_same_buffer_for_input_output: true
+    }
+  ]
+}
+
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "TEST_CASE"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind : KIND_CPU
+  }
+]

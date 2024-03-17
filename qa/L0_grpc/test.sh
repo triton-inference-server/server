@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,15 +42,22 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+CLIENT_PLUGIN_TEST="./grpc_client_plugin_test.py"
+BASIC_AUTH_TEST="./grpc_basic_auth_test.py"
+NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
+    CLIENT_PLUGIN_MODELDIR=${MODELDIR:=C:/client_plugin_models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_infer_client.py
+    SIMPLE_AIO_STREAM_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_grpc_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_async_infer_client.py
@@ -64,6 +71,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     SIMPLE_CUDASHM_CLIENT_PY=${SDKDIR}/python/simple_grpc_cudashm_client.py
     SIMPLE_MODEL_CONTROL_PY=${SDKDIR}/python/simple_grpc_model_control.py
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=${SDKDIR}/python/reuse_infer_objects_client.py
+    SIMPLE_KEEPALIVE_CLIENT_PY=${SDKDIR}/python/simple_grpc_keepalive_client.py
+    SIMPLE_CUSTOM_ARGS_CLIENT_PY=${SDKDIR}/python/simple_grpc_custom_args_client.py
     EXPLICIT_BYTE_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_byte_content_client.py
     EXPLICIT_INT_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_int_content_client.py
     EXPLICIT_INT8_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_int8_content_client.py
@@ -82,12 +91,20 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     SIMPLE_IMAGE_CLIENT=${SDKDIR}/python/image_client
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=${SDKDIR}/python/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
+    SIMPLE_KEEPALIVE_CLIENT=${SDKDIR}/python/simple_grpc_keepalive_client
+    SIMPLE_CUSTOM_ARGS_CLIENT=${SDKDIR}/python/simple_grpc_custom_args_client
+    # [FIXME] point to proper client
+    CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
+    CLIENT_PLUGIN_MODELDIR=${CLIENTPLUGINMODELDIR:=`pwd`/client_plugin_models}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_grpc_aio_infer_client.py
+    SIMPLE_AIO_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_grpc_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_grpc_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_grpc_async_infer_client.py
@@ -101,6 +118,8 @@ else
     SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_cudashm_client.py
     SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_model_control.py
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
+    SIMPLE_KEEPALIVE_CLIENT_PY=../clients/simple_grpc_keepalive_client.py
+    SIMPLE_CUSTOM_ARGS_CLIENT_PY=../clients/simple_grpc_custom_args_client.py
     EXPLICIT_BYTE_CONTENT_CLIENT_PY=../clients/grpc_explicit_byte_content_client.py
     EXPLICIT_INT_CONTENT_CLIENT_PY=../clients/grpc_explicit_int_content_client.py
     EXPLICIT_INT8_CONTENT_CLIENT_PY=../clients/grpc_explicit_int8_content_client.py
@@ -119,7 +138,11 @@ else
     SIMPLE_IMAGE_CLIENT=../clients/image_client
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+    SIMPLE_KEEPALIVE_CLIENT=../clients/simple_grpc_keepalive_client
+    SIMPLE_CUSTOM_ARGS_CLIENT=../clients/simple_grpc_custom_args_client
+    CC_UNIT_TEST=../clients/cc_client_test
 fi
+PYTHON_UNIT_TEST=python_unit_test.py
 
 # Add string_dyna_sequence model to repo
 cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
@@ -155,6 +178,8 @@ fi
 
 IMAGE=../images/vulture.jpeg
 for i in \
+        $SIMPLE_AIO_INFER_CLIENT_PY \
+        $SIMPLE_AIO_STREAM_INFER_CLIENT_PY \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_STRING_INFER_CLIENT_PY \
@@ -165,6 +190,8 @@ for i in \
         $SIMPLE_SHM_STRING_CLIENT_PY \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
+        $SIMPLE_KEEPALIVE_CLIENT_PY \
+        $SIMPLE_CUSTOM_ARGS_CLIENT_PY \
         $EXPLICIT_BYTE_CONTENT_CLIENT_PY \
         $EXPLICIT_INT_CONTENT_CLIENT_PY \
         $EXPLICIT_INT8_CONTENT_CLIENT_PY \
@@ -237,6 +264,8 @@ for i in \
    $SIMPLE_CUDASHM_CLIENT \
    $SIMPLE_IMAGE_CLIENT \
    $SIMPLE_ENSEMBLE_IMAGE_CLIENT \
+   $SIMPLE_KEEPALIVE_CLIENT \
+   $SIMPLE_CUSTOM_ARGS_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
@@ -267,6 +296,29 @@ for i in \
     #             RET=1
     #         fi
     #     done
+    elif [ $BASE = ${SIMPLE_INFER_CLIENT} ]; then
+        # Test forcing new channel creation with simple infer client
+        NEW_CHANNEL_STRING = "creating client_channel for channel stack"
+        GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "true" >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+        GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "false" >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
+            echo -e "\n***\n*** Failed. Expected 2 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
     else
         $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
         if [ $? -ne 0 ]; then
@@ -284,6 +336,37 @@ if [ $? -ne 0 ]; then
 fi
 
 set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${CLIENT_PLUGIN_MODELDIR} --http-header-forward-pattern=.* --grpc-header-forward-pattern=.*"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin
+    RET=1
+fi
+set -e
+
+# Create a password file with username:password
+echo -n 'username:' > pswd
+echo "password" | openssl passwd -stdin -apr1 >> pswd
+nginx -c `pwd`/$NGINX_CONF
+
+python3 $BASIC_AUTH_TEST
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin.auth
+    RET=1
+fi
+service nginx stop
+
 kill $SERVER_PID
 wait $SERVER_PID
 
@@ -346,6 +429,10 @@ if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
+if [ $(cat ${SERVER_LOG} | grep "Invalid config override" | wc -l) -eq 0 ]; then
+    cat ${SERVER_LOG}
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
@@ -400,6 +487,182 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Run cpp client unit test
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r ${MODELDIR}/simple unit_test_models/.
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
+            --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"
+SERVER_LOG="./inference_server_cc_unit_test.log"
+CLIENT_LOG="./cc_unit_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+# Run all unit tests except load
+$CC_UNIT_TEST --gtest_filter=GRPC*:-*Load* >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run cpp client load API unit test
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+# Make only version 2, 3 is valid version directory while config requests 1, 3
+rm -rf unit_test_models/onnx_int32_int32_int32/1
+
+# Start with EXPLICIT mode and load onnx_float32_float32_float32
+SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
+             --model-control-mode=explicit \
+             --load-model=onnx_int32_int32_int32 \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_cc_unit_test.load.log"
+CLIENT_LOG="./cc_unit_test.load.log"
+
+for i in \
+   "LoadWithFileOverride" \
+   "LoadWithConfigOverride" \
+   ; do
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    $CC_UNIT_TEST --gtest_filter=GRPC*$i >> ${CLIENT_LOG}.$i 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.$i
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Run python grpc aio unit test
+PYTHON_GRPC_AIO_TEST=python_grpc_aio_test.py
+CLIENT_LOG=`pwd`/python_grpc_aio_test.log
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_GRPC_AIO_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC AsyncIO Test Failed\n***"
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test GRPC health check implemented
+go install github.com/grpc-ecosystem/grpc-health-probe@latest
+HEALTH_PROBE="${GOPATH}/bin/grpc-health-probe -addr=localhost:8001"
+
+CLIENT_LOG=`pwd`/grpc_health_probe_offline.log
+set +e
+$HEALTH_PROBE > $CLIENT_LOG 2>&1
+set -e
+if [ `grep -c "timeout: failed to connect service" ${CLIENT_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected health check timeout\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+CLIENT_LOG=`pwd`/grpc_health_probe_online.log
+set +e
+$HEALTH_PROBE > $CLIENT_LOG 2>&1
+set -e
+if [ `grep -c "status: SERVING" ${CLIENT_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected health check to return SERVING\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Repeated protocol, not allowed
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-repository,health:k1=v1 \
+             --grpc-restricted-protocol=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="protocol 'health' can not be specified in multiple config groups"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+# Unknown protocol, not allowed
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-reposit,health:k1=v1 \
+             --grpc-restricted-protocol=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="unknown restricted protocol 'model-reposit'"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+# Test restricted protocols
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-repository:admin-key=admin-value \
+             --grpc-restricted-protocol=inference,health:infer-key=infer-value"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_UNIT_TEST RestrictedProtocolTest > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC Restricted Protocol Test Failed\n***"
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
@@ -407,3 +670,4 @@ else
 fi
 
 exit $RET
+

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+TEST_CLIENT_AIO_PY=../clients/simple_grpc_aio_infer_client.py
 TEST_CLIENT_PY=../clients/simple_grpc_infer_client.py
 TEST_CLIENT=../clients/simple_grpc_infer_client
 
@@ -102,6 +103,11 @@ for CASE in server mutual both; do
         cat ${CLIENT_LOG}.${CASE}.ssl_infer
         RET=1
     fi
+    $TEST_CLIENT_AIO_PY -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.${CASE}.ssl_infer.aio 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.ssl_infer.aio
+        RET=1
+    fi
 
     $TEST_CLIENT -v --ssl --root-certificates ca.crt --private-key client.key --certificate-chain client.crt >> ${CLIENT_LOG}.${CASE}.c++.ssl_infer 2>&1
     if [ $? -ne 0 ]; then
@@ -140,6 +146,13 @@ for CASE in server mutual; do
     else
         RET=1
     fi
+    $TEST_CLIENT_AIO_PY -v >> ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer.aio 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.no_ssl_fail_infer.aio
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
+        RET=1
+    fi
 
     $TEST_CLIENT -v >> ${CLIENT_LOG}.${CASE}.c++.no_ssl_fail_infer 2>&1
     if [ $? -ne 0 ]; then
@@ -153,6 +166,13 @@ for CASE in server mutual; do
     $TEST_CLIENT_PY -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer 2>&1
     if [ $? -ne 0 ]; then
         cat ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer
+        echo -e "\n***\n*** Expected test failure\n***"
+    else
+        RET=1
+    fi
+    $TEST_CLIENT_AIO_PY -v --ssl --root-certificates ca.crt --private-key client2.key --certificate-chain client2.crt >> ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer.aio 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.${CASE}.wrong_ssl_fail_infer.aio
         echo -e "\n***\n*** Expected test failure\n***"
     else
         RET=1

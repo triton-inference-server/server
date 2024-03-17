@@ -27,7 +27,7 @@ output {
 }
 instance_group {
   name: "no_config_no_batch_0"
-  count: 1
+  count: 2
   kind: KIND_CPU
 }
 default_model_filename: "model.onnx"
@@ -40,3 +40,4 @@ optimization {
   }
 }
 backend: "onnxruntime"
+runtime: ""

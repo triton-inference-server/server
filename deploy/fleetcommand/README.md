@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,7 +62,7 @@ For this example you will place the model repository in an S3 Storage bucket
 $ aws s3 mb s3://triton-inference-server-repository
 ```
 
-Following the [QuickStart](../../docs/quickstart.md) download the example model
+Following the [QuickStart](../../docs/getting_started/quickstart.md) download the example model
 repository to your system and copy it into the AWS S3 bucket.
 
 ```
@@ -87,7 +87,7 @@ echo -n 'AWS_SESSION_TOKEN' | base64
 
 Deploy the Triton Inference Server to your Location in Fleet Command by creating
 a Deployment.  You can specify configuration parameters to override the default
-[values.yaml](values.yaml) in the Application Configuration section.  
+[values.yaml](values.yaml) in the Application Configuration section.
 
 *Note:* You _must_ provide a `--model-repository` parameter with a path to your
 prepared model repository in your S3 bucket.  Otherwise, the Triton will not
@@ -114,7 +114,7 @@ for more info.
 If you have `prometheus-operator` deployed, you can enable the ServiceMonitor
 for the Triton Inference Server by setting `serviceMonitor.enabled: true` in
 Application Configuration.  This will also deploy a Grafana dashboard for Triton
-as a ConfigMap.  
+as a ConfigMap.
 
 Otherwise, metrics can be scraped by pointing an external Prometheus
 instance at the `metricsNodePort` in the values.
@@ -136,7 +136,7 @@ location has the IP `34.83.9.133`:
 $ curl 34.83.9.133:30343/v2
 ```
 
-Follow the [QuickStart](../../docs/quickstart.md) to get the example image
+Follow the [QuickStart](../../docs/getting_started/quickstart.md) to get the example image
 classification client that can be used to perform inferencing using image
 classification models being served by the Triton. For example,
 

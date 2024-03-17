@@ -1,0 +1,1 @@
+configuration specified max_batch_size 6, but in auto-complete-config function for model 'conflicting_max_batch_size' specified max_batch_size 4

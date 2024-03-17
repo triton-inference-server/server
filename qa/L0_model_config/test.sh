@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -175,23 +175,190 @@ done
 # Copy PyTorch models into the test model repositories.
 for modelpath in \
         autofill_noplatform/pytorch/too_few_inputs/1 \
-        autofill_noplatform/pytorch/too_few_outputs/1 ; do
+        autofill_noplatform/pytorch/too_few_outputs/1 \
+        autofill_noplatform_success/pytorch/no_name_platform/1 \
+        autofill_noplatform_success/pytorch/cpu_instance/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1/model.pt \
        $modelpath/.
+done
+
+# Copy Python models into the test model repositories.
+for modelpath in \
+        autofill_noplatform/python/input_mismatch_datatype/1 \
+        autofill_noplatform/python/input_mismatch_dims/1 \
+        autofill_noplatform/python/output_mismatch_datatype/1 \
+        autofill_noplatform/python/output_mismatch_dims/1 \
+        autofill_noplatform_success/python/incomplete_output/1 \
+        autofill_noplatform_success/python/unknown_input/1 \
+        autofill_noplatform_success/python/unknown_output/1 \
+        autofill_noplatform_success/python/empty_config/1 ; do
+    mkdir -p $modelpath
+    cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
+done
+for modelpath in \
+        autofill_noplatform/python/conflicting_max_batch_size \
+        autofill_noplatform/python/input_missing_datatype \
+        autofill_noplatform/python/input_missing_dims \
+        autofill_noplatform/python/input_missing_name \
+        autofill_noplatform/python/output_missing_datatype \
+        autofill_noplatform/python/output_missing_dims \
+        autofill_noplatform/python/output_missing_name \
+        autofill_noplatform/python/no_return \
+        autofill_noplatform/python/conflicting_scheduler_sequence \
+        autofill_noplatform_success/python/dynamic_batching_no_op \
+        autofill_noplatform_success/python/dynamic_batching \
+        autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform_success/python/model_transaction_policy \
+        autofill_noplatform_success/python/model_transaction_policy_decoupled_false \
+        autofill_noplatform_success/python/model_transaction_policy_no_op \
+        autofill_noplatform_success/python/optional_input \
+        autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/model_transaction_policy_invalid_args \
+        autofill_noplatform/python/model_transaction_policy_mismatch \
+        autofill_noplatform/python/output_wrong_property ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
+for modelpath in \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/conflicting_scheduler_ensemble \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_first_step \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_second_step ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
+
+# Make version folders for custom test model repositories.
+for modelpath in \
+        autofill_noplatform/custom/no_delimiter/1 \
+        autofill_noplatform/custom/unknown_backend.unknown/1 \
+        autofill_noplatform_success/custom/empty_config.identity/1 \
+        autofill_noplatform_success/custom/no_backend.identity/1 ; do
+    mkdir -p $modelpath
+done
+
+# Make version folders as the instance group validation is deferred to
+# the beginning of model creation
+for modelpath in \
+        noautofill_platform/invalid_cpu/1 \
+        noautofill_platform/invalid_gpu/1 \
+        noautofill_platform/negative_gpu/1 ; do
+    mkdir -p $modelpath
 done
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
     special_cases/invalid_platform/1/
+# Note that graphdef models don't support auto-complete-config
+# and that is why we are using graphdef model in this test case.
+mkdir -p special_cases/noautofill_noconfig/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float32_float32_float32/1/model.graphdef \
+    special_cases/noautofill_noconfig/1/
+# Create runtime escape scenario
+mkdir -p special_cases/runtime_escape/1 special_cases/runtime_escape/dummy_runtime
+touch special_cases/runtime_escape/dummy_runtime/libtriton_identity.so
+# Setup invalid runtime model
+mkdir -p special_cases/invalid_runtime/1
+
+# Copy reshape model files into the test model repositories.
+mkdir -p autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
+cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/graphdef_zero_2_float32/1/model.graphdef \
+    autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
+
+mkdir -p autofill_noplatform_success/tensorflow_savedmodel/reshape_config_provided/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/savedmodel_zero_2_float32/1/model.savedmodel \
+    autofill_noplatform_success/tensorflow_savedmodel/reshape_config_provided/1
+
+mkdir -p autofill_noplatform_success/tensorrt/reshape_config_provided/1
+cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/plan_zero_4_float32/1/model.plan \
+    autofill_noplatform_success/tensorrt/reshape_config_provided/1
+
+# Copy identity model into onnx test directories
+mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
+    autofill_noplatform_success/onnx/cpu_instance/1
+
+# Copy openvino models into test directories
+for modelpath in \
+        autofill_noplatform/openvino/bad_input_dims \
+        autofill_noplatform/openvino/bad_output_dims \
+        autofill_noplatform/openvino/too_few_inputs \
+        autofill_noplatform/openvino/too_many_inputs \
+        autofill_noplatform/openvino/unknown_input \
+        autofill_noplatform/openvino/unknown_output \
+        autofill_noplatform_success/openvino/empty_config \
+        autofill_noplatform_success/openvino/no_config; do
+    cp -r /opt/tritonserver/qa/openvino_models/fixed_batch/1 $modelpath
+done
+cp -r /opt/tritonserver/qa/openvino_models/dynamic_batch/1 \
+    autofill_noplatform_success/openvino/dynamic_batch
+# Copy openvino model from qa_model_repository
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_int8/1 \
+    autofill_noplatform_success/openvino/partial_config
+cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_int8/output0_labels.txt \
+    autofill_noplatform_success/openvino/partial_config
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 
+# Run tests for logs which do not have a timestamp on them
+for TARGET in `ls cli_messages`; do
+    case $TARGET in
+        "cli_override")
+            EXTRA_ARGS="--disable-auto-complete-config --strict-model-config=false" ;;
+        "cli_deprecation")
+            EXTRA_ARGS="--strict-model-config=true" ;;
+        *)
+            EXTRA_ARGS="" ;;
+    esac
+
+    SERVER_ARGS="--model-repository=`pwd`/models  $EXTRA_ARGS"
+    SERVER_LOG=$SERVER_LOG_BASE.cli_messages_${TARGET}.log
+
+    rm -fr models && mkdir models
+    cp -r cli_messages/$TARGET models/.
+
+    EXPECTEDS=models/$TARGET/expected*
+
+    echo -e "Test on cli_messages/$TARGET" >> $CLIENT_LOG
+
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        EXFOUND=0
+        for EXPECTED in `ls $EXPECTEDS`; do
+            EX=`cat $EXPECTED`
+            echo "grepping for: $EX"
+            if grep "$EX" $SERVER_LOG; then
+                echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                EXFOUND=1
+                break
+            else
+                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+            fi
+        done
+        if [ "$EXFOUND" == "0" ]; then
+            echo -e "*** FAILED: cli_messages/$TARGET" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
+
 # Run special test cases
 for TARGET in `ls special_cases`; do
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+    case $TARGET in
+        "invalid_platform")
+            EXTRA_ARGS="--disable-auto-complete-config" ;;
+        *)
+            EXTRA_ARGS="" ;;
+    esac
+
+    SERVER_ARGS="--model-repository=`pwd`/models $EXTRA_ARGS"
     SERVER_LOG=$SERVER_LOG_BASE.special_case_${TARGET}.log
 
     rm -fr models && mkdir models
@@ -228,6 +395,34 @@ for TARGET in `ls special_cases`; do
         fi
     fi
 done
+
+# Run noautofill unittest
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=1"
+SERVER_LOG=$SERVER_LOG_BASE.special_case_noautofill_test.log
+
+rm -fr models && mkdir models
+cp -r special_cases/noautofill_noconfig models/.
+
+echo -e "Test on special_cases/noautofill_test" >> $CLIENT_LOG
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python noautofill_test.py >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python NoAutoFill Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform to
@@ -274,6 +469,57 @@ for TRIAL in $TRIALS; do
 
             if [ "$EXFOUND" == "0" ]; then
                 echo -e "*** FAILED: platform $TRIAL noautofill_platform/$TARGET" >> $CLIENT_LOG
+                RET=1
+            fi
+        fi
+    done
+done
+
+for TRIAL in $TRIALS; do
+    # Run all tests that require no autofill but that add the platform to
+    # the model config before running the test
+    for TARGET in `ls noautofill_platform`; do
+        SERVER_ARGS="--model-repository=`pwd`/models --disable-auto-complete-config"
+        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_disableflag_${TRIAL}_${TARGET}.log
+
+        rm -fr models && mkdir models
+        cp -r noautofill_platform/$TARGET models/.
+
+        CONFIG=models/$TARGET/config.pbtxt
+        EXPECTEDS=models/$TARGET/expected*
+
+        # If there is a config.pbtxt change/add platform to it
+        if [ -f $CONFIG ]; then
+            sed -i '/platform:/d' $CONFIG
+            echo "platform: \"$TRIAL\"" >> $CONFIG
+            cat $CONFIG
+        fi
+
+        echo -e "Test platform $TRIAL on noautofill_platform/$TARGET with disable-auto-complete-config flag" >> $CLIENT_LOG
+
+        # We expect all the tests to fail with one of the expected
+        # error messages
+        run_server
+        if [ "$SERVER_PID" != "0" ]; then
+            echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+            RET=1
+            kill $SERVER_PID
+            wait $SERVER_PID
+        else
+            EXFOUND=0
+            for EXPECTED in `ls $EXPECTEDS`; do
+                EX=`cat $EXPECTED`
+                if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+                    echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                    EXFOUND=1
+                    break
+                else
+                    echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+                fi
+            done
+
+            if [ "$EXFOUND" == "0" ]; then
+                echo -e "*** FAILED: platform $TRIAL noautofill_platform/$TARGET with disable-auto-complete-config flag" >> $CLIENT_LOG
                 RET=1
             fi
         fi

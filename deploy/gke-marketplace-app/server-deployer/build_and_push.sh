@@ -1,4 +1,5 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,9 +27,9 @@
 
 export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
 export APP_NAME=tritonserver
-export MAJOR_VERSION=2.18
-export MINOR_VERSION=2.18.0
-export NGC_VERSION=22.01-py3
+export MAJOR_VERSION=2.41
+export MINOR_VERSION=2.43.0
+export NGC_VERSION=24.02-py3
 
 docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
 

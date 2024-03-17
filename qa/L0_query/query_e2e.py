@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,26 +27,23 @@
 
 import sys
 
-sys.path.append('../common')
+sys.path.append("../common")
 
-import argparse
+import unittest
+
 import numpy as np
-import os
-from builtins import range
-import tritonclient.http as tritonhttpclient
+import test_util as tu
 import tritonclient.grpc as tritongrpcclient
+import tritonclient.http as tritonhttpclient
 from tritonclient.utils import InferenceServerException
 from tritonclient.utils import cuda_shared_memory as cudashm
-import unittest
-import test_util as tu
 
 
 class QueryTest(tu.TestResultCollector):
-
     def test_http(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         try:
@@ -59,33 +56,33 @@ class QueryTest(tu.TestResultCollector):
     def test_http_shared_memory(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         # Set up CUDA shared memory for outputs
         triton_client.unregister_system_shared_memory()
         triton_client.unregister_cuda_shared_memory()
-        shm_op0_handle = cudashm.create_shared_memory_region(
-            "output0_data", 4, 0)
-        shm_op1_handle = cudashm.create_shared_memory_region(
-            "output1_data", 4, 0)
+        shm_op0_handle = cudashm.create_shared_memory_region("output0_data", 4, 0)
+        shm_op1_handle = cudashm.create_shared_memory_region("output1_data", 4, 0)
         triton_client.register_cuda_shared_memory(
-            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 4)
+            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 4
+        )
         triton_client.register_cuda_shared_memory(
-            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 4)
+            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 4
+        )
         outputs = []
         outputs.append(
-            tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+            tritonhttpclient.InferRequestedOutput("OUTPUT0", binary_data=True)
+        )
         outputs[-1].set_shared_memory("output0_data", 4)
 
         outputs.append(
-            tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+            tritonhttpclient.InferRequestedOutput("OUTPUT1", binary_data=True)
+        )
         outputs[-1].set_shared_memory("output1_data", 4)
 
         try:
-            triton_client.infer(model_name="query",
-                                inputs=inputs,
-                                outputs=outputs)
+            triton_client.infer(model_name="query", inputs=inputs, outputs=outputs)
             self.assertTrue(False, "expect error with query information")
         except InferenceServerException as ex:
             self.assertTrue("OUTPUT0 GPU 0" in ex.message())
@@ -99,34 +96,34 @@ class QueryTest(tu.TestResultCollector):
     def test_http_out_of_shared_memory(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritonhttpclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         # Set up too small CUDA shared memory for outputs, expect query
         # returns default value
         triton_client.unregister_system_shared_memory()
         triton_client.unregister_cuda_shared_memory()
-        shm_op0_handle = cudashm.create_shared_memory_region(
-            "output0_data", 1, 0)
-        shm_op1_handle = cudashm.create_shared_memory_region(
-            "output1_data", 1, 0)
+        shm_op0_handle = cudashm.create_shared_memory_region("output0_data", 1, 0)
+        shm_op1_handle = cudashm.create_shared_memory_region("output1_data", 1, 0)
         triton_client.register_cuda_shared_memory(
-            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 1)
+            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 1
+        )
         triton_client.register_cuda_shared_memory(
-            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 1)
+            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 1
+        )
         outputs = []
         outputs.append(
-            tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+            tritonhttpclient.InferRequestedOutput("OUTPUT0", binary_data=True)
+        )
         outputs[-1].set_shared_memory("output0_data", 1)
 
         outputs.append(
-            tritonhttpclient.InferRequestedOutput('OUTPUT1', binary_data=True))
+            tritonhttpclient.InferRequestedOutput("OUTPUT1", binary_data=True)
+        )
         outputs[-1].set_shared_memory("output1_data", 1)
 
         try:
-            triton_client.infer(model_name="query",
-                                inputs=inputs,
-                                outputs=outputs)
+            triton_client.infer(model_name="query", inputs=inputs, outputs=outputs)
             self.assertTrue(False, "expect error with query information")
         except InferenceServerException as ex:
             self.assertTrue("OUTPUT0 CPU 0" in ex.message())
@@ -140,7 +137,7 @@ class QueryTest(tu.TestResultCollector):
     def test_grpc(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        inputs.append(tritongrpcclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritongrpcclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         try:
@@ -153,31 +150,29 @@ class QueryTest(tu.TestResultCollector):
     def test_grpc_shared_memory(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        inputs.append(tritongrpcclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritongrpcclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         # Set up CUDA shared memory for outputs
         triton_client.unregister_system_shared_memory()
         triton_client.unregister_cuda_shared_memory()
-        shm_op0_handle = cudashm.create_shared_memory_region(
-            "output0_data", 4, 0)
-        shm_op1_handle = cudashm.create_shared_memory_region(
-            "output1_data", 4, 0)
+        shm_op0_handle = cudashm.create_shared_memory_region("output0_data", 4, 0)
+        shm_op1_handle = cudashm.create_shared_memory_region("output1_data", 4, 0)
         triton_client.register_cuda_shared_memory(
-            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 4)
+            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 4
+        )
         triton_client.register_cuda_shared_memory(
-            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 4)
+            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 4
+        )
         outputs = []
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+        outputs.append(tritongrpcclient.InferRequestedOutput("OUTPUT0"))
         outputs[-1].set_shared_memory("output0_data", 4)
 
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+        outputs.append(tritongrpcclient.InferRequestedOutput("OUTPUT1"))
         outputs[-1].set_shared_memory("output1_data", 4)
 
         try:
-            triton_client.infer(model_name="query",
-                                inputs=inputs,
-                                outputs=outputs)
+            triton_client.infer(model_name="query", inputs=inputs, outputs=outputs)
             self.assertTrue(False, "expect error with query information")
         except InferenceServerException as ex:
             self.assertTrue("OUTPUT0 GPU 0" in ex.message())
@@ -191,32 +186,30 @@ class QueryTest(tu.TestResultCollector):
     def test_grpc_out_of_shared_memory(self):
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
         inputs = []
-        inputs.append(tritongrpcclient.InferInput('INPUT', [1], "UINT8"))
+        inputs.append(tritongrpcclient.InferInput("INPUT", [1], "UINT8"))
         inputs[0].set_data_from_numpy(np.arange(1, dtype=np.uint8))
 
         # Set up too small CUDA shared memory for outputs, expect query
         # returns default value
         triton_client.unregister_system_shared_memory()
         triton_client.unregister_cuda_shared_memory()
-        shm_op0_handle = cudashm.create_shared_memory_region(
-            "output0_data", 1, 0)
-        shm_op1_handle = cudashm.create_shared_memory_region(
-            "output1_data", 1, 0)
+        shm_op0_handle = cudashm.create_shared_memory_region("output0_data", 1, 0)
+        shm_op1_handle = cudashm.create_shared_memory_region("output1_data", 1, 0)
         triton_client.register_cuda_shared_memory(
-            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 1)
+            "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, 1
+        )
         triton_client.register_cuda_shared_memory(
-            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 1)
+            "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, 1
+        )
         outputs = []
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+        outputs.append(tritongrpcclient.InferRequestedOutput("OUTPUT0"))
         outputs[-1].set_shared_memory("output0_data", 1)
 
-        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
+        outputs.append(tritongrpcclient.InferRequestedOutput("OUTPUT1"))
         outputs[-1].set_shared_memory("output1_data", 1)
 
         try:
-            triton_client.infer(model_name="query",
-                                inputs=inputs,
-                                outputs=outputs)
+            triton_client.infer(model_name="query", inputs=inputs, outputs=outputs)
             self.assertTrue(False, "expect error with query information")
         except InferenceServerException as ex:
             self.assertTrue("OUTPUT0 CPU 0" in ex.message())
@@ -228,5 +221,5 @@ class QueryTest(tu.TestResultCollector):
         triton_client.unregister_cuda_shared_memory()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

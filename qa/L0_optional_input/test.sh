@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,13 +39,22 @@ source ../common/util.sh
 rm -fr *.log
 
 mkdir -p ./models/identity_2_float32/1
+mkdir -p ./models/ensemble_identity_2_float32/1
+mkdir -p ./models/pipeline_identity_2_float32/1
+mkdir -p ./models/optional_connecting_tensor/1
 
 # Basic test cases
 TEST_CASES=${TEST_CASES:="test_all_inputs \
                             test_optional_same_input \
                             test_optional_mix_inputs \
-                            test_optional_mix_inputs_2"}
-
+                            test_optional_mix_inputs_2 \
+                            test_ensemble_all_inputs \
+                            test_ensemble_optional_same_input \
+                            test_ensemble_optional_mix_inputs \
+                            test_ensemble_optional_mix_inputs_2 \
+                            test_ensemble_optional_pipeline \
+                            test_ensemble_optional_connecting_tensor"}
+RET=0
 for i in $TEST_CASES ; do
     # Restart server for every test to clear model stats
     run_server
@@ -54,8 +63,6 @@ for i in $TEST_CASES ; do
         cat $SERVER_LOG
         exit 1
     fi
-
-    RET=0
 
     echo "Test: $i" >>$TEST_LOG
 

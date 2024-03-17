@@ -25,21 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# First need to set up enviroment
+# First need to set up environment
 if [ ${USE_TENSORFLOW} == "1" ] && [ ${USE_PYTORCH} == "1" ] ; then
     echo " Unsupported test configuration. Only one of USE_TENSORFLOW and USE_PYTORCH can be set to 1."
     exit 0
 elif [ ${USE_TENSORFLOW} == "1" ] ; then
-    echo "Setting up enviroment with tensorflow 1"
+    echo "Setting up environment with tensorflow 1"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 1
 elif [ ${USE_PYTORCH} == "1" ] ; then
-    echo "Setting up enviroment with pytorch"
+    echo "Setting up environment with pytorch"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
-else 
+else
     echo " Unsupported test configuration. USE_TENSORFLOW flag is: ${USE_TENSORFLOW} and USE_PYTORCH flag is: ${USE_PYTORCH}. Only one of them can be set to 1."
     exit 0
 fi
-echo "done setting up enviroment"
+echo "done setting up environment"
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -80,32 +80,32 @@ function create_inferentia_models () {
     for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
         for BATCHED_FLAG in ${BATCHED_FLAGS}; do
             for TEST_TYPE in ${TEST_TYPES}; do
-                CURR_GEN_SCRIPT="${GEN_SCRIPT} --model_type ${MODEL_TYPE}  
-                --triton_model_dir ${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}/add-sub-1x4 
+                CURR_GEN_SCRIPT="${GEN_SCRIPT} --model_type ${MODEL_TYPE}
+                --triton_model_dir ${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}/add-sub-1x4
                 --compiled_model ${COMPILED_MODEL}"
                 if [ ${DISABLE_DEFAULT_BATCHING_FLAG} == "_no_batch" ]; then
-                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT} 
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
                     --disable_batch_requests_to_neuron"
                 fi
                 if [ ${BATCHED_FLAG} == "_batched_" ]; then
                     CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
-                    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 
-                    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4          
-                    --enable_dynamic_batching 
-                    --max_batch_size 1000 
-                    --preferred_batch_size 8 
+                    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4
+                    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4
+                    --enable_dynamic_batching
+                    --max_batch_size 1000
+                    --preferred_batch_size 8
                     --max_queue_delay_microseconds 100"
                 else
                     CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
-                    --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 
+                    --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4
                     --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4"
                 fi
                 if [ ${TEST_TYPE} == "single" ]; then
-                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}   
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
                     --neuron_core_range 0:0"
                 elif [ ${TEST_TYPE} == "multiple" ]; then
-                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT} 
-                    --triton_model_instance_count 3 
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
+                    --triton_model_instance_count 3
                     --neuron_core_range 0:7"
                 fi
                 echo ${CURR_GEN_SCRIPT}

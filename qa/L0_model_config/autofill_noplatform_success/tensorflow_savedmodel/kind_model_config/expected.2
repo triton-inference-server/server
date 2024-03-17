@@ -5,7 +5,7 @@ version_policy {
     num_versions: 1
   }
 }
-max_batch_size: 1
+max_batch_size: 4
 input {
   name: "INPUT1"
   data_type: TYPE_INT32
@@ -31,6 +31,9 @@ instance_group {
   count: 1
   kind: KIND_MODEL
 }
+dynamic_batching {
+  preferred_batch_size: 4
+}
 default_model_filename: "model.savedmodel"
 optimization {
   input_pinned_memory {
@@ -41,3 +44,4 @@ optimization {
   }
 }
 backend: "tensorflow"
+runtime: ""

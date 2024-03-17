@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,13 +59,23 @@ source ../common/util.sh
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each case approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION_HTTP_CPP=1300000
-    REPETITION_HTTP_PY=2100000
-    REPETITION_GRPC_CPP=10000000
-    REPETITION_GRPC_PY=1500000
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # ~ 12 hours
+        # GRPC cycles are reduced as there is high fluctuation in time spent
+        REPETITION_HTTP_CPP=2220000
+        REPETITION_HTTP_PY=3600000
+        REPETITION_GRPC_CPP=8000000
+        REPETITION_GRPC_PY=1500000
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each case approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION_HTTP_CPP=1300000
+        REPETITION_HTTP_PY=2100000
+        REPETITION_GRPC_CPP=6600000
+        REPETITION_GRPC_PY=1000000
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION_CPP=100000
     REPETITION_PY=10000
@@ -106,6 +116,13 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
+            # NOTE: This test has risk of exhausting all available sockets in
+            # the ephemeral port range. Re-using the same client connection
+            # ("-R") can easily solve this problem. However, to cleanly separate
+            # the resources used by different client objects, we create new
+            # connections for each request and retry/sleep on failure to give
+            # the system time to reclaim sockets after TIME_WAIT.
+            # TIP: You can use the "ss -s" command to observe the socket usage.
             EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
@@ -113,18 +130,21 @@ for PROTOCOL in http grpc; do
             EXTRA_ARGS="-r ${REPETITION_PY} -i ${PROTOCOL}"
         fi
 
+        set +e
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
+        TEST_RETCODE=$?
         TEST_DURATION=$SECONDS
-        if [ $? -ne 0 ]; then
+        set -e
+        if [ ${TEST_RETCODE} -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
         else
             python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Memory leak detected\n***"
-            RET=1
+                echo -e "\n***\n*** Memory leak detected\n***"
+                RET=1
             fi
 
             set +e
@@ -159,8 +179,8 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py $EMAIL_SUBJECT
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+    python client_memory_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,14 +25,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="1"
+CLIENT_LOG="./model_control_client.log"
 TEST_RESULT_FILE='test_results.txt'
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./inference_server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/model_control/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_LOG="./model_control_server.log"
 
 RET=0
 rm -fr *.log ./models
@@ -53,23 +49,15 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 model_control_test.py 2>&1 > $CLIENT_LOG
+python3 -m pytest --junitxml=model_control.report.xml model_control_test.py 2>&1 > $CLIENT_LOG
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** model_control_test.py FAILED. \n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
@@ -77,3 +65,5 @@ if [ $RET -eq 1 ]; then
 else
     echo -e "\n***\n*** model_control_test PASSED. \n***"
 fi
+
+exit $RET

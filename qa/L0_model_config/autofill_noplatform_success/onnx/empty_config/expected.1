@@ -5,7 +5,7 @@ version_policy {
     num_versions: 1
   }
 }
-max_batch_size: 1
+max_batch_size: 4
 input {
   name: "INPUT0"
   data_type: TYPE_INT32
@@ -32,6 +32,9 @@ instance_group {
   gpus: 0
   kind: KIND_GPU
 }
+dynamic_batching {
+  preferred_batch_size: 4
+}
 default_model_filename: "model.onnx"
 optimization {
   input_pinned_memory {
@@ -42,3 +45,4 @@ optimization {
   }
 }
 backend: "onnxruntime"
+runtime: ""

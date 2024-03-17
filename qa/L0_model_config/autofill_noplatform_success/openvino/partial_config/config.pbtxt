@@ -1,0 +1,14 @@
+max_batch_size: 8
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+    label_filename: "output0_labels.txt"
+   },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  }
+]

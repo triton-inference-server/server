@@ -1,0 +1,42 @@
+name: "cpu_instance"
+platform: "pytorch_libtorch"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 8
+input {
+  name: "INPUT__0"
+  data_type: TYPE_INT32
+  dims: 16
+}
+input {
+  name: "INPUT__1"
+  data_type: TYPE_INT32
+  dims: 16
+}
+output {
+  name: "OUTPUT__0"
+  data_type: TYPE_INT32
+  dims: 16
+}
+output {
+  name: "OUTPUT__1"
+  data_type: TYPE_INT32
+  dims: 16
+}
+instance_group {
+  name: "cpu_instance"
+  kind: KIND_CPU
+}
+default_model_filename: "model.pt"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "pytorch"

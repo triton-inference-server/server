@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,8 @@ represented in a binary format in the body of an HTTP/REST
 request. Because this extension is supported, Triton reports
 “binary_tensor_data” in the extensions field of its Server Metadata.
 
+## Binary Tensor Request
+
 Tensor data represented as binary data is organized in little-endian
 byte order, row major, without stride or padding between elements. All
 tensor data types are representable as binary data in the native size
@@ -45,13 +47,13 @@ delivered in the HTTP body after the JSON object (see Examples).
 
 The binary tensor data extension uses parameters to indicate that an
 input or output tensor is communicated as binary data. The first
-parameter is used in $request_input and $response_output to indicate
+parameter is used in `$request_input` and `$response_output` to indicate
 that the input or output tensor is communicated as binary data:
 
 - "binary_data_size" : int64 parameter indicating the size of the
   tensor binary data, in bytes.
 
-The second parameter is used in $request_output to indicate that the
+The second parameter is used in `$request_output` to indicate that the
 output should be returned from Triton as binary data.
 
 - "binary_data" : bool parameter that is true if the output should be
@@ -76,7 +78,7 @@ the Inference-Header-Content-Length header must be provided to give
 the length of the JSON object, and Content-Length continues to give
 the full body length (as HTTP requires).
 
-## Examples
+### Examples
 
 For the following request the input tensors are sent as binary data
 and the output tensor must be returned as binary data as that is what
@@ -143,4 +145,72 @@ Content-Length: <yy+24>
   ]
 }
 <24 bytes of data for output0 tensor>
+```
+
+## Raw Binary Request
+
+For models whose tensor metadata can be deduced from the byte size of the binary
+data. User may send the binary tensor request without specifying inference
+header. In other words, the request body only contains the binary data of the
+tensor. Below is the constraints for the qualified models:
+
+1. Only has 1 input
+2. If the input data type is non-BYTE, the number of variable size dimensions is
+at most 1. If the data type is BYTE, the shape must be [1]. The supported data
+types can be found [here](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#tensor-data-types)
+
+To send a raw binary request, the Inference-Header-Content-Length header must be
+provided with value 0 to indicate that the request body doesn't include the
+inference header.
+
+Note: if the model supports batching, the request will be treated as batch-1
+request because the inference header is omitted. Additionally, all the model
+output will be requested to be returned in binary tensor form as described in
+the previous section.
+
+### Examples
+
+The following is the example of sending raw binary request. Note that the total
+size of the binary data is 16 bytes and that size must be reflected in
+the content length headers.
+
+```
+POST /v2/models/mymodel/infer HTTP/1.1
+Host: localhost:8000
+Content-Type: application/octet-stream
+Inference-Header-Content-Length: 0
+Content-Length: 16
+<16 bytes of data for input tensor>
+```
+
+Assuming the model returns two outputs which both has shape [ 3, 1 ] and data
+type FP32, then the following response would be returned.
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/octet-stream
+Inference-Header-Content-Length: <yy>
+Content-Length: <yy+24>
+{
+  "outputs" : [
+    {
+      "name" : "output0",
+      "shape" : [ 3, 1 ],
+      "datatype"  : "FP32",
+      "parameters" : {
+        "binary_data_size" : 12
+      }
+    },
+    {
+      "name" : "output1",
+      "shape" : [ 3, 1 ],
+      "datatype"  : "FP32",
+      "parameters" : {
+        "binary_data_size" : 12
+      }
+    }
+  ]
+}
+<12 bytes of data for output0 tensor>
+<12 bytes of data for output1 tensor>
 ```

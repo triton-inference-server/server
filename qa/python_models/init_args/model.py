@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,19 +24,45 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
+import sys
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-class TritonPythonModel:
+def check_init_args(args):
+    expected_args = {
+        "model_name": "init_args",
+        "model_instance_name": "init_args_0_0",
+        "model_instance_kind": "CPU",
+        "model_instance_device_id": "0",
+        "model_version": "1",
+    }
+    is_win = sys.platform == "win32"
+    triton_dir = os.getenv(
+        "TRITON_DIR", "c:\\tritonserver" if is_win else "/opt/tritonserver"
+    )
+    repo_path = triton_dir + "/qa/L0_backend_python/models/init_args"
+    expected_args["model_repository"] = (
+        repo_path.replace("/", "\\") if is_win else repo_path
+    )
 
+    for arg in expected_args:
+        if args[arg] != expected_args[arg]:
+            raise pb_utils.TritonModelException(
+                arg
+                + ' does not contain correct value. Expected "'
+                + expected_args[arg]
+                + ", got "
+                + args[arg]
+            )
+
+
+class TritonPythonModel:
     def initialize(self, args):
         self.args = args
-        if args['model_name'] != 'init_args' or args[
-                'model_instance_name'] != 'init_args_0':
-            raise pb_utils.TritonModelException(
-                'model_instance_name/model_name does not contain correct value.'
-            )
+        check_init_args(self.args)
 
     def execute(self, requests):
         """
@@ -45,9 +71,13 @@ class TritonPythonModel:
         correct.
         """
         keys = [
-            'model_config', 'model_instance_kind', 'model_instance_name',
-            'model_instance_device_id', 'model_repository', 'model_version',
-            'model_name'
+            "model_config",
+            "model_instance_kind",
+            "model_instance_name",
+            "model_instance_device_id",
+            "model_repository",
+            "model_version",
+            "model_name",
         ]
 
         correct_keys = 0
@@ -58,6 +88,7 @@ class TritonPythonModel:
         responses = []
         for _ in requests:
             out_args = pb_utils.Tensor(
-                "OUT", np.array([correct_keys], dtype=np.float32))
+                "OUT", np.array([correct_keys], dtype=np.float32)
+            )
             responses.append(pb_utils.InferenceResponse([out_args]))
         return responses

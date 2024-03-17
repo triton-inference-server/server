@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,13 +36,67 @@ plus several extensions that are defined in the following documents:
 
 - [Binary tensor data extension](./extension_binary_data.md)
 - [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
 - [Schedule policy extension](./extension_schedule_policy.md)
 - [Sequence extension](./extension_sequence.md)
 - [Shared-memory extension](./extension_shared_memory.md)
+- [Model configuration extension](./extension_model_configuration.md)
+- [Model repository extension](./extension_model_repository.md)
 - [Statistics extension](./extension_statistics.md)
+- [Trace extension](./extension_trace.md)
+- [Logging extension](./extension_logging.md)
+- [Parameters extension](./extension_parameters.md)
 
-For the GRPC protocol the [protobuf
+Note that some extensions introduce new fields onto the inference protocols,
+and the other extensions define new protocols that Triton follows, please refer
+to the extension documents for detail.
+
+For the GRPC protocol, the [protobuf
 specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-is also available.
+is also available. In addition, you can find the GRPC health checking protocol protobuf
+specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+
+## Restricted Protocols
+
+You can configure the Triton endpoints, which implement the protocols, to
+restrict access to some protocols and to control network settings, please refer
+to [protocol customization guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.
+
+## IPv6
+
+Assuming your host or [docker config](https://docs.docker.com/config/daemon/ipv6/)
+supports IPv6 connections, `tritonserver` can be configured to use IPv6
+HTTP endpoints as follows:
+```
+$ tritonserver ... --http-address ipv6:[::1]&
+...
+I0215 21:04:11.572305 571 grpc_server.cc:4868] Started GRPCInferenceService at 0.0.0.0:8001
+I0215 21:04:11.572528 571 http_server.cc:3477] Started HTTPService at ipv6:[::1]:8000
+I0215 21:04:11.614167 571 http_server.cc:184] Started Metrics Service at ipv6:[::1]:8002
+```
+
+This can be confirmed via `netstat`, for example:
+```
+$ netstat -tulpn | grep tritonserver
+tcp6      0      0 :::8000      :::*      LISTEN      571/tritonserver
+tcp6      0      0 :::8001      :::*      LISTEN      571/tritonserver
+tcp6      0      0 :::8002      :::*      LISTEN      571/tritonserver
+```
+
+And can be tested via `curl`, for example:
+```
+$ curl -6 --verbose "http://[::1]:8000/v2/health/ready"
+*   Trying ::1:8000...
+* TCP_NODELAY set
+* Connected to ::1 (::1) port 8000 (#0)
+> GET /v2/health/ready HTTP/1.1
+> Host: [::1]:8000
+> User-Agent: curl/7.68.0
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Content-Length: 0
+< Content-Type: text/plain
+<
+* Connection #0 to host ::1 left intact
+```

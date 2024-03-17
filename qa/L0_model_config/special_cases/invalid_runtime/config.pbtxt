@@ -1,0 +1,23 @@
+name: "invalid_runtime"
+max_batch_size: 2
+backend: "identity"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]
+runtime: "__invalid_runtime__"

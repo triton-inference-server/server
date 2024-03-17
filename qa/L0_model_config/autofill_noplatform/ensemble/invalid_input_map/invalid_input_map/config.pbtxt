@@ -71,7 +71,7 @@ ensemble_scheduling {
         value: "temp_tensor_3"
       }
       input_map {
-        key: "INTPUT3"
+        key: "INPUT3"
         value: "temp_tensor_4"
       }
       input_map {

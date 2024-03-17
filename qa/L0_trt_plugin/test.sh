@@ -43,18 +43,44 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
-EXPECTED_NUM_TESTS="2"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    MODELDIR=${MODELDIR:=C:/models}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/clipplugin.dll}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+else
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    MODELDIR=${MODELDIR:=`pwd`/models}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/libclipplugin.so}
+    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    BACKEND_DIR=${TRITON_DIR}/backends
+    SERVER=${TRITON_DIR}/bin/tritonserver
+fi
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $SERVER_LOG $CLIENT_LOG
-
 RET=0
+rm -f ./*.log
+
+SERVER_ARGS_BASE="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_TIMEOUT=20
+
+LOG_IDX=0
+
+## Default Plugin Tests
+
+## Create model folder with default plugin models
+rm -fr models && mkdir -p models
+set -e
+find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -rv {} models \;
+
+SERVER_ARGS=$SERVER_ARGS_BASE
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -63,14 +89,29 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST >$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+rm -f $CLIENT_LOG
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -79,13 +120,134 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
+
+## Custom Plugin Tests
+
+## Create model folder with custom plugin models for remaining tests
+rm -fr models && mkdir -p models
+find $DATADIR/qa_trt_plugin_model_repository/ -maxdepth 1 -iname '*clipplugin*' -exec cp -r {} models \;
+
+LOG_IDX=$((LOG_IDX+1))
+
+## Baseline Failure Test
+## Plugin library not loaded
+SERVER_ARGS=$SERVER_ARGS_BASE
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n"
+    echo -e "Unexpected successful server start $SERVER\n***"
+    kill_server
+    exit 1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+
+## Backend Config, Single Plugin Test
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill_server
+
+LOG_IDX=$((LOG_IDX+1))
+
+## Backend Config, Multiple Plugins Test
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill_server
+
+LOG_IDX=$((LOG_IDX+1))
+
+## LD_PRELOAD, Single Plugin Test
+## LD_PRELOAD is only on Linux
+
+SERVER_LD_PRELOAD=$CUSTOMPLUGIN
+SERVER_ARGS=$SERVER_ARGS_BASE
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    rm -f $CLIENT_LOG
+    set +e
+    python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill_server
+fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

@@ -61,8 +61,11 @@ for MODEL in \
        models/${MODEL}_test && \
     rm -fr models/${MODEL}_test/2 && \
     rm -fr models/${MODEL}_test/3 && \
+    # Set instance count > 1 to test parallel instance loading across all EPs
+    INSTANCE_COUNT=5
     (cd models/${MODEL}_test && \
-            sed -i 's/_float32_float32_float32/&_test/' config.pbtxt) && \
+            sed -i 's/_float32_float32_float32/&_test/' config.pbtxt && \
+            echo -e "\ninstance_group { count: ${INSTANCE_COUNT} }" >> config.pbtxt) && \
     # CUDA EP optimization params
     cp -r models/${MODEL}_test models/${MODEL}_cuda_config && \
     (cd models/${MODEL}_cuda_config && \
@@ -76,7 +79,10 @@ for MODEL in \
     (cd models/${MODEL}_cpu_config && \
             sed -i 's/_float32_test/_float32_cpu_config/' \
                 config.pbtxt && \
-            echo "parameters: { key: \"intra_op_thread_count\" value: { string_value: \"1\" }} " \ >> config.pbtxt) && \
+            echo "parameters: { key: \"intra_op_thread_count\" value: { string_value: \"1\" }} \
+            parameters: { key: \"enable_mem_arena\" value: { string_value: \"1\" }}
+            parameters: { key: \"enable_mem_pattern\" value: { string_value: \"1\" }}
+            parameters: { key: \"memory.enable_memory_arena_shrinkage\" value: { string_value: \"cpu:0\" }} " \ >> config.pbtxt) && \
     # GPU execution accelerators with default setting
     cp -r models/${MODEL}_test models/${MODEL}_trt && \
     (cd models/${MODEL}_trt && \
@@ -90,6 +96,11 @@ for MODEL in \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
+            parameters { key: \"trt_max_partition_iterations\" value: \"1000\" } \
+            parameters { key: \"trt_dump_subgraphs\" value: \"1\" } \
+            parameters { key: \"trt_timing_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_build_heuristics_enable\" value: \"1\" } \
+            parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" } }]}}" \
             >> config.pbtxt) && \
     # GPU execution accelerators with cache enabled
@@ -99,6 +110,11 @@ for MODEL in \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"trt_engine_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_max_partition_iterations\" value: \"1000\" } \
+            parameters { key: \"trt_dump_subgraphs\" value: \"1\" } \
+            parameters { key: \"trt_timing_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_build_heuristics_enable\" value: \"1\" } \
+            parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } }]}}" \
             >> config.pbtxt) && \
     # GPU execution accelerators with unknown parameters
@@ -183,6 +199,24 @@ for MODEL in \
         RET=1
     fi
 
+    # arena configs
+    grep "Configuring enable_mem_arena to 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring enable_mem_arena to 1\n***"
+        RET=1
+    fi
+
+    grep "Configuring enable_mem_pattern to 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring enable_mem_pattern to 1\n***"
+        RET=1
+    fi
+
+    grep "Configuring memory.enable_memory_arena_shrinkage to cpu:0" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring memory.enable_memory_arena_shrinkage to cpu:0\n***"
+        RET=1
+    fi
 
     set -e
 

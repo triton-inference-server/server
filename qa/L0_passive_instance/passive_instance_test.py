@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,24 +27,25 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 import unittest
-import numpy as np
+
 import infer_util as iu
+import numpy as np
 import test_util as tu
-import tritonclient.http as httpclient
 
 
 class PassiveInstanceTest(tu.TestResultCollector):
-
     def test_inference(self):
         try:
-            iu.infer_exact(self, "distributed", (1, 16), 1, np.int32, np.int32,
-                           np.int32)
+            iu.infer_exact(
+                self, "distributed", (1, 16), 1, np.int32, np.int32, np.int32
+            )
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

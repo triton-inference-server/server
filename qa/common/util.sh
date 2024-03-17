@@ -1,4 +1,5 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+SERVER_IPADDR=${TRITONSERVER_IPADDR:=localhost}
 SERVER_LOG=${SERVER_LOG:=./server.log}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 SERVER_LD_PRELOAD=${SERVER_LD_PRELOAD:=""}
@@ -65,7 +67,7 @@ function wait_for_server_ready() {
 
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
-        if ! kill -0 $spid; then
+        if ! kill -0 $spid > /dev/null 2>&1; then
             echo "=== Server not running."
             WAIT_RET=1
             return
@@ -74,7 +76,7 @@ function wait_for_server_ready() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/ready`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/ready`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -106,7 +108,7 @@ function wait_for_server_live() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/live`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/live`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -131,8 +133,8 @@ function wait_for_model_stable() {
         sleep 1;
 
         set +e
-        total_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "state" | wc -l`
-        stable_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
+        total_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "state" | wc -l`
+        stable_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
         count=$((total_count - stable_count))
         set -e
         if [ "$count" == "0" ]; then
@@ -143,6 +145,33 @@ function wait_for_model_stable() {
     done
 
     echo "=== Timeout $wait_time_secs secs. Not all models stable."
+}
+
+function gdb_helper () {
+  if ! command -v gdb > /dev/null 2>&1; then
+    echo "=== WARNING: gdb not installed"
+    return
+  fi
+
+  ### Server Hang ###
+  if kill -0 ${SERVER_PID} > /dev/null 2>&1; then
+    # If server process is still alive, try to get backtrace and core dump from it
+    GDB_LOG="gdb_bt.${SERVER_PID}.log"
+    echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    # Dump backtrace log for quick analysis. Allow these commands to fail.
+    gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}" || true
+
+    # Generate core dump for deeper analysis. Default filename is "core.${PID}"
+    gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
+  fi
+
+  ### Server Segfaulted ###
+  # If there are any core dumps locally from a segfault, load them and get a backtrace
+  for corefile in $(ls core.* > /dev/null 2>&1); do
+    GDB_LOG="${corefile}.log"
+    echo -e "=== WARNING: SEGFAULT DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true;
+  done
 }
 
 # Run inference server. Return once server's health endpoint shows
@@ -167,12 +196,16 @@ function run_server () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
-        kill $SERVER_PID || true
+        # Get further debug information about server startup failure
+        gdb_helper || true
+
+        # Cleanup
+        kill $SERVER_PID > /dev/null 2>&1 || true
         SERVER_PID=0
     fi
 }
@@ -199,7 +232,7 @@ function run_server_tolive () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
@@ -224,7 +257,7 @@ function run_server_nowait () {
         return
     fi
 
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # LD_PRELOAD not yet supported on windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
@@ -243,7 +276,7 @@ function run_server_nowait () {
             echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
         fi
 
-        LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
         SERVER_PID=$!
     fi
 }
@@ -275,7 +308,7 @@ function run_server_leakcheck () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    TRITONSERVER_DISABLE_BACKEND_UNLOAD=1 LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -296,16 +329,16 @@ function kill_server () {
     # causes the entire WSL shell to just exit. So instead we must use
     # taskkill.exe which can only forcefully kill tritonserver which
     # means that it does not gracefully exit.
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # Disable -x as it makes output below hard to read
         oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
         set +x
         set +e
-        
+
         tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq tritonserver.exe' /FO CSV)
         echo "=== Windows tritonserver tasks"
         echo "$tasklist"
-        
+
         taskcount=$(echo "$tasklist" | grep -c tritonserver)
         if (( $taskcount > 0 )); then
             echo "$tasklist" | while IFS=, read -r taskname taskpid taskrest; do
@@ -318,7 +351,7 @@ function kill_server () {
                 fi
             done
         fi
-        
+
         set +vx; eval "$oldstate"
     else
         # Non-windows...
@@ -326,7 +359,7 @@ function kill_server () {
         wait $SERVER_PID
     fi
 }
-          
+
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.
@@ -390,4 +423,106 @@ function check_test_results () {
     fi
 
     return 0
+}
+
+# Run multiple inference servers and return immediately. Sets pid for each server
+# correspondingly, or 0 if error.
+function run_multiple_servers_nowait () {
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    local server_count=$1
+    server_pid=()
+    local server_args=()
+    local server_log=()
+    for (( i=0; i<$server_count; i++ )); do
+        let SERVER${i}_PID=0 || true
+        server_pid+=(SERVER${i}_PID)
+        server_args+=(SERVER${i}_ARGS)
+        server_log+=(SERVER${i}_LOG)
+    done
+
+    for (( i=0; i<$server_count; i++ )); do
+        if [ -z "$SERVER_LD_PRELOAD" ]; then
+            echo "=== Running $SERVER ${!server_args[$i]}"
+        else
+            echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]}"
+        fi
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER ${!server_args[$i]} > ${!server_log[$i]} 2>&1 &
+        let SERVER${i}_PID=$!
+    done
+}
+
+# Kill all inference servers.
+function kill_servers () {
+    for (( i=0; i<${#server_pid[@]}; i++ )); do
+        kill ${!server_pid[$i]}
+        wait ${!server_pid[$i]}
+    done
+}
+
+# Upload a local directory to a GCS path
+function gcs_upload () {
+    local local_path=$1
+    local gcs_path=$2
+    gsutil cp -r $local_path $gcs_path
+}
+
+# Sort an array
+# Call with sort_array <array_name>
+# Example: sort_array array
+sort_array() {
+    local -n arr=$1
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    IFS=$'\n' sorted_arr=($(sort -n <<<"${arr[*]}"))
+    unset IFS
+    arr=("${sorted_arr[@]}")
+}
+
+# Remove an array's outliers
+# Call with remove_array_outliers <array_name> <percent to trim from both sides>
+# Example: remove_array_outliers array 5
+remove_array_outliers() {
+    local -n arr=$1
+    local percent=$2
+    local length=${#arr[@]}
+
+    if [ "$length" -le 1 ]; then
+        return
+    fi
+
+    local trim_count=$((length * percent / 100))
+    local start_index=$trim_count
+    local end_index=$((length - (trim_count*2)))
+
+    arr=("${arr[@]:$start_index:$end_index}")
+}
+
+function setup_virtualenv() {
+    # Create and activate virtual environment
+    virtualenv --system-site-packages venv
+    source venv/bin/activate
+    pip install pytest
+
+    if [[ ${TEST_WINDOWS} == 1 ]]; then
+        pip3 install numpy tritonclient[all]
+    fi
+}
+
+function deactivate_virtualenv() {
+    # Deactivate virtual environment and clean up
+    deactivate
+    rm -fr venv
 }

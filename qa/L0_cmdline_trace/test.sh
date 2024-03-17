@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
-SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
+# ============================= Helpers =======================================
+function assert_server_startup_failed() {
+  if [ "$SERVER_PID" != "0" ]; then
+      echo -e "\n***\n***Fail: Server start should have failed $SERVER\n***"
+      cat $SERVER_LOG
+      set -e
+      kill $SERVER_PID
+      wait $SERVER_PID
+      set +e
+      exit 1
+  fi
+}
+
 TRACE_SUMMARY=../common/trace_summary.py
+CLIENT_SCRIPT=trace_client.py
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -79,12 +91,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -117,12 +129,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -165,12 +177,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -212,12 +224,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -260,12 +272,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -294,6 +306,68 @@ fi
 
 set -e
 
+# trace-rate == 6, trace-level=TIMESTAMPS, trace-log-frequency == 2
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_frequency.log \
+             --trace-level=TIMESTAMPS --trace-rate=6 \
+             --trace-log-frequency=2 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_frequency.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_frequency.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_frequency.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+# Two trace files
+$TRACE_SUMMARY -t trace_frequency.log.0 > summary_frequency.log.0
+if [ `grep -c "COMPUTE_INPUT_END" summary_frequency.log.0` != "2" ]; then
+    cat summary_frequency.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_frequency.log.0` != "2" ]; then
+    cat summary_frequency.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$TRACE_SUMMARY -t trace_frequency.log.1 > summary_frequency.log.1
+if [ `grep -c "COMPUTE_INPUT_END" summary_frequency.log.1` != "1" ]; then
+    cat summary_frequency.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_frequency.log.1` != "1" ]; then
+    cat summary_frequency.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
 # trace-rate == 9, trace-level=TIMESTAMPS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_9.log \
              --trace-level=TIMESTAMPS --trace-rate=9 --model-repository=$MODELSDIR"
@@ -308,12 +382,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -377,7 +451,7 @@ fi
 
 set +e
 
-$SIMPLE_HTTP_CLIENT >> client_ensemble.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -397,18 +471,17 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
     echo -e "Ensemble trace log expects 7 compute"
     RET=1
 fi
-# For GRPC frontend, its handlers will occupy one trace ID on creation
-GRPC_ID_OFFSET=3
+
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1,\"request_id\":\"1\"}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble.log` != "1" ]; then
         echo -e "Ensemble trace log expects trace: ${trace_str}"
         RET=1
@@ -424,12 +497,6 @@ fi
 set -e
 
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-
 # trace-rate == 1, trace-level=TIMESTAMPS, trace-level=TENSORS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble_tensor.log \
              --trace-level=TIMESTAMPS --trace-level=TENSORS --trace-rate=1 --model-repository=$MODELSDIR"
@@ -443,7 +510,7 @@ fi
 
 set +e
 
-$SIMPLE_HTTP_CLIENT >> client_ensemble_tensor.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble_tensor.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -464,15 +531,15 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble_tensor.log` != "7" ]; then
     RET=1
 fi
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1,\"request_id\":\"1\"}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
         echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
         RET=1
@@ -496,10 +563,10 @@ if [ `grep -o TENSOR_BACKEND_OUTPUT trace_ensemble_tensor.log | wc -l` != "14" ]
 fi
 
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT0\",\"data\":\"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT1\",\"data\":\"1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT0\",\"data\":\"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT1\",\"data\":\"-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" ; do
+        "{\"id\":1,\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT0\",\"data\":\"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT1\",\"data\":\"1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT0\",\"data\":\"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT1\",\"data\":\"-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" ; do
     if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
         echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
         RET=1
@@ -515,5 +582,141 @@ else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
+
+# check deprecation warnings
+SERVER_ARGS=" --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS \
+              --trace-log-frequency=50 --trace-count=100 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+if [ `grep -c "Warning: '--trace-file' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-rate' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-level' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-log-frequency' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-count' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+################################################################################
+# The following set of tests checks that tritonserver gracefully handles       #
+# bad OpenTelemetry BatchSpanProcessor parameters, provided through            #
+# environment variables, or tritonserver's options.                            #
+################################################################################
+export OTEL_BSP_MAX_QUEUE_SIZE="bad_value"
+
+SERVER_ARGS="--trace-config mode=opentelemetry --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_MAX_QUEUE_SIZE\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_MAX_QUEUE_SIZE
+
+export OTEL_BSP_SCHEDULE_DELAY="bad_value"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_SCHEDULE_DELAY\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_SCHEDULE_DELAY
+
+export OTEL_BSP_MAX_EXPORT_BATCH_SIZE="bad_value"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_MAX_EXPORT_BATCH_SIZE\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_MAX_EXPORT_BATCH_SIZE
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_max_queue_size=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_max_queue_size\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_schedule_delay=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_schedule_delay\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_max_export_batch_size=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_max_export_batch_size\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
 
 exit $RET

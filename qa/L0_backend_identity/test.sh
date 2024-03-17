@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,6 +53,10 @@ cp -r ./models/identity_fp32 ./all_models/identity_uint32
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 3000000 }" >> config.pbtxt)
+cp -r ./models/identity_fp32 ./all_models/identity_bf16
+(cd all_models/identity_bf16 && \
+          sed -i "s/^name:.*/name: \"identity_bf16\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_BF16/g" config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -67,6 +71,7 @@ for PROTOCOL in http grpc; do
     set +e
     python $CLIENT_PY -i $PROTOCOL -v >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo "Failed: Client test had a non-zero return code."
         RET=1
     fi
     set -e
@@ -77,7 +82,7 @@ wait $SERVER_PID
 
 # Validate the byte_sizes reported by backend
 OLDIFS=$IFS; IFS=','
-for i in "byte_size = 0, 6", \
+for i in "byte_size = 0, 8", \
          "byte_size = 7, 2", \
          "byte_size = 16, 6", \
          "byte_size = 20, 2", \

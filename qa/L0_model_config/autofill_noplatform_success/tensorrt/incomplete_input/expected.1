@@ -32,6 +32,9 @@ instance_group {
   gpus: 0
   kind: KIND_GPU
 }
+dynamic_batching {
+  preferred_batch_size: 8
+}
 default_model_filename: "model.plan"
 optimization {
   input_pinned_memory {
@@ -42,3 +45,4 @@ optimization {
   }
 }
 backend: "tensorrt"
+runtime: ""

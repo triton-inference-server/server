@@ -47,6 +47,19 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
+# If the test should be run in long and high load setting
+if [ "$TRITON_PERF_LONG" == 1 ]; then
+    # ~ 6.5 days
+    TEST_DURATION=480000
+    LOAD_THREAD_COUNT=2
+    EMAIL_SUBJECT="Long"
+else
+    # ~ 7 hours
+    TEST_DURATION=25000
+    LOAD_THREAD_COUNT=0
+    EMAIL_SUBJECT=""
+fi
+
 RET=0
 
 # If BACKENDS not specified, set to all
@@ -57,7 +70,7 @@ export CI_JOB_ID=${CI_JOB_ID}
 
 MODEL_DIR=models
 
-rm -fr *.log *.txt *.serverlog models validation_data csv_dir && mkdir models validation_data csv_dir
+rm -fr *.log *.txt  models validation_data csv_dir && mkdir models validation_data csv_dir
 
 # Get the datatype to use based on the backend
 function get_datatype () {
@@ -124,10 +137,8 @@ cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_grap
     sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
 
-python -m pip install -U prettytable
-
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-SERVER_LOG="./serverlog"
+SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -136,8 +147,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $STRESS_TEST >>$CLIENT_LOG 2>&1
+python $STRESS_TEST -d ${TEST_DURATION} --load-thread ${LOAD_THREAD_COUNT} >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -154,8 +166,8 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python stress_mail.py
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+    python stress_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET

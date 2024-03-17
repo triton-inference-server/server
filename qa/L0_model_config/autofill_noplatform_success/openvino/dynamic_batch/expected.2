@@ -1,0 +1,46 @@
+name: "dynamic_batch"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 4
+input {
+  name: "Func/PartitionedCall/input/_0:0"
+  data_type: TYPE_INT32
+  dims: 4
+}
+input {
+  name: "input1"
+  data_type: TYPE_INT32
+  dims: 4
+}
+output {
+  name: "Func/PartitionedCall/output/_3:0"
+  data_type: TYPE_INT32
+  dims: 4
+}
+output {
+  name: "Func/PartitionedCall/output/_2:0"
+  data_type: TYPE_INT32
+  dims: 4
+}
+instance_group {
+  name: "dynamic_batch"
+  count: 1
+  kind: KIND_CPU
+}
+default_model_filename: "model.xml"
+dynamic_batching {
+  preferred_batch_size: 4
+}
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "openvino"
+runtime: ""

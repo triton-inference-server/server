@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,45 +28,9 @@ cmake_minimum_required(VERSION 3.17)
 
 project(tritonrelocationrepoagent LANGUAGES C CXX)
 
-#
-# Options
-#
-# Must include options required for this project as well as any
-# projects included in this one by FetchContent.
-#
-set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-#
-# Dependencies
-#
-# FetchContent's composibility isn't very good. We must include the
-# transitive closure of all repos so that we can override the tag.
-#
-include(FetchContent)
-
-FetchContent_Declare(
-  repo-common
-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_Declare(
-  repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(repo-common repo-core)
-
-#
-# Shared library implementing the Triton Backend API
-#
-configure_file(src/libtritonrepoagent_relocation.ldscript libtritonrepoagent_relocation.ldscript COPYONLY)
+configure_file(
+  src/libtritonrepoagent_relocation.ldscript
+  libtritonrepoagent_relocation.ldscript COPYONLY)
 
 add_library(
   triton-relocation-repoagent SHARED
@@ -75,14 +39,6 @@ add_library(
 
 add_library(
   TritonRelocationRepoAgent::triton-relocation-repoagent ALIAS triton-relocation-repoagent
-)
-
-target_include_directories(
-  triton-relocation-repoagent
-  PUBLIC
-    $<INSTALL_INTERFACE:include>
-  PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_compile_features(triton-relocation-repoagent PRIVATE cxx_std_11)
@@ -95,9 +51,9 @@ target_compile_options(
 target_link_libraries(
   triton-relocation-repoagent
   PRIVATE
-    triton-core-serverapi   # from repo-core
-    triton-core-repoagentapi   # from repo-core
-    triton-core-serverstub  # from repo-core
+    triton-core-serverapi     # from repo-core
+    triton-core-repoagentapi  # from repo-core
+    triton-core-serverstub    # from repo-core
 )
 
 set_target_properties(

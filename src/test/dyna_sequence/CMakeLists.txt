@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,54 +29,6 @@ cmake_minimum_required(VERSION 3.17)
 project(tritondynasequencebackend LANGUAGES C CXX)
 
 #
-# Options
-#
-# Must include options required for this project as well as any
-# projects included in this one by FetchContent.
-#
-# GPU support is disabled by default because dynasequence backend doesn't
-# support GPUs.
-#
-option(TRITON_ENABLE_GPU "Enable GPU support in backend" OFF)
-option(TRITON_ENABLE_STATS "Include statistics collections in backend" ON)
-
-set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
-set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-#
-# Dependencies
-#
-# FetchContent's composibility isn't very good. We must include the
-# transitive closure of all repos so that we can override the tag.
-#
-include(FetchContent)
-
-FetchContent_Declare(
-  repo-common
-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_Declare(
-  repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_Declare(
-  repo-backend
-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
-  GIT_SHALLOW ON
-)
-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
-
-#
 # libtriton_dyna_sequence.so
 # Shared library implementing the Triton Sequence Backend API
 #
@@ -91,12 +43,6 @@ add_library(
   TritonDynaSequenceBackend::triton-dyna-sequence-backend ALIAS triton-dyna-sequence-backend
 )
 
-target_include_directories(
-  triton-dyna-sequence-backend
-  PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
 target_compile_features(triton-dyna-sequence-backend PRIVATE cxx_std_11)
 target_compile_options(
   triton-dyna-sequence-backend PRIVATE
@@ -108,6 +54,8 @@ target_link_libraries(
   triton-dyna-sequence-backend
   PRIVATE
     triton-backend-utils    # from repo-backend
+    triton-core-serverapi   # from repo-core
+    triton-core-backendapi  # from repo-core
     triton-core-serverstub  # from repo-core
 )
 

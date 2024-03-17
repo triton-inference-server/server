@@ -55,22 +55,25 @@ The “shared_memory_offset” parameter is optional and defaults to
 zero. The other two parameters are required. If only one of the two is
 given Triton will return an error.
 
+Note that there is no Windows support for shared memory yet. Jetson only
+supports system shared memory.
+
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
-The shared-memory parameters may be used in the $request_input
+The shared-memory parameters may be used in the `$request_input`
 parameters to indicate that the corresponding input is being
 communicated via shared memory. The parameters may be used in the
-$request_output parameters to indicate that the requested output
+`$request_output` parameters to indicate that the requested output
 should be communicated via shared memory.
 
 When these parameters are set for an input tensor the “data” field of
-$request_input must not be set. If the “data” field is set Triton will
+`$request_input` must not be set. If the “data” field is set Triton will
 return an error. When these parameters are set for a requested output
-tensor the returned $response_output must not define the “data” field.
+tensor the returned `$response_output` must not define the “data” field.
 
 Shared memory regions must be created by the client and then
 registered with Triton before they can be referenced with a
@@ -105,7 +108,7 @@ registered regions.
 
 A successful status request is indicated by a 200 HTTP status
 code. The response object, identified as
-$system_shared_memory_status_response, is returned in the HTTP body
+`$system_shared_memory_status_response`, is returned in the HTTP body
 for every successful request.
 
 ```
@@ -133,7 +136,7 @@ $system_shared_memory_status_response =
 
 A failed status request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$system_shared_memory_status_error_response object.
+`$system_shared_memory_status_error_response` object.
 
 ```
 $system_shared_memory_status_error_response =
@@ -152,7 +155,7 @@ contains the response JSON. A successful register request is indicated
 by a 200 HTTP status code.
 
 The request object, identified as
-$system_shared_memory_register_request must be provided in the HTTP
+`$system_shared_memory_register_request` must be provided in the HTTP
 body.
 
 ```
@@ -174,7 +177,7 @@ $system_shared_memory_register_request =
 
 A failed register request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$system_shared_memory_register_error_response object.
+`$system_shared_memory_register_error_response` object.
 
 ```
 $system_shared_memory_register_error_response =
@@ -196,7 +199,7 @@ are unregisered.
 
 A failed unregister request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$system_shared_memory_unregister_error_response object.
+`$system_shared_memory_unregister_error_response` object.
 
 ```
 $system_shared_memory_unregister_error_response =
@@ -234,7 +237,7 @@ registered regions.
 
 A successful status request is indicated by a 200 HTTP status
 code. The response object, identified as
-$cuda_shared_memory_status_response, is returned in the HTTP body
+`$cuda_shared_memory_status_response`, is returned in the HTTP body
 for every successful request.
 
 ```
@@ -258,7 +261,7 @@ $cuda_shared_memory_status_response =
 
 A failed status request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$cuda_shared_memory_status_error_response object.
+`$cuda_shared_memory_status_error_response` object.
 
 ```
 $cuda_shared_memory_status_error_response =
@@ -277,7 +280,7 @@ contains the response JSON. A successful register request is indicated
 by a 200 HTTP status code.
 
 The request object, identified as
-$cuda_shared_memory_register_request must be provided in the HTTP
+`$cuda_shared_memory_register_request` must be provided in the HTTP
 body.
 
 ```
@@ -298,7 +301,7 @@ $cuda_shared_memory_register_request =
 
 A failed register request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$cuda_shared_memory_register_error_response object.
+`$cuda_shared_memory_register_error_response` object.
 
 ```
 $cuda_shared_memory_register_error_response =
@@ -321,7 +324,7 @@ are unregisered.
 
 A failed unregister request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$cuda_shared_memory_unregister_error_response object.
+`$cuda_shared_memory_unregister_error_response` object.
 
 ```
 $cuda_shared_memory_unregister_error_response =

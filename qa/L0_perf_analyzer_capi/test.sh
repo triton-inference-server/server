@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,8 @@ SEQ_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_data.json
 SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_data.json
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
-NON_SUPPORTED_ERROR_STRING="supported by C API"
+
+STABILITY_THRESHOLD="15"
 
 source ../common/util.sh
 
@@ -80,6 +81,11 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequ
 
 # Copying variable sequence model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
+
+# Copying bls model with undefined variable
+mkdir -p $DATADIR/bls_undefined/1 && \
+    cp ../python_models/bls_undefined/model.py $DATADIR/bls_undefined/1/. && \
+    cp ../python_models/bls_undefined/config.pbtxt $DATADIR/bls_undefined/.
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -106,7 +112,7 @@ set -e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
 --service-kind=triton_c_api \
 --model-repository=$DATADIR --triton-server-directory=$SERVER_LIBRARY_PATH \
->$CLIENT_LOG 2>&1
+-s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -120,7 +126,8 @@ fi
 
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -135,7 +142,8 @@ fi
 #Testing with string input
 $PERF_ANALYZER -v -m graphdef_object_object_object --string-data=1 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -151,7 +159,8 @@ fi
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -162,7 +171,7 @@ $PERF_ANALYZER -v -m graphdef_object_int32_int32 \
 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -178,7 +187,8 @@ fi
 $PERF_ANALYZER -v -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -194,7 +204,8 @@ fi
 $PERF_ANALYZER -v -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
 --shape DUMMY_INPUT0:4,4 -p2000 -b 8 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -206,73 +217,94 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-# TODO: Re-enable after sequence model support if fixed for CAPI
-# $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
-# --input-data=$SEQ_JSONDATAFILE \
-# --service-kind=triton_c_api --model-repository=$DATADIR \
-# --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-# if [ $? -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-# if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-#
-# TODO: Re-enable after variable model support if fixed for CAPI
-# $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
-# --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
-# --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
-# --service-kind=triton_c_api --model-repository=$DATADIR \
-# --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-# if [ $? -eq 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-# if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-
-#Testing that async does NOT work
-set +e
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
+$PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+--input-data=$SEQ_JSONDATAFILE \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set +e
+$PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
+--input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
+--input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
+--service-kind=triton_c_api --model-repository=$DATADIR \
+--triton-server-directory=$SERVER_LIBRARY_PATH --sync >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 set -e
 
-#Testing that shared memory does NOT work
+# Negative test for the async mode.
+set +e
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
+--service-kind=triton_c_api --model-repository=$DATADIR \
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
+if [ $(cat $CLIENT_LOG | grep "not supported by triton_c_api service" | wc -l) -ne 1 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
 for SHARED_MEMORY_TYPE in system cuda; do
-    set +e
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
     --shared-memory=$SHARED_MEMORY_TYPE \
     --service-kind=triton_c_api --model-repository=$DATADIR \
     --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-    if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+    if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    set -e
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 done
 
 
-# Testing --request-rate-range does NOT work
-set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+set +e
+# Testing erroneous configuration
+# This model is expected to fail
+$PERF_ANALYZER -v -m bls_undefined --shape INPUT0:1048576 -t 64\
+--service-kind=triton_c_api \
+--model-repository=$DATADIR --triton-server-directory=$SERVER_LIBRARY_PATH \
+-s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 99 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

@@ -26,20 +26,25 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-sys.path.append("../common")
 
-import nightly_email_helper
+sys.path.append("../common")
 
 import glob
 from datetime import date
 
-if __name__ == '__main__':
+import nightly_email_helper
+
+if __name__ == "__main__":
     today = date.today().strftime("%Y-%m-%d")
     subject = "Triton Client Memory Growth " + sys.argv[1] + " Summary: " + today
     memory_graphs = glob.glob("client_memory_growth*.log")
     write_up = "<p>This test is run for both HTTP and GRPC protocols using C++ and Python test scripts. The max-allowed difference between mean and maximum memory usage is set to 10MB and 1MB for C++ and Python tests individually.</p>"
     write_up += "<p><b>&#8226 What to look for</b><br>A linear memory growth in the beginning of the graph is acceptable only when it is followed by a flat memory usage. If a linear memory growth is observed during the entire test then there is possibly a memory leak.</p>"
-    html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
+    html_content = (
+        '<html><head></head><body><pre style="font-size:11pt;font-family:Arial, sans-serif;">'
+        + write_up
+        + '</pre><pre style="font-size:11pt;font-family:Consolas;">'
+    )
     for mem_graph in sorted(memory_graphs):
         html_content += "\n" + mem_graph + "\n"
         with open(mem_graph, "r") as f:

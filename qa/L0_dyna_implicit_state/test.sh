@@ -25,12 +25,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
+
 export ENSEMBLES=0
 BACKENDS=${BACKENDS:="onnx plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
 
-(cd ../L0_dyna_sequence_batcher/ && bash -ex test.sh)
+(cd ../L0_dyna_sequence_batcher/ && bash -ex test.sh $REPO_VERSION)
 RET=$?
 
 if [ $RET == 0 ]; then

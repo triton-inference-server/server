@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -79,7 +79,7 @@ else
     fi
 fi
 
-python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_output >> $CLIENT_LOG 2>&1
+python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_input >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
@@ -109,9 +109,10 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 else
-    ERROR_MESSAGE="unable to autofill for 'scalar_model': the rank of model tensor 'x' is 0 which is not supported"
+    ERROR_MESSAGE="Unable to autofill for 'scalar_model': the rank of model tensor 'x' is 0 and dimensions are not defined"
     if [[ $(cat $SERVER_LOG | grep "${ERROR_MESSAGE}" | wc -l) -ne 2 ]]; then
         echo -e "\n***\n*** Test Failed: "${ERROR_MESSAGE}" not found\n***"
+        cat $SERVER_LOG
         RET=1
     fi
 fi

@@ -1,0 +1,1 @@
+Invalid argument: unable to load model 'bad_output_type', configuration expects datatype TYPE_INT16 for output 'OUTPUT0', model provides TYPE_INT8

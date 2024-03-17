@@ -70,10 +70,10 @@ export AWS_SECRET_ACCESS_KEY=$SWIFTSTACK_SECRET_ACCESS_KEY &&
 export AWS_DEFAULT_REGION=$SWIFTSTACK_DEFAULT_REGION
 
 # S3 bucket path (Point to bucket when testing cloud storage)
-BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
+BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
 
 # S3 repo path to pass to Triton server
-S3_REPO_URL="s3://https://pbss.s8k.io:443/triton-bucket-${CI_PIPELINE_ID}"
+S3_REPO_URL="s3://https://pbss.s8k.io:443/triton-bucket-${CI_JOB_ID}"
 
 # Cleanup S3 test bucket if exists (due to test failure)
 aws s3 rm $BUCKET_URL --recursive --include "*" && \

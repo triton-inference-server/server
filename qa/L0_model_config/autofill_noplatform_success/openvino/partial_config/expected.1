@@ -1,0 +1,44 @@
+name: "partial_config"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 8
+input {
+  name: "INPUT0"
+  data_type: TYPE_INT8
+  dims: 16
+}
+input {
+  name: "INPUT1"
+  data_type: TYPE_INT8
+  dims: 16
+}
+output {
+  name: "OUTPUT0"
+  data_type: TYPE_INT8
+  dims: 16
+  label_filename: "output0_labels.txt"
+}
+output {
+  name: "OUTPUT1"
+  data_type: TYPE_INT8
+  dims: 16
+}
+instance_group {
+  name: "partial_config"
+  count: 1
+  kind: KIND_CPU
+}
+default_model_filename: "model.xml"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "openvino"
+runtime: ""

@@ -1,0 +1,12 @@
+name: "incomplete_output"
+
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+  },
+  {
+    name: "OUTPUT1"
+    dims: [ 4 ]
+  }
+]

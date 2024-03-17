@@ -65,11 +65,11 @@ ensemble_scheduling {
       model_name: "libtorch_nobatch_int32_int32_int32"
       model_version: -1
       input_map {
-        key: "INPUT__0"
+        key: "INPUT0"
         value: "repeat_out"
       }
       input_map {
-        key: "INPUT__1"
+        key: "INPUT1"
         value: "identity_out"
       }
       output_map {

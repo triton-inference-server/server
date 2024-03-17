@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -76,18 +76,28 @@ CLIENT_BS=8
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each model approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION=200
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # ~ 2.5 days for system under test
+        REPETITION=1400
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each model approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION=200
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION=3
     EMAIL_SUBJECT="Nightly"
 fi
 
 # Threshold memory growth in MB
-MAX_ALLOWED_ALLOC="150"
-export MAX_ALLOWED_ALLOC
+# NOTES:
+# - Bounded memory growth tests typically show < 70 MB usage
+#   - Plan/ONNX is typically between 20-40 MB
+#   - Savedmodel is closer to 50-70 MB
+# - Unbounded memory growth test typically shows > 100 MB usage
+export MAX_ALLOWED_ALLOC="100"
 
 # Create local model repository
 mkdir -p models/
@@ -114,6 +124,12 @@ set -e
 RET=0
 
 for MODEL in $(ls models); do
+    # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
+    # Tracked here: https://nvbugs/3954104
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+        continue
+    fi
+
     # Create temporary model repository and copy only the model being tested
     rm -rf test_repo && mkdir test_repo
     cp -r models/$MODEL test_repo/
@@ -146,13 +162,25 @@ for MODEL in $(ls models); do
 
     set +e
 
+    TEMP_CLIENT_LOG=temp_client.log
+    TEMP_RET=0
+
     SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
+        # [TMA-621] Use --no-stability mode in perf analyzer when available
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
+        PA_RET=$?
+        # Success
+        if [ ${PA_RET} -eq 0 ]; then
+          continue
+        # Unstable measurement: OK for this test
+        elif [ ${PA_RET} -eq 2 ]; then
+          continue
+        # Other failures unexpected, report error
+        else
+            cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
+            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
             RET=1
         fi
     done
@@ -177,26 +205,26 @@ for MODEL in $(ls models); do
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test for $MODEL Failed\n***"
+        echo -e "\n***\n*** Test for $MODEL Failed.\n***"
         RET=1
     fi
+    # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
+    grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
     set -e
 done
 
-# Next perform a test that has unbound memory growth. Use the busy op model
-# with a high delay in order to force requests to sit in the queue, and result
+# Next perform a test that has unbound memory growth. Use the busy op Python model
+# with a sleep function in order to force requests to sit in the queue, and result
 # in memory growth.
 BUSY_OP_TEST=busy_op_test.py
-DELAY_CYCLES=2100000000
 NUM_REQUESTS=100
 
 rm -rf test_repo && mkdir test_repo
-cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
+mkdir -p test_repo/busy_op/1/
+cp ../python_models/busy_op/model.py test_repo/busy_op/1/
+cp ../python_models/busy_op/config.pbtxt test_repo/busy_op
 
-# Explicitly set library path so custom ops can find TF
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1
 SERVER_ARGS="--model-repository=`pwd`/test_repo"
-SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
 LEAKCHECK_LOG="test_busyop.valgrind.log"
 MASSIF_LOG="test_busyop.massif"
@@ -224,11 +252,12 @@ set +e
 # Run the busy_op test if no PTX issue was observed when launching server
 if [ $SKIP_BUSYOP -ne 1 ]; then
     SECONDS=0
-    python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+    python $BUSY_OP_TEST -v -m busy_op -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+    TEST_RETCODE=$?
     TEST_DURATION=$SECONDS
-    if [ $? -ne 0 ]; then
+    if [ ${TEST_RETCODE} -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** busy_op_test.py Failed\n***"
         RET=1
     fi
     set -e
@@ -248,23 +277,30 @@ if [ $SKIP_BUSYOP -ne 1 ]; then
     cat ${GRAPH_LOG}
     # Check the massif output
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
+    # This busyop test is expected to return a non-zero error since it is
+    # intentionally testing unbounded growth. If it returns success for some
+    # reason, raise error.
     if [ $? -ne 1 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** Massif test for graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** Expected unbounded growth, but found acceptable growth within ${MAX_ALLOWED_ALLOC} MB\n***"
         RET=1
     fi
+    # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
+    grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
 fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Test Failed\n***"
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python server_memory_mail.py $EMAIL_SUBJECT
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+    python server_memory_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET

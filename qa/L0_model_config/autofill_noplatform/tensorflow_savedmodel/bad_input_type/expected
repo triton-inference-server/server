@@ -1,0 +1,1 @@
+Invalid argument: unable to load model 'bad_input_type', configuration expects datatype TYPE_FP32 for input 'INPUT1', model provides TYPE_INT32

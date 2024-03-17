@@ -1,0 +1,45 @@
+name: "conflicting_scheduler_ensemble"
+  platform: "ensemble"
+  version_policy {
+    latest {
+      num_versions: 1
+    }
+  }
+  input {
+    name: "ENSEMBLE_INPUT0"
+    data_type: TYPE_FP32
+    dims: 4
+  }
+  output {
+    name: "ENSEMBLE_OUTPUT0"
+    data_type: TYPE_FP32
+    dims: 4
+  }
+  ensemble_scheduling {
+    step {
+      model_name: "ensemble_first_step"
+      model_version: 1
+      input_map {
+        key: "INPUT0"
+        value: "ENSEMBLE_INPUT0"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "temp_output_0"
+      }
+    }
+    step {
+      model_name: "ensemble_second_step"
+      model_version: 1
+      input_map {
+        key: "INPUT0"
+        value: "temp_output_0"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "ENSEMBLE_OUTPUT0"
+      }
+    }
+  }
+  model_transaction_policy {
+  }

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,54 +27,47 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
-import requests
 import unittest
+
+import requests
 import test_util as tu
 
 
 class OutputValidationTest(tu.TestResultCollector):
     # for datatype mismatch
     def test_datatype(self):
-        url = 'http://localhost:8000/v2/models/libtorch_datatype_1_float32/infer'
+        url = "http://localhost:8000/v2/models/libtorch_datatype_1_float32/infer"
         body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
         response = requests.post(url, data=body)
         msg = response.json()["error"]
         self.assertTrue(
             msg.startswith(
                 "configuration expects datatype TYPE_INT32 for output 'OUTPUT__0', model provides TYPE_FP32"
-            ))
+            )
+        )
 
     # for output mismatch
     def test_index(self):
-        url = 'http://localhost:8000/v2/models/libtorch_index_1_float32/infer'
+        url = "http://localhost:8000/v2/models/libtorch_index_1_float32/infer"
         body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__1"}]}'
         response = requests.post(url, data=body)
         msg = response.json()["error"]
         self.assertTrue(
             msg.startswith(
                 "The output OUTPUT__1 in the model configuration refers to an output index which doesn't exist. This model has 1 outputs"
-            ))
-
-    # for naming convention violation
-    def test_name(self):
-        url = 'http://localhost:8000/v2/models/libtorch_name_1_float32/infer'
-        body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
-        response = requests.post(url, data=body)
-        msg = response.json()["error"]
-        self.assertTrue(
-            msg.startswith(
-                "Request for unknown model: 'libtorch_name_1_float32' has no available versions"
-            ))
+            )
+        )
 
     # successful run
     def test_success(self):
-        url = 'http://localhost:8000/v2/models/libtorch_zero_1_float32/infer'
+        url = "http://localhost:8000/v2/models/libtorch_zero_1_float32/infer"
         body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
         response = requests.post(url, data=body)
         self.assertEqual(response.status_code, 200)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -57,7 +57,7 @@ export CUDA_VISIBLE_DEVICES=0
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models4
+rm -fr *.log  models{0,1,2,4} && mkdir models4
 for m in \
         $DATADIR/qa_dyna_sequence_model_repository/graphdef_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/savedmodel_dyna_sequence_int32 \
@@ -88,7 +88,7 @@ for model_trial in 4; do
         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
         export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+        SERVER_LOG="./$i.$MODEL_DIR.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"

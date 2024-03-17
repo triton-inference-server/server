@@ -4,10 +4,10 @@ index a9d66f9..a92e218 100644
 +++ b/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc
 @@ -14,10 +14,12 @@ limitations under the License.
  ==============================================================================*/
- 
+
  #if GOOGLE_CUDA
 -#define EIGEN_USE_GPU
--#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
+-#include "unsupported/Eigen/CXX11/Tensor"  // from @eigen_archive
 -#include "tensorflow/core/util/gpu_kernel_helper.h"
 -#include "tensorflow/core/util/gpu_launch_config.h"
 +//#define EIGEN_USE_GPU
@@ -16,12 +16,12 @@ index a9d66f9..a92e218 100644
 +//#include "tensorflow/core/util/gpu_launch_config.h"
 +#include <algorithm>
 +#include <stdint.h>
- 
+
  __global__ void AddOneKernel(const int* in, const int N, int* out) {
    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < N;
 @@ -27,8 +29,9 @@ __global__ void AddOneKernel(const int* in, const int N, int* out) {
  }
- 
+
  void AddOneKernelLauncher(const int* in, const int N, int* out) {
 -  TF_CHECK_OK(::tensorflow::GpuLaunchKernel(AddOneKernel, 32, 256, 0, nullptr,
 -                                            in, N, out));
@@ -29,5 +29,5 @@ index a9d66f9..a92e218 100644
 +  int grid_size = (N + block_size - 1) / block_size;
 +  AddOneKernel<<<grid_size, block_size>>>(in, N, out);
  }
- 
+
  #endif
