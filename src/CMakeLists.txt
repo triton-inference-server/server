@@ -525,6 +525,7 @@ if(${TRITON_ENABLE_TRACING})
     tracing-library
     PUBLIC
       triton-common-logging    # from repo-common
+      triton-common-json      # from repo-common
       triton-core-serverapi    # from repo-core
       triton-core-serverstub   # from repo-core
   )
