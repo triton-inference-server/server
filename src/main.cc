@@ -548,9 +548,9 @@ main(int argc, char** argv)
 
   uint32_t exit_timeout_secs =
       PrepareStopEndpoints(g_triton_params.exit_timeout_secs_);
+  TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);
 
-  TRITONSERVER_Error* stop_err =
-      TRITONSERVER_ServerStopWithTimeout(server_ptr, exit_timeout_secs);
+  TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
 
   // If unable to gracefully stop the server then Triton threads and
   // state are potentially in an invalid state, so just exit
