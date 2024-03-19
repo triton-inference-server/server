@@ -301,12 +301,12 @@ StartEndpoints(
 }
 
 uint32_t
-PrepareStopEndpoints(uint32_t timeout_secs)
+WaitForExistingConnections(uint32_t timeout_secs)
 {
   // Instruct endpoints to stop accepting new connections
 #ifdef TRITON_ENABLE_HTTP
   if (g_http_service) {
-    g_http_service->StopAcceptingNewConnection();
+    g_http_service->StopAcceptingNewConnections();
   }
 #endif  // TRITON_ENABLE_HTTP
 
@@ -547,7 +547,7 @@ main(int argc, char** argv)
   }
 
   uint32_t exit_timeout_secs =
-      PrepareStopEndpoints(g_triton_params.exit_timeout_secs_);
+      WaitForExistingConnections(g_triton_params.exit_timeout_secs_);
   TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);
 
   TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);

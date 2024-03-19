@@ -83,7 +83,7 @@ class HTTPServer {
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
 
-  void StopAcceptingNewConnection() { accept_new_conn_ = false; }
+  void StopAcceptingNewConnections() { accept_new_conn_ = false; }
   uint32_t ConnectionCount() { return conn_cnt_; }
 
  protected:
