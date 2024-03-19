@@ -84,6 +84,7 @@ protocol/extension_sequence
 protocol/extension_shared_memory
 protocol/extension_statistics
 protocol/extension_trace
+protocol/extension_parameters
 ```
 
 ```{toctree}
