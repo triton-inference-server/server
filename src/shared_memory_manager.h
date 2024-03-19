@@ -160,6 +160,25 @@ class SharedMemoryManager {
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
   };
+
+#ifdef TRITON_ENABLE_GPU
+  struct CUDASharedMemoryInfo : SharedMemoryInfo {
+    CUDASharedMemoryInfo(
+        const std::string& name, const std::string& shm_key,
+        const size_t offset, const size_t byte_size, HANDLE shm_handle,
+        void* mapped_addr, const TRITONSERVER_MemoryType kind,
+        const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
+        : SharedMemoryInfo(
+              name, shm_key, offset, byte_size, shm_handle, mapped_addr, kind,
+              device_id),
+          cuda_ipc_handle_(*cuda_ipc_handle)
+    {
+    }
+
+    cudaIpcMemHandle_t cuda_ipc_handle_;
+  };
+#endif  // TRITON_ENABLE_GPU
+
 #else
   struct SharedMemoryInfo {
     SharedMemoryInfo(
@@ -182,7 +201,6 @@ class SharedMemoryManager {
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
   };
-#endif
 
 #ifdef TRITON_ENABLE_GPU
   struct CUDASharedMemoryInfo : SharedMemoryInfo {
@@ -200,7 +218,9 @@ class SharedMemoryManager {
 
     cudaIpcMemHandle_t cuda_ipc_handle_;
   };
-#endif
+#endif  // TRITON_ENABLE_GPU
+
+#endif  // _WIN32
 
   using SharedMemoryStateMap =
       std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
