@@ -254,6 +254,23 @@ SharedMemoryManager::GetMemoryInfo(
         std::string("Unable to find shared memory region: '" + name + "'")
             .c_str());
   }
+
+  // validate offset
+  size_t max_offset = 0;
+  if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
+    max_offset = it->second->offset_;
+  }
+  if (it->second->byte_size_ > 0) {
+    max_offset += it->second->byte_size_ - 1;
+  }
+  if (offset > max_offset) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("Invalid offset for shared memory region: '" + name + "'")
+            .c_str());
+  }
+  // TODO: should also validate byte_size from caller
+
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
                                it->second->offset_ + offset);
