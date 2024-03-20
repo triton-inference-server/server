@@ -55,16 +55,13 @@ OpenSharedMemoryRegion(
   DWORD high_order_size = (upperbound_size >> 32) & 0xFFFFFFFF;
   DWORD low_order_size = upperbound_size & 0xFFFFFFFF;
 
-  *shm_handle = CreateFileMapping(
-      INVALID_HANDLE_VALUE,  // use paging file
-      NULL,                  // default security
-      PAGE_READWRITE,        // read/write access
-      high_order_size,       // maximum object size (high-order DWORD)
-      low_order_size,        // maximum object size (low-order DWORD)
-      shm_key.c_str());      // name of mapping object
+  *shm_handle = OpenFileMapping(
+      FILE_MAP_ALL_ACCESS,  // read/write access
+      FALSE,                // cannot inherit handle
+      shm_key.c_str());     // name of mapping object
 
   if (*shm_handle == NULL) {
-    LOG_VERBOSE(1) << "CreateFileMapping failed with error code: "
+    LOG_VERBOSE(1) << "OpenFileMapping failed with error code: "
                    << std::to_string(GetLastError());
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
@@ -195,13 +192,22 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   TRITONSERVER_Error* err_map =
       MapSharedMemory(shm_handle, offset, byte_size, &mapped_addr);
   // TODO: Test if we can close windows handles without invalidating mapping
-  // TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_handle);
+  TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_handle);
   if (err_map != nullptr) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register shared memory region '" + name +
             "': " + TRITONSERVER_ErrorMessage(err_map))
+            .c_str());
+  }
+
+  if (err_close != nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': " + std::to_string(GetLastError()))
             .c_str());
   }
 
