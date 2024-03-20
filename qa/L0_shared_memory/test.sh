@@ -49,6 +49,7 @@ rm -fr *.log
 
 for i in \
         test_invalid_create_shm \
+        test_invalid_registration \
         test_valid_create_set_register \
         test_unregister_before_register \
         test_unregister_after_register \

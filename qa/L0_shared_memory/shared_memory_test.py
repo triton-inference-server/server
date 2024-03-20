@@ -64,6 +64,22 @@ class SharedMemoryTest(tu.TestResultCollector):
             else:
                 self.assertTrue(str(ex) == "unable to initialize the size")
 
+    def test_invalid_registration(self):
+        # Attempt to register non-existent shared memory region
+        if self._protocol == "http":
+            triton_client = httpclient.InferenceServerClient(self._url, verbose=True)
+        else:
+            triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
+        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm.set_shared_memory_region(
+            shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
+        )
+        try:
+            triton_client.register_system_shared_memory("dummy_data", "/wrong_key", 8)
+        except Exception as ex:
+            print(str(ex))
+            self.assertTrue("Unable to open shared memory region" in str(ex))
+
     def test_valid_create_set_register(self):
         # Create a valid system shared memory region, fill data in it and register
         if self._protocol == "http":
@@ -287,6 +303,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         else:
             triton_client = grpcclient.InferenceServerClient(self._url, verbose=True)
         triton_client.register_system_shared_memory("input2_data", "/input2_data", 128)
+        shm_status = triton_client.get_system_shared_memory_status()
         self._basic_inference(
             shm_handles[0],
             shm_ip2_handle,
