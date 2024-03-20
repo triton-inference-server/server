@@ -3373,25 +3373,34 @@ class LifeCycleTest(tu.TestResultCollector):
         inputs[0].set_data_from_numpy(input_data)
         inputs[1].set_data_from_numpy(input_data)
 
-        # start connection 1
-        conn_1 = httpclient.InferenceServerClient("localhost:8000", verbose=True)
-        conn_1.infer(model_name, inputs)
+        # start connection
+        conn = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        conn.infer(model_name, inputs)
 
         # shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
         time.sleep(2)
 
-        # cannot start new connection
-        conn_2 = httpclient.InferenceServerClient("localhost:8000", verbose=True)
-        with self.assertRaises(HTTPConnectionClosed, msg="connection closed."):
-            conn_2.infer(model_name, inputs)
-        conn_2.close()
+        # connection should still work
+        conn.infer(model_name, inputs)
 
-        # connection 1 should still work
-        conn_1.infer(model_name, inputs)
+        # close connection
+        conn.close()
+        time.sleep(2)
 
-        # close connection 1
-        conn_1.close()
+        # check exit timeout countdown did not restart
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertIn(
+            "Waiting for in-flight requests to complete.",
+            server_log,
+            "precondition not met - core shutdown did not begin",
+        )
+        self.assertEqual(
+            server_log.count("Timeout 30: "),
+            1,
+            "exit timeout countdown restart detected",
+        )
 
 
 if __name__ == "__main__":

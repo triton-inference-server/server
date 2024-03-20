@@ -2120,7 +2120,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_with_live_connection >>$CLIENT_LOG 2>&1
+SERVER_PID=$SERVER_PID SERVER_LOG=$SERVER_LOG python $LC_TEST LifeCycleTest.test_shutdown_with_live_connection >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
