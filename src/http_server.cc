@@ -236,8 +236,23 @@ HTTPServer::Start()
 }
 
 TRITONSERVER_Error*
-HTTPServer::Stop()
+HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
+  accept_new_conn_ = false;
+
+  if (exit_timeout_secs != nullptr) {
+    while (*exit_timeout_secs > 0) {
+      uint32_t conn_cnt = conn_cnt_;
+      if (conn_cnt == 0) {
+        break;
+      }
+      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt
+               << " " << service_name << " service connections";
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      (*exit_timeout_secs)--;
+    }
+  }
+
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
     send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
@@ -250,7 +265,6 @@ HTTPServer::Stop()
     event_base_free(evbase_);
     return nullptr;
   }
-
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }

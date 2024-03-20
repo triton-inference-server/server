@@ -300,50 +300,14 @@ StartEndpoints(
   return true;
 }
 
-uint32_t
-WaitForExistingConnections(uint32_t timeout_secs)
-{
-  // Instruct endpoints to stop accepting new connections
-#ifdef TRITON_ENABLE_HTTP
-  if (g_http_service) {
-    g_http_service->StopAcceptingNewConnections();
-  }
-#endif  // TRITON_ENABLE_HTTP
-
-  // Poll until endpoints have zero live connections, or timeout
-  while (timeout_secs > 0) {
-    uint32_t live_connections = 0;
-    std::string found_connections;
-
-#ifdef TRITON_ENABLE_HTTP
-    if (g_http_service) {
-      uint32_t count = g_http_service->ConnectionCount();
-      live_connections += count;
-      found_connections += " " + std::to_string(count) + " HTTP connections";
-    }
-#endif  // TRITON_ENABLE_HTTP
-
-    if (live_connections == 0) {
-      break;
-    }
-    LOG_INFO << "Timeout " << timeout_secs << ": Found" << found_connections;
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    timeout_secs--;
-  }
-
-  // Return timeout remaining
-  return timeout_secs;
-}
-
 bool
-StopEndpoints()
+StopEndpoints(uint32_t* exit_timeout_secs)
 {
   bool ret = true;
 
 #ifdef TRITON_ENABLE_HTTP
   if (g_http_service) {
-    TRITONSERVER_Error* err = g_http_service->Stop();
+    TRITONSERVER_Error* err = g_http_service->Stop(exit_timeout_secs);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to stop HTTP service");
       ret = false;
@@ -546,8 +510,9 @@ main(int argc, char** argv)
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  uint32_t exit_timeout_secs =
-      WaitForExistingConnections(g_triton_params.exit_timeout_secs_);
+  // Stop HTTP, gRPC and metrics endpoints, and update exit timeout.
+  uint32_t exit_timeout_secs = g_triton_params.exit_timeout_secs_;
+  StopEndpoints(&exit_timeout_secs);
   TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);
 
   TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
@@ -560,8 +525,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Stop tracing and the HTTP, GRPC, and metrics endpoints.
-  StopEndpoints();
+  // Stop tracing.
   StopTracing(&trace_manager);
 
 #ifdef TRITON_ENABLE_ASAN

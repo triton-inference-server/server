@@ -81,10 +81,9 @@ class HTTPServer {
   virtual ~HTTPServer() { IGNORE_ERR(Stop()); }
 
   TRITONSERVER_Error* Start();
-  TRITONSERVER_Error* Stop();
-
-  void StopAcceptingNewConnections() { accept_new_conn_ = false; }
-  uint32_t ConnectionCount() { return conn_cnt_; }
+  TRITONSERVER_Error* Stop(
+      uint32_t* exit_timeout_secs = nullptr,
+      const std::string& service_name = "HTTP");
 
  protected:
   explicit HTTPServer(
