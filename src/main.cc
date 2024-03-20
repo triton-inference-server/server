@@ -45,7 +45,6 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <string>
 #include <thread>
 
 #include "triton_signal.h"
