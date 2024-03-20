@@ -238,8 +238,6 @@ HTTPServer::Start()
 TRITONSERVER_Error*
 HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
-  accept_new_conn_ = false;
-
   if (exit_timeout_secs != nullptr) {
     while (*exit_timeout_secs > 0) {
       uint32_t conn_cnt = conn_cnt_;
@@ -285,9 +283,6 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 evhtp_res
 HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
 {
-  if ((static_cast<HTTPServer*>(arg))->accept_new_conn_ == false) {
-    return EVHTP_RES_SERVUNAVAIL;
-  }
   evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
