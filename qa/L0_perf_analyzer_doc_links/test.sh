@@ -34,8 +34,9 @@ python3 -m pip install mkdocs
 python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
 
 #Download perf_analyzer docs
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_CLIENT_REPO_TAG="${TRITON_CLIENT_REPO_TAG:=main}"
-git clone -b ${TRITON_CLIENT_REPO_TAG} https://github.com/triton-inference-server/client.git
+git clone -b ${TRITON_CLIENT_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/client.git
 cp `pwd`/client/src/c++/perf_analyzer/README.md .
 cp -rf `pwd`/client/src/c++/perf_analyzer/docs .
 

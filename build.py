@@ -70,10 +70,10 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.44.0dev": (
-        "24.03dev",  # triton container
-        "24.01",  # upstream container
-        "1.16.3",  # ORT
+    "2.45.0dev": (
+        "24.04dev",  # triton container
+        "24.02",  # upstream container
+        "1.17.2",  # ORT
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
@@ -439,6 +439,7 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
         cmake_core_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_core_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_core_arg("TRITON_VERSION", "STRING", FLAGS.version),
+        cmake_core_arg("TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization),
         cmake_core_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_core_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_core_arg("TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]),
@@ -503,6 +504,9 @@ def repoagent_cmake_args(images, components, ra, install_dir):
     cargs = args + [
         cmake_repoagent_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_repoagent_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_repoagent_arg(
+            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_repoagent_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_repoagent_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
     ]
@@ -524,6 +528,9 @@ def cache_cmake_args(images, components, cache, install_dir):
     cargs = args + [
         cmake_cache_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_cache_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_cache_arg(
+            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_cache_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_cache_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
     ]
@@ -571,6 +578,9 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     cargs = args + [
         cmake_backend_arg(be, "CMAKE_BUILD_TYPE", None, cmake_build_type),
         cmake_backend_arg(be, "CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_backend_arg(
+            be, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+        ),
         cmake_backend_arg(be, "TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
         cmake_backend_arg(be, "TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_backend_arg(
@@ -1337,7 +1347,7 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libucp.so.0 /opt/hpcx/ucx/lib/libucp
 COPY --from=min_container /opt/hpcx/ucx/lib/libucs.so.0 /opt/hpcx/ucx/lib/libucs.so.0
 COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct.so.0
 
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
 RUN apt-get update && \

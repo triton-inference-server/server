@@ -28,6 +28,8 @@
 source ../common.sh
 source ../../common/util.sh
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
+
 SERVER_ARGS="--model-repository=${MODELDIR}/examples/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./examples_server.log"
 
@@ -50,7 +52,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     pip3 install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 fi
 
-git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
+git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
 cd python_backend
 
 # Example 1

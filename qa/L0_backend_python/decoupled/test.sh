@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 CLIENT_PY=./decoupled_test.py
 CLIENT_LOG="./decoupled_client.log"
 TEST_RESULT_FILE='test_results.txt'
@@ -53,7 +54,7 @@ cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
 echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/config.pbtxt
 
 rm -fr python_backend
-git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
+git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
 mkdir -p models/square_int32/1/
 cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
 cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt

@@ -46,9 +46,10 @@ python3 -m pip install mkdocs-htmlproofer-plugin
 
 # Get the necessary repos
 mkdir repos && cd repos
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 echo ${TRITON_BACKEND_REPO_TAG}
-git clone --single-branch --depth=1 -b ${TRITON_BACKEND_REPO_TAG} https://github.com/triton-inference-server/backend.git
+git clone --single-branch --depth=1 -b ${TRITON_BACKEND_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/backend.git
 cd ..
 
 exec mkdocs serve -f $CONFIG > $LOG &
