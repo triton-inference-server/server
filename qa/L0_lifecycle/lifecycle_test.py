@@ -2662,6 +2662,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send more requests and should be rejected
         try:
@@ -2721,6 +2722,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send requests with different characteristic
         # 1: New sequence with new sequence ID
@@ -2808,6 +2810,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send more requests and should be rejected
         try:
