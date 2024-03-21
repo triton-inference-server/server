@@ -87,7 +87,7 @@ def build_docker_image(tag):
 
 def run_docker_image(tag, host_dir, container_dir):
     log_message("Running Docker RUN")
-    command = f"docker run -it -v {host_dir}:{container_dir} {tag}:1.0 /bin/bash -c 'cd {container_dir}/docs && make html'"
+    command = f"docker run -v {host_dir}:{container_dir} {tag}:1.0 /bin/bash -c 'cd {container_dir}/docs && make clean && make html'"
     run_command(command)
 
 
