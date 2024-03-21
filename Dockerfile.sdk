@@ -144,9 +144,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-RUN pip3 install hatch build \
+RUN pip3 install build \
     && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
-    && hatch version $(cat /workspace/TRITON_VERSION) \
     && python3 -m build --wheel --outdir /workspace/install/python
 ############################################################################
 ## Create sdk container
