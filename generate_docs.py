@@ -7,12 +7,12 @@ import sys
 from collections import defaultdict
 from functools import partial
 
-from docs.tests.test import run_test
+# from docs.tests.test import run_test
 
 # global variables
 SERVER_REPO_PATH = os.getcwd()
 SERVER_DOCS_DIR_PATH = os.path.join(os.getcwd(), "docs")
-DOCS_TEST_DIR_PATH = os.path.join(SERVER_DOCS_DIR_PATH, "tests")
+# DOCS_TEST_DIR_PATH = os.path.join(SERVER_DOCS_DIR_PATH, "tests")
 
 HTTP_REG = r"^https?://"
 TAG_REG = "/(?:blob|tree)/main"
@@ -161,7 +161,6 @@ def replace_url_with_relpath(url, src_doc_path):
 
     # target_path must be a file at this line
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
-    print(re.sub(TRITON_GITHUB_URL_REG, relpath, url, 1))
     return re.sub(TRITON_GITHUB_URL_REG, relpath, url, 1)
 
 
@@ -169,10 +168,11 @@ def replace_relpath_with_url(relpath, src_repo_name, src_doc_path):
     target_path = relpath.rsplit("#")[0]
     section = relpath[len(target_path) :]
     valid_hashtag = section not in ["", "#"] and section.startswith("#")
-    target_path = os.path.join(os.path.dirname(src_doc_path), relpath)
+    target_path = os.path.join(os.path.dirname(src_doc_path), target_path)
     target_path = os.path.normpath(target_path)
 
     """
+    TODO: Need to update comment
     Only replace relative paths with Triton Inference Server GitHub URLs in following cases.
     1. Relative path is pointing to a directory or file inside the same repo (excluding server).
     2. URL is a directory which contains README.md and URL has a hashtag.
@@ -180,10 +180,8 @@ def replace_relpath_with_url(relpath, src_repo_name, src_doc_path):
     url = f"https://github.com/triton-inference-server/{src_repo_name}/blob/main/"
     src_repo_abspath = os.path.join(SERVER_DOCS_DIR_PATH, src_repo_name)
 
-    # TODO: should we replace with repo URL?
-    # Relative path is not in the current repo
-    if os.path.commonpath([src_repo_abspath, target_path]) != src_repo_abspath:
-        return relpath
+    # Relative path is not in the current repo, which should not happen.
+    assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
     # if not os.path.exists(target_path) or \
@@ -197,7 +195,7 @@ def replace_relpath_with_url(relpath, src_repo_name, src_doc_path):
         os.path.isdir(target_path)
         and valid_hashtag
         or os.path.isfile(target_path)
-        and os.path.splitext(target_path)[1] != ".md"
+        and os.path.splitext(target_path)[1] == ".md"
     ):
         return relpath
     else:
@@ -278,7 +276,7 @@ def main():
 
     # clean up workspace
     rm_cmd = ["rm", "-rf", "client", "python_backend", "custom_backend"]
-    # subprocess.run(rm_cmd, check=True)
+    subprocess.run(rm_cmd, check=True)
 
 
 if __name__ == "__main__":
