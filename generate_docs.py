@@ -157,7 +157,7 @@ def replace_url_with_relpath(url, src_doc_path):
     ):
         target_path = os.path.join(target_path, "README.md")
     else:
-        return m.group(0)
+        return url
 
     # target_path must be a file at this line
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
