@@ -19,7 +19,8 @@ TAG_REG = "/(?:blob|tree)/main"
 TRITON_REPO_REG = rf"{HTTP_REG}github.com/triton-inference-server"
 TRITON_GITHUB_URL_REG = rf"{TRITON_REPO_REG}/([^/#]+)(?:{TAG_REG})?/*([^#]*)\s*(?=#|$)"
 RELPATH_REG = r"]\s*\(\s*([^)]+)\)"
-REFERENCE_REG = r"(]\s*\(\s*)([^)]+?)(\s*\))"
+# regex pattern to find all references excluding embedded images in a .md file.
+REFERENCE_REG = r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))"
 
 parser = argparse.ArgumentParser(description="Process some arguments.")
 parser.add_argument(
@@ -147,7 +148,6 @@ def replace_url_with_relpath(url, src_doc_path):
     1. URL is a doc file, e.g. ".md" file.
     2. URL is a directory which contains README.md and URL has a hashtag.
     """
-    # TODO: files must be inside server/docs
     if os.path.isfile(target_path) and os.path.splitext(target_path)[1] == ".md":
         pass
     elif (
@@ -158,6 +158,9 @@ def replace_url_with_relpath(url, src_doc_path):
         target_path = os.path.join(target_path, "README.md")
     else:
         return url
+
+    # Assert target path is under the server repo directory.
+    assert os.path.commonpath([SERVER_REPO_PATH, target_path]) == SERVER_REPO_PATH
 
     # target_path must be a file at this line
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
@@ -178,9 +181,13 @@ def replace_relpath_with_url(relpath, src_repo_name, src_doc_path):
     2. URL is a directory which contains README.md and URL has a hashtag.
     """
     url = f"https://github.com/triton-inference-server/{src_repo_name}/blob/main/"
-    src_repo_abspath = os.path.join(SERVER_DOCS_DIR_PATH, src_repo_name)
+    if src_repo_name == "server":
+        src_repo_abspath = SERVER_REPO_PATH
+        # TODO: assert the relative path not pointing to cloned repo, e.g. client
+    else:
+        src_repo_abspath = os.path.join(SERVER_DOCS_DIR_PATH, src_repo_name)
 
-    # Relative path is not in the current repo, which should not happen.
+    # Assert target path is under the current repo directory.
     assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
@@ -203,6 +210,10 @@ def replace_relpath_with_url(relpath, src_repo_name, src_doc_path):
 
 
 def replace_reference(m, src_repo_name, src_doc_path):
+    # TODO: markdown allows <link>, e.g. <a href=[^>]+>. Whether we want to
+    # find and replace the link depends on if they link to internal .md files
+    # or allows relative paths. I haven't seen one such case in our doc so
+    # should be safe for now.
     hyperlink_str = m.group(2)
     match = re.match(HTTP_REG, hyperlink_str)
 
@@ -213,15 +224,32 @@ def replace_reference(m, src_repo_name, src_doc_path):
         # Hyperlink is a relative path
         res = replace_relpath_with_url(hyperlink_str, src_repo_name, src_doc_path)
 
+    # TODO: This needs improvement. One way is to replace m.group(2) only
     return m.group(1) + res + m.group(3)
 
 
-def preprocess_docs(repo):
+def preprocess_docs(repo, excluded_dir_list=[]):
     # find all ".md" files inside the current repo
-    cmd = ["find", repo, "-name", "*.md"]
-    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+    # treat server repo as special case
+    if repo == "server":
+        excluded_dir_list.append("build")
+        # find . -type d \( -path ./build -o -path ./client -o -path ./python_backend \) -prune -o -type f -name "*.md" -print
+        cmd = (
+            ["find", ".", "-type", "d", "\\("]
+            + " -o ".join([f"-path './{dir}'" for dir in excluded_dir_list]).split(" ")
+            + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
+        )
+        cmd = " ".join(cmd)
+        result = subprocess.run(
+            cmd, check=True, capture_output=True, text=True, shell=True
+        )
+    else:
+        cmd = ["find", repo, "-name", "*.md"]
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
 
+    # Read, preprocess and write to each doc file
     for doc_path in docs_list:
         doc_path = os.path.abspath(doc_path)
         content = None
@@ -257,6 +285,10 @@ def main():
     if "custom_backend" in backend_tags:
         clone_from_github("custom_backend", backend_tags["custom_backend"], github_org)
 
+    # Preprocess after all repos are cloned
+    preprocess_docs(
+        "server", excluded_dir_list=["client", "python_backend", "custom_backend"]
+    )
     if "client" in repo_tags:
         preprocess_docs("client")
     if "python_backend" in repo_tags:
