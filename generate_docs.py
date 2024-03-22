@@ -80,15 +80,29 @@ def run_command(command):
         log_message(e.stderr)
 
 
-def build_docker_image(tag):
+def build_docker_image():
     log_message("Running Docker Build")
-    command = f"docker build -f Dockerfile.docs -t i_docs:1.0 ."
+    command = f"docker build -t i_docs_build - < docs/Dockerfile.docs"
+    run_command(command)
+
+def create_and_run_docker():
+    log_message("Running Docker CREATE")
+    command = f"docker create --name i_docs -w /docs i_docs_build /bin/bash -c 'make clean;make html'"
+    run_command(command)
+    command = f"docker cp $PWD/docs i_docs:/"
+    run_command(command)
+    log_message("Running Docker START")
+    command = f"docker start -a i_docs"
+    run_command(command)
+    command = f"docker cp i_docs:/docs/build/html html"
+    run_command(command)
+    command = f"docker rm -f i_docs"
     run_command(command)
 
 
 def run_docker_image(tag, host_dir, container_dir):
     log_message("Running Docker RUN")
-    command = f"docker run -it -v {host_dir}:{container_dir} {tag}:1.0 /bin/bash -c 'cd {container_dir}/docs && make html'"
+    command = f"docker run --rm -v {host_dir}:{container_dir} {tag}:1.0 /bin/bash -c 'cd {container_dir}/docs && make clean && make html'"
     run_command(command)
 
 
@@ -299,11 +313,9 @@ def main():
     tag = "i_docs"  # image tag
     host_dir = SERVER_REPO_PATH  # The directory on the host to mount
     container_dir = "/mnt"  # The mount point inside the container
-
-    build_docker_image(tag)
-
-    # Run the Docker image
-    run_docker_image(tag, host_dir, container_dir)
+    os.chdir(SERVER_REPO_PATH)
+    build_docker_image()
+    create_and_run_docker()
     log_message("**DONE**")
 
     # clean up workspace
