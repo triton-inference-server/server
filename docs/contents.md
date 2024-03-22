@@ -110,6 +110,9 @@ examples/jetson/concurrency_and_dynamic_batching/README
 
 client/README
 client/src/java/README
+client/src/grpc_generated/go/README
+client/src/grpc_generated/javascript/README
+client/src/grpc_generated/java/README
 ```
 
 ```{toctree}
@@ -126,9 +129,6 @@ client/src/c++/perf_analyzer/docs/input_data
 client/src/c++/perf_analyzer/docs/measurements_metrics
 client/src/c++/perf_analyzer/docs/benchmarking
 client/src/c++/perf_analyzer/docs/llm
-client/src/grpc_generated/go/README
-client/src/grpc_generated/javascript/README
-client/src/grpc_generated/java/README
 ```
 
 ```{toctree}
@@ -137,11 +137,6 @@ client/src/grpc_generated/java/README
 
 python_backend/README.md
 python_backend/inferentia/README.md
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Python Backend Examples
 python_backend/examples/auto_complete/README.md
 python_backend/examples/bls/README.md
 python_backend/examples/bls_decoupled/README.md
