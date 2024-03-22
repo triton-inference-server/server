@@ -1,5 +1,5 @@
 <!--
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -100,3 +100,19 @@ $ curl -6 --verbose "http://[::1]:8000/v2/health/ready"
 <
 * Connection #0 to host ::1 left intact
 ```
+
+
+## Mapping Triton Server Error Codes to HTTP Status Codes
+
+This table maps various Triton Server error codes to their corresponding HTTP status
+codes. It can be used as a reference guide for understanding how Triton Server errors
+are handled in HTTP responses.
+
+
+| Triton Server Error Code                      | HTTP Status Code   | Description          |
+| ----------------------------------------------| -------------------| ---------------------|
+| `TRITONSERVER_ERROR_INTERNAL`                 | 500                | Internal Server Error|
+| `TRITONSERVER_ERROR_NOT_FOUND`                | 404                | Not Found            |
+| `TRITONSERVER_ERROR_UNAVAILABLE`              | 503                | Service Unavailable  |
+| `TRITONSERVER_ERROR_UNSUPPORTED`              | 501                | Not Implemented      |
+| `TRITONSERVER_ERROR_UNKNOWN`,<br>`TRITONSERVER_ERROR_INVALID_ARG`,<br>`TRITONSERVER_ERROR_ALREADY_EXISTS`,<br>`TRITONSERVER_ERROR_CANCELLED` | `400` | Bad Request (default for other errors)      |

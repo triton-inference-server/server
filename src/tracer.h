@@ -54,6 +54,11 @@ namespace otel_cntxt = opentelemetry::context;
 namespace otel_resource = opentelemetry::sdk::resource;
 #endif
 #include "triton/core/tritonserver.h"
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSSUCCESS nullptr
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
 
@@ -265,6 +270,20 @@ class TraceManager {
 
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
+
+    /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
+    /// Trace context follows W3C Trace Context specification.
+    /// Ref. https://www.w3.org/TR/trace-context/.
+    /// OpenTelemetry ref:
+    /// https://github.com/open-telemetry/opentelemetry-cpp/blob/4bd64c9a336fd438d6c4c9dad2e6b61b0585311f/api/include/opentelemetry/trace/propagation/http_trace_context.h#L94-L113
+    ///
+    /// \param span An OpenTelemetry span, which is used to extract
+    /// OpenTelemetry's trace_id and span_id.
+    /// \param buffer Buffer used when writing JSON representation of
+    /// OpenTelemetry's context.
+    void PrepareTraceContext(
+        opentelemetry::nostd::shared_ptr<otel_trace_api::Span> span,
+        triton::common::TritonJson::WriteBuffer* buffer);
 
    private:
     // OpenTelemetry SDK relies on system's clock for event timestamps.

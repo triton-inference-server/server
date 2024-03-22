@@ -300,7 +300,9 @@ TraceManager::GetTraceStartOptions(
 {
   TraceManager::TraceStartOptions start_options;
   GetTraceSetting(model_name, start_options.trace_setting);
-  if (start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
+  if (!start_options.trace_setting->level_ ==
+          TRITONSERVER_TRACE_LEVEL_DISABLED &&
+      start_options.trace_setting->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
     auto prop =
         otel_cntxt::propagation::GlobalTextMapPropagator::GetGlobalPropagator();
@@ -560,6 +562,9 @@ TraceManager::Trace::StartSpan(
     if (std::string(request_id) != "") {
       span->SetAttribute("triton.request_id", request_id);
     }
+    triton::common::TritonJson::WriteBuffer buffer;
+    PrepareTraceContext(span, &buffer);
+    TRITONSERVER_InferenceTraceSetContext(trace, buffer.Contents().c_str());
   }
 
   otel_context_ = otel_context_.SetValue(span_key, span);
@@ -701,6 +706,32 @@ TraceManager::Trace::AddEvent(
         otel_context_.GetValue(span_key));
     span->AddEvent(event, time_offset_ + std::chrono::nanoseconds{timestamp});
   }
+}
+
+void
+TraceManager::Trace::PrepareTraceContext(
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> span,
+    triton::common::TritonJson::WriteBuffer* buffer)
+{
+  triton::common::TritonJson::Value json(
+      triton::common::TritonJson::ValueType::OBJECT);
+  char trace_id[32] = {0};
+  char span_id[16] = {0};
+  char trace_flags[2] = {0};
+  span->GetContext().span_id().ToLowerBase16(span_id);
+  span->GetContext().trace_id().ToLowerBase16(trace_id);
+  span->GetContext().trace_flags().ToLowerBase16(trace_flags);
+  std::string kTraceParent = std::string("traceparent");
+  std::string kTraceState = std::string("tracestate");
+  std::string traceparent = std::string("00-") + std::string(trace_id, 32) +
+                            std::string("-") + std::string(span_id, 16) +
+                            std::string("-") + std::string(trace_flags, 2);
+  std::string tracestate = span->GetContext().trace_state()->ToHeader();
+  json.SetStringObject(kTraceParent.c_str(), traceparent);
+  if (!tracestate.empty()) {
+    json.SetStringObject(kTraceState.c_str(), tracestate);
+  }
+  json.Write(buffer);
 }
 #endif
 
