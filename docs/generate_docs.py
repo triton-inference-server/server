@@ -95,7 +95,7 @@ def create_and_run_docker():
     log_message("Running Docker START")
     command = f"docker start -a i_docs"
     run_command(command)
-    command = f"docker cp i_docs:/docs/build/html html"
+    command = f"docker cp i_docs:/docs/build docs/build"
     run_command(command)
     command = f"docker rm -f i_docs"
     run_command(command)
