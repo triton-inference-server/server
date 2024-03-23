@@ -324,6 +324,9 @@ def main():
     rm_cmd = ["rm", "-rf", "client", "python_backend", "custom_backend"]
     subprocess.run(rm_cmd, check=True)
 
+    # Restore previous working state
+    os.chdir(SERVER_REPO_PATH)
+
 
 if __name__ == "__main__":
     main()
