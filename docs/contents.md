@@ -30,6 +30,7 @@
 :maxdepth: 1
 :caption: Getting Started
 
+index
 getting_started/quickstart
 ```
 
@@ -47,7 +48,6 @@ user_guide/optimization
 user_guide/ragged_batching
 user_guide/rate_limiter
 user_guide/model_analyzer
-user_guide/perf_analyzer
 user_guide/model_management
 user_guide/custom_operations
 user_guide/decoupled_models
@@ -128,7 +128,7 @@ client/src/c++/perf_analyzer/docs/inference_load_modes
 client/src/c++/perf_analyzer/docs/input_data
 client/src/c++/perf_analyzer/docs/measurements_metrics
 client/src/c++/perf_analyzer/docs/benchmarking
-client/src/c++/perf_analyzer/docs/llm
+client/src/c++/perf_analyzer/genai-perf/README
 ```
 
 ```{toctree}

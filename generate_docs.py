@@ -85,6 +85,7 @@ def build_docker_image():
     command = f"docker build -t i_docs_build - < docs/Dockerfile.docs"
     run_command(command)
 
+
 def create_and_run_docker():
     log_message("Running Docker CREATE")
     command = f"docker create --name i_docs -w /docs i_docs_build /bin/bash -c 'make clean;make html'"
@@ -157,6 +158,10 @@ def replace_url_with_relpath(url, src_doc_path):
             SERVER_DOCS_DIR_PATH, target_repo_name, target_relpath_from_target_repo
         )
 
+    # Return URL if it points to a path outside server/docs.
+    if os.path.commonpath([SERVER_DOCS_DIR_PATH, target_path]) != SERVER_DOCS_DIR_PATH:
+        return url
+
     """
     Only replace Triton Inference Server GitHub URLs with relative paths in following cases.
     1. URL is a doc file, e.g. ".md" file.
@@ -172,9 +177,6 @@ def replace_url_with_relpath(url, src_doc_path):
         target_path = os.path.join(target_path, "README.md")
     else:
         return url
-
-    # Assert target path is under the server repo directory.
-    assert os.path.commonpath([SERVER_REPO_PATH, target_path]) == SERVER_REPO_PATH
 
     # target_path must be a file at this line
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
