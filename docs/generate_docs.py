@@ -334,11 +334,12 @@ def main():
     log_message("**DONE**")
 
     # clean up workspace
-    rm_cmd = ["rm", "-rf", "client", "python_backend", "custom_backend"]
-    subprocess.run(rm_cmd, check=True)
-
-    # Restore previous working state
-    os.chdir(SERVER_REPO_PATH)
+    if "client" in repo_tags:
+        subprocess.run(["rm", "-rf", "docs/client"], check=True)
+    if "python_backend" in repo_tags:
+        subprocess.run(["rm", "-rf", "docs/python_backend"], check=True)
+    if "custom_backend" in backend_tags:
+        subprocess.run(["rm", "-rf", "docs/custom_backend"], check=True)
 
 
 if __name__ == "__main__":
