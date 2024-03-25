@@ -10,6 +10,8 @@ from functools import partial
 # from docs.tests.test import run_test
 
 # global variables
+exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer.md"]
+
 SERVER_REPO_PATH = os.getcwd()
 SERVER_DOCS_DIR_PATH = os.path.join(os.getcwd(), "docs")
 
@@ -139,6 +141,15 @@ def parse_repo_tag(repo_tags):
     return dict(repo_dict)
 
 
+def is_excluded(file_path):
+    for exclude_pattern in exclude_patterns:
+        file_abspath = os.path.abspath(file_path)
+        exclude_pattern = os.path.abspath(exclude_pattern)
+        if os.path.commonpath([file_abspath, exclude_pattern]) == exclude_pattern:
+            return True
+    return False
+
+
 # Return the Git repo name of given file path
 def get_git_repo_name(file_path):
     # Execute git command to get remote URL
@@ -190,12 +201,17 @@ def replace_url_with_relpath(url, src_doc_path):
     1. URL is a doc file, e.g. ".md" file.
     2. URL is a directory which contains README.md and URL has a hashtag.
     """
-    if os.path.isfile(target_path) and os.path.splitext(target_path)[1] == ".md":
+    if (
+        os.path.isfile(target_path)
+        and os.path.splitext(target_path)[1] == ".md"
+        and not is_excluded(target_path)
+    ):
         pass
     elif (
         os.path.isdir(target_path)
         and os.path.isfile(os.path.join(target_path, "README.md"))
         and valid_hashtag
+        and not is_excluded(os.path.join(target_path, "README.md"))
     ):
         target_path = os.path.join(target_path, "README.md")
     else:
@@ -241,8 +257,10 @@ def replace_relpath_with_url(relpath, src_doc_path):
     if os.path.exists(target_path) and (
         os.path.isdir(target_path)
         and valid_hashtag
+        and not is_excluded(os.path.join(target_path, "README.md"))
         or os.path.isfile(target_path)
         and os.path.splitext(target_path)[1] == ".md"
+        and not is_excluded(target_path)
     ):
         return relpath
     else:
@@ -288,6 +306,9 @@ def preprocess_docs(excluded_paths=[]):
 
     # Read, preprocess and write to each doc file
     for doc_path in docs_list:
+        if is_excluded(doc_path):
+            continue
+
         doc_path = os.path.abspath(doc_path)
         content = None
         with open(doc_path, "r") as f:
