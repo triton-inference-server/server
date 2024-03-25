@@ -205,7 +205,7 @@ A typical output in the log for _Model 'peoplenet' Stats_ looks as follows:
    ]
 }
 
-TOTAL INFERENCE TIME: 174ms
+"TOTAL INFERENCE TIME: 174ms"
 ```
 
 To learn about different statistics check out the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md#statistics-extension).
@@ -314,7 +314,7 @@ Take a look at _Model 'peoplenet' Stats_ and _TOTAL INFERENCE TIME_ to see the e
    ]
 }
 
-TOTAL INFERENCE TIME: 162ms
+"TOTAL INFERENCE TIME: 162ms"
 ```
 
 Notice that this time the model was executed only twice (as indicated by `execution_count`). Also, unlike in the previous example, the `batch_stats` part of the statitstics looks different: we see that our model was executed one time with `batch = 1` and the second time with `batch = 5`. It helped to decrease the total inference time.
