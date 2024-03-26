@@ -34,37 +34,42 @@ parser.add_argument("--github-organization", help="GitHub organization name")
 
 
 def setup_logger():
+    """
+    This function is to setup logging
+    """
     # Create a custom logger
     logger = logging.getLogger(__name__)
-
     # Set the log level
     logger.setLevel(logging.INFO)
-
     # Create handlers
     file_handler = logging.FileHandler("/tmp/docs.log")
-
     # Create formatters and add it to the handlers
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     file_handler.setFormatter(formatter)
-
     # Add handlers to the logger
     logger.addHandler(file_handler)
-
     return logger
 
 
 def log_message(message):
+    """
+    This function is for logging to /tmp
+    - message: Message to log
+    """
     # Setup the logger
     logger = setup_logger()
-
     # Log the message
     logger.info(message)
 
 
 def run_command(command):
-    print(command)
+    """
+    This function runs any command using subprocess and logs failures
+    - command: Command to execute
+    """
+    log_message(f"Running command: {command}")
     try:
         result = subprocess.run(
             command,
@@ -74,7 +79,6 @@ def run_command(command):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        log_message(result.stdout)
     except subprocess.CalledProcessError as e:
         log_message(f"Error executing command: {e.cmd}")
         log_message(e.output)
@@ -82,6 +86,12 @@ def run_command(command):
 
 
 def clone_from_github(repo, tag, org):
+    """
+    This function clones from github, in-sync with build.py
+    - repo: Repo Name
+    - tag: Tag Name
+    - org: Org Name
+    """
     # Construct the full GitHub repository URL
     repo_url = f"https://github.com/{org}/{repo}.git"
     print(repo_url)
@@ -97,7 +107,6 @@ def clone_from_github(repo, tag, org):
         ]
     else:
         clone_command = ["git", "clone", repo_url]
-
     # Execute the git clone command
     try:
         subprocess.run(clone_command, check=True)
@@ -302,22 +311,25 @@ def main():
     repo_tags = parse_repo_tag(args.repo_tag) if args.repo_tag else {}
     backend_tags = parse_repo_tag(args.backend) if args.backend else {}
     github_org = args.github_organization
-    print("Parsed repository tags:", repo_tags)
-    print("Parsed repository tags:", backend_tags)
 
     # Change working directory to server/docs.
     os.chdir(server_docs_dir_path)
 
+    # Usage generate_docs.py --repo-tag=client:main
     if "client" in repo_tags:
         clone_from_github("client", repo_tags["client"], github_org)
+
+    # Usage generate_docs.py --repo-tag=python_backend:main
     if "python_backend" in repo_tags:
         clone_from_github("python_backend", repo_tags["python_backend"], github_org)
+
+    # Usage generate_docs.py --backend-tag=custom_backend:main
+    # Custom backend can be anything currently empty
     if "custom_backend" in backend_tags:
         clone_from_github("custom_backend", backend_tags["custom_backend"], github_org)
 
     # Preprocess documents in server_docs_dir_path after all repos are cloned.
     preprocess_docs()
-    log_message("Running Docker CREATE")
     run_command("make html")
 
     # Clean up working directory.
