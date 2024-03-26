@@ -81,6 +81,24 @@ def run_command(command):
         log_message(e.stderr)
 
 
+def run_command(command):
+    print(command)
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        log_message(result.stdout)
+    except subprocess.CalledProcessError as e:
+        log_message(f"Error executing command: {e.cmd}")
+        log_message(e.output)
+        log_message(e.stderr)
+
+
 def clone_from_github(repo, tag, org):
     # Construct the full GitHub repository URL
     repo_url = f"https://github.com/{org}/{repo}.git"
@@ -318,8 +336,11 @@ def main():
 
     # Preprocess after all repos are cloned
     preprocess_docs(excluded_paths=["build"])
+    log_message("Running Docker CREATE")
+    run_command("make html")
 
     # clean up workspace
+    os.chdir(SERVER_REPO_PATH)
     if "client" in repo_tags:
         subprocess.run(["rm", "-rf", "docs/client"], check=True)
     if "python_backend" in repo_tags:
