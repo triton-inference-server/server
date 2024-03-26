@@ -264,34 +264,36 @@ def replace_hyperlink(m, src_doc_path):
     return m.group(1) + res + m.group(3)
 
 
-def preprocess_docs(excluded_paths=[]):
+def preprocess_docs(exclude_paths=[]):
     # Find all ".md" files inside the current repo.
-    cmd = (
-        ["find", ".", "-type", "d", "\\("]
-        + " -o ".join([f"-path './{dir}'" for dir in excluded_paths]).split(" ")
-        + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
-    )
+    if exclude_paths:
+        cmd = (
+            ["find", server_docs_dir_path, "-type", "d", "\\("]
+            + " -o ".join([f"-path './{dir}'" for dir in exclude_paths]).split(" ")
+            + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
+        )
+    else:
+        cmd = f"find {server_docs_dir_path} -name '.md'"
     cmd = " ".join(cmd)
     result = subprocess.run(cmd, check=True, capture_output=True, text=True, shell=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
 
     # Read, preprocess and write back to each document file.
-    for doc_path in docs_list:
-        if is_excluded(doc_path):
+    for doc_abspath in docs_list:
+        if is_excluded(doc_abspath):
             continue
 
-        doc_path = os.path.abspath(doc_path)
         content = None
-        with open(doc_path, "r") as f:
+        with open(doc_abspath, "r") as f:
             content = f.read()
 
         content = re.sub(
             hyperlink_reg,
-            partial(replace_hyperlink, src_doc_path=doc_path),
+            partial(replace_hyperlink, src_doc_path=doc_abspath),
             content,
         )
 
-        with open(doc_path, "w") as f:
+        with open(doc_abspath, "w") as f:
             f.write(content)
 
 
