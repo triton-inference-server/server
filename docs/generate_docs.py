@@ -273,7 +273,7 @@ def preprocess_docs(exclude_paths=[]):
             + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
         )
     else:
-        cmd = ["find", server_docs_dir_path, "-name", ".md"]
+        cmd = ["find", server_docs_dir_path, "-name", "'*.md'"]
     cmd = " ".join(cmd)
     result = subprocess.run(cmd, check=True, capture_output=True, text=True, shell=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
@@ -317,7 +317,6 @@ def main():
 
     # Preprocess documents in server_docs_dir_path after all repos are cloned.
     preprocess_docs()
-    log_message("Running Docker CREATE")
     run_command("make html")
 
     # Clean up working directory.
