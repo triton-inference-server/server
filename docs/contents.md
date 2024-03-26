@@ -30,7 +30,6 @@
 :maxdepth: 1
 :caption: Getting Started
 
-index
 getting_started/quickstart
 ```
 
