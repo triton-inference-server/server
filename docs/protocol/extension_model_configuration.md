@@ -63,7 +63,7 @@ $model_configuration_response =
 
 The contents of the response will be the JSON representation of the
 model's configuration described by the [ModelConfig message from
-model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+model_config.proto](#restricted-protocols).
 
 A failed model configuration request must be indicated by an HTTP
 error status (typically 400). The HTTP body must contain the
@@ -115,4 +115,4 @@ message ModelConfigResponse
 ```
 
 Where the ModelConfig message is defined in
-[model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+[model_config.proto](../protocol#restricted-protocols).
