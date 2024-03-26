@@ -7,11 +7,9 @@ import sys
 from collections import defaultdict
 from functools import partial
 
-# from docs.tests.test import run_test
+from conf import exclude_patterns
 
 # global variables
-exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer.md"]
-
 SERVER_REPO_PATH = os.getcwd()
 SERVER_DOCS_DIR_PATH = os.path.join(os.getcwd(), "docs")
 
