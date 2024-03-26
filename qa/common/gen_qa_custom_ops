@@ -124,12 +124,15 @@ if [ $? -ne 0 ]; then
 fi
 
 # PyTorch
+
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
+cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 
