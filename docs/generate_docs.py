@@ -9,18 +9,20 @@ from functools import partial
 
 from conf import exclude_patterns
 
-# global variables
-SERVER_REPO_PATH = os.getcwd()
-SERVER_DOCS_DIR_PATH = os.path.join(os.getcwd(), "docs")
+# Global constants
+server_repo_path = os.getcwd()
+server_docs_dir_path = os.path.join(os.getcwd(), "docs")
 
-HTTP_REG = r"^https?://"
-TAG_REG = "/(?:blob|tree)/main"
-TRITON_REPO_REG = rf"{HTTP_REG}github.com/triton-inference-server"
-TRITON_GITHUB_URL_REG = rf"{TRITON_REPO_REG}/([^/#]+)(?:{TAG_REG})?/*([^#]*)\s*(?=#|$)"
-RELPATH_REG = r"]\s*\(\s*([^)]+)\)"
-# regex pattern to find all references excluding embedded images in a .md file.
-REFERENCE_REG = r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))"
+# Regex patterns
+http_reg = r"^https?://"
+tag_reg = "/(?:blob|tree)/main"
+triton_repo_reg = rf"{http_reg}github.com/triton-inference-server"
+triton_github_url_reg = rf"{triton_repo_reg}/([^/#]+)(?:{tag_reg})?/*([^#]*)\s*(?=#|$)"
+relpath_reg = r"]\s*\(\s*([^)]+)\)"
+# Hyperlink excluding embedded images in a .md file.
+hyperlink_reg = r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))"
 
+# Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
 parser.add_argument(
     "--repo-tag", action="append", help="Repository tags in format key:value"
@@ -59,24 +61,6 @@ def log_message(message):
 
     # Log the message
     logger.info(message)
-
-
-def run_command(command):
-    print(command)
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            check=True,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        log_message(result.stdout)
-    except subprocess.CalledProcessError as e:
-        log_message(f"Error executing command: {e.cmd}")
-        log_message(e.output)
-        log_message(e.stderr)
 
 
 def run_command(command):
@@ -156,16 +140,23 @@ def get_git_repo_name(file_path):
     except subprocess.CalledProcessError:
         return None
 
-    # Extract repository name from the remote URL
+    # Extract repository name from the remote URL.
     if remote_url.endswith(".git"):
-        remote_url = remote_url[:-4]  # Remove '.git' extension
+        # Remove '.git' extension.
+        remote_url = remote_url[:-4]
     repo_name = os.path.basename(remote_url)
     return repo_name
 
 
 def replace_url_with_relpath(url, src_doc_path):
-    m = re.match(TRITON_GITHUB_URL_REG, url)
-    # Do not replace URL if it is not a Triton GitHub file
+    """
+    This function replaces Triton Inference Server GitHub URLs with relative paths in following cases.
+    1. URL is a doc file not in exclude_patterns, e.g. ".md" file.
+    2. URL is a directory which contains README.md and URL ends with a hashtag.
+        README.md is not in exclude_patterns.
+    """
+    m = re.match(triton_github_url_reg, url)
+    # Do not replace URL if it is not a Triton GitHub file.
     if not m:
         return url
 
@@ -175,21 +166,16 @@ def replace_url_with_relpath(url, src_doc_path):
     valid_hashtag = section not in ["", "#"] and section.startswith("#")
 
     if target_repo_name == "server":
-        target_path = os.path.join(SERVER_REPO_PATH, target_relpath_from_target_repo)
+        target_path = os.path.join(server_repo_path, target_relpath_from_target_repo)
     else:
         target_path = os.path.join(
-            SERVER_DOCS_DIR_PATH, target_repo_name, target_relpath_from_target_repo
+            server_docs_dir_path, target_repo_name, target_relpath_from_target_repo
         )
 
     # Return URL if it points to a path outside server/docs.
-    if os.path.commonpath([SERVER_DOCS_DIR_PATH, target_path]) != SERVER_DOCS_DIR_PATH:
+    if os.path.commonpath([server_docs_dir_path, target_path]) != server_docs_dir_path:
         return url
 
-    """
-    Only replace Triton Inference Server GitHub URLs with relative paths in following cases.
-    1. URL is a doc file, e.g. ".md" file.
-    2. URL is a directory which contains README.md and URL has a hashtag.
-    """
     if (
         os.path.isfile(target_path)
         and os.path.splitext(target_path)[1] == ".md"
@@ -206,12 +192,18 @@ def replace_url_with_relpath(url, src_doc_path):
     else:
         return url
 
-    # target_path must be a file at this line
+    # The "target_path" must be a file at this line.
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
-    return re.sub(TRITON_GITHUB_URL_REG, relpath, url, 1)
+    return re.sub(triton_github_url_reg, relpath, url, 1)
 
 
 def replace_relpath_with_url(relpath, src_doc_path):
+    """
+    TODO: Need to update comment
+    This function replaces relative paths with Triton Inference Server GitHub URLs in following cases.
+    1. Relative path is pointing to a directory or file inside the same repo (excluding server).
+    2. URL is a directory which contains README.md and URL has a hashtag.
+    """
     target_path = relpath.rsplit("#")[0]
     section = relpath[len(target_path) :]
     valid_hashtag = section not in ["", "#"] and section.startswith("#")
@@ -219,29 +211,18 @@ def replace_relpath_with_url(relpath, src_doc_path):
     target_path = os.path.normpath(target_path)
     src_git_repo_name = get_git_repo_name(src_doc_path)
 
-    """
-    TODO: Need to update comment
-    Only replace relative paths with Triton Inference Server GitHub URLs in following cases.
-    1. Relative path is pointing to a directory or file inside the same repo (excluding server).
-    2. URL is a directory which contains README.md and URL has a hashtag.
-    """
     url = f"https://github.com/triton-inference-server/{src_git_repo_name}/blob/main/"
     if src_git_repo_name == "server":
-        src_repo_abspath = SERVER_REPO_PATH
-        # TODO: assert the relative path not pointing to cloned repo, e.g. client
+        src_repo_abspath = server_repo_path
+        # TODO: Assert the relative path not pointing to cloned repo, e.g. client.
+        # This requires more information which may be stored in a global variable.
     else:
-        src_repo_abspath = os.path.join(SERVER_DOCS_DIR_PATH, src_git_repo_name)
+        src_repo_abspath = os.path.join(server_docs_dir_path, src_git_repo_name)
 
     # Assert target path is under the current repo directory.
     assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
-    # if not os.path.exists(target_path) or \
-    #    os.path.isfile(target_path) and os.path.splitext(target_path)[1] != ".md" or \
-    #    os.path.isdir(target_path) and not valid_hashtag:
-    #     return url + target_path_from_src_repo + section
-    # else:
-    #     return relpath
 
     if os.path.exists(target_path) and (
         os.path.isdir(target_path)
@@ -255,32 +236,36 @@ def replace_relpath_with_url(relpath, src_doc_path):
     else:
         return url + target_path_from_src_repo + section
 
+    # TODO: Compare which version is more concise
+    # if not os.path.exists(target_path) or \
+    #    os.path.isfile(target_path) and os.path.splitext(target_path)[1] != ".md" or \
+    #    os.path.isdir(target_path) and not valid_hashtag:
+    #     return url + target_path_from_src_repo + section
+    # else:
+    #     return relpath
 
-def replace_reference(m, src_doc_path):
-    # TODO: markdown allows <link>, e.g. <a href=[^>]+>. Whether we want to
+
+def replace_hyperlink(m, src_doc_path):
+    # TODO: Markdown allows <link>, e.g. <a href=[^>]+>. Whether we want to
     # find and replace the link depends on if they link to internal .md files
     # or allows relative paths. I haven't seen one such case in our doc so
     # should be safe for now.
     hyperlink_str = m.group(2)
-    match = re.match(HTTP_REG, hyperlink_str)
+    match = re.match(http_reg, hyperlink_str)
 
     if match:
-        # Hyperlink is a URL
+        # Hyperlink is a URL.
         res = replace_url_with_relpath(hyperlink_str, src_doc_path)
     else:
-        # Hyperlink is a relative path
+        # Hyperlink is a relative path.
         res = replace_relpath_with_url(hyperlink_str, src_doc_path)
 
-    # TODO: This needs improvement. One way is to replace m.group(2) only
+    # TODO: This can be improved. One way is to replace m.group(2) only.
     return m.group(1) + res + m.group(3)
 
 
 def preprocess_docs(excluded_paths=[]):
-    # find all ".md" files inside the current repo
-
-    # treat server repo as special case
-    # if repo == "server":
-    # find . -type d \( -path ./build -o -path ./client -o -path ./python_backend \) -prune -o -type f -name "*.md" -print
+    # Find all ".md" files inside the current repo.
     cmd = (
         ["find", ".", "-type", "d", "\\("]
         + " -o ".join([f"-path './{dir}'" for dir in excluded_paths]).split(" ")
@@ -288,12 +273,9 @@ def preprocess_docs(excluded_paths=[]):
     )
     cmd = " ".join(cmd)
     result = subprocess.run(cmd, check=True, capture_output=True, text=True, shell=True)
-    # else:
-    #     cmd = ["find", ".", "-name", "*.md"]
-    #     result = subprocess.run(cmd, check=True, capture_output=True, text=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
 
-    # Read, preprocess and write to each doc file
+    # Read, preprocess and write back to each document file.
     for doc_path in docs_list:
         if is_excluded(doc_path):
             continue
@@ -304,8 +286,8 @@ def preprocess_docs(excluded_paths=[]):
             content = f.read()
 
         content = re.sub(
-            REFERENCE_REG,
-            partial(replace_reference, src_doc_path=doc_path),
+            hyperlink_reg,
+            partial(replace_hyperlink, src_doc_path=doc_path),
             content,
         )
 
@@ -321,9 +303,8 @@ def main():
     print("Parsed repository tags:", repo_tags)
     print("Parsed repository tags:", backend_tags)
 
-    # docs_dir_name = "docs"
-    # Path
-    os.chdir(SERVER_DOCS_DIR_PATH)
+    # Change working directory to server/docs.
+    os.chdir(server_docs_dir_path)
 
     if "client" in repo_tags:
         clone_from_github("client", repo_tags["client"], github_org)
@@ -332,19 +313,21 @@ def main():
     if "custom_backend" in backend_tags:
         clone_from_github("custom_backend", backend_tags["custom_backend"], github_org)
 
-    # Preprocess after all repos are cloned
-    preprocess_docs(excluded_paths=["build"])
+    # Preprocess documents in server_docs_dir_path after all repos are cloned.
+    preprocess_docs()
     log_message("Running Docker CREATE")
     run_command("make html")
 
-    # clean up workspace
-    os.chdir(SERVER_REPO_PATH)
+    # Clean up working directory.
     if "client" in repo_tags:
-        subprocess.run(["rm", "-rf", "docs/client"], check=True)
+        run_command("rm -rf client")
     if "python_backend" in repo_tags:
-        subprocess.run(["rm", "-rf", "docs/python_backend"], check=True)
+        run_command("rm -rf python_backend")
     if "custom_backend" in backend_tags:
-        subprocess.run(["rm", "-rf", "docs/custom_backend"], check=True)
+        run_command("rm -rf custom_backend")
+
+    # Return to previous working directory server/.
+    os.chdir(server_repo_path)
 
 
 if __name__ == "__main__":
