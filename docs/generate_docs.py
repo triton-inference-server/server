@@ -273,7 +273,7 @@ def preprocess_docs(exclude_paths=[]):
             + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
         )
     else:
-        cmd = f"find {server_docs_dir_path} -name '.md'"
+        cmd = ["find", server_docs_dir_path, "-name", ".md"]
     cmd = " ".join(cmd)
     result = subprocess.run(cmd, check=True, capture_output=True, text=True, shell=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
