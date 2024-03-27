@@ -1417,7 +1417,6 @@ CommonHandler::RegisterTrace()
     (*response->mutable_settings())["log_frequency"].add_value(
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);
-    LOG_VERBOSE(1) << "Adding trace_mode " << trace_mode;
     (*response->mutable_settings())["trace_mode"].add_value(
         trace_manager_->InferenceTraceModeString(trace_mode));
     {

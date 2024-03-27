@@ -2000,7 +2000,6 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       trace_response.AddString("log_frequency", std::to_string(log_frequency)));
   RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_file", filepath));
-  LOG_VERBOSE(1) << "Adding trace_mode " << trace_mode;
   RETURN_AND_RESPOND_IF_ERR(
       req,
       trace_response.AddString(
