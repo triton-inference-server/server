@@ -64,6 +64,7 @@ namespace triton { namespace server {
 
 using TraceConfig = std::vector<
     std::pair<std::string, std::variant<std::string, int, uint32_t>>>;
+    // Key is trace mode, 
 using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 using AbstractCarrier = otel_cntxt::propagation::TextMapCarrier;
@@ -168,7 +169,7 @@ class TraceManager {
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-      std::string* filepath);
+      std::string* filepath, InferenceTraceMode* mode, TraceConfigMap* config_map);
 
   // Sets provided TraceSetting with correct trace settings for provided model.
   void GetTraceSetting(
