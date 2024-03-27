@@ -2006,8 +2006,10 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     auto mode_key = std::to_string(trace_mode);
     auto trace_options_it = config_map.find(mode_key);
     if (trace_options_it != config_map.end()) {
-      LOG_VERBOSE(1) << "Adding config_map of size " << config_map.size() << "\n";
       for (const auto& element : trace_options_it->second) {
+        if((element.first == "file") || (element.first == "log-frequency")) {
+          continue;
+        }
         std::string valueAsString;
         if (std::holds_alternative<std::string>(element.second)) {
           valueAsString = std::get<std::string>(element.second);
@@ -2016,10 +2018,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         } else if (std::holds_alternative<uint32_t>(element.second)) {
           valueAsString = std::to_string(std::get<uint32_t>(element.second));
         }
-        LOG_VERBOSE(1) << "Adding key " << element.first.c_str() << "Adding value " << valueAsString << "\n";
         RETURN_AND_RESPOND_IF_ERR(
             req, trace_response.AddString(element.first.c_str(), valueAsString));
       }
+    } else {
+      LOG_VERBOSE(1) << "Trace Config Empty";
     }
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_AND_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
