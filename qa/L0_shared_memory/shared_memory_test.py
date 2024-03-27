@@ -123,7 +123,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         util.kill_server(self._server_process)
         # Restore stdout / stderr so we can print to console and see server
         # output in CI even after logs expire. Print test result to client
-        # before doing so.
+        # before doing so for legibility.
         if not self._test_passed:
             print("*\n*\n*\nTest Failed\n*\n*\n*\n")
         util.stream_to_console(self._original_stdout, self._original_stderr)
@@ -294,9 +294,9 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 1)
+            self.assertEqual(len(shm_status), 1)
         else:
-            self.assertTrue(len(shm_status.regions) == 1)
+            self.assertEqual(len(shm_status.regions), 1)
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -316,9 +316,9 @@ class SharedMemoryTest(tu.TestResultCollector):
         self._triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 0)
+            self.assertEqual(len(shm_status), 0)
         else:
-            self.assertTrue(len(shm_status.regions) == 0)
+            self.assertEqual(len(shm_status.regions), 0)
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -340,9 +340,9 @@ class SharedMemoryTest(tu.TestResultCollector):
         self._triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 0)
+            self.assertEqual(len(shm_status), 0)
         else:
-            self.assertTrue(len(shm_status.regions) == 0)
+            self.assertEqual(len(shm_status.regions), 0)
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -371,9 +371,9 @@ class SharedMemoryTest(tu.TestResultCollector):
             )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 1)
+            self.assertEqual(len(shm_status), 1)
         else:
-            self.assertTrue(len(shm_status.regions) == 1)
+            self.assertEqual(len(shm_status.regions), 1)
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -400,9 +400,9 @@ class SharedMemoryTest(tu.TestResultCollector):
         self._triton_client.unregister_system_shared_memory("output0_data")
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 3)
+            self.assertEqual(len(shm_status), 3)
         else:
-            self.assertTrue(len(shm_status.regions) == 3)
+            self.assertEqual(len(shm_status.regions), 3)
         self._cleanup_server(shm_handles)
         self._test_passed = True
 
@@ -433,9 +433,9 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(shm_status) == 5)
+            self.assertEqual(len(shm_status), 5)
         else:
-            self.assertTrue(len(shm_status.regions) == 5)
+            self.assertEqual(len(shm_status.regions), 5)
         shm_handles.append(shm_ip2_handle)
         self._cleanup_server(shm_handles)
         self._test_passed = True
@@ -502,15 +502,15 @@ class SharedMemoryTest(tu.TestResultCollector):
 
         status_before = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(status_before) == 4)
+            self.assertEqual(len(status_before), 4)
         else:
-            self.assertTrue(len(status_before.regions) == 4)
+            self.assertEqual(len(status_before.regions), 4)
         self._triton_client.unregister_system_shared_memory()
         status_after = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
-            self.assertTrue(len(status_after) == 0)
+            self.assertEqual(len(status_after), 0)
         else:
-            self.assertTrue(len(status_after.regions) == 0)
+            self.assertEqual(len(status_after.regions), 0)
         self._cleanup_server(shm_handles)
         self._test_passed = True
 

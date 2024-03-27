@@ -111,10 +111,11 @@ MapSharedMemory(
   if (*mapped_addr == NULL) {
     CloseSharedMemoryRegion(shm_handle);
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "unable to process address space: " +
-                                         std::to_string(GetLastError()))
-                                         .c_str());
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to process address space, error code: " +
+            std::to_string(GetLastError()))
+            .c_str());
   }
   return nullptr;
 }
@@ -191,7 +192,6 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   // Map and then close the shared memory handle
   TRITONSERVER_Error* err_map =
       MapSharedMemory(shm_handle, offset, byte_size, &mapped_addr);
-  // TODO: Test if we can close windows handles without invalidating mapping
   TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_handle);
   if (err_map != nullptr) {
     return TRITONSERVER_ErrorNew(
@@ -207,7 +207,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register shared memory region '" + name +
-            "': " + std::to_string(GetLastError()))
+            "' with error code: " + std::to_string(GetLastError()))
             .c_str());
   }
 
