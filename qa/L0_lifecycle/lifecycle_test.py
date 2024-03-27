@@ -2662,6 +2662,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send more requests and should be rejected
         try:
@@ -2721,6 +2722,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send requests with different characteristic
         # 1: New sequence with new sequence ID
@@ -2808,6 +2810,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Send signal to shutdown the server
         os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
 
         # Send more requests and should be rejected
         try:
@@ -3359,6 +3362,48 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertFalse(triton_client.is_model_ready(model_name))
         # The server will shutdown after this sub-test exits. The server must shutdown
         # without any hang or runtime error.
+
+    def test_shutdown_with_live_connection(self):
+        model_name = "add_sub"
+        model_shape = (16,)
+        from geventhttpclient.response import HTTPConnectionClosed
+
+        input_data = np.ones(shape=model_shape, dtype=np.float32)
+        inputs = [
+            httpclient.InferInput("INPUT0", model_shape, "FP32"),
+            httpclient.InferInput("INPUT1", model_shape, "FP32"),
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        inputs[1].set_data_from_numpy(input_data)
+
+        # start connection
+        conn = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        conn.infer(model_name, inputs)
+
+        # shutdown the server
+        os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(2)
+
+        # connection should still work
+        conn.infer(model_name, inputs)
+
+        # close connection
+        conn.close()
+        time.sleep(2)
+
+        # check exit timeout countdown did not restart
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertIn(
+            "Waiting for in-flight requests to complete.",
+            server_log,
+            "precondition not met - core shutdown did not begin",
+        )
+        self.assertEqual(
+            server_log.count("Timeout 30: "),
+            1,
+            "exit timeout countdown restart detected",
+        )
 
 
 if __name__ == "__main__":
