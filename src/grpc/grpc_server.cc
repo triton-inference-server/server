@@ -1422,8 +1422,10 @@ CommonHandler::RegisterTrace()
       auto mode_key = std::to_string(trace_mode);
       auto trace_options_it = config_map.find(mode_key);
       if (trace_options_it != config_map.end()) {
-        LOG_VERBOSE(1) << "Adding config_map of size " << config_map.size() << "\n";
         for (const auto& element : trace_options_it->second) {
+          if((element.first == "file") || (element.first == "log-frequency")) {
+            continue;
+          }
           std::string valueAsString;
           if (std::holds_alternative<std::string>(element.second)) {
             valueAsString = std::get<std::string>(element.second);
@@ -1432,11 +1434,10 @@ CommonHandler::RegisterTrace()
           } else if (std::holds_alternative<uint32_t>(element.second)) {
             valueAsString = std::to_string(std::get<uint32_t>(element.second));
           }
-          LOG_VERBOSE(1) << "Adding key " << element.first.c_str() << "Adding value " << valueAsString << "\n";
           (*response->mutable_settings())[element.first].add_value(valueAsString);
         }
       } else {
-        LOG_VERBOSE(1) << "Adding key ";
+        LOG_VERBOSE(1) << "Trace Config Empty";
       }
     }
   earlyexit:
