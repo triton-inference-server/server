@@ -74,8 +74,8 @@ TRITON_VERSION_MAP = {
         "24.04dev",  # triton container
         "24.02",  # upstream container
         "1.17.2",  # ORT
-        "2023.3.0",  # ORT OpenVINO
-        "2023.3.0",  # Standalone OpenVINO
+        "2024.0.0",  # ORT OpenVINO
+        "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
         "0.3.2",  # vLLM version
@@ -1144,6 +1144,17 @@ RUN ARCH="$(uname -i)" \\
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
+    if FLAGS.enable_intel_gpu and ("openvino" in backends):
+        df += """
+RUN apt-get update && apt-get install -y gpg-agent wget
+RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
+        gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy/lts/2350 unified" | \
+        tee /etc/apt/sources.list.d/intel-gpu-jammy.list
+RUN apt-get update && apt-get install -y intel-opencl-icd intel-level-zero-gpu level-zero
+
+"""
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -2281,6 +2292,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--enable-gpu", action="store_true", required=False, help="Enable GPU support."
+    )
+    parser.add_argument(
+        "--enable-intel-gpu", action="store_true", required=False, help="Enable Intel GPU support for OpenVINO backend."
     )
     parser.add_argument(
         "--enable-mali-gpu",
