@@ -1393,7 +1393,8 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath, &trace_mode, &config_map);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath,
+        &trace_mode, &config_map);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;
@@ -1417,13 +1418,14 @@ CommonHandler::RegisterTrace()
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);
     LOG_VERBOSE(1) << "Adding trace_mode " << trace_mode;
-    (*response->mutable_settings())["trace_mode"].add_value(std::to_string(trace_mode));
+    (*response->mutable_settings())["trace_mode"].add_value(
+        trace_manager_->InferenceTraceModeString(trace_mode));
     {
       auto mode_key = std::to_string(trace_mode);
       auto trace_options_it = config_map.find(mode_key);
       if (trace_options_it != config_map.end()) {
         for (const auto& element : trace_options_it->second) {
-          if((element.first == "file") || (element.first == "log-frequency")) {
+          if ((element.first == "file") || (element.first == "log-frequency")) {
             continue;
           }
           std::string valueAsString;
@@ -1434,7 +1436,8 @@ CommonHandler::RegisterTrace()
           } else if (std::holds_alternative<uint32_t>(element.second)) {
             valueAsString = std::to_string(std::get<uint32_t>(element.second));
           }
-          (*response->mutable_settings())[element.first].add_value(valueAsString);
+          (*response->mutable_settings())[element.first].add_value(
+              valueAsString);
         }
       } else {
         LOG_VERBOSE(1) << "Trace Config Empty";
