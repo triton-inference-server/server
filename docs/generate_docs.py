@@ -13,6 +13,7 @@ from conf import exclude_patterns
 server_repo_path = os.getcwd()
 server_docs_dir_path = os.path.join(os.getcwd(), "docs")
 
+# TODO: Branch is not always main.
 # Regex patterns
 http_reg = r"^https?://"
 tag_reg = "/(?:blob|tree)/main"
@@ -160,9 +161,19 @@ def get_git_repo_name(file_path):
 def replace_url_with_relpath(url, src_doc_path):
     """
     This function replaces Triton Inference Server GitHub URLs with relative paths in following cases.
-    1. URL is a doc file not in exclude_patterns, e.g. ".md" file.
-    2. URL is a directory which contains README.md and URL ends with a hashtag.
-        README.md is not in exclude_patterns.
+    1. URL is a doc file, e.g. ".md" file.
+    2. URL is a directory which contains README.md and URL ends with "#<section>".
+
+    Examples:
+        https://github.com/triton-inference-server/server/blob/main/docs/protocol#restricted-protocols
+        https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md
+        https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher
+
+    Keep URL in the following cases:
+        https://github.com/triton-inference-server/server/tree/r24.02
+        https://github.com/triton-inference-server/server/blob/main/build.py
+        https://github.com/triton-inference-server/server/blob/main/qa
+        https://github.com/triton-inference-server/server/blob/main/CONTRIBUTING.md
     """
     m = re.match(triton_github_url_reg, url)
     # Do not replace URL if it is not a Triton GitHub file.
@@ -208,14 +219,27 @@ def replace_url_with_relpath(url, src_doc_path):
 
 def replace_relpath_with_url(relpath, src_doc_path):
     """
-    TODO: Need to update comment
     This function replaces relative paths with Triton Inference Server GitHub URLs in following cases.
-    1. Relative path is pointing to a directory or file inside the same repo (excluding server).
-    2. URL is a directory which contains README.md and URL has a hashtag.
+    1. Relative path is a file that is not ".md" type inside the current repo.
+    2. Relative path is a directory but not (has "README.md" and ends with "#<section>").
+    3. Relative path does not exist (shows 404 page).
+
+    Examples:
+        ../examples/model_repository
+        ../examples/model_repository/inception_graphdef/config.pbtxt
+
+    Keep relpath in the following cases:
+        build.md
+        build.md#building-with-docker
+        #building-with-docker
+        ../getting_started/quickstart.md
+        ../protocol#restricted-protocols
     """
     target_path = relpath.rsplit("#")[0]
     section = relpath[len(target_path) :]
-    valid_hashtag = section not in ["", "#"] and section.startswith("#")
+    valid_hashtag = section not in ["", "#"]
+    if relpath.startswith("#"):
+        target_path = os.path.basename(src_doc_path)
     target_path = os.path.join(os.path.dirname(src_doc_path), target_path)
     target_path = os.path.normpath(target_path)
     src_git_repo_name = get_git_repo_name(src_doc_path)
@@ -233,25 +257,25 @@ def replace_relpath_with_url(relpath, src_doc_path):
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
 
-    if os.path.exists(target_path) and (
+    # For example, target_path of "../protocol#restricted-protocols" should be "<path-to-server>/server/docs/protocol/README.md"
+    if (
         os.path.isdir(target_path)
         and valid_hashtag
-        and not is_excluded(os.path.join(target_path, "README.md"))
-        or os.path.isfile(target_path)
+        and os.path.isfile(os.path.join(target_path, "README.md"))
+    ):
+        relpath = os.path.join(relpath.rsplit("#")[0], "README.md") + section
+        target_path = os.path.join(target_path, "README.md")
+
+    if (
+        os.path.isfile(target_path)
         and os.path.splitext(target_path)[1] == ".md"
+        and os.path.commonpath([server_docs_dir_path, target_path])
+        == server_docs_dir_path
         and not is_excluded(target_path)
     ):
         return relpath
     else:
         return url + target_path_from_src_repo + section
-
-    # TODO: Compare which version is more concise
-    # if not os.path.exists(target_path) or \
-    #    os.path.isfile(target_path) and os.path.splitext(target_path)[1] != ".md" or \
-    #    os.path.isdir(target_path) and not valid_hashtag:
-    #     return url + target_path_from_src_repo + section
-    # else:
-    #     return relpath
 
 
 def replace_hyperlink(m, src_doc_path):
