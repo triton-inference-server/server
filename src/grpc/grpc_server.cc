@@ -1184,6 +1184,8 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
+    InferenceTraceMode trace_mode;
+    TraceConfigMap config_map;
 
     if (!request.model_name().empty()) {
       bool ready = false;
@@ -1391,7 +1393,7 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath, &trace_mode, &config_map);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;
@@ -1414,7 +1416,29 @@ CommonHandler::RegisterTrace()
     (*response->mutable_settings())["log_frequency"].add_value(
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);
-
+    LOG_VERBOSE(1) << "Adding trace_mode " << trace_mode;
+    (*response->mutable_settings())["trace_mode"].add_value(std::to_string(trace_mode));
+    {
+      auto mode_key = std::to_string(trace_mode);
+      auto trace_options_it = config_map.find(mode_key);
+      if (trace_options_it != config_map.end()) {
+        LOG_VERBOSE(1) << "Adding config_map of size " << config_map.size() << "\n";
+        for (const auto& element : trace_options_it->second) {
+          std::string valueAsString;
+          if (std::holds_alternative<std::string>(element.second)) {
+            valueAsString = std::get<std::string>(element.second);
+          } else if (std::holds_alternative<int>(element.second)) {
+            valueAsString = std::to_string(std::get<int>(element.second));
+          } else if (std::holds_alternative<uint32_t>(element.second)) {
+            valueAsString = std::to_string(std::get<uint32_t>(element.second));
+          }
+          LOG_VERBOSE(1) << "Adding key " << element.first.c_str() << "Adding value " << valueAsString << "\n";
+          (*response->mutable_settings())[element.first].add_value(valueAsString);
+        }
+      } else {
+        LOG_VERBOSE(1) << "Adding key ";
+      }
+    }
   earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
