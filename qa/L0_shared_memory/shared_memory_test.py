@@ -247,9 +247,9 @@ class SharedMemoryTest(tu.TestResultCollector):
             shm.destroy_shared_memory_region(shm_op0_handle)
         except Exception as ex:
             if self._test_windows:
-                self.assertTrue(str(ex) == "unable to create file mapping")
+                self.assertEqual(str(ex), "unable to create file mapping")
             else:
-                self.assertTrue(str(ex) == "unable to initialize the size")
+                self.assertEqual(str(ex), "unable to initialize the size")
         self._test_passed = True
 
     @parameterized.expand([("grpc"), ("http")])
@@ -271,7 +271,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             )
         except Exception as ex:
             print(str(ex))
-            self.assertTrue("Unable to open shared memory region" in str(ex))
+            self.assertIn("Unable to open shared memory region", str(ex))
         self._test_passed = True
 
     @parameterized.expand([("grpc"), ("http")])
@@ -366,8 +366,8 @@ class SharedMemoryTest(tu.TestResultCollector):
                 "dummy_data", "/dummy_data", 8
             )
         except Exception as ex:
-            self.assertTrue(
-                "shared memory region 'dummy_data' already in manager" in str(ex)
+            self.assertIn(
+                "shared memory region 'dummy_data' already in manager", str(ex)
             )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
