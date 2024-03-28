@@ -65,18 +65,6 @@ FROM ${BASE_IMAGE} as build_base
 
 SHELL ["cmd", "/S", "/C"]
 
-ARG CUDNN_VERSION
-ENV CUDNN_VERSION ${CUDNN_VERSION}
-COPY --from=dependency_base /cudnn /cudnn
-RUN setx PATH "c:\cudnn\bin;c:\cudnn\lib\x64;c:\cudnn\include;%PATH%"
-LABEL CUDNN_VERSION="${CUDNN_VERSION}"
-
-ARG TENSORRT_VERSION
-ENV TRT_VERSION ${TENSORRT_VERSION}
-COPY --from=dependency_base /TensorRT /TensorRT
-RUN setx PATH "c:\TensorRT\lib;%PATH%"
-LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
-
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
@@ -87,13 +75,13 @@ RUN choco install git docker unzip -y
 #
 # Installing python
 #
-ARG PYTHON_VERSION=3.10.11
+ARG PYTHON_VERSION=3.8.10
 ARG PYTHON_SOURCE=https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-amd64.exe
 ADD ${PYTHON_SOURCE} python-${PYTHON_VERSION}-amd64.exe
 RUN python-%PYTHON_VERSION%-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 Include_doc=0 TargetDir="C:\python%PYTHON_VERSION%"
 RUN mklink "C:\python%PYTHON_VERSION%\python3.exe" "C:\python%PYTHON_VERSION%\python.exe"
 RUN pip install --upgrade wheel setuptools docker
-RUN pip install grpcio-tools
+RUN pip install grpcio-tools psutil
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
 
@@ -101,9 +89,17 @@ LABEL PYTHON_VERSION=${PYTHON_VERSION}
 # Installing CMake
 #
 ARG CMAKE_VERSION=3.27.1
-RUN pip install cmake==%CMAKE_VERSION%
+ARG CMAKE_FILE=cmake-${CMAKE_VERSION}-windows-x86_64
+ARG CMAKE_SOURCE=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_FILE}.zip
+
+ADD ${CMAKE_SOURCE} ${CMAKE_FILE}.zip
+RUN unzip %CMAKE_FILE%.zip
+RUN move %CMAKE_FILE% "c:\CMake"
+RUN setx PATH "c:\CMake\bin;%PATH%"
+
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
+
 LABEL CMAKE_VERSION=${CMAKE_VERSION}
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
@@ -189,6 +185,20 @@ RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v170\BuildCustomizations"
 
 RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
+
+ARG CUDNN_VERSION
+ENV CUDNN_VERSION ${CUDNN_VERSION}
+COPY --from=dependency_base /cudnn /cudnn
+RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+LABEL CUDNN_VERSION="${CUDNN_VERSION}"
+
+ARG TENSORRT_VERSION
+ENV TRT_VERSION ${TENSORRT_VERSION}
+COPY --from=dependency_base /TensorRT /TensorRT
+RUN setx PATH "c:\TensorRT\lib;%PATH%"
+LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 
 LABEL CUDA_VERSION="${CUDA_VERSION}"
 # It is important that the entrypoint initialize VisualStudio

@@ -285,7 +285,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 
 ## Pinned Memory Metrics
 
-Starting in 24.02, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
+Starting in 24.03, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
 
 |Category        |Metric            |Metric Name                 |Description                                            |Granularity|Frequency    |
 |----------------|------------------|----------------------------|-------------------------------------------------------|-----------|-------------|
