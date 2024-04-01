@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,47 +24,37 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-source ../../common/util.sh
+import asyncio
 
-RET=0
+import triton_python_backend_utils as pb_utils
 
-#
-# Test execution overlapping on the same instance
-#
-rm -rf models && mkdir models
-mkdir -p models/async_execute_decouple/1 && \
-    cp ../../python_models/async_execute_decouple/model.py models/async_execute_decouple/1 && \
-    cp ../../python_models/async_execute_decouple/config.pbtxt models/async_execute_decouple
-mkdir -p models/async_execute_decouple_bls/1 && \
-    cp ../../python_models/async_execute_decouple_bls/model.py models/async_execute_decouple_bls/1 && \
-    cp ../../python_models/async_execute_decouple_bls/config.pbtxt models/async_execute_decouple_bls
 
-TEST_LOG="concurrency_test.log"
-SERVER_LOG="concurrency_test.server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/async_execute/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+class TritonPythonModel:
+    async def _execute_a_request(self, request):
+        input_tensor = pb_utils.get_input_tensor_by_name(
+            request, "WAIT_SECONDS"
+        ).as_numpy()
+        bls_input_tensor = pb_utils.Tensor("WAIT_SECONDS", input_tensor)
+        bls_request = pb_utils.InferenceRequest(
+            model_name="async_execute_decouple",
+            inputs=[bls_input_tensor],
+            requested_output_names=["DUMMY_OUT"],
+        )
+        bls_responses = await bls_request.async_exec(decoupled=True)
+        response_sender = request.get_response_sender()
+        for bls_response in bls_responses:
+            bls_output_tensor = pb_utils.get_output_tensor_by_name(
+                bls_response, "DUMMY_OUT"
+            ).as_numpy()
+            output_tensor = pb_utils.Tensor("DUMMY_OUT", bls_output_tensor)
+            response = pb_utils.InferenceResponse(output_tensors=[output_tensor])
+            response_sender.send(response)
+        response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-SERVER_LOG=$SERVER_LOG python3 -m pytest --junitxml=concurrency_test.report.xml concurrency_test.py > $TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** async execute concurrency test FAILED\n***"
-    cat $TEST_LOG
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if [ $RET -eq 1 ]; then
-    echo -e "\n***\n*** Async execute test FAILED\n***"
-else
-    echo -e "\n***\n*** Async execute test Passed\n***"
-fi
-exit $RET
+    async def execute(self, requests):
+        async_futures = []
+        for request in requests:
+            async_future = self._execute_a_request(request)
+            async_futures.append(async_future)
+        await asyncio.gather(*async_futures)
+        return None

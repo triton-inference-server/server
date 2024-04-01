@@ -46,8 +46,7 @@ class ConcurrencyTest(unittest.TestCase):
         return callback, response
 
     # Helper for testing concurrent execution
-    def _concurrent_execute_requests(self, batch_size, number_of_requests):
-        model_name = "async_execute_decouple"
+    def _concurrent_execute_requests(self, model_name, batch_size, number_of_requests):
         delay_secs = 4
         shape = [batch_size, 1]
         inputs = [grpcclient.InferInput("WAIT_SECONDS", shape, "FP32")]
@@ -76,11 +75,27 @@ class ConcurrencyTest(unittest.TestCase):
 
     # Test batched requests are executed concurrently
     def test_concurrent_execute_single_request(self):
-        self._concurrent_execute_requests(batch_size=4, number_of_requests=1)
+        self._concurrent_execute_requests(
+            model_name="async_execute_decouple", batch_size=4, number_of_requests=1
+        )
 
     # Test multiple requests are executed concurrently
     def test_concurrent_execute_multi_request(self):
-        self._concurrent_execute_requests(batch_size=1, number_of_requests=4)
+        self._concurrent_execute_requests(
+            model_name="async_execute_decouple", batch_size=1, number_of_requests=4
+        )
+
+    # Test batched requests are executed concurrently via bls
+    def test_concurrent_execute_single_request_bls(self):
+        self._concurrent_execute_requests(
+            model_name="async_execute_decouple_bls", batch_size=4, number_of_requests=1
+        )
+
+    # Test multiple requests are executed concurrently via bls
+    def test_concurrent_execute_multi_request_bls(self):
+        self._concurrent_execute_requests(
+            model_name="async_execute_decouple_bls", batch_size=1, number_of_requests=4
+        )
 
     # Test model exception handling
     def test_model_raise_exception(self):

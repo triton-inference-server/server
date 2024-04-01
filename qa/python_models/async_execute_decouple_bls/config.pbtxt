@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,47 +24,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-source ../../common/util.sh
+backend: "python"
+max_batch_size: 8
 
-RET=0
+input [
+  {
+    name: "WAIT_SECONDS"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "DUMMY_OUT"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
 
-#
-# Test execution overlapping on the same instance
-#
-rm -rf models && mkdir models
-mkdir -p models/async_execute_decouple/1 && \
-    cp ../../python_models/async_execute_decouple/model.py models/async_execute_decouple/1 && \
-    cp ../../python_models/async_execute_decouple/config.pbtxt models/async_execute_decouple
-mkdir -p models/async_execute_decouple_bls/1 && \
-    cp ../../python_models/async_execute_decouple_bls/model.py models/async_execute_decouple_bls/1 && \
-    cp ../../python_models/async_execute_decouple_bls/config.pbtxt models/async_execute_decouple_bls
-
-TEST_LOG="concurrency_test.log"
-SERVER_LOG="concurrency_test.server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/async_execute/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-SERVER_LOG=$SERVER_LOG python3 -m pytest --junitxml=concurrency_test.report.xml concurrency_test.py > $TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** async execute concurrency test FAILED\n***"
-    cat $TEST_LOG
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if [ $RET -eq 1 ]; then
-    echo -e "\n***\n*** Async execute test FAILED\n***"
-else
-    echo -e "\n***\n*** Async execute test Passed\n***"
-fi
-exit $RET
+instance_group [{ kind: KIND_CPU }]
+model_transaction_policy { decoupled: True }
