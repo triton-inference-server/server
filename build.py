@@ -944,8 +944,11 @@ RUN apt-get update \\
             wget \\
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip && \\
-    pip3 install --upgrade wheel setuptools docker
+RUN pip3 install --upgrade pip \\
+    && pip3 install --upgrade \\
+          wheel \\
+          setuptools \\
+          docker
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
