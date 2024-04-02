@@ -847,9 +847,9 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \
-    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
+RUN curl -o /tmp/cuda-keyring.deb \\
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \\
+    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \\
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
@@ -858,9 +858,9 @@ RUN curl -o /tmp/cuda-keyring.deb \
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \
-    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
+RUN curl -o /tmp/cuda-keyring.deb \\
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \\
+    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \\
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
@@ -894,16 +894,16 @@ SHELL ["cmd", "/S", "/C"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install docker docker buildx
-RUN apt-get update \
-        && apt-get install -y ca-certificates curl gnupg \
-        && install -m 0755 -d /etc/apt/keyrings \
-        && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-        && chmod a+r /etc/apt/keyrings/docker.gpg \
-        && echo \
-            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-            tee /etc/apt/sources.list.d/docker.list > /dev/null \
-        && apt-get update \
+RUN apt-get update \\
+        && apt-get install -y ca-certificates curl gnupg \\
+        && install -m 0755 -d /etc/apt/keyrings \\
+        && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \\
+        && chmod a+r /etc/apt/keyrings/docker.gpg \\
+        && echo \\
+            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\
+            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \\
+            tee /etc/apt/sources.list.d/docker.list > /dev/null \\
+        && apt-get update \\
         && apt-get install -y docker.io docker-buildx-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
@@ -911,45 +911,45 @@ RUN apt-get update \
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-            ca-certificates \
-            autoconf \
-            automake \
-            build-essential \
-            git \
-            gperf \
-            libre2-dev \
-            libssl-dev \
-            libtool \
-            libcurl4-openssl-dev \
-            libb64-dev \
-            libgoogle-perftools-dev \
-            patchelf \
-            python3-dev \
-            python3-pip \
-            python3-setuptools \
-            rapidjson-dev \
-            scons \
-            software-properties-common \
-            pkg-config \
-            unzip \
-            wget \
-            zlib1g-dev \
-            libarchive-dev \
-            libxml2-dev \
-            libnuma-dev \
-            wget \
+RUN apt-get update \\
+    && apt-get install -y --no-install-recommends \\
+            ca-certificates \\
+            autoconf \\
+            automake \\
+            build-essential \\
+            git \\
+            gperf \\
+            libre2-dev \\
+            libssl-dev \\
+            libtool \\
+            libcurl4-openssl-dev \\
+            libb64-dev \\
+            libgoogle-perftools-dev \\
+            patchelf \\
+            python3-dev \\
+            python3-pip \\
+            python3-setuptools \\
+            rapidjson-dev \\
+            scons \\
+            software-properties-common \\
+            pkg-config \\
+            unzip \\
+            wget \\
+            zlib1g-dev \\
+            libarchive-dev \\
+            libxml2-dev \\
+            libnuma-dev \\
+            wget \\
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip && \
+RUN pip3 install --upgrade pip && \\
     pip3 install --upgrade wheel setuptools docker
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \
-        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \
-    (cd /tmp && tar xzf boost.tar.gz) && \
+RUN wget -O /tmp/boost.tar.gz \\
+        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \\
+    (cd /tmp && tar xzf boost.tar.gz) && \\
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
@@ -1163,11 +1163,11 @@ ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
-        useradd $TRITON_SERVER_USER; \
-    fi && \
-    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
+RUN userdel tensorrt-server > /dev/null 2>&1 || true && \\
+    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
+        useradd $TRITON_SERVER_USER; \\
+    fi && \\
+    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \\
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
 # Ensure apt-get won't prompt for selecting options
@@ -1175,22 +1175,22 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-            clang \
-            curl \
-            dirmngr \
-            git \
-            gperf \
-            libb64-0d \
-            libcurl4-openssl-dev \
-            libgoogle-perftools-dev \
-            libjemalloc-dev \
-            libnuma-dev \
-            libre2-9 \
-            software-properties-common \
-            wget \
-            {backend_dependencies} \
+RUN apt-get update \\
+    && apt-get install -y --no-install-recommends \\
+            clang \\
+            curl \\
+            dirmngr \\
+            git \\
+            gperf \\
+            libb64-0d \\
+            libcurl4-openssl-dev \\
+            libgoogle-perftools-dev \\
+            libjemalloc-dev \\
+            libnuma-dev \\
+            libre2-9 \\
+            software-properties-common \\
+            wget \\
+            {backend_dependencies} \\
     && rm -rf /var/lib/apt/lists/*
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
@@ -1216,9 +1216,9 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
         df += """
 # Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
- && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
- && ldconfig \
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
+ && ldconfig \\
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
@@ -1228,14 +1228,14 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
     if "python" in backends:
         df += """
 # python3, python3-pip and some pip installs required for the python backend
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            python3 libarchive-dev \
-            python3-pip \
-            libpython3-dev && \
-    pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy && \
+RUN apt-get update && \\
+    apt-get install -y --no-install-recommends \\
+            python3 libarchive-dev \\
+            python3-pip \\
+            libpython3-dev && \\
+    pip3 install --upgrade pip && \\
+    pip3 install --upgrade wheel setuptools && \\
+    pip3 install --upgrade numpy && \\
     rm -rf /var/lib/apt/lists/*
 """
 
@@ -1310,7 +1310,7 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
-RUN apt-get update && \
+RUN apt-get update && \\
         apt-get install -y --no-install-recommends openmpi-bin patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
