@@ -950,7 +950,8 @@ RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           wheel \\
           setuptools \\
-          docker
+          docker \\
+          virtualenv
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1242,8 +1243,11 @@ RUN apt-get update \\
             python3-pip \\
             libpython3-dev \\
       && pip3 install --upgrade pip \\
-      && pip3 install --upgrade wheel setuptools \\
-      && pip3 install --upgrade numpy \\
+      && pip3 install --upgrade \\
+            wheel \\
+            setuptools \\
+            numpy \\
+            virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
 
