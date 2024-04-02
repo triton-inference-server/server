@@ -60,8 +60,7 @@ import requests
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
-#      DCGM version,
-#      Conda version
+#      DCGM version
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -77,7 +76,6 @@ TRITON_VERSION_MAP = {
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "py310_23.1.0-1",  # Conda version
         "0.3.2",  # vLLM version
     )
 }
@@ -868,38 +866,6 @@ RUN curl -o /tmp/cuda-keyring.deb \
                 dcgm_version, dcgm_version
             )
 
-
-def install_miniconda(conda_version, target_machine):
-    if target_machine == "arm64":
-        # This branch used for the case when linux container builds on MacOS with ARM chip
-        # macos arm arch names "arm64" when in linux it's names "aarch64".
-        # So we just replace the architecture to able find right conda version for Linux
-        target_machine = "aarch64"
-    if conda_version == "":
-        fail(
-            "unable to determine default repo-tag, CONDA version not known for {}".format(
-                FLAGS.version
-            )
-        )
-    miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
-    if target_machine == "x86_64":
-        sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
-    else:
-        sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
-    return f"""
-RUN mkdir -p /opt/
-RUN wget "{miniconda_url}" -O miniconda.sh -q && \
-    echo "{sha_sum}" "miniconda.sh" > shasum && \
-    sha256sum -c ./shasum && \
-    sh miniconda.sh -b -p /opt/conda && \
-    rm miniconda.sh shasum && \
-    find /opt/conda/ -follow -type f -name '*.a' -delete && \
-    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
-    /opt/conda/bin/conda clean -afy
-ENV PATH ${{PATH}}:/opt/conda/bin
-"""
-
-
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = """
 ARG TRITON_VERSION={}
@@ -1019,10 +985,6 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 """
-
-    # Install miniconda required for the DALI backend.
-    if target_platform() != "windows":
-        df += install_miniconda(argmap["CONDA_VERSION"], target_machine())
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1278,8 +1240,6 @@ RUN apt-get update && \
 """
 
     if "vllm" in backends:
-        # [DLIS-5606] Build Conda environment for vLLM backend
-        # Remove Pip install once vLLM backend moves to Conda environment.
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
