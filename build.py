@@ -950,9 +950,9 @@ RUN pip3 install --upgrade pip && \\
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
 RUN wget -O /tmp/boost.tar.gz \\
-        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \\
-    (cd /tmp && tar xzf boost.tar.gz) && \\
-    mv /tmp/boost_1_80_0/boost /usr/include/boost
+        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+    && (cd /tmp && tar xzf boost.tar.gz) \\
+    && mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN apt update -q=2 \\
@@ -1165,12 +1165,12 @@ ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \\
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
-        useradd $TRITON_SERVER_USER; \\
-    fi && \\
-    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \\
-    [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
+RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
+    && if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
+         useradd $TRITON_SERVER_USER; \\
+       fi \\
+    && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
+    && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -1219,9 +1219,9 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += """
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
- && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
- && ldconfig \\
- && rm -f ${_CUDA_COMPAT_PATH}/lib
+    && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
+    && ldconfig \\
+    && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
@@ -1230,15 +1230,16 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         df += """
 # python3, python3-pip and some pip installs required for the python backend
-RUN apt-get update && \\
-    apt-get install -y --no-install-recommends \\
-            python3 libarchive-dev \\
-            python3-pip \\
-            libpython3-dev && \\
-    pip3 install --upgrade pip && \\
-    pip3 install --upgrade wheel setuptools && \\
-    pip3 install --upgrade numpy && \\
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \\
+    && apt-get install -y --no-install-recommends \\
+          python3 \\
+          libarchive-dev \\
+          python3-pip \\
+          libpython3-dev \\
+    && pip3 install --upgrade pip \\
+    && pip3 install --upgrade wheel setuptools \\
+    && pip3 install --upgrade numpy \\
+    && rm -rf /var/lib/apt/lists/*
 """
 
     if "vllm" in backends:
