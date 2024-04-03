@@ -1435,8 +1435,7 @@ CommonHandler::RegisterTrace()
           } else if (std::holds_alternative<uint32_t>(value)) {
             valueAsString = std::to_string(std::get<uint32_t>(value));
           }
-          (*response->mutable_settings())[key].add_value(
-              valueAsString);
+          (*response->mutable_settings())[key].add_value(valueAsString);
         }
       }
     }
