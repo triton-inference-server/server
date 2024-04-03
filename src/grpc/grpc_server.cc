@@ -1423,23 +1423,21 @@ CommonHandler::RegisterTrace()
       auto mode_key = std::to_string(trace_mode);
       auto trace_options_it = config_map.find(mode_key);
       if (trace_options_it != config_map.end()) {
-        for (const auto& element : trace_options_it->second) {
-          if ((element.first == "file") || (element.first == "log-frequency")) {
+        for (const auto& [key, value] : trace_options_it->second) {
+          if ((key == "file") || (key == "log-frequency")) {
             continue;
           }
           std::string valueAsString;
-          if (std::holds_alternative<std::string>(element.second)) {
-            valueAsString = std::get<std::string>(element.second);
-          } else if (std::holds_alternative<int>(element.second)) {
-            valueAsString = std::to_string(std::get<int>(element.second));
-          } else if (std::holds_alternative<uint32_t>(element.second)) {
-            valueAsString = std::to_string(std::get<uint32_t>(element.second));
+          if (std::holds_alternative<std::string>(value)) {
+            valueAsString = std::get<std::string>(value);
+          } else if (std::holds_alternative<int>(value)) {
+            valueAsString = std::to_string(std::get<int>(value));
+          } else if (std::holds_alternative<uint32_t>(value)) {
+            valueAsString = std::to_string(std::get<uint32_t>(value));
           }
-          (*response->mutable_settings())[element.first].add_value(
+          (*response->mutable_settings())[key].add_value(
               valueAsString);
         }
-      } else {
-        LOG_VERBOSE(1) << "Trace Config Empty";
       }
     }
   earlyexit:
