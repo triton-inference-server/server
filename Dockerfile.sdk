@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.01-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.03-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -101,6 +101,7 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
+ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CLIENT_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
@@ -117,6 +118,7 @@ COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 WORKDIR /workspace/build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
@@ -127,6 +129,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
@@ -141,6 +144,9 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
+RUN pip3 install build \
+    && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
+    && python3 -m build --wheel --outdir /workspace/install/python
 ############################################################################
 ## Create sdk container
 ############################################################################
@@ -150,6 +156,7 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG DCGM_VERSION
+ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CORE_REPO_TAG
 ARG TARGETPLATFORM
 ARG TRITON_ENABLE_GPU
@@ -207,6 +214,8 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
+RUN pip3 install install/python/genai_perf-*.whl
+
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
@@ -222,7 +231,7 @@ RUN rm -f /usr/bin/python && \
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
-ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
+ARG TRITON_MODEL_ANALYZER_REPO="${TRITON_REPO_ORGANIZATION}/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
 RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 # Entrypoint Banner

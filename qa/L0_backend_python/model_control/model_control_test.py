@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -36,6 +37,10 @@ import numpy as np
 import shm_util
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class ExplicitModelTest(unittest.TestCase):
@@ -61,7 +66,7 @@ class ExplicitModelTest(unittest.TestCase):
     def test_model_reload(self):
         model_name = "identity_fp32"
         ensemble_model_name = "simple_" + "identity_fp32"
-        with httpclient.InferenceServerClient("localhost:8000") as client:
+        with httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000") as client:
             for _ in range(5):
                 self.assertFalse(client.is_model_ready(model_name))
                 # Load the model before the ensemble model to make sure reloading the

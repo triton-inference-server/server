@@ -96,6 +96,11 @@ for MODEL in \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
+            parameters { key: \"trt_max_partition_iterations\" value: \"1000\" } \
+            parameters { key: \"trt_dump_subgraphs\" value: \"1\" } \
+            parameters { key: \"trt_timing_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_build_heuristics_enable\" value: \"1\" } \
+            parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" } }]}}" \
             >> config.pbtxt) && \
     # GPU execution accelerators with cache enabled
@@ -105,6 +110,11 @@ for MODEL in \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"trt_engine_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_max_partition_iterations\" value: \"1000\" } \
+            parameters { key: \"trt_dump_subgraphs\" value: \"1\" } \
+            parameters { key: \"trt_timing_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_build_heuristics_enable\" value: \"1\" } \
+            parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } }]}}" \
             >> config.pbtxt) && \
     # GPU execution accelerators with unknown parameters

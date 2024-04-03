@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -128,6 +128,16 @@ function update_trace_setting {
   rm -f ./curl.out
   set +e
   code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${model_name}/trace/setting -d ${settings}`
+  set -e
+}
+
+function check_pbe_trace_context {
+  model_name="${1}"
+  expect_none="${2}"
+  data='{"inputs":[{"name":"expect_none","datatype":"BOOL","shape":[1],"data":['${expect_none}']}]}'
+  rm -f ./curl.out
+  set +e
+  code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/${model_name}/infer -d ${data}`
   set -e
 }
 
@@ -711,7 +721,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="13"
+EXPECTED_NUM_TESTS="14"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -722,11 +732,15 @@ cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
     rm -r ${MODEL_PATH}/2 && rm -r ${MODEL_PATH}/3 && \
         sed -i "s/onnx_int32_int32_int32/simple/" ${MODEL_PATH}/config.pbtxt
 
+# Add model to test trace context exposed to python backend
+mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_context/1/model.py
+
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
-                --trace-config=rate=1 --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --load-model=trace_context --trace-config=rate=1 \
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,resource=test.key=test.value \
                 --trace-config=opentelemetry,resource=service.name=test_triton \
                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
@@ -893,6 +907,177 @@ fi
 set -e
 kill $COLLECTOR_PID
 wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+################################################################################
+# Tests to make sure BatchSpanProcessor's arguments are propagated from cmd    #
+# to trace initialization step.                                                #
+################################################################################
+
+# bsp_max_queue_size = 1
+# We are sending a bls request, that results in a trace with 6 spans,
+# but because `bsp_max_queue_size` is 1, OTel should drop some of them
+# and print a warning in a log.
+EXPECTED_WARNING="BatchSpanProcessor queue is full - dropping span."
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_queue_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_queue_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 20
+
+if ! [[ `grep -c "$EXPECTED_WARNING" $SERVER_LOG` > 0 ]] ; then
+    echo -e "\n***\n*** $SERVER_LOG does not contain expected BSP warning.\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_schedule_delay = 0
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_schedule_delay` is 0, so OTel should export traces in batches of random
+# size, that translates into random number of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_schedule_delay=0
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_schedule_delay.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` > 1 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# bsp_max_export_batch_size = 1
+# We are sending a bls request, that results in a trace with 6 spans.
+# `bsp_max_export_batch_size` is 1, so OTel should export traces in batches of
+# size 1, that translates into 6 entries of 'scopeSpans' field in
+# `collected_traces.json`.
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                --trace-config opentelemetry,bsp_max_export_batch_size=1
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_otel_BSP_max_export_batch_size.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+set +e
+python -c 'import opentelemetry_unittest; \
+    opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
+
+sleep 10
+
+if ! [[ -s collected_traces.json && `grep -o "scopeSpans" ./collected_traces.json | wc -l` == 6 ]] ; then
+    echo -e "\n***\n*** collected_traces.json has unexpected number of span batches collected.\n***"
+    cat collected_traces.json
+    exit 1
+fi
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that PBE returns None as trace context in trace mode Triton
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=triton \
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_triton_trace_context.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+check_pbe_trace_context "trace_context" true
+assert_curl_success "PBE trace context is not None"
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+set +e
+
+# Test that PBE returns None as trace context in trace mode OpenTelemetry,
+# but traceing is OFF.
+SERVER_ARGS="--trace-config=level=OFF --trace-config=rate=1\
+                --trace-config=count=-1 --trace-config=mode=opentelemetry \
+                --model-repository=$MODELSDIR --log-verbose=1"
+SERVER_LOG="./inference_server_triton_trace_context.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+check_pbe_trace_context "trace_context" true
+assert_curl_success "PBE trace context is not None"
+
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e

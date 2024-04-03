@@ -30,10 +30,7 @@ CLIENT_LOG="./custom_metrics_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/custom_metrics/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./custom_metrics_server.log"
 
 RET=0
@@ -62,8 +59,7 @@ fi
 
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 if [ $RET -eq 1 ]; then

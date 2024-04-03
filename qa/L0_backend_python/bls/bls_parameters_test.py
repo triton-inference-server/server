@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,11 +27,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import os
 import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import np_to_triton_dtype
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class TestBlsParameters(unittest.TestCase):
@@ -49,7 +54,7 @@ class TestBlsParameters(unittest.TestCase):
             expected_params["int_" + str(i)] = i
             expected_params["str_" + str(i)] = str(i)
 
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             input_data = np.array([num_params], dtype=np.ubyte)
             inputs = [
                 grpcclient.InferInput(

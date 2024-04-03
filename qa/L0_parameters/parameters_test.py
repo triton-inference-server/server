@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,10 +56,12 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.parameter_list = []
         self.parameter_list.append({"key1": "value1", "key2": "value2"})
         self.parameter_list.append({"key1": 1, "key2": 2})
+        self.parameter_list.append({"key1": 123.123, "key2": 321.321})
         self.parameter_list.append({"key1": True, "key2": "value2"})
         self.parameter_list.append({"triton_": True, "key2": "value2"})
 
-        if TEST_HEADER == "1":
+        # Only "test_params" tests parameters without headers.
+        if TEST_HEADER != "test_params":
             self.headers = {
                 "header_1": "value_1",
                 "header_2": "value_2",
@@ -69,11 +71,14 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             }
 
             # only these headers should be forwarded to the model.
-            self.expected_headers = {
-                "my_header_1": "my_value_1",
-                "my_header_2": "my_value_2",
-                "my_header_3": 'This is a "quoted" string with a backslash\ ',
-            }
+            if TEST_HEADER == "test_grpc_header_forward_pattern_case_sensitive":
+                self.expected_headers = {}
+            else:
+                self.expected_headers = {
+                    "my_header_1": "my_value_1",
+                    "my_header_2": "my_value_2",
+                    "my_header_3": 'This is a "quoted" string with a backslash\ ',
+                }
         else:
             self.headers = {}
             self.expected_headers = {}

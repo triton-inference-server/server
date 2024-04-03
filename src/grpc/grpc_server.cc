@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -299,6 +299,13 @@ class CommonHandler : public HandlerBase {
   void RegisterRepositoryIndex();
   void RegisterRepositoryModelLoad();
   void RegisterRepositoryModelUnload();
+
+  // Set count and cumulative duration for 'RegisterModelStatistics()'
+  template <typename PBTYPE>
+  TRITONSERVER_Error* SetStatisticsDuration(
+      triton::common::TritonJson::Value& statistics_json,
+      const std::string& statistics_name,
+      PBTYPE* mutable_statistics_duration_protobuf) const;
 
   const std::string name_;
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
@@ -968,225 +975,145 @@ CommonHandler::RegisterModelStatistics()
         GOTO_IF_ERR(err, earlyexit);
         statistics->set_execution_count(ucnt);
 
-        triton::common::TritonJson::Value infer_stats_json;
-        err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
-        GOTO_IF_ERR(err, earlyexit);
-
         {
-          triton::common::TritonJson::Value success_json;
-          err = infer_stats_json.MemberAsObject("success", &success_json);
+          triton::common::TritonJson::Value infer_stats_json;
+          err = model_stat.MemberAsObject("inference_stats", &infer_stats_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = success_json.MemberAsUInt("count", &ucnt);
+          err = SetStatisticsDuration(
+              infer_stats_json, "success",
+              statistics->mutable_inference_stats()->mutable_success());
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_success()->set_count(
-              ucnt);
-          err = success_json.MemberAsUInt("ns", &ucnt);
+          err = SetStatisticsDuration(
+              infer_stats_json, "fail",
+              statistics->mutable_inference_stats()->mutable_fail());
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_success()->set_ns(
-              ucnt);
+          err = SetStatisticsDuration(
+              infer_stats_json, "queue",
+              statistics->mutable_inference_stats()->mutable_queue());
+          GOTO_IF_ERR(err, earlyexit);
+          err = SetStatisticsDuration(
+              infer_stats_json, "compute_input",
+              statistics->mutable_inference_stats()->mutable_compute_input());
+          GOTO_IF_ERR(err, earlyexit);
+          err = SetStatisticsDuration(
+              infer_stats_json, "compute_infer",
+              statistics->mutable_inference_stats()->mutable_compute_infer());
+          GOTO_IF_ERR(err, earlyexit);
+          err = SetStatisticsDuration(
+              infer_stats_json, "compute_output",
+              statistics->mutable_inference_stats()->mutable_compute_output());
+          GOTO_IF_ERR(err, earlyexit);
+          err = SetStatisticsDuration(
+              infer_stats_json, "cache_hit",
+              statistics->mutable_inference_stats()->mutable_cache_hit());
+          GOTO_IF_ERR(err, earlyexit);
+          err = SetStatisticsDuration(
+              infer_stats_json, "cache_miss",
+              statistics->mutable_inference_stats()->mutable_cache_miss());
+          GOTO_IF_ERR(err, earlyexit);
         }
 
         {
-          triton::common::TritonJson::Value fail_json;
-          err = infer_stats_json.MemberAsObject("fail", &fail_json);
+          triton::common::TritonJson::Value responses_json;
+          err = model_stat.MemberAsObject("response_stats", &responses_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = fail_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_fail()->set_count(
-              ucnt);
-          err = fail_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_fail()->set_ns(ucnt);
-        }
-
-        {
-          triton::common::TritonJson::Value queue_json;
-          err = infer_stats_json.MemberAsObject("queue", &queue_json);
+          std::vector<std::string> keys;
+          err = responses_json.Members(&keys);
           GOTO_IF_ERR(err, earlyexit);
 
-          err = queue_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_queue()->set_count(
-              ucnt);
-          err = queue_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_queue()->set_ns(ucnt);
-        }
+          for (const auto& key : keys) {
+            triton::common::TritonJson::Value res_json;
+            err = responses_json.MemberAsObject(key.c_str(), &res_json);
+            GOTO_IF_ERR(err, earlyexit);
 
-        {
-          triton::common::TritonJson::Value compute_input_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_input", &compute_input_json);
-          GOTO_IF_ERR(err, earlyexit);
+            inference::InferResponseStatistics res;
 
-          err = compute_input_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_input()
-              ->set_count(ucnt);
-          err = compute_input_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_input()
-              ->set_ns(ucnt);
-        }
-
-        {
-          triton::common::TritonJson::Value compute_infer_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_infer", &compute_infer_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          err = compute_infer_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_infer()
-              ->set_count(ucnt);
-          err = compute_infer_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_infer()
-              ->set_ns(ucnt);
-        }
-
-        {
-          triton::common::TritonJson::Value compute_output_json;
-          err = infer_stats_json.MemberAsObject(
-              "compute_output", &compute_output_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          err = compute_output_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_output()
-              ->set_count(ucnt);
-          err = compute_output_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_compute_output()
-              ->set_ns(ucnt);
-        }
-
-        {
-          triton::common::TritonJson::Value cache_hit_json;
-          err = infer_stats_json.MemberAsObject("cache_hit", &cache_hit_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          err = cache_hit_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_cache_hit()->set_count(
-              ucnt);
-          err = cache_hit_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_cache_hit()->set_ns(
-              ucnt);
-        }
-
-        {
-          triton::common::TritonJson::Value cache_miss_json;
-          err = infer_stats_json.MemberAsObject("cache_miss", &cache_miss_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          err = cache_miss_json.MemberAsUInt("count", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()
-              ->mutable_cache_miss()
-              ->set_count(ucnt);
-          err = cache_miss_json.MemberAsUInt("ns", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_cache_miss()->set_ns(
-              ucnt);
-        }
-
-        triton::common::TritonJson::Value batches_json;
-        err = model_stat.MemberAsArray("batch_stats", &batches_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value batch_stat;
-          err = batches_json.IndexAsObject(idx, &batch_stat);
-          GOTO_IF_ERR(err, earlyexit);
-
-          auto batch_statistics = statistics->add_batch_stats();
-
-          uint64_t ucnt;
-          err = batch_stat.MemberAsUInt("batch_size", &ucnt);
-          GOTO_IF_ERR(err, earlyexit);
-          batch_statistics->set_batch_size(ucnt);
-
-          {
-            triton::common::TritonJson::Value compute_input_json;
+            err = SetStatisticsDuration(
+                res_json, "compute_infer", res.mutable_compute_infer());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(
+                res_json, "compute_output", res.mutable_compute_output());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(
+                res_json, "success", res.mutable_success());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(res_json, "fail", res.mutable_fail());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(
+                res_json, "empty_response", res.mutable_empty_response());
+            GOTO_IF_ERR(err, earlyexit);
             err =
-                batch_stat.MemberAsObject("compute_input", &compute_input_json);
+                SetStatisticsDuration(res_json, "cancel", res.mutable_cancel());
             GOTO_IF_ERR(err, earlyexit);
 
-            err = compute_input_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_input()->set_count(ucnt);
-            err = compute_input_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_input()->set_ns(ucnt);
-          }
-
-          {
-            triton::common::TritonJson::Value compute_infer_json;
-            err =
-                batch_stat.MemberAsObject("compute_infer", &compute_infer_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            err = compute_infer_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_infer()->set_count(ucnt);
-            err = compute_infer_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_infer()->set_ns(ucnt);
-          }
-
-          {
-            triton::common::TritonJson::Value compute_output_json;
-            err = batch_stat.MemberAsObject(
-                "compute_output", &compute_output_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            err = compute_output_json.MemberAsUInt("count", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_output()->set_count(ucnt);
-            err = compute_output_json.MemberAsUInt("ns", &ucnt);
-            GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->mutable_compute_output()->set_ns(ucnt);
+            (*statistics->mutable_response_stats())[key] = std::move(res);
           }
         }
 
-        triton::common::TritonJson::Value memory_usage_json;
-        err = model_stat.MemberAsArray("memory_usage", &memory_usage_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < memory_usage_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value usage;
-          err = memory_usage_json.IndexAsObject(idx, &usage);
+        {
+          triton::common::TritonJson::Value batches_json;
+          err = model_stat.MemberAsArray("batch_stats", &batches_json);
           GOTO_IF_ERR(err, earlyexit);
 
-          auto memory_usage = statistics->add_memory_usage();
-          {
-            const char* type;
-            size_t type_len;
-            err = usage.MemberAsString("type", &type, &type_len);
+          for (size_t idx = 0; idx < batches_json.ArraySize(); ++idx) {
+            triton::common::TritonJson::Value batch_stat;
+            err = batches_json.IndexAsObject(idx, &batch_stat);
             GOTO_IF_ERR(err, earlyexit);
-            memory_usage->set_type(std::string(type, type_len));
+
+            auto batch_statistics = statistics->add_batch_stats();
+
+            uint64_t ucnt;
+            err = batch_stat.MemberAsUInt("batch_size", &ucnt);
+            GOTO_IF_ERR(err, earlyexit);
+            batch_statistics->set_batch_size(ucnt);
+
+            err = SetStatisticsDuration(
+                batch_stat, "compute_input",
+                batch_statistics->mutable_compute_input());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(
+                batch_stat, "compute_infer",
+                batch_statistics->mutable_compute_infer());
+            GOTO_IF_ERR(err, earlyexit);
+            err = SetStatisticsDuration(
+                batch_stat, "compute_output",
+                batch_statistics->mutable_compute_output());
+            GOTO_IF_ERR(err, earlyexit);
           }
-          {
-            int64_t id;
-            err = usage.MemberAsInt("id", &id);
+        }
+
+        {
+          triton::common::TritonJson::Value memory_usage_json;
+          err = model_stat.MemberAsArray("memory_usage", &memory_usage_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          for (size_t idx = 0; idx < memory_usage_json.ArraySize(); ++idx) {
+            triton::common::TritonJson::Value usage;
+            err = memory_usage_json.IndexAsObject(idx, &usage);
             GOTO_IF_ERR(err, earlyexit);
-            memory_usage->set_id(id);
-          }
-          {
-            uint64_t byte_size;
-            err = usage.MemberAsUInt("byte_size", &byte_size);
-            GOTO_IF_ERR(err, earlyexit);
-            memory_usage->set_byte_size(byte_size);
+
+            auto memory_usage = statistics->add_memory_usage();
+            {
+              const char* type;
+              size_t type_len;
+              err = usage.MemberAsString("type", &type, &type_len);
+              GOTO_IF_ERR(err, earlyexit);
+              memory_usage->set_type(std::string(type, type_len));
+            }
+            {
+              int64_t id;
+              err = usage.MemberAsInt("id", &id);
+              GOTO_IF_ERR(err, earlyexit);
+              memory_usage->set_id(id);
+            }
+            {
+              uint64_t byte_size;
+              err = usage.MemberAsUInt("byte_size", &byte_size);
+              GOTO_IF_ERR(err, earlyexit);
+              memory_usage->set_byte_size(byte_size);
+            }
           }
         }
       }
@@ -1211,6 +1138,26 @@ CommonHandler::RegisterModelStatistics()
       inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
       "ModelStatistics", 0, OnRegisterModelStatistics, OnExecuteModelStatistics,
       false /* async */, cq_, restricted_kv, response_delay_);
+}
+
+template <typename PBTYPE>
+TRITONSERVER_Error*
+CommonHandler::SetStatisticsDuration(
+    triton::common::TritonJson::Value& statistics_json,
+    const std::string& statistics_name,
+    PBTYPE* mutable_statistics_duration_protobuf) const
+{
+  triton::common::TritonJson::Value statistics_duration_json;
+  RETURN_IF_ERR(statistics_json.MemberAsObject(
+      statistics_name.c_str(), &statistics_duration_json));
+
+  uint64_t value;
+  RETURN_IF_ERR(statistics_duration_json.MemberAsUInt("count", &value));
+  mutable_statistics_duration_protobuf->set_count(value);
+  RETURN_IF_ERR(statistics_duration_json.MemberAsUInt("ns", &value));
+  mutable_statistics_duration_protobuf->set_ns(value);
+
+  return nullptr;
 }
 
 void

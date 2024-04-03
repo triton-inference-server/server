@@ -26,12 +26,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
 
 import itertools
-import os
 import queue
 import unittest
 from functools import partial
@@ -42,6 +42,10 @@ import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
 TRIAL = os.getenv("TRIAL")
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class UserData:
@@ -59,13 +63,13 @@ def callback(user_data, result, error):
 class IOTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
-        self._client = grpcclient.InferenceServerClient("localhost:8001")
+        self._client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
 
     def _run_ensemble_test(self, model_name):
         user_data = UserData()
         input0 = np.random.random([1000]).astype(np.float32)
         # Use context manager to close client stream if any early exit occurs
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             client.start_stream(callback=partial(callback, user_data))
             # Each pair represents whether the corresponding model is in GPU or not.
             gpu_flags = [(True, False), (True, False), (True, False)]

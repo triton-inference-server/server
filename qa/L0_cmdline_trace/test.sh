@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,19 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# ============================= Helpers =======================================
+function assert_server_startup_failed() {
+  if [ "$SERVER_PID" != "0" ]; then
+      echo -e "\n***\n***Fail: Server start should have failed $SERVER\n***"
+      cat $SERVER_LOG
+      set -e
+      kill $SERVER_PID
+      wait $SERVER_PID
+      set +e
+      exit 1
+  fi
+}
 
 TRACE_SUMMARY=../common/trace_summary.py
 CLIENT_SCRIPT=trace_client.py
@@ -618,11 +631,92 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
+
+################################################################################
+# The following set of tests checks that tritonserver gracefully handles       #
+# bad OpenTelemetry BatchSpanProcessor parameters, provided through            #
+# environment variables, or tritonserver's options.                            #
+################################################################################
+export OTEL_BSP_MAX_QUEUE_SIZE="bad_value"
+
+SERVER_ARGS="--trace-config mode=opentelemetry --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_MAX_QUEUE_SIZE\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_MAX_QUEUE_SIZE
+
+export OTEL_BSP_SCHEDULE_DELAY="bad_value"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_SCHEDULE_DELAY\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_SCHEDULE_DELAY
+
+export OTEL_BSP_MAX_EXPORT_BATCH_SIZE="bad_value"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"OTEL_BSP_MAX_EXPORT_BATCH_SIZE\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+unset OTEL_BSP_MAX_EXPORT_BATCH_SIZE
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_max_queue_size=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_max_queue_size\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_schedule_delay=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_schedule_delay\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+SERVER_ARGS="--model-repository=$MODELSDIR --trace-config mode=opentelemetry \
+             --trace-config opentelemetry,bsp_max_export_batch_size=bad_value"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+assert_server_startup_failed
+
+if [ `grep -c "Bad option: \"--trace-config opentelemetry,bsp_max_export_batch_size\"" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
-
 
 exit $RET

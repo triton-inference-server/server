@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@ import sys
 sys.path.append("../common")
 import json
 import queue
+import re
 import shutil
 import subprocess
 import time
@@ -104,6 +105,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
+        self.trace_context_model = "trace_context"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
@@ -250,9 +252,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
         span_names = []
         for span in spans:
             # Check that collected spans have proper events recorded
-            span_name = span[0]["name"]
+            span_name = span["name"]
             span_names.append(span_name)
-            span_events = span[0]["events"]
+            span_events = span["events"]
             event_names_only = [event["name"] for event in span_events]
             self._check_events(span_name, event_names_only)
 
@@ -283,13 +285,13 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         seen_spans = {}
         for span in spans:
-            cur_span = span[0]["spanId"]
-            seen_spans[cur_span] = span[0]["name"]
+            cur_span = span["spanId"]
+            seen_spans[cur_span] = span["name"]
 
         parent_child_dict = {}
         for span in spans:
-            cur_parent = span[0]["parentSpanId"]
-            cur_span = span[0]["name"]
+            cur_parent = span["parentSpanId"]
+            cur_span = span["name"]
             if cur_parent in seen_spans.keys():
                 parent_name = seen_spans[cur_parent]
                 if parent_name not in parent_child_dict:
@@ -377,16 +379,21 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         time.sleep(COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-        self.assertEqual(len(traces), 1, "Unexpected number of traces collected")
+        expected_traces_number = 1
+        self.assertEqual(
+            len(traces),
+            expected_traces_number,
+            "Unexpected number of traces collected. Expected {}, but got {}".format(
+                expected_traces_number, len(traces)
+            ),
+        )
         self._test_resource_attributes(
             traces[0]["resourceSpans"][0]["resource"]["attributes"]
         )
 
-        parsed_spans = [
-            entry["scopeSpans"][0]["spans"] for entry in traces[0]["resourceSpans"]
-        ]
+        parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
         root_span = [
-            entry[0] for entry in parsed_spans if entry[0]["name"] == "InferRequest"
+            entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
 
@@ -750,6 +757,27 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         time.sleep(5)
         self._test_simple_trace(headers=self.client_headers)
+
+    def test_trace_context_exposed_to_pbe(self):
+        """
+        Tests trace context, propagated to python backend.
+        """
+        triton_client_http = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
+        expect_none = np.array([False], dtype=bool)
+        inputs = httpclient.InferInput("expect_none", [1], "BOOL")
+        inputs.set_data_from_numpy(expect_none)
+        try:
+            result = triton_client_http.infer(self.trace_context_model, inputs=[inputs])
+        except InferenceServerException as e:
+            self.fail(e.message())
+
+        context = result.as_numpy("OUTPUT0")[()].decode("utf-8")
+        context = json.loads(context)
+        self.assertIn("traceparent", context.keys())
+        context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
+        self.assertIsNotNone(re.match(context_pattern, context["traceparent"]))
 
 
 if __name__ == "__main__":

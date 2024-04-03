@@ -285,7 +285,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 
 ## Pinned Memory Metrics
 
-Starting in 24.01, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
+Starting in 24.03, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
 
 |Category        |Metric            |Metric Name                 |Description                                            |Granularity|Frequency    |
 |----------------|------------------|----------------------------|-------------------------------------------------------|-----------|-------------|
@@ -353,3 +353,9 @@ demonstrates a practical example of adding a custom metric to a backend.
 Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
 `TRITONSERVER_Metric*` API annotations in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
+### TensorRT-LLM Backend Metrics
+
+The TRT-LLM backend uses the custom metrics API to track and expose specific metrics about
+LLMs, KV Cache, and Inflight Batching to Triton:
+https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#triton-metrics

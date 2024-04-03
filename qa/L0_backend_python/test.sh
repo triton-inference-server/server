@@ -35,23 +35,40 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+export TEST_WINDOWS=0
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    export DATADIR=${DATADIR:="/c/data/inferenceserver/${REPO_VERSION}"}
+    export TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
+    # This will run in WSL, but Triton will run in windows, so environment
+    # variables meant for loaded models must be exported using WSLENV.
+    # The /w flag indicates the value should only be included when invoking
+    # Win32 from WSL.
+    export WSLENV=TRITON_DIR/w
+    export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
+    export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
+    export MODELDIR=${MODELDIR:=c:/}
+    TEST_WINDOWS=1
+else
+    export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    export SERVER=${TRITON_DIR}/bin/tritonserver
+    export BACKEND_DIR=${TRITON_DIR}/backends
+    export MODELDIR=${MODELDIR:=`pwd`}
+fi
 export REPO_VERSION=$REPO_VERSION
-export DATADIR=$DATADIR
-
-export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-export BACKEND_DIR=${TRITON_DIR}/backends
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
+export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
-PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
 TEST_RESULT_FILE='test_results.txt'
@@ -111,18 +128,19 @@ mv ./models/default_model_name/1/model.py ./models/default_model_name/1/mymodel.
     echo "default_model_filename: \"mymodel.py\"" >> config.pbtxt )
 
 mkdir -p models/pytorch_fp32_fp32/1/
-cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
-cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
-(cd models/pytorch_fp32_fp32 && \
-          sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
+    cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
+    cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
+    (cd models/pytorch_fp32_fp32 && \
+            sed -i "s/^name:.*/name: \"pytorch_fp32_fp32\"/" config.pbtxt)
 
 mkdir -p models/delayed_model/1/
 cp -r ../python_models/delayed_model/model.py ./models/delayed_model/1/
 cp ../python_models/delayed_model/config.pbtxt ./models/delayed_model/
-
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
+sed -i "s|TRITON_DIR_PATH|${TRITON_DIR}|" ./models/init_args/config.pbtxt
+
 
 mkdir -p models/optional/1/
 cp ../python_models/optional/model.py ./models/optional/1/
@@ -146,14 +164,15 @@ mkdir -p models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
-if [ "$TEST_JETSON" == "0" ]; then
+
+if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
-  pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
   # GPU tensor tests are disabled on jetson
+  pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
-pip3 install pytest
+pip3 install pytest requests virtualenv
 
 prev_num_pages=`get_shm_pages`
 run_server
@@ -171,8 +190,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -195,7 +213,7 @@ fi
 
 sleep 5
 
-triton_procs=`pgrep --parent $SERVER_PID`
+readarray -t triton_procs < <(pgrep --parent ${SERVER_PID})
 
 set +e
 
@@ -218,8 +236,8 @@ set -e
 
 #
 # Test KIND_GPU
-# Disable env test for Jetson since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ]; then
+# Disable env test for Jetson & Windows since GPU Tensors are not supported
+if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
   rm -rf models/
   mkdir -p models/add_sub_gpu/1/
   cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -239,8 +257,7 @@ if [ "$TEST_JETSON" == "0" ]; then
       RET=1
   fi
 
-  kill $SERVER_PID
-  wait $SERVER_PID
+  kill_server
 
   current_num_pages=`get_shm_pages`
   if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -275,8 +292,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -295,6 +311,14 @@ cp ../python_models/model_env/model.py ./models/model_env/1/
 cp ../python_models/model_env/config.pbtxt ./models/model_env/
 
 export MY_ENV="MY_ENV"
+if [[ ${TEST_WINDOWS} == 1 ]]; then
+    # This will run in WSL, but Triton will run in windows, so environment
+    # variables meant for loaded models must be exported using WSLENV.
+    # The /w flag indicates the value should only be included when invoking
+    # Win32 from WSL.
+    export WSLENV=MY_ENV/w
+fi
+
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -304,8 +328,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
@@ -345,8 +368,7 @@ $page_size."
     fi
 done
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Test model getting killed during initialization
 rm -fr ./models
@@ -361,8 +383,7 @@ run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
     RET=1
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 else
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
@@ -387,8 +408,15 @@ fi
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
-if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble io bls decoupled variants python_based_backends"
+if [[ "$TEST_JETSON" == "0" ]]; then
+    SUBTESTS="ensemble bls decoupled"
+    # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
+    # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
+    # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
+    if [[ ${TEST_WINDOWS} == 0 ]]; then
+        SUBTESTS+=" variants io python_based_backends"
+    fi
+
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
@@ -396,14 +424,15 @@ if [ "$TEST_JETSON" == "0" ]; then
 
         (cd ${TEST} && bash -ex test.sh)
         if [ $? -ne 0 ]; then
-        echo "Subtest ${TEST} FAILED"
-        RET=1
+            echo "Subtest ${TEST} FAILED"
+            RET=1
         fi
 
         deactivate_virtualenv
     done
 
-    if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+    # [DLIS-5969]: Incorporate env test for windows
+    if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
         (cd env && bash -ex test.sh)
@@ -414,7 +443,13 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics request_rescheduling"
+SUBTESTS="lifecycle argument_validation logging custom_metrics"
+# [DLIS-6124] Disable restart test for Windows since it requires more investigation
+# [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
+# [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    SUBTESTS+=" restart model_control examples request_rescheduling"
+fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.

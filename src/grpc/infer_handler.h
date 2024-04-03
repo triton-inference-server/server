@@ -474,6 +474,9 @@ InferResponseCompleteCommon(
       case TRITONSERVER_PARAMETER_STRING:
         param.set_string_param(reinterpret_cast<const char*>(vvalue));
         break;
+      case TRITONSERVER_PARAMETER_DOUBLE:
+        param.set_double_param(*(reinterpret_cast<const double*>(vvalue)));
+        break;
       case TRITONSERVER_PARAMETER_BYTES:
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_UNSUPPORTED,
@@ -1029,6 +1032,7 @@ class InferHandlerState {
     unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
     step_ = start_step;
+    status_ = ::grpc::Status{};
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
@@ -1097,6 +1101,7 @@ class InferHandlerState {
   bool is_decoupled_ = false;
   StateParameters parameters_;
 
+  ::grpc::Status status_;
   std::atomic<uint32_t> cb_count_;
   bool complete_;
 

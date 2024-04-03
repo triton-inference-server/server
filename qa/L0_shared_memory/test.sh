@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,7 +49,8 @@ for i in \
         test_register_after_inference \
         test_too_big_shm \
         test_mixed_raw_shm \
-        test_unregisterall; do
+        test_unregisterall \
+        test_infer_offset_out_of_bound; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"

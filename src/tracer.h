@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,26 +34,36 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 #include "opentelemetry/context/propagation/global_propagator.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/resource/resource.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
 #include "opentelemetry/sdk/trace/processor.h"
-#include "opentelemetry/sdk/trace/simple_processor_factory.h"
 #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
 #include "opentelemetry/trace/context.h"
 #include "opentelemetry/trace/propagation/http_trace_context.h"
 #include "opentelemetry/trace/provider.h"
+namespace otlp = opentelemetry::exporter::otlp;
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
 namespace otel_cntxt = opentelemetry::context;
+namespace otel_resource = opentelemetry::sdk::resource;
 #endif
 #include "triton/core/tritonserver.h"
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSSUCCESS nullptr
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
 
-using TraceConfig = std::vector<std::pair<std::string, std::string>>;
+using TraceConfig = std::vector<
+    std::pair<std::string, std::variant<std::string, int, uint32_t>>>;
 using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 using AbstractCarrier = otel_cntxt::propagation::TextMapCarrier;
@@ -189,6 +199,13 @@ class TraceManager {
   /// set by InitTracer.
   /// In Triton trace mode is a no-op.
   void CleanupTracer();
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+  void ProcessOpenTelemetryParameters(
+      const triton::server::TraceConfigMap& config_map,
+      otlp::OtlpHttpExporterOptions& exporter_options,
+      otel_resource::ResourceAttributes& attributes,
+      otel_trace_sdk::BatchSpanProcessorOptions& processor_options);
+#endif
 
   struct Trace {
     Trace() : trace_(nullptr), trace_id_(0) {}
@@ -223,8 +240,8 @@ class TraceManager {
     /// it starts a new request or compute span. For the request span it
     /// adds some triton related attributes, and adds this span to
     /// `otel_context_`. Alternatively, if activity is
-    /// `TRITONSERVER_TRACE_REQUEST_END` or `TRITONSERVER_TRACE_COMPUTE_END`,
-    /// it ends the corresponding span.
+    /// `TRITONSERVER_TRACE_REQUEST_END` or
+    /// `TRITONSERVER_TRACE_COMPUTE_END`, it ends the corresponding span.
     ///
     /// \param trace TRITONSERVER_InferenceTrace instance.
     /// \param activity  Trace activity.
@@ -253,6 +270,20 @@ class TraceManager {
 
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
+
+    /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
+    /// Trace context follows W3C Trace Context specification.
+    /// Ref. https://www.w3.org/TR/trace-context/.
+    /// OpenTelemetry ref:
+    /// https://github.com/open-telemetry/opentelemetry-cpp/blob/4bd64c9a336fd438d6c4c9dad2e6b61b0585311f/api/include/opentelemetry/trace/propagation/http_trace_context.h#L94-L113
+    ///
+    /// \param span An OpenTelemetry span, which is used to extract
+    /// OpenTelemetry's trace_id and span_id.
+    /// \param buffer Buffer used when writing JSON representation of
+    /// OpenTelemetry's context.
+    void PrepareTraceContext(
+        opentelemetry::nostd::shared_ptr<otel_trace_api::Span> span,
+        triton::common::TritonJson::WriteBuffer* buffer);
 
    private:
     // OpenTelemetry SDK relies on system's clock for event timestamps.

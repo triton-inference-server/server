@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,8 +34,8 @@ fi
 source common.sh
 source ../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --disable-auto-complete-config"
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
@@ -132,8 +132,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
@@ -162,6 +161,7 @@ find /opt/tritonserver/qa/pkgs/ -maxdepth 1 -type f -name \
 # Build triton-shm-monitor for the test
 cd python_backend && rm -rf install build && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=$PWD/install \
+        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
         -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
         -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \

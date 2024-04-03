@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -327,6 +327,12 @@ SetInferenceRequestMetadata(
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
             inference_request, param.first.c_str(),
             infer_param.string_param().c_str()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kDoubleParam) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetDoubleParameter(
+            inference_request, param.first.c_str(),
+            infer_param.double_param()));
       } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -972,24 +978,19 @@ ModelInferHandler::InferResponseComplete(
   // notification.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
-  // Increment the callback index
-  state->cb_count_++;
+  // Increment the callback index if received valid 'iresponse'
+  if (iresponse != nullptr) {
+    state->cb_count_++;
+  }
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
-  // Defer to the callback with the final response
-  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
-    LOG_ERROR << "[INTERNAL] ModelInfer received a response without FINAL flag";
-    return;
+  // Allow sending 1 response and final flag separately, only mark
+  // non-inflight when seeing final flag
+  if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+    state->context_->EraseInflightState(state);
   }
-
-  state->context_->EraseInflightState(state);
-
-#ifdef TRITON_ENABLE_TRACING
-  state->trace_timestamps_.emplace_back(std::make_pair(
-      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
-#endif  // TRITON_ENABLE_TRACING
 
   // If gRPC Stream is cancelled then no need of forming and returning
   // a response.
@@ -999,6 +1000,7 @@ ModelInferHandler::InferResponseComplete(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
 
+    state->context_->EraseInflightState(state);
     state->step_ = Steps::CANCELLED;
 
     LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
@@ -1035,25 +1037,32 @@ ModelInferHandler::InferResponseComplete(
                                          "expected a single response, got " +
                                          std::to_string(state->cb_count_))
                                          .c_str());
-  } else if (iresponse == nullptr) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
-  } else {
+  } else if (iresponse != nullptr) {
     err = InferResponseCompleteCommon<inference::ModelInferResponse>(
         state->tritonserver_, iresponse, *response, state->alloc_payload_);
+#ifdef TRITON_ENABLE_TRACING
+    state->trace_timestamps_.emplace_back(std::make_pair(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
   }
 
   if (err != nullptr) {
     response->Clear();
   }
 
-  ::grpc::Status status;
-  GrpcStatusUtil::Create(&status, err);
+  GrpcStatusUtil::Create(&state->status_, err);
   TRITONSERVER_ErrorDelete(err);
 
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
+
+  // Defer sending the response until FINAL flag is seen or
+  // there is error
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    return;
+  }
+
 
 #ifdef TRITON_ENABLE_TRACING
   state->trace_timestamps_.emplace_back(
@@ -1061,7 +1070,7 @@ ModelInferHandler::InferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   state->step_ = COMPLETE;
-  state->context_->responder_->Finish(*response, status, state);
+  state->context_->responder_->Finish(*response, state->status_, state);
   if (response_created) {
     delete response;
   }
