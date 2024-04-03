@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.02-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.03-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -144,9 +144,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-RUN pip3 install hatch build \
+RUN pip3 install build \
     && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
-    && hatch version $(cat /workspace/TRITON_VERSION) \
     && python3 -m build --wheel --outdir /workspace/install/python
 ############################################################################
 ## Create sdk container

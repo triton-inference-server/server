@@ -65,4 +65,4 @@ From this directory of the repository, execute the following to evaluate model p
 
 In the example above we saved the results as a `.csv` file. To visualize these
 results, follow the steps described
-[here](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md#visualizing-latency-vs-throughput).
+[here](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md).
