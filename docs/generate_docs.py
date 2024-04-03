@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import subprocess
-import sys
 from collections import defaultdict
 from functools import partial
 
@@ -72,7 +71,7 @@ def run_command(command):
     """
     log_message(f"Running command: {command}")
     try:
-        result = subprocess.run(
+        subprocess.run(
             command,
             shell=True,
             check=True,
