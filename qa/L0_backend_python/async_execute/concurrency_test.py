@@ -97,6 +97,43 @@ class ConcurrencyTest(unittest.TestCase):
             model_name="async_execute_decouple_bls", batch_size=1, number_of_requests=4
         )
 
+    # Test requests with a shorter duration should return first
+    def test_concurrent_execute_different_duration(self):
+        model_name = "async_execute_decouple"
+        callback, response = self._generate_streaming_callback_and_response_pair()
+        self._triton.start_stream(callback)
+
+        # Send 2 requests / delays
+        shape = [1, 1]
+        for delay_secs in [10, 2]:
+            inputs = [grpcclient.InferInput("WAIT_SECONDS", shape, "FP32")]
+            inputs[0].set_data_from_numpy(np.full(shape, delay_secs, dtype=np.float32))
+            self._triton.async_stream_infer(model_name, inputs)
+            time.sleep(2)  # leave a gap after each inference
+            shape[0] += 1  # batch size to track request id
+
+        # The last request executes for 2 secs, leave an additional 2 secs for sending
+        # the request and 2 secs for receiving its response. Since 2 secs has elapsed
+        # after sending the request, wait for another 4 secs.
+        time.sleep(4)
+        # The response of the last request should be available by now, while the first
+        # request executes for 10 secs and only 8 secs has elapsed, so its response
+        # should not be available by now.
+        self.assertEqual(len(response), 1)
+        self.assertEqual(response[0]["result"].as_numpy("DUMMY_OUT").shape[0], 2)
+        self.assertIsNone(response[0]["error"])
+
+        # The first request executes for 10 secs, leave an additional 2 secs for sending
+        # the request and 2 secs for receiving its response. Since 8 secs has elapsed
+        # after sending the request, wait for another 6 secs.
+        time.sleep(6)
+        # The response of the first request should be available by now.
+        self.assertEqual(len(response), 2)
+        self.assertEqual(response[1]["result"].as_numpy("DUMMY_OUT").shape[0], 1)
+        self.assertIsNone(response[1]["error"])
+
+        self._triton.stop_stream()
+
     # Test model exception handling
     def test_model_raise_exception(self):
         model_name = "async_execute_decouple"
