@@ -76,6 +76,7 @@ TRITON_VERSION_MAP = {
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
+        "py310_23.1.0-1",  # Conda version
         "0.3.2",  # vLLM version
     )
 }
@@ -1256,7 +1257,7 @@ RUN apt-get update \\
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][7]
+            TRITON_VERSION_MAP[FLAGS.version][6]
         )
 
     df += """
