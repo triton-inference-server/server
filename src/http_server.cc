@@ -240,11 +240,14 @@ HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (exit_timeout_secs != nullptr) {
     while (*exit_timeout_secs > 0) {
-      uint32_t conn_cnt = conn_cnt_;
-      if (conn_cnt == 0) {
-        break;
+      {
+        std::lock_guard<std::mutex> lock(conn_mu_);
+        if (conn_cnt_ == 0) {
+          stop_accepting_new_conn_ = true;
+          break;
+        }
       }
-      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt
+      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
                << " " << service_name << " service connections";
       std::this_thread::sleep_for(std::chrono::seconds(1));
       (*exit_timeout_secs)--;
@@ -283,17 +286,28 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 evhtp_res
 HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
 {
+  HTTPServer* t = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(t->conn_mu_);
+    if (t->stop_accepting_new_conn_) {
+      return EVHTP_RES_SERVUNAVAIL;  // reset connection
+    }
+    t->conn_cnt_++;
+  }
   evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
-  (static_cast<HTTPServer*>(arg))->conn_cnt_++;
   return EVHTP_RES_OK;
 }
 
 evhtp_res
 HTTPServer::EndConnection(evhtp_connection_t* conn, void* arg)
 {
-  (static_cast<HTTPServer*>(arg))->conn_cnt_--;
+  HTTPServer* t = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(t->conn_mu_);
+    t->conn_cnt_--;
+  }
   return EVHTP_RES_OK;
 }
 

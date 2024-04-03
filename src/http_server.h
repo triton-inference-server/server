@@ -28,10 +28,10 @@
 #include <evhtp/evhtp.h>
 #include <re2/re2.h>
 
-#include <atomic>
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
@@ -92,7 +92,7 @@ class HTTPServer {
       : port_(port), reuse_port_(reuse_port), address_(address),
         header_forward_pattern_(header_forward_pattern),
         thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_),
-        conn_cnt_(0)
+        conn_cnt_(0), stop_accepting_new_conn_(false)
   {
   }
 
@@ -120,7 +120,9 @@ class HTTPServer {
   evutil_socket_t fds_[2];
   event* break_ev_;
 
-  std::atomic<uint32_t> conn_cnt_;
+  std::mutex conn_mu_;
+  uint32_t conn_cnt_;
+  bool stop_accepting_new_conn_;
 };
 
 #ifdef TRITON_ENABLE_METRICS
