@@ -76,7 +76,6 @@ TRITON_VERSION_MAP = {
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "py310_23.1.0-1",  # Conda version
         "0.3.2",  # vLLM version
     )
 }
@@ -1418,9 +1417,6 @@ def create_build_dockerfiles(
         "DCGM_VERSION": ""
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][5],
-        "CONDA_VERSION": ""
-        if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
-        else TRITON_VERSION_MAP[FLAGS.version][6],
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
