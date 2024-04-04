@@ -71,12 +71,12 @@ FROM {} AS full
         argmap["TRITON_VERSION"], argmap["TRITON_CONTAINER_VERSION"], images["full"]
     )
 
-    # PyTorch, TensorFlow 1 and TensorFlow 2 backends need extra CUDA and other
+    # PyTorch, TensorFlow backends need extra CUDA and other
     # dependencies during runtime that are missing in the CPU-only base container.
     # These dependencies must be copied from the Triton Min image.
     if not FLAGS.enable_gpu and (
         ("pytorch" in backends)
-        or ("tensorflow1" in backends)
+        or ("tensorflow" in backends)
         or ("tensorflow2" in backends)
     ):
         df += """
@@ -506,7 +506,7 @@ if __name__ == "__main__":
     # are not CPU-only.
     if (
         ("pytorch" in FLAGS.backend)
-        or ("tensorflow1" in FLAGS.backend)
+        or ("tensorflow" in FLAGS.backend)
         or ("tensorflow2" in FLAGS.backend)
     ) and ("gpu-min" not in images):
         images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
