@@ -183,7 +183,7 @@ ultimate_replacements = {
 # bibtex_default_style = "plain"
 
 ### We currently use Myst: https://myst-nb.readthedocs.io/en/latest/use/execute.html
-jupyter_execute_notebooks = "off"  # Global execution disable
+nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
 
