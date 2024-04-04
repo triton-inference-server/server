@@ -56,6 +56,7 @@ class SharedMemoryTest(tu.TestResultCollector):
     def _setUp(self, protocol, log_file_path):
         self._tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
         self._test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
+        self._shm_key_prefix = "/" if not self._test_windows else "Global\\"
         self._timeout = os.environ.get("SERVER_TIMEOUT", 120)
         self._protocol = protocol
         self._test_passed = False
@@ -136,16 +137,16 @@ class SharedMemoryTest(tu.TestResultCollector):
 
     def _configure_sever(self):
         shm_ip0_handle = shm.create_shared_memory_region(
-            "input0_data", "/input0_data", 64
+            "input0_data", (self._shm_key_prefix + "input0_data"), 64
         )
         shm_ip1_handle = shm.create_shared_memory_region(
-            "input1_data", "/input1_data", 64
+            "input1_data", (self._shm_key_prefix + "input1_data"), 64
         )
         shm_op0_handle = shm.create_shared_memory_region(
-            "output0_data", "/output0_data", 64
+            "output0_data", (self._shm_key_prefix + "output0_data"), 64
         )
         shm_op1_handle = shm.create_shared_memory_region(
-            "output1_data", "/output1_data", 64
+            "output1_data", (self._shm_key_prefix + "output1_data"), 64
         )
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -153,16 +154,16 @@ class SharedMemoryTest(tu.TestResultCollector):
         shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
 
         self._triton_client.register_system_shared_memory(
-            "input0_data", "/input0_data", 64
+            "input0_data", (self._shm_key_prefix + "input0_data"), 64
         )
         self._triton_client.register_system_shared_memory(
-            "input1_data", "/input1_data", 64
+            "input1_data", (self._shm_key_prefix + "input1_data"), 64
         )
         self._triton_client.register_system_shared_memory(
-            "output0_data", "/output0_data", 64
+            "output0_data", (self._shm_key_prefix + "output0_data"), 64
         )
         self._triton_client.register_system_shared_memory(
-            "output1_data", "/output1_data", 64
+            "output1_data", (self._shm_key_prefix + "output1_data"), 64
         )
         return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
 
@@ -242,9 +243,8 @@ class SharedMemoryTest(tu.TestResultCollector):
         print(f"*\n*\n*\nStarting Test:test_invalid_create_shm.{protocol}\n*\n*\n*\n")
         try:
             shm_op0_handle = shm.create_shared_memory_region(
-                "dummy_data", "/dummy_data", -1
+                "dummy_data", (self._shm_key_prefix + "dummy_data"), -1
             )
-            shm.destroy_shared_memory_region(shm_op0_handle)
         except Exception as ex:
             if self._test_windows:
                 self.assertEqual(str(ex), "unable to create file mapping")
@@ -261,16 +261,17 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         print(f"*\n*\n*\nStarting Test:test_invalid_registration.{protocol}\n*\n*\n*\n")
 
-        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
+        )
         shm.set_shared_memory_region(
             shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
         )
         try:
             self._triton_client.register_system_shared_memory(
-                "dummy_data", "/wrong_key", 8
+                "dummy_data", (self._shm_key_prefix + "wrong_key"), 8
             )
         except Exception as ex:
-            print(str(ex))
             self.assertIn("Unable to open shared memory region", str(ex))
         self._test_passed = True
 
@@ -285,12 +286,14 @@ class SharedMemoryTest(tu.TestResultCollector):
             f"*\n*\n*\nStarting Test:test_valid_create_set_register.{protocol}\n*\n*\n*\n"
         )
 
-        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
+        )
         shm.set_shared_memory_region(
             shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
         )
         self._triton_client.register_system_shared_memory(
-            "dummy_data", "/dummy_data", 8
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
         )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
@@ -312,7 +315,9 @@ class SharedMemoryTest(tu.TestResultCollector):
             f"*\n*\n*\nStarting Test:test_unregister_before_register.{protocol}\n*\n*\n*\n"
         )
 
-        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
+        )
         self._triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
@@ -333,9 +338,11 @@ class SharedMemoryTest(tu.TestResultCollector):
             f"*\n*\n*\nStarting Test:test_unregister_after_register.{protocol}\n*\n*\n*\n"
         )
 
-        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
+        )
         self._triton_client.register_system_shared_memory(
-            "dummy_data", "/dummy_data", 8
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
         )
         self._triton_client.unregister_system_shared_memory("dummy_data")
         shm_status = self._triton_client.get_system_shared_memory_status()
@@ -357,13 +364,15 @@ class SharedMemoryTest(tu.TestResultCollector):
             f"*\n*\n*\nStarting Test:test_reregister_after_register.{protocol}\n*\n*\n*\n"
         )
 
-        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
+        )
         self._triton_client.register_system_shared_memory(
-            "dummy_data", "/dummy_data", 8
+            "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
         )
         try:
             self._triton_client.register_system_shared_memory(
-                "dummy_data", "/dummy_data", 8
+                "dummy_data", (self._shm_key_prefix + "dummy_data"), 8
             )
         except Exception as ex:
             self.assertIn(
@@ -426,10 +435,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
         shm_ip2_handle = shm.create_shared_memory_region(
-            "input2_data", "/input2_data", 64
+            "input2_data", (self._shm_key_prefix + "input2_data"), 64
         )
         self._triton_client.register_system_shared_memory(
-            "input2_data", "/input2_data", 64
+            "input2_data", (self._shm_key_prefix + "input2_data"), 64
         )
         shm_status = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
@@ -447,10 +456,10 @@ class SharedMemoryTest(tu.TestResultCollector):
     #     error_msg = []
     #     shm_handles = self._configure_sever()
     #     shm_ip2_handle = shm.create_shared_memory_region(
-    #         "input2_data", "/input2_data", 128
+    #         "input2_data", (self._shm_key_prefix + "input2_data"), 128
     #     )
 
-    #     self._triton_client.register_system_shared_memory("input2_data", "/input2_data", 128)
+    #     self._triton_client.register_system_shared_memory("input2_data", (self._shm_key_prefix + "input2_data"), 128)
     #     shm_status = self._triton_client.get_system_shared_memory_status()
     #     self._basic_inference(
     #         shm_handles[0],

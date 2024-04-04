@@ -136,17 +136,27 @@ class SharedMemoryManager {
   TRITONSERVER_Error* UnregisterHelper(
       const std::string& name, TRITONSERVER_MemoryType memory_type);
 
-/// A struct that records the shared memory regions registered by the shared
-/// memory manager.
+  struct ShmFile {
 #ifdef _WIN32
+    HANDLE shm_file_;
+    ShmFile(void* shm_file) { shm_file_ = static_cast<HANDLE>(shm_file); };
+#else
+    int shm_file_;
+    ShmFile(int shm_file) { shm_file_ = *static_cast<int*>(shm_file); };
+#endif  // _WIN32
+  };
+
+  /// A struct that records the shared memory regions registered by the shared
+  /// memory manager.
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, HANDLE shm_handle,
+        const size_t offset, const size_t byte_size, void* shm_file,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_handle_(shm_handle),
+          byte_size_(byte_size),
+          platform_handle_(std::make_unique<ShmFile>(shm_file)),
           mapped_addr_(mapped_addr), kind_(kind), device_id_(device_id)
     {
     }
@@ -155,7 +165,7 @@ class SharedMemoryManager {
     std::string shm_key_;
     size_t offset_;
     size_t byte_size_;
-    HANDLE shm_handle_;
+    std::unique_ptr<ShmFile> platform_handle_;
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
@@ -165,11 +175,11 @@ class SharedMemoryManager {
   struct CUDASharedMemoryInfo : SharedMemoryInfo {
     CUDASharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, HANDLE shm_handle,
+        const size_t offset, const size_t byte_size, void* shm_file,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
         : SharedMemoryInfo(
-              name, shm_key, offset, byte_size, shm_handle, mapped_addr, kind,
+              name, shm_key, offset, byte_size, shm_file, mapped_addr, kind,
               device_id),
           cuda_ipc_handle_(*cuda_ipc_handle)
     {
@@ -178,49 +188,6 @@ class SharedMemoryManager {
     cudaIpcMemHandle_t cuda_ipc_handle_;
   };
 #endif  // TRITON_ENABLE_GPU
-
-#else
-  struct SharedMemoryInfo {
-    SharedMemoryInfo(
-        const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id)
-        : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          kind_(kind), device_id_(device_id)
-    {
-    }
-
-    std::string name_;
-    std::string shm_key_;
-    size_t offset_;
-    size_t byte_size_;
-    int shm_fd_;
-    void* mapped_addr_;
-    TRITONSERVER_MemoryType kind_;
-    int64_t device_id_;
-  };
-
-#ifdef TRITON_ENABLE_GPU
-  struct CUDASharedMemoryInfo : SharedMemoryInfo {
-    CUDASharedMemoryInfo(
-        const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
-        : SharedMemoryInfo(
-              name, shm_key, offset, byte_size, shm_fd, mapped_addr, kind,
-              device_id),
-          cuda_ipc_handle_(*cuda_ipc_handle)
-    {
-    }
-
-    cudaIpcMemHandle_t cuda_ipc_handle_;
-  };
-#endif  // TRITON_ENABLE_GPU
-
-#endif  // _WIN32
 
   using SharedMemoryStateMap =
       std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
