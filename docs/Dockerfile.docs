@@ -30,6 +30,7 @@ FROM ubuntu:22.04
 RUN apt-get update -q=2 \
     && apt-get install -y --no-install-recommends \
         build-essential \
+        curl \
         doxygen \
         git \
         git-lfs \
