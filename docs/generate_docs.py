@@ -12,15 +12,30 @@ from conf import exclude_patterns
 server_repo_path = os.getcwd()
 server_docs_dir_path = os.path.join(os.getcwd(), "docs")
 
-# TODO: Branch is not always main.
+"""
+TODO: Needs to handle cross-branch linkage.
+
+For example, server/docs/user_guide/architecture.md on branch 24.04 links to
+server/docs/user_guide/model_analyzer.md on main branch. In this case, the
+hyperlink of model_analyzer.md should be a URL instead of relative path.
+
+Another example can be server/docs/user_guide/model_analyzer.md on branch 24.04
+links to a file in server repo with relative path. Currently all URLs are
+hardcoded to main branch. We need to make sure that the URL actually points to the
+correct branch. We also need to handle cases like deprecated or removed files from
+older branch to avoid 404 error code.
+"""
 # Regex patterns
-http_reg = r"^https?://"
-tag_reg = "/(?:blob|tree)/main"
-triton_repo_reg = rf"{http_reg}github.com/triton-inference-server"
-triton_github_url_reg = rf"{triton_repo_reg}/([^/#]+)(?:{tag_reg})?/*([^#]*)\s*(?=#|$)"
-relpath_reg = r"]\s*\(\s*([^)]+)\)"
-# Hyperlink excluding embedded images in a .md file.
-hyperlink_reg = r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))"
+http_patn = r"^https?://"
+http_reg = re.compile(http_patn)
+tag_patn = "/(?:blob|tree)/main"
+triton_repo_patn = rf"{http_patn}github.com/triton-inference-server"
+triton_github_url_reg = re.compile(
+    rf"{triton_repo_patn}/([^/#]+)(?:{tag_patn})?/*([^#]*)\s*(?=#|$)"
+)
+# relpath_patn = r"]\s*\(\s*([^)]+)\)"
+# Hyperlink in a .md file, excluding embedded images.
+hyperlink_reg = re.compile(r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))")
 
 # Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
@@ -174,7 +189,7 @@ def replace_url_with_relpath(url, src_doc_path):
         https://github.com/triton-inference-server/server/blob/main/qa
         https://github.com/triton-inference-server/server/blob/main/CONTRIBUTING.md
     """
-    m = re.match(triton_github_url_reg, url)
+    m = triton_github_url_reg.match(url)
     # Do not replace URL if it is not a Triton GitHub file.
     if not m:
         return url
@@ -283,7 +298,7 @@ def replace_hyperlink(m, src_doc_path):
     # or allows relative paths. I haven't seen one such case in our doc so
     # should be safe for now.
     hyperlink_str = m.group(2)
-    match = re.match(http_reg, hyperlink_str)
+    match = http_reg.match(hyperlink_str)
 
     if match:
         # Hyperlink is a URL.
@@ -292,7 +307,6 @@ def replace_hyperlink(m, src_doc_path):
         # Hyperlink is a relative path.
         res = replace_relpath_with_url(hyperlink_str, src_doc_path)
 
-    # TODO: This can be improved. One way is to replace m.group(2) only.
     return m.group(1) + res + m.group(3)
 
 
@@ -319,8 +333,7 @@ def preprocess_docs(exclude_paths=[]):
         with open(doc_abspath, "r") as f:
             content = f.read()
 
-        content = re.sub(
-            hyperlink_reg,
+        content = hyperlink_reg.sub(
             partial(replace_hyperlink, src_doc_path=doc_abspath),
             content,
         )
