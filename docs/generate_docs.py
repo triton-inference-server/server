@@ -9,7 +9,7 @@ from functools import partial
 from conf import exclude_patterns
 
 # Global constants
-server_abspath = os.environ("SERVER_ABSPATH")
+server_abspath = os.environ["SERVER_ABSPATH"]
 server_docs_abspath = os.path.join(server_abspath, "docs")
 
 """
@@ -293,10 +293,17 @@ def replace_relpath_with_url(relpath, src_doc_path):
 
 
 def replace_hyperlink(m, src_doc_path):
-    # TODO: Markdown allows <link>, e.g. <a href=[^>]+>. Whether we want to
-    # find and replace the link depends on if they link to internal .md files
-    # or allows relative paths. I haven't seen one such case in our doc so
-    # should be safe for now.
+    """
+    TODO: Support of HTML tags for future docs.
+    1. Markdown allows <link>, e.g. <a href=[^>]+>. Whether we want to
+       find and replace the link depends on if they link to internal .md files
+       or allows relative paths. I haven't seen one such case in our doc so
+       should be safe for now.
+    2. Broken images have been found in the client repo src/grpc_generated/java/README.md.
+       Sphinx did not compile HTML image tags correctly. Reach out to @yinggeh for more detail.
+       Ex: <img src="images/proto-files.png" width="220" />
+    """
+
     hyperlink_str = m.group(2)
     match = http_reg.match(hyperlink_str)
 
