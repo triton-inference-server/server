@@ -61,7 +61,8 @@ import requests
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
 #      DCGM version,
-#      Conda version
+#      Conda version,
+#      vLLM version,
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -78,7 +79,7 @@ TRITON_VERSION_MAP = {
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "py310_23.1.0-1",  # Conda version
-        "0.3.2",  # vLLM version
+        "0.4.0.post1",  # vLLM version
     )
 }
 
