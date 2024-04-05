@@ -106,6 +106,93 @@ TraceManager::UpdateTraceSetting(
   return nullptr;
 }
 
+void
+printTraceConfigMap(const TraceConfigMap& mp)
+{
+  LOG_VERBOSE(1) << "Start Print \n";
+  for (const auto& [key, traceConfig] : mp) {
+    std::cout << "Key: " << key << std::endl;
+    for (const auto& [configKey, configValue] : traceConfig) {
+      std::cout << "  Config Key: " << configKey << ", Value: ";
+      // Visit the variant and print the value based on its type
+      std::visit(
+          [](const auto& value) { std::cout << value << std::endl; },
+          configValue);
+    }
+  }
+  LOG_VERBOSE(1) << "End Print \n";
+}
+
+void
+TraceManager::UpdateOpenTelemetryConfig(
+    TraceConfigMap& config_map_new, const TraceConfigMap& config_map_old)
+{
+  // Lock already taken by caller
+  // We need to see what has changed
+  LOG_VERBOSE(1) << "New Config \n";
+  printTraceConfigMap(config_map_new);
+  LOG_VERBOSE(1) << "OLD Config \n";
+  printTraceConfigMap(config_map_old);
+
+  auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
+  auto otel_options_it_new = config_map_new.find(mode_key);
+  auto otel_options_it_old = config_map_old.find(mode_key);
+  if (otel_options_it_new == config_map_new.end()) {
+    LOG_VERBOSE(1) << "Nothing to update \n";
+    return;
+  }
+  if (otel_options_it_old != config_map_old.end()) {
+    std::unordered_map<std::string, bool> param_map;
+    for (const auto& pair : otel_options_it_new->second) {
+      param_map[pair.first] = true;
+    }
+    for (const auto& pair : otel_options_it_old->second) {
+      if (param_map.find(pair.first) == param_map.end()) {
+        otel_options_it_new->second.push_back(pair);
+        param_map[pair.first] = true;  // Mark this key as existing
+      }
+    }
+  }
+  LOG_VERBOSE(1) << "New Config \n";
+  printTraceConfigMap(config_map_new);
+  LOG_VERBOSE(1) << "OLD Config \n";
+  printTraceConfigMap(config_map_old);
+  CleanupTracer();
+  InitTracer(config_map_new);
+}
+
+void
+TraceManager::InsertUpdateIntoConfig(
+    TraceConfigMap& config_map, const std::string& key,
+    const std::string& urlValue)
+{
+  // Check if "OTEL" key exists
+  LOG_VERBOSE(1) << "Inside InsertUpdateIntoConfig";
+
+  auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
+  auto otel_options_it = config_map.find(mode_key);
+  if (otel_options_it == config_map.end()) {
+    config_map[mode_key].push_back(std::make_pair(key, urlValue));
+    LOG_VERBOSE(1) << "Exit InsertUpdateIntoConfig 1";
+    printTraceConfigMap(config_map);
+    return;
+  }
+  // Found "OTEL", now check for "url" key in the vector
+  bool urlFound = false;
+  for (auto& pair : otel_options_it->second) {
+    if (pair.first == key) {
+      // "url" key found, update its value
+      LOG_VERBOSE(1) << "Updating OLD URL";
+      pair.second = urlValue;
+      urlFound = true;
+      break;
+    }
+  }
+  if (!urlFound) {
+    config_map[mode_key].push_back(std::make_pair(key, urlValue));
+  }
+}
+
 TRITONSERVER_Error*
 TraceManager::UpdateTraceSettingInternal(
     const std::string& model_name, const NewSetting& new_setting)
@@ -114,6 +201,9 @@ TraceManager::UpdateTraceSettingInternal(
   // current setting may be 'nullptr' if the setting is newly added
   const TraceSetting* current_setting = nullptr;
   const TraceSetting* fallback_setting = nullptr;
+  bool updateOpenTelemetryConfigFlag = false;
+  LOG_VERBOSE(1) << "UpdateTraceSettingInternal Call";
+
   if (!model_name.empty()) {
     auto it = model_settings_.find(model_name);
     if (it != model_settings_.end()) {
@@ -166,6 +256,12 @@ TraceManager::UpdateTraceSettingInternal(
                                    : (((current_setting != nullptr) &&
                                        current_setting->filepath_specified_) ||
                                       (new_setting.filepath_ != nullptr)));
+  const bool config_map_specified =
+      (new_setting.clear_config_map_
+           ? false
+           : (((current_setting != nullptr) &&
+               current_setting->config_map_specified_) ||
+              (new_setting.config_map_ != nullptr)));
 
   if (level_specified) {
     level = (new_setting.level_ != nullptr) ? *new_setting.level_
@@ -188,6 +284,16 @@ TraceManager::UpdateTraceSettingInternal(
     filepath = (new_setting.filepath_ != nullptr)
                    ? *new_setting.filepath_
                    : current_setting->file_->FileName();
+  }
+
+  if (true) {
+    LOG_VERBOSE(1) << "config_map_specified is true";
+    config_map = (new_setting.config_map_ != nullptr)
+                     ? *new_setting.config_map_
+                     : current_setting->config_map_;
+    updateOpenTelemetryConfigFlag = true;
+  } else {
+    LOG_VERBOSE(1) << "config_map_specified is false";
   }
 
   // Some special case when updating model setting
@@ -257,6 +363,9 @@ TraceManager::UpdateTraceSettingInternal(
         // Model init
         model_settings_.emplace(model_name, lts);
       }
+    }
+    if ((mode == TRACE_MODE_OPENTELEMETRY) && (updateOpenTelemetryConfigFlag)) {
+      UpdateOpenTelemetryConfig(config_map, current_setting->config_map_);
     }
   }
 
@@ -404,6 +513,7 @@ TraceManager::Trace::CaptureTimestamp(
 void
 TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 {
+  LOG_VERBOSE(1) << "Init Tracer called \n";
   switch (global_setting_->mode_) {
     case TRACE_MODE_OPENTELEMETRY: {
 #ifndef _WIN32
@@ -443,6 +553,12 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 void
 TraceManager::CleanupTracer()
 {
+  LOG_VERBOSE(1) << "CleanupTracer called \n";
+
+  // TODO : Does this truly flush?
+  // auto tracerProvider = opentelemetry::trace::Provider::GetTracerProvider();
+  // auto spanProcessor = tracerProvider->GetProcessor();
+  // spanProcessor->Shutdown(std::chrono::microseconds::max());
   switch (global_setting_->mode_) {
     case TRACE_MODE_OPENTELEMETRY: {
 #ifndef _WIN32

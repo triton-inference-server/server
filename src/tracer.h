@@ -113,6 +113,18 @@ class TraceManager {
     bool clear_level_;
     const TRITONSERVER_InferenceTraceLevel* level_;
 
+    bool clear_url_;
+    const std::string* url_;
+
+    bool clear_bsp_max_queue_size_;
+    const uint32_t* bsp_max_queue_size_;
+
+    bool clear_bsp_max_export_batch_size_;
+    const uint32_t* bsp_max_export_batch_size_;
+
+    bool clear_bsp_schedule_delay_;
+    const uint32_t* bsp_schedule_delay_;
+
     bool clear_rate_;
     const uint32_t* rate_;
 
@@ -125,8 +137,10 @@ class TraceManager {
     bool clear_filepath_;
     const std::string* filepath_;
 
+    bool clear_mode_;
     const InferenceTraceMode* mode_;
 
+    bool clear_config_map_;
     const TraceConfigMap* config_map_;
   };
 
@@ -164,6 +178,12 @@ class TraceManager {
   // updated.
   TRITONSERVER_Error* UpdateTraceSetting(
       const std::string& model_name, const NewSetting& new_setting);
+
+  void UpdateOpenTelemetryConfig(
+      TraceConfigMap& config_map_new, const TraceConfigMap& config_map_old);
+  void InsertUpdateIntoConfig(
+      TraceConfigMap& configMap, const std::string& key,
+      const std::string& urlValue);
 
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,

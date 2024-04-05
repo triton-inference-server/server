@@ -1772,6 +1772,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   int32_t count;
   uint32_t log_frequency;
   std::string filepath;
+  std::string url;
+  TraceConfigMap config_map;
   if (!model_name.empty()) {
     bool ready = false;
     RETURN_AND_RESPOND_IF_ERR(
@@ -1788,6 +1790,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
   // Perform trace setting update if requested
   if (req->method == htp_method_POST) {
+    LOG_VERBOSE(1) << "Update Called \n";
     struct evbuffer_iovec* v = nullptr;
     int v_idx = 0;
     int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -1958,6 +1961,17 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                    " ], got: " + frequency_str)
                       .c_str()));
         }
+      }
+    }
+    // the exact request key can be decided later
+    if (request.Find("url", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_config_map_ = true;
+      } else {
+        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&url));
+        LOG_VERBOSE(1) << "URL recieved: " << url;
+        trace_manager_->InsertUpdateIntoConfig(config_map, "url", url);
+        new_setting.config_map_ = &config_map;
       }
     }
     RETURN_AND_RESPOND_IF_ERR(
