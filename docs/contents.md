@@ -70,7 +70,7 @@ user_guide/faq
 :maxdepth: 1
 :caption: Protocol Guides
 
-protocol/README.md
+protocol/README
 customization_guide/inference_protocols
 protocol/extension_binary_data
 protocol/extension_classification
@@ -128,20 +128,21 @@ client/src/c++/perf_analyzer/docs/input_data
 client/src/c++/perf_analyzer/docs/measurements_metrics
 client/src/c++/perf_analyzer/docs/benchmarking
 client/src/c++/perf_analyzer/genai-perf/README
+client/src/c++/perf_analyzer/genai-perf/examples/tutorial
 ```
 
 ```{toctree}
 :maxdepth: 1
 :caption: Python Backend
 
-python_backend/README.md
-python_backend/inferentia/README.md
-python_backend/examples/auto_complete/README.md
-python_backend/examples/bls/README.md
-python_backend/examples/bls_decoupled/README.md
-python_backend/examples/custom_metrics/README.md
-python_backend/examples/decoupled/README.md
-python_backend/examples/instance_kind/README.md
-python_backend/examples/jax/README.md
-python_backend/examples/preprocessing/README.md
+python_backend/README
+python_backend/inferentia/README
+python_backend/examples/auto_complete/README
+python_backend/examples/bls/README
+python_backend/examples/bls_decoupled/README
+python_backend/examples/custom_metrics/README
+python_backend/examples/decoupled/README
+python_backend/examples/instance_kind/README
+python_backend/examples/jax/README
+python_backend/examples/preprocessing/README
 ```
