@@ -2375,7 +2375,7 @@ if __name__ == "__main__":
         "--ci-split",
         action="store_true",
         required=False,
-        help="Requires to split CI build into multiple builds. Will generate cmake build script separatelly for each backend",
+        help="Split the intermediate build artifacts into independently build-able targets",
     )
     parser.add_argument(
         "--cache-from-map",
