@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,11 +31,41 @@ TEST_LOG="./response_cache_test.log"
 UNIT_TEST="./response_cache_test --gtest_output=xml:response_cache.report.xml"
 export CUDA_VISIBLE_DEVICES=0
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "${REPO_VERSION}" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 # Only localhost supported in this test for now, but in future could make
 # use of a persistent remote redis server, or similarly use --replicaof arg.
 export TRITON_REDIS_HOST="localhost"
 export TRITON_REDIS_PORT="6379"
 REDIS_LOG="./redis-server.unit_tests.log"
+ENSEMBLE_CACHE_TEST_PY="./ensemble_cache_test.py"
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
+CLIENT_LOG="./client.log"
+TEST_RESULT_FILE='test_results.txt'
+SERVER_LOG=./inference_server.log
+source ../common/util.sh
+
+MODEL_DIR="${PWD}/models"
+mkdir -p "${MODEL_DIR}/ensemble_models"
+ENSEMBLE_MODEL_DIR="${PWD}/models/ensemble_models"
+ENSEMBLE_MODEL="simple_graphdef_float32_float32_float32"
+COMPOSING_MODEL="graphdef_float32_float32_float32"
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${ENSEMBLE_MODEL_DIR}/${ENSEMBLE_MODEL}"
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${ENSEMBLE_MODEL_DIR}/${COMPOSING_MODEL}"
+mkdir -p "${MODEL_DIR}/decoupled_cache/1"
+mkdir -p "${MODEL_DIR}/identity_cache/1"
+
 
 rm -fr *.log
 
@@ -88,11 +118,11 @@ function unset_redis_auth() {
 # UNIT TESTS
 set +e
 
-## Unit tests currently run for both Local and Redis cache implementations
-## by default. However, we could break out the unit tests for each
-## into separate runs gtest filters if needed in the future:
-## - `${UNIT_TEST} --gtest_filter=*Local*`
-## - `${UNIT_TEST} --gtest_filter=*Redis*`
+# Unit tests currently run for both Local and Redis cache implementations
+# by default. However, we could break out the unit tests for each
+# into separate runs gtest filters if needed in the future:
+# - `${UNIT_TEST} --gtest_filter=*Local*`
+# - `${UNIT_TEST} --gtest_filter=*Redis*`
 install_redis
 # Stop any existing redis server first for good measure
 stop_redis
@@ -140,26 +170,21 @@ function check_server_expected_failure {
     fi
 }
 
-MODEL_DIR="${PWD}/models"
-mkdir -p "${MODEL_DIR}/decoupled_cache/1"
-mkdir -p "${MODEL_DIR}/identity_cache/1"
+function check_server_failure_decoupled_model {
+  EXTRA_ARGS="--model-control-mode=$2 --load-model=$3"
+  SERVER_ARGS="--model-repository="${1}" --cache-config local,size=1048576000 ${EXTRA_ARGS}"
+  source ../common/util.sh
 
-# Check that server fails to start for a "decoupled" model with cache enabled
-EXTRA_ARGS="--model-control-mode=explicit --load-model=decoupled_cache"
-
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
-SERVER_LOG="./inference_server.log"
-source ../common/util.sh
-run_server
-if [ "$SERVER_PID" != "0" ]; then
+  rm -f $SERVER_LOG
+  run_server
+  if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
     cat $SERVER_LOG
     RET=1
 
     kill $SERVER_PID
     wait $SERVER_PID
-else
+  else
     # Check that server fails with the correct error message
     set +e
     grep -i "response cache does not currently support" ${SERVER_LOG} | grep -i "decoupled"
@@ -169,23 +194,50 @@ else
         RET=1
     fi
     set -e
-fi
+  fi
+}
+
+function test_ensemble_model_with_cache_util {
+  SERVER_ARGS="--model-repository="${3}" --cache-config local,size=1048576000"
+  if [ "${SERVER_PID}" == "0" ]; then
+    run_server
+  else
+    set +e
+    python ${ENSEMBLE_CACHE_TEST_PY} "${1}" >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "${2}"
+            RET=1
+        fi
+    fi
+    set -e
+
+  fi
+}
+
+# Check that server fails to start for a "decoupled" model with cache enabled
+check_server_failure_decoupled_model ${MODEL_DIR} "explicit" "decoupled_cache"
+
 
 # Test with model expected to load successfully
 EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
 
-# Test old cache config method
-# --response-cache-byte-size must be non-zero to test models with cache enabled
+#  Test old cache config method
+#  --response-cache-byte-size must be non-zero to test models with cache enabled
 SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
-# Test new cache config method
+#  Test new cache config method
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
-# Test that specifying multiple cache types is not supported and should fail
+#  Test that specifying multiple cache types is not supported and should fail
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 --cache-config=redis,key=value ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "multiple cache configurations"
@@ -272,10 +324,42 @@ run_server
 check_server_expected_failure "WRONGPASS"
 unset TRITONCACHE_REDIS_USERNAME
 unset TRITONCACHE_REDIS_PASSWORD
-
-# Clean up redis server before exiting test
+# Clean up redis server
 unset_redis_auth
 stop_redis
+
+
+#Test Ensemble Model With Cache Enabled and Decoupled Mode in Ensemble Config
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.enable_cache_and_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
+check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+
+# Test Ensemble Model With Cache Enabled and Decoupled Mode in Composing Model
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.enable_composing_model_decoupled >>$CLIENT_LOG 2>&1
+check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+
+#Remove decoupled Config
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.remove_decoupled_config >> $CLIENT_LOG 2>&1
+
+#Test Ensemble Model with Top Level Caching Enabled
+FUNCTION_NAME="EnsembleCacheTest.test_ensemble_top_level_cache"
+ERROR_MESSAGE="\n***\n*** Failed: Expected Top Level Request Caching\n***"
+test_ensemble_model_with_cache_util "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+#check_server_success_and_kill
+
+# Test Ensemble Model with cache enabled in all models
+FUNCTION_NAME="EnsembleCacheTest.test_all_models_with_cache_enabled"
+ERROR_MESSAGE="\n***\n*** Failed: Expected Cache to return Top-Level request's response\n***"
+test_ensemble_model_with_cache_util "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+#check_server_success_and_kill
+
+# Cleanup extra configuration for next iteration
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.reset_config_files >>$CLIENT_LOG 2>&1
+
+
+if [ $SERVER_PID != "0" ]; then
+  kill $SERVER_PID
+  #wait $SERVER_PID
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
@@ -284,3 +368,4 @@ else
 fi
 
 exit $RET
+

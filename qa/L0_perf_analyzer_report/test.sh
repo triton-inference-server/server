@@ -73,13 +73,7 @@ function check_cache_output {
     ERROR_STRING="Cache hit count: 0"
     num_cache_hit_lines=$(cat ${CLIENT_LOG} |  grep -i "${CACHE_STRING}" | wc -l)
     num_cache_hit_zero_lines=$(cat ${CLIENT_LOG} |  grep -i "${ERROR_STRING}" | wc -l)
-    # Top-level ensemble model requests do not currently support caching and
-    # will always report a cache hit count of zero if any composing model
-    # has caching enabled. So we check that at least one model reports
-    # non-zero cache hits for now.
-    # TODO: When ensemble models support cache hits, this should just fail
-    #       for any occurrence of ERROR_STRING
-    if [ ${num_cache_hit_lines} -eq ${num_cache_hit_zero_lines} ]; then
+    if [ ${num_cache_hit_zero_lines} -eq ${num_cache_hit_lines} ]; then
         cat ${CLIENT_LOG}
 	echo "ERROR: All cache hit counts were zero, expected a non-zero number of cache hits"
         echo -e "\n***\n*** Test Failed\n***"
@@ -166,7 +160,8 @@ set -e
 
 # Cleanup
 kill $SERVER_PID
-wait $SERVER_PID
+
+echo "Server process has terminated or timeout reached."
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
