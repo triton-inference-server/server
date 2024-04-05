@@ -92,7 +92,7 @@ class HTTPServer {
       : port_(port), reuse_port_(reuse_port), address_(address),
         header_forward_pattern_(header_forward_pattern),
         thread_cnt_(thread_cnt), header_forward_regex_(header_forward_pattern_),
-        conn_cnt_(0), stop_accepting_new_conn_(false)
+        conn_cnt_(0), accepting_new_conn_(true)
   {
   }
 
@@ -122,7 +122,7 @@ class HTTPServer {
 
   std::mutex conn_mu_;
   uint32_t conn_cnt_;
-  bool stop_accepting_new_conn_;
+  bool accepting_new_conn_;
 };
 
 #ifdef TRITON_ENABLE_METRICS

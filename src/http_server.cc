@@ -238,14 +238,14 @@ HTTPServer::Start()
 TRITONSERVER_Error*
 HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
+  {
+    std::lock_guard<std::mutex> lock(conn_mu_);
+    accepting_new_conn_ = false;
+  }
   if (exit_timeout_secs != nullptr) {
     while (*exit_timeout_secs > 0) {
-      {
-        std::lock_guard<std::mutex> lock(conn_mu_);
-        if (conn_cnt_ == 0) {
-          stop_accepting_new_conn_ = true;
-          break;
-        }
+      if (conn_cnt_ == 0) {  // conn_cnt_ can only decrease
+        break;
       }
       LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
                << " " << service_name << " service connections";
@@ -286,13 +286,13 @@ HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 evhtp_res
 HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
 {
-  HTTPServer* t = static_cast<HTTPServer*>(arg);
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
   {
-    std::lock_guard<std::mutex> lock(t->conn_mu_);
-    if (t->stop_accepting_new_conn_) {
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    if (!server->accepting_new_conn_) {
       return EVHTP_RES_SERVUNAVAIL;  // reset connection
     }
-    t->conn_cnt_++;
+    server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
@@ -303,10 +303,10 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
 evhtp_res
 HTTPServer::EndConnection(evhtp_connection_t* conn, void* arg)
 {
-  HTTPServer* t = static_cast<HTTPServer*>(arg);
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
   {
-    std::lock_guard<std::mutex> lock(t->conn_mu_);
-    t->conn_cnt_--;
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    server->conn_cnt_--;
   }
   return EVHTP_RES_OK;
 }
