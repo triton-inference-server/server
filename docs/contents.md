@@ -47,7 +47,6 @@ user_guide/optimization
 user_guide/ragged_batching
 user_guide/rate_limiter
 user_guide/model_analyzer
-user_guide/perf_analyzer
 user_guide/model_management
 user_guide/custom_operations
 user_guide/decoupled_models
@@ -71,7 +70,7 @@ user_guide/faq
 :maxdepth: 1
 :caption: Protocol Guides
 
-protocol/README.md
+protocol/README
 customization_guide/inference_protocols
 protocol/extension_binary_data
 protocol/extension_classification
@@ -84,6 +83,7 @@ protocol/extension_sequence
 protocol/extension_shared_memory
 protocol/extension_statistics
 protocol/extension_trace
+protocol/extension_parameters
 ```
 
 ```{toctree}
@@ -101,4 +101,48 @@ customization_guide/test
 
 examples/jetson/README
 examples/jetson/concurrency_and_dynamic_batching/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Client
+
+client/README
+client/src/java/README
+client/src/grpc_generated/go/README
+client/src/grpc_generated/javascript/README
+client/src/grpc_generated/java/README
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Performance Analyzer
+
+client/src/c++/perf_analyzer/README
+client/src/c++/perf_analyzer/docs/README
+client/src/c++/perf_analyzer/docs/install
+client/src/c++/perf_analyzer/docs/quick_start
+client/src/c++/perf_analyzer/docs/cli
+client/src/c++/perf_analyzer/docs/inference_load_modes
+client/src/c++/perf_analyzer/docs/input_data
+client/src/c++/perf_analyzer/docs/measurements_metrics
+client/src/c++/perf_analyzer/docs/benchmarking
+client/src/c++/perf_analyzer/genai-perf/README
+client/src/c++/perf_analyzer/genai-perf/examples/tutorial
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Python Backend
+
+python_backend/README
+python_backend/inferentia/README
+python_backend/examples/auto_complete/README
+python_backend/examples/bls/README
+python_backend/examples/bls_decoupled/README
+python_backend/examples/custom_metrics/README
+python_backend/examples/decoupled/README
+python_backend/examples/instance_kind/README
+python_backend/examples/jax/README
+python_backend/examples/preprocessing/README
 ```
