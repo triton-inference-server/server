@@ -2381,7 +2381,7 @@ if __name__ == "__main__":
         "--cache-from-map",
         action="append",
         required=False,
-        help="Requires to split CI build into multiple builds. Will generate cmake build script separatelly for each backend",
+        help="A set of docker images to `--cache-from` where applicable to help speedup builds",
         default = [ "tritonserver_buildbase", "tritonserver_buildbase_cache0", "tritonserver_buildbase_cache1", ],
     )
 
