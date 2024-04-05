@@ -76,7 +76,7 @@ extensions = [
     "sphinx_sitemap",
 ]
 
-suppress_warnings = ["myst.domains", "ref.ref"]
+suppress_warnings = ["myst.domains", "ref.ref", "myst.header"]
 
 numfig = True
 
@@ -105,7 +105,7 @@ templates_path = ["_templates"]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["README.md"]
+exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer.md"]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -183,7 +183,7 @@ ultimate_replacements = {
 # bibtex_default_style = "plain"
 
 ### We currently use Myst: https://myst-nb.readthedocs.io/en/latest/use/execute.html
-jupyter_execute_notebooks = "off"  # Global execution disable
+nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
 
