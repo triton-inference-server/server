@@ -336,7 +336,8 @@ InferAllocatorPayload(
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          region_name, offset, &base, &memory_type, &memory_type_id));
+          region_name, offset, byte_size, &base, &memory_type,
+          &memory_type_id));
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
