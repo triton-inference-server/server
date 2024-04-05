@@ -9,8 +9,8 @@ from functools import partial
 from conf import exclude_patterns
 
 # Global constants
-server_repo_path = os.getcwd()
-server_docs_dir_path = os.path.join(os.getcwd(), "docs")
+server_abspath = os.environ("SERVER_ABSPATH")
+server_docs_abspath = os.path.join(server_abspath, "docs")
 
 """
 TODO: Needs to handle cross-branch linkage.
@@ -200,14 +200,14 @@ def replace_url_with_relpath(url, src_doc_path):
     valid_hashtag = section not in ["", "#"] and section.startswith("#")
 
     if target_repo_name == "server":
-        target_path = os.path.join(server_repo_path, target_relpath_from_target_repo)
+        target_path = os.path.join(server_abspath, target_relpath_from_target_repo)
     else:
         target_path = os.path.join(
-            server_docs_dir_path, target_repo_name, target_relpath_from_target_repo
+            server_docs_abspath, target_repo_name, target_relpath_from_target_repo
         )
 
     # Return URL if it points to a path outside server/docs.
-    if os.path.commonpath([server_docs_dir_path, target_path]) != server_docs_dir_path:
+    if os.path.commonpath([server_docs_abspath, target_path]) != server_docs_abspath:
         return url
 
     if (
@@ -260,11 +260,11 @@ def replace_relpath_with_url(relpath, src_doc_path):
 
     url = f"https://github.com/triton-inference-server/{src_git_repo_name}/blob/main/"
     if src_git_repo_name == "server":
-        src_repo_abspath = server_repo_path
+        src_repo_abspath = server_abspath
         # TODO: Assert the relative path not pointing to cloned repo, e.g. client.
         # This requires more information which may be stored in a global variable.
     else:
-        src_repo_abspath = os.path.join(server_docs_dir_path, src_git_repo_name)
+        src_repo_abspath = os.path.join(server_docs_abspath, src_git_repo_name)
 
     # Assert target path is under the current repo directory.
     assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
@@ -283,8 +283,8 @@ def replace_relpath_with_url(relpath, src_doc_path):
     if (
         os.path.isfile(target_path)
         and os.path.splitext(target_path)[1] == ".md"
-        and os.path.commonpath([server_docs_dir_path, target_path])
-        == server_docs_dir_path
+        and os.path.commonpath([server_docs_abspath, target_path])
+        == server_docs_abspath
         and not is_excluded(target_path)
     ):
         return relpath
@@ -314,12 +314,12 @@ def preprocess_docs(exclude_paths=[]):
     # Find all ".md" files inside the current repo.
     if exclude_paths:
         cmd = (
-            ["find", server_docs_dir_path, "-type", "d", "\\("]
+            ["find", server_docs_abspath, "-type", "d", "\\("]
             + " -o ".join([f"-path './{dir}'" for dir in exclude_paths]).split(" ")
             + ["\\)", "-prune", "-o", "-type", "f", "-name", "'*.md'", "-print"]
         )
     else:
-        cmd = ["find", server_docs_dir_path, "-name", "'*.md'"]
+        cmd = ["find", server_docs_abspath, "-name", "'*.md'"]
     cmd = " ".join(cmd)
     result = subprocess.run(cmd, check=True, capture_output=True, text=True, shell=True)
     docs_list = list(filter(None, result.stdout.split("\n")))
@@ -349,7 +349,8 @@ def main():
     github_org = args.github_organization
 
     # Change working directory to server/docs.
-    os.chdir(server_docs_dir_path)
+    os.chdir(server_docs_abspath)
+    run_command("make clean")
 
     # Usage generate_docs.py --repo-tag=client:main
     if "client" in repo_tags:
@@ -364,7 +365,7 @@ def main():
     if "custom_backend" in backend_tags:
         clone_from_github("custom_backend", backend_tags["custom_backend"], github_org)
 
-    # Preprocess documents in server_docs_dir_path after all repos are cloned.
+    # Preprocess documents in server_docs_abspath after all repos are cloned.
     preprocess_docs()
     run_command("make html")
 
@@ -377,7 +378,7 @@ def main():
         run_command("rm -rf custom_backend")
 
     # Return to previous working directory server/.
-    os.chdir(server_repo_path)
+    os.chdir(server_abspath)
 
 
 if __name__ == "__main__":
