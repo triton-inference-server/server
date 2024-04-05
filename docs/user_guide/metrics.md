@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -285,7 +285,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 
 ## Pinned Memory Metrics
 
-Starting in 24.03, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
+Starting in 24.01, Triton offers Pinned Memory metrics to monitor the utilization of the Pinned Memory pool.
 
 |Category        |Metric            |Metric Name                 |Description                                            |Granularity|Frequency    |
 |----------------|------------------|----------------------------|-------------------------------------------------------|-----------|-------------|
