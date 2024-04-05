@@ -9,7 +9,7 @@ from functools import partial
 from conf import exclude_patterns
 
 # Global constants
-server_abspath = os.environ["SERVER_ABSPATH"]
+server_abspath = os.environ.get("SERVER_ABSPATH", os.getcwd())
 server_docs_abspath = os.path.join(server_abspath, "docs")
 
 """
