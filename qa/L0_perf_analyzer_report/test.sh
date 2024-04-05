@@ -161,7 +161,6 @@ set -e
 # Cleanup
 kill $SERVER_PID
 
-echo "Server process has terminated or timeout reached."
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
