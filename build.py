@@ -60,8 +60,7 @@ import requests
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
-#      DCGM version,
-#      Conda version
+#      DCGM version
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -72,12 +71,11 @@ import requests
 TRITON_VERSION_MAP = {
     "2.45.0dev": (
         "24.04dev",  # triton container
-        "24.02",  # upstream container
+        "24.03",  # upstream container
         "1.17.2",  # ORT
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "py310_23.1.0-1",  # Conda version
         "0.3.2",  # vLLM version
     )
 }
@@ -849,10 +847,12 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \
-    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-    apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
+RUN curl -o /tmp/cuda-keyring.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \\
+      && apt install /tmp/cuda-keyring.deb \\
+      && rm /tmp/cuda-keyring.deb \\
+      && apt-get update \\
+      && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
             )
@@ -860,44 +860,15 @@ RUN curl -o /tmp/cuda-keyring.deb \
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \
-    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-    apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
+RUN curl -o /tmp/cuda-keyring.deb \\
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \\
+      && apt install /tmp/cuda-keyring.deb \\
+      && rm /tmp/cuda-keyring.deb \\
+      && apt-get update \\
+      && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
             )
-
-
-def install_miniconda(conda_version, target_machine):
-    if target_machine == "arm64":
-        # This branch used for the case when linux container builds on MacOS with ARM chip
-        # macos arm arch names "arm64" when in linux it's names "aarch64".
-        # So we just replace the architecture to able find right conda version for Linux
-        target_machine = "aarch64"
-    if conda_version == "":
-        fail(
-            "unable to determine default repo-tag, CONDA version not known for {}".format(
-                FLAGS.version
-            )
-        )
-    miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
-    if target_machine == "x86_64":
-        sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
-    else:
-        sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
-    return f"""
-RUN mkdir -p /opt/
-RUN wget "{miniconda_url}" -O miniconda.sh -q && \
-    echo "{sha_sum}" "miniconda.sh" > shasum && \
-    sha256sum -c ./shasum && \
-    sh miniconda.sh -b -p /opt/conda && \
-    rm miniconda.sh shasum && \
-    find /opt/conda/ -follow -type f -name '*.a' -delete && \
-    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
-    /opt/conda/bin/conda clean -afy
-ENV PATH ${{PATH}}:/opt/conda/bin
-"""
 
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
@@ -928,72 +899,76 @@ SHELL ["cmd", "/S", "/C"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install docker docker buildx
-RUN apt-get update \
-        && apt-get install -y ca-certificates curl gnupg \
-        && install -m 0755 -d /etc/apt/keyrings \
-        && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-        && chmod a+r /etc/apt/keyrings/docker.gpg \
-        && echo \
-            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-            "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-            tee /etc/apt/sources.list.d/docker.list > /dev/null \
-        && apt-get update \
-        && apt-get install -y docker.io docker-buildx-plugin
+RUN apt-get update \\
+      && apt-get install -y ca-certificates curl gnupg \\
+      && install -m 0755 -d /etc/apt/keyrings \\
+      && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \\
+      && chmod a+r /etc/apt/keyrings/docker.gpg \\
+      && echo \\
+          "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \\
+          "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \\
+          tee /etc/apt/sources.list.d/docker.list > /dev/null \\
+      && apt-get update \\
+      && apt-get install -y docker.io docker-buildx-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-            ca-certificates \
-            autoconf \
-            automake \
-            build-essential \
-            git \
-            gperf \
-            libre2-dev \
-            libssl-dev \
-            libtool \
-            libcurl4-openssl-dev \
-            libb64-dev \
-            libgoogle-perftools-dev \
-            patchelf \
-            python3-dev \
-            python3-pip \
-            python3-setuptools \
-            rapidjson-dev \
-            scons \
-            software-properties-common \
-            pkg-config \
-            unzip \
-            wget \
-            zlib1g-dev \
-            libarchive-dev \
-            libxml2-dev \
-            libnuma-dev \
-            wget \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends \\
+            ca-certificates \\
+            autoconf \\
+            automake \\
+            build-essential \\
+            git \\
+            gperf \\
+            libre2-dev \\
+            libssl-dev \\
+            libtool \\
+            libcurl4-openssl-dev \\
+            libb64-dev \\
+            libgoogle-perftools-dev \\
+            patchelf \\
+            python3-dev \\
+            python3-pip \\
+            python3-setuptools \\
+            rapidjson-dev \\
+            scons \\
+            software-properties-common \\
+            pkg-config \\
+            unzip \\
+            wget \\
+            zlib1g-dev \\
+            libarchive-dev \\
+            libxml2-dev \\
+            libnuma-dev \\
+            wget \\
+      && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools docker
+RUN pip3 install --upgrade pip \\
+      && pip3 install --upgrade \\
+          wheel \\
+          setuptools \\
+          docker \\
+          virtualenv
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \
-        https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && \
-    (cd /tmp && tar xzf boost.tar.gz) && \
-    mv /tmp/boost_1_80_0/boost /usr/include/boost
+RUN wget -O /tmp/boost.tar.gz \\
+          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+      && (cd /tmp && tar xzf boost.tar.gz) \\
+      && mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN apt update -q=2 \\
-    && apt install -y gpg wget \\
-    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-    && . /etc/os-release \\
-    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-    && apt-get update -q=2 \\
-    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
+      && apt install -y gpg wget \\
+      && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
+      && . /etc/os-release \\
+      && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
+      && apt-get update -q=2 \\
+      && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
 
         if FLAGS.enable_gpu:
@@ -1019,10 +994,6 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 """
-
-    # Install miniconda required for the DALI backend.
-    if target_platform() != "windows":
-        df += install_miniconda(argmap["CONDA_VERSION"], target_machine())
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1123,13 +1094,13 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
         df += """
 # Remove TRT contents that are not needed in runtime
 RUN ARCH="$(uname -i)" \\
-    && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
-    && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
-    && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
+      && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
+      && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
+      && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
 
 # Install required packages for TRT-LLM models
 RUN python3 -m pip install --upgrade pip \\
-    && pip3 install transformers
+      && pip3 install transformers
 
 # Uninstall unused nvidia packages
 RUN if pip freeze | grep -q "nvidia.*"; then \\
@@ -1139,7 +1110,7 @@ RUN pip cache purge
 
 # Drop the static libs
 RUN ARCH="$(uname -i)" \\
-    && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
+      && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
           ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
@@ -1201,35 +1172,35 @@ ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
-        useradd $TRITON_SERVER_USER; \
-    fi && \
-    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
-    [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
+RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
+      && if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
+          useradd $TRITON_SERVER_USER; \\
+        fi \\
+      && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
+      && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-            clang \
-            curl \
-            dirmngr \
-            git \
-            gperf \
-            libb64-0d \
-            libcurl4-openssl-dev \
-            libgoogle-perftools-dev \
-            libjemalloc-dev \
-            libnuma-dev \
-            libre2-9 \
-            software-properties-common \
-            wget \
-            {backend_dependencies} \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends \\
+              clang \\
+              curl \\
+              dirmngr \\
+              git \\
+              gperf \\
+              libb64-0d \\
+              libcurl4-openssl-dev \\
+              libgoogle-perftools-dev \\
+              libjemalloc-dev \\
+              libnuma-dev \\
+              libre2-9 \\
+              software-properties-common \\
+              wget \\
+              {backend_dependencies} \\
+      && rm -rf /var/lib/apt/lists/*
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
@@ -1254,10 +1225,10 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
         df += """
 # Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
- && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
- && ldconfig \
- && rm -f ${_CUDA_COMPAT_PATH}/lib
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
+      && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
+      && ldconfig \\
+      && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
@@ -1266,25 +1237,27 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
     if "python" in backends:
         df += """
 # python3, python3-pip and some pip installs required for the python backend
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            python3 libarchive-dev \
-            python3-pip \
-            libpython3-dev && \
-    pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends \\
+            python3 \\
+            libarchive-dev \\
+            python3-pip \\
+            libpython3-dev \\
+      && pip3 install --upgrade pip \\
+      && pip3 install --upgrade \\
+            wheel \\
+            setuptools \\
+            numpy \\
+            virtualenv \\
+      && rm -rf /var/lib/apt/lists/*
 """
 
     if "vllm" in backends:
-        # [DLIS-5606] Build Conda environment for vLLM backend
-        # Remove Pip install once vLLM backend moves to Conda environment.
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][7]
+            TRITON_VERSION_MAP[FLAGS.version][6]
         )
 
     df += """
@@ -1350,8 +1323,8 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin patchelf
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends openmpi-bin patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
@@ -1445,9 +1418,6 @@ def create_build_dockerfiles(
         "DCGM_VERSION": ""
         if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
         else TRITON_VERSION_MAP[FLAGS.version][5],
-        "CONDA_VERSION": ""
-        if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
-        else TRITON_VERSION_MAP[FLAGS.version][6],
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
