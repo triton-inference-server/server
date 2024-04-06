@@ -78,7 +78,7 @@ OpenSharedMemoryRegion(const std::string& shm_key, void** shm_file)
   }
 #else
   // get shared memory region descriptor
-  int* shm_fd = *static_cast<int**>(shm_file);
+  int* shm_fd = *reinterpret_cast<int**>(shm_file);
   *shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
   if (*shm_fd == -1) {
     LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
@@ -160,7 +160,7 @@ MapSharedMemory(
   if (*mapped_addr == MAP_FAILED) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "unable to process address space" +
+                                         "unable to process address space " +
                                          std::string(std::strerror(errno)))
                                          .c_str());
   }
@@ -253,19 +253,24 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // register
   void* mapped_addr;
-  void* shm_file = nullptr;
+  // Safe initializer for Unix case where shm_file must be dereferenced to
+  // base in order to store file descriptor.
+  int shm_safe_initializer = -1;
+  void* shm_file = &shm_safe_initializer;
+  bool shm_file_exists = false;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
-      shm_file = itr->second->platform_handle_->shm_file_;
+      shm_file = itr->second->platform_handle_->GetShmFile();
+      shm_file_exists = true;
       break;
     }
   }
 
   // open and set new shm_file if new shared memory key
-  if (!shm_file) {
+  if (!shm_file_exists) {
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_file));
   }
 
@@ -341,8 +346,8 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<CUDASharedMemoryInfo>(new CUDASharedMemoryInfo(
-                name, "", 0, byte_size, nullptr, mapped_addr, TRITONSERVER_MEMORY_GPU,
-                device_id, cuda_shm_handle))))
+                name, "", 0, byte_size, nullptr, mapped_addr,
+                TRITONSERVER_MEMORY_GPU, device_id, cuda_shm_handle))));
 
   return nullptr;  // success
 #endif
@@ -568,6 +573,8 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
       }
     }
   } else if (memory_type == TRITONSERVER_MEMORY_GPU) {
+    // TODO: DLIS-4169 - Verify whether we need a Windows implementation of
+    // UnregisterAll for GPU shm once we have GPU shm mem support
     error_message += "cuda shared memory regions: ";
     for (auto it = shared_memory_map_.cbegin(), next_it = it;
          it != shared_memory_map_.cend(); it = next_it) {

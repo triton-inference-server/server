@@ -140,9 +140,14 @@ class SharedMemoryManager {
 #ifdef _WIN32
     HANDLE shm_file_;
     ShmFile(void* shm_file) { shm_file_ = static_cast<HANDLE>(shm_file); };
+    HANDLE GetShmFile() { return shm_file_; };
 #else
-    int shm_file_;
-    ShmFile(int shm_file) { shm_file_ = *static_cast<int*>(shm_file); };
+    std::unique_ptr<int> shm_file_;
+    ShmFile(void* shm_file)
+    {
+      shm_file_ = std::make_unique<int>(*static_cast<int*>(shm_file));
+    };
+    int* GetShmFile() { return shm_file_.get(); };
 #endif  // _WIN32
   };
 
