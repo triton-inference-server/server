@@ -50,7 +50,8 @@ for i in \
         test_too_big_shm \
         test_mixed_raw_shm \
         test_unregisterall \
-        test_infer_offset_out_of_bound; do
+        test_infer_offset_out_of_bound \
+        test_infer_byte_size_out_of_bound; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"

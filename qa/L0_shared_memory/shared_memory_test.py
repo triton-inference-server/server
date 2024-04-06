@@ -163,6 +163,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         big_shm_name="",
         big_shm_size=64,
         shm_output_offset=0,
+        shm_output_byte_size=0,
     ):
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -192,8 +193,12 @@ class SharedMemoryTest(tu.TestResultCollector):
         else:
             inputs[1].set_shared_memory("input1_data", 64)
 
-        outputs[0].set_shared_memory("output0_data", 64, offset=shm_output_offset)
-        outputs[1].set_shared_memory("output1_data", 64, offset=shm_output_offset)
+        outputs[0].set_shared_memory(
+            "output0_data", 64, offset=shm_output_offset, byte_size=shm_output_byte_size
+        )
+        outputs[1].set_shared_memory(
+            "output1_data", 64, offset=shm_output_offset, byte_size=shm_output_byte_size
+        )
 
         try:
             results = triton_client.infer(
@@ -346,6 +351,26 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         self.assertEqual(len(error_msg), 1)
         self.assertIn("Invalid offset for shared memory region", error_msg[0])
+        self._cleanup_server(shm_handles)
+
+    def test_infer_byte_size_out_of_bound(self):
+        # Shared memory byte_size outside output region - Throws error
+        error_msg = []
+        shm_handles = self._configure_sever()
+        offset = 2**64 - 1
+        byte_size = 2**32
+
+        self._basic_inference(
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
+            shm_output_offset=offset,
+            shm_output_byte_size=byte_size,
+        )
+        self.assertEqual(len(error_msg), 1)
+        self.assertIn("Invalid byte size for shared memory region", error_msg[0])
         self._cleanup_server(shm_handles)
 
 
