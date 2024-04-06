@@ -2692,7 +2692,7 @@ if __name__ == "__main__":
             )
         # Commands to build each backend...
         for be in backends:
-            # Define fucntion to create cmake_script with backend name as suffix
+            # Define function to create cmake_script with backend name as suffix
             if FLAGS.ci_split:
                 cmake_script = split_cmake_script("cmake_build_backend_" + be)
 
