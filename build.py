@@ -1566,7 +1566,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             ],
             check_exitcode=True,
         )
-        
+
         if not FLAGS.ci_split:
             docker_script.cmd(
                 [
@@ -2070,6 +2070,7 @@ def enable_all():
         if ep not in FLAGS.endpoint:
             FLAGS.endpoint += [ep]
 
+
 def split_cmake_script(script_name):
     if target_platform() == "windows":
         script_name += ".ps1"
@@ -2382,7 +2383,11 @@ if __name__ == "__main__":
         action="append",
         required=False,
         help="A set of docker images to `--cache-from` where applicable to help speedup builds",
-        default = [ "tritonserver_buildbase", "tritonserver_buildbase_cache0", "tritonserver_buildbase_cache1", ],
+        default=[
+            "tritonserver_buildbase",
+            "tritonserver_buildbase_cache0",
+            "tritonserver_buildbase_cache1",
+        ],
     )
 
     FLAGS = parser.parse_args()
@@ -2754,7 +2759,7 @@ if __name__ == "__main__":
             # Commands to collect all the build artifacts needed for CI
             # testing.
             if FLAGS.ci_split:
-                cmake_script = split_cmake_script("cmake_build_collect" )
+                cmake_script = split_cmake_script("cmake_build_collect")
             cibase_build(
                 cmake_script,
                 script_repo_dir,
