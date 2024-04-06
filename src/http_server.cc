@@ -1774,6 +1774,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   std::string filepath;
   std::string url;
   TraceConfigMap config_map;
+  InferenceTraceMode trace_mode;
+
   if (!model_name.empty()) {
     bool ready = false;
     RETURN_AND_RESPOND_IF_ERR(
@@ -1981,7 +1983,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      model_name, &level, &rate, &count, &log_frequency, &filepath);
+      model_name, &level, &rate, &count, &log_frequency, &filepath, &trace_mode,
+      &config_map);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level
@@ -2010,7 +2013,29 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       trace_response.AddString("log_frequency", std::to_string(log_frequency)));
   RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_file", filepath));
-
+  RETURN_AND_RESPOND_IF_ERR(
+      req,
+      trace_response.AddString(
+          "trace_mode", trace_manager_->InferenceTraceModeString(trace_mode)));
+  auto mode_key = std::to_string(trace_mode);
+  auto trace_options_it = config_map.find(mode_key);
+  if (trace_options_it != config_map.end()) {
+    for (const auto& [key, value] : trace_options_it->second) {
+      if ((key == "file") || (key == "log-frequency")) {
+        continue;
+      }
+      std::string valueAsString;
+      if (std::holds_alternative<std::string>(value)) {
+        valueAsString = std::get<std::string>(value);
+      } else if (std::holds_alternative<int>(value)) {
+        valueAsString = std::to_string(std::get<int>(value));
+      } else if (std::holds_alternative<uint32_t>(value)) {
+        valueAsString = std::to_string(std::get<uint32_t>(value));
+      }
+      RETURN_AND_RESPOND_IF_ERR(
+          req, trace_response.AddString(key.c_str(), valueAsString));
+    }
+  }
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_AND_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
   evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
@@ -4584,6 +4609,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
+
       return;
     }
   }
