@@ -212,6 +212,7 @@ TraceManager::UpdateTraceSettingInternal(
     fallback_setting = global_setting_.get();
   } else {
     current_setting = global_setting_.get();
+    printTraceConfigMap(current_setting->config_map_)
     fallback_setting = global_default_.get();
   }
 
@@ -335,7 +336,7 @@ TraceManager::UpdateTraceSettingInternal(
       level, rate, count, log_frequency, file, mode, config_map,
       level_specified, rate_specified, count_specified, log_frequency_specified,
       filepath_specified, false /*mode_specified*/,
-      false /*config_map_specified*/));
+      config_map_specified));
   // The only invalid setting allowed is if it disables tracing
   if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
