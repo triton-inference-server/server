@@ -130,6 +130,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         util.stream_to_console(self._original_stdout, self._original_stderr)
         self._shared_memory_test_server_log.close()
         self._client_log.close()
+        # Print server log to console on failure
         if not self._test_passed:
             with open(self._log_file_path, "r") as f:
                 print(f.read())
@@ -273,6 +274,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             )
         except Exception as ex:
             self.assertIn("Unable to open shared memory region", str(ex))
+        shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
     @parameterized.expand([("grpc"), ("http")])
