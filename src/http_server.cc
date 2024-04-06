@@ -243,10 +243,8 @@ HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     accepting_new_conn_ = false;
   }
   if (exit_timeout_secs != nullptr) {
-    while (*exit_timeout_secs > 0) {
-      if (conn_cnt_ == 0) {  // conn_cnt_ can only decrease
-        break;
-      }
+    // Note: conn_cnt_ can only decrease
+    while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
       LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
                << " " << service_name << " service connections";
       std::this_thread::sleep_for(std::chrono::seconds(1));
