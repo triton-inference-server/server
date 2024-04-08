@@ -1414,12 +1414,19 @@ CommonHandler::RegisterTrace()
         std::to_string(rate));
     (*response->mutable_settings())["trace_count"].add_value(
         std::to_string(count));
-    (*response->mutable_settings())["log_frequency"].add_value(
-        std::to_string(log_frequency));
-    (*response->mutable_settings())["trace_file"].add_value(filepath);
-    (*response->mutable_settings())["trace_mode"].add_value(
-        trace_manager_->InferenceTraceModeString(trace_mode));
+    if (trace_mode == TRACE_MODE_TRITON) {
+      (*response->mutable_settings())["log_frequency"].add_value(
+          std::to_string(log_frequency));
+      (*response->mutable_settings())["trace_file"].add_value(filepath);
+    }
     {
+      std::string trace_mode_lower =
+          trace_manager_->InferenceTraceModeString(trace_mode);
+      std::transform(
+          trace_mode_lower.begin(), trace_mode_lower.end(),
+          trace_mode_lower.begin(),
+          [](unsigned char c) -> unsigned char { return std::tolower(c); });
+      (*response->mutable_settings())["trace_mode"].add_value(trace_mode_lower);
       auto mode_key = std::to_string(trace_mode);
       auto trace_options_it = config_map.find(mode_key);
       if (trace_options_it != config_map.end()) {

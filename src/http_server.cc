@@ -1995,15 +1995,21 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       req, trace_response.AddString("trace_rate", std::to_string(rate)));
   RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_count", std::to_string(count)));
+  if (trace_mode == TRACE_MODE_TRITON) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, trace_response.AddString(
+                 "log_frequency", std::to_string(log_frequency)));
+    RETURN_AND_RESPOND_IF_ERR(
+        req, trace_response.AddString("trace_file", filepath));
+  }
+  std::string trace_mode_lower =
+      trace_manager_->InferenceTraceModeString(trace_mode);
+  std::transform(
+      trace_mode_lower.begin(), trace_mode_lower.end(),
+      trace_mode_lower.begin(),
+      [](unsigned char c) -> unsigned char { return std::tolower(c); });
   RETURN_AND_RESPOND_IF_ERR(
-      req,
-      trace_response.AddString("log_frequency", std::to_string(log_frequency)));
-  RETURN_AND_RESPOND_IF_ERR(
-      req, trace_response.AddString("trace_file", filepath));
-  RETURN_AND_RESPOND_IF_ERR(
-      req,
-      trace_response.AddString(
-          "trace_mode", trace_manager_->InferenceTraceModeString(trace_mode)));
+      req, trace_response.AddString("trace_mode", trace_mode_lower));
   auto mode_key = std::to_string(trace_mode);
   auto trace_options_it = config_map.find(mode_key);
   if (trace_options_it != config_map.end()) {
@@ -4596,7 +4602,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
-
       return;
     }
   }
