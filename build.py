@@ -1567,7 +1567,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             check_exitcode=True,
         )
 
-        if not FLAGS.ci_split:
+        if not FLAGS.split_build:
             docker_script.cmd(
                 [
                     "docker",
@@ -2373,7 +2373,7 @@ if __name__ == "__main__":
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
-        "--ci-split",
+        "--split-build",
         action="store_true",
         required=False,
         help="Split the intermediate build artifacts into independently build-able targets",
@@ -2693,7 +2693,7 @@ if __name__ == "__main__":
         # Commands to build each backend...
         for be in backends:
             # Define function to create cmake_script with backend name as suffix
-            if FLAGS.ci_split:
+            if FLAGS.split_build:
                 cmake_script = split_cmake_script("cmake_build_backend_" + be)
 
             # Core backends are not built separately from core so skip...
@@ -2730,7 +2730,7 @@ if __name__ == "__main__":
 
         # Commands to build each repo agent...
         for ra in repoagents:
-            if FLAGS.ci_split:
+            if FLAGS.split_build:
                 cmake_script = split_cmake_script("cmake_build_agent_" + ra)
             repo_agent_build(
                 ra,
@@ -2743,7 +2743,7 @@ if __name__ == "__main__":
 
         # Commands to build each cache...
         for cache in caches:
-            if FLAGS.ci_split:
+            if FLAGS.split_build:
                 cmake_script = split_cmake_script("cmake_build_cache_" + cache)
             cache_build(
                 cache,
@@ -2758,7 +2758,7 @@ if __name__ == "__main__":
         if not FLAGS.no_container_build:
             # Commands to collect all the build artifacts needed for CI
             # testing.
-            if FLAGS.ci_split:
+            if FLAGS.split_build:
                 cmake_script = split_cmake_script("cmake_build_collect")
             cibase_build(
                 cmake_script,
