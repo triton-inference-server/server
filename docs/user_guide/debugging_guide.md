@@ -59,7 +59,7 @@ Before proceeding, please see if the model configuration documentation [here](./
     - [Custom_models](https://github.com/triton-inference-server/server/tree/main/qa/custom_models), [ensemble_models](https://github.com/triton-inference-server/server/tree/main/qa/ensemble_models), and [python_models](https://github.com/triton-inference-server/server/tree/main/qa/python_models) include examples of configs for their respective use cases.
     - [L0_model_config](https://github.com/triton-inference-server/server/tree/main/qa/L0_model_config) tests many types of incomplete model configs.
 
-Note that if you are running into an issue with [perf_analyzer](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md) or [Model Analyzer](https://github.com/triton-inference-server/model_analyzer), try loading the model onto Triton directly. This checks if the configuration is incorrect or the perf_analyzer or Model Analyzer options need to be updated.
+Note that if you are running into an issue with [perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c%2B%2B/perf_analyzer/README.md) or [Model Analyzer](https://github.com/triton-inference-server/model_analyzer), try loading the model onto Triton directly. This checks if the configuration is incorrect or the perf_analyzer or Model Analyzer options need to be updated.
 
 ## Model Issues
 **Step 1. Run Models Outside of Triton**
