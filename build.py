@@ -2376,7 +2376,7 @@ if __name__ == "__main__":
         "--split-build",
         action="store_true",
         required=False,
-        help="Split the intermediate build artifacts into independently build-able targets",
+        help="Split the intermediate build artifacts into independent build-able targets",
     )
     parser.add_argument(
         "--cache-from-map",
