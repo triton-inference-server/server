@@ -2215,7 +2215,7 @@ TritonParser::SetTritonTraceArgs(
       } else if (setting == "log-frequency") {
         if (trace_log_frequency_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-log-frequency' "
-                       "in favor of provided file in --trace-config!"
+                       "in favor of provided log-frequency in --trace-config!"
                     << std::endl;
         }
         lparams.trace_log_frequency_ = ParseOption<int>(value);
