@@ -90,7 +90,7 @@ myst_enable_extensions = [
     "amsmath",
     "deflist",
     # "html_admonition",
-    # "html_image",
+    "html_image",
     "colon_fence",
     # "smartquotes",
     "replacements",
