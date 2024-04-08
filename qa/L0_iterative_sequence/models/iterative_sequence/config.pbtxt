@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 backend: "iterative_sequence"
-max_batch_size: 4
+max_batch_size: 1
 input [
   {
     name: "INPUT"
