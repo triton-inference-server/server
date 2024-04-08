@@ -79,24 +79,24 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.ifconfig",
-    "sphinx.ext.extlinks"
+    "sphinx.ext.extlinks",
 ]
 
 suppress_warnings = ["myst.domains", "ref.ref", "myst.header"]
 
-source_suffix = ['.rst', '.md']
+source_suffix = [".rst", ".md"]
 
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
-    "private-members": True
+    "private-members": True,
 }
 
 autosummary_generate = True
 autosummary_mock_imports = [
-    'tritonclient.grpc.model_config_pb2',
-    'tritonclient.grpc.service_pb2',
-    'tritonclient.grpc.service_pb2_grpc'
+    "tritonclient.grpc.model_config_pb2",
+    "tritonclient.grpc.service_pb2",
+    "tritonclient.grpc.service_pb2_grpc",
 ]
 
 napoleon_include_special_with_doc = True
