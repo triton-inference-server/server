@@ -1114,7 +1114,7 @@ RUN ARCH="$(uname -i)" \\
           ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
 
 # Install TensorRT-LLM
-RUN pip3 install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl --extra-index-url https://pypi.ngc.nvidia.com
+RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
