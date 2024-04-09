@@ -363,7 +363,7 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
   // validate byte_size + offset is within memory bounds
-  size_t total_req_shm = offset + byte_size;
+  size_t total_req_shm = offset + byte_size - 1;
   if (total_req_shm > shm_region_end) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,

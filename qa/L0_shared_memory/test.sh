@@ -63,12 +63,13 @@ for i in \
         fi
 
         export CLIENT_TYPE=$client_type
-        echo "Test: $i, client type: $client_type" >>$CLIENT_LOG
+        TMP_CLIENT_LOG="./tmp_client.log"
+        echo "Test: $i, client type: $client_type" >>$TMP_CLIENT_LOG
 
         set +e
-        python $SHM_TEST SharedMemoryTest.$i >>$CLIENT_LOG 2>&1
+        python $SHM_TEST SharedMemoryTest.$i >>$TMP_CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
+            cat $TMP_CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         else
@@ -79,17 +80,17 @@ for i in \
                 RET=1
             fi
         fi
-        set -e
-
+        cat $TMP_CLIENT_LOG >>$CLIENT_LOG
+        rm $TMP_CLIENT_LOG
         kill $SERVER_PID
         wait $SERVER_PID
+        set -e
     done
 done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
 fi
 

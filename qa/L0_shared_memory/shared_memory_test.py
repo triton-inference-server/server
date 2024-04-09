@@ -40,10 +40,10 @@ import tritonclient.http as httpclient
 import tritonclient.utils.shared_memory as shm
 from tritonclient import utils
 
-DEFAULT_SHM_BYTE_SIZE = 64
-
 
 class SharedMemoryTest(tu.TestResultCollector):
+    DEFAULT_SHM_BYTE_SIZE = 64
+
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid system shared memory region
         try:
@@ -124,18 +124,18 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertTrue(len(shm_status.regions) == 1)
         shm.destroy_shared_memory_region(shm_op0_handle)
 
-    def _configure_sever(self):
+    def _configure_sever(self, shm_byte_size=DEFAULT_SHM_BYTE_SIZE):
         shm_ip0_handle = shm.create_shared_memory_region(
-            "input0_data", "/input0_data", DEFAULT_SHM_BYTE_SIZE
+            "input0_data", "/input0_data", shm_byte_size
         )
         shm_ip1_handle = shm.create_shared_memory_region(
-            "input1_data", "/input1_data", DEFAULT_SHM_BYTE_SIZE
+            "input1_data", "/input1_data", shm_byte_size
         )
         shm_op0_handle = shm.create_shared_memory_region(
-            "output0_data", "/output0_data", DEFAULT_SHM_BYTE_SIZE
+            "output0_data", "/output0_data", shm_byte_size
         )
         shm_op1_handle = shm.create_shared_memory_region(
-            "output1_data", "/output1_data", DEFAULT_SHM_BYTE_SIZE
+            "output1_data", "/output1_data", shm_byte_size
         )
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -146,16 +146,16 @@ class SharedMemoryTest(tu.TestResultCollector):
         else:
             triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         triton_client.register_system_shared_memory(
-            "input0_data", "/input0_data", DEFAULT_SHM_BYTE_SIZE
+            "input0_data", "/input0_data", shm_byte_size
         )
         triton_client.register_system_shared_memory(
-            "input1_data", "/input1_data", DEFAULT_SHM_BYTE_SIZE
+            "input1_data", "/input1_data", shm_byte_size
         )
         triton_client.register_system_shared_memory(
-            "output0_data", "/output0_data", DEFAULT_SHM_BYTE_SIZE
+            "output0_data", "/output0_data", shm_byte_size
         )
         triton_client.register_system_shared_memory(
-            "output1_data", "/output1_data", DEFAULT_SHM_BYTE_SIZE
+            "output1_data", "/output1_data", shm_byte_size
         )
         return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
 
@@ -238,7 +238,11 @@ class SharedMemoryTest(tu.TestResultCollector):
         error_msg = []
         shm_handles = self._configure_sever()
         self._basic_inference(
-            shm_handles[0], shm_handles[1], shm_handles[2], shm_handles[3], error_msg
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
         )
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
@@ -268,10 +272,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
         shm_ip2_handle = shm.create_shared_memory_region(
-            "input2_data", "/input2_data", DEFAULT_SHM_BYTE_SIZE
+            "input2_data", "/input2_data", self.DEFAULT_SHM_BYTE_SIZE
         )
         triton_client.register_system_shared_memory(
-            "input2_data", "/input2_data", DEFAULT_SHM_BYTE_SIZE
+            "input2_data", "/input2_data", self.DEFAULT_SHM_BYTE_SIZE
         )
         shm_status = triton_client.get_system_shared_memory_status()
         if _protocol == "http":
@@ -313,7 +317,7 @@ class SharedMemoryTest(tu.TestResultCollector):
     def test_mixed_raw_shm(self):
         # Mix of shared memory and RAW inputs
         error_msg = []
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_sever(shm_byte_size=256)
         input1_data = np.ones(shape=16, dtype=np.int32)
         self._basic_inference(
             shm_handles[0], [input1_data], shm_handles[2], shm_handles[3], error_msg
@@ -346,7 +350,6 @@ class SharedMemoryTest(tu.TestResultCollector):
         # Shared memory offset outside output region - Throws error
         error_msg = []
         shm_handles = self._configure_sever()
-        print("testing")
         if _protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
@@ -362,7 +365,6 @@ class SharedMemoryTest(tu.TestResultCollector):
             shm_handles[3],
             error_msg,
             shm_output_offset=offset,
-            default_shm_byte_size=0,
         )
         self.assertEqual(len(error_msg), 1)
         self.assertIn("Invalid offset for shared memory region", error_msg[0])
