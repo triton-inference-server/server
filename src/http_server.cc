@@ -2002,14 +2002,10 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     RETURN_AND_RESPOND_IF_ERR(
         req, trace_response.AddString("trace_file", filepath));
   }
-  std::string trace_mode_lower =
-      trace_manager_->InferenceTraceModeString(trace_mode);
-  std::transform(
-      trace_mode_lower.begin(), trace_mode_lower.end(),
-      trace_mode_lower.begin(),
-      [](unsigned char c) -> unsigned char { return std::tolower(c); });
   RETURN_AND_RESPOND_IF_ERR(
-      req, trace_response.AddString("trace_mode", trace_mode_lower));
+      req,
+      trace_response.AddString(
+          "trace_mode", trace_manager_->InferenceTraceModeString(trace_mode)));
   auto mode_key = std::to_string(trace_mode);
   auto trace_options_it = config_map.find(mode_key);
   if (trace_options_it != config_map.end()) {

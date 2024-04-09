@@ -762,9 +762,9 @@ TraceManager::InferenceTraceModeString(InferenceTraceMode mode)
 {
   switch (mode) {
     case TRACE_MODE_TRITON:
-      return "TRITON";
+      return "triton";
     case TRACE_MODE_OPENTELEMETRY:
-      return "OPENTELEMETRY";
+      return "opentelemetry";
   }
 
   return "<unknown>";

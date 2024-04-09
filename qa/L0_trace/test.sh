@@ -188,7 +188,7 @@ fi
 if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -247,7 +247,7 @@ fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -271,7 +271,7 @@ fi
 if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -354,7 +354,7 @@ fi
 if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -384,7 +384,7 @@ fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -455,7 +455,7 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -479,7 +479,7 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -505,7 +505,7 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -624,7 +624,7 @@ fi
 if [ `grep -c "\"trace_file\":\"bls_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"TRITON\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -833,7 +833,10 @@ fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"OPENTELEMETRY\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"http://localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
@@ -845,6 +848,13 @@ fi
 if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+
 
 set +e
 # Send bls requests to make sure bls_simple model is NOT traced
@@ -908,7 +918,10 @@ fi
 if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"OPENTELEMETRY\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"http://localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
@@ -918,6 +931,12 @@ if [ `grep -c "\"bsp_schedule_delay\":\"5000\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
     RET=1
 fi
 
