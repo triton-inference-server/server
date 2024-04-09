@@ -41,23 +41,26 @@ from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server).
+The `compose.py` script can be found in the
+[server repository](https://github.com/triton-inference-server/server).
 Simply clone the repository and run `compose.py` to create a custom container.
 Note: Created container version will depend on the branch that was cloned.
-For example branch [r24.02](https://github.com/triton-inference-server/server/tree/r24.02)
-should be used to create a image based on the NGC 24.02 Triton release.
+For example branch
+ [r24.03](https://github.com/triton-inference-server/server/tree/r24.03)
+should be used to create a image based on the NGC 24.03 Triton release.
 
 `compose.py` provides `--backend`, `--repoagent` options that allow you to
 specify which backends and repository agents to include in the custom image.
 For example, the following creates a new docker image that
-contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum
+contains only the Pytorch and Tensorflow backends and the checksum
 repository agent.
 
 Example:
 ```
-python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum
+python3 compose.py --backend pytorch --backend tensorflow --repoagent checksum
 ```
-will provide a container `tritonserver` locally. You can access the container with
+will provide a container `tritonserver` locally. You can access the container
+with
 ```
 $ docker run -it tritonserver:latest
 ```
@@ -74,32 +77,50 @@ script will extract components. The version of the `min` and `full` container
 is determined by the branch of Triton `compose.py` is on.
 For example, running
 ```
-python3 compose.py --backend tensorflow1 --repoagent checksum
+python3 compose.py --backend pytorch --repoagent checksum
 ```
-on branch [r24.02](https://github.com/triton-inference-server/server/tree/r24.02) pulls:
-- `min` container `nvcr.io/nvidia/tritonserver:24.02-py3-min`
-- `full` container `nvcr.io/nvidia/tritonserver:24.02-py3`
+on branch [r24.03](https://github.com/triton-inference-server/server/tree/r24.03) pulls:
+- `min` container `nvcr.io/nvidia/tritonserver:24.03-py3-min`
+- `full` container `nvcr.io/nvidia/tritonserver:24.03-py3`
 
-Alternatively, users can specify the version of Triton container to pull from any branch by either:
+Alternatively, users can specify the version of Triton container to pull from
+any branch by either:
 1. Adding flag `--container-version <container version>` to branch
 ```
-python3 compose.py --backend tensorflow1 --repoagent checksum --container-version 24.02
+python3 compose.py --backend pytorch --repoagent checksum --container-version 24.03
 ```
 2. Specifying `--image min,<min container image name> --image full,<full container image name>`.
    The user is responsible for specifying compatible `min` and `full` containers.
 ```
-python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:24.02-py3-min --image full,nvcr.io/nvidia/tritonserver:24.02-py3
+python3 compose.py --backend pytorch --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:24.03-py3-min --image full,nvcr.io/nvidia/tritonserver:24.03-py3
 ```
-Method 1 and 2 will result in the same composed container. Furthermore, `--image` flag overrides the `--container-version` flag when both are specified.
+Method 1 and 2 will result in the same composed container. Furthermore,
+`--image` flag overrides the `--container-version` flag when both are specified.
+
+Note:
+1. All contents in `/opt/tritonserver` repository of the `min` image will be
+ removed to ensure dependencies of the composed image are added properly.
+2. vLLM and TensorRT-LLM backends are currently not supported backends for
+`compose.py`. If you want to build additional backends on top of these backends,
+it would be better to [build it yourself](#build-it-yourself) by using
+`nvcr.io/nvidia/tritonserver:24.03-vllm-python-py3` or
+`nvcr.io/nvidia/tritonserver:24.03-trtllm-python-py3` as a `min` container.
+
 
 ### CPU-only container composition
 
-CPU-only containers are not yet available for customization. Please see [build documentation](build.md) for instructions to build a full CPU-only container. When including TensorFlow or PyTorch backends in the composed container, an additional `gpu-min` container is needed
-since this container provided the CUDA stubs and runtime dependencies which are not provided in the CPU only min container.
+CPU-only containers are not yet available for customization. Please see
+ [build documentation](build.md) for instructions to build a full CPU-only
+ container. When including TensorFlow or PyTorch backends in the composed
+ container, an additional `gpu-min` container is needed
+since this container provided the CUDA stubs and runtime dependencies which are
+not provided in the CPU only min container.
 
 ## Build it yourself
 
-If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs.
+If you would like to do what `compose.py` is doing under the hood yourself, you
+ can run `compose.py` with the `--dry-run` option and then modify the
+ `Dockerfile.compose` file to satisfy your needs.
 
 
 ### Triton with Unsupported and Custom Backends
@@ -110,8 +131,8 @@ result of that build should be a directory containing your backend
 shared library and any additional files required by the
 backend. Assuming your backend is called "mybackend" and that the
 directory is "./mybackend", adding the following to the Dockerfile `compose.py`
-created will create a Triton image that contains all the supported Triton backends plus your
-custom backend.
+created will create a Triton image that contains all the supported Triton
+backends plus your custom backend.
 
 ```
 COPY ./mybackend /opt/tritonserver/backends/mybackend
