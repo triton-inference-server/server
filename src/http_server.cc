@@ -212,6 +212,7 @@ HTTPServer::Start()
       evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
     }
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
+    evhtp_set_pre_accept_cb(htp_, HTTPServer::NewConnection, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
       return TRITONSERVER_ErrorNew(
@@ -235,8 +236,22 @@ HTTPServer::Start()
 }
 
 TRITONSERVER_Error*
-HTTPServer::Stop()
+HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
+  {
+    std::lock_guard<std::mutex> lock(conn_mu_);
+    accepting_new_conn_ = false;
+  }
+  if (exit_timeout_secs != nullptr) {
+    // Note: conn_cnt_ can only decrease
+    while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
+      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
+               << " " << service_name << " service connections";
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      (*exit_timeout_secs)--;
+    }
+  }
+
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
     send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
@@ -249,7 +264,6 @@ HTTPServer::Stop()
     event_base_free(evbase_);
     return nullptr;
   }
-
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
@@ -265,6 +279,34 @@ void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
   (static_cast<HTTPServer*>(arg))->Handle(req);
+}
+
+evhtp_res
+HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
+{
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    if (!server->accepting_new_conn_) {
+      return EVHTP_RES_SERVUNAVAIL;  // reset connection
+    }
+    server->conn_cnt_++;
+  }
+  evhtp_connection_set_hook(
+      conn, evhtp_hook_on_connection_fini,
+      (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::EndConnection(evhtp_connection_t* conn, void* arg)
+{
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    server->conn_cnt_--;
+  }
+  return EVHTP_RES_OK;
 }
 
 #ifdef TRITON_ENABLE_METRICS
