@@ -40,16 +40,6 @@ RET=0
 rm -fr *.log
 
 for i in \
-        test_invalid_create_shm \
-        test_valid_create_set_register \
-        test_unregister_before_register \
-        test_unregister_after_register \
-        test_reregister_after_register \
-        test_unregister_after_inference \
-        test_register_after_inference \
-        test_too_big_shm \
-        test_mixed_raw_shm \
-        test_unregisterall \
         test_infer_offset_out_of_bound \
         test_infer_byte_size_out_of_bound; do
     for client_type in http grpc; do

@@ -194,10 +194,10 @@ class SharedMemoryTest(tu.TestResultCollector):
             inputs[1].set_shared_memory("input1_data", 64)
 
         outputs[0].set_shared_memory(
-            "output0_data", 64, offset=shm_output_offset, byte_size=shm_output_byte_size
+            "output0_data", shm_output_byte_size, offset=shm_output_offset
         )
         outputs[1].set_shared_memory(
-            "output1_data", 64, offset=shm_output_offset, byte_size=shm_output_byte_size
+            "output1_data", shm_output_byte_size, offset=shm_output_offset
         )
 
         try:
@@ -333,6 +333,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         # Shared memory offset outside output region - Throws error
         error_msg = []
         shm_handles = self._configure_sever()
+        print("testing")
         if _protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
