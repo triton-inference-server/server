@@ -58,12 +58,13 @@ for i in \
         set +e
         python $SHM_TEST SharedMemoryTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         else
             check_test_results $TEST_RESULT_FILE 1
             if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
+                cat $TEST_RESULT_FILE
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
                 RET=1
             fi
