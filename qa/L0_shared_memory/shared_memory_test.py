@@ -164,16 +164,16 @@ class SharedMemoryTest(tu.TestResultCollector):
         shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
         shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
         self.triton_client.register_system_shared_memory(
-            "input0_data", "/input0_data", register_byte_size
+            "input0_data", "/input0_data", register_byte_size, offset=register_offset
         )
         self.triton_client.register_system_shared_memory(
-            "input1_data", "/input1_data", register_byte_size
+            "input1_data", "/input1_data", register_byte_size, offset=register_offset
         )
         self.triton_client.register_system_shared_memory(
-            "output0_data", "/output0_data", register_byte_size
+            "output0_data", "/output0_data", register_byte_size, offset=register_offset
         )
         self.triton_client.register_system_shared_memory(
-            "output1_data", "/output1_data", register_byte_size
+            "output1_data", "/output1_data", register_byte_size, offset=register_offset
         )
         return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
 
