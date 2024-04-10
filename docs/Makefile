@@ -29,10 +29,11 @@
 
 # You can set these variables from the command line, and also
 # from the environment for the first two.
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = build
+SPHINXOPTS        ?=
+SPHINXBUILD       ?= sphinx-build
+SOURCEDIR          = .
+BUILDDIR           = build
+TRITONCLIENTRSTDIR = _reference/tritonclient
 
 #PROTOBUFFILES = $(wildcard ../triton/proto/*.proto)
 
@@ -40,7 +41,11 @@ BUILDDIR      = build
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile
+clean:
+	@rm -fr ${BUILDDIR}
+	@rm -fr ${TRITONCLIENTRSTDIR}
+
+.PHONY: help Makefile clean
 
 # protobuf: source/reference/protos/gen_proto_doc.sh
 # 	cd source/reference/protos && \

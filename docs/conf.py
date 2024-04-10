@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,16 +67,39 @@ master_doc = "contents"
 # ones.
 extensions = [
     "ablog",
-    "myst_nb",
+    "myst_parser",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx-prompt",
     # "sphinxcontrib.bibtex",
     "sphinx_tabs.tabs",
     "sphinx_sitemap",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.ifconfig",
+    "sphinx.ext.extlinks",
 ]
 
 suppress_warnings = ["myst.domains", "ref.ref", "myst.header"]
+
+source_suffix = [".rst", ".md"]
+
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "private-members": True,
+}
+
+autosummary_generate = True
+autosummary_mock_imports = [
+    "tritonclient.grpc.model_config_pb2",
+    "tritonclient.grpc.service_pb2",
+    "tritonclient.grpc.service_pb2_grpc",
+]
+
+napoleon_include_special_with_doc = True
 
 numfig = True
 
@@ -90,7 +113,7 @@ myst_enable_extensions = [
     "amsmath",
     "deflist",
     # "html_admonition",
-    # "html_image",
+    "html_image",
     "colon_fence",
     # "smartquotes",
     "replacements",
