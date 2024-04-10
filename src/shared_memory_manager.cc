@@ -120,6 +120,7 @@ SharedMemoryManager::UnregisterHelper(
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -143,6 +144,35 @@ OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
   }
 
   return nullptr;
+}
+
+TRITONSERVER_Error*
+GetSharedMemoryRegionInfo(
+    const std::string& shm_key, int shm_fd, size_t* shm_region_size)
+{
+  struct stat sb;
+  if (fstat(shm_fd, &sb) == -1) {
+    LOG_VERBOSE(1) << "fstat on shm_fd failed, errno: " << errno;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Unable to stat shared memory region: '" + shm_key + "'")
+            .c_str());
+  }
+
+  // According to POSIX standard, type off_t can be negative, so for sake of
+  // catching possible under/overflows, assert that the size is non-negative.
+  if (sb.st_size < 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "File size of shared memory region: '" + shm_key +
+            "' must be non-negative.")
+            .c_str());
+  }
+
+  // FIXME: Consider file permissions
+  *shm_region_size = static_cast<size_t>(sb.st_size);
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -249,6 +279,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
+      // FIXME: Consider invalid file descriptors after close
       shm_fd = itr->second->shm_fd_;
       break;
     }
@@ -257,6 +288,22 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   // open and set new shm_fd if new shared memory key
   if (shm_fd == -1) {
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  }
+
+  // Check shm file metadata to help validate registration attempts
+  size_t shm_region_size = 0;
+  RETURN_IF_ERR(GetSharedMemoryRegionInfo(shm_key, shm_fd, &shm_region_size));
+  if ((offset + byte_size) > shm_region_size) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': registered region must remain within the bounds of the shared "
+            "memory object (offset=" +
+            std::to_string(offset) +
+            " + byte_size=" + std::to_string(byte_size) +
+            " > region_size=" + std::to_string(shm_region_size) + ")")
+            .c_str());
   }
 
   // Mmap and then close the shared memory descriptor
