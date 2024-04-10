@@ -1114,7 +1114,7 @@ RUN ARCH="$(uname -i)" \\
           ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
 
 # Install TensorRT-LLM
-RUN pip3 install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
+RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
         && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
@@ -1731,6 +1731,7 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
         "cp -a {} {}".format(
             os.path.join(
                 tensorrtllm_be_dir,
+                "tensorrt_llm",
                 "cpp",
                 "build",
                 "tensorrt_llm",
@@ -1742,7 +1743,11 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
     )
     cmake_script.cp(
         os.path.join(
-            tensorrtllm_be_dir, "build", "tensorrt_llm", "libtensorrt_llm.so*"
+            tensorrtllm_be_dir,
+            "tensorrt_llm",
+            "build",
+            "tensorrt_llm",
+            "libtensorrt_llm.so*",
         ),
         cmake_destination_dir,
     )
