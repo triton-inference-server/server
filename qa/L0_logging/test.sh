@@ -203,7 +203,7 @@ code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_file":"other_log.log"}' loc
 set +e
 
 # updating log file location no longer supported
-if [ `grep -c "\"error\":\"updating log file was deprecated and no longer supported\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"error\":\"log file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
     echo -e "\n***\n*** Test Failed: Incorrect Error Response\n***"
     RET=1
 fi

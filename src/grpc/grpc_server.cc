@@ -1465,7 +1465,7 @@ CommonHandler::RegisterLogging()
         if (it != request.settings().end()) {
           err = TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,
-              "updating log file was deprecated and no longer supported");
+              "log file location can not be updated through network protocol");
           GOTO_IF_ERR(err, earlyexit);
         }
       }

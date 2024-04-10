@@ -2048,10 +2048,10 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
         RETURN_AND_RESPOND_IF_ERR(
-            req,
-            TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_UNSUPPORTED,
-                "updating log file was deprecated and no longer supported"));
+            req, TRITONSERVER_ErrorNew(
+                     TRITONSERVER_ERROR_UNSUPPORTED,
+                     "log file location can not be updated through network "
+                     "protocol"));
       }
     }
     if (request.Find("log_info", &setting_json)) {

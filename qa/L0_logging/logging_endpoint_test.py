@@ -135,7 +135,7 @@ class LogEndpointTest(tu.TestResultCollector):
             "log_format": "default",
         }
         expected_log_settings_1 = {
-            "error": "updating log file was deprecated and no longer supported"
+            "error": "log file location can not be updated through network protocol"
         }
 
         log_settings_2 = {
