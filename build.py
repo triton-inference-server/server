@@ -1745,6 +1745,7 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
         os.path.join(
             tensorrtllm_be_dir,
             "tensorrt_llm",
+            "cpp",
             "build",
             "tensorrt_llm",
             "libtensorrt_llm.so*",
