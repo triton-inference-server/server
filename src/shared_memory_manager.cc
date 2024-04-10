@@ -147,7 +147,7 @@ OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
 }
 
 TRITONSERVER_Error*
-GetSharedMemoryRegionInfo(
+GetSharedMemoryFileInfo(
     const std::string& shm_key, int shm_fd, size_t* shm_region_size)
 {
   struct stat sb;
@@ -155,19 +155,16 @@ GetSharedMemoryRegionInfo(
     LOG_VERBOSE(1) << "fstat on shm_fd failed, errno: " << errno;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        std::string("Unable to stat shared memory region: '" + shm_key + "'")
-            .c_str());
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
   }
 
   // According to POSIX standard, type off_t can be negative, so for sake of
   // catching possible under/overflows, assert that the size is non-negative.
   if (sb.st_size < 0) {
+    LOG_VERBOSE(1) << "File size of shared memory region must be non-negative";
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "File size of shared memory region: '" + shm_key +
-            "' must be non-negative.")
-            .c_str());
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
   }
 
   // FIXME: Consider file permissions
@@ -292,17 +289,13 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // Check shm file metadata to help validate registration attempts
   size_t shm_region_size = 0;
-  RETURN_IF_ERR(GetSharedMemoryRegionInfo(shm_key, shm_fd, &shm_region_size));
+  RETURN_IF_ERR(GetSharedMemoryFileInfo(shm_key, shm_fd, &shm_region_size));
   if ((offset + byte_size) > shm_region_size) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register shared memory region '" + name +
-            "': registered region must remain within the bounds of the shared "
-            "memory object (offset=" +
-            std::to_string(offset) +
-            " + byte_size=" + std::to_string(byte_size) +
-            " > region_size=" + std::to_string(shm_region_size) + ")")
+            "': invalid args")
             .c_str());
   }
 
