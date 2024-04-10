@@ -84,6 +84,10 @@ for i in \
         rm $TMP_CLIENT_LOG
         kill $SERVER_PID
         wait $SERVER_PID
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Server shut down non-gracefully\n***"
+            RET=1
+        fi
         set -e
     done
 done
