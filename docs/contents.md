@@ -108,6 +108,7 @@ examples/jetson/concurrency_and_dynamic_batching/README
 :caption: Client
 
 client/README
+_reference/tritonclient_api.rst
 client/src/java/README
 client/src/grpc_generated/go/README
 client/src/grpc_generated/javascript/README
