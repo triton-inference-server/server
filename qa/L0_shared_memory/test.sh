@@ -50,7 +50,8 @@ for i in \
         test_too_big_shm \
         test_mixed_raw_shm \
         test_unregisterall \
-        test_infer_offset_out_of_bound; do
+        test_infer_offset_out_of_bound \
+        test_register_out_of_bound; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"
@@ -65,7 +66,7 @@ for i in \
         echo "Test: $i, client type: $client_type" >>$CLIENT_LOG
 
         set +e
-        python $SHM_TEST SharedMemoryTest.$i >>$CLIENT_LOG 2>&1
+        python3 $SHM_TEST SharedMemoryTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
