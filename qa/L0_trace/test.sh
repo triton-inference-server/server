@@ -836,7 +836,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"url\":\"http://localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
@@ -921,7 +921,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"url\":\"http://localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
