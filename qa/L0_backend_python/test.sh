@@ -414,7 +414,7 @@ if [[ "$TEST_JETSON" == "0" ]]; then
     # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
     # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
     if [[ ${TEST_WINDOWS} == 0 ]]; then
-        SUBTESTS+=" variants io python_based_backends"
+        SUBTESTS+=" variants io python_based_backends async_execute"
     fi
 
     for TEST in ${SUBTESTS}; do
