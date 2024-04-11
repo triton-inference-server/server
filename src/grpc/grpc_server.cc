@@ -1463,32 +1463,10 @@ CommonHandler::RegisterLogging()
         static std::string setting_name = "log_file";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
-          const auto& log_param = it->second;
-          if (log_param.parameter_choice_case() !=
-              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
-                  kStringParam) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect string for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          } else {
-            // Set new settings in server then in core
-            const std::string& log_file_path = it->second.string_param();
-            const std::string& error = LOG_SET_OUT_FILE(log_file_path);
-            if (!error.empty()) {
-              err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INTERNAL, (error).c_str());
-              GOTO_IF_ERR(err, earlyexit);
-            }
-            // Okay to pass nullptr because we know the update will be applied
-            // to the global object.
-            err = TRITONSERVER_ServerOptionsSetLogFile(
-                nullptr, log_file_path.c_str());
-            if (err != nullptr) {
-              GOTO_IF_ERR(err, earlyexit);
-            }
-          }
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "log file location can not be updated through network protocol");
+          GOTO_IF_ERR(err, earlyexit);
         }
       }
       {
