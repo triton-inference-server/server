@@ -1184,6 +1184,8 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
+    InferenceTraceMode trace_mode;
+    TraceConfigMap config_map;
 
     if (!request.model_name().empty()) {
       bool ready = false;
@@ -1391,7 +1393,8 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath,
+        &trace_mode, &config_map);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;
@@ -1411,10 +1414,33 @@ CommonHandler::RegisterTrace()
         std::to_string(rate));
     (*response->mutable_settings())["trace_count"].add_value(
         std::to_string(count));
-    (*response->mutable_settings())["log_frequency"].add_value(
-        std::to_string(log_frequency));
-    (*response->mutable_settings())["trace_file"].add_value(filepath);
-
+    if (trace_mode == TRACE_MODE_TRITON) {
+      (*response->mutable_settings())["log_frequency"].add_value(
+          std::to_string(log_frequency));
+      (*response->mutable_settings())["trace_file"].add_value(filepath);
+    }
+    (*response->mutable_settings())["trace_mode"].add_value(
+        trace_manager_->InferenceTraceModeString(trace_mode));
+    {
+      auto mode_key = std::to_string(trace_mode);
+      auto trace_options_it = config_map.find(mode_key);
+      if (trace_options_it != config_map.end()) {
+        for (const auto& [key, value] : trace_options_it->second) {
+          if ((key == "file") || (key == "log-frequency")) {
+            continue;
+          }
+          std::string valueAsString;
+          if (std::holds_alternative<std::string>(value)) {
+            valueAsString = std::get<std::string>(value);
+          } else if (std::holds_alternative<int>(value)) {
+            valueAsString = std::to_string(std::get<int>(value));
+          } else if (std::holds_alternative<uint32_t>(value)) {
+            valueAsString = std::to_string(std::get<uint32_t>(value));
+          }
+          (*response->mutable_settings())[key].add_value(valueAsString);
+        }
+      }
+    }
   earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);

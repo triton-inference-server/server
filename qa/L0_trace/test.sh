@@ -188,6 +188,9 @@ fi
 if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 send_inference_requests "client_min.log" 10
 
@@ -244,6 +247,9 @@ fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 # Use a different name
 update_trace_setting "simple" '{"trace_file":"simple_trace.log","log_frequency":"2"}'
@@ -263,6 +269,9 @@ if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -345,6 +354,9 @@ fi
 if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 # Send requests to simple where trace is explicitly disabled
 send_inference_requests "client_update.log" 10
@@ -370,6 +382,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -440,6 +455,9 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 # Set trace count
 update_global_trace_setting '{"trace_count":"5"}'
@@ -459,6 +477,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -482,6 +503,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -598,6 +622,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"bls_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -806,6 +833,28 @@ fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_schedule_delay\":\"5000\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+
 
 set +e
 # Send bls requests to make sure bls_simple model is NOT traced
@@ -867,6 +916,27 @@ if [ `grep -c "\"trace_rate\":\"5\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_schedule_delay\":\"5000\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
     RET=1
 fi
 
