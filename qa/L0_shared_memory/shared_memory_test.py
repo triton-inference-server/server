@@ -243,7 +243,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         print(f"*\n*\n*\nStarting Test:test_invalid_create_shm.{protocol}\n*\n*\n*\n")
         try:
-            shm_op0_handle = shm.create_shared_memory_region(
+            shm.create_shared_memory_region(
                 "dummy_data", (self._shm_key_prefix + "dummy_data"), -1
             )
         except Exception as ex:
@@ -302,6 +302,35 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertEqual(len(shm_status), 1)
         else:
             self.assertEqual(len(shm_status.regions), 1)
+        shm.destroy_shared_memory_region(shm_op0_handle)
+        self._test_passed = True
+
+    @parameterized.expand([("grpc"), ("http")])
+    def test_different_name_same_key(self, protocol):
+        # Create a valid system shared memory region, fill data in it and register
+        self._setUp(
+            protocol,
+            Path(os.getcwd()) / f"test_different_name_same_key.{protocol}.server.log",
+        )
+        print(
+            f"*\n*\n*\nStarting Test:test_different_name_same_key.{protocol}\n*\n*\n*\n"
+        )
+
+        shm_op0_handle = shm.create_shared_memory_region(
+            "dummy", (self._shm_key_prefix + "dummy_data"), 8
+        )
+        shm.set_shared_memory_region(
+            shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
+        )
+        self._triton_client.register_system_shared_memory(
+            "dummy", (self._shm_key_prefix + "dummy_data"), 8
+        )
+        try:
+            self._triton_client.register_system_shared_memory(
+                "dummy2", (self._shm_key_prefix + "dummy_data"), 8
+            )
+        except Exception as ex:
+            self.assertIn("registering an active shared memory key", str(ex))
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 

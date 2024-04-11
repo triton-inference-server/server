@@ -131,56 +131,84 @@ class SharedMemoryManager {
 #endif  // TRITON_ENABLE_GPU
 
  private:
+  /// A struct that records the platform-dependent handle to a shared memory
+  /// file.
+  struct ShmFile {
+#ifdef _WIN32
+    HANDLE shm_handle_;
+    ShmFile(HANDLE shm_handle) : shm_file_(shm_handle){};
+#else
+    int shm_fd_;
+    ShmFile(int fd) : shm_fd_(fd){};
+#endif  // _WIN32
+  };
+
+  /// Open the shared memory object created by the client.
+  /// \param shm_key The name of the shared memory object
+  /// containing the block of memory.
+  /// \param shm_file The file handle/descriptor of the the
+  /// opened shared memory object.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* OpenSharedMemoryRegion(
+      const std::string& shm_key, ShmFile** shm_file);
+
+  /// Close the shared memory object.
+  /// \param shm_file The file handle/descriptor of the the
+  /// open shared memory object.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* CloseSharedMemoryRegion(ShmFile* shm_file);
+
+  /// Maps a view of the shared object into the address space of
+  /// a calling process.
+  /// \param shm_file The file handle/descriptor of the the
+  /// opened shared memory object.
+  /// \param offset The offset within the shared memory object to the
+  /// start of the block.
+  /// \param byte_size The size, in bytes of the block.
+  /// \param mapped_addr A pointer to the starting address of the mapped
+  /// view.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* MapSharedMemory(
+      ShmFile* shm_file, const size_t offset, const size_t byte_size,
+      void** mapped_addr);
+
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
       const std::string& name, TRITONSERVER_MemoryType memory_type);
-
-  struct ShmFile {
-#ifdef _WIN32
-    HANDLE shm_file_;
-    ShmFile(void* shm_file) { shm_file_ = static_cast<HANDLE>(shm_file); };
-    HANDLE GetShmFile() { return shm_file_; };
-#else
-    std::unique_ptr<int> shm_file_;
-    ShmFile(void* shm_file)
-    {
-      shm_file_ = std::make_unique<int>(*static_cast<int*>(shm_file));
-    };
-    int* GetShmFile() { return shm_file_.get(); };
-#endif  // _WIN32
-  };
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, void* shm_file,
+        const size_t offset, const size_t byte_size, ShmFile* shm_file,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size),
-          platform_handle_(std::make_unique<ShmFile>(shm_file)),
-          mapped_addr_(mapped_addr), kind_(kind), device_id_(device_id)
+          byte_size_(byte_size), mapped_addr_(mapped_addr), kind_(kind),
+          device_id_(device_id)
     {
+      if (shm_file != nullptr) {
+        platform_handle_.reset(shm_file);
+      }
     }
 
     std::string name_;
     std::string shm_key_;
     size_t offset_;
     size_t byte_size_;
-    std::unique_ptr<ShmFile> platform_handle_;
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
+    std::unique_ptr<ShmFile> platform_handle_;
   };
 
 #ifdef TRITON_ENABLE_GPU
   struct CUDASharedMemoryInfo : SharedMemoryInfo {
     CUDASharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, void* shm_file,
+        const size_t offset, const size_t byte_size, ShmFile* shm_file,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
         : SharedMemoryInfo(

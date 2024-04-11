@@ -59,116 +59,6 @@ GetWindowsError()
 #endif
 
 TRITONSERVER_Error*
-OpenSharedMemoryRegion(const std::string& shm_key, void** shm_file)
-{
-#ifdef _WIN32
-  HANDLE* shm_handle = static_cast<HANDLE*>(shm_file);
-  *shm_handle = OpenFileMapping(
-      FILE_MAP_ALL_ACCESS,  // read/write access
-      FALSE,                // cannot inherit handle
-      shm_key.c_str());     // name of mapping object
-
-  if (*shm_handle == NULL) {
-    LOG_VERBOSE(1) << "OpenFileMapping failed with error code: "
-                   << GetWindowsError();
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string("Unable to open shared memory region: '" + shm_key + "'")
-            .c_str());
-  }
-#else
-  // get shared memory region descriptor
-  int* shm_fd = *reinterpret_cast<int**>(shm_file);
-  *shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
-    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string("Unable to open shared memory region: '" + shm_key + "'")
-            .c_str());
-  }
-#endif
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-CloseSharedMemoryRegion(void* shm_file)
-{
-#ifdef _WIN32
-  HANDLE shm_handle = static_cast<HANDLE>(shm_file);
-  bool success = CloseHandle(shm_handle);
-  if (!success) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "unable to close shared memory handle, error code: " +
-            GetWindowsError())
-            .c_str());
-  }
-#else
-  int shm_fd = *static_cast<int*>(shm_file);
-  int status = close(shm_fd);
-  if (status == -1) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "unable to close shared memory descriptor, errno: " +
-            std::string(std::strerror(errno)))
-            .c_str());
-  }
-#endif
-
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-MapSharedMemory(
-    void* shm_file, const size_t offset, const size_t byte_size,
-    void** mapped_addr)
-{
-#ifdef _WIN32
-  HANDLE shm_handle = static_cast<HANDLE>(shm_file);
-  // The MapViewOfFile function takes a high-order and low-order DWORD (4 bytes
-  // each) for offset. 'size_t' can either be 4 or 8 bytes depending on the
-  // operating system. To handle both cases agnostically, we cast 'offset' to
-  // uint64 to ensure we have a known size and enough space to perform our
-  // logical operations.
-  uint64_t upperbound_offset = (uint64_t)offset;
-  DWORD high_order_offset = (upperbound_offset >> 32) & 0xFFFFFFFF;
-  DWORD low_order_offset = upperbound_offset & 0xFFFFFFFF;
-  // map shared memory to process address space
-  *mapped_addr = MapViewOfFile(
-      shm_handle,           // handle to map object
-      FILE_MAP_ALL_ACCESS,  // read/write permission
-      high_order_offset,    // offset (high-order DWORD)
-      low_order_offset,     // offset (low-order DWORD)
-      byte_size);
-
-  if (*mapped_addr == NULL) {
-    CloseSharedMemoryRegion(shm_handle);
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "unable to process address space, error code: " + GetWindowsError())
-            .c_str());
-  }
-#else
-  int shm_fd = *static_cast<int*>(shm_file);
-  // map shared memory to process address space
-  *mapped_addr =
-      mmap(NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_fd, offset);
-  if (*mapped_addr == MAP_FAILED) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "unable to process address space " +
-                                         std::string(std::strerror(errno)))
-                                         .c_str());
-  }
-#endif
-  return nullptr;
-}
-
-TRITONSERVER_Error*
 UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 {
 #ifdef _WIN32
@@ -229,6 +119,116 @@ OpenCudaIPCRegion(
 
 }  // namespace
 
+TRITONSERVER_Error*
+SharedMemoryManager::OpenSharedMemoryRegion(
+    const std::string& shm_key, ShmFile** shm_file)
+{
+#ifdef _WIN32
+  HANDLE shm_handle = OpenFileMapping(
+      FILE_MAP_ALL_ACCESS,  // read/write access
+      FALSE,                // cannot inherit handle
+      shm_key.c_str());     // name of mapping object
+
+  if (shm_handle == NULL) {
+    LOG_VERBOSE(1) << "OpenFileMapping failed with error code: "
+                   << GetWindowsError();
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Unable to open shared memory region: '" + shm_key + "'")
+            .c_str());
+  }
+  // Dynamic memory will eventually be owned by uniqe_ptr
+  *shm_file = new ShmFile(shm_handle);
+#else
+  // get shared memory region descriptor
+  int shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Unable to open shared memory region: '" + shm_key + "'")
+            .c_str());
+  }
+  // Dynamic memory will eventually be owned by uniqe_ptr
+  *shm_file = new ShmFile(shm_fd);
+#endif
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::CloseSharedMemoryRegion(ShmFile* shm_file)
+{
+#ifdef _WIN32
+  bool success = CloseHandle(shm_file->shm_handle_);
+  if (!success) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to close shared memory handle, error code: " +
+            GetWindowsError())
+            .c_str());
+  }
+#else
+  int status = close(shm_file->shm_fd_);
+  if (status == -1) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to close shared memory descriptor, errno: " +
+            std::string(std::strerror(errno)))
+            .c_str());
+  }
+#endif
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::MapSharedMemory(
+    ShmFile* shm_file, const size_t offset, const size_t byte_size,
+    void** mapped_addr)
+{
+#ifdef _WIN32
+  // The MapViewOfFile function takes a high-order and low-order DWORD (4 bytes
+  // each) for offset. 'size_t' can either be 4 or 8 bytes depending on the
+  // operating system. To handle both cases agnostically, we cast 'offset' to
+  // uint64 to ensure we have a known size and enough space to perform our
+  // logical operations.
+  uint64_t upperbound_offset = (uint64_t)offset;
+  DWORD high_order_offset = (upperbound_offset >> 32) & 0xFFFFFFFF;
+  DWORD low_order_offset = upperbound_offset & 0xFFFFFFFF;
+  // map shared memory to process address space
+  *mapped_addr = MapViewOfFile(
+      shm_file->shm_handle_,  // handle to map object
+      FILE_MAP_ALL_ACCESS,    // read/write permission
+      high_order_offset,      // offset (high-order DWORD)
+      low_order_offset,       // offset (low-order DWORD)
+      byte_size);
+
+  if (*mapped_addr == NULL) {
+    CloseSharedMemoryRegion(shm_handle);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to process address space, error code: " + GetWindowsError())
+            .c_str());
+  }
+#else
+  // map shared memory to process address space
+  *mapped_addr = mmap(
+      NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_file->shm_fd_,
+      offset);
+  if (*mapped_addr == MAP_FAILED) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, std::string(
+                                         "unable to process address space " +
+                                         std::string(std::strerror(errno)))
+                                         .c_str());
+  }
+#endif
+  return nullptr;
+}
+
 SharedMemoryManager::~SharedMemoryManager()
 {
   UnregisterAll(TRITONSERVER_MEMORY_CPU);
@@ -253,17 +253,14 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // register
   void* mapped_addr;
-  // Safe initializer for Unix case where shm_file must be dereferenced to
-  // base in order to store file descriptor.
-  int shm_safe_initializer = -1;
-  void* shm_file = &shm_safe_initializer;
+  ShmFile* shm_file = nullptr;
   bool shm_file_exists = false;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
-      shm_file = itr->second->platform_handle_->GetShmFile();
+      shm_file = itr->second->platform_handle_.get();
       shm_file_exists = true;
       break;
     }
@@ -272,8 +269,16 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   // open and set new shm_file if new shared memory key
   if (!shm_file_exists) {
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_file));
+  } else {
+    // FIXME: DLIS-6448 - We should allow users the flexibility to register
+    // the same key under different names with different attributes.
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "registering an active shared memory key, \"" + shm_key +
+            "\", under a different name is not currently supported")
+            .c_str());
   }
-
   // Mmap and then close the shared memory descriptor
   TRITONSERVER_Error* err_map =
       MapSharedMemory(shm_file, offset, byte_size, &mapped_addr);

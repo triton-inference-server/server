@@ -53,7 +53,11 @@ def kill_server(server_process):
             server_process.kill()
         else:
             server_process.send_signal(signal.SIGINT)
-        server_process.wait()
+        try:
+            server_process.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            server_process.kill()
+            raise Exception("Server did not shutdown properly")
 
 
 def stream_to_log(client_log):
