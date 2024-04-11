@@ -1117,6 +1117,7 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
         && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
 RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
+RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
