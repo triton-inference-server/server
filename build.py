@@ -1116,6 +1116,8 @@ RUN ARCH="$(uname -i)" \\
 # Install TensorRT-LLM
 RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
         && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
+RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
+
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1723,33 +1725,6 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
     # Copy over the TRT-LLM wheel for later installation
     cmake_script.cp(
         os.path.join(tensorrtllm_be_dir, "tensorrt_llm", "build", "tensorrt_llm-*.whl"),
-        cmake_destination_dir,
-    )
-
-    # Copy over the TRT-LLM libraries required for C++ backend
-    cmake_script.cmd(
-        "cp -a {} {}".format(
-            os.path.join(
-                tensorrtllm_be_dir,
-                "tensorrt_llm",
-                "cpp",
-                "build",
-                "tensorrt_llm",
-                "plugins",
-                "libnvinfer_plugin_tensorrt_llm.so*",
-            ),
-            cmake_destination_dir,
-        )
-    )
-    cmake_script.cp(
-        os.path.join(
-            tensorrtllm_be_dir,
-            "tensorrt_llm",
-            "cpp",
-            "build",
-            "tensorrt_llm",
-            "libtensorrt_llm.so*",
-        ),
         cmake_destination_dir,
     )
 
