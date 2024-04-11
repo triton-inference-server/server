@@ -71,8 +71,8 @@ import requests
 TRITON_VERSION_MAP = {
     "2.46.0dev": (
         "24.05dev",  # triton container
-        "24.03",  # upstream container
-        "1.17.2",  # ORT
+        "24.04",  # upstream container
+        "1.17.3",  # ORT
         "2023.3.0",  # ORT OpenVINO
         "2023.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
