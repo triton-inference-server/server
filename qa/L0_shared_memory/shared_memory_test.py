@@ -63,16 +63,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         self._original_stdout, self._original_stderr = None, None
         self._log_file_path = log_file_path
 
-        if self._protocol == "http":
-            self._url = self._tritonserver_ipaddr + ":8000"
-            self._triton_client = httpclient.InferenceServerClient(
-                self._url, verbose=True
-            )
-        else:
-            self._url = self._tritonserver_ipaddr + ":8001"
-            self._triton_client = grpcclient.InferenceServerClient(
-                self._url, verbose=True
-            )
+        self._setup_client()
         self._build_model_repo()
         self._build_server_args()
         self._shared_memory_test_server_log = open(log_file_path, "w")
@@ -89,6 +80,18 @@ class SharedMemoryTest(tu.TestResultCollector):
         self._original_stdout, self._original_stderr = util.stream_to_log(
             self._client_log
         )
+
+    def _setup_client(self):
+        if self._protocol == "http":
+            self._url = self._tritonserver_ipaddr + ":8000"
+            self._triton_client = httpclient.InferenceServerClient(
+                self._url, verbose=True
+            )
+        else:
+            self._url = self._tritonserver_ipaddr + ":8001"
+            self._triton_client = grpcclient.InferenceServerClient(
+                self._url, verbose=True
+            )
 
     def _build_server_args(self):
         if self._test_windows:
@@ -136,35 +139,56 @@ class SharedMemoryTest(tu.TestResultCollector):
                 print(f.read())
             print("*\n*\n*\nEnd of Server Output\n*\n*\n*\n")
 
-    def _configure_sever(self):
+    def _configure_server(
+        self, create_byte_size=64, register_byte_size=64, register_offset=0
+    ):
+        """Creates and registers shared memory regions for testing.
+
+        Parameters
+        ----------
+        create_byte_size: int
+            Size of each system shared memory region to create.
+            NOTE: This should be sufficiently large to hold the inputs/outputs
+                  stored in shared memory.
+
+        register_byte_size: int
+            Size of each system shared memory region to register with server.
+            NOTE: The (offset + register_byte_size) should be less than or equal
+            to the create_byte_size. Otherwise an exception will be raised for
+            an invalid set of registration args.
+
+        register_offset: int
+            Offset into the shared memory object to start the registered region.
+
+        """
         shm_ip0_handle = shm.create_shared_memory_region(
-            "input0_data", (self._shm_key_prefix + "input0_data"), 64
+            "input0_data", (self._shm_key_prefix + "input0_data"), create_byte_size
         )
         shm_ip1_handle = shm.create_shared_memory_region(
-            "input1_data", (self._shm_key_prefix + "input1_data"), 64
+            "input1_data", (self._shm_key_prefix + "input1_data"), create_byte_size
         )
         shm_op0_handle = shm.create_shared_memory_region(
-            "output0_data", (self._shm_key_prefix + "output0_data"), 64
+            "output0_data", (self._shm_key_prefix + "output0_data"), create_byte_size
         )
         shm_op1_handle = shm.create_shared_memory_region(
-            "output1_data", (self._shm_key_prefix + "output1_data"), 64
+            "output1_data", (self._shm_key_prefix + "output1_data"), create_byte_size
         )
+        # Implicit assumption that input and output byte_sizes are 64 bytes for now
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
         shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
         shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
-
-        self._triton_client.register_system_shared_memory(
-            "input0_data", (self._shm_key_prefix + "input0_data"), 64
+        self.triton_client.register_system_shared_memory(
+            "input0_data", (self._shm_key_prefix + "input0_data"), register_byte_size, offset=register_offset
         )
-        self._triton_client.register_system_shared_memory(
-            "input1_data", (self._shm_key_prefix + "input1_data"), 64
+        self.triton_client.register_system_shared_memory(
+            "input1_data", (self._shm_key_prefix + "input1_data"), register_byte_size, offset=register_offset
         )
-        self._triton_client.register_system_shared_memory(
-            "output0_data", (self._shm_key_prefix + "output0_data"), 64
+        self.triton_client.register_system_shared_memory(
+            "output0_data", (self._shm_key_prefix + "output0_data"), register_byte_size, offset=register_offset
         )
-        self._triton_client.register_system_shared_memory(
-            "output1_data", (self._shm_key_prefix + "output1_data"), 64
+        self.triton_client.register_system_shared_memory(
+            "output1_data", (self._shm_key_prefix + "output1_data"), register_byte_size, offset=register_offset
         )
         return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
 
@@ -430,7 +454,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
 
         error_msg = []
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_server()
         self._basic_inference(
             shm_handles[0], shm_handles[1], shm_handles[2], shm_handles[3], error_msg
         )
@@ -458,7 +482,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
 
         error_msg = []
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_server()
 
         self._basic_inference(
             shm_handles[0], shm_handles[1], shm_handles[2], shm_handles[3], error_msg
@@ -485,7 +509,7 @@ class SharedMemoryTest(tu.TestResultCollector):
     # def test_too_big_shm(self, protocol):
     #     # Shared memory input region larger than needed - Throws error
     #     error_msg = []
-    #     shm_handles = self._configure_sever()
+    #     shm_handles = self._configure_server()
     #     shm_ip2_handle = shm.create_shared_memory_region(
     #         "input2_data", (self._shm_key_prefix + "input2_data"), 128
     #     )
@@ -519,7 +543,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         print(f"*\n*\n*\nStarting Test:test_mixed_raw_shm.{protocol}\n*\n*\n*\n")
 
         error_msg = []
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_server()
         input1_data = np.ones(shape=16, dtype=np.int32)
         self._basic_inference(
             shm_handles[0], [input1_data], shm_handles[2], shm_handles[3], error_msg
@@ -538,7 +562,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
         print(f"*\n*\n*\nStarting Test:test_unregisterall.{protocol}\n*\n*\n*\n")
 
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_server()
 
         status_before = self._triton_client.get_system_shared_memory_status()
         if self._protocol == "http":
@@ -566,7 +590,7 @@ class SharedMemoryTest(tu.TestResultCollector):
         )
 
         error_msg = []
-        shm_handles = self._configure_sever()
+        shm_handles = self._configure_server()
         if self._protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
@@ -587,6 +611,59 @@ class SharedMemoryTest(tu.TestResultCollector):
         self.assertIn("Invalid offset for shared memory region", error_msg[0])
         self._cleanup_server(shm_handles)
         self._test_passed = True
+
+    @parameterized.expand([("grpc"), ("http")])
+    def test_register_out_of_bound(self, protocol):
+        self._setUp(
+            protocol,
+            Path(os.getcwd()) / f"test_register_out_of_bound.{protocol}.server.log",
+        )
+        print(
+            f"*\n*\n*\nStarting Test:test_register_out_of_bound.{protocol}\n*\n*\n*\n"
+        )
+        create_byte_size = 64
+
+        # Verify various edge cases of registered region size (offset+byte_size)
+        # don't go out of bounds of the actual created shm file object's size.
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "failed to register shared memory region.*invalid args",
+        ):
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_byte_size=create_byte_size + 1,
+                register_offset=0,
+            )
+
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "failed to register shared memory region.*invalid args",
+        ):
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_byte_size=create_byte_size,
+                register_offset=1,
+            )
+
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "failed to register shared memory region.*invalid args",
+        ):
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_byte_size=1,
+                register_offset=create_byte_size,
+            )
+
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "failed to register shared memory region.*invalid args",
+        ):
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_byte_size=0,
+                register_offset=create_byte_size + 1,
+            )
 
 
 if __name__ == "__main__":

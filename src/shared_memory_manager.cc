@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -153,6 +154,62 @@ SharedMemoryManager::OpenSharedMemoryRegion(
   *shm_file = new ShmFile(shm_fd);
 #endif
   return nullptr;
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::GetSharedMemoryRegionSize(
+    const std::string& shm_key, ShmFile* shm_file, uint64_t* shm_region_size)
+{
+#ifdef WIN32
+  BY_HANDLE_FILE_INFORMATION info;
+  if(!GetFileInformationByHandle(shm_file->shm_handle_, &info)) {
+    LOG_VERBOSE(1) << "GetFileInformationByHandle failed with error code: " << GetWindowsError();
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
+  uint64_t file_size = ((uint64_t)info.nFileSizeHigh << 32) | info.nFileSizeLow;
+  *shm_region_size = file_size;
+#else
+  struct stat file_status;
+  if (fstat(shm_file->shm_fd_, &file_status) == -1) {
+    LOG_VERBOSE(1) << "fstat on shm_fd failed, errno: " << errno;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
+
+  // According to POSIX standard, type off_t can be negative, so for sake of
+  // catching possible under/overflows, assert that the size is non-negative.
+  if (file_status.st_size < 0) {
+    LOG_VERBOSE(1) << "File size of shared memory region must be non-negative";
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
+  *shm_region_size = static_cast<uint64_t>(file_status.st_size);
+#endif
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::CheckSharedMemoryRegionSize(
+    const std::string& name, const std::string& shm_key, ShmFile* shm_file,
+    size_t offset, size_t byte_size)
+{
+  uint64_t shm_region_size = 0;
+  RETURN_IF_ERR(GetSharedMemoryRegionSize(shm_key, shm_file, &shm_region_size));
+  // User-provided offset and byte_size should not go out-of-bounds.
+  if ((offset + byte_size) > shm_region_size) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': invalid args")
+            .c_str());
+  }
+
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -279,6 +336,11 @@ SharedMemoryManager::RegisterSystemSharedMemory(
             "\", under a different name is not currently supported")
             .c_str());
   }
+
+  // Enforce that registered region is in-bounds of shm file object.
+  RETURN_IF_ERR(
+      CheckSharedMemoryRegionSize(name, shm_key, shm_file, offset, byte_size));
+
   // Mmap and then close the shared memory descriptor
   TRITONSERVER_Error* err_map =
       MapSharedMemory(shm_file, offset, byte_size, &mapped_addr);

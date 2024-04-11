@@ -152,6 +152,34 @@ class SharedMemoryManager {
   TRITONSERVER_Error* OpenSharedMemoryRegion(
       const std::string& shm_key, ShmFile** shm_file);
 
+  /// Get the size of the shared memory region.
+  /// \param shm_key The name of the shared memory object
+  /// containing the block of memory.
+  /// \param shm_file The file handle/descriptor of the the
+  /// opened shared memory object.
+  /// \param shm_region_size A pointer to store the size of the
+  /// shared memory region.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error*
+  GetSharedMemoryRegionSize(
+    const std::string& shm_key, int shm_fd, size_t* shm_region_size)
+
+  /// Validate that offset + byte_size does not exceed the size of
+  /// the registered shared memory region.
+  /// \param name The name of the memory block.
+  /// \param shm_key The name of the shared memory object
+  /// containing the block of memory.
+  /// \param shm_file The file handle/descriptor of the the
+  /// opened shared memory object.
+  /// \param offset The offset within the shared memory object to the
+  /// start of the block.
+  /// \param byte_size The size, in bytes of the block.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error*
+  CheckSharedMemoryRegionSize(
+    const std::string& name, const std::string& shm_key, ShmFile* shm_file,
+    size_t offset, size_t byte_size)
+
   /// Close the shared memory object.
   /// \param shm_file The file handle/descriptor of the the
   /// open shared memory object.
