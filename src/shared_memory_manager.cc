@@ -26,163 +26,52 @@
 
 #include "shared_memory_manager.h"
 
+#include "common.h"
+#include "triton/common/logging.h"
+
 // Not supporting shared memory for now
-#ifdef _WIN32
-namespace triton { namespace server {
-SharedMemoryManager::~SharedMemoryManager() {}
-
-TRITONSERVER_Error*
-SharedMemoryManager::RegisterSystemSharedMemory(
-    const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-#ifdef TRITON_ENABLE_GPU
-TRITONSERVER_Error*
-SharedMemoryManager::RegisterCUDASharedMemory(
-    const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
-    const size_t byte_size, const int device_id)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::GetCUDAHandle(
-    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-#endif  // TRITON_ENABLE_GPU
-
-TRITONSERVER_Error*
-SharedMemoryManager::GetMemoryInfo(
-    const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::GetStatus(
-    const std::string& name, TRITONSERVER_MemoryType memory_type,
-    triton::common::TritonJson::Value* shm_status)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::Unregister(
-    const std::string& name, TRITONSERVER_MemoryType memory_type)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::UnregisterHelper(
-    const std::string& name, TRITONSERVER_MemoryType memory_type)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-}}  // namespace triton::server
-#else
+#ifndef _WIN32
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#include "common.h"
-#include "triton/common/logging.h"
+#endif
 
 namespace triton { namespace server {
 
 namespace {
 
-TRITONSERVER_Error*
-OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
+#ifdef _WIN32
+const std::string
+GetWindowsError()
 {
-  // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
-    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string("Unable to open shared memory region: '" + shm_key + "'")
-            .c_str());
-  }
-
-  return nullptr;
+  LPSTR err_buffer = nullptr;
+  size_t size = FormatMessageA(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      (LPSTR)&err_buffer, 0, NULL);
+  std::string errstr(err_buffer, size);
+  std::string retString = std::to_string(GetLastError()) + " - " + errstr;
+  LocalFree(err_buffer);
+  return retString;
 }
-
-TRITONSERVER_Error*
-MapSharedMemory(
-    const int shm_fd, const size_t offset, const size_t byte_size,
-    void** mapped_addr)
-{
-  // map shared memory to process address space
-  *mapped_addr =
-      mmap(NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_fd, offset);
-  if (*mapped_addr == MAP_FAILED) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "unable to process address space" +
-                                         std::string(std::strerror(errno)))
-                                         .c_str());
-  }
-
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-CloseSharedMemoryRegion(int shm_fd)
-{
-  int status = close(shm_fd);
-  if (status == -1) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        std::string(
-            "unable to close shared memory descriptor, errno: " +
-            std::string(std::strerror(errno)))
-            .c_str());
-  }
-
-  return nullptr;
-}
+#endif
 
 TRITONSERVER_Error*
 UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 {
+#ifdef _WIN32
+  bool success = UnmapViewOfFile(mapped_addr);
+  if (!success) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to unmap shared memory region, error code: " +
+            GetWindowsError())
+            .c_str());
+  }
+#else
   int status = munmap(mapped_addr, byte_size);
   if (status == -1) {
     return TRITONSERVER_ErrorNew(
@@ -192,7 +81,7 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
             std::string(std::strerror(errno)))
             .c_str());
   }
-
+#endif
   return nullptr;
 }
 
@@ -201,6 +90,13 @@ TRITONSERVER_Error*
 OpenCudaIPCRegion(
     const cudaIpcMemHandle_t* cuda_shm_handle, void** data_ptr, int device_id)
 {
+#ifdef _WIN32
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string(
+          "GPU shared memory features are currently not supported on Windows")
+          .c_str());
+#else
   // Set to device curres
   cudaSetDevice(device_id);
 
@@ -216,15 +112,129 @@ OpenCudaIPCRegion(
   }
 
   return nullptr;
+#endif
 }
+
 #endif  // TRITON_ENABLE_GPU
 
 }  // namespace
 
+TRITONSERVER_Error*
+SharedMemoryManager::OpenSharedMemoryRegion(
+    const std::string& shm_key, ShmFile** shm_file)
+{
+#ifdef _WIN32
+  HANDLE shm_handle = OpenFileMapping(
+      FILE_MAP_ALL_ACCESS,  // read/write access
+      FALSE,                // cannot inherit handle
+      shm_key.c_str());     // name of mapping object
+
+  if (shm_handle == NULL) {
+    LOG_VERBOSE(1) << "OpenFileMapping failed with error code: "
+                   << GetWindowsError();
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Unable to open shared memory region: '" + shm_key + "'")
+            .c_str());
+  }
+  // Dynamic memory will eventually be owned by uniqe_ptr
+  *shm_file = new ShmFile(shm_handle);
+#else
+  // get shared memory region descriptor
+  int shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Unable to open shared memory region: '" + shm_key + "'")
+            .c_str());
+  }
+  // Dynamic memory will eventually be owned by uniqe_ptr
+  *shm_file = new ShmFile(shm_fd);
+#endif
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::CloseSharedMemoryRegion(ShmFile* shm_file)
+{
+#ifdef _WIN32
+  bool success = CloseHandle(shm_file->shm_handle_);
+  if (!success) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to close shared memory handle, error code: " +
+            GetWindowsError())
+            .c_str());
+  }
+#else
+  int status = close(shm_file->shm_fd_);
+  if (status == -1) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to close shared memory descriptor, errno: " +
+            std::string(std::strerror(errno)))
+            .c_str());
+  }
+#endif
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::MapSharedMemory(
+    ShmFile* shm_file, const size_t offset, const size_t byte_size,
+    void** mapped_addr)
+{
+#ifdef _WIN32
+  // The MapViewOfFile function takes a high-order and low-order DWORD (4 bytes
+  // each) for offset. 'size_t' can either be 4 or 8 bytes depending on the
+  // operating system. To handle both cases agnostically, we cast 'offset' to
+  // uint64 to ensure we have a known size and enough space to perform our
+  // logical operations.
+  uint64_t upperbound_offset = (uint64_t)offset;
+  DWORD high_order_offset = (upperbound_offset >> 32) & 0xFFFFFFFF;
+  DWORD low_order_offset = upperbound_offset & 0xFFFFFFFF;
+  // map shared memory to process address space
+  *mapped_addr = MapViewOfFile(
+      shm_file->shm_handle_,  // handle to map object
+      FILE_MAP_ALL_ACCESS,    // read/write permission
+      high_order_offset,      // offset (high-order DWORD)
+      low_order_offset,       // offset (low-order DWORD)
+      byte_size);
+
+  if (*mapped_addr == NULL) {
+    CloseSharedMemoryRegion(shm_handle);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "unable to process address space, error code: " + GetWindowsError())
+            .c_str());
+  }
+#else
+  // map shared memory to process address space
+  *mapped_addr = mmap(
+      NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_file->shm_fd_,
+      offset);
+  if (*mapped_addr == MAP_FAILED) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, std::string(
+                                         "unable to process address space " +
+                                         std::string(std::strerror(errno)))
+                                         .c_str());
+  }
+#endif
+  return nullptr;
+}
+
 SharedMemoryManager::~SharedMemoryManager()
 {
   UnregisterAll(TRITONSERVER_MEMORY_CPU);
+#ifndef _WIN32
   UnregisterAll(TRITONSERVER_MEMORY_GPU);
+#endif
 }
 
 TRITONSERVER_Error*
@@ -243,32 +253,42 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // register
   void* mapped_addr;
-  int shm_fd = -1;
+  ShmFile* shm_file = nullptr;
+  bool shm_file_exists = false;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
-      shm_fd = itr->second->shm_fd_;
+      shm_file = itr->second->platform_handle_.get();
+      shm_file_exists = true;
       break;
     }
   }
 
-  // open and set new shm_fd if new shared memory key
-  if (shm_fd == -1) {
-    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  // open and set new shm_file if new shared memory key
+  if (!shm_file_exists) {
+    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_file));
+  } else {
+    // FIXME: DLIS-6448 - We should allow users the flexibility to register
+    // the same key under different names with different attributes.
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "registering an active shared memory key, \"" + shm_key +
+            "\", under a different name is not currently supported")
+            .c_str());
   }
-
   // Mmap and then close the shared memory descriptor
-  TRITONSERVER_Error* err_mmap =
-      MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
-  TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_fd);
-  if (err_mmap != nullptr) {
+  TRITONSERVER_Error* err_map =
+      MapSharedMemory(shm_file, offset, byte_size, &mapped_addr);
+  TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_file);
+  if (err_map != nullptr) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register shared memory region '" + name +
-            "': " + TRITONSERVER_ErrorMessage(err_mmap))
+            "': " + TRITONSERVER_ErrorMessage(err_map))
             .c_str());
   }
 
@@ -283,7 +303,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                name, shm_key, offset, byte_size, shm_fd, mapped_addr,
+                name, shm_key, offset, byte_size, shm_file, mapped_addr,
                 TRITONSERVER_MEMORY_CPU, 0))));
 
   return nullptr;  // success
@@ -295,6 +315,13 @@ SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
     const size_t byte_size, const int device_id)
 {
+#ifdef _WIN32
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string(
+          "GPU shared memory features are currently not supported on Windows")
+          .c_str());
+#else
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -324,11 +351,42 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<CUDASharedMemoryInfo>(new CUDASharedMemoryInfo(
-                name, "", 0, byte_size, 0, mapped_addr, TRITONSERVER_MEMORY_GPU,
-                device_id, cuda_shm_handle))));
+                name, "", 0, byte_size, nullptr, mapped_addr,
+                TRITONSERVER_MEMORY_GPU, device_id, cuda_shm_handle))));
 
   return nullptr;  // success
+#endif
 }
+
+TRITONSERVER_Error*
+SharedMemoryManager::GetCUDAHandle(
+    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
+{
+#ifdef _WIN32
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string(
+          "GPU shared memory features are currently not supported on Windows")
+          .c_str());
+#else
+  // protect shared_memory_map_ from concurrent access
+  std::lock_guard<std::mutex> lock(mu_);
+
+  auto it = shared_memory_map_.find(name);
+  if (it == shared_memory_map_.end()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_NOT_FOUND,
+        std::string("Unable to find shared memory region: '" + name + "'")
+            .c_str());
+  }
+  CUDASharedMemoryInfo& shm_info =
+      reinterpret_cast<CUDASharedMemoryInfo&>(*(it->second));
+  *cuda_mem_handle = &(shm_info.cuda_ipc_handle_);
+
+  return nullptr;
+#endif
+}
+
 #endif  // TRITON_ENABLE_GPU
 
 TRITONSERVER_Error*
@@ -375,29 +433,6 @@ SharedMemoryManager::GetMemoryInfo(
 
   return nullptr;
 }
-
-#ifdef TRITON_ENABLE_GPU
-TRITONSERVER_Error*
-SharedMemoryManager::GetCUDAHandle(
-    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
-{
-  // protect shared_memory_map_ from concurrent access
-  std::lock_guard<std::mutex> lock(mu_);
-
-  auto it = shared_memory_map_.find(name);
-  if (it == shared_memory_map_.end()) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_NOT_FOUND,
-        std::string("Unable to find shared memory region: '" + name + "'")
-            .c_str());
-  }
-  CUDASharedMemoryInfo& shm_info =
-      reinterpret_cast<CUDASharedMemoryInfo&>(*(it->second));
-  *cuda_mem_handle = &(shm_info.cuda_ipc_handle_);
-
-  return nullptr;
-}
-#endif
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
@@ -486,52 +521,6 @@ SharedMemoryManager::Unregister(
 }
 
 TRITONSERVER_Error*
-SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-  std::string error_message = "Failed to unregister the following ";
-  std::vector<std::string> unregister_fails;
-  if (memory_type == TRITONSERVER_MEMORY_CPU) {
-    // Serialize all operations that write/read current shared memory regions
-    error_message += "system shared memory regions: ";
-    for (auto it = shared_memory_map_.cbegin(), next_it = it;
-         it != shared_memory_map_.cend(); it = next_it) {
-      ++next_it;
-      if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
-        if (err != nullptr) {
-          unregister_fails.push_back(it->first);
-        }
-      }
-    }
-  } else if (memory_type == TRITONSERVER_MEMORY_GPU) {
-    error_message += "cuda shared memory regions: ";
-    for (auto it = shared_memory_map_.cbegin(), next_it = it;
-         it != shared_memory_map_.cend(); it = next_it) {
-      ++next_it;
-      if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
-        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
-        ;
-        if (err != nullptr) {
-          unregister_fails.push_back(it->first);
-        }
-      }
-    }
-  }
-
-  if (!unregister_fails.empty()) {
-    for (auto unreg_fail : unregister_fails) {
-      error_message += unreg_fail + " ,";
-    }
-    LOG_ERROR << error_message;
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, error_message.c_str());
-  }
-
-  return nullptr;
-}
-
-TRITONSERVER_Error*
 SharedMemoryManager::UnregisterHelper(
     const std::string& name, TRITONSERVER_MemoryType memory_type)
 {
@@ -569,5 +558,52 @@ SharedMemoryManager::UnregisterHelper(
   return nullptr;
 }
 
+TRITONSERVER_Error*
+SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+  std::string error_message = "Failed to unregister the following ";
+  std::vector<std::string> unregister_fails;
+  if (memory_type == TRITONSERVER_MEMORY_CPU) {
+    // Serialize all operations that write/read current shared memory regions
+    error_message += "system shared memory regions: ";
+    for (auto it = shared_memory_map_.cbegin(), next_it = it;
+         it != shared_memory_map_.cend(); it = next_it) {
+      ++next_it;
+      if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
+        if (err != nullptr) {
+          unregister_fails.push_back(it->first);
+        }
+      }
+    }
+  } else if (memory_type == TRITONSERVER_MEMORY_GPU) {
+    // TODO: DLIS-4169 - Verify whether we need a Windows implementation of
+    // UnregisterAll for GPU shm once we have GPU shm mem support
+    error_message += "cuda shared memory regions: ";
+    for (auto it = shared_memory_map_.cbegin(), next_it = it;
+         it != shared_memory_map_.cend(); it = next_it) {
+      ++next_it;
+      if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
+        ;
+        if (err != nullptr) {
+          unregister_fails.push_back(it->first);
+        }
+      }
+    }
+  }
+
+  if (!unregister_fails.empty()) {
+    for (auto unreg_fail : unregister_fails) {
+      error_message += unreg_fail + " ,";
+    }
+    LOG_ERROR << error_message;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, error_message.c_str());
+  }
+
+  return nullptr;
+}
+
 }}  // namespace triton::server
-#endif

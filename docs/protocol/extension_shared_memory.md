@@ -45,10 +45,10 @@ memory. These parameters and their type are:
   registered shared memory region. Region names share a namespace for
   system-shared-memory regions and CUDA-shared-memory regions.
 
-- "shared_memory_offset" : int64 value is the offset, in bytes, into
+- "shared_memory_offset" : size_t value is the offset, in bytes, into
   the region where the data for the tensor starts.
 
-- "shared_memory_byte_size" : int64 value is the size, in bytes, of
+- "shared_memory_byte_size" : size_t value is the size, in bytes, of
   the data.
 
 The “shared_memory_offset” parameter is optional and defaults to
