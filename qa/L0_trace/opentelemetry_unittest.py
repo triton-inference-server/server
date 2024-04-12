@@ -81,6 +81,9 @@ def send_bls_request(model_name="simple", headers=None):
         inputs[-1].set_data_from_numpy(np.array([model_name], dtype=np.object_))
         client.infer("bls_simple", inputs, headers=headers)
 
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
 
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
@@ -112,6 +115,10 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.bls_model_name,
         ]
         self.root_span = "InferRequest"
+        self._user_data = UserData()
+        self._callback = partial(callback, self._user_data)
+        self._outputs = []
+
 
     def tearDown(self):
         self.collector_subprocess.kill()
@@ -199,6 +206,17 @@ class OpenTelemetryTest(tu.TestResultCollector):
             )
             self.assertFalse(all(entry in events for entry in compute_events))
 
+    def _check_events_cancel(self, events):
+        """
+        Helper function that verifies passed events contain expected entries.
+
+        Args:
+            span_name (str): name of a span.
+            events (List[str]): list of event names, collected for the span with the name `span_name`.
+        """
+        request_events = ["REQUEST_START", "REQUEST_END"]
+        self.assertFalse(all(entry in events for entry in request_events))
+
     def _test_resource_attributes(self, attributes):
         """
         Helper function that verifies passed span attributes.
@@ -270,6 +288,14 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 "Unexpeced number of " + name + " spans collected",
             )
 
+    def _verify_contents_cancel(self, spans):
+
+        for span in spans:
+            # Check that collected spans have proper events recorded
+            span_events = span["events"]
+            event_names_only = [event["name"] for event in span_events]
+            self._check_events_cancel(event_names_only)
+
     def _verify_nesting(self, spans, expected_parent_span_dict):
         """
         Helper function that checks parent-child relationships between
@@ -339,6 +365,15 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
+    def _test_trace_cancel(
+        self,
+    ):
+        time.sleep(COLLECTOR_TIMEOUT)
+        traces = self._parse_trace_log(self.filename)
+
+        parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        self._verify_contents_cancel(parsed_spans)
+        
     def _test_trace(
         self,
         headers,
@@ -526,6 +561,26 @@ class OpenTelemetryTest(tu.TestResultCollector):
         triton_client_grpc.infer(self.simple_model_name, inputs)
 
         self._test_simple_trace()
+
+    def test_grpc_trace_simple_model_cancel(self):
+        """
+        Tests trace, collected from executing one inference request
+        for a `simple` model and GRPC client.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        inputs = prepare_data(grpcclient)
+        future = triton_client_grpc.async_infer(
+            model_name=self.simple_model_name,
+            inputs=inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        time.sleep(2)  # ensure the inference has started
+        future.cancel()
+        time.sleep(0.1)  # context switch
+        self._test_trace_cancel()
 
     def test_grpc_trace_simple_model_context_propagation(self):
         """
