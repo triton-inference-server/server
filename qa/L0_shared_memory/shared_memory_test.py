@@ -42,6 +42,8 @@ from tritonclient import utils
 
 
 class SharedMemoryTest(tu.TestResultCollector):
+    DEFAULT_SHM_BYTE_SIZE = 64
+
     def setUp(self):
         self._setup_client()
 
@@ -125,7 +127,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         shm.destroy_shared_memory_region(shm_op0_handle)
 
     def _configure_server(
-        self, create_byte_size=64, register_byte_size=64, register_offset=0
+        self,
+        create_byte_size=DEFAULT_SHM_BYTE_SIZE,
+        register_byte_size=DEFAULT_SHM_BYTE_SIZE,
+        register_offset=0,
     ):
         """Creates and registers shared memory regions for testing.
 
@@ -189,8 +194,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         shm_op1_handle,
         error_msg,
         big_shm_name="",
-        big_shm_size=64,
+        big_shm_size=DEFAULT_SHM_BYTE_SIZE,
         shm_output_offset=0,
+        shm_output_byte_size=DEFAULT_SHM_BYTE_SIZE,
+        default_shm_byte_size=DEFAULT_SHM_BYTE_SIZE,
     ):
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -209,17 +216,21 @@ class SharedMemoryTest(tu.TestResultCollector):
             outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
             outputs.append(grpcclient.InferRequestedOutput("OUTPUT1"))
 
-        inputs[0].set_shared_memory("input0_data", 64)
+        inputs[0].set_shared_memory("input0_data", default_shm_byte_size)
 
         if type(shm_ip1_handle) == np.array:
             inputs[1].set_data_from_numpy(input0_data, binary_data=True)
         elif big_shm_name != "":
             inputs[1].set_shared_memory(big_shm_name, big_shm_size)
         else:
-            inputs[1].set_shared_memory("input1_data", 64)
+            inputs[1].set_shared_memory("input1_data", default_shm_byte_size)
 
-        outputs[0].set_shared_memory("output0_data", 64, offset=shm_output_offset)
-        outputs[1].set_shared_memory("output1_data", 64, offset=shm_output_offset)
+        outputs[0].set_shared_memory(
+            "output0_data", shm_output_byte_size, offset=shm_output_offset
+        )
+        outputs[1].set_shared_memory(
+            "output1_data", shm_output_byte_size, offset=shm_output_offset
+        )
 
         try:
             results = self.triton_client.infer(
@@ -248,7 +259,11 @@ class SharedMemoryTest(tu.TestResultCollector):
         error_msg = []
         shm_handles = self._configure_server()
         self._basic_inference(
-            shm_handles[0], shm_handles[1], shm_handles[2], shm_handles[3], error_msg
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
         )
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
@@ -270,10 +285,10 @@ class SharedMemoryTest(tu.TestResultCollector):
         if len(error_msg) > 0:
             raise Exception(str(error_msg))
         shm_ip2_handle = shm.create_shared_memory_region(
-            "input2_data", "/input2_data", 64
+            "input2_data", "/input2_data", self.DEFAULT_SHM_BYTE_SIZE
         )
         self.triton_client.register_system_shared_memory(
-            "input2_data", "/input2_data", 64
+            "input2_data", "/input2_data", self.DEFAULT_SHM_BYTE_SIZE
         )
         shm_status = self.triton_client.get_system_shared_memory_status()
         if self.protocol == "http":
@@ -362,8 +377,30 @@ class SharedMemoryTest(tu.TestResultCollector):
         self.assertIn("Invalid offset for shared memory region", error_msg[0])
         self._cleanup_server(shm_handles)
 
+    def test_infer_byte_size_out_of_bound(self):
+        # Shared memory byte_size outside output region - Throws error
+        error_msg = []
+        shm_handles = self._configure_server()
+        offset = 60
+        byte_size = self.DEFAULT_SHM_BYTE_SIZE
+
+        self._basic_inference(
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
+            shm_output_offset=offset,
+            shm_output_byte_size=byte_size,
+        )
+        self.assertEqual(len(error_msg), 1)
+        self.assertIn(
+            "Invalid offset + byte size for shared memory region", error_msg[0]
+        )
+        self._cleanup_server(shm_handles)
+
     def test_register_out_of_bound(self):
-        create_byte_size = 64
+        create_byte_size = self.DEFAULT_SHM_BYTE_SIZE
 
         # Verify various edge cases of registered region size (offset+byte_size)
         # don't go out of bounds of the actual created shm file object's size.
