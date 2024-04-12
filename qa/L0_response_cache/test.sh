@@ -197,26 +197,36 @@ function check_server_failure_decoupled_model {
   fi
 }
 
-function test_ensemble_model_with_cache_util {
+function run_server_ensemble_model {
   SERVER_ARGS="--model-repository="${3}" --cache-config local,size=1048576000"
-  if [ "${SERVER_PID}" == "0" ]; then
-    run_server
+  run_server
+  set +e
+  python ${ENSEMBLE_CACHE_TEST_PY} "${1}" >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      RET=1
   else
-    set +e
-    python ${ENSEMBLE_CACHE_TEST_PY} "${1}" >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "${2}"
-            RET=1
-        fi
-    fi
-    set -e
-
+      check_test_results $TEST_RESULT_FILE 1
+      if [ $? -ne 0 ]; then
+          cat $CLIENT_LOG
+          echo -e "${2}"
+          RET=1
+      fi
   fi
+  set -e
+}
+
+function test_ensemble_model_cache_and_decoupled {
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
+  check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
+}
+
+function test_ensemble_cache_composing_decoupled {
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_composing_model >>$CLIENT_LOG 2>&1
+  check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_composing_model >>$CLIENT_LOG 2>&1
 }
 
 # Check that server fails to start for a "decoupled" model with cache enabled
@@ -330,36 +340,26 @@ stop_redis
 
 
 #Test Ensemble Model With Cache Enabled and Decoupled Mode in Ensemble Config
-python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.enable_cache_and_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
-check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+test_ensemble_model_cache_and_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
 
 # Test Ensemble Model With Cache Enabled and Decoupled Mode in Composing Model
-python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.enable_composing_model_decoupled >>$CLIENT_LOG 2>&1
-check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
-
-#Remove decoupled Config
-python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.remove_decoupled_config >> $CLIENT_LOG 2>&1
+ test_ensemble_cache_composing_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
 
 #Test Ensemble Model with Top Level Caching Enabled
 FUNCTION_NAME="EnsembleCacheTest.test_ensemble_top_level_cache"
 ERROR_MESSAGE="\n***\n*** Failed: Expected Top Level Request Caching\n***"
-test_ensemble_model_with_cache_util "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
-#check_server_success_and_kill
+run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+check_server_success_and_kill
 
-# Test Ensemble Model with cache enabled in all models
+#Test Ensemble Model with cache enabled in all models
 FUNCTION_NAME="EnsembleCacheTest.test_all_models_with_cache_enabled"
 ERROR_MESSAGE="\n***\n*** Failed: Expected Cache to return Top-Level request's response\n***"
-test_ensemble_model_with_cache_util "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
-#check_server_success_and_kill
+run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+check_server_success_and_kill
 
-# Cleanup extra configuration for next iteration
-python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest.reset_config_files >>$CLIENT_LOG 2>&1
+#Cleanup extra configuration for next iteration
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._reset_config_files >>$CLIENT_LOG 2>&1
 
-
-if [ $SERVER_PID != "0" ]; then
-  kill $SERVER_PID
-  #wait $SERVER_PID
-fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
