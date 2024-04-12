@@ -574,9 +574,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   // Log appropriate errors
-  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
+  bool is_complete =
+      state->complete_ || (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
   if (!state->is_decoupled_) {
-    if (!state->complete_) {
+    if (!is_complete) {
       LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
                    "FINAL flag for a model with one-to-one transaction";
     }
@@ -591,7 +592,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   // Also make sure that if this state was sent to gRPC async notification
   // mechanism then the state is not removed as it would be needed for handling
   // the cancellation if detected.
-  if (state->complete_ && (!state->IsAsyncNotifyState())) {
+  if (is_complete && (!state->IsAsyncNotifyState())) {
     state->context_->EraseInflightState(state);
   }
 
@@ -610,11 +611,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // If this was the final callback for the state
     // then cycle through the completion queue so
     // that state object can be released.
-    if (state->complete_) {
+    if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
     }
 
+    state->complete_ = is_complete;
     return;
   }
 
@@ -661,8 +663,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   // "empty" responses are not sent back to the client. Clients can
   // opt-in to receiving these empty responses via request parameters.
   // NOTE: The complete flag is the only flag used for this case at this time.
-  const bool empty_final =
-      (!iresponse && state->is_decoupled_ && state->complete_);
+  const bool empty_final = !iresponse && state->is_decoupled_ && is_complete;
   const bool enable_empty_final =
       state->parameters_.enable_empty_final_response_;
 
@@ -690,7 +691,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       infer_response.set_model_version(state->request_.model_version());
     }
     auto& params = *(infer_response.mutable_parameters());
-    params["triton_final_response"].set_bool_param(state->complete_);
+    params["triton_final_response"].set_bool_param(is_complete);
   }
 
   // Update states to signal that response/error is ready to write to stream
@@ -708,11 +709,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       // If this was the final callback for the state
       // then cycle through the completion queue so
       // that state object can be released.
-      if (state->complete_) {
+      if (is_complete) {
         state->step_ = Steps::CANCELLED;
         state->context_->PutTaskBackToQueue(state);
       }
 
+      state->complete_ = is_complete;
       return;
     }
 
@@ -728,6 +730,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       state->step_ = Steps::WRITEREADY;
       state->context_->WriteResponseIfReady(state);
     }
+
+    state->complete_ = is_complete;
   }
 }
 
