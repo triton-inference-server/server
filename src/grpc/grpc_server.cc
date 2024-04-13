@@ -1210,18 +1210,11 @@ CommonHandler::RegisterTrace()
         static std::string setting_name = "trace_file";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
-          if (it->second.value().size() == 0) {
-            new_setting.clear_filepath_ = true;
-          } else if (it->second.value().size() == 1) {
-            filepath = it->second.value()[0];
-            new_setting.filepath_ = &filepath;
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect only 1 value for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          }
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "trace file location can not be updated through network "
+              "protocol");
+          GOTO_IF_ERR(err, earlyexit);
         }
       }
       {

@@ -162,10 +162,7 @@ TraceManager::UpdateTraceSettingInternal(
                current_setting->log_frequency_specified_) ||
               (new_setting.log_frequency_ != nullptr)));
   const bool filepath_specified =
-      (new_setting.clear_filepath_ ? false
-                                   : (((current_setting != nullptr) &&
-                                       current_setting->filepath_specified_) ||
-                                      (new_setting.filepath_ != nullptr)));
+      (((current_setting != nullptr) && current_setting->filepath_specified_));
 
   if (level_specified) {
     level = (new_setting.level_ != nullptr) ? *new_setting.level_
@@ -185,9 +182,7 @@ TraceManager::UpdateTraceSettingInternal(
                         : current_setting->log_frequency_;
   }
   if (filepath_specified) {
-    filepath = (new_setting.filepath_ != nullptr)
-                   ? *new_setting.filepath_
-                   : current_setting->file_->FileName();
+    filepath = current_setting->file_->FileName();
   }
 
   // Some special case when updating model setting
