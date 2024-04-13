@@ -136,10 +136,12 @@ class SharedMemoryManager {
   struct ShmFile {
 #ifdef _WIN32
     HANDLE shm_handle_;
-    ShmFile(HANDLE shm_handle) : shm_file_(shm_handle){};
+    ShmFile(HANDLE shm_handle) : shm_handle_(shm_handle){};
+    ~ShmFile() { CloseHandle(shm_handle_); };
 #else
     int shm_fd_;
     ShmFile(int fd) : shm_fd_(fd){};
+    ~ShmFile() { close(fd); };
 #endif  // _WIN32
   };
 
@@ -150,7 +152,7 @@ class SharedMemoryManager {
   /// opened shared memory object.
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* OpenSharedMemoryRegion(
-      const std::string& shm_key, ShmFile** shm_file);
+      const std::string& shm_key, std::shared_ptr<ShmFile>& shm_file);
 
   /// Get the size of the shared memory region.
   /// \param shm_key The name of the shared memory object
@@ -160,9 +162,8 @@ class SharedMemoryManager {
   /// \param shm_region_size A pointer to store the size of the
   /// shared memory region.
   /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error*
-  GetSharedMemoryRegionSize(
-    const std::string& shm_key, int shm_fd, size_t* shm_region_size)
+  TRITONSERVER_Error* GetSharedMemoryRegionSize(
+      const std::string& shm_key, ShmFile* shm_file, size_t* shm_region_size);
 
   /// Validate that offset + byte_size does not exceed the size of
   /// the registered shared memory region.
@@ -175,10 +176,9 @@ class SharedMemoryManager {
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
   /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error*
-  CheckSharedMemoryRegionSize(
-    const std::string& name, const std::string& shm_key, ShmFile* shm_file,
-    size_t offset, size_t byte_size)
+  TRITONSERVER_Error* CheckSharedMemoryRegionSize(
+      const std::string& name, const std::string& shm_key, ShmFile* shm_file,
+      size_t offset, size_t byte_size);
 
   /// Close the shared memory object.
   /// \param shm_file The file handle/descriptor of the the
@@ -210,35 +210,33 @@ class SharedMemoryManager {
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, ShmFile* shm_file,
-        void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id)
+        const size_t offset, const size_t byte_size,
+        std::shared_ptr<ShmFile> shm_file, void* mapped_addr,
+        const TRITONSERVER_MemoryType kind, const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), mapped_addr_(mapped_addr), kind_(kind),
-          device_id_(device_id)
+          platform_handle_(shm_file), byte_size_(byte_size),
+          mapped_addr_(mapped_addr), kind_(kind), device_id_(device_id)
     {
-      if (shm_file != nullptr) {
-        platform_handle_.reset(shm_file);
-      }
     }
 
     std::string name_;
     std::string shm_key_;
     size_t offset_;
+    std::shared_ptr<ShmFile> platform_handle_;
     size_t byte_size_;
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
-    std::unique_ptr<ShmFile> platform_handle_;
   };
 
 #ifdef TRITON_ENABLE_GPU
   struct CUDASharedMemoryInfo : SharedMemoryInfo {
     CUDASharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, ShmFile* shm_file,
-        void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
+        const size_t offset, const size_t byte_size,
+        std::shared_ptr<ShmFile> shm_file, void* mapped_addr,
+        const TRITONSERVER_MemoryType kind, const int64_t device_id,
+        const cudaIpcMemHandle_t* cuda_ipc_handle)
         : SharedMemoryInfo(
               name, shm_key, offset, byte_size, shm_file, mapped_addr, kind,
               device_id),

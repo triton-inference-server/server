@@ -36,6 +36,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#else
+#define TRITON_SHM_FILE_ROOT "C:\\triton_shm\\"
 #endif
 
 namespace triton { namespace server {
@@ -122,7 +124,7 @@ OpenCudaIPCRegion(
 
 TRITONSERVER_Error*
 SharedMemoryManager::OpenSharedMemoryRegion(
-    const std::string& shm_key, ShmFile** shm_file)
+    const std::string& shm_key, std::shared_ptr<ShmFile>& shm_file)
 {
 #ifdef _WIN32
   HANDLE shm_handle = OpenFileMapping(
@@ -138,8 +140,7 @@ SharedMemoryManager::OpenSharedMemoryRegion(
         std::string("Unable to open shared memory region: '" + shm_key + "'")
             .c_str());
   }
-  // Dynamic memory will eventually be owned by uniqe_ptr
-  *shm_file = new ShmFile(shm_handle);
+  shm_file = std::make_shared<ShmFile>(shm_handle);
 #else
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
@@ -150,8 +151,7 @@ SharedMemoryManager::OpenSharedMemoryRegion(
         std::string("Unable to open shared memory region: '" + shm_key + "'")
             .c_str());
   }
-  // Dynamic memory will eventually be owned by uniqe_ptr
-  *shm_file = new ShmFile(shm_fd);
+  shm_file = std::make_shared<ShmFile>(shm_fd);
 #endif
   return nullptr;
 }
@@ -161,14 +161,42 @@ SharedMemoryManager::GetSharedMemoryRegionSize(
     const std::string& shm_key, ShmFile* shm_file, uint64_t* shm_region_size)
 {
 #ifdef WIN32
-  BY_HANDLE_FILE_INFORMATION info;
-  if(!GetFileInformationByHandle(shm_file->shm_handle_, &info)) {
-    LOG_VERBOSE(1) << "GetFileInformationByHandle failed with error code: " << GetWindowsError();
+  // Open file for reading
+  LPCSTR backing_file_path =
+      std::string(TRITON_SHM_FILE_ROOT + shm_key).c_str();
+  HANDLE backing_file_handle = CreateFile(
+      backing_file_path, 0, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, NULL);
+  if (backing_file_handle == INVALID_HANDLE_VALUE) {
+    LOG_VERBOSE(1) << "Failed to open backing file with error code: "
+                   << GetWindowsError();
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
   }
-  uint64_t file_size = ((uint64_t)info.nFileSizeHigh << 32) | info.nFileSizeLow;
+  // Construct its size
+  uint64_t file_size;
+  DWORD high_order_size;
+  DWORD low_order_size = GetFileSize(backing_file_handle, &high_order_size);
+  if (low_order_size == INVALID_FILE_SIZE) {
+    CloseHandle(backing_file_handle);
+    LOG_VERBOSE(1) << "GetFileSize failed with error code: "
+                   << GetWindowsError();
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  } else if (high_order_size != NULL) {
+    file_size = ((uint64_t)high_order_size << 32) | low_order_size;
+  } else {
+    file_size = low_order_size;
+  }
+  if (!CloseHandle(backing_file_handle)) {
+    LOG_VERBOSE(1) << "failed to close backing file with error: "
+                   << GetWindowsError();
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
   *shm_region_size = file_size;
 #else
   struct stat file_status;
@@ -201,6 +229,7 @@ SharedMemoryManager::CheckSharedMemoryRegionSize(
   RETURN_IF_ERR(GetSharedMemoryRegionSize(shm_key, shm_file, &shm_region_size));
   // User-provided offset and byte_size should not go out-of-bounds.
   if ((offset + byte_size) > shm_region_size) {
+    CloseSharedMemoryRegion(shm_file);
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
@@ -263,7 +292,7 @@ SharedMemoryManager::MapSharedMemory(
       byte_size);
 
   if (*mapped_addr == NULL) {
-    CloseSharedMemoryRegion(shm_handle);
+    CloseSharedMemoryRegion(shm_file);
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string(
@@ -289,9 +318,7 @@ SharedMemoryManager::MapSharedMemory(
 SharedMemoryManager::~SharedMemoryManager()
 {
   UnregisterAll(TRITONSERVER_MEMORY_CPU);
-#ifndef _WIN32
   UnregisterAll(TRITONSERVER_MEMORY_GPU);
-#endif
 }
 
 TRITONSERVER_Error*
@@ -310,14 +337,14 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // register
   void* mapped_addr;
-  ShmFile* shm_file = nullptr;
+  std::shared_ptr<ShmFile> shm_file;
   bool shm_file_exists = false;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
-      shm_file = itr->second->platform_handle_.get();
+      shm_file = itr->second->platform_handle_;
       shm_file_exists = true;
       break;
     }
@@ -325,7 +352,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // open and set new shm_file if new shared memory key
   if (!shm_file_exists) {
-    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_file));
+    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, shm_file));
   } else {
     // FIXME: DLIS-6448 - We should allow users the flexibility to register
     // the same key under different names with different attributes.
@@ -338,13 +365,13 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   }
 
   // Enforce that registered region is in-bounds of shm file object.
-  RETURN_IF_ERR(
-      CheckSharedMemoryRegionSize(name, shm_key, shm_file, offset, byte_size));
+  RETURN_IF_ERR(CheckSharedMemoryRegionSize(
+      name, shm_key, shm_file.get(), offset, byte_size));
 
   // Mmap and then close the shared memory descriptor
   TRITONSERVER_Error* err_map =
-      MapSharedMemory(shm_file, offset, byte_size, &mapped_addr);
-  TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_file);
+      MapSharedMemory(shm_file.get(), offset, byte_size, &mapped_addr);
+  TRITONSERVER_Error* err_close = CloseSharedMemoryRegion(shm_file.get());
   if (err_map != nullptr) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,

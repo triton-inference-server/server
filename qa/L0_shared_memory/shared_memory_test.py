@@ -56,7 +56,7 @@ class SharedMemoryTest(tu.TestResultCollector):
     def _setUp(self, protocol, log_file_path):
         self._tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
         self._test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
-        self._shm_key_prefix = "/" if not self._test_windows else "Global\\"
+        self._shm_key_prefix = "/" if not self._test_windows else ""
         self._timeout = os.environ.get("SERVER_TIMEOUT", 120)
         self._protocol = protocol
         self._test_passed = False
@@ -95,9 +95,11 @@ class SharedMemoryTest(tu.TestResultCollector):
 
     def _build_server_args(self):
         if self._test_windows:
-            backend_dir = "C:\\opt\\tritonserver\\backends"
-            model_dir = "C:\\opt\\tritonserver\\qa\\L0_shared_memory\\models"
-            self._server_executable = "C:\\opt\\tritonserver\\bin\\tritonserver.exe"
+            backend_dir = os.environ.get("BACKEND_DIR", "C:\\opt\\tritonserver\\backends")
+            model_dir = os.environ.get("MODELDIR", (os.getcwd() + "\\models"))
+            self._server_executable = os.environ.get(
+                "SERVER", "C:\\tritonserver\\bin\\tritonserver.exe"
+            )
         else:
             triton_dir = os.environ.get("TRITON_DIR", "/opt/tritonserver")
             backend_dir = os.environ.get("BACKEND_DIR", f"{triton_dir}/backends")
@@ -178,21 +180,44 @@ class SharedMemoryTest(tu.TestResultCollector):
         input1_data = np.ones(shape=16, dtype=np.int32)
         shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
         shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
-        self.triton_client.register_system_shared_memory(
-            "input0_data", (self._shm_key_prefix + "input0_data"), register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "input1_data", (self._shm_key_prefix + "input1_data"), register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "output0_data", (self._shm_key_prefix + "output0_data"), register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "output1_data", (self._shm_key_prefix + "output1_data"), register_byte_size, offset=register_offset
-        )
+        try:
+            self._triton_client.register_system_shared_memory(
+                "input0_data",
+                (self._shm_key_prefix + "input0_data"),
+                register_byte_size,
+                offset=register_offset,
+            )
+            self._triton_client.register_system_shared_memory(
+                "input1_data",
+                (self._shm_key_prefix + "input1_data"),
+                register_byte_size,
+                offset=register_offset,
+            )
+            self._triton_client.register_system_shared_memory(
+                "output0_data",
+                (self._shm_key_prefix + "output0_data"),
+                register_byte_size,
+                offset=register_offset,
+            )
+            self._triton_client.register_system_shared_memory(
+                "output1_data",
+                (self._shm_key_prefix + "output1_data"),
+                register_byte_size,
+                offset=register_offset,
+            )
+        except utils.InferenceServerException as e:
+            shm_handles = [
+                shm_ip0_handle,
+                shm_ip1_handle,
+                shm_op0_handle,
+                shm_op1_handle,
+            ]
+            self._cleanup_server(shm_handles)
+            raise (e)
         return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
 
     def _cleanup_server(self, shm_handles):
+        self._triton_client.unregister_system_shared_memory()
         for shm_handle in shm_handles:
             shm.destroy_shared_memory_region(shm_handle)
 
@@ -326,6 +351,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertEqual(len(shm_status), 1)
         else:
             self.assertEqual(len(shm_status.regions), 1)
+        self._triton_client.unregister_system_shared_memory()
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -355,6 +381,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             )
         except Exception as ex:
             self.assertIn("registering an active shared memory key", str(ex))
+        self._triton_client.unregister_system_shared_memory()
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -379,6 +406,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertEqual(len(shm_status), 0)
         else:
             self.assertEqual(len(shm_status.regions), 0)
+        self._triton_client.unregister_system_shared_memory()
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -405,6 +433,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertEqual(len(shm_status), 0)
         else:
             self.assertEqual(len(shm_status.regions), 0)
+        self._triton_client.unregister_system_shared_memory()
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -438,6 +467,7 @@ class SharedMemoryTest(tu.TestResultCollector):
             self.assertEqual(len(shm_status), 1)
         else:
             self.assertEqual(len(shm_status.regions), 1)
+        self._triton_client.unregister_system_shared_memory()
         shm.destroy_shared_memory_region(shm_op0_handle)
         self._test_passed = True
 
@@ -664,6 +694,7 @@ class SharedMemoryTest(tu.TestResultCollector):
                 register_byte_size=0,
                 register_offset=create_byte_size + 1,
             )
+        self._test_passed = True
 
 
 if __name__ == "__main__":
