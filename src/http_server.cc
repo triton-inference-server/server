@@ -1856,12 +1856,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
     triton::common::TritonJson::Value setting_json;
     if (request.Find("trace_file", &setting_json)) {
-      if (setting_json.IsNull()) {
-        new_setting.clear_filepath_ = true;
-      } else {
-        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
-        new_setting.filepath_ = &filepath;
-      }
+      RETURN_AND_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_UNSUPPORTED,
+                   "trace file location can not be updated through network "
+                   "protocol"));
     }
     if (request.Find("trace_level", &setting_json)) {
       if (setting_json.IsNull()) {
