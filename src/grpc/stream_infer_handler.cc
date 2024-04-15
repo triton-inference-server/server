@@ -694,6 +694,23 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     params["triton_final_response"].set_bool_param(is_complete);
   }
 
+  if (state->delay_complete_ms_ != 0) {
+    // Delay updating the state. This is useful for testing race condition with
+    // the thread that runs Process().
+    LOG_INFO << "Delaying the completion of reporting response / flag by "
+             << state->delay_complete_ms_ << " ms...";
+    void* context_ptr_before_delay = (void*)state->context_.get();
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_complete_ms_));
+    void* context_ptr_after_delay = (void*)state->context_.get();
+    if (context_ptr_before_delay != context_ptr_after_delay) {
+      LOG_ERROR << "Should not print this! The state context object has "
+                   "changed after delay, pointer before: "
+                << context_ptr_before_delay
+                << ", pointer after: " << context_ptr_after_delay;
+    }
+  }
+
   // Update states to signal that response/error is ready to write to stream
   {
     // Need to hold lock because the handler thread processing context
