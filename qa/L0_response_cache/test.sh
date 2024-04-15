@@ -171,26 +171,29 @@ function check_server_expected_failure {
 }
 
 function check_server_failure_decoupled_model {
-  EXTRA_ARGS="--model-control-mode=$2 --load-model=$3"
-  SERVER_ARGS="--model-repository="${1}" --cache-config local,size=1048576000 ${EXTRA_ARGS}"
+  MODEL_REPOSITORY="${1}"
+  MODEL_CONTROL_MODE="${2}"
+  MODEL_LOAD_TYPE="${3}"
+  EXTRA_ARGS="--model-control-mode=${MODEL_CONTROL_MODE} --load-model=${MODEL_LOAD_TYPE}"
+  SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --cache-config local,size=1048576000 ${EXTRA_ARGS}"
   source ../common/util.sh
 
-  rm -f $SERVER_LOG
+  rm -f ${SERVER_LOG}
   run_server
-  if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
-    cat $SERVER_LOG
+  if [ "${SERVER_PID}" != "0" ]; then
+    echo -e "\n***\n*** Failed: ${SERVER} started successfully when it was expected to fail\n***"
+    cat ${SERVER_LOG}
     RET=1
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill ${SERVER_PID}
+    wait ${SERVER_PID}
   else
     # Check that server fails with the correct error message
     set +e
     grep -i "response cache does not currently support" ${SERVER_LOG} | grep -i "decoupled"
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed: Expected response cache / decoupled mode error message in output\n***"
-        cat $SERVER_LOG
+        cat ${SERVER_LOG}
         RET=1
     fi
     set -e
@@ -198,17 +201,20 @@ function check_server_failure_decoupled_model {
 }
 
 function run_server_ensemble_model {
-  SERVER_ARGS="--model-repository="${3}" --cache-config local,size=1048576000"
+  FUNCTION="${1}"
+  ERROR_MESSAGE="${2}"
+  MODEL_REPOSITORY="${3}"
+  SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --cache-config local,size=1048576000"
   run_server
   set +e
-  python ${ENSEMBLE_CACHE_TEST_PY} "${1}" >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} $FUNCTION >>$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
       RET=1
   else
-      check_test_results $TEST_RESULT_FILE 1
+      check_test_results ${TEST_RESULT_FILE} 1
       if [ $? -ne 0 ]; then
-          cat $CLIENT_LOG
-          echo -e "${2}"
+          cat ${CLIENT_LOG}
+          echo -e ${ERROR_MESSAGE}
           RET=1
       fi
   fi
@@ -216,17 +222,17 @@ function run_server_ensemble_model {
 }
 
 function test_ensemble_model_cache_and_decoupled {
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>$CLIENT_LOG 2>&1
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>${CLIENT_LOG} 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_ensemble_model >>${CLIENT_LOG} 2>&1
   check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_ensemble_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_ensemble_model >>${CLIENT_LOG} 2>&1
 }
 
 function test_ensemble_cache_composing_decoupled {
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>$CLIENT_LOG 2>&1
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_composing_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_cache_ensemble_model >>${CLIENT_LOG} 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._enable_decoupled_composing_model >>${CLIENT_LOG} 2>&1
   check_server_failure_decoupled_model "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
-  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_composing_model >>$CLIENT_LOG 2>&1
+  python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._remove_decoupled_composing_model >>${CLIENT_LOG} 2>&1
 }
 
 # Check that server fails to start for a "decoupled" model with cache enabled
@@ -343,7 +349,7 @@ stop_redis
 test_ensemble_model_cache_and_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
 
 # Test Ensemble Model With Cache Enabled and Decoupled Mode in Composing Model
- test_ensemble_cache_composing_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
+test_ensemble_cache_composing_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${ENSEMBLE_MODEL}"
 
 #Test Ensemble Model with Top Level Caching Enabled
 FUNCTION_NAME="EnsembleCacheTest.test_ensemble_top_level_cache"
@@ -358,7 +364,7 @@ run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL
 check_server_success_and_kill
 
 #Cleanup extra configuration for next iteration
-python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._reset_config_files >>$CLIENT_LOG 2>&1
+python ${ENSEMBLE_CACHE_TEST_PY} EnsembleCacheTest._reset_config_files >>${CLIENT_LOG} 2>&1
 
 
 if [ $RET -eq 0 ]; then
