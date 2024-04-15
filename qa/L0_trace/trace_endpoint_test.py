@@ -38,6 +38,7 @@ import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from google.protobuf import json_format
+from tritonclient.utils import InferenceServerException
 
 
 # Similar set up as dynamic batcher tests
@@ -49,7 +50,6 @@ class TraceEndpointTest(tu.TestResultCollector):
         # tearDown() is properly executed and not affecting start state of
         # other test cases
         clear_settings = {
-            "trace_file": None,
             "trace_level": None,
             "trace_rate": None,
             "trace_count": None,
@@ -157,15 +157,18 @@ class TraceEndpointTest(tu.TestResultCollector):
         self.check_server_initial_state()
 
         expected_first_model_settings = {
-            "trace_file": "model.log",
+            "trace_file": "global_unittest.log",
             "trace_level": ["TIMESTAMPS"],
             "trace_rate": "1",
             "trace_count": "-1",
             "log_frequency": "0",
             "trace_mode": "triton",
         }
+        expected_first_model_response = {
+            "error": "trace file location can not be updated through network protocol"
+        }
         expected_second_model_settings = {
-            "trace_file": "model.log",
+            "trace_file": "global_unittest.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
             "trace_rate": "1",
             "trace_count": "-1",
@@ -173,7 +176,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             "trace_mode": "triton",
         }
         expected_global_settings = {
-            "trace_file": "another.log",
+            "trace_file": "global_unittest.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
             "trace_rate": "1",
             "trace_count": "-1",
@@ -183,17 +186,20 @@ class TraceEndpointTest(tu.TestResultCollector):
 
         model_update_settings = {"trace_file": "model.log"}
         global_update_settings = {
-            "trace_file": "another.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
         }
 
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        self.assertEqual(
-            expected_first_model_settings,
+        with self.assertRaisesRegex(
+            InferenceServerException, expected_first_model_response["error"]
+        ) as e:
             triton_client.update_trace_settings(
                 model_name="simple", settings=model_update_settings
-            ),
-            "Unexpected updated model trace settings",
+            )
+        self.assertEqual(
+            expected_first_model_settings,
+            triton_client.get_trace_settings(model_name="simple"),
+            "Unexpected model trace settings after global update",
         )
         # Note that 'trace_level' may be mismatch due to the order of
         # the levels listed, currently we assume the order is the same
@@ -230,7 +236,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             json.dumps(
                 {
                     "settings": {
-                        "trace_file": {"value": ["model.log"]},
+                        "trace_file": {"value": ["global_unittest.log"]},
                         "trace_level": {"value": ["TIMESTAMPS"]},
                         "trace_rate": {"value": ["1"]},
                         "trace_count": {"value": ["-1"]},
@@ -247,7 +253,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             json.dumps(
                 {
                     "settings": {
-                        "trace_file": {"value": ["model.log"]},
+                        "trace_file": {"value": ["global_unittest.log"]},
                         "trace_level": {"value": ["TIMESTAMPS", "TENSORS"]},
                         "trace_rate": {"value": ["1"]},
                         "trace_count": {"value": ["-1"]},
@@ -264,7 +270,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             json.dumps(
                 {
                     "settings": {
-                        "trace_file": {"value": ["another.log"]},
+                        "trace_file": {"value": ["global_unittest.log"]},
                         "trace_level": {"value": ["TIMESTAMPS", "TENSORS"]},
                         "trace_rate": {"value": ["1"]},
                         "trace_count": {"value": ["-1"]},
@@ -278,18 +284,10 @@ class TraceEndpointTest(tu.TestResultCollector):
 
         model_update_settings = {"trace_file": "model.log"}
         global_update_settings = {
-            "trace_file": "another.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
         }
 
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
-        self.assertEqual(
-            expected_first_model_settings,
-            triton_client.update_trace_settings(
-                model_name="simple", settings=model_update_settings
-            ),
-            "Unexpected updated model trace settings",
-        )
         # Note that 'trace_level' may be mismatch due to the order of
         # the levels listed, currently we assume the order is the same
         # for simplicity. But the order shouldn't be enforced and this checking
