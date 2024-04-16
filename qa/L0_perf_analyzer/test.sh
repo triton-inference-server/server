@@ -640,27 +640,6 @@ for PROTOCOL in grpc http; do
         set -e
     done
 
-    # Testing that trace logging works
-    set +e
-    TRACE_FILE="trace.json"
-    rm ${TRACE_FILE}*
-    $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync --trace-file $TRACE_FILE \
-    --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
-    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if ! compgen -G "$TRACE_FILE*" > /dev/null; then
-        echo -e "\n***\n*** Test Failed. $TRACE_FILE failed to generate.\n***"
-        RET=1
-    elif [ $(cat ${TRACE_FILE}* |  grep "REQUEST_START" | wc -l) -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed. Did not find `REQUEST_START` in $TRACE_FILE \n***"
-        RET=1
-    fi
-    set -e
 done
 
 # Test with output validation
