@@ -78,16 +78,14 @@ class EnsembleCacheTest(tu.TestResultCollector):
         input_tensors[1].set_data_from_numpy(input1_data)
         return input_tensors
 
-    def _get_infer_stats(self):
+    def _get_infer_stats(self, model):
         stats = self.triton_client.get_inference_statistics(
-            model_name=self.ensemble_model_name, as_json=True
+            model_name=model, as_json=True
         )
         return stats["model_stats"][1]["inference_stats"]
 
-    def _infer(self):
-        output = self.triton_client.infer(
-            model_name=self.ensemble_model_name, inputs=self.input_tensors
-        )
+    def _infer(self, model):
+        output = self.triton_client.infer(model_name=model, inputs=self.input_tensors)
         output0 = output.as_numpy("OUTPUT0")
         output1 = output.as_numpy("OUTPUT1")
         outputs = [output0, output1]
@@ -123,18 +121,18 @@ class EnsembleCacheTest(tu.TestResultCollector):
         if int(model_inference_stats["cache_miss"]["count"]) > 1:
             self.assertTrue(False, "unexpected multiple cache miss")
 
-    def _run_ensemble(self):
-        model_inference_stats = self._get_infer_stats()
+    def _run_ensemble(self, model):
+        model_inference_stats = self._get_infer_stats(model)
         self._check_zero_stats_baseline(model_inference_stats)
-        inference_outputs = self._infer()
+        inference_outputs = self._infer(model)
         self._check_valid_output(inference_outputs)
-        model_inference_stats = self._get_infer_stats()
+        model_inference_stats = self._get_infer_stats(model)
         self._check_valid_stats(model_inference_stats)
         self._check_single_cache_miss_success_inference(model_inference_stats)
-        cached_outputs = self._infer()
+        cached_outputs = self._infer(model)
         self._check_valid_output(cached_outputs)
         self._check_valid_output_inference(inference_outputs, cached_outputs)
-        model_inference_stats = self._get_infer_stats()
+        model_inference_stats = self._get_infer_stats(model)
         self._check_valid_stats(model_inference_stats)
         return model_inference_stats
 
@@ -205,7 +203,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
 
     def test_ensemble_top_level_cache(self):
         self._enable_cache_ensemble_model()
-        model_inference_stats = self._run_ensemble()
+        model_inference_stats = self._run_ensemble(self.ensemble_model_name)
         if (
             "count" not in model_inference_stats["cache_hit"]
             or model_inference_stats["cache_hit"]["count"] != "0"
@@ -218,19 +216,32 @@ class EnsembleCacheTest(tu.TestResultCollector):
 
     def test_all_models_with_cache_enabled(self):
         self._enable_cache_for_all_models()
-        model_inference_stats = self._run_ensemble()
-        print(model_inference_stats)
+        ensemble_model_stats = self._run_ensemble(self.ensemble_model_name)
+        composing_model_stats = self._get_infer_stats(self.composing_model_name)
         if (
-            "count" not in model_inference_stats["cache_hit"]
-            or int(model_inference_stats["cache_hit"]["count"]) == 0
+            "count" not in ensemble_model_stats["cache_hit"]
+            or int(ensemble_model_stats["cache_hit"]["count"]) == 0
         ):
             self.assertTrue(
                 False, "unexpected error in top-level ensemble request caching"
             )
-        if int(model_inference_stats["cache_hit"]["count"]) > int(
-            model_inference_stats["success"]["count"]
-        ):
+        if "count" in composing_model_stats["cache_hit"]:
             self.assertTrue(False, "unexpected composing model cache hits")
+
+    def test_composing_model_cache_enabled(self):
+        self._enable_cache_for_all_models()
+        ensemble_config_file = os.path.join(
+            self.model_directory, self.ensemble_model_name, "config.pbtxt"
+        )
+        self._remove_extra_config(ensemble_config_file, self.response_cache_config)
+        composing_model_stats = self._run_ensemble(self.composing_model_name)
+        ensemble_model_stats = self._get_infer_stats(self.ensemble_model_name)
+        if "count" not in composing_model_stats["cache_hit"]:
+            self.assertTrue(
+                False, "unexpected error in caching composing model response"
+            )
+        if "count" in ensemble_model_stats["cache_hit"]:
+            self.assertTrue(False, "unexpected top-level response caching")
 
 
 if __name__ == "__main__":

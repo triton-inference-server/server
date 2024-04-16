@@ -50,7 +50,7 @@ export TRITON_REDIS_PORT="6379"
 REDIS_LOG="./redis-server.unit_tests.log"
 ENSEMBLE_CACHE_TEST_PY="./ensemble_cache_test.py"
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
+# SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
 CLIENT_LOG="./client.log"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG=./inference_server.log
@@ -58,7 +58,7 @@ source ../common/util.sh
 
 MODEL_DIR="${PWD}/models"
 mkdir -p "${MODEL_DIR}/ensemble_models"
-ENSEMBLE_MODEL_DIR="${PWD}/models/ensemble_models"
+ENSEMBLE_MODEL_DIR="${MODEL_DIR}/ensemble_models"
 ENSEMBLE_MODEL="simple_graphdef_float32_float32_float32"
 COMPOSING_MODEL="graphdef_float32_float32_float32"
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${ENSEMBLE_MODEL_DIR}/${ENSEMBLE_MODEL}"
@@ -354,13 +354,18 @@ test_ensemble_cache_composing_decoupled  "${ENSEMBLE_MODEL_DIR}" "explicit" "${E
 #Test Ensemble Model with Top Level Caching Enabled
 FUNCTION_NAME="EnsembleCacheTest.test_ensemble_top_level_cache"
 ERROR_MESSAGE="\n***\n*** Failed: Expected Top Level Request Caching\n***"
-run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" "${ENSEMBLE_MODEL_DIR}"
 check_server_success_and_kill
 
 #Test Ensemble Model with cache enabled in all models
 FUNCTION_NAME="EnsembleCacheTest.test_all_models_with_cache_enabled"
-ERROR_MESSAGE="\n***\n*** Failed: Expected Cache to return Top-Level request's response\n***"
-run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" ${ENSEMBLE_MODEL_DIR}
+ERROR_MESSAGE="\n***\n*** Failed: Expected cache to return Top-Level request's response\n***"
+run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" "${ENSEMBLE_MODEL_DIR}"
+check_server_success_and_kill
+
+FUNCTION_NAME="EnsembleCacheTest.test_composing_model_cache_enabled"
+ERROR_MESSAGE="\n***\n*** Failed: Expected cache to return ensemble pipeline and return composing model's response\n***"
+run_server_ensemble_model "${FUNCTION_NAME}" "${ERROR_MESSAGE}" "${ENSEMBLE_MODEL_DIR}"
 check_server_success_and_kill
 
 #Cleanup extra configuration for next iteration
