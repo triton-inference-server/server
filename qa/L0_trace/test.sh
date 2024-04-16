@@ -748,7 +748,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="14"
+EXPECTED_NUM_TESTS="15"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
