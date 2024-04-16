@@ -202,7 +202,7 @@ function run_server () {
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         # Get further debug information about server startup failure
-        gdb_helper || true
+        # gdb_helper || true
 
         # Cleanup
         kill $SERVER_PID > /dev/null 2>&1 || true
