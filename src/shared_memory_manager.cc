@@ -384,8 +384,9 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
-    const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
+    const std::string& name, size_t offset, size_t byte_size,
+    void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
+    int64_t* device_id)
 {
   // protect shared_memory_map_ from concurrent access
   std::lock_guard<std::mutex> lock(mu_);
@@ -399,20 +400,29 @@ SharedMemoryManager::GetMemoryInfo(
   }
 
   // validate offset
-  size_t max_offset = 0;
+  size_t shm_region_end = 0;
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    max_offset = it->second->offset_;
+    shm_region_end = it->second->offset_;
   }
   if (it->second->byte_size_ > 0) {
-    max_offset += it->second->byte_size_ - 1;
+    shm_region_end += it->second->byte_size_ - 1;
   }
-  if (offset > max_offset) {
+  if (offset > shm_region_end) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("Invalid offset for shared memory region: '" + name + "'")
             .c_str());
   }
-  // TODO: should also validate byte_size from caller
+  // validate byte_size + offset is within memory bounds
+  size_t total_req_shm = offset + byte_size - 1;
+  if (total_req_shm > shm_region_end) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "Invalid offset + byte size for shared memory region: '" + name +
+            "'")
+            .c_str());
+  }
 
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +

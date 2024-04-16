@@ -1856,12 +1856,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
     triton::common::TritonJson::Value setting_json;
     if (request.Find("trace_file", &setting_json)) {
-      if (setting_json.IsNull()) {
-        new_setting.clear_filepath_ = true;
-      } else {
-        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
-        new_setting.filepath_ = &filepath;
-      }
+      RETURN_AND_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_UNSUPPORTED,
+                   "trace file location can not be updated through network "
+                   "protocol"));
     }
     if (request.Find("trace_level", &setting_json)) {
       if (setting_json.IsNull()) {
@@ -2682,7 +2681,8 @@ HTTPAPIServer::ParseJsonTritonIO(
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, shm_offset, &base, &memory_type, &memory_type_id));
+            shm_region, shm_offset, byte_size, &base, &memory_type,
+            &memory_type_id));
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
           cudaIpcMemHandle_t* cuda_handle;
@@ -2796,7 +2796,8 @@ HTTPAPIServer::ParseJsonTritonIO(
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, offset, &base, &memory_type, &memory_type_id));
+            shm_region, offset, byte_size, &base, &memory_type,
+            &memory_type_id));
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU

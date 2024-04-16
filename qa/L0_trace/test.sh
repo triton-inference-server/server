@@ -60,6 +60,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log
+rm -f *.log.*
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
 
 # set up simple and global_simple model using MODELBASE
@@ -232,19 +233,10 @@ set +e
 
 # Add trace setting for 'simple' via trace API, first use the same trace file
 update_trace_setting "simple" '{"trace_file":"global_trace.log"}'
-assert_curl_success "Failed to modify trace settings for 'simple' model"
+assert_curl_failure "trace_file updated through network protocol expects an error"
 
 # Check if the current setting is returned (not specified setting from global)
-if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
@@ -252,7 +244,7 @@ if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
 fi
 
 # Use a different name
-update_trace_setting "simple" '{"trace_file":"simple_trace.log","log_frequency":"2"}'
+update_trace_setting "simple" '{"log_frequency":"2"}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned (not specified setting from global)
@@ -268,7 +260,7 @@ fi
 if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
@@ -284,35 +276,35 @@ wait $SERVER_PID
 
 set +e
 
-if [ -f ./global_trace.log ]; then
-    echo -e "\n***\n*** Test Failed, unexpected generation of global_trace.log\n***"
+if [ -f ./simple_trace.log ]; then
+    echo -e "\n***\n*** Test Failed, unexpected generation of simple_trace.log\n***"
     RET=1
 fi
 
-$TRACE_SUMMARY -t simple_trace.log.0 > summary_simple_trace.log.0
+$TRACE_SUMMARY -t global_trace.log.0 > summary_global_trace.log.0
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_simple_trace.log.0` != "2" ]; then
-    cat summary_simple_trace.log.0
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.0` != "2" ]; then
+    cat summary_global_trace.log.0
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_simple_trace.log.0` != "2" ]; then
-    cat summary_simple_trace.log.0
+if [ `grep -c ^simple summary_global_trace.log.0` != "2" ]; then
+    cat summary_global_trace.log.0
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-$TRACE_SUMMARY -t simple_trace.log.1 > summary_simple_trace.log.1
+$TRACE_SUMMARY -t global_trace.log.1 > summary_global_trace.log.1
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_simple_trace.log.1` != "1" ]; then
-    cat summary_simple_trace.log.1
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.1` != "1" ]; then
+    cat summary_global_trace.log.1
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_simple_trace.log.1` != "1" ]; then
-    cat summary_simple_trace.log.1
+if [ `grep -c ^simple summary_global_trace.log.1` != "1" ]; then
+    cat summary_global_trace.log.1
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -332,10 +324,10 @@ fi
 set +e
 
 # Add model setting and update it
-update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_rate":"1"}'
+update_trace_setting "simple" '{"trace_rate":"1"}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
-update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_level":["OFF"]}'
+update_trace_setting "simple" '{"trace_level":["OFF"]}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned
@@ -351,7 +343,7 @@ fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
@@ -365,7 +357,7 @@ rm -f ./curl.out
 set +e
 
 # Clear trace setting by explicitly asking removal for every field except 'trace_rate'
-update_trace_setting "simple" '{"trace_file":null,"trace_level":null}'
+update_trace_setting "simple" '{"trace_level":null}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting (global) is returned
@@ -510,8 +502,8 @@ if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
 fi
 
 # Check if the indexed file has been generated when trace count reaches 0
-if [ -f ./global_trace.log.0 ]; then
-    echo -e "\n***\n*** Test Failed, expect generation of global_trace.log.0 before stopping server\n***"
+if [ ! -f ./global_count.log.0 ]; then
+    echo -e "\n***\n*** Test Failed, expect generation of global_count.log.0 before stopping server\n***"
     RET=1
 fi
 
