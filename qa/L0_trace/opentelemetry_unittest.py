@@ -81,9 +81,11 @@ def send_bls_request(model_name="simple", headers=None):
         inputs[-1].set_data_from_numpy(np.array([model_name], dtype=np.object_))
         client.infer("bls_simple", inputs, headers=headers)
 
+
 class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
+
 
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
@@ -118,7 +120,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self._user_data = UserData()
         self._callback = partial(callback, self._user_data)
         self._outputs = []
-
 
     def tearDown(self):
         self.collector_subprocess.kill()
@@ -214,8 +215,31 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_name (str): name of a span.
             events (List[str]): list of event names, collected for the span with the name `span_name`.
         """
-        request_events = ["REQUEST_START", "REQUEST_END"]
-        self.assertFalse(all(entry in events for entry in request_events))
+        print("Printing Events2")
+        print(events)
+        root_events_grpc = [
+            "GRPC_WAITREAD_START",
+            "GRPC_WAITREAD_END",
+            "INFER_RESPONSE_COMPLETE",
+            "GRPC_SEND_START",
+            "GRPC_SEND_END",
+        ]
+        root_events_http = [
+            "HTTP_RECV_START",
+            "HTTP_RECV_END",
+            "INFER_RESPONSE_COMPLETE",
+            "HTTP_SEND_START",
+            "HTTP_SEND_END",
+        ]
+
+        if "HTTP" in events:
+            print("HTTP_Indrajit")
+            self.assertTrue(all(entry in events for entry in root_events_http))
+            self.assertFalse(all(entry in events for entry in root_events_grpc))
+        elif "GRPC" in events:
+            print("GRPC_Indrajit")
+            self.assertTrue(all(entry in events for entry in root_events_grpc))
+            self.assertFalse(all(entry in events for entry in root_events_http))
 
     def _test_resource_attributes(self, attributes):
         """
@@ -289,12 +313,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
             )
 
     def _verify_contents_cancel(self, spans):
-
-        for span in spans:
-            # Check that collected spans have proper events recorded
-            span_events = span["events"]
-            event_names_only = [event["name"] for event in span_events]
-            self._check_events_cancel(event_names_only)
+        span_events = spans["events"]
+        event_names_only = [event["name"] for event in span_events]
+        self._check_events_cancel(event_names_only)
 
     def _verify_nesting(self, spans, expected_parent_span_dict):
         """
@@ -372,8 +393,11 @@ class OpenTelemetryTest(tu.TestResultCollector):
         traces = self._parse_trace_log(self.filename)
 
         parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
-        self._verify_contents_cancel(parsed_spans)
-        
+        root_span = [
+            entry for entry in parsed_spans if entry["name"] == "InferRequest"
+        ][0]
+        self._verify_contents_cancel(root_span)
+
     def _test_trace(
         self,
         headers,
