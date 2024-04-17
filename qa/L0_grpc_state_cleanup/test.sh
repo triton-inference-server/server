@@ -184,6 +184,40 @@ for i in test_simple_infer_shutdownserver \
   set -e
 done
 
+TEST_NAME=test_decoupled_infer_complete
+export TRITONSERVER_DELAY_GRPC_COMPLETE=2000
+
+SERVER_LOG="./inference_server.$TEST_NAME.log"
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  cat $SERVER_LOG
+  exit 1
+fi
+
+echo "Test: $TEST_NAME" >>$CLIENT_LOG
+
+set +e
+
+SERVER_LOG=$SERVER_LOG python $CLEANUP_TEST CleanUpTest.$TEST_NAME >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test $TEST_NAME Failed\n***"
+  RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+check_state_release $SERVER_LOG
+if [ $? -ne 0 ]; then
+  cat $SERVER_LOG
+  echo -e "\n***\n*** State Verification Failed for $TEST_NAME\n***"
+  RET=1
+fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
