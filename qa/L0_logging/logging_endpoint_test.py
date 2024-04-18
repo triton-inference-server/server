@@ -227,21 +227,34 @@ class LogEndpointTest(tu.TestResultCollector):
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
 
         log_settings_1 = {
-            "log_file": "log_file.log",
             "log_info": True,
             "log_warning": True,
             "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default",
         }
-        expected_log_settings_1 = (
-            "log file location can not be updated through network protocol"
+        expected_log_settings_1 = grpcclient.service_pb2.LogSettingsResponse()
+        json_format.Parse(
+            json.dumps(
+                {
+                    "settings": {
+                        "log_file": {"stringParam": ""},
+                        "log_info": {"boolParam": True},
+                        "log_warning": {"boolParam": True},
+                        "log_error": {"boolParam": True},
+                        "log_verbose_level": {"uint32Param": 0},
+                        "log_format": {"stringParam": "default"},
+                    }
+                }
+            ),
+            expected_log_settings_1,
         )
 
-        with self.assertRaisesRegex(
-            InferenceServerException, expected_log_settings_1
-        ) as e:
-            triton_client.update_log_settings(settings=log_settings_1)
+        self.assertEqual(
+            expected_log_settings_1,
+            triton_client.update_log_settings(settings=log_settings_1),
+            "Unexpected updated log settings",
+        )
 
         log_settings_2 = {
             "log_info": False,
