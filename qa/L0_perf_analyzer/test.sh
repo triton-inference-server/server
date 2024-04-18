@@ -642,7 +642,6 @@ for PROTOCOL in grpc http; do
 
     # Testing that trace logging works
     set +e
-    curl localhost:8000/v2/trace/setting -d '{"trace_level":["TIMESTAMPS"]}'
     TRACE_FILE="trace.json"
     rm ${TRACE_FILE}*
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync \
