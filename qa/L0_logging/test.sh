@@ -202,12 +202,7 @@ rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_file":"other_log.log"}' localhost:8000/v2/logging`
 set +e
 
-# updating log file location no longer supported
-if [ `grep -c "\"error\":\"updating log file was deprecated and no longer supported\"" ./curl.out` != "1" ]; then
-    echo -e "\n***\n*** Test Failed: Incorrect Error Response\n***"
-    RET=1
-fi
-verify_correct_settings "log_file.log" "true" "true" "true" "1" "default"
+verify_correct_settings "other_log.log" "true" "true" "true" "1" "default"
 
 $SIMPLE_HTTP_CLIENT >> client_test_log_file.log 2>&1
 if [ $? -ne 0 ]; then
@@ -230,7 +225,7 @@ if [ $actual_log_count -lt $expected_log_count ]; then
     RET=1
 fi
 expected_other_log_count=31
-actual_other_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./log_file.log)
+actual_other_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./other_log.log)
 if [ $actual_other_log_count -lt $expected_other_log_count ]; then
     echo $actual_other_log_count
     echo $expected_other_log_count
