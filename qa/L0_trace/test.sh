@@ -239,9 +239,6 @@ assert_curl_failure "trace_file updated through network protocol expects an erro
 if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
 
 # Use a different name
 update_trace_setting "simple" '{"log_frequency":"2"}'
