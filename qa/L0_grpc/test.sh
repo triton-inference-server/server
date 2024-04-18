@@ -312,8 +312,8 @@ for i in \
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        if [ `grep -c "${CACHED_CHANNEL_STRING_ONE}" ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 cached channel\n***"
+        if [ `grep -c "${CACHED_CHANNEL_STRING_NONE}" ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
+            echo -e "\n***\n*** Failed. Expected 0 cached channels\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
@@ -328,8 +328,8 @@ for i in \
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        if [ `grep -c "${CACHED_CHANNEL_STRING_NONE}" ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
-            echo -e "\n***\n*** Failed. Expected 0 cached channels\n***"
+        if [ `grep -c "${CACHED_CHANNEL_STRING_ONE}" ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 cached channels\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
