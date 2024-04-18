@@ -58,7 +58,6 @@ MODELSDIR=`pwd`/trace_models
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
-
 rm -f *.log
 rm -f *.log.*
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
@@ -78,6 +77,10 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
             sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
             sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt) && \
     mkdir -p $MODELSDIR/bls_simple/1 && cp $BLSDIR/bls_simple.py $MODELSDIR/bls_simple/1/model.py
+
+# set up repeat_int32 model
+cp -r ../L0_decoupled/models/repeat_int32 $MODELSDIR
+sed -i "s/decoupled: True/decoupled: False/" $MODELSDIR/repeat_int32/config.pbtxt
 
 RET=0
 
@@ -740,7 +743,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="15"
+EXPECTED_NUM_TESTS="16"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -757,6 +760,7 @@ mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_co
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
+                --load-mode=repeat_int32 \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --load-model=trace_context --trace-config=rate=1 \
                 --trace-config=count=-1 --trace-config=mode=opentelemetry \

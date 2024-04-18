@@ -111,15 +111,22 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
         self.trace_context_model = "trace_context"
+        self.non_decoupled_model_name_ = "repeat_int32"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
             self.bls_model_name,
+            self.non_decoupled_model_name_,
         ]
         self.root_span = "InferRequest"
         self._user_data = UserData()
         self._callback = partial(callback, self._user_data)
         self._outputs = []
+        self.input_data = {
+            "IN": np.array([1], dtype=np.int32),
+            "DELAY": np.array([0], dtype=np.uint32),
+            "WAIT": np.array([0], dtype=np.uint32),
+        }
 
     def tearDown(self):
         self.collector_subprocess.kill()
@@ -233,11 +240,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
         ]
 
         if "HTTP" in events:
-            print("HTTP_Indrajit")
             self.assertTrue(all(entry in events for entry in root_events_http))
             self.assertFalse(all(entry in events for entry in root_events_grpc))
         elif "GRPC" in events:
-            print("GRPC_Indrajit")
             self.assertTrue(all(entry in events for entry in root_events_grpc))
             self.assertFalse(all(entry in events for entry in root_events_http))
 
@@ -479,6 +484,24 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_parent_span_dict=expected_parent_span_dict,
         )
 
+    def _test_non_decoupled_trace(self, headers=None):
+        """
+        Helper function, that collects trace for non decoupled model and verifies it.
+        """
+        expected_number_of_spans = 3
+        expected_counts = dict(
+            {"compute": 1, self.non_decoupled_model_name_: 1, self.root_span: 1}
+        )
+        expected_parent_span_dict = dict(
+            {"InferRequest": ["repeat_int32"], "repeat_int32": ["compute"]}
+        )
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
+
     def _test_bls_trace(self, headers=None):
         """
         Helper function, that specifies expected parameters to evaluate trace,
@@ -588,7 +611,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
     def test_grpc_trace_simple_model_cancel(self):
         """
-        Tests trace, collected from executing one inference request
+        Tests trace, collected from executing one inference request and cancelling the request
         for a `simple` model and GRPC client.
         """
         triton_client_grpc = grpcclient.InferenceServerClient(
@@ -605,6 +628,32 @@ class OpenTelemetryTest(tu.TestResultCollector):
         future.cancel()
         time.sleep(0.1)  # context switch
         self._test_trace_cancel()
+
+    def test_non_decoupled(self):
+        """
+        Tests trace, collected from executing one inference request and cancelling the request
+        for a `simple` model and GRPC client.
+        """
+        inputs = [
+            grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                self.input_data["IN"]
+            ),
+            grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                self.input_data["DELAY"]
+            ),
+            grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                self.input_data["WAIT"]
+            ),
+        ]
+
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
+        # Expect the inference is successful
+        res = triton_client.infer(
+            model_name=self.non_decoupled_model_name_, inputs=inputs
+        )
+        self._test_non_decoupled_trace()
 
     def test_grpc_trace_simple_model_context_propagation(self):
         """
