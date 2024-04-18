@@ -665,9 +665,7 @@ for PROTOCOL in grpc http; do
 
     # Testing that setting trace file does not work
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object \
-    -p 2000 -t5 --sync --trace-file trace.json --trace-level TIMESTAMPS \
-    --trace-rate 1000 --trace-count 100 --log-frequency 10 \
-    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+    --trace-file trace.json >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed. Expected to fail for unknown arg --trace-file"
