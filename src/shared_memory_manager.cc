@@ -67,9 +67,8 @@ SharedMemoryManager::GetCUDAHandle(
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
-    const std::string& name, size_t offset, size_t byte_size,
-    void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
-    int64_t* device_id)
+    const std::string& name, size_t offset, void** shm_mapped_addr,
+    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
