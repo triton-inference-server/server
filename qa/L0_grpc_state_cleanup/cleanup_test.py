@@ -554,6 +554,15 @@ class CleanUpTest(tu.TestResultCollector):
                 infer_helper_map=[False, True],
             )
 
+    def test_decoupled_infer_complete(self):
+        # Test if the Process() thread could release the state object before
+        # the StreamInferResponseComplete() thread is done accessing it.
+        self._decoupled_infer(request_count=1, repeat_count=1, stream_timeout=16)
+        # Check no error is printed to the log.
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertNotIn("Should not print this", server_log)
+
 
 if __name__ == "__main__":
     CleanUpTest.SERVER_PID = os.environ.get("SERVER_PID", CleanUpTest.SERVER_PID)
