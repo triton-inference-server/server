@@ -222,8 +222,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_name (str): name of a span.
             events (List[str]): list of event names, collected for the span with the name `span_name`.
         """
-        print("Printing Events2")
-        print(events)
         root_events_grpc = [
             "GRPC_WAITREAD_START",
             "GRPC_WAITREAD_END",
