@@ -664,6 +664,7 @@ for PROTOCOL in grpc http; do
     set -e
 
     # Testing that setting trace file does not work
+    set +e
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object \
     --trace-file trace.json >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
