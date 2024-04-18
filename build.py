@@ -1102,33 +1102,6 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
-# For aarch64, install pytorch from source
-RUN ARCH="$(uname -i)" \\
-    && if [ "$ARCH" == "aarch64" ]; then \\
-        # Install cmake
-        apt update -q=2 \\
-        && apt install -y gpg wget \\
-        && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-        && . /etc/os-release \\
-        && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-        && apt-get update -q=2 \\
-        && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7* && \\
-        # Install pytorch from source
-        export _GLIBCXX_USE_CXX11_ABI=0 && \\
-        export TORCH_CUDA_ARCH_LIST="8.0;9.0" && \\
-        export TORCH_VERSION="2.2.1" && \\
-        pip3 uninstall -y torch && \\
-        cd /tmp && \\
-        git clone --depth 1 --branch v$TORCH_VERSION https://github.com/pytorch/pytorch && \\
-        cd pytorch && \\
-        git submodule sync && git submodule update --init --recursive && \\
-        pip3 install -r requirements.txt && \\
-        python3 setup.py install && \\
-        cd /tmp && rm -rf /tmp/pytorch && \\
-        # Remove cmake
-        apt-get purge cmake -y \\
-    ; fi
-
 # Uninstall unused nvidia packages
 RUN if pip freeze | grep -q "nvidia.*"; then \\
         pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
