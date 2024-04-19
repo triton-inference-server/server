@@ -66,8 +66,10 @@ SEQ_WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_
 
 REPEAT_INT32_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/repeat_int32_data.json
 
+TRACE_FILE="trace.json"
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --trace-config triton,file=trace.json"
+SERVER_ARGS="--model-repository=${DATADIR} --trace-config triton,file=${TRACE_FILE}"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
@@ -642,7 +644,6 @@ for PROTOCOL in grpc http; do
 
     # Testing that trace logging works
     set +e
-    TRACE_FILE="trace.json"
     rm ${TRACE_FILE}*
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync \
     --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
@@ -666,7 +667,7 @@ for PROTOCOL in grpc http; do
     # Testing that setting trace file does not work
     set +e
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object \
-    --trace-file trace.json >$CLIENT_LOG 2>&1
+    --trace-file $TRACE_FILE >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed. Expected to fail for unknown arg --trace-file"
