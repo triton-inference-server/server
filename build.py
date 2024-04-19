@@ -1103,9 +1103,6 @@ RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
 # Uninstall unused nvidia packages
-RUN if pip freeze | grep -q "nvidia.*"; then \\
-        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
-    fi
 RUN pip cache purge
 
 # Drop the static libs
