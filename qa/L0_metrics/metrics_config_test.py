@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -137,6 +137,16 @@ class MetricsConfigTest(tu.TestResultCollector):
             self.assertIn(metric, metrics)
         for metric in bad_patterns:
             self.assertNotIn(metric, metrics)
+
+    def test_model_namespacing(self):
+        metrics = self._get_metrics()
+        expected_namespaces = [
+            "/opt/tritonserver/qa/L0_metrics/model_namespacing_repos/addsub_repo",
+            "/opt/tritonserver/qa/L0_metrics/model_namespacing_repos/subadd_repo",
+        ]
+        for namespace in expected_namespaces:
+            label = 'namespace="' + namespace + '"'
+            self.assertIn(label, metrics)
 
 
 if __name__ == "__main__":
