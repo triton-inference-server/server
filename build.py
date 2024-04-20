@@ -1102,9 +1102,6 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
-# Uninstall unused nvidia packages
-RUN pip cache purge
-
 # Drop the static libs
 RUN ARCH="$(uname -i)" \\
       && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
