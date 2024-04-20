@@ -67,8 +67,9 @@ SharedMemoryManager::GetCUDAHandle(
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
-    const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
+    const std::string& name, size_t offset, size_t byte_size,
+    void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
+    int64_t* device_id)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
@@ -120,6 +121,7 @@ SharedMemoryManager::UnregisterHelper(
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -143,6 +145,51 @@ OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
   }
 
   return nullptr;
+}
+
+TRITONSERVER_Error*
+GetSharedMemoryRegionSize(
+    const std::string& shm_key, int shm_fd, size_t* shm_region_size)
+{
+  struct stat file_status;
+  if (fstat(shm_fd, &file_status) == -1) {
+    LOG_VERBOSE(1) << "fstat on shm_fd failed, errno: " << errno;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
+
+  // According to POSIX standard, type off_t can be negative, so for sake of
+  // catching possible under/overflows, assert that the size is non-negative.
+  if (file_status.st_size < 0) {
+    LOG_VERBOSE(1) << "File size of shared memory region must be non-negative";
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Invalid shared memory region: '" + shm_key + "'").c_str());
+  }
+
+  *shm_region_size = static_cast<size_t>(file_status.st_size);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+CheckSharedMemoryRegionSize(
+    const std::string& name, const std::string& shm_key, int shm_fd,
+    size_t offset, size_t byte_size)
+{
+  size_t shm_region_size = 0;
+  RETURN_IF_ERR(GetSharedMemoryRegionSize(shm_key, shm_fd, &shm_region_size));
+  // User-provided offset and byte_size should not go out-of-bounds.
+  if ((offset + byte_size) > shm_region_size) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': invalid args")
+            .c_str());
+  }
+
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -249,6 +296,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
        ++itr) {
     if (itr->second->shm_key_ == shm_key) {
+      // FIXME: Consider invalid file descriptors after close
       shm_fd = itr->second->shm_fd_;
       break;
     }
@@ -258,6 +306,10 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   if (shm_fd == -1) {
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
   }
+
+  // Enforce that registered region is in-bounds of shm file object.
+  RETURN_IF_ERR(
+      CheckSharedMemoryRegionSize(name, shm_key, shm_fd, offset, byte_size));
 
   // Mmap and then close the shared memory descriptor
   TRITONSERVER_Error* err_mmap =
@@ -333,8 +385,9 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
-    const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
+    const std::string& name, size_t offset, size_t byte_size,
+    void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
+    int64_t* device_id)
 {
   // protect shared_memory_map_ from concurrent access
   std::lock_guard<std::mutex> lock(mu_);
@@ -348,20 +401,29 @@ SharedMemoryManager::GetMemoryInfo(
   }
 
   // validate offset
-  size_t max_offset = 0;
+  size_t shm_region_end = 0;
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    max_offset = it->second->offset_;
+    shm_region_end = it->second->offset_;
   }
   if (it->second->byte_size_ > 0) {
-    max_offset += it->second->byte_size_ - 1;
+    shm_region_end += it->second->byte_size_ - 1;
   }
-  if (offset > max_offset) {
+  if (offset > shm_region_end) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("Invalid offset for shared memory region: '" + name + "'")
             .c_str());
   }
-  // TODO: should also validate byte_size from caller
+  // validate byte_size + offset is within memory bounds
+  size_t total_req_shm = offset + byte_size - 1;
+  if (total_req_shm > shm_region_end) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "Invalid offset + byte size for shared memory region: '" + name +
+            "'")
+            .c_str());
+  }
 
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +

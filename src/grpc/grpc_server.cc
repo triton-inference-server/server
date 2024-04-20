@@ -1210,18 +1210,11 @@ CommonHandler::RegisterTrace()
         static std::string setting_name = "trace_file";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
-          if (it->second.value().size() == 0) {
-            new_setting.clear_filepath_ = true;
-          } else if (it->second.value().size() == 1) {
-            filepath = it->second.value()[0];
-            new_setting.filepath_ = &filepath;
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect only 1 value for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          }
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "trace file location can not be updated through network "
+              "protocol");
+          GOTO_IF_ERR(err, earlyexit);
         }
       }
       {
@@ -1414,9 +1407,11 @@ CommonHandler::RegisterTrace()
         std::to_string(rate));
     (*response->mutable_settings())["trace_count"].add_value(
         std::to_string(count));
-    (*response->mutable_settings())["log_frequency"].add_value(
-        std::to_string(log_frequency));
-    (*response->mutable_settings())["trace_file"].add_value(filepath);
+    if (trace_mode == TRACE_MODE_TRITON) {
+      (*response->mutable_settings())["log_frequency"].add_value(
+          std::to_string(log_frequency));
+      (*response->mutable_settings())["trace_file"].add_value(filepath);
+    }
     (*response->mutable_settings())["trace_mode"].add_value(
         trace_manager_->InferenceTraceModeString(trace_mode));
     {
@@ -1487,32 +1482,10 @@ CommonHandler::RegisterLogging()
         static std::string setting_name = "log_file";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
-          const auto& log_param = it->second;
-          if (log_param.parameter_choice_case() !=
-              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
-                  kStringParam) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect string for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          } else {
-            // Set new settings in server then in core
-            const std::string& log_file_path = it->second.string_param();
-            const std::string& error = LOG_SET_OUT_FILE(log_file_path);
-            if (!error.empty()) {
-              err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INTERNAL, (error).c_str());
-              GOTO_IF_ERR(err, earlyexit);
-            }
-            // Okay to pass nullptr because we know the update will be applied
-            // to the global object.
-            err = TRITONSERVER_ServerOptionsSetLogFile(
-                nullptr, log_file_path.c_str());
-            if (err != nullptr) {
-              GOTO_IF_ERR(err, earlyexit);
-            }
-          }
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "log file location can not be updated through network protocol");
+          GOTO_IF_ERR(err, earlyexit);
         }
       }
       {

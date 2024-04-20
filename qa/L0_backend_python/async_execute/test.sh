@@ -1,4 +1,5 @@
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,35 +25,47 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Minimal makefile for Sphinx documentation
+source ../../common/util.sh
+
+RET=0
+
 #
+# Test execution overlapping on the same instance
+#
+rm -rf models && mkdir models
+mkdir -p models/async_execute_decouple/1 && \
+    cp ../../python_models/async_execute_decouple/model.py models/async_execute_decouple/1 && \
+    cp ../../python_models/async_execute_decouple/config.pbtxt models/async_execute_decouple
+mkdir -p models/async_execute_decouple_bls/1 && \
+    cp ../../python_models/async_execute_decouple_bls/model.py models/async_execute_decouple_bls/1 && \
+    cp ../../python_models/async_execute_decouple_bls/config.pbtxt models/async_execute_decouple_bls
 
-# You can set these variables from the command line, and also
-# from the environment for the first two.
-SPHINXOPTS        ?=
-SPHINXBUILD       ?= sphinx-build
-SOURCEDIR          = .
-BUILDDIR           = build
-TRITONCLIENTRSTDIR = _reference/tritonclient
+TEST_LOG="concurrency_test.log"
+SERVER_LOG="concurrency_test.server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/async_execute/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
-#PROTOBUFFILES = $(wildcard ../triton/proto/*.proto)
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
-# Put it first so that "make" without argument is like "make help".
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+set +e
+SERVER_LOG=$SERVER_LOG python3 -m pytest --junitxml=concurrency_test.report.xml concurrency_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** async execute concurrency test FAILED\n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
 
-clean:
-	@rm -fr ${BUILDDIR}
-	@rm -fr ${TRITONCLIENTRSTDIR}
+kill $SERVER_PID
+wait $SERVER_PID
 
-.PHONY: help Makefile clean
-
-# protobuf: source/reference/protos/gen_proto_doc.sh
-# 	cd source/reference/protos && \
-#     rm -f *.proto.rst && \
-#     bash -x ./gen_proto_doc.sh $(PROTOBUFFILES:%=../%)
-
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%:
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+if [ $RET -eq 1 ]; then
+    echo -e "\n***\n*** Async execute test FAILED\n***"
+else
+    echo -e "\n***\n*** Async execute test Passed\n***"
+fi
+exit $RET

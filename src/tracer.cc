@@ -212,8 +212,8 @@ TraceManager::UpdateTraceSettingInternal(
     fallback_setting = global_setting_.get();
   } else {
     current_setting = global_setting_.get();
-    printTraceConfigMap(current_setting->config_map_)
-    fallback_setting = global_default_.get();
+    printTraceConfigMap(current_setting->config_map_) fallback_setting =
+        global_default_.get();
   }
 
   // Prepare the updated setting, use two passes for simplicity:
@@ -253,16 +253,7 @@ TraceManager::UpdateTraceSettingInternal(
                current_setting->log_frequency_specified_) ||
               (new_setting.log_frequency_ != nullptr)));
   const bool filepath_specified =
-      (new_setting.clear_filepath_ ? false
-                                   : (((current_setting != nullptr) &&
-                                       current_setting->filepath_specified_) ||
-                                      (new_setting.filepath_ != nullptr)));
-  const bool config_map_specified =
-      (new_setting.clear_config_map_
-           ? false
-           : (((current_setting != nullptr) &&
-               current_setting->config_map_specified_) ||
-              (new_setting.config_map_ != nullptr)));
+      (((current_setting != nullptr) && current_setting->filepath_specified_));
 
   if (level_specified) {
     level = (new_setting.level_ != nullptr) ? *new_setting.level_
@@ -282,9 +273,7 @@ TraceManager::UpdateTraceSettingInternal(
                         : current_setting->log_frequency_;
   }
   if (filepath_specified) {
-    filepath = (new_setting.filepath_ != nullptr)
-                   ? *new_setting.filepath_
-                   : current_setting->file_->FileName();
+    filepath = current_setting->file_->FileName();
   }
 
   if (true) {
@@ -335,8 +324,7 @@ TraceManager::UpdateTraceSettingInternal(
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
       level, rate, count, log_frequency, file, mode, config_map,
       level_specified, rate_specified, count_specified, log_frequency_specified,
-      filepath_specified, false /*mode_specified*/,
-      config_map_specified));
+      filepath_specified, false /*mode_specified*/, config_map_specified));
   // The only invalid setting allowed is if it disables tracing
   if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
@@ -879,9 +867,9 @@ TraceManager::InferenceTraceModeString(InferenceTraceMode mode)
 {
   switch (mode) {
     case TRACE_MODE_TRITON:
-      return "TRITON";
+      return "triton";
     case TRACE_MODE_OPENTELEMETRY:
-      return "OPENTELEMETRY";
+      return "opentelemetry";
   }
 
   return "<unknown>";

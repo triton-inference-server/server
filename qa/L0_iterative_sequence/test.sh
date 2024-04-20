@@ -44,7 +44,7 @@ RET=0
 
 CLIENT_LOG="./iterative_sequence_client.log"
 TEST_PY=./iterative_sequence_e2e.py
-EXPECTED_NUM_TESTS="5"
+EXPECTED_NUM_TESTS="6"
 TEST_RESULT_FILE='test_results.txt'
 
 
