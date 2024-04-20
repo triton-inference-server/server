@@ -1108,14 +1108,7 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
-# Drop the static libs
-RUN ARCH="$(uname -i)" \\
-      && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
-          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
-
 # Install TensorRT-LLM
-RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
-        && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
 RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
 RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
 
@@ -1729,11 +1722,6 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
     # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
     cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
     cmake_script.mkdir(cmake_destination_dir)
-    # Copy over the TRT-LLM wheel for later installation
-    cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "tensorrt_llm", "build", "tensorrt_llm-*.whl"),
-        cmake_destination_dir,
-    )
 
     # Copy over the TRT-LLM backend libraries
     cmake_script.cp(
