@@ -38,6 +38,9 @@ class Config(dict):
         self["triton_url"] = os.environ.get("TRITON_URL")
         self["triton_model_repo"] = os.environ.get("TRITON_MODEL_REPO")
 
+        if not self["triton_model_repo"]:
+            raise MlflowException("environment variable 'TRITON_MODEL_REPO' is not set")
+
         if self["triton_model_repo"].startswith("s3://"):
             self.s3_regex = re.compile(
                 "s3://(http://|https://|)([0-9a-zA-Z\\-.]+):([0-9]+)/"
