@@ -556,7 +556,10 @@ def create_plan_dynamic_rf_modelfile(
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -784,9 +787,16 @@ def create_plan_fixed_rf_modelfile(
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
-    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
+    if max_batch == 0:
+        input_with_batchsize = [i for i in input_shape]
+    else:
+        input_with_batchsize = [-1] + [i for i in input_shape]
+
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
 
@@ -814,17 +824,39 @@ def create_plan_fixed_rf_modelfile(
     if trt_output1_dtype == trt.int8:
         out1.get_output(0).dynamic_range = (-128.0, 127.0)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    config = builder.create_builder_config()
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in input_shape:
+        min_shape = min_shape + [i]
+        opt_shape = opt_shape + [i]
+        max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
             flags |= 1 << int(trt.BuilderFlag.INT8)
         elif dt == trt.float16:
             flags |= 1 << int(trt.BuilderFlag.FP16)
+        
     config = builder.create_builder_config()
     config.flags = flags
+    config.add_optimization_profile(profile)
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
+
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -868,9 +900,16 @@ def create_plan_fixed_modelfile(
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
-    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
+    if max_batch == 0:
+        input_with_batchsize = [i for i in input_shape]
+    else:
+        input_with_batchsize = [-1] + [i for i in input_shape]
+
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
 
@@ -883,8 +922,25 @@ def create_plan_fixed_modelfile(
     network.mark_output(out1.get_output(0))
 
     config = builder.create_builder_config()
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in input_shape:
+        min_shape = min_shape + [i]
+        opt_shape = opt_shape + [i]
+        max_shape = max_shape + [i]
+    
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+    config.add_optimization_profile(profile)
+
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:

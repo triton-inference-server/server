@@ -339,7 +339,7 @@ def create_plan_shape_tensor_modelfile(
     shape_out0 = network.add_shape(resized_out0)
 
     shape_out0.get_output(0).name = "SHAPE_OUTPUT"
-    shape_out0.get_output(0).dtype = trt.int32
+    shape_out0.get_output(0).dtype = trt.int64
     network.mark_output_for_shapes(shape_out0.get_output(0))
 
     out0.name = "OUTPUT"
@@ -365,7 +365,9 @@ def create_plan_shape_tensor_modelfile(
         start0.dynamic_range = (-128.0, 127.0)
         ready0.dynamic_range = (-128.0, 127.0)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
@@ -427,116 +429,7 @@ def create_plan_shape_tensor_modelfile(
         f.write(engine_bytes)
 
 
-def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape):
-    trt_dtype = np_to_trt_dtype(dtype)
-    # Create the model. For now don't implement a proper accumulator
-    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
-    # tests know to expect this.
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-    in0 = network.add_input("INPUT", trt_dtype, shape)
-    start0 = network.add_input("START", trt_dtype, [1 for i in shape])
-    ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
-    add = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(
-        add.get_output(0), ready0, trt.ElementWiseOperation.PROD
-    )
-
-    out0.get_output(0).name = "OUTPUT"
-    network.mark_output(out0.get_output(0))
-
-    config = builder.create_builder_config()
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
-    try:
-        engine_bytes = builder.build_serialized_network(network, config)
-    except AttributeError:
-        engine = builder.build_engine(network, config)
-        engine_bytes = engine.serialize()
-        del engine
-    del network
-
-    model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype
-    )
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine_bytes)
-
-
-def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
-    trt_dtype = np_to_trt_dtype(dtype)
-    trt_memory_format = trt.TensorFormat.LINEAR
-    # Create the model. For now don't implement a proper accumulator
-    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
-    # tests know to expect this.
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-    in0 = network.add_input("INPUT", trt_dtype, shape)
-    start0 = network.add_input("START", trt_dtype, [1 for i in shape])
-    ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
-    add = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(
-        add.get_output(0), ready0, trt.ElementWiseOperation.PROD
-    )
-
-    out0.get_output(0).name = "OUTPUT"
-    network.mark_output(out0.get_output(0))
-
-    out0.get_output(0).dtype = trt_dtype
-
-    in0.allowed_formats = 1 << int(trt_memory_format)
-    start0.allowed_formats = 1 << int(trt_memory_format)
-    ready0.allowed_formats = 1 << int(trt_memory_format)
-    out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
-
-    if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
-
-    if trt_dtype == trt.int8:
-        flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
-        flags |= 1 << int(trt.BuilderFlag.FP16)
-
-    config = builder.create_builder_config()
-    config.flags = flags
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
-    try:
-        engine_bytes = builder.build_serialized_network(network, config)
-    except AttributeError:
-        engine = builder.build_engine(network, config)
-        engine_bytes = engine.serialize()
-        del engine
-
-    model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype
-    )
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine_bytes)
-
-
-def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, shape):
+def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
@@ -625,7 +518,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
         f.write(engine_bytes)
 
 
-def create_plan_dynamic_rf_modelfile(
+def create_plan_rf_modelfile(
     models_dir, model_version, max_batch, dtype, shape
 ):
     trt_dtype = np_to_trt_dtype(dtype)
@@ -671,7 +564,9 @@ def create_plan_dynamic_rf_modelfile(
         start0.dynamic_range = (-128.0, 127.0)
         ready0.dynamic_range = (-128.0, 127.0)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
@@ -740,28 +635,18 @@ def create_plan_dynamic_rf_modelfile(
         f.write(engine_bytes)
 
 
-def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
+def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     if dtype != np.float32:
-        if not tu.shape_is_fixed(shape):
-            create_plan_dynamic_rf_modelfile(
-                models_dir, model_version, max_batch, dtype, shape
-            )
-        else:
-            create_plan_fixed_rf_modelfile(
-                models_dir, model_version, max_batch, dtype, shape
-            )
+        create_plan_rf_modelfile(
+            models_dir, model_version, max_batch, dtype, shape
+        )
     else:
-        if not tu.shape_is_fixed(shape):
-            create_plan_dynamic_modelfile(
-                models_dir, model_version, max_batch, dtype, shape
-            )
-        else:
-            create_plan_fixed_modelfile(
-                models_dir, model_version, max_batch, dtype, shape
-            )
+        create_plan_modelfile(
+            models_dir, model_version, max_batch, dtype, shape
+        )
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
@@ -833,7 +718,7 @@ output [
 output [
   {{
     name: "SHAPE_OUTPUT"
-    data_type: TYPE_INT32
+    data_type: TYPE_INT64
     dims: [ {} ]
     is_shape_tensor: true
   }}
@@ -1396,10 +1281,10 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             suffix = [1, 1]
 
         create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + suffix)
-        create_plan_modelfile(models_dir, model_version, 8, dtype, shape + suffix)
+        create_plan_models(models_dir, model_version, 8, dtype, shape + suffix)
         if no_batch:
             create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + suffix)
-            create_plan_modelfile(models_dir, model_version, 0, dtype, shape + suffix)
+            create_plan_models(models_dir, model_version, 0, dtype, shape + suffix)
 
     if FLAGS.onnx:
         create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape)

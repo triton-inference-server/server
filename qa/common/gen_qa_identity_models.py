@@ -732,7 +732,9 @@ def create_plan_dynamic_rf_modelfile(
     for io_num in range(io_cnt):
         profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -808,7 +810,7 @@ def create_plan_shape_tensor_modelfile(
         network.mark_output(dummy_out_node)
         dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
 
-        out_node.get_output(0).dtype = trt.int32
+        out_node.get_output(0).dtype = trt.int64
         network.mark_output_for_shapes(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
@@ -842,7 +844,9 @@ def create_plan_shape_tensor_modelfile(
 
     config.add_optimization_profile(profile)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -988,7 +992,7 @@ output [
   }},
   {{
     name: "OUTPUT{}"
-    data_type: TYPE_INT32
+    data_type: TYPE_INT64
     dims: [ {} ]
     is_shape_tensor: true
   }}

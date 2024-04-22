@@ -38,13 +38,12 @@ np_dtype_string = np.dtype(object)
 
 
 def trt_format_to_string(trt_format):
-    # FIXME uncomment the following formats once TRT used is up-to-date
-    # if trt_format == trt.TensorFormat.CDHW32:
-    #     return "CDHW32"
-    # if trt_format == trt.TensorFormat.DHWC8:
-    #     return "DHWC8"
-    # if trt_format == trt.TensorFormat.HWC:
-    #     return "HWC"
+    if trt_format == trt.TensorFormat.CDHW32:
+        return "CDHW32"
+    if trt_format == trt.TensorFormat.DHWC8:
+        return "DHWC8"
+    if trt_format == trt.TensorFormat.HWC:
+        return "HWC"
     if trt_format == trt.TensorFormat.CHW2:
         return "CHW2"
     if trt_format == trt.TensorFormat.CHW32:
@@ -60,7 +59,7 @@ def trt_format_to_string(trt_format):
     return "INVALID"
 
 
-def create_plan_dynamic_modelfile(
+def create_plan_modelfile(
     models_dir,
     max_batch,
     model_version,
@@ -141,7 +140,10 @@ def create_plan_dynamic_modelfile(
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+
+    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -178,96 +180,6 @@ def create_plan_dynamic_modelfile(
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-
-def create_plan_fixed_modelfile(
-    models_dir,
-    max_batch,
-    model_version,
-    input_shape,
-    output0_shape,
-    output1_shape,
-    input_dtype,
-    output0_dtype,
-    output1_dtype,
-    input_memory_format,
-    output_memory_format,
-):
-    trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
-    trt_input_memory_format = input_memory_format
-    trt_output_memory_format = output_memory_format
-
-    # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
-    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
-    add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
-    sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
-
-    out0 = network.add_identity(add.get_output(0))
-    out1 = network.add_identity(sub.get_output(0))
-
-    out0.get_output(0).name = "OUTPUT0"
-    out1.get_output(0).name = "OUTPUT1"
-    network.mark_output(out0.get_output(0))
-    network.mark_output(out1.get_output(0))
-
-    out0.get_output(0).dtype = trt_output0_dtype
-    out1.get_output(0).dtype = trt_output1_dtype
-
-    in0.allowed_formats = 1 << int(trt_input_memory_format)
-    in1.allowed_formats = 1 << int(trt_input_memory_format)
-    out0.get_output(0).allowed_formats = 1 << int(trt_output_memory_format)
-    out1.get_output(0).allowed_formats = 1 << int(trt_output_memory_format)
-
-    if trt_input_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in1.dynamic_range = (-128.0, 127.0)
-    if trt_output0_dtype == trt.int8:
-        out0.get_output(0).dynamic_range = (-128.0, 127.0)
-    if trt_output1_dtype == trt.int8:
-        out1.get_output(0).dynamic_range = (-128.0, 127.0)
-
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
-    datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
-    for dt in datatype_set:
-        if dt == trt.int8:
-            flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
-            flags |= 1 << int(trt.BuilderFlag.FP16)
-    config = builder.create_builder_config()
-    config.flags = flags
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
-    try:
-        engine_bytes = builder.build_serialized_network(network, config)
-    except AttributeError:
-        engine = builder.build_engine(network, config)
-        engine_bytes = engine.serialize()
-        del engine
-
-    base_name = "plan_nobatch" if max_batch == 0 else "plan"
-    base_name += (
-        "_"
-        + trt_format_to_string(input_memory_format)
-        + "_"
-        + trt_format_to_string(output_memory_format)
-    )
-    model_name = tu.get_model_name(base_name, input_dtype, output0_dtype, output1_dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine_bytes)
-
 
 def create_plan_modelconfig(
     models_dir,
@@ -456,38 +368,19 @@ def create_plan_model(
         None,
     )
 
-    if (
-        not tu.shape_is_fixed(input_shape)
-        or not tu.shape_is_fixed(output0_shape)
-        or not tu.shape_is_fixed(output1_shape)
-    ):
-        create_plan_dynamic_modelfile(
-            models_dir,
-            max_batch,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            input_memory_format,
-            output_memory_format,
-        )
-    else:
-        create_plan_fixed_modelfile(
-            models_dir,
-            max_batch,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            input_memory_format,
-            output_memory_format,
-        )
+    create_plan_modelfile(
+        models_dir,
+        max_batch,
+        model_version,
+        input_shape,
+        output0_shape,
+        output1_shape,
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+        input_memory_format,
+        output_memory_format,
+    )
 
 
 if __name__ == "__main__":
