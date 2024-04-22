@@ -819,6 +819,7 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
+    cmake_script.cmd("python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt")
     cargs = [
         cmake_backend_arg(
             "tensorrtllm",
@@ -830,7 +831,6 @@ def tensorrtllm_cmake_args(images):
             "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
         ),
     ]
-    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
