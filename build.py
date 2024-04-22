@@ -831,6 +831,7 @@ def tensorrtllm_cmake_args(images):
         ),
     ]
     cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
+    cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
 
