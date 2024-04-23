@@ -60,7 +60,7 @@ OPENVINO_VERSION=2023.3.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf2-py3}
-TENSORRT_IMAGE=${TENSORRT_IMAGE:=gitlab-master.nvidia.com:5005/dl/dgx/tensorrt:tensorrt-10.0.0.6-py3.14203027-devel}
+TENSORRT_IMAGE="gitlab-master.nvidia.com:5005/dl/dgx/tensorrt:tensorrt-10.0.0.6-py3.14203027-devel"
 CUDA_DEVICE=${NV_GPU:=0}
 
 [[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
@@ -498,14 +498,11 @@ python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
 chmod -R 777 $FORMATDESTDIR
 python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 chmod -R 777 $DATADEPENDENTDIR
-# Make shared library for custom clip plugin.
-# FIXME: [DLIS-4138] Once TensorRT uploads a new custom sample plugin they maintain, we should switch to
-# that one. This uses the provided plugin code from Release 8.4. This could break when TensorRT makes
-# changes to their plugin code.
-(git clone -b release/8.4 https://github.com/NVIDIA/TensorRT.git && \
-cd /workspace/TensorRT/samples/python/uff_custom_plugin && cmake . && make && \
-cp libclipplugin.so $PLGDESTDIR/.)
-LD_PRELOAD=$PLGDESTDIR/libclipplugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
+# Make shared library for custom Hardmax plugin.
+(git clone -b release/10.0 https://github.com/NVIDIA/TensorRT.git && \
+cd /workspace/TensorRT/samples/python/onnx_custom_plugin && cmake . && make && \
+cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
+LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
 chmod -R 777 $PLGDESTDIR
 EOF
 
