@@ -169,7 +169,7 @@ for MODEL in $(ls models); do
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
         # [TMA-621] Use --no-stability mode in perf analyzer when available
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS -p 10000 > $TEMP_CLIENT_LOG 2>&1
         PA_RET=$?
         # Success
         if [ ${PA_RET} -eq 0 ]; then
