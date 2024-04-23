@@ -819,6 +819,8 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
+    cmake_script.cmd("apt-get update && apt-get install -y libcudnn8-dev && ldconfig")
+    cmake_script.cmd("python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt")
     cargs = [
         cmake_backend_arg(
             "tensorrtllm",
@@ -830,7 +832,6 @@ def tensorrtllm_cmake_args(images):
             "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
         ),
     ]
-    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
     cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
@@ -1094,6 +1095,8 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
     if "tensorrtllm" in backends:
         df += """
 # Remove TRT contents that are not needed in runtime
+RUN apt-get update && apt-get install -y libcudnn8-dev && ldconfig
+
 RUN ARCH="$(uname -i)" \\
       && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
       && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
