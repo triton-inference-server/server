@@ -70,7 +70,7 @@ rm -rf *.log models/ *.massif
 # Test parameters
 STATIC_BATCH=128
 INSTANCE_CNT=2
-CONCURRENCY=32
+CONCURRENCY=20
 CLIENT_BS=8
 
 # Set the number of repetitions in nightly and weekly tests
@@ -87,7 +87,7 @@ if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
         EMAIL_SUBJECT="Weekly"
     fi
 else
-    REPETITION=3
+    REPETITION=10
     EMAIL_SUBJECT="Nightly"
 fi
 
@@ -169,7 +169,7 @@ for MODEL in $(ls models); do
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
         # [TMA-621] Use --no-stability mode in perf analyzer when available
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS -p 10000 > $TEMP_CLIENT_LOG 2>&1
         PA_RET=$?
         # Success
         if [ ${PA_RET} -eq 0 ]; then
