@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -819,6 +819,10 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
+    cmake_script.cmd("apt-get update && apt-get install -y libcudnn8-dev && ldconfig")
+    cmake_script.cmd(
+        "python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt"
+    )
     cargs = [
         cmake_backend_arg(
             "tensorrtllm",
@@ -830,7 +834,7 @@ def tensorrtllm_cmake_args(images):
             "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
         ),
     ]
-    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
+    cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
 
@@ -1093,6 +1097,8 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
     if "tensorrtllm" in backends:
         df += """
 # Remove TRT contents that are not needed in runtime
+RUN apt-get update && apt-get install -y libcudnn8-dev && ldconfig
+
 RUN ARCH="$(uname -i)" \\
       && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
       && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
@@ -1102,16 +1108,16 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
-# Uninstall unused nvidia packages
-RUN if pip freeze | grep -q "nvidia.*"; then \\
-        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
-    fi
-RUN pip cache purge
-
 # Drop the static libs
 RUN ARCH="$(uname -i)" \\
       && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
           ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
+
+# Install TensorRT-LLM
+RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
+        && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
+RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
+RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
@@ -1708,6 +1714,30 @@ def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
     cmake_script.cmd("export ARCH=$(uname -m)")
+    cmake_script.cmd(
+        'export LD_LIBRARY_PATH="/usr/local/cuda/compat/lib.real:${LD_LIBRARY_PATH}"'
+    )
+
+
+def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
+    # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
+    cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
+    cmake_script.mkdir(cmake_destination_dir)
+    # Copy over the TRT-LLM wheel for later installation
+    cmake_script.cp(
+        os.path.join(tensorrtllm_be_dir, "tensorrt_llm", "build", "tensorrt_llm-*.whl"),
+        cmake_destination_dir,
+    )
+
+    # Copy over the TRT-LLM backend libraries
+    cmake_script.cp(
+        os.path.join(tensorrtllm_be_dir, "build", "libtriton_tensorrtllm*.so"),
+        cmake_destination_dir,
+    )
+    cmake_script.cp(
+        os.path.join(tensorrtllm_be_dir, "build", "triton_tensorrtllm_worker"),
+        cmake_destination_dir,
+    )
 
 
 def backend_build(
@@ -1741,6 +1771,10 @@ def backend_build(
         backend_cmake_args(images, components, be, repo_install_dir, library_paths)
     )
     cmake_script.makeinstall()
+
+    if be == "tensorrtllm":
+        tensorrtllm_be_dir = os.path.join(build_dir, be)
+        tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir)
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
