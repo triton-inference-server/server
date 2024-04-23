@@ -562,8 +562,6 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-RET=0
-
 set +e
 
 python $CLIENT_TEST >>$CLIENT_LOG 2>&1
