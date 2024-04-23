@@ -463,6 +463,7 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 set -x
+dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
