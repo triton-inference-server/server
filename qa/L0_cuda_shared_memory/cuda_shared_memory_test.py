@@ -35,10 +35,10 @@ import unittest
 
 import numpy as np
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 import tritonshmutils.cuda_shared_memory as cshm
-from tritonclientutils import *
+from tritonclient.utils import *
 
 
 class CudaSharedMemoryTest(tu.TestResultCollector):
