@@ -328,13 +328,21 @@ check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Check model namespacing label exists
+# Check model namespacing label with namespace on and off
 REPOS_DIR="${PWD}/model_namespacing_repos"
 mkdir -p "${REPOS_DIR}/addsub_repo/addsub_ensemble/1"
 mkdir -p "${REPOS_DIR}/subadd_repo/subadd_ensemble/1"
+# Namespace on
 SERVER_ARGS="--model-repository=${REPOS_DIR}/addsub_repo --model-repository=${REPOS_DIR}/subadd_repo --model-namespacing=true --allow-metrics=true"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsConfigTest.test_model_namespacing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_model_namespacing_label_with_namespace_on 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+# Namespace off
+SERVER_ARGS="--model-repository=${REPOS_DIR}/addsub_repo --model-namespacing=false --allow-metrics=true"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_model_namespacing_label_with_namespace_off 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill $SERVER_PID
 wait $SERVER_PID

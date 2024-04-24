@@ -138,7 +138,7 @@ class MetricsConfigTest(tu.TestResultCollector):
         for metric in bad_patterns:
             self.assertNotIn(metric, metrics)
 
-    def test_model_namespacing(self):
+    def test_model_namespacing_label_with_namespace_on(self):
         metrics = self._get_metrics()
         expected_namespaces = [
             "/opt/tritonserver/qa/L0_metrics/model_namespacing_repos/addsub_repo",
@@ -147,6 +147,10 @@ class MetricsConfigTest(tu.TestResultCollector):
         for namespace in expected_namespaces:
             label = 'namespace="' + namespace + '"'
             self.assertIn(label, metrics)
+
+    def test_model_namespacing_label_with_namespace_off(self):
+        metrics = self._get_metrics()
+        self.assertNotIn('namespace="', metrics)
 
 
 if __name__ == "__main__":
