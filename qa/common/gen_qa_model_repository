@@ -499,13 +499,15 @@ python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
 chmod -R 777 $FORMATDESTDIR
 python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 chmod -R 777 $DATADEPENDENTDIR
-# Make shared library for custom Hardmax plugin.
-(git clone -b release/10.0 https://github.com/NVIDIA/TensorRT.git && \
-cd /workspace/TensorRT/samples/python/onnx_custom_plugin && cmake . && make && \
-cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
-LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
-chmod -R 777 $PLGDESTDIR
 EOF
+
+# [FIXME]
+# # Make shared library for custom Hardmax plugin.
+# (git clone -b release/10.0 https://github.com/NVIDIA/TensorRT.git && \
+# cd /workspace/TensorRT/samples/python/onnx_custom_plugin && cmake . && make && \
+# cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
+# LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
+# chmod -R 777 $PLGDESTDIR
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
 if [ $? -ne 0 ]; then

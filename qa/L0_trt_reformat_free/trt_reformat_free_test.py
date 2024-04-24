@@ -36,7 +36,7 @@ from builtins import range
 import numpy as np
 import test_util as tu
 import tritonclient.utils.shared_memory as shm
-import tritonhttpclient
+import tritonclient.http as tritonhttpclient
 
 
 def div_up(a, b):

@@ -35,7 +35,7 @@ import unittest
 import infer_util as iu
 import numpy as np
 import test_util as tu
-from tritonclientutils import *
+from tritonclient.utils import *
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
