@@ -58,8 +58,8 @@ RESET_CONFIG_FUNCTION="_reset_config_files"
 source ../common/util.sh
 
 MODEL_DIR="${PWD}/models"
-mkdir -p "${MODEL_DIR}/ensemble_models"
 ENSEMBLE_MODEL_DIR="${MODEL_DIR}/ensemble_models"
+rm -fr ${ENSEMBLE_MODEL_DIR} && mkdir ${ENSEMBLE_MODEL_DIR}
 ENSEMBLE_MODEL="simple_graphdef_float32_float32_float32"
 COMPOSING_MODEL="graphdef_float32_float32_float32"
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${ENSEMBLE_MODEL_DIR}/${ENSEMBLE_MODEL}"
