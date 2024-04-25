@@ -42,16 +42,11 @@ import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
 
-class EnsembleCacheTest(tu.TestResultCollector):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class ModelConfigManager:
+    def __init__(self):
         self.ensemble_model_name = "simple_graphdef_float32_float32_float32"
         self.composing_model_name = "graphdef_float32_float32_float32"
         self.model_directory = os.path.join(os.getcwd(), "models", "ensemble_models")
-        self.input_tensors = self._get_input_tensors()
-        self.triton_client = grpcclient.InferenceServerClient(
-            "localhost:8001", verbose=True
-        )
         self.ensemble_config_file = os.path.join(
             self.model_directory, self.ensemble_model_name, "config.pbtxt"
         )
@@ -62,6 +57,92 @@ class EnsembleCacheTest(tu.TestResultCollector):
         self.response_cache_config = "response_cache {\n  enable:true\n}\n"
         self.decoupled_pattern = "decoupled:true"
         self.decoupled_config = "model_transaction_policy {\n decoupled:true\n}\n"
+
+    def _update_config(self, config_file, config_pattern, config_to_add):
+        with open(config_file, "r") as f:
+            config_data = f.read()
+            if config_pattern not in config_data:
+                with open(config_file, "w") as f:
+                    config_data = config_data + config_to_add
+                    f.write(config_data)
+
+    def _remove_config(self, config_file, config_to_remove):
+        with open(config_file, "r") as f:
+            config_data = f.read()
+        updated_config_data = re.sub(config_to_remove, "", config_data)
+        with open(config_file, "w") as f:
+            f.write(updated_config_data)
+
+    def _get_all_config_files(self):
+        config_files = []
+        contents = os.listdir(self.model_directory)
+        folders = [
+            folder
+            for folder in contents
+            if os.path.isdir(os.path.join(self.model_directory, folder))
+        ]
+        for model_dir in folders:
+            config_file_path = os.path.join(
+                self.model_directory, str(model_dir), "config.pbtxt"
+            )
+            config_files.append(config_file_path)
+        return config_files
+
+    def get_ensemble_model(self):
+        return self.ensemble_model_name
+
+    def get_composing_model(self):
+        return self.composing_model_name
+
+    def enable_response_cache_ensemble_model(self):
+        config_file = self.ensemble_config_file
+        self._update_config(
+            self.ensemble_config_file,
+            self.response_cache_pattern,
+            self.response_cache_config,
+        )
+
+    def enable_response_cache_all_models(self):
+        config_files = self._get_all_config_files()
+        for config_file in config_files:
+            self._update_config(
+                config_file, self.response_cache_pattern, self.response_cache_config
+            )
+
+    def enable_response_cache_composing_model(self):
+        config_file = self.composing_config_file
+        self._update_config(
+            self.composing_config_file,
+            self.response_cache_pattern,
+            self.response_cache_config,
+        )
+
+    def reset_config_files(self):
+        config_files = self._get_all_config_files()
+        for config_file in config_files:
+            self._remove_config(config_file, self.response_cache_config)
+            self._remove_config(config_file, self.decoupled_config)
+
+    def enable_decoupled_ensemble_model(self):
+        self._update_config(
+            self.ensemble_config_file,
+            self.decoupled_pattern,
+            self.decoupled_config,
+        )
+
+    def enable_decoupled_composing_model(self):
+        self._update_config(
+            self.composing_config_file, self.decoupled_pattern, self.decoupled_config
+        )
+
+
+class InferenceHandler:
+    def __init__(self):
+        self.config_manager = ModelConfigManager()
+        self.input_tensors = self._get_input_tensors()
+        self.triton_client = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
 
     def _get_input_tensors(self):
         input0_data = np.ones((1, 16), dtype=np.float32)
@@ -78,18 +159,24 @@ class EnsembleCacheTest(tu.TestResultCollector):
         input_tensors[1].set_data_from_numpy(input1_data)
         return input_tensors
 
-    def _get_infer_stats(self, model):
+    def get_inference_statistics(self, model):
         stats = self.triton_client.get_inference_statistics(
             model_name=model, as_json=True
         )
         return stats["model_stats"][1]["inference_stats"]
 
-    def _infer(self, model):
+    def infer(self):
+        model = self.config_manager.get_ensemble_model()
         output = self.triton_client.infer(model_name=model, inputs=self.input_tensors)
         output0 = output.as_numpy("OUTPUT0")
         output1 = output.as_numpy("OUTPUT1")
         outputs = [output0, output1]
         return outputs
+
+
+class InferenceValidator:
+    def __init__(self):
+        self.inference_handler = InferenceHandler()
 
     def _check_valid_output(self, output):
         if output is None:
@@ -114,96 +201,60 @@ class EnsembleCacheTest(tu.TestResultCollector):
         ):
             self.assertTrue(False, "unexpected error with response cache")
         if (
-            model_inference_stats["cache_miss"]["count"] == "0"
+            "count" in model_inference_stats["cache_hit"]
             and int(model_inference_stats["cache_hit"]["count"]) > 0
         ):
             self.assertTrue(False, "unexpected cache hit")
         if int(model_inference_stats["cache_miss"]["count"]) > 1:
             self.assertTrue(False, "unexpected multiple cache miss")
 
-    def _run_ensemble(self, model):
-        model_inference_stats = self._get_infer_stats(model)
+    def run_ensemble(self, model):
+        model_inference_stats = self.inference_handler.get_inference_statistics(model)
         self._check_zero_stats_baseline(model_inference_stats)
-        inference_outputs = self._infer(model)
+        inference_outputs = self.inference_handler.infer()
         self._check_valid_output(inference_outputs)
-        model_inference_stats = self._get_infer_stats(model)
+        model_inference_stats = self.inference_handler.get_inference_statistics(model)
         self._check_valid_stats(model_inference_stats)
         self._check_single_cache_miss_success_inference(model_inference_stats)
-        cached_outputs = self._infer(model)
+        cached_outputs = self.inference_handler.infer()
         self._check_valid_output(cached_outputs)
         self._check_valid_output_inference(inference_outputs, cached_outputs)
-        model_inference_stats = self._get_infer_stats(model)
+        model_inference_stats = self.inference_handler.get_inference_statistics(model)
         self._check_valid_stats(model_inference_stats)
         return model_inference_stats
 
-    def _update_config(self, config_file, config_pattern, config_to_add):
-        with open(config_file, "r") as f:
-            config_data = f.read()
-            if config_pattern not in config_data:
-                with open(config_file, "w") as f:
-                    config_data = config_data + config_to_add
-                    f.write(config_data)
 
-    def _remove_extra_config(self, config_file, config_to_remove):
-        with open(config_file, "r") as f:
-            config_data = f.read()
-        updated_config_data = re.sub(config_to_remove, "", config_data)
-        with open(config_file, "w") as f:
-            f.write(updated_config_data)
+class EnsembleCacheTest(tu.TestResultCollector):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.config_manager = ModelConfigManager()
+        self.inference_validator = InferenceValidator()
+        self.inference_handler = InferenceHandler()
+        self.ensemble_model = self.config_manager.get_ensemble_model()
+        self.composing_model = self.config_manager.get_composing_model()
 
-    def _get_all_config_files(self):
-        config_files = []
-        contents = os.listdir(self.model_directory)
-        folders = [
-            folder
-            for folder in contents
-            if os.path.isdir(os.path.join(self.model_directory, folder))
-        ]
-        for model_dir in folders:
-            config_file_path = os.path.join(
-                self.model_directory, str(model_dir), "config.pbtxt"
-            )
-            config_files.append(config_file_path)
-        return config_files
+    def setup_cache_ensemble_model(self):
+        self.config_manager.enable_response_cache_ensemble_model()
 
-    def _enable_cache_ensemble_model(self):
-        self._update_config(
-            self.ensemble_config_file,
-            self.response_cache_pattern,
-            self.response_cache_config,
-        )
+    def setup_decoupled_ensemble_model(self):
+        self.config_manager.enable_decoupled_ensemble_model()
 
-    def _enable_decoupled_ensemble_model(self):
-        self._update_config(
-            self.ensemble_config_file, self.decoupled_pattern, self.decoupled_config
-        )
+    def setup_decoupled_composing_model(self):
+        self.config_manager.enable_decoupled_composing_model()
 
-    def _enable_decoupled_composing_model(self):
-        self._update_config(
-            self.composing_config_file, self.decoupled_pattern, self.decoupled_config
-        )
+    def setup_cache_composing_model(self):
+        self.config_manager.enable_response_cache_composing_model()
 
-    def _remove_decoupled_ensemble_model(self):
-        self._remove_extra_config(self.ensemble_config_file, self.decoupled_config)
+    def setup_cache_all_models(self):
+        self.config_manager.enable_response_cache_all_models()
 
-    def _remove_decoupled_composing_model(self):
-        self._remove_extra_config(self.composing_config_file, self.decoupled_config)
-
-    def _enable_cache_for_all_models(self):
-        config_files = self._get_all_config_files()
-        for config_file in config_files:
-            self._update_config(
-                config_file, self.response_cache_pattern, self.response_cache_config
-            )
-
-    def _reset_config_files(self):
-        config_files = self._get_all_config_files()
-        for config_file in config_files:
-            self._remove_extra_config(config_file, self.response_cache_config)
+    def reset_config(self):
+        self.config_manager.reset_config_files()
 
     def test_ensemble_top_level_cache(self):
-        self._enable_cache_ensemble_model()
-        model_inference_stats = self._run_ensemble(self.ensemble_model_name)
+        model_inference_stats = self.inference_validator.run_ensemble(
+            self.ensemble_model
+        )
         if (
             "count" not in model_inference_stats["cache_hit"]
             or model_inference_stats["cache_hit"]["count"] != "0"
@@ -213,11 +264,15 @@ class EnsembleCacheTest(tu.TestResultCollector):
             )
         if int(model_inference_stats["cache_hit"]["count"]) > 1:
             self.assertTrue(False, "unexpected multiple cache hits")
+        self.config_manager.reset_config_files()
 
     def test_all_models_with_cache_enabled(self):
-        self._enable_cache_for_all_models()
-        ensemble_model_stats = self._run_ensemble(self.ensemble_model_name)
-        composing_model_stats = self._get_infer_stats(self.composing_model_name)
+        ensemble_model_stats = self.inference_validator.run_ensemble(
+            self.ensemble_model
+        )
+        composing_model_stats = self.inference_handler.get_inference_statistics(
+            self.composing_model
+        )
         if (
             "count" not in ensemble_model_stats["cache_hit"]
             or int(ensemble_model_stats["cache_hit"]["count"]) == 0
@@ -227,21 +282,35 @@ class EnsembleCacheTest(tu.TestResultCollector):
             )
         if "count" in composing_model_stats["cache_hit"]:
             self.assertTrue(False, "unexpected composing model cache hits")
+        self.config_manager.reset_config_files()
 
     def test_composing_model_cache_enabled(self):
-        self._enable_cache_for_all_models()
-        ensemble_config_file = os.path.join(
-            self.model_directory, self.ensemble_model_name, "config.pbtxt"
+        composing_model_stats = self.inference_validator.run_ensemble(
+            self.composing_model
         )
-        self._remove_extra_config(ensemble_config_file, self.response_cache_config)
-        composing_model_stats = self._run_ensemble(self.composing_model_name)
-        ensemble_model_stats = self._get_infer_stats(self.ensemble_model_name)
-        if "count" not in composing_model_stats["cache_hit"]:
+        ensemble_model_stats = self.inference_handler.get_inference_statistics(
+            self.ensemble_model
+        )
+        if "count" not in composing_model_stats["cache_miss"]:
             self.assertTrue(
                 False, "unexpected error in caching composing model response"
             )
         if "count" in ensemble_model_stats["cache_hit"]:
             self.assertTrue(False, "unexpected top-level response caching")
+        self.config_manager.reset_config_files()
+
+    def test_cache_insertion_failure(self):
+        ensemble_model_stats = self.inference_validator.run_ensemble(
+            self.ensemble_model
+        )
+        if "count" in ensemble_model_stats["cache_hit"]:
+            self.assertTrue(False, "unexpected successful cache insert")
+        if (
+            ensemble_model_stats["cache_miss"]["count"]
+            != ensemble_model_stats["success"]["count"]
+        ):
+            self.assertTrue(False, "unexpected error with response cache")
+        self.config_manager.reset_config_files()
 
 
 if __name__ == "__main__":
