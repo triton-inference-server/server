@@ -175,7 +175,7 @@ function check_server_failure_decoupled_model {
   MODEL_REPOSITORY="${1}"
   MODEL="${2}"
   EXTRA_ARGS="--model-control-mode="explicit" --load-model=${MODEL}"
-  SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --cache-config local,size=1048576000 ${EXTRA_ARGS}"
+  SERVER_ARGS="--model-repository=${MODEL_REPOSITORY} --cache-config local,size=10480 ${EXTRA_ARGS}"
   source ../common/util.sh
 
   rm -f ${SERVER_LOG}

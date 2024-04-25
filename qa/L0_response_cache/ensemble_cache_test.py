@@ -95,7 +95,6 @@ class ModelConfigManager:
         return self.composing_model_name
 
     def enable_response_cache_ensemble_model(self):
-        config_file = self.ensemble_config_file
         self._update_config(
             self.ensemble_config_file,
             self.response_cache_pattern,
@@ -110,7 +109,6 @@ class ModelConfigManager:
             )
 
     def enable_response_cache_composing_model(self):
-        config_file = self.composing_config_file
         self._update_config(
             self.composing_config_file,
             self.response_cache_pattern,
