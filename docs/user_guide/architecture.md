@@ -799,10 +799,12 @@ scheduler will:
 Unlike other models, ensemble models do not support "instance_group" field in
 the model configuration. The reason is that the ensemble scheduler itself
 is mainly an event-driven scheduler with very minimal overhead so its
-almost never the bottleneck of the pipeline. For optimized throughput,
-make sure to optimize your pipeline using
+almost never the bottleneck of the pipeline. The composing models
+within the ensemble can be individually scaled up or down with their
+respective `instance_group` settings. To optimize your model pipeline
+performance, you can use
 [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
-for best performance.
+to find the optimal model configurations.
 
 #### Additional Resources
 
