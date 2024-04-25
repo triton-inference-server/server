@@ -796,6 +796,14 @@ scheduler will:
    response to the inference request with the tensors mapped to the ensemble
    output names.
 
+Unlike other models, ensemble models do not support "instance_group" field in
+the model configuration. The reason is that the ensemble scheduler itself
+is mainly an event-driven scheduler with very minimal overhead so its
+almost never the bottleneck of the pipeline. For optimized throughput,
+make sure to optimize your pipeline using
+[Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
+for best performance.
+
 #### Additional Resources
 
 You can find additional end-to-end ensemble examples in the links below:
