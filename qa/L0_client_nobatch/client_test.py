@@ -34,9 +34,9 @@ import unittest
 
 import numpy as np
 import test_util as tu
-import tritongrpcclient
-import tritonhttpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as tritongrpcclient
+import tritonclient.http as tritonhttpclient
+from tritonclient.utils import InferenceServerException
 
 
 class ClientNoBatchTest(tu.TestResultCollector):
