@@ -810,8 +810,7 @@ def create_plan_shape_tensor_modelfile(
         network.mark_output(dummy_out_node)
         dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
 
-        # [FIXME] use trt.int64 and TYPE_INT64 in config (OUTPU{})
-        out_node.get_output(0).dtype =  trt.int32 # trt.int64
+        out_node.get_output(0).dtype =  trt.int64
         network.mark_output_for_shapes(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
@@ -993,7 +992,7 @@ output [
   }},
   {{
     name: "OUTPUT{}"
-    data_type: TYPE_INT32
+    data_type: TYPE_INT64
     dims: [ {} ]
     is_shape_tensor: true
   }}

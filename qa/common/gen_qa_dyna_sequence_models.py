@@ -367,8 +367,7 @@ def create_plan_shape_tensor_modelfile(
     resized_out0 = resize_layer.get_output(0)
 
     shape_out0.get_output(0).name = "SHAPE_OUTPUT"
-    # [FIXME] use trt.int64 and TYPE_INT64 in config (SHAPE_OUTPUT)
-    shape_out0.get_output(0).dtype = trt.int32 # trt.int64
+    shape_out0.get_output(0).dtype = trt.int64
     network.mark_output_for_shapes(shape_out0.get_output(0))
 
     out0.name = "OUTPUT"
@@ -822,7 +821,7 @@ output [
 output [
   {{
     name: "SHAPE_OUTPUT"
-    data_type: TYPE_INT32
+    data_type: TYPE_INT64
     dims: [ {} ]
     is_shape_tensor: true
   }}
