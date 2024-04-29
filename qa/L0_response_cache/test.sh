@@ -329,7 +329,6 @@ unset TRITONCACHE_REDIS_PASSWORD
 unset_redis_auth
 stop_redis
 
-
 # Test ensemble model with cache and decoupled mode enabled
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1

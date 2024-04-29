@@ -32,7 +32,6 @@ import sys
 
 sys.path.append("../common")
 sys.path.append("../clients")
-
 import logging
 import unittest
 
@@ -177,34 +176,29 @@ class InferenceValidator:
         self.inference_handler = InferenceHandler()
 
     def _check_valid_output(self, output):
-        if output is None:
-            self.assertTrue(False, "unexpected error in inference")
+        assert output is not None, "Unexpected error in inference"
 
     def _check_valid_output_inference(self, inference_outputs, cached_outputs):
-        if not np.array_equal(inference_outputs, cached_outputs):
-            self.assertTrue(False, "mismtached outputs")
+        assert np.array_equal(inference_outputs, cached_outputs), "Mismatched outputs"
 
     def _check_zero_stats_baseline(self, model_inference_stats):
-        if "count" in model_inference_stats["success"]:
-            self.assertTrue(False, "unexpected non-zero inference statistics")
+        assert (
+            "count" not in model_inference_stats["success"]
+        ), "Unexpected error while retrieving statistics"
 
     def _check_valid_stats(self, model_inference_stats):
-        if "count" not in model_inference_stats["success"]:
-            self.assertTrue(False, "unexpected error while retrieving statistics")
+        assert (
+            "count" in model_inference_stats["success"]
+        ), "Unexpected error while retrieving statistics"
 
     def _check_single_cache_miss_success_inference(self, model_inference_stats):
-        if (
-            "count" not in model_inference_stats["cache_miss"]
-            and "count" not in model_inference_stats["cache_hit"]
-        ):
-            self.assertTrue(False, "unexpected error with response cache")
-        if (
-            "count" in model_inference_stats["cache_hit"]
-            and int(model_inference_stats["cache_hit"]["count"]) > 0
-        ):
-            self.assertTrue(False, "unexpected cache hit")
-        if int(model_inference_stats["cache_miss"]["count"]) > 1:
-            self.assertTrue(False, "unexpected multiple cache miss")
+        assert (
+            "count" in model_inference_stats["cache_miss"]
+        ), "Unexpected error with response cache"
+        assert (
+            int(model_inference_stats["cache_miss"]["count"]) == 1
+        ), "Unexpected multiple cache miss"
+        assert "count" not in model_inference_stats["cache_hit"], "Unexpected cache hit"
 
     def run_ensemble(self, model):
         model_inference_stats = self.inference_handler.get_inference_statistics(model)
@@ -253,16 +247,17 @@ class EnsembleCacheTest(tu.TestResultCollector):
         model_inference_stats = self.inference_validator.run_ensemble(
             self.ensemble_model
         )
-        if (
-            "count" not in model_inference_stats["cache_hit"]
-            or model_inference_stats["cache_hit"]["count"] != "0"
-        ):
-            self.assertFalse(
-                False, "unexpected error in top-level ensemble response caching"
-            )
-        if int(model_inference_stats["cache_hit"]["count"]) > 1:
-            self.assertTrue(False, "unexpected multiple cache hits")
-        self.config_manager.reset_config_files()
+        self.assertNotEqual(
+            model_inference_stats["cache_hit"]["count"],
+            "0",
+            "Unexpected error in top-level ensemble response caching",
+        )
+        self.assertLessEqual(
+            int(model_inference_stats["cache_hit"]["count"]),
+            1,
+            "Unexpected multiple cache hits",
+        )
+        self.reset_config()
 
     def test_all_models_with_cache_enabled(self):
         ensemble_model_stats = self.inference_validator.run_ensemble(
@@ -271,16 +266,17 @@ class EnsembleCacheTest(tu.TestResultCollector):
         composing_model_stats = self.inference_handler.get_inference_statistics(
             self.composing_model
         )
-        if (
-            "count" not in ensemble_model_stats["cache_hit"]
-            or int(ensemble_model_stats["cache_hit"]["count"]) == 0
-        ):
-            self.assertTrue(
-                False, "unexpected error in top-level ensemble request caching"
-            )
-        if "count" in composing_model_stats["cache_hit"]:
-            self.assertTrue(False, "unexpected composing model cache hits")
-        self.config_manager.reset_config_files()
+        self.assertNotEqual(
+            ensemble_model_stats["cache_hit"]["count"],
+            "0",
+            "Unexpected error in top-level ensemble request caching",
+        )
+        self.assertNotIn(
+            "count",
+            composing_model_stats["cache_hit"],
+            "Unexpected composing model cache hits",
+        )
+        self.reset_config()
 
     def test_composing_model_cache_enabled(self):
         composing_model_stats = self.inference_validator.run_ensemble(
@@ -289,26 +285,33 @@ class EnsembleCacheTest(tu.TestResultCollector):
         ensemble_model_stats = self.inference_handler.get_inference_statistics(
             self.ensemble_model
         )
-        if "count" not in composing_model_stats["cache_miss"]:
-            self.assertTrue(
-                False, "unexpected error in caching composing model response"
-            )
-        if "count" in ensemble_model_stats["cache_hit"]:
-            self.assertTrue(False, "unexpected top-level response caching")
-        self.config_manager.reset_config_files()
+        self.assertIn(
+            "count",
+            composing_model_stats["cache_miss"],
+            "Unexpected error in caching composing model response",
+        )
+        self.assertNotIn(
+            "count",
+            ensemble_model_stats["cache_hit"],
+            "Unexpected top-level response caching",
+        )
+        self.reset_config()
 
     def test_cache_insertion_failure(self):
         ensemble_model_stats = self.inference_validator.run_ensemble(
             self.ensemble_model
         )
-        if "count" in ensemble_model_stats["cache_hit"]:
-            self.assertTrue(False, "unexpected successful cache insert")
-        if (
-            ensemble_model_stats["cache_miss"]["count"]
-            != ensemble_model_stats["success"]["count"]
-        ):
-            self.assertTrue(False, "unexpected error with response cache")
-        self.config_manager.reset_config_files()
+        self.assertNotIn(
+            "count",
+            ensemble_model_stats["cache_hit"],
+            "Unexpected successful cache insert",
+        )
+        self.assertEqual(
+            ensemble_model_stats["cache_miss"]["count"],
+            ensemble_model_stats["success"]["count"],
+            "Unexpected error with response cache",
+        )
+        self.reset_config()
 
 
 if __name__ == "__main__":
