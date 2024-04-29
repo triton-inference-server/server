@@ -67,7 +67,6 @@ cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MOD
 mkdir -p "${MODEL_DIR}/decoupled_cache/1"
 mkdir -p "${MODEL_DIR}/identity_cache/1"
 
-
 rm -fr *.log
 
 function install_redis() {
@@ -200,7 +199,6 @@ function check_server_failure_decoupled_model {
   fi
 }
 
-
 function run_server_ensemble_model {
   TESTCASE="${1}"
   ERROR_MESSAGE="${2}"
@@ -331,7 +329,8 @@ unset TRITONCACHE_REDIS_PASSWORD
 unset_redis_auth
 stop_redis
 
-# Test ensemble model with response cache and decoupled mode enabled
+
+# Test ensemble model with cache and decoupled mode enabled
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 DECOUPLED_FUNCTION="EnsembleCacheTest.setup_decoupled_ensemble_model"
