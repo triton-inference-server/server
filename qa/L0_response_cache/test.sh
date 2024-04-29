@@ -333,7 +333,7 @@ unset_redis_auth
 stop_redis
 
 
-#Test Ensemble Model With Cache Enabled and Decoupled Mode in Ensemble Config
+# Test ensemble model with cache enabled and decoupled mode in ensemble config
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 DECOUPLED_FUNCTION="EnsembleCacheTest.setup_decoupled_ensemble_model"
