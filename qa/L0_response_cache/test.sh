@@ -340,7 +340,6 @@ check_server_failure_decoupled_model ${ENSEMBLE_MODEL_DIR} ${ENSEMBLE_MODEL}
 RESET_CONFIG_FUNCTION="EnsembleCacheTest.reset_config"
 python ${ENSEMBLE_CACHE_TEST_PY} ${RESET_CONFIG_FUNCTION} >> ${CLIENT_LOG} 2>&1
 
-
 # Test ensemble model with cache enabled and decoupled mode enabled in composing model
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
@@ -381,7 +380,6 @@ TEST_NAME="EnsembleCacheTest.test_cache_insertion_failure"
 ERROR_MESSAGE="\n***\n*** Failed: Request added to cache successfully when it was expected to fail\n***"
 CACHE_SIZE=200
 run_server_ensemble_model "${TEST_NAME}" "${ERROR_MESSAGE}" "${CACHE_SIZE}"
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
