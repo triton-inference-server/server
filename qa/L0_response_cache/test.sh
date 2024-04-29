@@ -226,7 +226,6 @@ function run_server_ensemble_model {
 # Check that server fails to start for a "decoupled" model with cache enabled
 check_server_failure_decoupled_model ${MODEL_DIR}  "decoupled_cache"
 
-
 # Test with model expected to load successfully
 EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
 
@@ -332,8 +331,7 @@ unset TRITONCACHE_REDIS_PASSWORD
 unset_redis_auth
 stop_redis
 
-
-#Test Ensemble Model With Cache Enabled and Decoupled Mode in Ensemble Config
+# Test ensemble model with response cache and decoupled mode enabled
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 DECOUPLED_FUNCTION="EnsembleCacheTest.setup_decoupled_ensemble_model"
@@ -343,7 +341,7 @@ RESET_CONFIG_FUNCTION="EnsembleCacheTest.reset_config"
 python ${ENSEMBLE_CACHE_TEST_PY} ${RESET_CONFIG_FUNCTION} >> ${CLIENT_LOG} 2>&1
 
 
-# Test Ensemble Model With Cache Enabled and Decoupled Mode in Composing Model
+# Test ensemble model with cache enabled and decoupled mode enabled in composing model
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 DECOUPLED_FUNCTION="EnsembleCacheTest.setup_decoupled_composing_model"
@@ -352,7 +350,7 @@ check_server_failure_decoupled_model ${ENSEMBLE_MODEL_DIR} ${ENSEMBLE_MODEL}
 RESET_CONFIG_FUNCTION="EnsembleCacheTest.reset_config"
 python ${ENSEMBLE_CACHE_TEST_PY} ${RESET_CONFIG_FUNCTION} >> ${CLIENT_LOG} 2>&1
 
-#Test Ensemble Model with Top Level Caching Enabled
+# Test ensemble model with response cache enabled
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 TEST_NAME="EnsembleCacheTest.test_ensemble_top_level_cache"
@@ -360,8 +358,7 @@ ERROR_MESSAGE="\n***\n*** Failed: Expected Top Level Request Caching\n***"
 CACHE_SIZE=10480
 run_server_ensemble_model "${TEST_NAME}" "${ERROR_MESSAGE}" "${CACHE_SIZE}"
 
-
-#Test Ensemble Model with cache enabled in all models
+#Test ensemble model with cache enabled in all models
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_all_models"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 TEST_NAME="EnsembleCacheTest.test_all_models_with_cache_enabled"
@@ -369,8 +366,7 @@ ERROR_MESSAGE="\n***\n*** Failed: Expected cache to return Top-Level request's r
 CACHE_SIZE=10480
 run_server_ensemble_model "${TEST_NAME}" "${ERROR_MESSAGE}" "${CACHE_SIZE}"
 
-
-#Test Composing model cache enabled
+#Test composing model cache enabled
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_composing_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 TEST_NAME="EnsembleCacheTest.test_composing_model_cache_enabled"
@@ -378,8 +374,7 @@ ERROR_MESSAGE="\n***\n*** Failed: Expected only composing model's input/output t
 CACHE_SIZE=10480
 run_server_ensemble_model "${TEST_NAME}" "${ERROR_MESSAGE}" "${CACHE_SIZE}"
 
-
-#Test Cache Insertion Failure
+#Test cache insertion failure
 CACHE_FUNCTION="EnsembleCacheTest.setup_cache_ensemble_model"
 python ${ENSEMBLE_CACHE_TEST_PY} ${CACHE_FUNCTION} >> ${CLIENT_LOG} 2>&1
 TEST_NAME="EnsembleCacheTest.test_cache_insertion_failure"
