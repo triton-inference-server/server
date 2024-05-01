@@ -241,7 +241,6 @@ class EnsembleCacheTest(tu.TestResultCollector):
         self._run_inference_and_validate(self.composing_model)
         ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
         composing_model_stats = self._get_model_statistics(self.composing_model)
-        expected_cache_hit_count = 0
         self.assertIn(
             "count",
             composing_model_stats["success"],
