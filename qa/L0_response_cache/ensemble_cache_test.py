@@ -42,8 +42,6 @@ from tritonclient.utils import *
 
 RESPONSE_CACHE_PATTERN = "response_cache"
 RESPONSE_CACHE_CONFIG = "response_cache {\n  enable:true\n}\n"
-DECOUPLED_PATTERN = "decoupled:true"
-DECOUPLED_CONFIG = "model_transaction_policy {\n decoupled:true\n}\n"
 
 
 class EnsembleCacheTest(tu.TestResultCollector):
@@ -93,9 +91,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
     def _reset_config_files(self):
         # Utillity function to reset all config files to original
         self._remove_config(self.ensemble_config_file, RESPONSE_CACHE_CONFIG)
-        self._remove_config(self.ensemble_config_file, DECOUPLED_CONFIG)
         self._remove_config(self.composing_config_file, RESPONSE_CACHE_CONFIG)
-        self._remove_config(self.composing_config_file, DECOUPLED_CONFIG)
 
     def _run_ensemble(self):
         # Run the ensemble pipeline and validate output
