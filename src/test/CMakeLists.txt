@@ -34,22 +34,23 @@ find_package(GTest REQUIRED)
 #
 # caffe2plan
 #
-if(${TRITON_ENABLE_TENSORRT} AND NOT ${TRITON_IGPU_BUILD})
-  add_executable(caffe2plan caffe2plan.cc)
-  target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(
-    caffe2plan
-    PRIVATE
-      -lnvinfer
-      -lnvcaffe_parser
-      CUDA::cudart
-  )
-
-  install(
-    TARGETS caffe2plan
-    RUNTIME DESTINATION bin
-  )
-endif() # TRITON_ENABLE_TENSORRT
+# [FIXME TRTV10]
+#if(${TRITON_ENABLE_TENSORRT} AND NOT ${TRITON_IGPU_BUILD})
+#  add_executable(caffe2plan caffe2plan.cc)
+#  target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
+#  target_link_libraries(
+#    caffe2plan
+#    PRIVATE
+#      -lnvinfer
+#      -lnvcaffe_parser
+#      CUDA::cudart
+#  )
+#
+#  install(
+#    TARGETS caffe2plan
+#    RUNTIME DESTINATION bin
+#  )
+#endif() # TRITON_ENABLE_TENSORRT
 
 #
 # Unit test for DataCompressor
