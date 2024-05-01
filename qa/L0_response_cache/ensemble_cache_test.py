@@ -40,111 +40,29 @@ import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 
-
-class ModelConfigManager:
-    def __init__(self):
-        self.ensemble_model_name = "simple_graphdef_float32_float32_float32"
-        self.composing_model_name = "graphdef_float32_float32_float32"
-        self.model_directory = os.path.join(os.getcwd(), "models", "ensemble_models")
-        self.ensemble_config_file = os.path.join(
-            self.model_directory, self.ensemble_model_name, "config.pbtxt"
-        )
-        self.composing_config_file = os.path.join(
-            self.model_directory, self.composing_model_name, "config.pbtxt"
-        )
-        self.response_cache_pattern = "response_cache"
-        self.response_cache_config = "response_cache {\n  enable:true\n}\n"
-        self.decoupled_pattern = "decoupled:true"
-        self.decoupled_config = "model_transaction_policy {\n decoupled:true\n}\n"
-
-    def _update_config(self, config_file, config_pattern, config_to_add):
-        with open(config_file, "r") as f:
-            config_data = f.read()
-            if config_pattern not in config_data:
-                with open(config_file, "w") as f:
-                    config_data = config_data + config_to_add
-                    f.write(config_data)
-
-    def _remove_config(self, config_file, config_to_remove):
-        with open(config_file, "r") as f:
-            config_data = f.read()
-        updated_config_data = re.sub(config_to_remove, "", config_data)
-        with open(config_file, "w") as f:
-            f.write(updated_config_data)
-
-    def _get_all_config_files(self):
-        config_files = []
-        contents = os.listdir(self.model_directory)
-        folders = [
-            folder
-            for folder in contents
-            if os.path.isdir(os.path.join(self.model_directory, folder))
-        ]
-        for model_dir in folders:
-            config_file_path = os.path.join(
-                self.model_directory, str(model_dir), "config.pbtxt"
-            )
-            config_files.append(config_file_path)
-        return config_files
-
-    def get_ensemble_model(self):
-        return self.ensemble_model_name
-
-    def get_composing_model(self):
-        return self.composing_model_name
-
-    def enable_response_cache_ensemble_model(self):
-        self._update_config(
-            self.ensemble_config_file,
-            self.response_cache_pattern,
-            self.response_cache_config,
-        )
-
-    def enable_response_cache_all_models(self):
-        config_files = self._get_all_config_files()
-        for config_file in config_files:
-            self._update_config(
-                config_file, self.response_cache_pattern, self.response_cache_config
-            )
-
-    def enable_response_cache_composing_model(self):
-        self._update_config(
-            self.composing_config_file,
-            self.response_cache_pattern,
-            self.response_cache_config,
-        )
-
-    def reset_config_files(self):
-        config_files = self._get_all_config_files()
-        for config_file in config_files:
-            self._remove_config(config_file, self.response_cache_config)
-            self._remove_config(config_file, self.decoupled_config)
-
-    def enable_decoupled_ensemble_model(self):
-        self._update_config(
-            self.ensemble_config_file,
-            self.decoupled_pattern,
-            self.decoupled_config,
-        )
-
-    def enable_decoupled_composing_model(self):
-        self._update_config(
-            self.composing_config_file, self.decoupled_pattern, self.decoupled_config
-        )
+RESPONSE_CACHE_PATTERN = "response_cache"
+RESPONSE_CACHE_CONFIG = "response_cache {\n  enable:true\n}\n"
+DECOUPLED_PATTERN = "decoupled:true"
+DECOUPLED_CONFIG = "model_transaction_policy {\n decoupled:true\n}\n"
 
 
-class InferenceHandler:
-    def __init__(self):
-        self.config_manager = ModelConfigManager()
-        self.input_tensors = self._get_input_tensors()
+class EnsembleCacheTest(tu.TestResultCollector):
+    def setUp(self):
         self.triton_client = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
         )
-
-    def _get_input_tensors(self):
+        self.ensemble_model = "simple_graphdef_float32_float32_float32"
+        self.composing_model = "graphdef_float32_float32_float32"
+        self.model_directory = os.path.join(os.getcwd(), "models", "ensemble_models")
+        self.ensemble_config_file = os.path.join(
+            self.model_directory, self.ensemble_model, "config.pbtxt"
+        )
+        self.composing_config_file = os.path.join(
+            self.model_directory, self.composing_model, "config.pbtxt"
+        )
         input0_data = np.ones((1, 16), dtype=np.float32)
         input1_data = np.ones((1, 16), dtype=np.float32)
-        input_tensors = [
+        self.input_tensors = [
             grpcclient.InferInput(
                 "INPUT0", input0_data.shape, np_to_triton_dtype(input0_data.dtype)
             ),
@@ -152,166 +70,231 @@ class InferenceHandler:
                 "INPUT1", input1_data.shape, np_to_triton_dtype(input0_data.dtype)
             ),
         ]
-        input_tensors[0].set_data_from_numpy(input0_data)
-        input_tensors[1].set_data_from_numpy(input1_data)
-        return input_tensors
+        self.input_tensors[0].set_data_from_numpy(input0_data)
+        self.input_tensors[1].set_data_from_numpy(input1_data)
 
-    def get_inference_statistics(self, model):
-        stats = self.triton_client.get_inference_statistics(
-            model_name=model, as_json=True
+    def _update_config(self, config_file, config_pattern, config_to_add):
+        # Utility function to update config files as per testcase
+        with open(config_file, "r") as f:
+            config_data = f.read()
+            if config_pattern not in config_data:
+                with open(config_file, "w") as f:
+                    config_data += config_to_add
+                    f.write(config_data)
+
+    def _remove_config(self, config_file, config_to_remove):
+        # Utility function to remove extra added config from the config files
+        with open(config_file, "r") as f:
+            config_data = f.read()
+        updated_config_data = re.sub(config_to_remove, "", config_data)
+        with open(config_file, "w") as f:
+            f.write(updated_config_data)
+
+    def _reset_config_files(self):
+        # Utiltity function to reset all config files to original
+        self._remove_config(self.ensemble_config_file, RESPONSE_CACHE_CONFIG)
+        self._remove_config(self.ensemble_config_file, DECOUPLED_CONFIG)
+        self._remove_config(self.composing_config_file, RESPONSE_CACHE_CONFIG)
+        self._remove_config(self.composing_config_file, DECOUPLED_CONFIG)
+
+    def _run_ensemble(self):
+        # Run the ensemble pipeline and validate output
+        output = self.triton_client.infer(
+            model_name=self.ensemble_model, inputs=self.input_tensors
         )
-        return stats["model_stats"][1]["inference_stats"]
-
-    def infer(self):
-        model = self.config_manager.get_ensemble_model()
-        output = self.triton_client.infer(model_name=model, inputs=self.input_tensors)
+        self.assertIsNotNone(
+            output,
+            f"Unexpected error: Inference result is None for model '{self.ensemble_model}'. Expected non-null output.",
+        )
         output0 = output.as_numpy("OUTPUT0")
         output1 = output.as_numpy("OUTPUT1")
         outputs = [output0, output1]
         return outputs
 
-
-class InferenceValidator:
-    def __init__(self):
-        self.inference_handler = InferenceHandler()
-
-    def _check_valid_output(self, output):
-        assert output is not None, "Unexpected error in inference"
-
-    def _check_valid_output_inference(self, inference_outputs, cached_outputs):
-        assert np.array_equal(inference_outputs, cached_outputs), "Mismatched outputs"
-
-    def _check_zero_stats_baseline(self, model_inference_stats):
-        assert (
-            "count" not in model_inference_stats["success"]
-        ), "Unexpected error while retrieving statistics"
-
-    def _check_valid_stats(self, model_inference_stats):
-        assert (
-            "count" in model_inference_stats["success"]
-        ), "Unexpected error while retrieving statistics"
-
-    def _check_single_cache_miss_success_inference(self, model_inference_stats):
-        assert (
-            "count" in model_inference_stats["cache_miss"]
-        ), "Unexpected error with response cache"
-        assert (
-            int(model_inference_stats["cache_miss"]["count"]) == 1
-        ), "Unexpected multiple cache miss"
-        assert "count" not in model_inference_stats["cache_hit"], "Unexpected cache hit"
-
-    def run_ensemble(self, model):
-        model_inference_stats = self.inference_handler.get_inference_statistics(model)
-        self._check_zero_stats_baseline(model_inference_stats)
-        inference_outputs = self.inference_handler.infer()
-        self._check_valid_output(inference_outputs)
-        model_inference_stats = self.inference_handler.get_inference_statistics(model)
-        self._check_valid_stats(model_inference_stats)
-        self._check_single_cache_miss_success_inference(model_inference_stats)
-        cached_outputs = self.inference_handler.infer()
-        self._check_valid_output(cached_outputs)
-        self._check_valid_output_inference(inference_outputs, cached_outputs)
-        model_inference_stats = self.inference_handler.get_inference_statistics(model)
-        self._check_valid_stats(model_inference_stats)
-        return model_inference_stats
-
-
-class EnsembleCacheTest(tu.TestResultCollector):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.config_manager = ModelConfigManager()
-        self.inference_validator = InferenceValidator()
-        self.inference_handler = InferenceHandler()
-        self.ensemble_model = self.config_manager.get_ensemble_model()
-        self.composing_model = self.config_manager.get_composing_model()
-
-    def setup_cache_ensemble_model(self):
-        self.config_manager.enable_response_cache_ensemble_model()
-
-    def setup_decoupled_ensemble_model(self):
-        self.config_manager.enable_decoupled_ensemble_model()
-
-    def setup_decoupled_composing_model(self):
-        self.config_manager.enable_decoupled_composing_model()
-
-    def setup_cache_composing_model(self):
-        self.config_manager.enable_response_cache_composing_model()
-
-    def setup_cache_all_models(self):
-        self.config_manager.enable_response_cache_all_models()
-
-    def reset_config(self):
-        self.config_manager.reset_config_files()
-
-    def test_ensemble_top_level_cache(self):
-        model_inference_stats = self.inference_validator.run_ensemble(
-            self.ensemble_model
+    def _get_model_statistics(self, model):
+        # Get the stats for the requested model
+        model_stats = self.triton_client.get_inference_statistics(
+            model_name=model, as_json=True
         )
-        self.assertNotEqual(
-            model_inference_stats["cache_hit"]["count"],
-            "0",
-            "Unexpected error in top-level ensemble response caching",
-        )
-        self.assertLessEqual(
-            int(model_inference_stats["cache_hit"]["count"]),
-            1,
-            "Unexpected multiple cache hits",
-        )
-        self.reset_config()
+        return model_stats["model_stats"][1]["inference_stats"]
 
-    def test_all_models_with_cache_enabled(self):
-        ensemble_model_stats = self.inference_validator.run_ensemble(
-            self.ensemble_model
+    def _run_inference_and_validate(self, model):
+        # Utility function to call run_ensemble for inference and validate expected baseline output and stats
+        self.triton_client.load_model(self.ensemble_model)
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.ensemble_model),
+            f"Failed to load ensemble model '{self.ensemble_model}'",
         )
-        composing_model_stats = self.inference_handler.get_inference_statistics(
-            self.composing_model
+        self.triton_client.load_model(self.composing_model)
+        self.assertTrue(
+            self.triton_client.is_model_ready(self.composing_model),
+            f"Failed to load composing model '{self.composing_model}'",
         )
-        self.assertNotEqual(
-            ensemble_model_stats["cache_hit"]["count"],
-            "0",
-            "Unexpected error in top-level ensemble request caching",
+
+        model_stats_initial = self._get_model_statistics(model)
+        self.assertNotIn(
+            "count",
+            model_stats_initial["success"],
+            f"No inference stats expected initially for model '{model}'",
+        )
+
+        inference_output = self._run_ensemble()
+        model_stats = self._get_model_statistics(model)
+        self.assertIn(
+            "count", model_stats["success"], f"Failed inference for model '{model}'"
+        )
+        self.assertIn(
+            "count",
+            model_stats["cache_miss"],
+            f"No cache miss recorded for model '{model}', expected exactly one cache miss",
+        )
+        self.assertEqual(
+            model_stats["cache_miss"]["count"],
+            "1",
+            f"Expected exactly one cache miss in model '{model}', found {model_stats['cache_miss']['count']}",
+        )
+
+        cached_output = self._run_ensemble()
+        self.assertTrue(
+            np.array_equal(inference_output, cached_output),
+            f"Cache response does not match actual inference output for model '{model}'",
+        )
+
+    def test_ensemble_top_level_response_cache(self):
+        """
+        Test top level response caching when response cache enabled only in
+        ensemble model's config file.
+        Expected result: One cache hit in ensemble model stats. No cache related metric counts in
+        composing model stats.
+        """
+        self._update_config(
+            self.ensemble_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
+        )
+        self._run_inference_and_validate(self.ensemble_model)
+        ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
+        expected_cache_hit_count = "1"
+        actual_cache_hit_count = ensemble_model_stats["cache_hit"]["count"]
+        self.assertIn(
+            "count",
+            ensemble_model_stats["success"],
+            f"Failed inference recorded for ensemble model '{self.ensemble_model}'. Expected successful inference.",
+        )
+        self.assertIn(
+            "count",
+            ensemble_model_stats["cache_hit"],
+            f"No cache hit recorded for ensemble model '{self.ensemble_model}'. Expected exactly one cache hit.",
+        )
+        self.assertEqual(
+            actual_cache_hit_count,
+            expected_cache_hit_count,
+            f"Unexpected number of cache hits recorded for ensemble model '{self.ensemble_model}'. Expected exactly one cache hit.",
+        )
+
+    def test_ensemble_all_models_cache_enabled(self):
+        """
+        Test top level response caching when response cache enabled in
+        all the models.
+        Expected result: One cache hit in ensemble model stats. No cache hit in composing model stats.
+        """
+        self._update_config(
+            self.ensemble_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
+        )
+        self._update_config(
+            self.composing_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
+        )
+        self._run_inference_and_validate(self.ensemble_model)
+        ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
+        composing_model_stats = self._get_model_statistics(self.composing_model)
+        expected_cache_hit_count = "1"
+        actual_cache_hit_count = ensemble_model_stats["cache_hit"]["count"]
+        self.assertIn(
+            "count",
+            ensemble_model_stats["success"],
+            f"Failed inference recorded for ensemble model '{self.ensemble_model}'. Expected successful inference.",
+        )
+        self.assertIn(
+            "count",
+            ensemble_model_stats["cache_hit"],
+            f"No cache hit recorded for ensemble model '{self.ensemble_model}'. Expected exactly one cache hit.",
         )
         self.assertNotIn(
             "count",
             composing_model_stats["cache_hit"],
-            "Unexpected composing model cache hits",
+            f"Unexpected cache hit recorded for composing model '{self.composing_model}'. Expected top-level response in cache for ensemble model '{self.ensemble_model}'.",
         )
-        self.reset_config()
+        self.assertEqual(
+            actual_cache_hit_count,
+            expected_cache_hit_count,
+            f"Unexpected number of cache hits recorded for ensemble model '{self.ensemble_model}'. Expected exactly one cache hit.",
+        )
 
-    def test_composing_model_cache_enabled(self):
-        composing_model_stats = self.inference_validator.run_ensemble(
-            self.composing_model
+    def test_ensemble_composing_model_cache_enabled(self):
+        """
+        Test caching behavior when response cache enabled only in
+        composing model's config file.
+        Expected result: One cache hit in composing model stats. No cache related metric counts in
+        ensemble model stats.
+        """
+        self._update_config(
+            self.composing_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
         )
-        ensemble_model_stats = self.inference_handler.get_inference_statistics(
-            self.ensemble_model
+        self._run_inference_and_validate(self.composing_model)
+        ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
+        composing_model_stats = self._get_model_statistics(self.composing_model)
+        expected_cache_hit_count = 0
+        self.assertIn(
+            "count",
+            composing_model_stats["success"],
+            f"Failed inference recorded for ensemble model '{self.composing_model}'. Expected successful inference.",
         )
         self.assertIn(
             "count",
-            composing_model_stats["cache_miss"],
-            "Unexpected error in caching composing model response",
+            composing_model_stats["cache_hit"],
+            f"No cache hit recorded for ensemble model '{self.composing_model}'. Expected exactly one cache hit.",
         )
         self.assertNotIn(
             "count",
             ensemble_model_stats["cache_hit"],
-            "Unexpected top-level response caching",
+            f"Unexpected number of cache hits recorded for ensemble model '{self.ensemble_model}'. Expected empty cache metrics",
         )
-        self.reset_config()
 
-    def test_cache_insertion_failure(self):
-        ensemble_model_stats = self.inference_validator.run_ensemble(
-            self.ensemble_model
+    def test_ensemble_cache_insertion_failure(self):
+        """
+        Test cache insertion failure with cache enabled in
+        ensemble model's config file.
+        Expected result: Two cache miss in ensemble model stats indicating request/response not inserted into cache
+        """
+        self._update_config(
+            self.ensemble_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
+        )
+        self._run_inference_and_validate(self.ensemble_model)
+        ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
+        expected_cache_miss_count = "2"
+        actual_cache_miss_count = ensemble_model_stats["cache_miss"]["count"]
+        self.assertIn(
+            "count",
+            ensemble_model_stats["success"],
+            f"Failed inference recorded for ensemble model '{self.ensemble_model}'. Expected successful inference.",
         )
         self.assertNotIn(
             "count",
             ensemble_model_stats["cache_hit"],
-            "Unexpected successful cache insert",
+            f"No cache hit recorded for ensemble model '{self.ensemble_model}'. Expected exactly one cache hit.",
+        )
+        self.assertIn(
+            "count",
+            ensemble_model_stats["cache_miss"],
+            f"No cache miss recorded in ensemble model '{self.ensemble_model}'. Expected cache miss.",
         )
         self.assertEqual(
-            ensemble_model_stats["cache_miss"]["count"],
-            ensemble_model_stats["success"]["count"],
-            "Unexpected error with response cache",
+            actual_cache_miss_count,
+            expected_cache_miss_count,
+            f"Unexpected number of cache misses recorded in ensemble model '{self.ensemble_model}'. Expected exactly {expected_cache_miss_count} cache misses for two inference requests, but found {actual_cache_miss_count}.",
         )
-        self.reset_config()
+
+    def tearDown(self):
+        self._reset_config_files()
+        self.triton_client.close()
 
 
 if __name__ == "__main__":
