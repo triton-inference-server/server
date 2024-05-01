@@ -91,7 +91,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
             f.write(updated_config_data)
 
     def _reset_config_files(self):
-        # Utiltity function to reset all config files to original
+        # Utillity function to reset all config files to original
         self._remove_config(self.ensemble_config_file, RESPONSE_CACHE_CONFIG)
         self._remove_config(self.ensemble_config_file, DECOUPLED_CONFIG)
         self._remove_config(self.composing_config_file, RESPONSE_CACHE_CONFIG)
