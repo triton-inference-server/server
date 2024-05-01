@@ -242,18 +242,18 @@ check_server_failure_decoupled_model ${MODEL_DIR}  "decoupled_cache"
 # Test with model expected to load successfully
 EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
 
-#  Test old cache config method
+# Test old cache config method
 #  --response-cache-byte-size must be non-zero to test models with cache enabled
 SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
-#  Test new cache config method
+# Test new cache config method
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
-#  Test that specifying multiple cache types is not supported and should fail
+# Test that specifying multiple cache types is not supported and should fail
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 --cache-config=redis,key=value ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "multiple cache configurations"
