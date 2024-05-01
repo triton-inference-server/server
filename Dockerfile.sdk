@@ -214,7 +214,7 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
-RUN pip3 install install/python/genai_perf-*.whl
+RUN pip3 uninstall genai-perf && pip3 install install/python/genai_perf-*.whl
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
