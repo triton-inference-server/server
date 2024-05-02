@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+RET=0
 REPODIR=/data/inferenceserver/${REPO_VERSION}
 TRTEXEC=/usr/src/tensorrt/bin/trtexec
 MODEL="deeprecommender"
@@ -52,19 +53,40 @@ STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
 
-# Create the TensorRT plan from TF
-rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
-    (cd tensorrt_models/deeprecommender_plan && \
-        sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
+# Create the TensorRT plan from ONNX
+rm -fr tensorrt_models && mkdir -p tensorrt_models/deeprecommender_plan/0 && \
+cp $REPODIR/perf_model_store/deeprecommender_onnx/1/model.onnx tensorrt_models/deeprecommender_plan && \
+(cd tensorrt_models/deeprecommender_plan && \
+echo 'name: "deeprecommender_plan"
+platform: "tensorrt_plan"
+max_batch_size: ${STATIC_BATCH}
+input [
+  {
+    name: "Placeholder:0"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [17736,1,1]
+  }
+]
+output [
+  {
+    name: "fc5/Relu:0"
+    data_type: TYPE_FP32
+    dims: [17736]
+  }
+]' >| config.pbtxt)
 
-$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
-         --uffInput=Placeholder,1,1,17736\
-         --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
-         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
+$TRTEXEC --onnx=tensorrt_models/deeprecommender_plan/model.onnx --verbose \
+         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan \
+         --minShapes=Placeholder:0:1x17736x1x1 \
+         --optShapes=Placeholder:0:${STATIC_BATCH}x17736x1x1 \
+         --maxShapes=Placeholder:0:${STATIC_BATCH}x17736x1x1
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to generate TensorRT Plan \n***"
+    exit 1
+fi
+rm tensorrt_models/deeprecommender_plan/model.onnx
 
 OPTIMIZED_MODEL_NAMES="deeprecommender_graphdef_trt"
 
@@ -102,6 +124,9 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
                 INSTANCE_COUNTS=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
+        if [ $? -ne 0 ]; then
+          RET=1
+        fi
     done
 done
 
@@ -112,19 +137,40 @@ STATIC_BATCH=256
 INSTANCE_CNT=2
 CONCURRENCY=4
 
-# Create the TensorRT plan from TF
-rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
-    (cd tensorrt_models/deeprecommender_plan && \
-        sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
+# Create the TensorRT plan from ONNX
+rm -fr tensorrt_models && mkdir -p tensorrt_models/deeprecommender_plan/0 && \
+cp $REPODIR/perf_model_store/deeprecommender_onnx/1/model.onnx tensorrt_models/deeprecommender_plan && \
+(cd tensorrt_models/deeprecommender_plan && \
+echo 'name: "deeprecommender_plan"
+platform: "tensorrt_plan"
+max_batch_size: ${STATIC_BATCH}
+input [
+  {
+    name: "Placeholder:0"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [17736,1,1]
+  }
+]
+output [
+  {
+    name: "fc5/Relu:0"
+    data_type: TYPE_FP32
+    dims: [17736]
+  }
+]' >| config.pbtxt)
 
-$TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommender_graphdef.uff \
-         --uffInput=Placeholder,1,1,17736\
-         --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
-         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
+$TRTEXEC --onnx=tensorrt_models/deeprecommender_plan/model.onnx --verbose \
+         --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan \
+         --minShapes=Placeholder:0:1x17736x1x1 \
+         --optShapes=Placeholder:0:${STATIC_BATCH}x17736x1x1 \
+         --maxShapes=Placeholder:0:${STATIC_BATCH}x17736x1x1
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to generate TensorRT Plan \n***"
+    exit 1
+fi
+rm tensorrt_models/deeprecommender_plan/model.onnx
 
 # Tests with each model
 for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
@@ -146,5 +192,14 @@ for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
                 INSTANCE_COUNTS=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
                 bash -x run_test.sh
+        if [ $? -ne 0 ]; then
+          RET=1
+        fi
     done
 done
+
+if (( $RET == 0 )); then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
