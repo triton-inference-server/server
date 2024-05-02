@@ -298,7 +298,7 @@ CheckCudaSharedMemoryRegionSize(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register CUDA shared memory region '" + name +
-            "': register size exceeds shared memory region size")
+            "': register size exceeds CUDA shared memory region size")
             .c_str());
   }
 
