@@ -28,19 +28,6 @@
 
 # Triton Inference Server
 
-📣 **Triton Meetup at the NVIDIA Headquarters on April 30th 3:00 - 6:30 pm**
-
-We are excited to announce that we will be hosting our Triton user meetup at
-the NVIDIA Headquarters on April 30th 3:00 - 6:30 pm. Join us for this
-exclusive event where you will learn about the newest Triton features, get a
-glimpse into the roadmap, and connect with fellow users and the NVIDIA Triton
-engineering and product teams. Seating is limited and registration confirmation
-is required to attend - please register [here](https://lu.ma/tl06fqc1) to join
-the meetup. We can’t wait to welcome you and share what’s next for the Triton
-Inference Server.
-
----
-
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 > [!WARNING]
