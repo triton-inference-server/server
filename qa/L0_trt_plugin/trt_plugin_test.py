@@ -41,6 +41,11 @@ import tritonclient.http as httpclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+def hardmax_reference(arr, axis=0):
+    one_hot = np.zeros(arr.shape, dtype=arr.dtype)
+    argmax = np.expand_dims(np.argmax(arr, axis), axis)
+    np.put_along_axis(one_hot,argmax,1,axis=axis)
+    return one_hot
 
 class PluginModelTest(tu.TestResultCollector):
     def _full_exact(self, model_name, plugin_name, shape):
@@ -64,32 +69,9 @@ class PluginModelTest(tu.TestResultCollector):
         tolerance_relative = 1e-6
         tolerance_absolute = 1e-7
 
-        # Verify values of Clip, GELU, and Normalize
-        if plugin_name == "CustomClipPlugin":
-            # Clip data to minimum of .1, maximum of .5
-            test_output = np.clip(input0_data, 0.1, 0.5)
-            np.testing.assert_allclose(
-                output0_data,
-                test_output,
-                rtol=tolerance_relative,
-                atol=tolerance_absolute,
-            )
-        elif plugin_name == "CustomGeluPluginDynamic":
-            # Add bias
-            input0_data += 1
-            # Calculate Gelu activation
-            test_output = (input0_data * 0.5) * (
-                1 + np.tanh((0.797885 * input0_data) + (0.035677 * (input0_data**3)))
-            )
-            np.testing.assert_allclose(
-                output0_data,
-                test_output,
-                rtol=tolerance_relative,
-                atol=tolerance_absolute,
-            )
-        elif plugin_name == "Normalize_TRT":
-            # L2 norm is sqrt(sum([1]*16)))
-            test_output = input0_data / np.sqrt(sum([1] * 16))
+        # Verify values of Hardmax, GELU, and Normalize
+        if plugin_name == "CustomHardmax":
+            test_output = hardmax_reference(input0_data)
             np.testing.assert_allclose(
                 output0_data,
                 test_output,
@@ -99,25 +81,17 @@ class PluginModelTest(tu.TestResultCollector):
         else:
             self.fail("Unexpected plugin: " + plugin_name)
 
-    def test_raw_fff_clip(self):
+    def test_raw_hard_max(self):
         for bs in (1, 8):
             self._full_exact(
-                "plan_float32_float32_float32", "CustomClipPlugin", (bs, 16)
+                "plan_float32_float32_float32", "CustomHardmax", (bs, 2, 2),
             )
 
-    def test_raw_fff_gelu(self):
         self._full_exact(
             "plan_nobatch_float32_float32_float32",
-            "CustomGeluPluginDynamic",
+            "CustomHardmax",
             (16, 1, 1),
         )
-
-    def test_raw_fff_norm(self):
-        # model that supports batching
-        for bs in (1, 8):
-            self._full_exact(
-                "plan_float32_float32_float32", "Normalize_TRT", (bs, 16, 16, 16)
-            )
 
 
 if __name__ == "__main__":

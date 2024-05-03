@@ -1,4 +1,4 @@
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,27 +30,6 @@ cmake_minimum_required (VERSION 3.18)
 # Unit tests
 #
 find_package(GTest REQUIRED)
-
-#
-# caffe2plan
-#
-# [FIXME TRTV10]
-#if(${TRITON_ENABLE_TENSORRT} AND NOT ${TRITON_IGPU_BUILD})
-#  add_executable(caffe2plan caffe2plan.cc)
-#  target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
-#  target_link_libraries(
-#    caffe2plan
-#    PRIVATE
-#      -lnvinfer
-#      -lnvcaffe_parser
-#      CUDA::cudart
-#  )
-#
-#  install(
-#    TARGETS caffe2plan
-#    RUNTIME DESTINATION bin
-#  )
-#endif() # TRITON_ENABLE_TENSORRT
 
 #
 # Unit test for DataCompressor
