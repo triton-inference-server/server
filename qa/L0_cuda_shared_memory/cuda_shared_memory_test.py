@@ -331,7 +331,7 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         # Verify various edge cases of registered region size don't go out of bounds of the actual created shm region's size.
         with self.assertRaisesRegex(
             InferenceServerException,
-            r"failed to register CUDA shared memory region.*register size exceeds CUDA shared memory region size",
+            "failed to register shared memory region.*invalid args",
         ):
             self._configure_server(
                 create_byte_size=create_byte_size,
