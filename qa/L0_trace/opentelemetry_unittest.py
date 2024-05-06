@@ -402,7 +402,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
     def _test_trace_cancel(
         self,
     ):
-        # TO accomadate for delay in the model
+        # TO accommodate for delay in the model
         time.sleep(2 * COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
 
