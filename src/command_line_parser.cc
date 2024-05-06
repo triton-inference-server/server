@@ -354,6 +354,7 @@ enum TritonOptionId {
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
   OPTION_STARTUP_MODEL,
+  OPTION_CUSTOM_MODEL_CONFIG_NAME,
   OPTION_RATE_LIMIT,
   OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
@@ -440,6 +441,12 @@ TritonParser::SetupOptions()
        "Specifying --load-model=* in conjunction with another --load-model "
        "argument will result in error. Note that this option will only take "
        "effect if --model-control-mode=explicit is true."});
+  model_repo_options_.push_back(
+      {OPTION_CUSTOM_MODEL_CONFIG_NAME, "model-config-name", Option::ArgStr,
+       "The custom model configuration for models to load."
+       "For example: --model-config-name=a100. "
+       "If --model-config-name is not set, Triton will use the default "
+       "config.pbtxt."});
   model_repo_options_.push_back(
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
@@ -1013,6 +1020,11 @@ TritonServerParameters::BuildTritonServerOptions()
   }
   THROW_IF_ERR(
       ParseException,
+      TRITONSERVER_ServerOptionsSetModelConfigName(
+          loptions, model_config_name_.c_str()),
+      "setting custom model configuration name for models");
+  THROW_IF_ERR(
+      ParseException,
       TRITONSERVER_ServerOptionsSetRateLimiterMode(loptions, rate_limit_mode_),
       "setting rate limiter configuration");
   for (const auto& resource : rate_limit_resources_) {
@@ -1353,7 +1365,6 @@ TritonParser::Parse(int argc, char** argv)
           lparams.http_forward_header_pattern_ =
               std::move(case_insensitive_prefix + optarg);
           break;
-          break;
         case OPTION_HTTP_THREAD_COUNT:
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
           break;
@@ -1590,6 +1601,13 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_STARTUP_MODEL:
           lparams.startup_models_.insert(optarg);
+          break;
+        case OPTION_CUSTOM_MODEL_CONFIG_NAME:
+          if (std::strlen(optarg) == 0) {
+            throw ParseException(
+                "Error: empty argument for --model-config-name");
+          }
+          lparams.model_config_name_ = optarg;
           break;
         case OPTION_MODEL_CONTROL_MODE: {
           std::string mode_str(optarg);

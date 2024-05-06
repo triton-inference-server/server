@@ -1259,7 +1259,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     model_version=1,
                 )
                 self.assertTrue(
-                    False, "expected error for unavailable model " + graphdef_name
+                    False, "expected error for unavailable model " + model_name
                 )
             except Exception as ex:
                 self.assertIn("Request for unknown model", ex.message())
@@ -3404,6 +3404,302 @@ class LifeCycleTest(tu.TestResultCollector):
             1,
             "exit timeout countdown restart detected",
         )
+
+    def test_add_custom_config(self):
+        models_base = ("savedmodel_nobatch",)
+        models_shape = ((16,),)
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on the model on all versions
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=1,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=2,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=True,
+                    model_version=3,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Add custom model configuration, which cause model to be
+        # re-loaded and use custom config inside configs folder, which
+        # means that version policy will change and only version 2 will
+        # be available.
+        for base_name, model_name in zip(models_base, models):
+            shutil.copyfile(
+                "config.pbtxt.custom." + base_name,
+                "models/" + model_name + "/configs/custom.pbtxt",
+            )
+
+        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Only version 2 should work...
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=True,
+                    model_version=2,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=1,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=3,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
+
+    def test_delete_custom_config(self):
+        models_base = ("savedmodel_nobatch",)
+        models_shape = ((16,),)
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on the model on all versions
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=1,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=True,
+                    model_version=2,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=3,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
+
+        # Delete custom model configuration, which cause model to be
+        # re-loaded and use default config, which means that version
+        # policy will be changed and so only version 1, 3 will be available
+        for model_name in models:
+            os.remove("models/" + model_name + "/configs/custom.pbtxt")
+
+        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Only version 1, 3 should work...
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=1,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=True,
+                    model_version=3,
+                )
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(
+                    self,
+                    model_name,
+                    model_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    swap=False,
+                    model_version=2,
+                )
+                self.assertTrue(
+                    False, "expected error for unavailable model " + model_name
+                )
+            except Exception as ex:
+                self.assertIn("Request for unknown model", ex.message())
 
 
 if __name__ == "__main__":
