@@ -70,7 +70,6 @@ class TestImplicitState(unittest.TestCase):
 
     # Test timeout is reset for a sequence slot after its sequence is cancelled
     def test_state_reset_after_cancel(self):
-        model_name = "sequence_state"
         sequence_timeout = 6  # secs
         # Start sequence 1 and cancel it
         num_reqs = 10
