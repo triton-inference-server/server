@@ -88,7 +88,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
             f.write(updated_config_data)
 
     def _reset_config_files(self):
-        # Utillity function to reset all config files to original
+        # Utility function to reset all config files to original
         self._remove_config(self.ensemble_config_file, RESPONSE_CACHE_CONFIG)
         self._remove_config(self.composing_config_file, RESPONSE_CACHE_CONFIG)
 
@@ -111,10 +111,29 @@ class EnsembleCacheTest(tu.TestResultCollector):
         model_stats = self.triton_client.get_inference_statistics(
             model_name=model, as_json=True
         )
+
+        """
+        The models used have two versions, version 1 and version 3.
+        Since, model_version is set to -1 in config.pbtxt, the highest version is loaded
+        which is version 3.
+        model_stats has inference stats of version_1 at index 0 and inference stats for version 3 at index 1.
+        """
         return model_stats["model_stats"][1]["inference_stats"]
 
     def _run_inference_and_validate(self, model):
-        # Utility function to call run_ensemble for inference and validate expected baseline output and stats
+        """
+        Helper function that takes model as a parameter to verify the corresponding model's stats
+        The passed model is composing model for test case `test_ensemble_composing_model_cache_enabled`
+        For other testcases, the top-level ensemble model stats are verified.
+            * loads the simple_graphdef_float32_float32_float32 and graphdef_float32_float32_float32
+              and verifies if they are loaded properly.
+            * Checks the initial statistics of the model passed in the parameter
+              Expected - baseline statistics to be all empty metrics since
+            * Calls the run_ensemble function to run the ensemble pipeline.
+            * Verifies the stats after first inference. Expected single cache miss.
+            * Calls the run_ensemble function to run the ensemble pipeline again.
+            * Checks if returned output is equal to th output of first inference.
+        """
         self.triton_client.load_model(self.ensemble_model)
         self.assertTrue(
             self.triton_client.is_model_ready(self.ensemble_model),
@@ -256,7 +275,8 @@ class EnsembleCacheTest(tu.TestResultCollector):
         """
         Test cache insertion failure with cache enabled in
         ensemble model's config file.
-        Expected result: Two cache miss in ensemble model stats indicating request/response not inserted into cache
+        Expected result: Two cache miss in ensemble model stats indicating request/response not inserted into cache 
+        Reason: The data (input tensors, output tensors and other model information) to be inserted in cache is bigger cache size.
         """
         self._update_config(
             self.ensemble_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG

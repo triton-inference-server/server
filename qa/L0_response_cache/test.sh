@@ -81,7 +81,6 @@ echo -e "model_transaction_policy { decoupled: True }" >> "${ENSEMBLE_CACHE_DECO
 echo -e "response_cache { enable: True }" >> "${ENSEMBLE_CACHE_COMPOSING_DECOUPLED}/${ENSEMBLE_MODEL}/config.pbtxt"
 echo -e "model_transaction_policy { decoupled: True }" >> "${ENSEMBLE_CACHE_COMPOSING_DECOUPLED}/${COMPOSING_MODEL}/config.pbtxt"
 
-
 rm -fr *.log
 
 function install_redis() {
@@ -232,6 +231,17 @@ function test_response_cache_ensemble_model {
           RET=1
       fi
   fi
+
+  if [ "${TESTCASE}" = "EnsembleCacheTest.test_ensemble_cache_insertion_failure" ]; then
+      # Check for the error message in the log file
+      set +e
+      grep -i "Failed to insert key" "${SERVER_LOG}"
+      if [ $? -ne 0 ]; then
+          echo "\n***\n*** Failed: Cache insertion successful when it was expected to fail\n***"
+          RET=1
+      fi
+      set -e
+  fi
   set -e
   check_server_success_and_kill
 }
@@ -243,7 +253,7 @@ check_server_failure_decoupled_model ${MODEL_DIR}  "decoupled_cache"
 EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
 
 # Test old cache config method
-#  --response-cache-byte-size must be non-zero to test models with cache enabled
+# --response-cache-byte-size must be non-zero to test models with cache enabled
 SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill

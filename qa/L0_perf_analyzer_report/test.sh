@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -160,6 +160,7 @@ set -e
 
 # Cleanup
 kill $SERVER_PID
+wait $SERVER_PID
 
 
 if [ $RET -eq 0 ]; then
