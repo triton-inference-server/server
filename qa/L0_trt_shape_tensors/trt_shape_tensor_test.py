@@ -40,7 +40,7 @@ import infer_util as iu
 import numpy as np
 import sequence_util as su
 import test_util as tu
-import tritongrpcclient as grpcclient
+import tritonclient.grpc as grpcclient
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 

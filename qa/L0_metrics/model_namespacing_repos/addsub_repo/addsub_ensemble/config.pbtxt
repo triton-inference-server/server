@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,25 +24,60 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
-export APP_NAME=tritonserver
-export MAJOR_VERSION=2.45
-export MINOR_VERSION=2.45.0
-export NGC_VERSION=24.04-py3
+platform: "ensemble"
+max_batch_size: 0
+version_policy: { all { } }
 
-docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
 
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker push $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker build --tag $REGISTRY/$APP_NAME/deployer .
-
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
+ensemble_scheduling {
+  step [
+    {
+      model_name: "composing_model"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "INPUT0"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "INPUT1"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "OUTPUT0"
+      }
+      output_map {
+        key: "OUTPUT1"
+        value: "OUTPUT1"
+      }
+    }
+  ]
+}
