@@ -52,6 +52,7 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
+CANCELDIR=models/
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
@@ -71,6 +72,8 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
     cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+    # set up new dir for cancel model
+    cp -r $CANCELDIR/input_all_required $MODELSDIR/input_all_required && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
@@ -761,6 +764,7 @@ mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_co
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
                 --load-mode=repeat_int32 \
+                --load-model=input_all_required \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --load-model=trace_context --trace-config=rate=1 \
                 --trace-config=count=-1 --trace-config=mode=opentelemetry \
