@@ -49,26 +49,34 @@ class TestImplicitState(unittest.TestCase):
 
         return callback, response
 
+    def _sequence_state_model_infer(self, num_reqs, seq_ids, delay_itrs, cancel_reqs):
+        model_name = "sequence_state"
+        callback, response = self._generate_streaming_callback_and_response_pair()
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            client.start_stream(callback)
+            seq_start = True
+            for req_id in range(num_reqs):
+                for seq_id in seq_ids:
+                    client.async_stream_infer(
+                        model_name,
+                        self._get_inputs(delay_itrs),
+                        sequence_id=seq_id,
+                        sequence_start=seq_start,
+                    )
+                    time.sleep(0.1)
+                seq_start = False
+            client.stop_stream(cancel_requests=cancel_reqs)
+        return response
+
     # Test timeout is reset for a sequence slot after its sequence is cancelled
     def test_state_reset_after_cancel(self):
         model_name = "sequence_state"
         sequence_timeout = 6  # secs
         # Start sequence 1 and cancel it
-        callback, response = self._generate_streaming_callback_and_response_pair()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
-            client.start_stream(callback)
-            seq_start = True
-            num_reqs = 10
-            for req_id in range(num_reqs):
-                client.async_stream_infer(
-                    model_name,
-                    self._get_inputs(delay_itrs=5000000),
-                    sequence_id=1,
-                    sequence_start=True,
-                )
-                seq_start = False
-                time.sleep(0.1)
-            client.stop_stream(cancel_requests=True)
+        num_reqs = 10
+        response = self._sequence_state_model_infer(
+            num_reqs, seq_ids=[1], delay_itrs=5000000, cancel_reqs=True
+        )
         self.assertLess(
             len(response),
             num_reqs,
@@ -77,23 +85,9 @@ class TestImplicitState(unittest.TestCase):
         # Wait for sequence 1 to timeout
         time.sleep(sequence_timeout + 2)
         # Start sequence 2 and 3
-        callback, _ = self._generate_streaming_callback_and_response_pair()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
-            client.start_stream(callback)
-            seq_start = True
-            num_reqs = 4
-            seq_ids = [2, 3]
-            for req_id in range(num_reqs):
-                for seq_id in seq_ids:
-                    client.async_stream_infer(
-                        model_name,
-                        self._get_inputs(delay_itrs=0),
-                        sequence_id=seq_id,
-                        sequence_start=seq_start,
-                    )
-                    time.sleep(0.1)
-                seq_start = False
-            client.stop_stream(cancel_requests=False)
+        self._sequence_state_model_infer(
+            num_reqs=4, seq_ids=[2, 3], delay_itrs=0, cancel_reqs=False
+        )
         # Check for any unexpected sequence state mixing
         with open(os.environ["SERVER_LOG"]) as f:
             server_log = f.read()
