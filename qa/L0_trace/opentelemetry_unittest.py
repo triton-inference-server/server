@@ -625,7 +625,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
     def test_grpc_trace_all_input_required_model_cancel(self):
         """
         Tests trace, collected from executing one inference request and cancelling the request
-        for a `simple` model and GRPC client.
+        for a model and GRPC client.
         """
         triton_client_grpc = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
@@ -650,8 +650,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
     def test_non_decoupled(self):
         """
-        Tests trace, collected from executing one inference request and cancelling the request
-        for a `simple` model and GRPC client.
+        Tests trace, collected from executing one inference request of non decoupled model.
         """
         inputs = [
             grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
@@ -673,6 +672,8 @@ class OpenTelemetryTest(tu.TestResultCollector):
             model_name=self.non_decoupled_model_name_, inputs=inputs
         )
         self._test_non_decoupled_trace()
+        self.assertEqual(1, res.as_numpy("OUT")[0])
+        self.assertEqual(0, res.as_numpy("IDX")[0])
 
     def test_grpc_trace_simple_model_context_propagation(self):
         """
