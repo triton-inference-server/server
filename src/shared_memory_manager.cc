@@ -276,10 +276,11 @@ GetCudaSharedMemoryRegionSize(CUdeviceptr data_ptr, size_t& shm_region_size)
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL, "Failed to get CUDA error string");
     }
-    // Should not pass the detailed error message back to the client.
-    LOG_ERROR << "Failed to get CUDA address range: " << errorString;
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "Failed to get CUDA address range");
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "Failed to get CUDA address range: " + std::string(errorString))
+            .c_str());
   }
   return nullptr;
 }
@@ -289,10 +290,15 @@ CheckCudaSharedMemoryRegionSize(
     const std::string& name, CUdeviceptr data_ptr, size_t byte_size)
 {
   size_t shm_region_size = 0;
-  RETURN_IF_ERR(GetCudaSharedMemoryRegionSize(data_ptr, shm_region_size));
+  auto err = GetCudaSharedMemoryRegionSize(data_ptr, shm_region_size);
 
   // User-provided offset and byte_size should not go out-of-bounds.
-  if (byte_size > shm_region_size) {
+  if (err != nullptr || byte_size > shm_region_size) {
+    if (err != nullptr) {
+      // Should not pass the detailed error message back to the client.
+      LOG_ERROR << TRITONSERVER_ErrorMessage(err);
+      TRITONSERVER_ErrorDelete(err);
+    }
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
