@@ -52,7 +52,6 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
-CANCELDIR=models/
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
@@ -72,8 +71,6 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
     cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
-    # set up new dir for cancel model
-    cp -r $CANCELDIR/input_all_required $MODELSDIR/input_all_required && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
@@ -171,9 +168,9 @@ SERVER_ARGS="--trace-config triton,file=trace_off_to_min.log --trace-config leve
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 set +e
@@ -184,19 +181,19 @@ assert_curl_success "Failed to modify global trace settings"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 send_inference_requests "client_min.log" 10
@@ -212,15 +209,15 @@ set +e
 $TRACE_SUMMARY -t trace_off_to_min.log > summary_off_to_min.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_off_to_min.log` != "20" ]; then
-cat summary_off_to_min.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_off_to_min.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_off_to_min.log` != "20" ]; then
-cat summary_off_to_min.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_off_to_min.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 set -e
@@ -230,9 +227,9 @@ SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TI
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 set +e
@@ -243,7 +240,10 @@ assert_curl_failure "trace_file updated through network protocol expects an erro
 
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
 fi
 
 # Use a different name
@@ -252,22 +252,22 @@ assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 send_inference_requests "client_simple.log" 10
@@ -280,36 +280,36 @@ wait $SERVER_PID
 set +e
 
 if [ -f ./simple_trace.log ]; then
-echo -e "\n***\n*** Test Failed, unexpected generation of simple_trace.log\n***"
-RET=1
+    echo -e "\n***\n*** Test Failed, unexpected generation of simple_trace.log\n***"
+    RET=1
 fi
 
 $TRACE_SUMMARY -t global_trace.log.0 > summary_global_trace.log.0
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.0` != "2" ]; then
-cat summary_global_trace.log.0
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_global_trace.log.0` != "2" ]; then
-cat summary_global_trace.log.0
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 $TRACE_SUMMARY -t global_trace.log.1 > summary_global_trace.log.1
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.1` != "1" ]; then
-cat summary_global_trace.log.1
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_global_trace.log.1` != "1" ]; then
-cat summary_global_trace.log.1
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 set -e
@@ -319,9 +319,9 @@ SERVER_ARGS="--trace-config triton,file=global_trace.log --trace-config level=TI
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 set +e
@@ -335,22 +335,22 @@ assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"OFF\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 # Send requests to simple where trace is explicitly disabled
@@ -365,22 +365,22 @@ assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting (global) is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 # Send requests to simple where now uses global setting
@@ -394,22 +394,22 @@ wait $SERVER_PID
 set +e
 
 if [ -f ./update_trace.log ]; then
-echo -e "\n***\n*** Test Failed, unexpected generation of update_trace.log\n***"
-RET=1
+    echo -e "\n***\n*** Test Failed, unexpected generation of update_trace.log\n***"
+    RET=1
 fi
 
 $TRACE_SUMMARY -t global_trace.log > summary_global_trace.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log` != "10" ]; then
-cat summary_global_trace.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_global_trace.log` != "10" ]; then
-cat summary_global_trace.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_trace.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 set -e
@@ -419,9 +419,9 @@ SERVER_ARGS="--trace-config triton,file=global_count.log --trace-config level=TI
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 set +e
@@ -436,22 +436,22 @@ get_trace_setting "simple"
 assert_curl_success "Failed to obtain trace settings for 'simple' model"
 
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 # Set trace count
@@ -460,22 +460,22 @@ assert_curl_success "Failed to modify global trace settings"
 
 # Check if the current setting is returned
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"5\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 # Send requests to simple where trace is explicitly disabled
@@ -486,36 +486,36 @@ get_trace_setting "simple"
 assert_curl_success "Failed to obtain trace settings for 'simple' model"
 
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-RET=1
+    RET=1
 fi
 
 # Check if the indexed file has been generated when trace count reaches 0
 if [ ! -f ./global_count.log.0 ]; then
-echo -e "\n***\n*** Test Failed, expect generation of global_count.log.0 before stopping server\n***"
-RET=1
+    echo -e "\n***\n*** Test Failed, expect generation of global_count.log.0 before stopping server\n***"
+    RET=1
 fi
 
 SETTINGS="trace_count trace_rate log_frequency"
 
 for SETTING in $SETTINGS; do
-# Check `out of range` errors
-update_trace_setting "simple" '{"'${SETTING}'":"10000000000"}'
-assert_curl_failure "Server modified '${SETTING}' with an out of range value."
+    # Check `out of range` errors
+    update_trace_setting "simple" '{"'${SETTING}'":"10000000000"}'
+    assert_curl_failure "Server modified '${SETTING}' with an out of range value."
 done
 
 set -e
@@ -530,29 +530,29 @@ set +e
 $TRACE_SUMMARY -t global_count.log > summary_global_count.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log` != "20" ]; then
-cat summary_global_count.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_count.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_global_count.log` != "20" ]; then
-cat summary_global_count.log
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_count.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 $TRACE_SUMMARY -t global_count.log.0 > summary_global_count.log.0
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log.0` != "5" ]; then
-cat summary_global_count.log.0
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_count.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_global_count.log.0` != "5" ]; then
-cat summary_global_count.log.0
-echo -e "\n***\n*** Test Failed\n***"
-RET=1
+    cat summary_global_count.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
 
 set -e
@@ -562,24 +562,26 @@ SERVER_ARGS="--trace-config triton,file=global_unittest.log --trace-config level
 SERVER_LOG="./inference_server_unittest.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
+
+RET=0
 
 set +e
 
 python $CLIENT_TEST >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-cat $CLIENT_LOG
-RET=1
+    cat $CLIENT_LOG
+    RET=1
 else
-check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-if [ $? -ne 0 ]; then
-cat $CLIENT_LOG
-echo -e "\n***\n*** Test Result Verification Failed\n***"
-RET=1
-fi
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e
@@ -638,27 +640,27 @@ set +e
 $TRACE_SUMMARY -t bls_trace.log > summary_bls.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_bls.log` != "2" ]; then
-cat summary_bls.log
-echo -e "\n***\n*** Test Failed: Unexpected number of traced "COMPUTE_INPUT_END" events.\n***"
-RET=1
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "COMPUTE_INPUT_END" events.\n***"
+    RET=1
 fi
 
 if [ `grep -c ^ensemble_add_sub_int32_int32_int32 summary_bls.log` != "1" ]; then
-cat summary_bls.log
-echo -e "\n***\n*** Test Failed: BLS child ensemble model wasn't traced. \n***"
-RET=1
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: BLS child ensemble model wasn't traced. \n***"
+    RET=1
 fi
 
 if [ `grep -c ^simple summary_bls.log` != "1" ]; then
-cat summary_bls.log
-echo -e "\n***\n*** Test Failed: ensemble's model 'simple' wasn't traced. \n***"
-RET=1
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed: ensemble's model 'simple' wasn't traced. \n***"
+    RET=1
 fi
 
 if [ `grep -o 'parent_id' bls_trace.log | wc -l` != "2" ]; then
-cat bls_trace.log
-echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
-RET=1
+    cat bls_trace.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of 'parent id' fields. \n***"
+    RET=1
 fi
 
 # Attempt to trace non-existent model
@@ -666,9 +668,9 @@ SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_nonexistent_model.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-echo -e "\n***\n*** Failed to start $SERVER\n***"
-cat $SERVER_LOG
-exit 1
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 # Explicitly load model
@@ -759,7 +761,6 @@ mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_co
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
                 --load-mode=repeat_int32 \
-                --load-model=input_all_required \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --load-model=trace_context --trace-config=rate=1 \
                 --trace-config=count=-1 --trace-config=mode=opentelemetry \

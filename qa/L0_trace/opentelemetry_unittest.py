@@ -108,7 +108,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
             {"traceparent": "00-0af7651916cd43dd8448eb211c12666c-b7ad6b7169242424-01"}
         )
         self.simple_model_name = "simple"
-        self.input_all_required_model_name = "input_all_required"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.bls_model_name = "bls_simple"
         self.trace_context_model = "trace_context"
@@ -154,7 +153,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
         return traces
 
-    def _check_events(self, span_name, events, is_cancel):
+    def _check_events(self, span_name, events):
         """
         Helper function that verifies passed events contain expected entries.
 
@@ -176,14 +175,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
             "GRPC_SEND_START",
             "GRPC_SEND_END",
         ]
-        cancel_root_events_http = [
-            "HTTP_RECV_START",
-            "HTTP_RECV_END",
-        ]
-        cancel_root_events_grpc = [
-            "GRPC_WAITREAD_START",
-            "GRPC_WAITREAD_END",
-        ]
         request_events = ["REQUEST_START", "QUEUE_START", "REQUEST_END"]
         compute_events = [
             "COMPUTE_START",
@@ -204,10 +195,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
-            if is_cancel == True:
-                root_events_http = cancel_root_events_http
-                root_events_grpc = cancel_root_events_grpc
-
             if "HTTP" in events:
                 self.assertTrue(all(entry in events for entry in root_events_http))
                 self.assertFalse(all(entry in events for entry in root_events_grpc))
@@ -215,9 +202,8 @@ class OpenTelemetryTest(tu.TestResultCollector):
             elif "GRPC" in events:
                 self.assertTrue(all(entry in events for entry in root_events_grpc))
                 self.assertFalse(all(entry in events for entry in root_events_http))
-            if is_cancel == False:
-                self.assertFalse(all(entry in events for entry in request_events))
-                self.assertFalse(all(entry in events for entry in compute_events))
+            self.assertFalse(all(entry in events for entry in request_events))
+            self.assertFalse(all(entry in events for entry in compute_events))
 
         elif span_name in self.test_models:
             # Check that all request related events (and only them)
@@ -291,7 +277,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
-    def _verify_contents(self, spans, expected_counts, is_cancel):
+    def _verify_contents(self, spans, expected_counts):
         """
         Helper function that:
          * iterates over `spans` and for every span it verifies that proper events are collected
@@ -315,7 +301,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_names.append(span_name)
             span_events = span["events"]
             event_names_only = [event["name"] for event in span_events]
-            self._check_events(span_name, event_names_only, is_cancel)
+            self._check_events(span_name, event_names_only)
 
         self.assertEqual(
             len(span_names),
@@ -329,6 +315,10 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 "Unexpeced number of " + name + " spans collected",
             )
 
+    def _verify_contents_cancel(self, spans):
+        span_events = spans["events"]
+        event_names_only = [event["name"] for event in span_events]
+        self._check_events_cancel(event_names_only)
 
     def _verify_nesting(self, spans, expected_parent_span_dict):
         """
@@ -402,18 +392,14 @@ class OpenTelemetryTest(tu.TestResultCollector):
     def _test_trace_cancel(
         self,
     ):
-        time.sleep(2 * COLLECTOR_TIMEOUT)
+        time.sleep(COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-        expected_counts = dict(
-            {"compute": 1, self.input_all_required_model_name : 1, self.root_span: 1}
-        )
+
         parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
         root_span = [
             entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
-        is_cancel = True
-        self._verify_contents(parsed_spans, expected_counts, is_cancel)
-
+        self._verify_contents_cancel(root_span)
 
     def _test_trace(
         self,
@@ -473,7 +459,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
 
-        self._verify_contents(parsed_spans, expected_counts, False)
+        self._verify_contents(parsed_spans, expected_counts)
         self._verify_nesting(parsed_spans, expected_parent_span_dict)
         self._verify_headers_propagated_from_client_if_any(root_span, headers)
 
@@ -621,7 +607,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
         self._test_simple_trace()
 
-    def test_grpc_trace_all_input_required_model_cancel(self):
+    def test_grpc_trace_simple_model_cancel(self):
         """
         Tests trace, collected from executing one inference request and cancelling the request
         for a `simple` model and GRPC client.
@@ -629,15 +615,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
         triton_client_grpc = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
         )
-        inputs = []
-        inputs.append(grpcclient.InferInput("INPUT0", [1], "FP32"))
-        inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs.append(grpcclient.InferInput("INPUT1", [1], "FP32"))
-        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs.append(grpcclient.InferInput("INPUT2", [1], "FP32"))
-        inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        inputs = prepare_data(grpcclient)
         future = triton_client_grpc.async_infer(
-            model_name=self.input_all_required_model_name,
+            model_name=self.simple_model_name,
             inputs=inputs,
             callback=self._callback,
             outputs=self._outputs,
