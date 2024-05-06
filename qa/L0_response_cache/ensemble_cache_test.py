@@ -116,7 +116,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
         The models used have two versions, version 1 and version 3.
         Since, model_version is set to -1 in config.pbtxt, the highest version is loaded
         which is version 3.
-        model_stats has inference stats of version_1 at index 0 and inference stats for version 3 at index 1.
+        model_stats has inference stats for version 1 at index 0 and inference stats for version 3 at index 1.
         """
         return model_stats["model_stats"][1]["inference_stats"]
 
@@ -275,7 +275,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
         """
         Test cache insertion failure with cache enabled in
         ensemble model's config file.
-        Expected result: Two cache miss in ensemble model stats indicating request/response not inserted into cache 
+        Expected result: Two cache miss in ensemble model stats indicating request/response not inserted into cache
         Reason: The data (input tensors, output tensors and other model information) to be inserted in cache is bigger cache size.
         """
         self._update_config(
