@@ -28,25 +28,12 @@
 
 # Triton Inference Server
 
-📣 **Triton Meetup at the NVIDIA Headquarters on April 30th 3:00 - 6:30 pm**
-
-We are excited to announce that we will be hosting our Triton user meetup at
-the NVIDIA Headquarters on April 30th 3:00 - 6:30 pm. Join us for this
-exclusive event where you will learn about the newest Triton features, get a
-glimpse into the roadmap, and connect with fellow users and the NVIDIA Triton
-engineering and product teams. Seating is limited and registration confirmation
-is required to attend - please register [here](https://lu.ma/tl06fqc1) to join
-the meetup. We can’t wait to welcome you and share what’s next for the Triton
-Inference Server.
-
----
-
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 > [!WARNING]
 > ##### LATEST RELEASE
 > You are currently on the `main` branch which tracks under-development progress towards the next release.
-> The current release is version [2.44.0](https://github.com/triton-inference-server/server/releases/latest) and corresponds to the 24.03 container release on NVIDIA GPU Cloud (NGC).
+> The current release is version [2.45.0](https://github.com/triton-inference-server/server/releases/latest) and corresponds to the 24.04 container release on NVIDIA GPU Cloud (NGC).
 
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
@@ -104,16 +91,16 @@ Inference Server with the
 
 ```bash
 # Step 1: Create the example model repository
-git clone -b r24.03 https://github.com/triton-inference-server/server.git
+git clone -b r24.04 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:24.03-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:24.04-py3 tritonserver --model-repository=/models
 
 # Step 3: Sending an Inference Request
 # In a separate console, launch the image_client example from the NGC Triton SDK container
-docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:24.03-py3-sdk
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:24.04-py3-sdk
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following

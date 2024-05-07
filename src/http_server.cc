@@ -212,6 +212,7 @@ HTTPServer::Start()
       evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
     }
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
+    evhtp_set_pre_accept_cb(htp_, HTTPServer::NewConnection, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
       return TRITONSERVER_ErrorNew(
@@ -235,8 +236,22 @@ HTTPServer::Start()
 }
 
 TRITONSERVER_Error*
-HTTPServer::Stop()
+HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
+  {
+    std::lock_guard<std::mutex> lock(conn_mu_);
+    accepting_new_conn_ = false;
+  }
+  if (exit_timeout_secs != nullptr) {
+    // Note: conn_cnt_ can only decrease
+    while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
+      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
+               << " " << service_name << " service connections";
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      (*exit_timeout_secs)--;
+    }
+  }
+
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
     send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
@@ -249,7 +264,6 @@ HTTPServer::Stop()
     event_base_free(evbase_);
     return nullptr;
   }
-
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
@@ -265,6 +279,34 @@ void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
   (static_cast<HTTPServer*>(arg))->Handle(req);
+}
+
+evhtp_res
+HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
+{
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    if (!server->accepting_new_conn_) {
+      return EVHTP_RES_SERVUNAVAIL;  // reset connection
+    }
+    server->conn_cnt_++;
+  }
+  evhtp_connection_set_hook(
+      conn, evhtp_hook_on_connection_fini,
+      (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::EndConnection(evhtp_connection_t* conn, void* arg)
+{
+  HTTPServer* server = static_cast<HTTPServer*>(arg);
+  {
+    std::lock_guard<std::mutex> lock(server->conn_mu_);
+    server->conn_cnt_--;
+  }
+  return EVHTP_RES_OK;
 }
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1772,6 +1814,9 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   int32_t count;
   uint32_t log_frequency;
   std::string filepath;
+  InferenceTraceMode trace_mode;
+  TraceConfigMap config_map;
+
   if (!model_name.empty()) {
     bool ready = false;
     RETURN_AND_RESPOND_IF_ERR(
@@ -1811,12 +1856,11 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
     triton::common::TritonJson::Value setting_json;
     if (request.Find("trace_file", &setting_json)) {
-      if (setting_json.IsNull()) {
-        new_setting.clear_filepath_ = true;
-      } else {
-        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
-        new_setting.filepath_ = &filepath;
-      }
+      RETURN_AND_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_UNSUPPORTED,
+                   "trace file location can not be updated through network "
+                   "protocol"));
     }
     if (request.Find("trace_level", &setting_json)) {
       if (setting_json.IsNull()) {
@@ -1967,7 +2011,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      model_name, &level, &rate, &count, &log_frequency, &filepath);
+      model_name, &level, &rate, &count, &log_frequency, &filepath, &trace_mode,
+      &config_map);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level
@@ -1991,12 +2036,36 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       req, trace_response.AddString("trace_rate", std::to_string(rate)));
   RETURN_AND_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_count", std::to_string(count)));
+  if (trace_mode == TRACE_MODE_TRITON) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, trace_response.AddString(
+                 "log_frequency", std::to_string(log_frequency)));
+    RETURN_AND_RESPOND_IF_ERR(
+        req, trace_response.AddString("trace_file", filepath));
+  }
   RETURN_AND_RESPOND_IF_ERR(
       req,
-      trace_response.AddString("log_frequency", std::to_string(log_frequency)));
-  RETURN_AND_RESPOND_IF_ERR(
-      req, trace_response.AddString("trace_file", filepath));
-
+      trace_response.AddString(
+          "trace_mode", trace_manager_->InferenceTraceModeString(trace_mode)));
+  auto mode_key = std::to_string(trace_mode);
+  auto trace_options_it = config_map.find(mode_key);
+  if (trace_options_it != config_map.end()) {
+    for (const auto& [key, value] : trace_options_it->second) {
+      if ((key == "file") || (key == "log-frequency")) {
+        continue;
+      }
+      std::string valueAsString;
+      if (std::holds_alternative<std::string>(value)) {
+        valueAsString = std::get<std::string>(value);
+      } else if (std::holds_alternative<int>(value)) {
+        valueAsString = std::to_string(std::get<int>(value));
+      } else if (std::holds_alternative<uint32_t>(value)) {
+        valueAsString = std::to_string(std::get<uint32_t>(value));
+      }
+      RETURN_AND_RESPOND_IF_ERR(
+          req, trace_response.AddString(key.c_str(), valueAsString));
+    }
+  }
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_AND_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
   evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
@@ -2038,7 +2107,6 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
                 "unexpected error getting dynamic logging request buffers"));
       }
     }
-    TRITONSERVER_Error* err = nullptr;
     triton::common::TritonJson::Value request;
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
     RETURN_AND_RESPOND_IF_ERR(
@@ -2048,25 +2116,11 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     triton::common::TritonJson::Value setting_json;
     if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
-        // Set new settings in server then in core
-        std::string log_file_path;
-        RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
-        const std::string& error = LOG_SET_OUT_FILE(log_file_path);
-        if (!error.empty()) {
-          RETURN_AND_RESPOND_IF_ERR(
-              req, TRITONSERVER_ErrorNew(
-                       TRITONSERVER_ERROR_UNAVAILABLE, (error).c_str()));
-        }
-        // Okay to pass nullptr because we know the update will be applied
-        // to the global object.
-        err = TRITONSERVER_ServerOptionsSetLogFile(
-            nullptr, log_file_path.c_str());
-        if (err != nullptr) {
-          RETURN_AND_RESPOND_IF_ERR(
-              req, TRITONSERVER_ErrorNew(
-                       TRITONSERVER_ERROR_UNAVAILABLE,
-                       (TRITONSERVER_ErrorMessage(err))));
-        }
+        RETURN_AND_RESPOND_IF_ERR(
+            req, TRITONSERVER_ErrorNew(
+                     TRITONSERVER_ERROR_UNSUPPORTED,
+                     "log file location can not be updated through network "
+                     "protocol"));
       }
     }
     if (request.Find("log_info", &setting_json)) {
@@ -2627,7 +2681,8 @@ HTTPAPIServer::ParseJsonTritonIO(
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, shm_offset, &base, &memory_type, &memory_type_id));
+            shm_region, shm_offset, byte_size, &base, &memory_type,
+            &memory_type_id));
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
           cudaIpcMemHandle_t* cuda_handle;
@@ -2741,7 +2796,8 @@ HTTPAPIServer::ParseJsonTritonIO(
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, offset, &base, &memory_type, &memory_type_id));
+            shm_region, offset, byte_size, &base, &memory_type,
+            &memory_type_id));
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
