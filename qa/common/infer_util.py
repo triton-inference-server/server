@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1306,3 +1306,90 @@ def infer_zero(
                 shm.destroy_shared_memory_region(shm_op_handles[io_num])
 
     return results
+
+
+# Perform basic inference for shared memory tests
+def shm_basic_infer(
+    tester,
+    triton_client,
+    shm_ip0_handle,
+    shm_ip1_handle,
+    shm_op0_handle,
+    shm_op1_handle,
+    error_msg,
+    big_shm_name="",
+    big_shm_size=64,
+    default_shm_byte_size=64,
+    shm_output_offset=0,
+    shm_output_byte_size=64,
+    protocol="http",
+    use_system_shared_memory=False,
+    use_cuda_shared_memory=False,
+):
+    # Lazy shm imports...
+    if use_system_shared_memory:
+        import tritonclient.utils.shared_memory as shm
+    elif use_cuda_shared_memory:
+        import tritonclient.utils.cuda_shared_memory as cudashm
+    else:
+        raise Exception("No shared memory type specified")
+
+    input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+    input1_data = np.ones(shape=16, dtype=np.int32)
+    inputs = []
+    outputs = []
+    if protocol == "http":
+        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
+        outputs.append(httpclient.InferRequestedOutput("OUTPUT0", binary_data=True))
+        outputs.append(httpclient.InferRequestedOutput("OUTPUT1", binary_data=False))
+    else:
+        inputs.append(grpcclient.InferInput("INPUT0", [1, 16], "INT32"))
+        inputs.append(grpcclient.InferInput("INPUT1", [1, 16], "INT32"))
+        outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
+        outputs.append(grpcclient.InferRequestedOutput("OUTPUT1"))
+
+    inputs[0].set_shared_memory("input0_data", default_shm_byte_size)
+
+    if type(shm_ip1_handle) == np.array:
+        inputs[1].set_data_from_numpy(input0_data, binary_data=True)
+    elif big_shm_name != "":
+        inputs[1].set_shared_memory(big_shm_name, big_shm_size)
+    else:
+        inputs[1].set_shared_memory("input1_data", default_shm_byte_size)
+
+    outputs[0].set_shared_memory(
+        "output0_data", shm_output_byte_size, offset=shm_output_offset
+    )
+    outputs[1].set_shared_memory(
+        "output1_data", shm_output_byte_size, offset=shm_output_offset
+    )
+
+    try:
+        results = triton_client.infer(
+            "simple", inputs, model_version="", outputs=outputs
+        )
+        output = results.get_output("OUTPUT0")
+        if protocol == "http":
+            output_datatype = output["datatype"]
+            output_shape = output["shape"]
+        else:
+            output_datatype = output.datatype
+            output_shape = output.shape
+        output_dtype = triton_to_np_dtype(output_datatype)
+
+        if use_system_shared_memory:
+            output_data = shm.get_contents_as_numpy(
+                shm_op0_handle, output_dtype, output_shape
+            )
+        elif use_cuda_shared_memory:
+            output_data = cudashm.get_contents_as_numpy(
+                shm_op0_handle, output_dtype, output_shape
+            )
+
+        tester.assertTrue(
+            (output_data[0] == (input0_data + input1_data)).all(),
+            "Model output does not match expected output",
+        )
+    except Exception as ex:
+        error_msg.append(str(ex))
