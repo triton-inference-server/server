@@ -322,7 +322,7 @@ set -e
 
 set +e
 if [ `grep -c "Context with profile default \[0\] is launching CUDA graph " $SERVER_LOG` != "0" ]; then
-    echo -e "\n***\n*** Failed. Expected only one execution with CUDA graph\n***"
+    echo -e "\n***\n*** Failed. Expected 0 execution with CUDA graph\n***"
     RET=1
 fi
 
