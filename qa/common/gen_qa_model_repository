@@ -162,7 +162,7 @@ cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
 cp ./gen_common.py $HOST_SRCDIR/.
 cp ./gen_qa_ort_scalar_models.py $HOST_SRCDIR/.
-cp ./generate_qa_image_models.py $HOST_SRCDIR/.
+cp ./gen_qa_image_models.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
@@ -365,7 +365,7 @@ chmod -R 777 $TORCHTRTDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
 # Export torchvision image models to ONNX
-python3 $SRCDIR/generate_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$IMAGEMODELSDESTDIR
+python3 $SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$IMAGEMODELSDESTDIR
 chmod -R 777 $IMAGEMODELSDESTDIR
 EOF
 
