@@ -255,11 +255,12 @@ OpenCudaIPCRegion(
   cudaError_t err = cudaIpcOpenMemHandle(
       data_ptr, *cuda_shm_handle, cudaIpcMemLazyEnablePeerAccess);
   if (err != cudaSuccess) {
+    // Should not pass the detailed error message back to the client.
+    LOG_ERROR << "failed to open CUDA IPC handle: " << cudaGetErrorString(err);
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "failed to open CUDA IPC handle: " +
-                                         std::string(cudaGetErrorString(err)))
-                                         .c_str());
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("failed to register shared memory region: invalid args")
+            .c_str());
   }
 
   return nullptr;
