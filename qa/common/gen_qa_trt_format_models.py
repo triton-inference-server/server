@@ -141,8 +141,10 @@ def create_plan_modelfile(
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
-    flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # Commenting this because from I/O Formats from TensorRT Developer Guide:
+    # The build will fail if TensorRT cannot build an engine without introducing such reformatting. The failure may happen only for some target platforms, because of what formats are supported by kernels for those platforms.
+    # flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
