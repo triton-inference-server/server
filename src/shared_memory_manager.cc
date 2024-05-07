@@ -255,7 +255,7 @@ OpenCudaIPCRegion(
   cudaError_t err = cudaIpcOpenMemHandle(
       data_ptr, *cuda_shm_handle, cudaIpcMemLazyEnablePeerAccess);
   if (err != cudaSuccess) {
-    // Should not pass the detailed error message back to the client.
+    // Log detailed error message
     LOG_ERROR << "failed to open CUDA IPC handle: " << cudaGetErrorString(err);
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
@@ -296,7 +296,7 @@ CheckCudaSharedMemoryRegionSize(
   // User-provided offset and byte_size should not go out-of-bounds.
   if (err != nullptr || byte_size > shm_region_size) {
     if (err != nullptr) {
-      // Should not pass the detailed error message back to the client.
+      // Log detailed error message
       LOG_ERROR << TRITONSERVER_ErrorMessage(err);
       TRITONSERVER_ErrorDelete(err);
     }
