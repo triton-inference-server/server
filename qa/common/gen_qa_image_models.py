@@ -35,7 +35,7 @@ import argparse
 import test_util as tu
 import requests
 
-LABELS_URL = "https://raw.githubusercontent.com/triton-inference-server/server/main/docs/examples/model_repository/inception_graphdef/inception_labels.txt"
+LABELS_URL = "https://raw.githubusercontent.com/triton-inference-server/python_backend/main/examples/preprocessing/model_repository/resnet50_trt/labels.txt"
 
 
 def download_labels_file(url, path, file_name="labels.txt"):
@@ -94,12 +94,9 @@ output [
 
 def export_vgg19(models_dir, model_name="model.onnx"):
     model_path = f"{models_dir}/{model_name}"
-    model = models.vgg19(weights=models.VGG19_Weights.DEFAULT)
+    model = models.vgg19(weights=models.VGG19_Weights.IMAGENET1K_V1)
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
-
-    # Specify dynamic axes for batch size
-    dynamic_axes = {"input": {0: "batch"}}
 
     # Export the model to ONNX format
     torch.onnx.export(
@@ -108,8 +105,7 @@ def export_vgg19(models_dir, model_name="model.onnx"):
         model_path,
         input_names=["input"],
         output_names=["output"],
-        dynamic_axes=dynamic_axes,
-        opset_version=11,
+        dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
     )
 
     print(f"VGG19 model exported to: {model_path}")
@@ -132,9 +128,6 @@ def export_resnet152(models_dir, model_name="model.onnx"):
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
 
-    # Specify dynamic axes for batch size
-    dynamic_axes = {"input": {0: "batch"}}
-
     # Export the model to ONNX format
     torch.onnx.export(
         model,
@@ -142,8 +135,7 @@ def export_resnet152(models_dir, model_name="model.onnx"):
         model_path,
         input_names=["input"],
         output_names=["output"],
-        dynamic_axes=dynamic_axes,
-        opset_version=11,
+        dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
     )
 
     print(f"ResNet-152 model exported to: {model_path}")
@@ -166,9 +158,6 @@ def export_resnet50(models_dir, model_name="model.onnx"):
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
 
-    # Specify dynamic axes for batch size
-    dynamic_axes = {"input": {0: "batch"}}
-
     # Export the model to ONNX format
     torch.onnx.export(
         model,
@@ -176,8 +165,7 @@ def export_resnet50(models_dir, model_name="model.onnx"):
         model_path,
         input_names=["input"],
         output_names=["output"],
-        dynamic_axes=dynamic_axes,
-        opset_version=11,
+        dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
     )
 
     print(f"ResNet-50 model exported to: {model_path}")
