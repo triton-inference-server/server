@@ -394,7 +394,7 @@ def create_plan_shape_tensor_modelfile(
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
-    
+
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
     elif trt_dtype == trt.float16:
@@ -570,9 +570,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
         f.write(engine_bytes)
 
 
-def create_plan_rf_modelfile(
-    models_dir, model_version, max_batch, dtype, shape
-):
+def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
@@ -710,13 +708,9 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         return
 
     if dtype != np.float32:
-        create_plan_rf_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     else:
-        create_plan_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):

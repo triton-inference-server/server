@@ -514,9 +514,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
         f.write(engine_bytes)
 
 
-def create_plan_rf_modelfile(
-    models_dir, model_version, max_batch, dtype, shape
-):
+def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
@@ -634,13 +632,9 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         return
 
     if dtype != np.float32:
-        create_plan_rf_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     else:
-        create_plan_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):

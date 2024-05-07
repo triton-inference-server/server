@@ -845,7 +845,7 @@ def create_plan_fixed_rf_modelfile(
             flags |= 1 << int(trt.BuilderFlag.INT8)
         elif dt == trt.float16:
             flags |= 1 << int(trt.BuilderFlag.FP16)
-        
+
     config = builder.create_builder_config()
     config.flags = flags
     config.add_optimization_profile(profile)
@@ -926,7 +926,7 @@ def create_plan_fixed_modelfile(
         min_shape = min_shape + [i]
         opt_shape = opt_shape + [i]
         max_shape = max_shape + [i]
-    
+
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)

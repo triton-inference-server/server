@@ -27,13 +27,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import os
-import torch
-import torchvision.models as models
-import torch.onnx
 import argparse
-import test_util as tu
+import os
+
 import requests
+import test_util as tu
+import torch
+import torch.onnx
+import torchvision.models as models
 
 LABELS_URL = "https://raw.githubusercontent.com/triton-inference-server/python_backend/main/examples/preprocessing/model_repository/resnet50_trt/labels.txt"
 

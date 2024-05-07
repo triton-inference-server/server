@@ -181,6 +181,7 @@ def create_plan_modelfile(
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
+
 def create_plan_modelconfig(
     models_dir,
     max_batch,

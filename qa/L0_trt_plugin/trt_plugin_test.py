@@ -41,11 +41,13 @@ import tritonclient.http as httpclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+
 def hardmax_reference(arr, axis=0):
     one_hot = np.zeros(arr.shape, dtype=arr.dtype)
     argmax = np.expand_dims(np.argmax(arr, axis), axis)
-    np.put_along_axis(one_hot,argmax,1,axis=axis)
+    np.put_along_axis(one_hot, argmax, 1, axis=axis)
     return one_hot
+
 
 class PluginModelTest(tu.TestResultCollector):
     def _full_exact(self, model_name, plugin_name, shape):
@@ -84,7 +86,9 @@ class PluginModelTest(tu.TestResultCollector):
     def test_raw_hard_max(self):
         for bs in (1, 8):
             self._full_exact(
-                "plan_float32_float32_float32", "CustomHardmax", (bs, 2, 2),
+                "plan_float32_float32_float32",
+                "CustomHardmax",
+                (bs, 2, 2),
             )
 
         self._full_exact(

@@ -901,7 +901,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network( )
+    network = builder.create_network()
 
     unit_shape = [1] * len(shape)
     if max_batch != 0:
@@ -919,7 +919,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
         constant_1_data = trt.Weights(np.ones(unit_shape, dtype=dtype))
         constant_1 = network.add_constant(unit_shape, constant_1_data)
-    
+
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
@@ -1001,9 +1001,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
         f.write(engine_bytes)
 
 
-def create_plan_rf_modelfile(
-    models_dir, model_version, max_batch, dtype, shape
-):
+def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
@@ -1139,13 +1137,9 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         return
 
     if dtype != np.float32:
-        create_plan_rf_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     else:
-        create_plan_modelfile(
-            models_dir, model_version, max_batch, dtype, shape
-        )
+        create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
