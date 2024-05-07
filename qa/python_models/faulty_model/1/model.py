@@ -37,7 +37,7 @@ class TritonPythonModel:
         # TYPO to cause error in load
         input0 = {"nameas": "INPUT0", "data_type": "TYPE_FP32", "dims": [4]}
         auto_complete_model_config.add_input(input0)
-          
+
     def initialize(self, args):
         self.model_config = json.loads(args["model_config"])
 
