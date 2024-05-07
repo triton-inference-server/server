@@ -327,7 +327,7 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         self._cleanup_server(shm_handles)
 
     def test_register_out_of_bound(self):
-        create_byte_size = 64
+        create_byte_size = self.DEFAULT_SHM_BYTE_SIZE
         # Verify various edge cases of registered region size don't go out of bounds of the actual created shm region's size.
         with self.assertRaisesRegex(
             InferenceServerException,
