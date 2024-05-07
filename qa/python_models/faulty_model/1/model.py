@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,48 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./model_control_client.log"
-TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=${MODELDIR}/model_control/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./model_control_server.log"
+import json
+import time
 
-RET=0
-rm -fr *.log ./models
+import numpy as np
+import triton_python_backend_utils as pb_utils
 
-source ../../common/util.sh
 
-mkdir -p models/identity_fp32/1/
-mkdir -p models/simple_identity_fp32/1/
-mkdir -p models/faulty_model/
+class TritonPythonModel:
+    @staticmethod
+    def auto_complete_config(auto_complete_model_config):
+        # TYPO to cause error in load
+        input0 = {"nameas": "INPUT0", "data_type": "TYPE_FP32", "dims": [4]}
+        auto_complete_model_config.add_input(input0)
+          
+    def initialize(self, args):
+        self.model_config = json.loads(args["model_config"])
 
-cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
-cp ../../python_models/simple_identity_fp32/config.pbtxt ./models/simple_identity_fp32/config.pbtxt
-cp -r ../../python_models/faulty_model/. ./models/faulty_model
+    def execute(self, requests):
+        """This function is called on inference request."""
+        # Less than collector timeout which is 10
+        time.sleep(2)
+        responses = []
+        for _ in requests:
+            # Include one of each specially parsed JSON value: nan, inf, and -inf
+            out_0 = np.array([1], dtype=np.float32)
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python3 -m pytest --junitxml=model_control.report.xml model_control_test.py 2>&1 > $CLIENT_LOG
-
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** model_control_test.py FAILED. \n***"
-    RET=1
-fi
-set -e
-
-kill_server
-
-if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** model_control_test FAILED. \n***"
-else
-    echo -e "\n***\n*** model_control_test PASSED. \n***"
-fi
-
-exit $RET
+        return responses

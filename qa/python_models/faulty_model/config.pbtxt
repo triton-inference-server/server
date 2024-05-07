@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,48 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./model_control_client.log"
-TEST_RESULT_FILE='test_results.txt'
-SERVER_ARGS="--model-repository=${MODELDIR}/model_control/models --model-control-mode=explicit --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./model_control_server.log"
+name: "faulty_model"
+backend: "python"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  },
+  {
+    name: "INPUT2"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
 
-RET=0
-rm -fr *.log ./models
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
 
-source ../../common/util.sh
-
-mkdir -p models/identity_fp32/1/
-mkdir -p models/simple_identity_fp32/1/
-mkdir -p models/faulty_model/
-
-cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
-cp ../../python_models/simple_identity_fp32/config.pbtxt ./models/simple_identity_fp32/config.pbtxt
-cp -r ../../python_models/faulty_model/. ./models/faulty_model
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python3 -m pytest --junitxml=model_control.report.xml model_control_test.py 2>&1 > $CLIENT_LOG
-
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** model_control_test.py FAILED. \n***"
-    RET=1
-fi
-set -e
-
-kill_server
-
-if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** model_control_test FAILED. \n***"
-else
-    echo -e "\n***\n*** model_control_test PASSED. \n***"
-fi
-
-exit $RET
+instance_group [{ kind: KIND_CPU }]
