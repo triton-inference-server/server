@@ -38,7 +38,7 @@ TRITON_VERSION=${TRITON_VERSION:=24.04}
 # Set the CUDA device to use
 CUDA_DEVICE=${RUNNER_ID:=0}
 # Set TensorRT image
-TENSORRT_IMAGE="gitlab-master.nvidia.com:5005/dl/dgx/tensorrt:tensorrt-10.0.0.6-py3.14203027-devel"
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3-igpu}
 
 # Set the path to the host working directory
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp/models_build}
