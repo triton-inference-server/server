@@ -35,6 +35,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
+pip3 install psutil
 
 RET=0
 rm -fr *.log
@@ -52,7 +53,8 @@ for i in \
         test_unregisterall \
         test_infer_offset_out_of_bound \
         test_infer_byte_size_out_of_bound \
-        test_register_out_of_bound; do
+        test_register_out_of_bound \
+        test_python_client_leak; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"
