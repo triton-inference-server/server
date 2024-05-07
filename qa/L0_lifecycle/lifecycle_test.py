@@ -3406,8 +3406,8 @@ class LifeCycleTest(tu.TestResultCollector):
         )
 
     def test_add_custom_config(self):
-        models_base = ("savedmodel_nobatch",)
-        models_shape = ((16,),)
+        models_base = ("savedmodel", "plan")
+        models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
@@ -3556,8 +3556,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertIn("Request for unknown model", ex.message())
 
     def test_delete_custom_config(self):
-        models_base = ("savedmodel_nobatch",)
-        models_shape = ((16,),)
+        models_base = ("savedmodel", "plan")
+        models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
