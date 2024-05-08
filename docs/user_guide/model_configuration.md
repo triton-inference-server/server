@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -320,6 +320,52 @@ Triton only generates the [minimal portion of the model
 configuration](#minimal-model-configuration). You must still provide
 the optional portions of the model configuration by editing the
 config.pbtxt file.
+
+## Custom Model Configuration
+
+Sometimes when multiple devices running Triton instances that share one
+model repository, it is nessecery to have models configured differently
+on each platform in order to achieve the best performance. Triton allows
+users to pick the custom model configuration name by setting `--model-config-name` option.
+
+For example, when running `./tritonserver --model-repository=</path/to/model/repository> --model-config-name=a100`,
+the server will search the custom configuration file `a100.pbtxt` under
+`/path/to/model/repository/<model-name>/configs` directory for each model
+that is loaded. If `a100.pbtxt` exists, it will be used as the configuration
+for this model. Otherwise, the default configuration `/path/to/model/repository/<model-name>/config.pbtxt`
+or [auto-generated model configuration](#auto-generated-model-configuration)
+will be selected based on the settings.
+
+Custom model configuration also works with `Explicit` and `Poll` model
+control modes. Users may delete or add new custom configurations and the
+server will pick the configuration file for each loaded model dynamically.
+
+The repository layout looks like:
+
+```
+  <model-repository-path>/
+    <model-name>/
+      [config.pbtxt]
+      [<output-labels-file> ...]
+      <configs>/
+        [<custom-config-file> ...]
+      <version>/
+        <model-definition-file>
+      <version>/
+        <model-definition-file>
+      ...
+    <model-name>/
+      [config.pbtxt]
+      [<output-labels-file> ...]
+      <configs>/
+        [<custom-config-file> ...]
+      <version>/
+        <model-definition-file>
+      <version>/
+        <model-definition-file>
+      ...
+    ...
+```
 
 ### Default Max Batch Size and Dynamic Batcher
 
