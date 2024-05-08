@@ -100,5 +100,6 @@ class ExplicitModelTest(unittest.TestCase):
             self.assertFalse(client.is_model_ready(faulty_model_name))
         client.unload_model(working_model_name)
 
+
 if __name__ == "__main__":
     unittest.main()
