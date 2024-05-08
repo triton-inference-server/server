@@ -154,7 +154,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
         return traces
 
-    def _check_events(self, span_name, events, is_cancel):
+    def _check_events(self, span_name, events, is_cancelled):
         """
         Helper function that verifies passed events contain expected entries.
 
@@ -204,7 +204,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
-            if is_cancel == True:
+            if is_cancelled == True:
                 root_events_http = cancel_root_events_http
                 root_events_grpc = cancel_root_events_grpc
 
@@ -216,7 +216,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 self.assertTrue(all(entry in events for entry in root_events_grpc))
                 self.assertFalse(all(entry in events for entry in root_events_http))
 
-            if is_cancel == False:
+            if is_cancelled == False:
                 self.assertFalse(all(entry in events for entry in request_events))
                 self.assertFalse(all(entry in events for entry in compute_events))
 
@@ -292,7 +292,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
-    def _verify_contents(self, spans, expected_counts, is_cancel):
+    def _verify_contents(self, spans, expected_counts, is_cancelled):
         """
         Helper function that:
          * iterates over `spans` and for every span it verifies that proper events are collected
@@ -307,6 +307,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                    and `events` are required.
             expected_counts (dict): dictionary, containing expected spans in the form:
                     span_name : #expected_number_of_entries
+            is_cancelled (bool): boolean, is true if called by cancelled workflow
         """
 
         span_names = []
@@ -316,7 +317,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_names.append(span_name)
             span_events = span["events"]
             event_names_only = [event["name"] for event in span_events]
-            self._check_events(span_name, event_names_only, is_cancel)
+            self._check_events(span_name, event_names_only, is_cancelled)
 
         self.assertEqual(
             len(span_names),
@@ -399,22 +400,21 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
-    def _test_trace_cancel(
-        self,
-    ):
+    def _test_trace_cancel(self, is_queued):
         # TO accommodate for delay in the model
         time.sleep(2 * COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-
-        expected_counts = dict(
-            {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
-        )
+        if is_queued == False:
+            expected_counts = dict(
+                {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
+            )
+        else:
+            expected_counts = dict(
+                {"compute": 2, self.input_all_required_model_name: 2, self.root_span: 2}
+            )
         parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
-        root_span = [
-            entry for entry in parsed_spans if entry["name"] == "InferRequest"
-        ][0]
-        is_cancel = True
-        self._verify_contents(parsed_spans, expected_counts, is_cancel)
+        is_cancelled = True
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled)
 
     def _test_trace(
         self,
@@ -473,8 +473,8 @@ class OpenTelemetryTest(tu.TestResultCollector):
             entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
-
-        self._verify_contents(parsed_spans, expected_counts, False)
+        is_cancelled = False
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled)
         self._verify_nesting(parsed_spans, expected_parent_span_dict)
         self._verify_headers_propagated_from_client_if_any(root_span, headers)
 
@@ -646,7 +646,39 @@ class OpenTelemetryTest(tu.TestResultCollector):
         time.sleep(2)  # ensure the inference has started
         future.cancel()
         time.sleep(0.1)  # context switch
-        self._test_trace_cancel()
+        self._test_trace_cancel(is_queued=False)
+
+    def test_grpc_trace_model_cancel_in_queue(self):
+        """
+        Tests trace, collected from executing 2 back to back inference request and cancelling the latest request
+        for a model and GRPC client. To ensure queueing behavior is captured.
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        inputs = []
+        inputs.append(grpcclient.InferInput("INPUT0", [1], "FP32"))
+        inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        inputs.append(grpcclient.InferInput("INPUT1", [1], "FP32"))
+        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        inputs.append(grpcclient.InferInput("INPUT2", [1], "FP32"))
+        inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        future_1 = triton_client_grpc.async_infer(
+            model_name=self.input_all_required_model_name,
+            inputs=inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        future_2 = triton_client_grpc.async_infer(
+            model_name=self.input_all_required_model_name,
+            inputs=inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        time.sleep(0.1)  # ensure the inference has started
+        future_2.cancel()
+        time.sleep(0.1)  # context switch
+        self._test_trace_cancel(is_queued=True)
 
     def test_non_decoupled(self):
         """
