@@ -84,16 +84,15 @@ class ExplicitModelTest(unittest.TestCase):
 
     def test_faulty_model_load(self):
         working_model_name = "identity_fp32"
-        faulty_model_name = "faulty_model"
+        faulty_model_name = "auto_complete_error"
         with httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000") as client:
             # Load a correct model
             client.load_model(working_model_name)
             # Load a faulty model
-            # Load a faulty model
-            try:
-                client.load_model(faulty_model_name)
-            except:
-                pass
+            with self.assertRaises(InferenceServerException) as cm:
+                _ = client.load_model(faulty_model_name)
+            self.assertIn("load failed for model", str(cm.exception))
+
             # Check if server is responsive
             self.assertTrue(client.is_model_ready(working_model_name))
             # Verify faulty model is not loaded
