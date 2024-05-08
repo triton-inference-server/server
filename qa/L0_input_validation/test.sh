@@ -44,6 +44,7 @@ RET=0
 
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
+SHAPE_TEST_PY=./input_shape_validation_test.py
 TEST_RESULT_FILE='./test_results.txt'
 
 export CUDA_VISIBLE_DEVICES=0
@@ -64,13 +65,21 @@ set +e
 python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
     RET=1
 fi
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+pip install torch
+python3 -m pytest $SHAPE_TEST_PY >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** input_shape_validation_test.py FAILED. \n***"
+    RET=1
+
+fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
