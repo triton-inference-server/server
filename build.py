@@ -1735,7 +1735,7 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
         cmake_destination_dir,
     )
     cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "build", "triton_tensorrtllm_worker"),
+        os.path.join(tensorrtllm_be_dir, "build", "trtllmExecutorWorker"),
         cmake_destination_dir,
     )
 
