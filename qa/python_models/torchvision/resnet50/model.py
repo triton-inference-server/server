@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,6 +35,8 @@ class TritonPythonModel:
         This function initializes pre-trained ResNet50 model.
         """
         self.device = "cuda" if args["model_instance_kind"] == "GPU" else "cpu"
+        # Avoid the "HTTP Error 403: rate limit exceeded" error
+        torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
         # Our tests currently depend on torchvision=0.14,
         # to make sure `torch.hub` loads Resnet50 implementation
         # compatible with torchvision=0.14, we need to provide tag

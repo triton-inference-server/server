@@ -66,8 +66,10 @@ SEQ_WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_
 
 REPEAT_INT32_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/repeat_int32_data.json
 
+TRACE_FILE="trace.json"
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR}"
+SERVER_ARGS="--model-repository=${DATADIR} --trace-config triton,file=${TRACE_FILE}"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
@@ -639,6 +641,40 @@ for PROTOCOL in grpc http; do
         fi
         set -e
     done
+
+    # Testing that trace logging works
+    set +e
+    rm ${TRACE_FILE}*
+    $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+    --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if ! compgen -G "$TRACE_FILE*" > /dev/null; then
+        echo -e "\n***\n*** Test Failed. $TRACE_FILE failed to generate.\n***"
+        RET=1
+    elif [ $(cat ${TRACE_FILE}* |  grep "REQUEST_START" | wc -l) -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed. Did not find `REQUEST_START` in $TRACE_FILE \n***"
+        RET=1
+    fi
+    curl localhost:8000/v2/trace/setting -d '{"trace_level":["OFF"]}'
+    set -e
+
+    # Testing that setting trace file does not work
+    set +e
+    $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object \
+    --trace-file $TRACE_FILE >$CLIENT_LOG 2>&1
+    if [ $? -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed. Expected to fail for unknown arg --trace-file"
+        RET=1
+    fi
+    curl localhost:8000/v2/trace/setting -d '{"trace_level":["OFF"]}'
+    set -e
 done
 
 # Test with output validation
