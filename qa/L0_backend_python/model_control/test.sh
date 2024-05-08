@@ -37,12 +37,12 @@ source ../../common/util.sh
 
 mkdir -p models/identity_fp32/1/
 mkdir -p models/simple_identity_fp32/1/
-mkdir -p models/faulty_model/
+mkdir -p models/auto_complete_error/1/
 
+cp ../../python_models/auto_complete_error/model.py ./models/auto_complete_error/1/
 cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
 cp ../../python_models/simple_identity_fp32/config.pbtxt ./models/simple_identity_fp32/config.pbtxt
-cp -r ../../python_models/faulty_model/. ./models/faulty_model
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
