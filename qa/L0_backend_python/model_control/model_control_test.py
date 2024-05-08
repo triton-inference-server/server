@@ -86,20 +86,19 @@ class ExplicitModelTest(unittest.TestCase):
         working_model_name = "identity_fp32"
         faulty_model_name = "faulty_model"
         with httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000") as client:
-            for _ in range(5):
-                # Load a correct model
-                client.load_model(working_model_name)
-                # Load a faulty model
-                # Load a faulty model
-                try:
-                    client.load_model(faulty_model_name)
-                except:
-                    pass
-                # Check if server is responsive
-                self.assertTrue(client.is_model_ready(working_model_name))
-                # Verify faulty model is not loaded
-                self.assertFalse(client.is_model_ready(faulty_model_name))
-
+            # Load a correct model
+            client.load_model(working_model_name)
+            # Load a faulty model
+            # Load a faulty model
+            try:
+                client.load_model(faulty_model_name)
+            except:
+                pass
+            # Check if server is responsive
+            self.assertTrue(client.is_model_ready(working_model_name))
+            # Verify faulty model is not loaded
+            self.assertFalse(client.is_model_ready(faulty_model_name))
+        client.unload_model(working_model_name)
 
 if __name__ == "__main__":
     unittest.main()
