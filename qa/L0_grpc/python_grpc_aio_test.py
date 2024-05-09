@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -113,7 +113,7 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
     async def test_register_cuda_shared_memory(self):
         with self.assertRaisesRegex(
             InferenceServerException,
-            "\[StatusCode\.INVALID_ARGUMENT\] failed to register CUDA shared memory region '': failed to open CUDA IPC handle: invalid argument",
+            "failed to register shared memory region.*invalid args",
         ):
             await self._triton_client.register_cuda_shared_memory("", b"", 0, 0)
 

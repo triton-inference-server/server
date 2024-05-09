@@ -180,6 +180,7 @@ if(${TRITON_ENABLE_GPU})
     main
     PRIVATE
       CUDA::cudart
+      -lcuda
   )
 endif() # TRITON_ENABLE_GPU
 
