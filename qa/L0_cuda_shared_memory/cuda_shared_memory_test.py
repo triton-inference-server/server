@@ -338,6 +338,63 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
                 register_byte_size=create_byte_size + 1,
             )
 
+    def test_infer_offset_out_of_bound(self):
+        # CUDA Shared memory offset outside output region - Throws error
+        error_msg = []
+        shm_handles = self._configure_server()
+        if self.protocol == "http":
+            # -32 when placed in an int64 signed type, to get a negative offset
+            # by overflowing
+            offset = 2**64 - 32
+        else:
+            # gRPC will throw an error if > 2**63 - 1, so instead test for
+            # exceeding shm region size by 1 byte, given its size is 64 bytes
+            offset = 64
+        iu.shm_basic_infer(
+            self,
+            self.triton_client,
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
+            shm_output_offset=offset,
+            protocol=self.protocol,
+            use_system_shared_memory=False,
+            use_cuda_shared_memory=True,
+        )
+
+        self.assertEqual(len(error_msg), 1)
+        self.assertIn("Invalid offset for shared memory region", error_msg[0])
+        self._cleanup_server(shm_handles)
+
+    def test_infer_byte_size_out_of_bound(self):
+        # Shared memory byte_size outside output region - Throws error
+        error_msg = []
+        shm_handles = self._configure_server()
+        offset = 60
+        byte_size = self.DEFAULT_SHM_BYTE_SIZE
+
+        iu.shm_basic_infer(
+            self,
+            self.triton_client,
+            shm_handles[0],
+            shm_handles[1],
+            shm_handles[2],
+            shm_handles[3],
+            error_msg,
+            shm_output_offset=offset,
+            shm_output_byte_size=byte_size,
+            protocol=self.protocol,
+            use_system_shared_memory=False,
+            use_cuda_shared_memory=True,
+        )
+        self.assertEqual(len(error_msg), 1)
+        self.assertIn(
+            "Invalid offset + byte size for shared memory region", error_msg[0]
+        )
+        self._cleanup_server(shm_handles)
+
 
 if __name__ == "__main__":
     unittest.main()
