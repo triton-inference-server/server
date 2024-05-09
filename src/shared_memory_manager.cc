@@ -255,11 +255,57 @@ OpenCudaIPCRegion(
   cudaError_t err = cudaIpcOpenMemHandle(
       data_ptr, *cuda_shm_handle, cudaIpcMemLazyEnablePeerAccess);
   if (err != cudaSuccess) {
+    // Log detailed error message and send generic error to client
+    LOG_ERROR << "failed to open CUDA IPC handle: " << cudaGetErrorString(err);
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, std::string(
-                                         "failed to open CUDA IPC handle: " +
-                                         std::string(cudaGetErrorString(err)))
-                                         .c_str());
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("failed to register shared memory region: invalid args")
+            .c_str());
+  }
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+GetCudaSharedMemoryRegionSize(CUdeviceptr data_ptr, size_t& shm_region_size)
+{
+  CUdeviceptr* base = nullptr;
+  CUresult result = cuMemGetAddressRange(base, &shm_region_size, data_ptr);
+  if (result != CUDA_SUCCESS) {
+    const char* errorString;
+    if (cuGetErrorString(result, &errorString) != CUDA_SUCCESS) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, "Failed to get CUDA error string");
+    }
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "Failed to get CUDA address range: " + std::string(errorString))
+            .c_str());
+  }
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+CheckCudaSharedMemoryRegionSize(
+    const std::string& name, CUdeviceptr data_ptr, size_t byte_size)
+{
+  size_t shm_region_size = 0;
+  auto err = GetCudaSharedMemoryRegionSize(data_ptr, shm_region_size);
+
+  // User-provided offset and byte_size should not go out-of-bounds.
+  if (err != nullptr || byte_size > shm_region_size) {
+    if (err != nullptr) {
+      // Log detailed error message and send generic error to client
+      LOG_ERROR << TRITONSERVER_ErrorMessage(err);
+      TRITONSERVER_ErrorDelete(err);
+    }
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': invalid args")
+            .c_str());
   }
 
   return nullptr;
@@ -363,16 +409,11 @@ SharedMemoryManager::RegisterCUDASharedMemory(
   void* mapped_addr;
 
   // Get CUDA shared memory base address
-  TRITONSERVER_Error* err =
-      OpenCudaIPCRegion(cuda_shm_handle, &mapped_addr, device_id);
-  if (err != nullptr) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "failed to register CUDA shared memory region '" + name +
-            "': " + TRITONSERVER_ErrorMessage(err))
-            .c_str());
-  }
+  RETURN_IF_ERR(OpenCudaIPCRegion(cuda_shm_handle, &mapped_addr, device_id));
+
+  // Enforce that registered region is in-bounds of shm file object.
+  RETURN_IF_ERR(CheckCudaSharedMemoryRegionSize(
+      name, reinterpret_cast<CUdeviceptr>(mapped_addr), byte_size));
 
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<CUDASharedMemoryInfo>(new CUDASharedMemoryInfo(
