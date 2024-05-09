@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1526,6 +1526,8 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_file_override >>$CLIENT_LOG 2>&1
+check_unit_test
+python $LC_TEST LifeCycleTest.test_file_override_security >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 
