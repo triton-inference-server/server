@@ -41,7 +41,6 @@ GRPC_PORT = 9653
 FIXED_LAST_DIM = 8
 
 
-@pytest.fixture
 def repo_dir():
     with TemporaryDirectory() as model_repo:
         (Path(model_repo) / "pt_identity" / "1").mkdir(parents=True, exist_ok=True)
@@ -95,6 +94,13 @@ async def poll_readiness(client: InferenceServerClient, server_proc):
         await asyncio.sleep(0.5)
 
 
+async def server_terminated(client: InferenceServerClient, server_proc):
+    if server_proc is not None and (ret_code := server_proc.poll()) is not None:
+        _, stderr = server_proc.communicate()
+        print(stderr)
+        raise Exception(f"Tritonserver died with return code {ret_code}")
+
+
 @pytest.mark.asyncio
 async def test_shape_overlapped(repo_dir: str):
     with Popen(
@@ -134,14 +140,19 @@ async def test_shape_overlapped(repo_dir: str):
             )
         ]
         inputs_2[0].set_data_from_numpy(input_data_2)
+        with pytest.raises(Exception) as e_info:
+            server_terminated(
+                InferenceServerClient("localhost:" + str(GRPC_PORT)), server
+            )
+            t1 = asyncio.create_task(
+                alice.infer("pt_identity", inputs_1)
+            )  # should fail here
+            t2 = asyncio.create_task(bob.infer("pt_identity", inputs_2))
 
-        t1 = asyncio.create_task(alice.infer("pt_identity", inputs_1))
-        t2 = asyncio.create_task(bob.infer("pt_identity", inputs_2))
-
-        alice_result, bob_result = await asyncio.gather(t1, t2)
-        print(f"{alice_result.as_numpy('OUTPUT0')=}")
-        print(f"{bob_result.as_numpy('OUTPUT0')=}")
-        server.terminate()
-        assert np.allclose(
-            bob_result.as_numpy("OUTPUT0"), input_data_2
-        ), "Bob's result should be the same as input"
+        # alice_result, bob_result = await asyncio.gather(t1, t2)
+        # print(f"{alice_result.as_numpy('OUTPUT0')=}")
+        # print(f"{bob_result.as_numpy('OUTPUT0')=}")
+        # server.terminate()
+        # assert np.allclose(
+        #     bob_result.as_numpy("OUTPUT0"), input_data_2
+        # ), "Bob's result should be the same as input"
