@@ -443,8 +443,9 @@ TritonParser::SetupOptions()
        "effect if --model-control-mode=explicit is true."});
   model_repo_options_.push_back(
       {OPTION_CUSTOM_MODEL_CONFIG_NAME, "model-config-name", Option::ArgStr,
-       "The custom model configuration for models to load."
-       "For example: --model-config-name=a100. "
+       "The custom configuration name for models to load."
+       "The name should not contain any space character."
+       "For example: --model-config-name=h100. "
        "If --model-config-name is not set, Triton will use the default "
        "config.pbtxt."});
   model_repo_options_.push_back(

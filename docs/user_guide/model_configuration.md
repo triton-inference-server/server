@@ -324,14 +324,14 @@ config.pbtxt file.
 ## Custom Model Configuration
 
 Sometimes when multiple devices running Triton instances that share one
-model repository, it is nessecery to have models configured differently
+model repository, it is necessary to have models configured differently
 on each platform in order to achieve the best performance. Triton allows
 users to pick the custom model configuration name by setting `--model-config-name` option.
 
-For example, when running `./tritonserver --model-repository=</path/to/model/repository> --model-config-name=a100`,
-the server will search the custom configuration file `a100.pbtxt` under
+For example, when running `./tritonserver --model-repository=</path/to/model/repository> --model-config-name=h100`,
+the server will search the custom configuration file `h100.pbtxt` under
 `/path/to/model/repository/<model-name>/configs` directory for each model
-that is loaded. If `a100.pbtxt` exists, it will be used as the configuration
+that is loaded. If `h100.pbtxt` exists, it will be used as the configuration
 for this model. Otherwise, the default configuration `/path/to/model/repository/<model-name>/config.pbtxt`
 or [auto-generated model configuration](#auto-generated-model-configuration)
 will be selected based on the settings.
@@ -340,31 +340,63 @@ Custom model configuration also works with `Explicit` and `Poll` model
 control modes. Users may delete or add new custom configurations and the
 server will pick the configuration file for each loaded model dynamically.
 
-The repository layout looks like:
+Note: custom model configuration name should not contain any space character.
 
+Example 1: --model-config-name=h100
 ```
-  <model-repository-path>/
-    <model-name>/
-      [config.pbtxt]
-      [<output-labels-file> ...]
-      <configs>/
-        [<custom-config-file> ...]
-      <version>/
-        <model-definition-file>
-      <version>/
-        <model-definition-file>
-      ...
-    <model-name>/
-      [config.pbtxt]
-      [<output-labels-file> ...]
-      <configs>/
-        [<custom-config-file> ...]
-      <version>/
-        <model-definition-file>
-      <version>/
-        <model-definition-file>
-      ...
-    ...
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── **h100.pbtxt**
+    │   └── config.pbtxt
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── config.pbtxt
+        └── **config.pbtxt**
+```
+
+Example 2: --model-config-name=config
+```
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── h100.pbtxt
+    │   └── **config.pbtxt**
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── **config.pbtxt**
+        └── config.pbtxt
+```
+
+Example 3: --model-config-name not set
+```
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── h100.pbtxt
+    │   └── **config.pbtxt**
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── config.pbtxt
+        └── **config.pbtxt**
 ```
 
 ### Default Max Batch Size and Dynamic Batcher

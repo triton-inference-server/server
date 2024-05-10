@@ -70,7 +70,7 @@ test_custom_config()
     set -e
     if [ "$code" != "200" ]; then
         cat $out.out
-        echo -e "\n***\n*** Test Failed\n***"
+        echo -e "\n***\n*** Test Failed to GET model configuration\n***"
         RET=1
     fi
 
@@ -123,15 +123,6 @@ test_custom_config $VERSION_CUSTOM
 # Test model-config-name=h200. Expect fall back to default config since h200 config does not exist.
 SERVER_ARGS="--model-repository=`pwd`/models --model-config-name=h200"
 test_custom_config $VERSION_DEFAULT
-
-# TODO: It seems that command argument parser does not accept value with spaces.
-# Test model-config-name="h100 v100"
-# VERSION_MULT_TOKENS="1,2"
-# (cd models/savedmodel_nobatch_float32_float32_float32 && \
-#      cp config.pbtxt configs/h100\ v100.pbtxt && \
-#      sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [$VERSION_MULT_TOKENS] }}/" configs/h100\ v100.pbtxt)
-# SERVER_ARGS="--model-repository=`pwd`/models --model-config-name=\"h100\ v100\""
-# test_custom_config $VERSION_MULT_TOKENS
 
 # Test model-config-name=
 SERVER_ARGS="--model-repository=`pwd`/models --model-config-name="
