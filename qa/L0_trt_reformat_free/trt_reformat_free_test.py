@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,8 +35,8 @@ from builtins import range
 
 import numpy as np
 import test_util as tu
+import tritonclient.http as tritonhttpclient
 import tritonclient.utils.shared_memory as shm
-import tritonhttpclient
 
 
 def div_up(a, b):

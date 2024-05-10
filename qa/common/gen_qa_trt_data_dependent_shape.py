@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,9 +47,7 @@ def create_data_dependent_modelfile(
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-    )
+    network = builder.create_network()
 
     # input
     in0 = network.add_input("INPUT", trt_input_dtype, input_shape)
