@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -209,19 +209,23 @@ output [
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])
-            )
-            if input_shapes[io_num] != input_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(input_model_shapes[io_num])
+                )
+                if input_shapes[io_num] != input_model_shapes[io_num]
+                else ""
+            ),
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(output_model_shapes[io_num])
-            )
-            if output_shapes[io_num] != output_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(output_model_shapes[io_num])
+                )
+                if output_shapes[io_num] != output_model_shapes[io_num]
+                else ""
+            ),
         )
 
     try:
@@ -250,10 +254,17 @@ def create_plan_modelfile(
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
+    profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
         input_name = "INPUT{}".format(io_num)
         output_name = "OUTPUT{}".format(io_num)
-        in0 = network.add_input(input_name, trt_dtype, input_shapes[io_num])
+
+        if max_batch == 0:
+            input_with_batchsize = [i for i in input_shapes[io_num]]
+        else:
+            input_with_batchsize = [-1] + [i for i in input_shapes[io_num]]
+
+        in0 = network.add_input(input_name, trt_dtype, input_with_batchsize)
         if input_shapes == output_shapes:
             out0 = network.add_identity(in0)
         else:
@@ -263,9 +274,23 @@ def create_plan_modelfile(
         out0.get_output(0).name = output_name
         network.mark_output(out0.get_output(0))
 
+        min_shape = []
+        opt_shape = []
+        max_shape = []
+
+        if max_batch != 0:
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [max(1, max_batch)]
+            max_shape = max_shape + [max(1, max_batch)]
+        for i in input_shapes[io_num]:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+        profile.set_shape(input_name, min_shape, opt_shape, max_shape)
+
     config = builder.create_builder_config()
+    config.add_optimization_profile(profile)
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -342,19 +367,23 @@ output [
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])
-            )
-            if input_shapes[io_num] != input_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(input_model_shapes[io_num])
+                )
+                if input_shapes[io_num] != input_model_shapes[io_num]
+                else ""
+            ),
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(output_model_shapes[io_num])
-            )
-            if output_shapes[io_num] != output_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(output_model_shapes[io_num])
+                )
+                if output_shapes[io_num] != output_model_shapes[io_num]
+                else ""
+            ),
         )
 
     try:
@@ -644,19 +673,23 @@ output [
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])
-            )
-            if input_shapes[io_num] != input_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(input_model_shapes[io_num])
+                )
+                if input_shapes[io_num] != input_model_shapes[io_num]
+                else ""
+            ),
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(output_model_shapes[io_num])
-            )
-            if output_shapes[io_num] != output_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(output_model_shapes[io_num])
+                )
+                if output_shapes[io_num] != output_model_shapes[io_num]
+                else ""
+            ),
         )
 
     try:
@@ -996,19 +1029,23 @@ output [
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(input_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(input_model_shapes[io_num])
-            )
-            if input_shapes[io_num] != input_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(input_model_shapes[io_num])
+                )
+                if input_shapes[io_num] != input_model_shapes[io_num]
+                else ""
+            ),
             io_num,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(output_shapes[io_num]),
-            "reshape: {{ shape: [ {} ] }}".format(
-                tu.shape_to_dims_str(output_model_shapes[io_num])
-            )
-            if output_shapes[io_num] != output_model_shapes[io_num]
-            else "",
+            (
+                "reshape: {{ shape: [ {} ] }}".format(
+                    tu.shape_to_dims_str(output_model_shapes[io_num])
+                )
+                if output_shapes[io_num] != output_model_shapes[io_num]
+                else ""
+            ),
         )
 
     try:

@@ -792,8 +792,12 @@ def infer_shape_tensor(
         expected_dict[output_name] = np.ndarray.copy(in0)
 
         # Only need to create region once
+        # FIXME DLIS-6653: Currently in our test cases we are
+        # using int32 inputs and int64 outputs for shape tensors
+        # hence there is a multiple of 2 to compute the byte size
+        # properly.
         input_byte_size = in0.size * np.dtype(np.int32).itemsize
-        output_byte_size = input_byte_size * batch_size
+        output_byte_size = input_byte_size * batch_size * 2
         if use_system_shared_memory:
             input_shm_handle_list.append(
                 (
@@ -915,8 +919,11 @@ def infer_shape_tensor(
                     output_shape = output.shape
                 else:
                     output_shape = output["shape"]
+                # FIXME DLIS-6653: Currently in our test cases we are
+                # using int32 inputs and int64 outputs for shape tensors
+                # hence passing int64 as datatype.
                 out = shm.get_contents_as_numpy(
-                    output_shm_handle_list[io_num][0], np.int32, output_shape
+                    output_shm_handle_list[io_num][0], np.int64, output_shape
                 )
 
             # if out shape is 2D, it is batched

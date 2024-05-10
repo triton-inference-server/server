@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -92,6 +92,7 @@ HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_
 HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 HOST_SCALARMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
+HOST_IMAGEMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
@@ -101,6 +102,7 @@ rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPEND
 rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
 rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 rm -rf $HOST_SCALARMODELSDESTDIR
+rm -rf $HOST_IMAGEMODELSDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -126,6 +128,7 @@ mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_TORCHTRTDESTDIR
 mkdir -p $HOST_SCALARMODELSDESTDIR
+mkdir -p $HOST_IMAGEMODELSDESTDIR
 
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
@@ -159,6 +162,7 @@ cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
 cp ./gen_common.py $HOST_SRCDIR/.
 cp ./gen_qa_ort_scalar_models.py $HOST_SRCDIR/.
+cp ./gen_qa_image_models.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
@@ -191,6 +195,7 @@ FORMATDESTDIR=/tmp/formatmodels
 DATADEPENDENTDIR=/tmp/datadependentmodels
 TORCHTRTDESTDIR=/tmp/torchtrtmodels
 SCALARMODELSDESTDIR=/tmp/scalarmodels
+IMAGEMODELSDESTDIR=/tmp/imagemodels
 
 # OPENVINO
 #
@@ -359,6 +364,9 @@ python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
 chmod -R 777 $TORCHTRTDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
+# Export torchvision image models to ONNX
+python3 $SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$IMAGEMODELSDESTDIR
+chmod -R 777 $IMAGEMODELSDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TORCHSCRIPT
@@ -381,6 +389,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_IMAGEMODELSDESTDIR,target=$IMAGEMODELSDESTDIR \
        $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -463,6 +472,7 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 set -x
+dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
@@ -498,14 +508,11 @@ python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
 chmod -R 777 $FORMATDESTDIR
 python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 chmod -R 777 $DATADEPENDENTDIR
-# Make shared library for custom clip plugin.
-# FIXME: [DLIS-4138] Once TensorRT uploads a new custom sample plugin they maintain, we should switch to
-# that one. This uses the provided plugin code from Release 8.4. This could break when TensorRT makes
-# changes to their plugin code.
-(git clone -b release/8.4 https://github.com/NVIDIA/TensorRT.git && \
-cd /workspace/TensorRT/samples/python/uff_custom_plugin && cmake . && make && \
-cp libclipplugin.so $PLGDESTDIR/.)
-LD_PRELOAD=$PLGDESTDIR/libclipplugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
+# Make shared library for custom Hardmax plugin.
+(git clone -b release/10.0 https://github.com/NVIDIA/TensorRT.git && \
+cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
+LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
 chmod -R 777 $PLGDESTDIR
 EOF
 
@@ -535,6 +542,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        $TENSORRT_IMAGE
+
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1

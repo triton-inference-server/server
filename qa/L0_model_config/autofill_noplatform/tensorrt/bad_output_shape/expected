@@ -1,0 +1,1 @@
+unable to autofill for 'bad_output_shape', model tensor configurations are contradicting each other in terms of whether batching is supported

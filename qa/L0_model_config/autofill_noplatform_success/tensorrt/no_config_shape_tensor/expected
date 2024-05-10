@@ -26,7 +26,7 @@ output {
 }
 output {
   name: "OUTPUT0"
-  data_type: TYPE_INT32
+  data_type: TYPE_INT64
   dims: 2
   is_shape_tensor: true
 }
