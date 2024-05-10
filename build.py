@@ -948,7 +948,8 @@ RUN pip3 install --upgrade pip && \
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
 RUN wget -O /tmp/boost.tar.gz \
         https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz && \
-    (cd /tmp && tar xzf boost.tar.gz) && \
+    (cd /tmp && tar xzf boost.tar.gz) && cd /tmp/boost_1_80_0 && ./bootstrap.sh \
+      && ./b2 --with-filesystem && cp /tmp/boost_1_80_0/stage/lib/libboost_filesystem.so.1.80.0 /usr/lib
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
@@ -1555,6 +1556,11 @@ def core_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
         cmake_script.cp(
             os.path.join(repo_install_dir, 'lib', 'libtritonserver.so'),
             os.path.join(install_dir, 'lib'))
+        # Copy boost filesystem library used to compile tritonserver
+        cmake_script.mkdir(os.path.join(install_dir, 'boost_filesystem'))
+        cmake_script.cp(
+            os.path.join('usr', 'lib', 'libboost_filesystem.so.1.80.0'),
+            os.path.join(install_dir, 'boost_filesystem'))
 
     cmake_script.mkdir(os.path.join(install_dir, 'include', 'triton'))
     cmake_script.cpdir(
