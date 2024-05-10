@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ rm -f *.log  *.csv *.tjson *.json
 
 PROTOCOLS="grpc http triton_c_api"
 
-TRT_MODEL_NAME="resnet50_fp16_plan"
+TRT_MODEL_NAME="resnet50_fp32_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
 PYT_MODEL_NAME="resnet50_fp32_libtorch"
 ONNX_MODEL_NAME="resnet50_fp32_onnx"
@@ -56,6 +56,7 @@ TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 ARCH=${ARCH:="x86_64"}
 REPODIR=${REPODIR:="/data/inferenceserver/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+TRTEXEC=/usr/src/tensorrt/bin/trtexec
 CACHE_PATH=`pwd`/trt_cache
 
 
@@ -66,16 +67,14 @@ STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
 
+MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
+
 # Disable TF-TRT test on Jetson due to Segfault
 # Disable ORT-TRT test on Jetson due to support being disabled
 if [ "$ARCH" == "aarch64" ]; then
-    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME}"
-    CAFFE2PLAN=${TRITON_DIR}/bin/caffe2plan
 else
-    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
-    CAFFE2PLAN=../common/caffe2plan
 fi
 
 # Create optimized models
@@ -106,16 +105,20 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     echo "}}" >> ${CONFIG_PATH}
 done
 
-# Create the TensorRT plan from Caffe model
-rm -fr tensorrt_models && mkdir tensorrt_models
-cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
-    (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
-            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
-    mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
-$CAFFE2PLAN -h -b ${STATIC_BATCH} \
-            -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
-            $REPODIR/caffe_models/resnet50.prototxt $REPODIR/caffe_models/resnet50.caffemodel
+# Create the TensorRT plan from ONNX model
+rm -fr tensorrt_models && mkdir -p tensorrt_models/$TRT_MODEL_NAME/1 && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/1/model.onnx tensorrt_models/$TRT_MODEL_NAME/ && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/labels.txt tensorrt_models/$TRT_MODEL_NAME/ && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/config.pbtxt tensorrt_models/$TRT_MODEL_NAME/
+
+# Build TRT engine
+$TRTEXEC --onnx=tensorrt_models/$TRT_MODEL_NAME/model.onnx --saveEngine=tensorrt_models/$TRT_MODEL_NAME/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:${STATIC_BATCH}x3x224x224 \
+         --maxShapes=input:${STATIC_BATCH}x3x224x224
+
+rm tensorrt_models/$TRT_MODEL_NAME/model.onnx
+sed -i "s/^name: .*/name: \"$TRT_MODEL_NAME\"/g" tensorrt_models/$TRT_MODEL_NAME/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' tensorrt_models/$TRT_MODEL_NAME/config.pbtxt
 
 # Tests with each "non-optimized" model
 for MODEL_NAME in $MODEL_NAMES; do
@@ -164,16 +167,20 @@ fi
 INSTANCE_CNT=2
 CONCURRENCY=4
 
-# Create the TensorRT plan from Caffe model
-rm -fr tensorrt_models && mkdir tensorrt_models
-cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
-    (cd tensorrt_models/${TRT_MODEL_NAME} && \
-            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt && \
-            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt) && \
-    mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
-$CAFFE2PLAN -h -b ${STATIC_BATCH} \
-            -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
-            $REPODIR/caffe_models/resnet50.prototxt $REPODIR/caffe_models/resnet50.caffemodel
+# Create the TensorRT plan from ONNX model
+rm -fr tensorrt_models && mkdir -p tensorrt_models/$TRT_MODEL_NAME/1 && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/1/model.onnx tensorrt_models/$TRT_MODEL_NAME/ && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/labels.txt tensorrt_models/$TRT_MODEL_NAME/ && \
+cp $REPODIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/config.pbtxt tensorrt_models/$TRT_MODEL_NAME/
+
+# Build TRT engine
+$TRTEXEC --onnx=tensorrt_models/$TRT_MODEL_NAME/model.onnx --saveEngine=tensorrt_models/$TRT_MODEL_NAME/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:${STATIC_BATCH}x3x224x224 \
+         --maxShapes=input:${STATIC_BATCH}x3x224x224
+
+rm tensorrt_models/$TRT_MODEL_NAME/model.onnx
+sed -i "s/^name: .*/name: \"$TRT_MODEL_NAME\"/g" tensorrt_models/$TRT_MODEL_NAME/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' tensorrt_models/$TRT_MODEL_NAME/config.pbtxt
 
 for MODEL_NAME in $MODEL_NAMES; do
     for PROTOCOL in $PROTOCOLS; do

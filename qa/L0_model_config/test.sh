@@ -53,9 +53,11 @@ TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx
 # Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \
         autofill_noplatform/tensorrt/bad_input_dims/1 \
+        autofill_noplatform/tensorrt/bad_input_shape/1 \
         autofill_noplatform/tensorrt/bad_input_type/1 \
         autofill_noplatform/tensorrt/bad_input_shape_tensor/1 \
         autofill_noplatform/tensorrt/bad_output_dims/1 \
+        autofill_noplatform/tensorrt/bad_output_shape/1 \
         autofill_noplatform/tensorrt/bad_output_type/1 \
         autofill_noplatform/tensorrt/bad_output_shape_tensor/1 \
         autofill_noplatform/tensorrt/too_few_inputs/1 \

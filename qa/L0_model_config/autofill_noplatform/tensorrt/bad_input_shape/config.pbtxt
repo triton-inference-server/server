@@ -1,3 +1,4 @@
+
 max_batch_size: 8
 input [
   {
@@ -8,7 +9,7 @@ input [
   {
     name: "INPUT1"
     data_type: TYPE_FP32
-    dims: [ 7 ]
+    dims: [ 16, 1 ]
   }
 ]
 output [
