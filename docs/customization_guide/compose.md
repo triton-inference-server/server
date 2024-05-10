@@ -46,8 +46,8 @@ The `compose.py` script can be found in the
 Simply clone the repository and run `compose.py` to create a custom container.
 Note: Created container version will depend on the branch that was cloned.
 For example branch
- [r24.04](https://github.com/triton-inference-server/server/tree/r24.04)
-should be used to create a image based on the NGC 24.04 Triton release.
+ [r24.05](https://github.com/triton-inference-server/server/tree/r24.05)
+should be used to create a image based on the NGC 24.05 Triton release.
 
 `compose.py` provides `--backend`, `--repoagent` options that allow you to
 specify which backends and repository agents to include in the custom image.
@@ -79,20 +79,20 @@ For example, running
 ```
 python3 compose.py --backend pytorch --repoagent checksum
 ```
-on branch [r24.04](https://github.com/triton-inference-server/server/tree/r24.04) pulls:
-- `min` container `nvcr.io/nvidia/tritonserver:24.04-py3-min`
-- `full` container `nvcr.io/nvidia/tritonserver:24.04-py3`
+on branch [r24.05](https://github.com/triton-inference-server/server/tree/r24.05) pulls:
+- `min` container `nvcr.io/nvidia/tritonserver:24.05-py3-min`
+- `full` container `nvcr.io/nvidia/tritonserver:24.05-py3`
 
 Alternatively, users can specify the version of Triton container to pull from
 any branch by either:
 1. Adding flag `--container-version <container version>` to branch
 ```
-python3 compose.py --backend pytorch --repoagent checksum --container-version 24.04
+python3 compose.py --backend pytorch --repoagent checksum --container-version 24.05
 ```
 2. Specifying `--image min,<min container image name> --image full,<full container image name>`.
    The user is responsible for specifying compatible `min` and `full` containers.
 ```
-python3 compose.py --backend pytorch --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:24.04-py3-min --image full,nvcr.io/nvidia/tritonserver:24.04-py3
+python3 compose.py --backend pytorch --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:24.05-py3-min --image full,nvcr.io/nvidia/tritonserver:24.05-py3
 ```
 Method 1 and 2 will result in the same composed container. Furthermore,
 `--image` flag overrides the `--container-version` flag when both are specified.
@@ -103,8 +103,8 @@ Note:
 2. vLLM and TensorRT-LLM backends are currently not supported backends for
 `compose.py`. If you want to build additional backends on top of these backends,
 it would be better to [build it yourself](#build-it-yourself) by using
-`nvcr.io/nvidia/tritonserver:24.04-vllm-python-py3` or
-`nvcr.io/nvidia/tritonserver:24.04-trtllm-python-py3` as a `min` container.
+`nvcr.io/nvidia/tritonserver:24.05-vllm-python-py3` or
+`nvcr.io/nvidia/tritonserver:24.05-trtllm-python-py3` as a `min` container.
 
 
 ### CPU-only container composition

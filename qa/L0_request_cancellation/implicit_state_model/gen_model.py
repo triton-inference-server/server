@@ -1,4 +1,6 @@
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,43 +26,31 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/24_03
-publishedVersion: '2.46.0'
-gcpMarketplace: true
+import torch
 
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 24.05-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
 
-service:
-  type: NodePort
+class ImplicitStateModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
 
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+    def forward(self, delay_itrs, seq_start, seq_id, seq_state_in):
+        # if not sequence start, verify sequence state match sequence id
+        if not seq_start and seq_id != seq_state_in:
+            print(
+                f"[MODEL ERROR] Invalid sequence state, expect {seq_id}, got {seq_state_in}"
+            )
+        # delay the execution
+        delay = 0
+        for i in range(int(delay_itrs)):
+            delay += i
+        # set sequence state, do not modify state unless sequence starting
+        if seq_start:
+            seq_state_out = seq_id
+        else:
+            seq_state_out = seq_state_in
+        dummy_out = seq_state_out
+        return dummy_out, seq_state_out
+
+
+if __name__ == "__main__":
+    torch.jit.save(torch.jit.script(ImplicitStateModel()), "model.pt")
