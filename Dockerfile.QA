@@ -1,4 +1,4 @@
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -358,19 +358,18 @@ RUN pip3 install --upgrade wheel setuptools && \
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-arm64.tar.gz && \
-      rm -f go1.19.1.linux-arm64.tar.gz; \
+      wget https://golang.org/dl/go1.22.3.linux-arm64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.3.linux-arm64.tar.gz && \
+      rm -f go1.22.3.linux-arm64.tar.gz; \
     else \
-      wget https://golang.org/dl/go1.19.1.linux-amd64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-amd64.tar.gz && \
-      rm -f go1.19.1.linux-amd64.tar.gz; \
+      wget https://golang.org/dl/go1.22.3.linux-amd64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.3.linux-amd64.tar.gz && \
+      rm -f go1.22.3.linux-amd64.tar.gz; \
     fi
 ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
-RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
-    GO111MODULE=off go get google.golang.org/grpc
-
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
 # user.
