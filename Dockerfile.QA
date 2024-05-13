@@ -368,9 +368,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
     fi
 ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
-RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
-    GO111MODULE=off go get google.golang.org/grpc
-
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
 # user.
