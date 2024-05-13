@@ -33,5 +33,5 @@ class TritonPythonModel:
     def initialize(self, args):
         self._common = ResponseSenderModelCommon(pb_utils)
 
-    def execute(self, requests):
-        return self._common.execute(requests, use_async=False)
+    async def execute(self, requests):
+        return self._common.execute(requests, use_async=True)

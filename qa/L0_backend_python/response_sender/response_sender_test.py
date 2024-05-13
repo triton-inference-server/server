@@ -102,79 +102,183 @@ class ResponseSenderTest(unittest.TestCase):
 
     # Decoupled model send response final flag before request return.
     def test_decoupled_zero_response_pre_return(self):
+        number_of_response_before_return = 0
+        send_complete_final_flag_before_return = True
+        return_a_response = False
+        number_of_response_after_return = 0
+        send_complete_final_flag_after_return = False
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=True,
-            return_a_response=False,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 0)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
         self.assertEqual(len(responses), 0)
 
     # Decoupled model send response final flag after request return.
     def test_decoupled_zero_response_post_return(self):
+        number_of_response_before_return = 0
+        send_complete_final_flag_before_return = False
+        return_a_response = False
+        number_of_response_after_return = 0
+        send_complete_final_flag_after_return = True
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=False,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=True,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 0)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
         self.assertEqual(len(responses), 0)
 
     # Decoupled model send 1 response before request return.
     def test_decopled_one_response_pre_return(self):
-        number_of_response = 1
+        number_of_response_before_return = 1
+        send_complete_final_flag_before_return = True
+        return_a_response = False
+        number_of_response_after_return = 0
+        send_complete_final_flag_after_return = False
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=number_of_response,
-            send_complete_final_flag_before_return=True,
-            return_a_response=False,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
-        self.assertEqual(len(responses), number_of_response)
+        self.assertEqual(len(responses), 1)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 1)
 
     # Decoupled model send 1 response after request return.
     def test_decopled_one_response_post_return(self):
-        number_of_response = 1
+        number_of_response_before_return = 0
+        send_complete_final_flag_before_return = False
+        return_a_response = False
+        number_of_response_after_return = 1
+        send_complete_final_flag_after_return = True
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=False,
-            number_of_response_after_return=number_of_response,
-            send_complete_final_flag_after_return=True,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
-        self.assertEqual(len(responses), number_of_response)
+        self.assertEqual(len(responses), 1)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 1)
 
     # Decoupled model send 2 response before request return.
     def test_decopled_two_response_pre_return(self):
-        number_of_response = 2
+        number_of_response_before_return = 2
+        send_complete_final_flag_before_return = True
+        return_a_response = False
+        number_of_response_after_return = 0
+        send_complete_final_flag_after_return = False
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=number_of_response,
-            send_complete_final_flag_before_return=True,
-            return_a_response=False,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
-        self.assertEqual(len(responses), number_of_response)
+        self.assertEqual(len(responses), 2)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 2)
 
     # Decoupled model send 2 response after request return.
     def test_decopled_two_response_post_return(self):
-        number_of_response = 2
+        number_of_response_before_return = 0
+        send_complete_final_flag_before_return = False
+        return_a_response = False
+        number_of_response_after_return = 2
+        send_complete_final_flag_after_return = True
+
+        model_name = "response_sender_decoupled"
         responses = self._infer(
-            model_name="response_sender_decoupled",
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=False,
-            number_of_response_after_return=number_of_response,
-            send_complete_final_flag_after_return=True,
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
         )
-        self.assertEqual(len(responses), number_of_response)
+        self.assertEqual(len(responses), 2)
+
+        model_name = "response_sender_decoupled_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self.assertEqual(len(responses), 2)
 
 
 if __name__ == "__main__":

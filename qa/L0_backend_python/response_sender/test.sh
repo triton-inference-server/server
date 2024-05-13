@@ -34,12 +34,23 @@ RET=0
 #
 rm -rf models && mkdir models
 mkdir -p models/response_sender/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender/1 && \
     cp ../../python_models/response_sender/model.py models/response_sender/1 && \
     cp ../../python_models/response_sender/config.pbtxt models/response_sender
 mkdir -p models/response_sender_decoupled/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_decoupled/1 && \
     cp ../../python_models/response_sender/model.py models/response_sender_decoupled/1 && \
     cp ../../python_models/response_sender/config.pbtxt models/response_sender_decoupled && \
     echo "model_transaction_policy { decoupled: True }" >> models/response_sender_decoupled/config.pbtxt
+mkdir -p models/response_sender_async/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_async/1 && \
+    cp ../../python_models/response_sender/model_async.py models/response_sender_async/1/model.py && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_async
+mkdir -p models/response_sender_decoupled_async/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_decoupled_async/1 && \
+    cp ../../python_models/response_sender/model_async.py models/response_sender_decoupled_async/1/model.py && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_decoupled_async && \
+    echo "model_transaction_policy { decoupled: True }" >> models/response_sender_decoupled_async/config.pbtxt
 
 TEST_LOG="response_sender_test.log"
 SERVER_LOG="response_sender_test.server.log"
