@@ -83,7 +83,7 @@ class ResponseSenderModelCommon:
 
     def _create_response(self, batch_size, response_id):
         output_tensor = self._pb_utils.Tensor(
-            "DUMMY_OUT", np.array([[response_id] for _ in range(batch_size)], np.uint8)
+            "INDEX", np.array([[response_id] for _ in range(batch_size)], np.uint16)
         )
         response = self._pb_utils.InferenceResponse(output_tensors=[output_tensor])
         return response

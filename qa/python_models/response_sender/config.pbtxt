@@ -56,8 +56,8 @@ input [
 ]
 output [
   {
-    name: "DUMMY_OUT"
-    data_type: TYPE_UINT8
+    name: "INDEX"
+    data_type: TYPE_UINT16
     dims: [ 1 ]
   }
 ]
