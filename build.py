@@ -1268,7 +1268,7 @@ RUN pip3 install vllm=={}
     if "dali" in backends:
         df += """
 # Update Python path to include DALI
-RUN export PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
+ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
     df += """
