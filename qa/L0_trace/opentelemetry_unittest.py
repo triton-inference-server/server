@@ -27,6 +27,7 @@
 import sys
 
 sys.path.append("../common")
+import concurrent.futures
 import json
 import queue
 import re
@@ -110,6 +111,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.input_all_required_model_name = "input_all_required"
+        self.cancel_queue_model_name = "dynamic_batch"
         self.bls_model_name = "bls_simple"
         self.trace_context_model = "trace_context"
         self.non_decoupled_model_name_ = "repeat_int32"
@@ -118,6 +120,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.ensemble_model_name,
             self.bls_model_name,
             self.non_decoupled_model_name_,
+            self.cancel_queue_model_name,
         ]
         self.root_span = "InferRequest"
         self._user_data = UserData()
@@ -135,6 +138,22 @@ class OpenTelemetryTest(tu.TestResultCollector):
         time.sleep(5)
         test_name = unittest.TestCase.id(self).split(".")[-1]
         shutil.copyfile(self.filename, self.filename + "_" + test_name + ".log")
+
+    def _get_inputs(self, batch_size):
+        shape = [batch_size, 8]
+        inputs = [grpcclient.InferInput("INPUT0", shape, "FP32")]
+        inputs[0].set_data_from_numpy(np.ones(shape, dtype=np.float32))
+        return inputs
+
+    def _generate_callback_and_response_pair(self):
+        response = {"responded": False, "result": None, "error": None}
+
+        def callback_queue(result, error):
+            response["responded"] = True
+            response["result"] = result
+            response["error"] = error
+
+        return callback_queue, response
 
     def _parse_trace_log(self, trace_log):
         """
@@ -228,36 +247,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
             self.assertFalse(all(entry in events for entry in compute_events))
-
-    def _check_events_cancel(self, events):
-        """
-        Helper function that verifies passed events contain expected entries.
-
-        Args:
-            span_name (str): name of a span.
-            events (List[str]): list of event names, collected for the span with the name `span_name`.
-        """
-        root_events_grpc = [
-            "GRPC_WAITREAD_START",
-            "GRPC_WAITREAD_END",
-            "INFER_RESPONSE_COMPLETE",
-            "GRPC_SEND_START",
-            "GRPC_SEND_END",
-        ]
-        root_events_http = [
-            "HTTP_RECV_START",
-            "HTTP_RECV_END",
-            "INFER_RESPONSE_COMPLETE",
-            "HTTP_SEND_START",
-            "HTTP_SEND_END",
-        ]
-
-        if "HTTP" in events:
-            self.assertTrue(all(entry in events for entry in root_events_http))
-            self.assertFalse(all(entry in events for entry in root_events_grpc))
-        elif "GRPC" in events:
-            self.assertTrue(all(entry in events for entry in root_events_grpc))
-            self.assertFalse(all(entry in events for entry in root_events_http))
 
     def _test_resource_attributes(self, attributes):
         """
@@ -409,12 +398,12 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
             )
         else:
+            # Compute is expected to be 0 as cancelled in queue
             expected_counts = dict(
-                {"compute": 2, self.input_all_required_model_name: 2, self.root_span: 2}
+                {"compute": 0, self.cancel_queue_model_name: 1, self.root_span: 1}
             )
         parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
-        is_cancelled = True
-        self._verify_contents(parsed_spans, expected_counts, is_cancelled)
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled=True)
 
     def _test_trace(
         self,
@@ -473,8 +462,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
-        is_cancelled = False
-        self._verify_contents(parsed_spans, expected_counts, is_cancelled)
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled=False)
         self._verify_nesting(parsed_spans, expected_parent_span_dict)
         self._verify_headers_propagated_from_client_if_any(root_span, headers)
 
@@ -625,7 +613,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
     def test_grpc_trace_all_input_required_model_cancel(self):
         """
         Tests trace, collected from executing one inference request and cancelling the request
-        for a model and GRPC client.
+        for a model and GRPC client. Expects only 2 GRPC stage events
         """
         triton_client_grpc = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
@@ -648,37 +636,32 @@ class OpenTelemetryTest(tu.TestResultCollector):
         time.sleep(0.1)  # context switch
         self._test_trace_cancel(is_queued=False)
 
+    # Test queued requests on dynamic batch scheduler can be cancelled
     def test_grpc_trace_model_cancel_in_queue(self):
         """
-        Tests trace, collected from executing 2 back to back inference request and cancelling the latest request
-        for a model and GRPC client. To ensure queueing behavior is captured.
+        Tests trace, collected from executing one inference request and cancelling the request
+        for a model and GRPC client while the request is in queue. Expects 0 compute stage traces
         """
+        model_name = self.cancel_queue_model_name
         triton_client_grpc = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
         )
-        inputs = []
-        inputs.append(grpcclient.InferInput("INPUT0", [1], "FP32"))
-        inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs.append(grpcclient.InferInput("INPUT1", [1], "FP32"))
-        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        inputs.append(grpcclient.InferInput("INPUT2", [1], "FP32"))
-        inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
-        future_1 = triton_client_grpc.async_infer(
-            model_name=self.input_all_required_model_name,
-            inputs=inputs,
-            callback=self._callback,
-            outputs=self._outputs,
-        )
-        future_2 = triton_client_grpc.async_infer(
-            model_name=self.input_all_required_model_name,
-            inputs=inputs,
-            callback=self._callback,
-            outputs=self._outputs,
-        )
-        time.sleep(0.1)  # ensure the inference has started
-        future_2.cancel()
-        time.sleep(0.1)  # context switch
-        self._test_trace_cancel(is_queued=True)
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # Saturate the slots on the model
+            saturate_thread = pool.submit(
+                triton_client_grpc.infer, model_name, self._get_inputs(batch_size=1)
+            )
+            time.sleep(2)  # ensure the slots are filled
+            # The next request should be queued
+            callback, response = self._generate_callback_and_response_pair()
+            future = triton_client_grpc.async_infer(
+                model_name, self._get_inputs(batch_size=1), callback
+            )
+            time.sleep(0.2)  # ensure the request is queued
+            future.cancel()
+            # Join saturating thread
+            saturate_thread.result()
+            self._test_trace_cancel(is_queued=True)
 
     def test_non_decoupled(self):
         """

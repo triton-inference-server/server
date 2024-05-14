@@ -62,6 +62,18 @@ source ../common/util.sh
 rm -f *.log
 rm -f *.log.*
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
+# set up model for inference delay queueing
+mkdir -p trace_models/dynamic_batch/1 && (cd trace_models/dynamic_batch && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'dynamic_batching {' >> config.pbtxt && \
+    echo -e '  preferred_batch_size: [ 1 ]' >> config.pbtxt && \
+    echo -e '  default_queue_policy { timeout_action: REJECT \n default_timeout_microseconds: 1000000 \n max_queue_size: 8 }' >> config.pbtxt && \
+    echo -e '}' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "8000" } }]' >> config.pbtxt)
 
 # set up simple and global_simple model using MODELBASE
 cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
