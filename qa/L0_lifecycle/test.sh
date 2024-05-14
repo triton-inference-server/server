@@ -80,7 +80,7 @@ fi
 # LifeCycleTest.test_file_override
 rm -fr models config.pbtxt.*
 mkdir models
-cp -r /data/inferenceserver/23.06_xavier/qa_model_repository/onnx_float32_float32_float32 models/.
+cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
 # Make only version 2, 3 is valid version directory while config requests 1, 3
 rm -rf models/onnx_float32_float32_float32/1
 
