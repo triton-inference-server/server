@@ -1266,6 +1266,12 @@ RUN pip3 install vllm=={}
             TRITON_VERSION_MAP[FLAGS.version][6]
         )
 
+    if "dali" in backends:
+        df += """
+# Update Python path to include DALI
+ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
+"""
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
