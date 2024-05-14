@@ -288,6 +288,26 @@ class ResponseSenderTest(unittest.TestCase):
             send_complete_final_flag_after_return=False,
         )
 
+    # Non-decoupled model send 1 response before return.
+    def test_non_decoupled_one_response_pre_return(self):
+        self._assert_non_decoupled_infer_success(
+            number_of_response_before_return=1,
+            send_complete_final_flag_before_return=True,
+            return_a_response=False,
+            number_of_response_after_return=0,
+            send_complete_final_flag_after_return=False,
+        )
+
+    # Non-decoupled model send 1 response after return.
+    def test_non_decoupled_one_response_post_return(self):
+        self._assert_non_decoupled_infer_success(
+            number_of_response_before_return=0,
+            send_complete_final_flag_before_return=False,
+            return_a_response=False,
+            number_of_response_after_return=1,
+            send_complete_final_flag_after_return=True,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
