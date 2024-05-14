@@ -35,6 +35,7 @@ import unittest
 
 import infer_util as iu
 import numpy as np
+import psutil
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -414,6 +415,32 @@ class SharedMemoryTest(tu.TestResultCollector):
                 register_byte_size=0,
                 register_offset=create_byte_size + 1,
             )
+
+    def test_python_client_leak(self):
+        process = psutil.Process()
+        initial_mem_usage = process.memory_info().rss / 1024**2
+        threshold = initial_mem_usage * 1.02  # 2% tolerance threshold
+
+        byte_size = 4
+        i = 0
+        while i < 100000:
+            if i % 5000 == 0:
+                print(
+                    f"[iter: {i:<8}] Memory Usage:",
+                    process.memory_info().rss / 1024**2,
+                    "MiB",
+                )
+
+            shm_handle = shm.create_shared_memory_region(
+                "shmtest", "/shmtest", byte_size
+            )
+            shm.destroy_shared_memory_region(shm_handle)
+            i += 1
+        final_mem_usage = process.memory_info().rss / 1024**2
+        self.assertTrue(
+            (initial_mem_usage <= final_mem_usage <= threshold),
+            "client memory usage is increasing",
+        )
 
 
 if __name__ == "__main__":
