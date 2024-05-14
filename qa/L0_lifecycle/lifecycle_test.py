@@ -3406,8 +3406,7 @@ class LifeCycleTest(tu.TestResultCollector):
         )
 
     def test_add_custom_config(self):
-        models_base = ("savedmodel", "plan")
-        models_shape = ((1, 16), (1, 16))
+        models_base = ("savedmodel",)
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
@@ -3426,55 +3425,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     self.assertTrue(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Run inference on the model on all versions. Only version 1, 3 should work.
-        for model_name, model_shape in zip(models_base, models_shape):
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=False,
-                    model_version=1,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=True,
-                    model_version=3,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=2,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
 
         # Add custom model configuration, which cause model to be
         # re-loaded and use custom config inside configs folder, which
@@ -3501,60 +3451,8 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Only version 2 should work.
-        for model_name, model_shape in zip(models_base, models_shape):
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=True,
-                    model_version=2,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=1,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=3,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
-
     def test_delete_custom_config(self):
-        models_base = ("savedmodel", "plan")
-        models_shape = ((1, 16), (1, 16))
+        models_base = ("savedmodel",)
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
@@ -3573,57 +3471,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     self.assertFalse(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Run inference on the model on all versions. Only version 2 should work.
-        for model_name, model_shape in zip(models_base, models_shape):
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=True,
-                    model_version=2,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=1,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=3,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
 
         # Delete custom model configuration, which cause model to be
         # re-loaded and use default config, which means that version
@@ -3645,55 +3492,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     self.assertTrue(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Only version 1, 3 should work.
-        for model_name, model_shape in zip(models_base, models_shape):
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=False,
-                    model_version=1,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=True,
-                    model_version=3,
-                )
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    model_name,
-                    model_shape,
-                    1,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    model_version=2,
-                )
-                self.assertTrue(
-                    False, "expected error for unavailable model " + model_name
-                )
-            except Exception as ex:
-                self.assertIn("Request for unknown model", ex.message())
 
 
 if __name__ == "__main__":

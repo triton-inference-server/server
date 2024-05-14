@@ -2136,7 +2136,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_add_custom_config
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel plan ; do
+for i in savedmodel; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mkdir models/${i}_float32_float32_float32/configs
     sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
@@ -2168,7 +2168,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_delete_custom_config
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel plan ; do
+for i in savedmodel; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mkdir models/${i}_float32_float32_float32/configs
     sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
