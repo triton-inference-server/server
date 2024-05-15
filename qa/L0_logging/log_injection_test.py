@@ -27,8 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-import pytest
-import tritonclient
 import tritonclient.http as httpclient
 import numpy
 
@@ -54,4 +52,4 @@ class LogInjectionTest(tu.TestResultCollector):
         input_tensor = httpclient.InferInput(input_name, input_data.shape, "FP32")
         input_tensor.set_data_from_numpy(input_data)
 
-        result = triton_client.infer(model_name="simple", inputs=[input_tensor])
+        triton_client.infer(model_name="simple", inputs=[input_tensor])
