@@ -266,6 +266,10 @@ OpenCudaIPCRegion(
   return nullptr;
 }
 
+// Using `cudaGetDriverEntryPoint` from CUDA runtime API to get CUDA driver
+// entry point. This approach is used to avoid linking against CUDA driver
+// library so that when Triton is built with GPU support, it can still be run on
+// CPU-only environments.
 TRITONSERVER_Error*
 GetCudaDriverEntryPoint(const char* name, void** func_ptr)
 {
