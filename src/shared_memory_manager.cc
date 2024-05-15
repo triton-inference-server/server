@@ -118,6 +118,7 @@ SharedMemoryManager::UnregisterHelper(
 }
 }}  // namespace triton::server
 #else
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -267,13 +268,37 @@ OpenCudaIPCRegion(
 }
 
 TRITONSERVER_Error*
+GetCudaDriverEntryPoint(const char* name, void** func_ptr)
+{
+  cudaError_t err = cudaGetDriverEntryPoint(name, func_ptr, cudaEnableDefault);
+  if (err != cudaSuccess) {
+    LOG_ERROR << "Failed to get CUDA driver entry point for " << name << ": "
+              << cudaGetErrorString(err);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string("Failed to get CUDA driver entry point").c_str());
+  }
+  return nullptr;
+}
+
+TRITONSERVER_Error*
 GetCudaSharedMemoryRegionSize(CUdeviceptr data_ptr, size_t& shm_region_size)
 {
+  void* cu_mem_get_address_range = nullptr;
+  void* cu_get_error_string = nullptr;
+  RETURN_IF_ERR(GetCudaDriverEntryPoint(
+      "cuMemGetAddressRange", &cu_mem_get_address_range));
+  RETURN_IF_ERR(
+      GetCudaDriverEntryPoint("cuGetErrorString", &cu_get_error_string));
+
   CUdeviceptr* base = nullptr;
-  CUresult result = cuMemGetAddressRange(base, &shm_region_size, data_ptr);
+  CUresult result = ((
+      CUresult(*)(CUdeviceptr*, size_t*, CUdeviceptr))cu_mem_get_address_range)(
+      base, &shm_region_size, data_ptr);
   if (result != CUDA_SUCCESS) {
     const char* errorString;
-    if (cuGetErrorString(result, &errorString) != CUDA_SUCCESS) {
+    if (((CUresult(*)(CUresult, const char**))cu_get_error_string)(
+            result, &errorString) != CUDA_SUCCESS) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL, "Failed to get CUDA error string");
     }
