@@ -221,7 +221,7 @@ fi
 
 # Check redirection worked properly (server log has tolerance of 40 due to
 # unavoidable onnx framework logging)
-expected_log_count=55
+expected_log_count=75
 actual_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./log_file.log)
 if [ $actual_log_count -lt $expected_log_count ]; then
     echo $actual_log_count
