@@ -165,7 +165,7 @@ cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
 cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
 
-if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
+if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # GPU tensor tests are disabled on jetson
@@ -237,7 +237,7 @@ set -e
 #
 # Test KIND_GPU
 # Disable env test for Jetson & Windows since GPU Tensors are not supported
-if [[ "$TEST_JETSON" == "0" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
+if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
   rm -rf models/
   mkdir -p models/add_sub_gpu/1/
   cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
@@ -408,7 +408,7 @@ fi
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
-if [[ "$TEST_JETSON" == "0" ]]; then
+if [ "$TEST_JETSON" == "0" ]; then
     SUBTESTS="ensemble bls decoupled"
     # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
     # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
