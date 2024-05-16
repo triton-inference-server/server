@@ -134,6 +134,9 @@ struct TritonServerParameters {
   uint32_t model_load_thread_count_{4};
   uint32_t model_load_retry_count_{0};
   std::map<int, double> load_gpu_limit_;
+  // Custom model configuration file. Fall back to default config.pbtxt if not
+  // set.
+  std::string model_config_name_;
 
   // Rate limiter configuration
   // FIXME: Once the rate limiter implementation is complete make
