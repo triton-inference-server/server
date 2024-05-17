@@ -3,6 +3,7 @@ on:
 jobs:
   mirror_repo:
     environment: GITLAB
+    needs: pre-commit
     runs-on: self-hosted
     steps:
       - name: step1
