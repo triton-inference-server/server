@@ -1,7 +1,5 @@
 on:
-  workflow_run:
-    workflows: ["pre-commit"]
-    types: [completed]
+  pull_request:
 jobs:
   mirror_repo:
     environment: GITLAB
