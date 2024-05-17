@@ -1,6 +1,6 @@
 on:
   workflow_run:
-    workflows: [pre-commit]
+    workflows: ["pre-commit"]
     types: [completed]
 jobs:
   mirror_repo:
