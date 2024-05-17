@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,20 +24,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import tritonclient.http as httpclient
-import tritonclient.grpc as grpcclient
-import numpy
-import pytest
-import os
-import shutil
-import subprocess
-import time
-import re
-from pathlib import Path
 import datetime
 import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
 import google.protobuf.text_format
+import numpy
+import pytest
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 
 module_directory = os.path.split(os.path.abspath(__file__))[0]
 
@@ -63,12 +62,12 @@ os.makedirs(test_logs_directory)
 # data_rows
 # border
 
-table_border_regex = re.compile(r'^\+[-+]+\+$')
-table_row_regex = re.compile(r'^\| (?P<row>.*?) \|$')
+table_border_regex = re.compile(r"^\+[-+]+\+$")
+table_row_regex = re.compile(r"^\| (?P<row>.*?) \|$")
 
 
 # Regular expression pattern for default log record
-default_log_record = r'(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)'
+default_log_record = r"(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)"
 
 # Compile the regex pattern
 default_log_record_regex = re.compile(default_log_record, re.DOTALL)
@@ -84,22 +83,27 @@ FORMATS = [
 
 IDS = ["default", "ISO8601", "default_unescaped", "ISO8601_unescaped"]
 
+
 def parse_timestamp(timestamp):
-    hours, minutes, seconds = timestamp.split(':')
+    hours, minutes, seconds = timestamp.split(":")
     hours = int(hours)
     minutes = int(minutes)
     seconds = float(seconds)
     return datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
+
 validators = {}
 
+
 def validator(func):
-    validators[func.__name__.replace('validate_','')] = func
+    validators[func.__name__.replace("validate_", "")] = func
     return func
+
 
 @validator
 def validate_level(level, _):
     assert level in LEVELS
+
 
 @validator
 def validate_month(month, _):
@@ -107,80 +111,94 @@ def validate_month(month, _):
     month = int(month)
     assert month >= 1 and month <= 12
 
+
 @validator
 def validate_day(day, _):
     assert day.isdigit()
     day = int(day)
     assert day >= 1 and day <= 31
 
+
 @validator
 def validate_timestamp(timestamp, _):
     parse_timestamp(timestamp)
+
 
 @validator
 def validate_pid(pid, _):
     assert pid.isdigit()
 
+
 @validator
 def validate_file(file_, _):
     assert Path(file_).name is not None
+
 
 @validator
 def validate_line(line, _):
     assert line.isdigit()
 
+
 def _split_row(row):
-    return [r.strip() for r in row.group("row").strip().split('|')]
+    return [r.strip() for r in row.group("row").strip().split("|")]
+
 
 def validate_table(table_rows):
     index = 0
     top_border = table_border_regex.search(table_rows[index])
     assert top_border
 
-    index += 1 
+    index += 1
     header = table_row_regex.search(table_rows[index])
     assert header
     header = _split_row(header)
 
-    index  += 1
+    index += 1
     middle_border = table_border_regex.search(table_rows[index])
-    assert(middle_border)
+    assert middle_border
 
     # Process each row
-    index+=1
+    index += 1
     parsed_rows = []
-    row=""
+    row = ""
     for index, row in enumerate(table_rows[index:]):
         matched = table_row_regex.search(row)
         if matched:
             row_data = _split_row(matched)
             parsed_rows.append(row_data)
-            
+
     end_border = table_border_regex.search(row)
     assert end_border
-       
+
     for row in parsed_rows:
-        assert len(row)==len(header)
-    
+        assert len(row) == len(header)
+
+
 @validator
 def validate_message(message, escaped):
-    heading, obj = message.split('\n',1)
+    heading, obj = message.split("\n", 1)
     if heading and escaped:
         try:
             json.loads(heading)
         except json.JSONDecodeError as e:
-            raise Exception(f"{e} First line of message in log record is not a valid JSON string")
+            raise Exception(
+                f"{e} First line of message in log record is not a valid JSON string"
+            )
         except Exception as e:
-            raise type(e)(f"{e} First line of message in log record is not a valid JSON string")
+            raise type(e)(
+                f"{e} First line of message in log record is not a valid JSON string"
+            )
     if len(obj):
-        obj = obj.strip().split('\n')
+        obj = obj.strip().split("\n")
         if obj:
             match = table_border_regex.search(obj[0])
             if match:
                 validate_table(obj)
             else:
-                google.protobuf.text_format.ParseLines(obj,grpcclient.model_config_pb2.ModelConfig())
-        
+                google.protobuf.text_format.ParseLines(
+                    obj, grpcclient.model_config_pb2.ModelConfig()
+                )
+
 
 class TestLogFormat:
     @pytest.fixture(autouse=True)
@@ -234,16 +252,17 @@ class TestLogFormat:
 
     def validate_log_record(self, record, format_regex, escaped):
         match = format_regex.search(record)
-        if match:
-            for field, value in match.groupdict().items():
-                if field in validators:
-                    try:
-                        validators[field](value,escaped)
-                    except Exception as e:
-                        raise type(e)(f"{e}\nInvalid {field}: '{match.group(field)}' in log record '{record}'")
+        assert match, "Invalid log line"
 
-        else:
-            raise Exception("Invalid log line")
+        for field, value in match.groupdict().items():
+            if field not in validators:
+                continue
+            try:
+                validators[field](value, escaped)
+            except Exception as e:
+                raise type(e)(
+                    f"{e}\nInvalid {field}: '{match.group(field)}' in log record '{record}'"
+                )
 
     def verify_log_format(self, file_path, format_regex, escaped):
         log_records = []
@@ -271,7 +290,7 @@ class TestLogFormat:
         self._server_options["log-format"] = log_format.replace("_unescaped", "")
 
         escaped = "_unescaped" not in log_format
-        
+
         self._launch_server(escaped)
         time.sleep(1)
         self._server_process.kill()
