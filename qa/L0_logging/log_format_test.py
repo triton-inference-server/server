@@ -31,7 +31,6 @@ import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 import numpy
 import pytest
-import unittest
 import os
 import shutil
 import subprocess
