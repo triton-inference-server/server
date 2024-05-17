@@ -55,26 +55,23 @@ git clone ${TRITON_REPO_ORGANIZATION}/client.git
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 pushd ${GO_CLIENT_DIR}
+
 git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
     ${TRITON_REPO_ORGANIZATION}/common.git
 bash gen_go_stubs.sh
-popd
-
-# Copy packages to GOPATH, where Go expects to find packages.
-PACKAGE_PATH="${GOPATH}/src/github.com/triton-inference-server"
-rm -rf ${PACKAGE_PATH}/client
-mkdir -p ${PACKAGE_PATH}
-cp -r client $PACKAGE_PATH
 
 set +e
 
-# Run test for GRPC variant of go client
-GO111MODULE=off go run $SIMPLE_GO_CLIENT >>client.log 2>&1
+# Run test for GRPC variant of go client within go.mod path
+go run grpc_simple_client.go >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "Checking Inference Outputs" client.log` != "1" ]; then
+popd
+
+
+if [ `grep -c "Checking Inference Outputs" ${GO_CLIENT_DIR}/client.log` != "1" ]; then
     echo -e "\n***\n*** Failed. Unable to run inference.\n***"
     RET=1
 fi
