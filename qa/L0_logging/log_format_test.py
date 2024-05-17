@@ -295,9 +295,10 @@ class TestLogFormat:
         time.sleep(1)
         self._server_process.kill()
         return_code = self._server_process.wait()
-        if isinstance(format_regex, str):
-            return
-        self.verify_log_format(self._server_options["log-file"], format_regex, escaped)
+        if format_regex:
+            self.verify_log_format(
+                self._server_options["log-file"], format_regex, escaped
+            )
 
     def foo_test_injection(self):
         try:
