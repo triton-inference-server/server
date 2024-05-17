@@ -31,7 +31,6 @@ TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-i
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
 GO_CLIENT_DIR=client/src/grpc_generated/go
-SIMPLE_GO_CLIENT=${GO_CLIENT_DIR}/grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
