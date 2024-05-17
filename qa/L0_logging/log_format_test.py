@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,27 +63,6 @@ test_logs_directory = os.path.abspath(
 shutil.rmtree(test_logs_directory, ignore_errors=True)
 
 os.makedirs(test_logs_directory)
-
-
-import re
-
-# Sample ASCII table
-ascii_table = """
-+--------+---------+----------------------------------------------------------------------------------------------------------------------------------+
-| Model  | Version | Status                                                                                                                           |
-+--------+---------+----------------------------------------------------------------------------------------------------------------------------------+
-| simple | 1       | UNAVAILABLE: Not found: unable to load shared library: /opt/tritonserver/backends/onnxruntime/libtriton_onnxruntime.so: undefined symbol: TRITONSERVER_LogServerMessage |
-+--------+---------+----------------------------------------------------------------------------------------------------------------------------------+
-"""
-
-
-# I0516 17:33:33.476093 2814 cache_manager.cc:480] "Create CacheManager with cache_dir: '/opt/tritonserver/caches'"
-
-# import re
-
-# Sample log entry
-# log_entry = "#I0516 17:33:33.476093 2814 cache_manager.cc:480] \"Create CacheManager with cache_dir: '/opt/tritonserver/caches'\""
-
 
 # Regular expression pattern to capture the headers and rows
 table_regex = re.compile(
