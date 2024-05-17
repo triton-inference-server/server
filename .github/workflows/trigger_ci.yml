@@ -1,6 +1,11 @@
 on:
   pull_request:
 jobs:
+  waiting:
+    runs-on: self-hosted
+    steps:
+      - name: waiting
+        run: echo "Waiting for pre-commit steps to finish first"
   mirror_repo:
     environment: GITLAB
     needs: pre-commit
