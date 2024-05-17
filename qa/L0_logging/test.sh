@@ -588,12 +588,24 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
 
+FORMAT_TEST_LOG="./log_format_test.log"
+
+python3 -m pytest --junitxml=log_format_test.xml log_format_test.py > $FORMAT_TEST_LOG 2>&1
+
+if [ $? -ne 0 ]; then
+    cat $FORMAT_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Test Failed\n***"
 fi
 
 
