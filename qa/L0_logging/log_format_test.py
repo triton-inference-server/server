@@ -54,6 +54,7 @@ shutil.rmtree(test_logs_directory, ignore_errors=True)
 os.makedirs(test_logs_directory)
 
 # Regular expressions for Table
+#
 # Table format is:
 #
 # border
@@ -67,18 +68,20 @@ table_row_regex = re.compile(r"^\| (?P<row>.*?) \|$")
 
 
 # Regular expression pattern for default log record
-default_log_record = r"(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)"
+DEFAULT_LOG_RECORD = r"(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)"
+default_log_record_regex = re.compile(DEFAULT_LOG_RECORD, re.DOTALL)
 
-# Compile the regex pattern
-default_log_record_regex = re.compile(default_log_record, re.DOTALL)
+# Regular expression pattern for ISO8601 log record
+ISO8601_LOG_RECORD = r"(?P<ISO8601_timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?P<level>\w+) (?P<pid>\d+) (?P<file>.+):(?P<line>\d+)] (?P<message>.*)"
+IS08601_log_record_regex = re.compile(ISO8601_LOG_RECORD, re.DOTALL)
 
 LEVELS = set({"E", "W", "I"})
 
 FORMATS = [
     ("default", default_log_record_regex),
-    ("ISO8601", ""),
+    ("ISO8601", IS08601_log_record_regex),
     ("default_unescaped", default_log_record_regex),
-    ("ISO8601_unescaped", ""),
+    ("ISO8601_unescaped", IS08601_log_record_regex),
 ]
 
 IDS = ["default", "ISO8601", "default_unescaped", "ISO8601_unescaped"]
@@ -117,6 +120,11 @@ def validate_day(day, _):
     assert day.isdigit()
     day = int(day)
     assert day >= 1 and day <= 31
+
+
+@validator
+def validate_ISO8601_timestamp(timestamp, _):
+    datetime.datetime.fromisoformat(timestamp.rstrip("Z"))
 
 
 @validator
@@ -294,7 +302,7 @@ class TestLogFormat:
         self._launch_server(escaped)
         time.sleep(1)
         self._server_process.kill()
-        return_code = self._server_process.wait()
+        self._server_process.wait()
         if format_regex:
             self.verify_log_format(
                 self._server_options["log-file"], format_regex, escaped
