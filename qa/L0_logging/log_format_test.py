@@ -41,14 +41,6 @@ import datetime
 import json
 import google.protobuf.text_format
 
-def parse_timestamp(timestamp):
-    hours, minutes, seconds = timestamp.split(':')
-    hours = int(hours)
-    minutes = int(minutes)
-    seconds = float(seconds)
-    return datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
-
-
 module_directory = os.path.split(os.path.abspath(__file__))[0]
 
 test_model_directory = os.path.abspath(os.path.join(module_directory, "log_models"))
@@ -58,17 +50,17 @@ test_logs_directory = os.path.abspath(
     os.path.join(module_directory, "log_format_test_logs")
 )
 
-
 shutil.rmtree(test_logs_directory, ignore_errors=True)
 
 os.makedirs(test_logs_directory)
 
-# Regular expression pattern to capture the headers and rows
-# table is
+# Regular expressions for Table
+# Table format is:
+#
 # border
-# header
+# header_row
 # border
-# row  *
+# data_rows
 # border
 
 table_border_regex = re.compile(r'^\+[-+]+\+$')
@@ -76,21 +68,28 @@ table_row_regex = re.compile(r'^\| (?P<row>.*?) \|$')
 
 
 # Regular expression pattern for default log record
-default_pattern = r'(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)'
+default_log_record = r'(?P<level>\w)(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)'
 
 # Compile the regex pattern
-default_regex = re.compile(default_pattern, re.DOTALL)
+default_log_record_regex = re.compile(default_log_record, re.DOTALL)
 
 LEVELS = set({"E", "W", "I"})
 
 FORMATS = [
-    ("default", default_regex),
+    ("default", default_log_record_regex),
     ("ISO8601", ""),
-    ("default_unescaped", default_regex),
+    ("default_unescaped", default_log_record_regex),
     ("ISO8601_unescaped", ""),
 ]
 
 IDS = ["default", "ISO8601", "default_unescaped", "ISO8601_unescaped"]
+
+def parse_timestamp(timestamp):
+    hours, minutes, seconds = timestamp.split(':')
+    hours = int(hours)
+    minutes = int(minutes)
+    seconds = float(seconds)
+    return datetime.timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
 validators = {}
 
