@@ -39,6 +39,7 @@ import numpy
 import pytest
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 module_directory = os.path.split(os.path.abspath(__file__))[0]
 
@@ -73,20 +74,105 @@ default_log_record_regex = re.compile(DEFAULT_LOG_RECORD, re.DOTALL)
 
 # Regular expression pattern for ISO8601 log record
 ISO8601_LOG_RECORD = r"(?P<ISO8601_timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?P<level>\w+) (?P<pid>\d+) (?P<file>.+):(?P<line>\d+)] (?P<message>.*)"
-IS08601_log_record_regex = re.compile(ISO8601_LOG_RECORD, re.DOTALL)
+ISO8601_log_record_regex = re.compile(ISO8601_LOG_RECORD, re.DOTALL)
 
 LEVELS = set({"E", "W", "I"})
 
 FORMATS = [
     ("default", default_log_record_regex),
-    ("ISO8601", IS08601_log_record_regex),
+    ("ISO8601", ISO8601_log_record_regex),
     ("default_unescaped", default_log_record_regex),
-    ("ISO8601_unescaped", IS08601_log_record_regex),
+    ("ISO8601_unescaped", ISO8601_log_record_regex),
 ]
 
 IDS = ["default", "ISO8601", "default_unescaped", "ISO8601_unescaped"]
 
 INT32_MAX = 2**31 - 1
+
+INJECTED_MESSAGE = "THIS ENTRY WAS INJECTED"
+
+CONTROL_INJECTED_MESSAGE = (
+    "\u001b[31mESC-INJECTION-LFUNICODE:\u001b[32mSUCCESSFUL\u001b[0m\u0007"
+)
+
+DEFAULT_INJECTED_LOG_FORMAT = (
+    "I0205 18:34:18.707423 1 file.cc:123] {QUOTE}{INJECTED_MESSAGE}{QUOTE}"
+)
+ISO8601_INJECTED_LOG_FORMAT = (
+    "2024-05-18T01:46:51Z I 1 file.cc:123] {QUOTE}{INJECTED_MESSAGE}{QUOTE}"
+)
+
+INJECTED_FORMATS = [
+    (
+        "default",
+        default_log_record_regex,
+        DEFAULT_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=INJECTED_MESSAGE, QUOTE='"'
+        ),
+    ),
+    (
+        "ISO8601",
+        ISO8601_log_record_regex,
+        ISO8601_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=INJECTED_MESSAGE, QUOTE='"'
+        ),
+    ),
+    (
+        "default_unescaped",
+        default_log_record_regex,
+        DEFAULT_INJECTED_LOG_FORMAT.format(INJECTED_MESSAGE=INJECTED_MESSAGE, QUOTE=""),
+    ),
+    (
+        "ISO8601_unescaped",
+        ISO8601_log_record_regex,
+        ISO8601_INJECTED_LOG_FORMAT.format(INJECTED_MESSAGE=INJECTED_MESSAGE, QUOTE=""),
+    ),
+    (
+        "default",
+        default_log_record_regex,
+        DEFAULT_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=CONTROL_INJECTED_MESSAGE, QUOTE='"'
+        ),
+    ),
+    (
+        "ISO8601",
+        ISO8601_log_record_regex,
+        ISO8601_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=CONTROL_INJECTED_MESSAGE, QUOTE='"'
+        ),
+    ),
+    (
+        "default_unescaped",
+        default_log_record_regex,
+        DEFAULT_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=CONTROL_INJECTED_MESSAGE, QUOTE=""
+        ),
+    ),
+    (
+        "ISO8601_unescaped",
+        ISO8601_log_record_regex,
+        ISO8601_INJECTED_LOG_FORMAT.format(
+            INJECTED_MESSAGE=CONTROL_INJECTED_MESSAGE, QUOTE=""
+        ),
+    ),
+]
+
+INJECTED_IDS = [
+    "default",
+    "ISO8601",
+    "default_unescaped",
+    "ISO8601_unescaped",
+    "default_control",
+    "ISO8601_control",
+    "default_unescaped_control",
+    "ISO8601_unescaped_control",
+]
+
+ESCAPE_ENVIRONMENT_VARIABLE = "TRITON_SERVER_ESCAPE_LOG_MESSAGES"
+
+
+class LogInjectionError(Exception):
+    pass
 
 
 def parse_timestamp(timestamp):
@@ -149,7 +235,7 @@ def validate_line(line, _):
     assert line.isdigit()
 
 
-def _split_row(row):
+def split_row(row):
     return [r.strip() for r in row.group("row").strip().split("|")]
 
 
@@ -170,7 +256,7 @@ def validate_table(table_rows):
     index += 1
     header = table_row_regex.search(table_rows[index])
     assert header
-    header = _split_row(header)
+    header = split_row(header)
 
     index += 1
     middle_border = table_border_regex.search(table_rows[index])
@@ -183,7 +269,7 @@ def validate_table(table_rows):
     for index, row in enumerate(table_rows[index:]):
         matched = table_row_regex.search(row)
         if matched:
-            row_data = _split_row(matched)
+            row_data = split_row(matched)
             parsed_rows.append(row_data)
 
     end_border = table_border_regex.search(row)
@@ -195,30 +281,34 @@ def validate_table(table_rows):
 
 @validator
 def validate_message(message, escaped):
-    heading, obj = message.split("\n", 1)
+    split_message = message.split("\n")
+    heading = split_message[0]
+    obj = split_message[1:] if len(split_message) > 1 else []
     if heading and escaped:
         try:
             json.loads(heading)
-        except json.JSONDecodeError as e:
-            raise Exception(
-                f"{e} First line of message in log record is not a valid JSON string"
-            )
         except Exception as e:
-            raise type(e)(
-                f"{e} First line of message in log record is not a valid JSON string"
+            raise Exception(
+                f"{e.__class__.__name__} {e}\nFirst line of message in log record is not a valid JSON string"
             )
+    elif heading:
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(heading)
     if obj:
-        obj = obj.strip().split("\n")
         match = table_border_regex.search(obj[0])
         if match:
             validate_table(obj)
-        else:
+        elif escaped:
             validate_protobuf(obj)
+        else:
+            # if not escaped we can't
+            # guarantee why type of object is present
+            pass
 
 
 class TestLogFormat:
     @pytest.fixture(autouse=True)
-    def setup(self, request):
+    def _setup(self, request):
         test_case_name = request.node.name
         self._server_options = {}
         self._server_options["log-verbose"] = INT32_MAX
@@ -243,19 +333,21 @@ class TestLogFormat:
         env = os.environ.copy()
 
         if escaped is not None and not escaped:
-            env["TRITON_SERVER_ESCAPE_LOG_MESSSAGES"] = "FALSE"
+            env[ESCAPE_ENVIRONMENT_VARIABLE] = "0"
         elif escaped is not None and escaped:
-            env["TRITON_SERVER_ESCAPE_LOG_MESSSAGES"] = "TRUE"
+            env[ESCAPE_ENVIRONMENT_VARIABLE] = "1"
         else:
-            del env["TRITON_SERVER_ESCAPE_LOG_MESSSAGES"]
-
-        self._server_process = subprocess.Popen(
-            cmd,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+            del env[ESCAPE_ENVIRONMENT_VARIABLE]
+        log_file = self._server_options["log-file"]
+        with open(f"{log_file}.stderr.log", "w") as output_err_:
+            with open(f"{log_file}.stdout.log", "w") as output_:
+                self._server_process = subprocess.Popen(
+                    cmd,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output_,
+                    stderr=output_err_,
+                )
 
         wait_time = 5
 
@@ -266,7 +358,7 @@ class TestLogFormat:
         if not os.path.exists(self._server_options["log-file"]):
             raise Exception("Log not found")
 
-    def validate_log_record(self, record, format_regex, escaped):
+    def _validate_log_record(self, record, format_regex, escaped):
         match = format_regex.search(record)
         assert match, "Invalid log line"
 
@@ -276,11 +368,11 @@ class TestLogFormat:
             try:
                 validators[field](value, escaped)
             except Exception as e:
-                raise type(e)(
-                    f"{e}\nInvalid {field}: '{match.group(field)}' in log record '{record}'"
+                raise Exception(
+                    f"{e.__class__.__name__} {e}\nInvalid {field}: '{match.group(field)}' in log record '{record}'"
                 )
 
-    def verify_log_format(self, file_path, format_regex, escaped):
+    def _parse_log_file(self, file_path, format_regex):
         log_records = []
         with open(file_path, "rt") as file_:
             current_log_record = []
@@ -293,39 +385,74 @@ class TestLogFormat:
                 else:
                     current_log_record.append(line)
         log_records.append(current_log_record)
-        log_records = ["".join(log_record_lines) for log_record_lines in log_records]
+        log_records = [
+            "".join(log_record_lines).rstrip("\n") for log_record_lines in log_records
+        ]
+        return log_records
+
+    def _validate_log_file(self, file_path, format_regex, escaped):
+        log_records = self._parse_log_file(file_path, format_regex)
         for log_record in log_records:
-            self.validate_log_record(log_record, format_regex, escaped)
+            self._validate_log_record(log_record, format_regex, escaped)
+
+    def _detect_injection(self, log_records, injected_record):
+        for record in log_records:
+            if record == injected_record:
+                raise LogInjectionError(
+                    f"LOG INJECTION ATTACK! Found: {injected_record}"
+                )
 
     @pytest.mark.parametrize(
         "log_format,format_regex",
         FORMATS,
         ids=IDS,
     )
-    def test_log_format(self, log_format, format_regex):
+    def test_format(self, log_format, format_regex):
         self._server_options["log-format"] = log_format.replace("_unescaped", "")
 
         escaped = "_unescaped" not in log_format
 
         self._launch_server(escaped)
-        time.sleep(1)
         self._server_process.kill()
         self._server_process.wait()
-        self.verify_log_format(self._server_options["log-file"], format_regex, escaped)
+        self._validate_log_file(self._server_options["log-file"], format_regex, escaped)
 
-    def foo_test_injection(self):
+    @pytest.mark.parametrize(
+        "log_format,format_regex,injected_record",
+        INJECTED_FORMATS,
+        ids=INJECTED_IDS,
+    )
+    def test_injection(self, log_format, format_regex, injected_record):
+        self._server_options["log-format"] = log_format.replace("_unescaped", "")
+
+        escaped = "_unescaped" not in log_format
+
+        self._launch_server(escaped)
+
         try:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000", verbose=True
+                url="localhost:8000", verbose=False
             )
         except Exception as e:
-            print("context creation failed: " + str(e))
-            sys.exit(1)
+            raise Exception(f"{e.__class__.__name__} {e}\ncontext creation failed")
 
-        input_name = "'nothing_wrong'\nI0205 18:34:18.707423 1 [file.cc:123] THIS ENTRY WAS INJECTED\nI0205 18:34:18.707461 1 [http_server.cc:3570] [request id: <id_unknown>] Infer failed: [request id: <id_unknown>] input 'nothing_wrong"
+        input_name = f"\n{injected_record}\n{injected_record}"
 
         input_data = numpy.random.randn(1, 3).astype(numpy.float32)
         input_tensor = httpclient.InferInput(input_name, input_data.shape, "FP32")
         input_tensor.set_data_from_numpy(input_data)
+        with pytest.raises(InferenceServerException):
+            triton_client.infer(model_name="simple", inputs=[input_tensor])
 
-        triton_client.infer(model_name="simple", inputs=[input_tensor])
+        self._server_process.kill()
+        self._server_process.wait()
+
+        log_records = self._parse_log_file(
+            self._server_options["log-file"], format_regex
+        )
+
+        if not escaped:
+            with pytest.raises(LogInjectionError):
+                self._detect_injection(log_records, injected_record)
+        else:
+            self._detect_injection(log_records, injected_record)
