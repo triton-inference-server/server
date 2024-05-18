@@ -151,6 +151,15 @@ def _split_row(row):
     return [r.strip() for r in row.group("row").strip().split("|")]
 
 
+def validate_protobuf(protobuf):
+    # Note currently we only check for model config
+    # but technically any protubuf should be valid
+
+    google.protobuf.text_format.ParseLines(
+        protobuf, grpcclient.model_config_pb2.ModelConfig()
+    )
+
+
 def validate_table(table_rows):
     index = 0
     top_border = table_border_regex.search(table_rows[index])
@@ -196,16 +205,13 @@ def validate_message(message, escaped):
             raise type(e)(
                 f"{e} First line of message in log record is not a valid JSON string"
             )
-    if len(obj):
+    if obj:
         obj = obj.strip().split("\n")
-        if obj:
-            match = table_border_regex.search(obj[0])
-            if match:
-                validate_table(obj)
-            else:
-                google.protobuf.text_format.ParseLines(
-                    obj, grpcclient.model_config_pb2.ModelConfig()
-                )
+        match = table_border_regex.search(obj[0])
+        if match:
+            validate_table(obj)
+        else:
+            validate_protobuf(obj)
 
 
 class TestLogFormat:
