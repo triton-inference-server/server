@@ -86,6 +86,8 @@ FORMATS = [
 
 IDS = ["default", "ISO8601", "default_unescaped", "ISO8601_unescaped"]
 
+INT32_MAX = 2**31 - 1
+
 
 def parse_timestamp(timestamp):
     hours, minutes, seconds = timestamp.split(":")
@@ -219,7 +221,7 @@ class TestLogFormat:
     def setup(self, request):
         test_case_name = request.node.name
         self._server_options = {}
-        self._server_options["log-verbose"] = 256
+        self._server_options["log-verbose"] = INT32_MAX
         self._server_options["log-info"] = 1
         self._server_options["log-error"] = 1
         self._server_options["log-warning"] = 1
