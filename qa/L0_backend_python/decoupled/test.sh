@@ -63,6 +63,10 @@ mkdir -p models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
+mkdir -p models/repeat_int32/1/
+cp ../../python_models/repeat_thread/model.py models/repeat_int32/1/
+cp python_backend/examples/decoupled/repeat_config.pbtxt models/repeat_int32/config.pbtxt
+
 function verify_log_counts () {
   if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then
     echo -e "\n***\n*** Test Failed: Specific Msg Count Incorrect\n***"
@@ -109,6 +113,18 @@ python3 -m pytest --junitxml=decoupled.report.xml $CLIENT_PY > $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** decoupled test FAILED. \n***"
+    RET=1
+fi
+set -e
+
+# Run the repeat_client.py to test the repeat_thread model. When server is shutdown,
+# the repeat_thread model should not be hanging.
+set +e
+python3 python_backend/examples/decoupled/repeat_client.py >> $CLIENT_LOG 2>&1
+grep "PASS: repeat_int32" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify repeat_thread model. \n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
