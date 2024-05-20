@@ -596,7 +596,7 @@ python3 -m pytest --junitxml=log_format_test.xml log_format_test.py > $FORMAT_TE
 
 if [ $? -ne 0 ]; then
     cat $FORMAT_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Log Format Test Failed\n***"
     RET=1
 fi
 
