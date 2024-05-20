@@ -323,6 +323,11 @@ class TestLogFormat:
             test_logs_directory, test_case_name + ".server.log"
         )
 
+    def _shutdown_server(self):
+        if self._server_process:
+            self._server_process.kill()
+            self._server_process.wait()
+
     def _launch_server(self, escaped=None):
         cmd = ["tritonserver"]
 
@@ -412,8 +417,7 @@ class TestLogFormat:
         escaped = "_unescaped" not in log_format
 
         self._launch_server(escaped)
-        self._server_process.kill()
-        self._server_process.wait()
+        self._shutdown_server()
         self._validate_log_file(self._server_options["log-file"], format_regex, escaped)
 
     @pytest.mark.parametrize(
@@ -432,7 +436,14 @@ class TestLogFormat:
             triton_client = httpclient.InferenceServerClient(
                 url="localhost:8000", verbose=False
             )
+            while not triton_client.is_server_ready():
+                time.sleep(1)
+
+            while not triton_client.is_model_ready("simple"):
+                time.sleep(1)
+
         except Exception as e:
+            self._shutdown_server()
             raise Exception(f"{e.__class__.__name__} {e}\ncontext creation failed")
 
         input_name = f"\n{injected_record}\n{injected_record}"
@@ -440,11 +451,13 @@ class TestLogFormat:
         input_data = numpy.random.randn(1, 3).astype(numpy.float32)
         input_tensor = httpclient.InferInput(input_name, input_data.shape, "FP32")
         input_tensor.set_data_from_numpy(input_data)
-        with pytest.raises(InferenceServerException):
-            triton_client.infer(model_name="simple", inputs=[input_tensor])
-
-        self._server_process.kill()
-        self._server_process.wait()
+        try:
+            with pytest.raises(InferenceServerException):
+                triton_client.infer(model_name="simple", inputs=[input_tensor])
+        except Exception as e:
+            raise Exception(f"{e.__class__.__name__} {e}\ninference failed")
+        finally:
+            self._shutdown_server()
 
         log_records = self._parse_log_file(
             self._server_options["log-file"], format_regex
