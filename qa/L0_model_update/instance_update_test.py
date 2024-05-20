@@ -510,11 +510,11 @@ class TestInstanceUpdate(unittest.TestCase):
             if os.environ["RATE_LIMIT_MODE"] == "execution_count":
                 # Make sure the previous max resource limit of 4 is reduced to 3
                 # when no explicit limit is set.
-                self.assertIn("Resource: R1\t Count: 3", f.read())
+                self.assertIn("Resource: R1\\t Count: 3", f.read())
             else:
                 # Make sure the max resource limit is never set to 3 when
                 # explicit limit of 10 is set.
-                self.assertNotIn("Resource: R1\t Count: 3", f.read())
+                self.assertNotIn("Resource: R1\\t Count: 3", f.read())
 
     _direct_sequence_batching_str = (
         "direct { }\nmax_sequence_idle_microseconds: 8000000"
