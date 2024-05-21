@@ -347,7 +347,6 @@ if [ "$SERVER_PID" == "0" ]; then
 
 else
     # Count number of default configs
-    BACKEND_CONFIG_MAP=$(grep "backend configuration:" $SERVER_LOG)
     BACKEND_CONFIG_MAP=$(get_config_map $SERVER_LOG)
     DEFAULT_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq length)
     if [ $DEFAULT_CONFIG_COUNT -lt 4 ]; then
