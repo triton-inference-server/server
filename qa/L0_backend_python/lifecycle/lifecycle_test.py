@@ -199,7 +199,7 @@ class LifecycleTest(unittest.TestCase):
                     print(e.message())
                     self.assertTrue(
                         e.message().startswith(
-                            "Failed to process the request(s) for model instance"
+                            "Failed to process the request(s) for model "
                         ),
                         "Exception message is not correct",
                     )
@@ -208,6 +208,7 @@ class LifecycleTest(unittest.TestCase):
                         False, "Wrong exception raised or did not raise an exception"
                     )
 
+    @unittest.skip("Defer response sending test to response_sender tests")
     def test_incorrect_execute_return(self):
         model_name = "execute_return_error"
         shape = [1, 1]

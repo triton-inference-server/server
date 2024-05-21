@@ -243,12 +243,12 @@ class DecoupledTest(unittest.TestCase):
                 client.async_stream_infer(model_name=model_name, inputs=inputs)
                 data_item = user_data._completed_requests.get()
                 if type(data_item) == InferenceServerException:
-                    self.assertEqual(
-                        data_item.message(),
+                    self.assertIn(
                         "Python model 'decoupled_return_response_error_0_0' is using "
                         "the decoupled mode and the execute function must return "
                         "None.",
-                        "Exception message didn't match.",
+                        data_item.message(),
+                        "Exception message didn't show up.",
                     )
 
     def test_decoupled_send_after_close_error(self):
