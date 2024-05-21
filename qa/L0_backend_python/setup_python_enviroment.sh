@@ -104,6 +104,8 @@ if [ ${PYTHON_ENV_VERSION} = "11" ]; then
     # tensorflow needs to be installed before numpy so pip does not mess up conda
     # environment
     pip install tensorflow==2.12.0
+    # six is needed for tensorflow
+    pip install six
     conda install -c conda-forge libstdcxx-ng=12 -y
     conda install numpy=1.23.5 -y
     EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and Tensorflow version is 2.12.0"
