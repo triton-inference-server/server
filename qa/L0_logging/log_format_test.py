@@ -479,11 +479,22 @@ class TestLogFormat:
             triton_client = httpclient.InferenceServerClient(
                 url="localhost:8000", verbose=False
             )
-            while not triton_client.is_server_ready():
-                time.sleep(1)
 
-            while not triton_client.is_model_ready("simple"):
+            # TODO Refactor server launch, shutdown into reusable class
+            wait_time = 10
+
+            while wait_time and not triton_client.is_server_ready():
                 time.sleep(1)
+                wait_time -= 1
+
+            while wait_time and not triton_client.is_model_ready("simple"):
+                time.sleep(1)
+                wait_time -= 1
+
+            if not triton_client.is_server_ready() or not triton_client.is_model_ready(
+                "simple"
+            ):
+                raise Exception("Model or Server not Ready")
 
         except Exception as e:
             self._shutdown_server()
