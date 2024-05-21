@@ -25,10 +25,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Parses default-max-batch-size log record
+#
+# Example log record:
+# I0521 02:12:37.402353 161 backend_model.cc:503] "Adding default backend config setting: default-max-batch-size,4
 parse_default_max_batch_size() {
     echo $(python3 -c "print('$1'.split(',')[1].strip('\"'))")
 }
 
+# Returns backend configuration json
+# message from server log file path
+#
+# Example: config_map = $(get_config_map server.log)
 get_config_map() {
     BACKEND_CONFIG_MAP=$(grep "backend configuration:" $1)
     echo $(python3 -c "backend_config='$BACKEND_CONFIG_MAP'.split('] \"backend configuration:\n')[1].rstrip('\"');print(backend_config)")
@@ -97,8 +105,6 @@ else
     if [ "$RESULT_LOG_LINE" != "" ]; then
 
         # Pick out the logged value of the default-max-batch-size which gets passed into model creation
-	# Example log line:
-	# I0521 02:12:37.402353 161 backend_model.cc:503] "Adding default backend config setting: default-max-batch-size,4
         RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(parse_default_max_batch_size "${RESULT_LOG_LINE}")
 
         if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "4" ]; then
