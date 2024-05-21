@@ -390,7 +390,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
 
     def _test_trace_cancel(self, is_queued):
-        # TO accommodate for delay in the model
+        # We want to capture a cancellation request traces WHILE the inference is in the COMPUTE stage.
+        # Because the model "input_all_required" has a delay/wait in the compute phase so the cancellation request can be send while the request is waiting in the compute phase.
+        # The idea here is to wait before we try and read the traces from the file.
         time.sleep(2 * COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
         if is_queued == False:
