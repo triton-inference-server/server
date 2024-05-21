@@ -69,7 +69,7 @@ the `$string` representation of the log setting and the “value” is a `$strin
 `$bool`, or `$number` representation of the setting value. Currently, the
 following log settings are defined:
 
-- "log_file" : a `$string` log file location where the log outputs will be saved. If empty, log outputs are being streamed to the console.
+- "log_file" : a `$string` log file location where the log outputs will be saved. If empty, log outputs are streamed to the console.
 
 - "log_info" : a `$boolean` parameter that controls whether the Triton server logs INFO level messages.
 
