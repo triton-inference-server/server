@@ -280,6 +280,51 @@ def validate_table(table_rows):
 
 @validator
 def validate_message(message, escaped):
+    """message field validator
+
+    Messages can be single line or multi-line. In the multi-line case
+    messages have the form:
+
+    <heading>\n
+    <object>
+
+    Where heading is an optional string (escaped with normal escaping
+    rules) and object is a structured representation of an object such
+    as a table or protobuf. The only objects currently allowed are:
+
+    * Tables (triton::common::table_printer)
+
+    * Model config protobuf messages
+
+
+
+    Parameters
+    ----------
+    message : str
+        message portion of log record (may be multiple lines)
+    escaped : bool
+        whether the message is escaped
+
+    Raises
+    ------
+    Exception If message is expected to be escaped but is not
+    or object doesn't match formatting
+
+    Examples
+    --------
+
+    validate_message("foo",escaped=True) -> Exception
+    validate_message('"foo"', escaped=True) -> pass
+    validate_message('"foo"\nfoo',escaped=True) -> Exception
+    validate_message('"foo"\n+--------+---------+--------+\n' \
+                     '| Model  | Version | Status |\n' \
+                     '+--------+---------+--------+\n' \
+                     '| simple | 1       | READY  |\n' \
+                     '+--------+---------+--------+',
+                      escaped=True) -> pass
+
+    """
+
     split_message = message.split("\n")
     heading = split_message[0]
     obj = split_message[1:] if len(split_message) > 1 else []
@@ -300,7 +345,7 @@ def validate_message(message, escaped):
         elif escaped:
             validate_protobuf(obj)
         else:
-            # if not escaped we can't
+            # if not escaped and not table we can't
             # guarantee why type of object is present
             pass
 
@@ -315,9 +360,7 @@ class TestLogFormat:
         self._server_options["log-error"] = 1
         self._server_options["log-warning"] = 1
         self._server_options["log-format"] = "default"
-        self._server_options["model-repository"] = os.path.abspath(
-            os.path.join(module_directory, "log_models")
-        )
+        self._server_options["model-repository"] = test_model_directory
         self._server_process = None
         self._server_options["log-file"] = os.path.join(
             test_logs_directory, test_case_name + ".server.log"
@@ -436,11 +479,22 @@ class TestLogFormat:
             triton_client = httpclient.InferenceServerClient(
                 url="localhost:8000", verbose=False
             )
-            while not triton_client.is_server_ready():
-                time.sleep(1)
 
-            while not triton_client.is_model_ready("simple"):
+            # TODO Refactor server launch, shutdown into reusable class
+            wait_time = 10
+
+            while wait_time and not triton_client.is_server_ready():
                 time.sleep(1)
+                wait_time -= 1
+
+            while wait_time and not triton_client.is_model_ready("simple"):
+                time.sleep(1)
+                wait_time -= 1
+
+            if not triton_client.is_server_ready() or not triton_client.is_model_ready(
+                "simple"
+            ):
+                raise Exception("Model or Server not Ready")
 
         except Exception as e:
             self._shutdown_server()
