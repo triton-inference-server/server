@@ -119,22 +119,12 @@ $log_setting_request =
 
 When a `$log_setting` JSON is received (defined above), only the
 specified settings will be updated. Currently, the following log
-settings can be updated:
-
-- "log_info" : a `$boolean` parameter that controls whether the Triton server logs INFO level messages.
-
-- "log_warning" : a `$boolean` parameter that controls whether the Triton server logs WARNING level messages.
-
-- "log_error" : a `$boolean` parameter that controls whether the Triton server logs ERROR level messages.
-
-- "log_verbose_level" : a `$number` parameter that controls whether the Triton server outputs verbose messages
-of varying degrees. This value can be any integer >= 0. If "log_verbose_level" is 0, verbose logging will be disabled, and
-no verbose messages will be output by the Triton server. If "log_verbose_level" is 1, level 1 verbose messages will be output
-by the Triton server. If "log_verbose_level" is 2, the Triton server will output all verbose messages of
-level <= 2, etc. Attempting to set "log_verbose_level" to a number < 0 will result in an error.
-
-- "log_format" : a `$string` parameter that controls the format of Triton server log messages. There are currently
-2 formats: "default" and "ISO8601".
+settings (described above) can be updated:
+- "log_info"
+- "log_warning"
+- "log_error"
+- "log_verbose_level"
+- "log_format" 
 
 ### Example Usage
 The logging protocol extension can be invoked using the curl library in the following manner (assuming
