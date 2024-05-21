@@ -124,7 +124,7 @@ settings (described above) can be updated:
 - "log_warning"
 - "log_error"
 - "log_verbose_level"
-- "log_format" 
+- "log_format"
 
 ### Example Usage
 The logging protocol extension can be invoked using the curl library in the following manner (assuming
