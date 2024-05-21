@@ -25,6 +25,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Parses default-max-batch-size log record
+#
+# Example log record:
+# I0521 02:12:37.402353 161 backend_model.cc:503] "Adding default backend config setting: default-max-batch-size,4
+parse_default_max_batch_size() {
+    echo $(python3 -c "print('$1'.split(',')[1].strip('\"'))")
+}
+
+# Returns backend configuration json
+# message from server log file path
+#
+# Example: config_map = $(get_config_map server.log)
+get_config_map() {
+    BACKEND_CONFIG_MAP=$(grep "backend configuration:" $1)
+    echo $(python3 -c "backend_config='$BACKEND_CONFIG_MAP'.split('] \"backend configuration:\n')[1].rstrip('\"');print(backend_config)")
+}
+
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -88,7 +105,7 @@ else
     if [ "$RESULT_LOG_LINE" != "" ]; then
 
         # Pick out the logged value of the default-max-batch-size which gets passed into model creation
-        RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(awk -v line="$RESULT_LOG_LINE" 'BEGIN {split(line, a, "]"); split(a[2], b, ": "); split(b[2], c, ","); print c[2]}')
+        RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(parse_default_max_batch_size "${RESULT_LOG_LINE}")
 
         if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "4" ]; then
             echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: default-max-batch-size,4, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n"
@@ -117,7 +134,7 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
         if [ "$RESULT_LOG_LINE" != "" ]; then
 
             # Pick out the logged value of the default-max-batch-size which gets passed into model creation
-            RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(awk -v line="$RESULT_LOG_LINE" 'BEGIN {split(line, a, "]"); split(a[2], b, ": "); split(b[2], c, ","); print c[2]}')
+            RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(parse_default_max_batch_size "${RESULT_LOG_LINE}")
 
             if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "${POSITIVE_TEST_ANSWERS[$i]}" ]; then
                 echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: ${POSITIVE_TEST_ANSWERS[$i]}, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n"
@@ -330,8 +347,8 @@ if [ "$SERVER_PID" == "0" ]; then
 
 else
     # Count number of default configs
-    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
-    DEFAULT_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+    BACKEND_CONFIG_MAP=$(get_config_map $SERVER_LOG)
+    DEFAULT_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq length)
     if [ $DEFAULT_CONFIG_COUNT -lt 4 ]; then
         echo "*** FAILED: Expected number of default configs to be at least 4 but found: $DEFAULT_CONFIG_COUNT\n"
         RET=1
@@ -361,7 +378,7 @@ if [ "$SERVER_PID" == "0" ]; then
 
 else
     # Count number of default configs
-    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    BACKEND_CONFIG_MAP=$(get_config_map $SERVER_LOG)
     CONFIG_VALUE=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq -r '.["min-compute-capability"]')
 
     if [ $CONFIG_VALUE != $MIN_COMPUTE_CAPABILITY ]; then
@@ -385,7 +402,7 @@ if [ "$SERVER_PID" == "0" ]; then
 
 else
     # Count number of default configs
-    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    BACKEND_CONFIG_MAP=$(get_config_map $SERVER_LOG)
     TOTAL_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
 
     if [ $TOTAL_CONFIG_COUNT -ne $EXPECTED_CONFIG_COUNT ]; then
