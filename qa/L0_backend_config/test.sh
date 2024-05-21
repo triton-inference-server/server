@@ -31,7 +31,7 @@ parse_default_max_batch_size() {
 
 get_config_map() {
     BACKEND_CONFIG_MAP=$(grep "backend configuration:" $1)
-    echo $(python3 -c "import json; backend_config='$BACKEND_CONFIG_MAP'.split('] \"backend configuration:\n')[1].rstrip('\"');print(backend_config)")
+    echo $(python3 -c "backend_config='$BACKEND_CONFIG_MAP'.split('] \"backend configuration:\n')[1].rstrip('\"');print(backend_config)")
 }
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
