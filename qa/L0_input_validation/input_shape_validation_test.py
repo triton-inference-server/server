@@ -41,7 +41,9 @@ GRPC_PORT = 9653
 FIXED_LAST_DIM = 8
 
 
-def repo_dir():
+# This helper function creates a temporary model repository which contains
+# pt_identity model and yields the path to the model repository.
+def tmp_repo_path():
     with TemporaryDirectory() as model_repo:
         (Path(model_repo) / "pt_identity" / "1").mkdir(parents=True, exist_ok=True)
 
@@ -94,7 +96,7 @@ async def poll_readiness(client: InferenceServerClient, server_proc):
         await asyncio.sleep(0.5)
 
 
-async def server_terminated(client: InferenceServerClient, server_proc):
+async def server_terminated(server_proc):
     if server_proc is not None and (ret_code := server_proc.poll()) is not None:
         _, stderr = server_proc.communicate()
         print(stderr)
@@ -102,16 +104,17 @@ async def server_terminated(client: InferenceServerClient, server_proc):
 
 
 @pytest.mark.asyncio
-async def test_shape_overlapped(repo_dir: str):
+async def test_shape_overlapped(tmp_repo_path: str):
     with Popen(
         [
             "/opt/tritonserver/bin/tritonserver",
             "--model-repository",
-            repo_dir,
+            tmp_repo_path,
             "--grpc-port",
             str(GRPC_PORT),
         ]
     ) as server:
+        # wait until server is ready
         await poll_readiness(
             InferenceServerClient("localhost:" + str(GRPC_PORT)), server
         )
@@ -119,6 +122,7 @@ async def test_shape_overlapped(repo_dir: str):
         alice = InferenceServerClient("localhost:" + str(GRPC_PORT))
         bob = InferenceServerClient("localhost:" + str(GRPC_PORT))
 
+        # wrong input shape
         input_data_1 = np.arange(FIXED_LAST_DIM + 2)[None].astype(np.float32)
         print(f"{input_data_1=}")
         inputs_1 = [
@@ -130,6 +134,7 @@ async def test_shape_overlapped(repo_dir: str):
         # Compromised input shape
         inputs_1[0].set_shape((1, FIXED_LAST_DIM))
 
+        # correct input shape
         input_data_2 = 100 + np.arange(FIXED_LAST_DIM)[None].astype(np.float32)
         print(f"{input_data_2=}")
         inputs_2 = [
@@ -141,9 +146,7 @@ async def test_shape_overlapped(repo_dir: str):
         ]
         inputs_2[0].set_data_from_numpy(input_data_2)
         with pytest.raises(Exception) as e_info:
-            server_terminated(
-                InferenceServerClient("localhost:" + str(GRPC_PORT)), server
-            )
+            server_terminated(server)
             t1 = asyncio.create_task(
                 alice.infer("pt_identity", inputs_1)
             )  # should fail here
