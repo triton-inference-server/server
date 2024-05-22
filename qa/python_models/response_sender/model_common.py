@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import asyncio
+import json
 import threading
 import time
 
@@ -32,8 +33,11 @@ import numpy as np
 
 
 class ResponseSenderModelCommon:
-    def __init__(self, pb_utils):
+    def __init__(self, pb_utils, args):
         self._pb_utils = pb_utils
+        self._is_decoupled = pb_utils.using_decoupled_model_transaction_policy(
+            json.loads(args["model_config"])
+        )
         self._background_tasks = set()
 
     def _get_instructions_from_request(self, request):
@@ -119,6 +123,20 @@ class ResponseSenderModelCommon:
             batch_size = request["batch_size"]
             response_sender = request["response_sender"]
             send_complete_final_flag = request["send_complete_final_flag"]
+
+            # TODO: gRPC frontend may segfault if non-decoupled model send response
+            #       final flag separately from the response.
+            if (
+                not self._is_decoupled
+                and number_of_response == 1
+                and send_complete_final_flag
+            ):
+                response_sender.send(
+                    self._create_response(batch_size, response_id=response_id_offset),
+                    flags=self._pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                )
+                continue
+
             for response_id in range(number_of_response):
                 response_sender.send(
                     self._create_response(
@@ -132,7 +150,7 @@ class ResponseSenderModelCommon:
 
     def _send_responses_delayed_threaded(self, processed_requests, response_id_offset):
         def response_thread(send_responses, processed_requests, response_id_offset):
-            time.sleep(1)  # response after requests are released
+            time.sleep(0.5)  # response after requests are released
             send_responses(processed_requests, response_id_offset)
 
         thread = threading.Thread(
@@ -146,7 +164,7 @@ class ResponseSenderModelCommon:
         async def response_async(
             send_responses, processed_requests, response_id_offset
         ):
-            asyncio.sleep(1)  # response after requests are released
+            await asyncio.sleep(0.5)  # response after requests are released
             send_responses(processed_requests, response_id_offset)
 
         coro = response_async(

@@ -28,6 +28,7 @@ import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
+from tritonclient.utils import InferenceServerException
 
 
 class ResponseSenderTest(unittest.TestCase):
@@ -66,6 +67,94 @@ class ResponseSenderTest(unittest.TestCase):
         )
         return inputs
 
+    def _get_parallel_inputs_and_response_types_decoupled(self):
+        return {
+            "parallel_inputs": [
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=True,
+                    return_a_response=False,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=False,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=False,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=True,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=1,
+                    send_complete_final_flag_before_return=True,
+                    return_a_response=False,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=False,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=False,
+                    number_of_response_after_return=1,
+                    send_complete_final_flag_after_return=True,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=2,
+                    send_complete_final_flag_before_return=True,
+                    return_a_response=False,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=False,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=False,
+                    number_of_response_after_return=2,
+                    send_complete_final_flag_after_return=True,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=1,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=False,
+                    number_of_response_after_return=3,
+                    send_complete_final_flag_after_return=True,
+                ),
+            ],
+            "number_of_response_before_return": 4,
+            "return_a_response": 0,
+            "number_of_response_after_return": 6,
+        }
+
+    def _get_parallel_inputs_and_response_types_non_decoupled(self):
+        return {
+            "parallel_inputs": [
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=True,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=False,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=1,
+                    send_complete_final_flag_before_return=True,
+                    return_a_response=False,
+                    number_of_response_after_return=0,
+                    send_complete_final_flag_after_return=False,
+                ),
+                self._get_inputs(
+                    number_of_response_before_return=0,
+                    send_complete_final_flag_before_return=False,
+                    return_a_response=False,
+                    number_of_response_after_return=1,
+                    send_complete_final_flag_after_return=True,
+                ),
+            ],
+            "number_of_response_before_return": 1,
+            "return_a_response": 1,
+            "number_of_response_after_return": 1,
+        }
+
     def _generate_streaming_callback_and_responses_pair(self):
         responses = []  # [{"result": result, "error": error}, ...]
 
@@ -73,6 +162,15 @@ class ResponseSenderTest(unittest.TestCase):
             responses.append({"result": result, "error": error})
 
         return callback, responses
+
+    def _infer_parallel(self, model_name, parallel_inputs):
+        callback, responses = self._generate_streaming_callback_and_responses_pair()
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            client.start_stream(callback)
+            for inputs in parallel_inputs:
+                client.async_stream_infer(model_name, inputs)
+            client.stop_stream()
+        return responses
 
     def _infer(
         self,
@@ -90,12 +188,7 @@ class ResponseSenderTest(unittest.TestCase):
             number_of_response_after_return,
             send_complete_final_flag_after_return,
         )
-        callback, responses = self._generate_streaming_callback_and_responses_pair()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
-            client.start_stream(callback)
-            client.async_stream_infer(model_name, inputs)
-            client.stop_stream()
-        return responses
+        return self._infer_parallel(model_name, [inputs])
 
     def _assert_responses_valid(
         self,
@@ -127,6 +220,12 @@ class ResponseSenderTest(unittest.TestCase):
         self.assertEqual(number_of_response_before_return, before_return_response_count)
         self.assertEqual(return_a_response, response_returned)
         self.assertEqual(number_of_response_after_return, after_return_response_count)
+
+    def _assert_responses_exception(self, responses, expected_message):
+        for response in responses:
+            self.assertIsNone(response["result"])
+            self.assertIsInstance(response["error"], InferenceServerException)
+            self.assertIn(expected_message, response["error"].message())
 
     def _assert_decoupled_infer_success(
         self,
@@ -307,6 +406,67 @@ class ResponseSenderTest(unittest.TestCase):
             number_of_response_after_return=1,
             send_complete_final_flag_after_return=True,
         )
+
+    # Decoupled model requests each responding differently.
+    def test_decoupled_multiple_requests(self):
+        model_name = "response_sender_decoupled_batching"
+        ios = self._get_parallel_inputs_and_response_types_decoupled()
+        responses = self._infer_parallel(model_name, ios["parallel_inputs"])
+        self._assert_responses_valid(
+            responses,
+            ios["number_of_response_before_return"],
+            ios["return_a_response"],
+            ios["number_of_response_after_return"],
+        )
+        # Do NOT group into a for-loop as it hides which model failed.
+        model_name = "response_sender_decoupled_async_batching"
+        ios = self._get_parallel_inputs_and_response_types_decoupled()
+        responses = self._infer_parallel(model_name, ios["parallel_inputs"])
+        self._assert_responses_valid(
+            responses,
+            ios["number_of_response_before_return"],
+            ios["return_a_response"],
+            ios["number_of_response_after_return"],
+        )
+
+    # Non-decoupled model requests each responding differently.
+    def test_non_decoupled_multiple_requests(self):
+        model_name = "response_sender_batching"
+        ios = self._get_parallel_inputs_and_response_types_non_decoupled()
+        responses = self._infer_parallel(model_name, ios["parallel_inputs"])
+        self._assert_responses_valid(
+            responses,
+            ios["number_of_response_before_return"],
+            ios["return_a_response"],
+            ios["number_of_response_after_return"],
+        )
+        # Do NOT group into a for-loop as it hides which model failed.
+        model_name = "response_sender_async_batching"
+        ios = self._get_parallel_inputs_and_response_types_non_decoupled()
+        responses = self._infer_parallel(model_name, ios["parallel_inputs"])
+        self._assert_responses_valid(
+            responses,
+            ios["number_of_response_before_return"],
+            ios["return_a_response"],
+            ios["number_of_response_after_return"],
+        )
+
+    # Decoupled model send 1 response on return.
+    def test_decoupled_one_response_on_return(self):
+        responses = self._infer(
+            model_name="response_sender_decoupled",
+            number_of_response_before_return=0,
+            send_complete_final_flag_before_return=False,
+            return_a_response=True,
+            number_of_response_after_return=0,
+            send_complete_final_flag_after_return=False,
+        )
+        self._assert_responses_exception(
+            responses,
+            expected_message="using the decoupled mode and the execute function must return None",
+        )
+        # TODO: Test for async decoupled after fixing 'AsyncEventFutureDoneCallback'
+        #       using `py_future.result()` with error hangs on exit.
 
 
 if __name__ == "__main__":
