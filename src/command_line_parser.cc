@@ -1751,6 +1751,14 @@ TritonParser::Parse(int argc, char** argv)
     lparams.repository_poll_secs_ = 0;
   }
 
+  if (lparams.startup_models_.size() > 0 &&
+      lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_EXPLICIT) {
+    throw ParseException(
+        "Error: Use of '--load-model' requires setting "
+        "'--model-control-mode=explicit' as well.");
+  }
+
+
 #ifdef TRITON_ENABLE_VERTEX_AI
   // Set default model repository if specific flag is set, postpone the
   // check to after parsing so we only monitor the default repository if

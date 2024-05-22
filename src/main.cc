@@ -439,9 +439,10 @@ main(int argc, char** argv)
     g_triton_params.CheckPortCollision();
   }
   catch (const triton::server::ParseException& pe) {
-    std::cerr << pe.what() << std::endl;
     std::cerr << "Usage: tritonserver [options]" << std::endl;
     std::cerr << tp.Usage() << std::endl;
+    // Show error at bottom for immediate visibility
+    std::cerr << pe.what() << std::endl;
     exit(1);
   }
 
