@@ -42,18 +42,19 @@ source ../common/util.sh
 
 RET=0
 
+SERVER=/opt/tritonserver/bin/tritonserver
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
 SHAPE_TEST_PY=./input_shape_validation_test.py
 TEST_RESULT_FILE='./test_results.txt'
+SERVER_LOG="./inference_server.log"
 
 export CUDA_VISIBLE_DEVICES=0
 
 rm -fr *.log
 
-SERVER=/opt/tritonserver/bin/tritonserver
+# input_validation_test
 SERVER_ARGS="--model-repository=`pwd`/models"
-SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -73,13 +74,44 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# input_shape_validation_test
 pip install torch
-python3 -m pytest $SHAPE_TEST_PY >> $CLIENT_LOG 2>&1
+pip install pytest-asyncio
+
+mkdir -p models/pt_identity/1
+PYTHON_CODE=$(cat <<END
+import torch
+torch.jit.save(
+    torch.jit.script(torch.nn.Identity()),
+    "`pwd`/models/pt_identity/1/model.pt",
+)
+END
+)
+res="$(python3 -c "$PYTHON_CODE")"
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** model "pt_identity" initialization FAILED. \n***"
+    echo $res
+    exit 1
+fi
+
+# input_validation_test
+SERVER_ARGS="--model-repository=`pwd`/models  --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $TEST_PY InputShapeTest.test_input_shape_validation >> $CLIENT_LOG 2>&1
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** input_shape_validation_test.py FAILED. \n***"
     RET=1
-
 fi
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"

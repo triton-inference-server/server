@@ -33,7 +33,7 @@ import unittest
 
 import numpy as np
 import tritonclient.grpc as tritongrpcclient
-from tritonclient.utils import InferenceServerException
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 
 class InputValTest(unittest.TestCase):
@@ -111,6 +111,45 @@ class InputValTest(unittest.TestCase):
         )
         response = result.get_response()
         self.assertIn(str(response.outputs[0].name), "OUTPUT0")
+
+
+class InputShapeTest(unittest.TestCase):
+    def test_input_shape_validation(self):
+        expected_dim = 8
+        model_name = "pt_identity"
+        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+
+        # Pass
+        input_data = np.arange(expected_dim)[None].astype(np.float32)
+        inputs = [
+            tritongrpcclient.InferInput(
+                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        triton_client.infer(model_name=model_name, inputs=inputs)
+
+        # Larger input byte size than expected
+        input_data = np.arange(expected_dim + 2)[None].astype(np.float32)
+        inputs = [
+            tritongrpcclient.InferInput(
+                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        # Compromised input shape
+        inputs[0].set_shape((1, expected_dim))
+
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name=model_name,
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
+        self.assertIn(
+            "input byte size mismatch for input 'INPUT0' for model 'pt_identity'. Expected 32, got 40",
+            err_str,
+        )
 
 
 if __name__ == "__main__":
