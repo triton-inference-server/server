@@ -41,10 +41,11 @@ class WorkItem:
 
 
 class TritonPythonModel:
-    """This model launches a separate thread to handle the request from a queue. The thread is launched from
-    the `initialize` function and is terminated in the `finalize` function. This is different from the repeat
-    example in the Python Backend repository where a thread is launched per request and terminated after the response
-    is sent.
+    """This model launches a separate thread to handle the request from a
+    queue. The thread is launched from the `initialize` function and is
+    terminated in the `finalize` function. This is different from the repeat
+    example in the Python Backend repository where a thread is launched per
+    request and terminated after the response is sent.
     """
 
     def initialize(self, args):
@@ -58,9 +59,9 @@ class TritonPythonModel:
         )
         if not using_decoupled:
             raise pb_utils.TritonModelException(
-                """the model `{}` can generate any number of responses per request,
-                enable decoupled transaction policy in model configuration to
-                serve this model""".format(
+                """the model `{}` can generate any number of responses per
+                request, enable decoupled transaction policy in model
+                configuration to serve this model""".format(
                     args["model_name"]
                 )
             )
@@ -140,12 +141,6 @@ class TritonPythonModel:
         return None
 
     def finalize(self):
-        """`finalize` is called only once when the model is being unloaded.
-        Implementing `finalize` function is OPTIONAL. This function allows
-        the model to perform any necessary clean ups before exit.
-        Here we will wait for all response threads to complete sending
-        responses.
-        """
         pb_utils.log(pb_utils.LogLevel.INFO, "Finalizing model...")
 
         # Pass dummy work item to the queue to terminate the sender_thread
