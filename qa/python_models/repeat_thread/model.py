@@ -138,8 +138,6 @@ class TritonPythonModel:
         wait_input = pb_utils.get_input_tensor_by_name(requests[0], "WAIT").as_numpy()
         time.sleep(wait_input[0] / 1000)
 
-        return None
-
     def finalize(self):
         pb_utils.log(pb_utils.LogLevel.INFO, "Finalizing model...")
 
