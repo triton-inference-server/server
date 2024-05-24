@@ -52,16 +52,28 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
+CANCELDIR=models/
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
-
 rm -f *.log
 rm -f *.log.*
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
+# set up model for inference delay queueing
+mkdir -p trace_models/dynamic_batch/1 && (cd trace_models/dynamic_batch && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'dynamic_batching {' >> config.pbtxt && \
+    echo -e '  preferred_batch_size: [ 1 ]' >> config.pbtxt && \
+    echo -e '  default_queue_policy { timeout_action: REJECT \n default_timeout_microseconds: 1000000 \n max_queue_size: 8 }' >> config.pbtxt && \
+    echo -e '}' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "8000" } }]' >> config.pbtxt)
 
 # set up simple and global_simple model using MODELBASE
 cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
@@ -72,12 +84,18 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
     cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+    # set up new dir for cancel model
+    cp -r $CANCELDIR/input_all_required $MODELSDIR/input_all_required && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
             sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
             sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt) && \
     mkdir -p $MODELSDIR/bls_simple/1 && cp $BLSDIR/bls_simple.py $MODELSDIR/bls_simple/1/model.py
+
+# set up repeat_int32 model
+cp -r ../L0_decoupled/models/repeat_int32 $MODELSDIR
+sed -i "s/decoupled: True/decoupled: False/" $MODELSDIR/repeat_int32/config.pbtxt
 
 RET=0
 
@@ -740,7 +758,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="14"
+EXPECTED_NUM_TESTS="17"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -757,6 +775,8 @@ mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_co
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
+                --load-model=repeat_int32 \
+                --load-model=input_all_required \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --load-model=trace_context --trace-config=rate=1 \
                 --trace-config=count=-1 --trace-config=mode=opentelemetry \
