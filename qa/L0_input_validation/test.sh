@@ -42,6 +42,7 @@ source ../common/util.sh
 
 RET=0
 
+DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
@@ -95,7 +96,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# input_validation_test
+cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
+
 SERVER_ARGS="--model-repository=`pwd`/models  --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -105,13 +107,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $TEST_PY InputShapeTest.test_input_shape_validation >> $CLIENT_LOG 2>&1
+python3 $TEST_PY InputShapeTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** input_shape_validation_test.py FAILED. \n***"
+    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
     RET=1
 fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
