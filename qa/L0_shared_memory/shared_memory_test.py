@@ -118,8 +118,8 @@ class SharedMemoryTest(tu.TestResultCollector):
                 "dummy_data", "/dummy_data", 8
             )
         except Exception as ex:
-            self.assertTrue(
-                "shared memory region 'dummy_data' already in manager" in str(ex)
+            self.assertIn(
+                "shared memory region 'dummy_data' already in manager", str(ex)
             )
         shm_status = self.triton_client.get_system_shared_memory_status()
         if self.protocol == "http":
@@ -271,9 +271,9 @@ class SharedMemoryTest(tu.TestResultCollector):
             use_system_shared_memory=True,
         )
         if len(error_msg) > 0:
-            self.assertTrue(
-                "unexpected total byte size 128 for input 'INPUT1', expecting 64"
-                in error_msg[-1]
+            self.assertIn(
+                "input byte size mismatch for input 'INPUT1' for model 'simple'. Expected 64, got 128",
+                error_msg[-1],
             )
         shm_handles.append(shm_ip2_handle)
         self._cleanup_server(shm_handles)
