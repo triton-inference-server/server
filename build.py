@@ -1266,6 +1266,12 @@ RUN pip3 install vllm=={}
             TRITON_VERSION_MAP[FLAGS.version][6]
         )
 
+    if "dali" in backends:
+        df += """
+# Update Python path to include DALI
+ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
+"""
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
@@ -1735,7 +1741,7 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
         cmake_destination_dir,
     )
     cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "build", "triton_tensorrtllm_worker"),
+        os.path.join(tensorrtllm_be_dir, "build", "trtllmExecutorWorker"),
         cmake_destination_dir,
     )
 

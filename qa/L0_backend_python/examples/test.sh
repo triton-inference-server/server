@@ -38,7 +38,7 @@ rm -fr *.log python_backend/
 
 # Install torch
 pip3 uninstall -y torch
-if [[ "$TEST_JETSON" == "0" ]] || [[ ${TEST_WINDOWS} == 0 ]]; then
+if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
 else
     pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
@@ -48,7 +48,8 @@ fi
 pip3 install validators
 
 # Install JAX
-if [ "$TEST_JETSON" == "0" ]; then
+# Jax has dropped the support for Python 3.8. See https://jax.readthedocs.io/en/latest/changelog.html
+if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
     pip3 install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 fi
 
@@ -117,7 +118,8 @@ kill_server
 
 # JAX AddSub
 # JAX is not supported on Jetson
-if [ "$TEST_JETSON" == "0" ]; then
+# Jax has dropped the support for Python 3.8. See https://jax.readthedocs.io/en/latest/changelog.html
+if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
     CLIENT_LOG="./examples_jax_client.log"
     mkdir -p models/jax/1/
     cp examples/jax/model.py models/jax/1/model.py

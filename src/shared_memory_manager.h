@@ -39,6 +39,7 @@
 #include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_GPU
+#include <cuda.h>
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
