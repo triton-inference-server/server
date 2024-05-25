@@ -122,8 +122,10 @@ class ResponseSenderTest(unittest.TestCase):
                 response_returned = True
             elif response_id < 2000:
                 before_return_response_count += 1
-            else:  # response_id < 3000
+            elif response_id < 3000:
                 after_return_response_count += 1
+            else:
+                raise ValueError(f"Unexpected response_id: {response_id}")
         self.assertEqual(number_of_response_before_return, before_return_response_count)
         self.assertEqual(return_a_response, response_returned)
         self.assertEqual(number_of_response_after_return, after_return_response_count)
