@@ -409,12 +409,12 @@ fi
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble bls decoupled"
+    SUBTESTS="ensemble bls decoupled response_sender"
     # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
     # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
     # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
     if [[ ${TEST_WINDOWS} == 0 ]]; then
-        SUBTESTS+=" variants io python_based_backends async_execute response_sender"
+        SUBTESTS+=" variants io python_based_backends async_execute"
     fi
 
     for TEST in ${SUBTESTS}; do
