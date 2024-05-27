@@ -36,6 +36,8 @@ from gen_common import (
     np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    trt_dtype_to_model_dtype,
+    trt_dtype_to_dtype_string,
 )
 
 FLAGS = None
@@ -291,9 +293,11 @@ instance_group [
         model_name,
         "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
         max_batch,
-        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-        if max_batch > 0
-        else "",
+        (
+            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+            if max_batch > 0
+            else ""
+        ),
         "fp32" if dtype == np.float32 else "int32",
         "fp32" if dtype == np.float32 else "int32",
         "fp32" if dtype == np.float32 else "int32",
@@ -312,7 +316,7 @@ instance_group [
 
 
 def create_plan_shape_tensor_modelfile(
-    models_dir, model_version, max_batch, dtype, shape
+    models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype
 ):
     # Note that resize layer does not support int tensors.
     # The model takes three inputs (INPUT, DUMMY_INPUT and SHAPE_INPUT)
@@ -336,7 +340,9 @@ def create_plan_shape_tensor_modelfile(
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt.int32, [-1] + dummy_shape)
         dummy_in0 = network.add_input("DUMMY_INPUT", trt_dtype, [-1] + dummy_shape)
-        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [1 + len(shape)])
+        shape_in0 = network.add_input(
+            "SHAPE_INPUT", shape_tensor_input_dtype, [1 + len(shape)]
+        )
         start0 = network.add_input("START", trt.int32, [-1] + unit_shape)
         end0 = network.add_input("END", trt.int32, [-1] + unit_shape)
         ready0 = network.add_input("READY", trt.int32, [-1] + unit_shape)
@@ -344,7 +350,7 @@ def create_plan_shape_tensor_modelfile(
     else:
         in0 = network.add_input("INPUT", trt.int32, dummy_shape)
         dummy_in0 = network.add_input("DUMMY_INPUT", trt_dtype, dummy_shape)
-        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [len(shape)])
+        shape_in0 = network.add_input("SHAPE_INPUT", shape_tensor_input_dtype, [len(shape)])
         start0 = network.add_input("START", trt.int32, unit_shape)
         end0 = network.add_input("END", trt.int32, unit_shape)
         ready0 = network.add_input("READY", trt.int32, unit_shape)
@@ -453,6 +459,7 @@ def create_plan_shape_tensor_modelfile(
     model_name = tu.get_dyna_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype
     )
+    model_name = model_name + "_" + trt_dtype_to_dtype_string(shape_tensor_input_dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -713,13 +720,17 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+def create_plan_modelconfig(
+    models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype=None
+):
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype
     )
+    if shape_tensor_input_dtype:
+        model_name = model_name + "_" + trt_dtype_to_dtype_string(shape_tensor_input_dtype)
     config_dir = models_dir + "/" + model_name
 
     if FLAGS.tensorrt_shape_io:
@@ -787,7 +798,7 @@ input [
 input [
   {{
     name: "SHAPE_INPUT"
-    data_type: TYPE_INT32
+    data_type: {}
     dims: [ {} ]
     is_shape_tensor: true
   }}
@@ -822,15 +833,18 @@ instance_group [
 """.format(
             model_name,
             max_batch,
-            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-            if max_batch > 0
-            else "",
+            (
+                "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+                if max_batch > 0
+                else ""
+            ),
             "int32",
             "int32",
             "int32",
             tu.shape_to_dims_str(shape),
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(shape),
+            trt_dtype_to_model_dtype(shape_tensor_input_dtype),
             shape_tensor_dim,
             tu.shape_to_dims_str(shape),
             np_to_model_dtype(dtype),
@@ -907,9 +921,11 @@ instance_group [
 """.format(
             model_name,
             max_batch,
-            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-            if max_batch > 0
-            else "",
+            (
+                "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+                if max_batch > 0
+                else ""
+            ),
             "int32" if dtype == np.int32 else "fp32",
             "int32" if dtype == np.int32 else "fp32",
             "int32" if dtype == np.int32 else "fp32",
@@ -1097,9 +1113,11 @@ instance_group [
 """.format(
         model_name,
         max_batch,
-        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-        if max_batch > 0
-        else "",
+        (
+            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+            if max_batch > 0
+            else ""
+        ),
         np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape),
         np_to_model_dtype(dtype),
@@ -1237,9 +1255,11 @@ instance_group [
 """.format(
         model_name,
         max_batch,
-        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-        if max_batch > 0
-        else "",
+        (
+            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+            if max_batch > 0
+            else ""
+        ),
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
@@ -1379,9 +1399,11 @@ output [
 """.format(
         model_name,
         max_batch,
-        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-        if max_batch > 0
-        else "",
+        (
+            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+            if max_batch > 0
+            else ""
+        ),
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
@@ -1399,14 +1421,24 @@ output [
         cfile.write(config)
 
 
-def create_shape_tensor_models(models_dir, dtype, shape, no_batch=True):
+def create_shape_tensor_models(
+    models_dir, dtype, shape, shape_tensor_input_dtype, no_batch=True
+):
     model_version = 1
 
-    create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
-    create_plan_shape_tensor_modelfile(models_dir, model_version, 8, dtype, shape)
+    create_plan_modelconfig(
+        models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
+    )
+    create_plan_shape_tensor_modelfile(
+        models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
+    )
     if no_batch:
-        create_plan_modelconfig(models_dir, model_version, 0, dtype, shape)
-        create_plan_shape_tensor_modelfile(models_dir, model_version, 0, dtype, shape)
+        create_plan_modelconfig(
+            models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
+        )
+        create_plan_shape_tensor_modelfile(
+            models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
+        )
 
 
 def create_models(models_dir, dtype, shape, no_batch=True):
@@ -1543,6 +1575,15 @@ if __name__ == "__main__":
             [
                 -1,
             ],
+            trt.int32,
+        )
+        create_shape_tensor_models(
+            FLAGS.models_dir,
+            np.float32,
+            [
+                -1,
+            ],
+            trt.int64,
         )
     else:
         # Tests with models that accept fixed-shape input/output tensors
