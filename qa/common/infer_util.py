@@ -729,6 +729,7 @@ def infer_shape_tensor(
     priority=0,
     timeout_us=0,
     batch_size=1,
+    shape_tensor_input_dtype=np.int32,
 ):
     # Lazy shm imports...
     if use_system_shared_memory:
@@ -784,7 +785,7 @@ def infer_shape_tensor(
         dummy_input_list.append(dummy_in0)
 
         # Prepare shape input tensor
-        in0 = np.asarray(input_shape_values[io_num], dtype=np.int32)
+        in0 = np.asarray(input_shape_values[io_num], dtype=shape_tensor_input_dtype)
         input_list.append(in0)
 
         # Prepare the expected value for the output. Skip dummy output as we
@@ -792,12 +793,14 @@ def infer_shape_tensor(
         expected_dict[output_name] = np.ndarray.copy(in0)
 
         # Only need to create region once
-        # FIXME DLIS-6653: Currently in our test cases we are
-        # using int32 inputs and int64 outputs for shape tensors
-        # hence there is a multiple of 2 to compute the byte size
-        # properly.
-        input_byte_size = in0.size * np.dtype(np.int32).itemsize
-        output_byte_size = input_byte_size * batch_size * 2
+        input_byte_size = in0.size * np.dtype(shape_tensor_input_dtype).itemsize
+        output_byte_size = input_byte_size * batch_size
+        if shape_tensor_input_dtype == np.int32:
+            # Currently in our test cases we are
+            # using int64 outputs for shape tensors
+            # hence there is a multiple of 2 to compute the byte size
+            # properly.
+            output_byte_size = output_byte_size * 2
         if use_system_shared_memory:
             input_shm_handle_list.append(
                 (
@@ -827,6 +830,7 @@ def infer_shape_tensor(
             )
 
     model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+    model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
     # Run inference and check results for each config
     for config in configs:
         client_utils = grpcclient if config[1] == "grpc" else httpclient
@@ -850,7 +854,11 @@ def infer_shape_tensor(
                 )
             )
             inputs.append(
-                client_utils.InferInput(input_name, input_list[io_num].shape, "INT32")
+                client_utils.InferInput(
+                    input_name,
+                    input_list[io_num].shape,
+                    np_to_triton_dtype(shape_tensor_input_dtype),
+                )
             )
             outputs.append(client_utils.InferRequestedOutput(dummy_output_name))
             outputs.append(client_utils.InferRequestedOutput(output_name))
@@ -919,8 +927,8 @@ def infer_shape_tensor(
                     output_shape = output.shape
                 else:
                     output_shape = output["shape"]
-                # FIXME DLIS-6653: Currently in our test cases we are
-                # using int32 inputs and int64 outputs for shape tensors
+                # Currently in our test cases we are
+                # using int64 outputs for shape tensors
                 # hence passing int64 as datatype.
                 out = shm.get_contents_as_numpy(
                     output_shm_handle_list[io_num][0], np.int64, output_shape

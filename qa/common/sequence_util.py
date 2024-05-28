@@ -195,7 +195,13 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     # Returns (name, byte size, shm_handle)
     def precreate_register_shape_tensor_regions(
-        self, value_list, dtype, i, batch_size=1, tensor_shape=(1,)
+        self,
+        value_list,
+        dtype,
+        i,
+        batch_size=1,
+        tensor_shape=(1,),
+        shape_tensor_input_dtype=np.int32,
     ):
         self.assertFalse(
             _test_cuda_shared_memory,
@@ -220,7 +226,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 # Only one shape tensor input per batch
                 shape_input_list.append(
-                    np.full(tensor_shape, shape_value, dtype=np.int32)
+                    np.full(tensor_shape, shape_value, dtype=shape_tensor_input_dtype)
                 )
 
                 if dtype == np.object_:
@@ -233,11 +239,13 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
 
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
-                # FIXME DLIS-6653: Currently in our test cases we are
-                # using int32 inputs and int64 outputs for shape tensors
-                # hence there is a multiple of 2 to compute the byte size
-                # properly.
-                shape_output_byte_size = shape_input_byte_size * 2
+                shape_output_byte_size = shape_input_byte_size
+                if shape_tensor_input_dtype == np.int32:
+                    # Currently in our test cases we are
+                    # using int64 outputs for shape tensors
+                    # hence there is a multiple of 2 to compute the byte size
+                    # properly.
+                    shape_output_byte_size = shape_output_byte_size * 2
                 output_byte_size = np.dtype(dtype).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
@@ -298,7 +306,13 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     # Returns (name, byte size, shm_handle)
     def precreate_register_dynaseq_shape_tensor_regions(
-        self, value_list, dtype, i, batch_size=1, tensor_shape=(1,)
+        self,
+        value_list,
+        dtype,
+        i,
+        batch_size=1,
+        tensor_shape=(1,),
+        shape_tensor_input_dtype=np.int32,
     ):
         self.assertFalse(
             _test_cuda_shared_memory,
@@ -326,7 +340,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 # Only one shape tensor input per batch
                 shape_input_list.append(
-                    np.full(tensor_shape, shape_value, dtype=np.int32)
+                    np.full(tensor_shape, shape_value, dtype=shape_tensor_input_dtype)
                 )
 
                 if dtype == np.object_:
@@ -341,11 +355,13 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 dummy_input_byte_size = sum([i0.nbytes for i0 in dummy_input_list])
 
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
-                # FIXME DLIS-6653: Currently in our test cases we are
-                # using int32 inputs and int64 outputs for shape tensors
-                # hence there is a multiple of 2 to compute the byte size
-                # properly.
-                shape_output_byte_size = shape_input_byte_size * 2
+                shape_output_byte_size = shape_input_byte_size
+                if shape_tensor_input_dtype == np.int32:
+                    # Currently in our test cases we are
+                    # using int64 outputs for shape tensors
+                    # hence there is a multiple of 2 to compute the byte size
+                    # properly.
+                    shape_output_byte_size = shape_output_byte_size * 2
                 output_byte_size = np.dtype(np.int32).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
@@ -894,6 +910,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
         shm_region_handles,
         using_dynamic_batcher=False,
         sequence_name="<unknown>",
+        shape_tensor_input_dtype=np.int32,
     ):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
@@ -943,7 +960,9 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 )
                 inputs.append(
                     client_utils.InferInput(
-                        "SHAPE_INPUT", shape_tensor_shape, np_to_triton_dtype(np.int32)
+                        "SHAPE_INPUT",
+                        shape_tensor_shape,
+                        np_to_triton_dtype(shape_tensor_input_dtype),
                     )
                 )
                 if using_dynamic_batcher:
@@ -959,7 +978,9 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
                 # Set IO values
                 shape_values.append(
-                    np.full(shape_tensor_shape, shape_value, dtype=np.int32)
+                    np.full(
+                        shape_tensor_shape, shape_value, dtype=shape_tensor_input_dtype
+                    )
                 )
                 if not _test_system_shared_memory:
                     if using_dynamic_batcher:

@@ -127,10 +127,17 @@ else
 fi
 
 # Prepare the config file for dynamic batching tests
-CONFIG_FILE="models/plan_zero_1_float32/config.pbtxt"
+CONFIG_FILE="models/plan_zero_1_float32_int32/config.pbtxt"
 sed -i "s/^max_batch_size:.*/max_batch_size: 8/" $CONFIG_FILE && \
 sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" $CONFIG_FILE && \
                 echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> $CONFIG_FILE
+
+# Prepare the config file for dynamic batching tests
+CONFIG_FILE="models/plan_zero_1_float32_int64/config.pbtxt"
+sed -i "s/^max_batch_size:.*/max_batch_size: 8/" $CONFIG_FILE && \
+sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" $CONFIG_FILE && \
+                echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> $CONFIG_FILE
+
 for i in \
             test_dynamic_different_shape_values \
             test_dynamic_identical_shape_values; do
@@ -202,7 +209,11 @@ for i in \
     done
 
 # Prepare the config file for dynamic sequence batching tests
-CONFIG_FILE="models/plan_dyna_sequence_float32/config.pbtxt"
+CONFIG_FILE="models/plan_dyna_sequence_float32_int32/config.pbtxt"
+sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" $CONFIG_FILE && \
+sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" $CONFIG_FILE
+
+CONFIG_FILE="models/plan_dyna_sequence_float32_int64/config.pbtxt"
 sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" $CONFIG_FILE && \
 sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" $CONFIG_FILE
 
