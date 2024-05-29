@@ -3,12 +3,12 @@ input [
   {
     name: "INPUT0"
     data_type: TYPE_FP32
-    dims: [ 16]
+    dims: [ 16 ]
   },
   {
     name: "INPUT1"
     data_type: TYPE_FP32
-    dims: [ 7 ]
+    dims: [ 16 ]
   }
 ]
 output [
@@ -20,6 +20,6 @@ output [
   {
     name: "OUTPUT1"
     data_type: TYPE_FP32
-    dims: [ 16 ]
+    dims: [ 16, 1]
   }
 ]
