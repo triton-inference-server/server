@@ -564,7 +564,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_ << ", callback index "
-                 << state->cb_count_ << ", flags " << flags;
+                 << state->cb_count_ << ", flags " << flags
+                 << ", response is nullptr " << (iresponse == nullptr);
 
 #ifdef TRITON_ENABLE_TRACING
   if (state->cb_count_ == 1) {
@@ -575,19 +576,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 
   bool is_complete =
       state->complete_ || (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
-
-  // Log appropriate messages
-  if (!state->is_decoupled_) {
-    if (!is_complete) {
-      LOG_VERBOSE(2)
-          << "[INTERNAL] ModelStreamInfer received a response without FINAL "
-             "flag for a model with one-to-one transaction";
-    }
-    if (iresponse == nullptr) {
-      LOG_VERBOSE(2) << "[INTERNAL] ModelStreamInfer received a null response "
-                        "for a model with one-to-one transaction";
-    }
-  }
 
   // If receiving the final callback then erase the state from the inflight
   // state data structure to prevent cancellation being called on the request.
