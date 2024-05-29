@@ -17,7 +17,6 @@
 Check the [conventional commit type](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#type)
 box here and add the label to the github PR.
 - [ ] build
-- [ ] chore
 - [ ] ci
 - [ ] docs
 - [ ] feat
