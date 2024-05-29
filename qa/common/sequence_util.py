@@ -233,7 +233,11 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
 
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
-                shape_output_byte_size = shape_input_byte_size
+                # FIXME DLIS-6653: Currently in our test cases we are
+                # using int32 inputs and int64 outputs for shape tensors
+                # hence there is a multiple of 2 to compute the byte size
+                # properly.
+                shape_output_byte_size = shape_input_byte_size * 2
                 output_byte_size = np.dtype(dtype).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
@@ -337,7 +341,11 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 dummy_input_byte_size = sum([i0.nbytes for i0 in dummy_input_list])
 
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
-                shape_output_byte_size = shape_input_byte_size
+                # FIXME DLIS-6653: Currently in our test cases we are
+                # using int32 inputs and int64 outputs for shape tensors
+                # hence there is a multiple of 2 to compute the byte size
+                # properly.
+                shape_output_byte_size = shape_input_byte_size * 2
                 output_byte_size = np.dtype(np.int32).itemsize + 2
                 resized_output_byte_size = 32 * shape_value
 
