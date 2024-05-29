@@ -4,6 +4,7 @@ _Describe your pull request here. Please read the text below the line, and make 
 
 #### Checklist
 - [ ] Populated all fields in this template.
+- [ ] The PR title reflects the change.
 - [ ] Changes are described in the pull request, or an [existing issue is referenced](https://github.com/triton-inference-server/server/issues).
 - [ ] Added [test plan](#test-plan) and verified test passes.
 - [ ] Verified that the PR passes existing CI.
