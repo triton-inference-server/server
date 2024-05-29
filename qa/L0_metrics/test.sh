@@ -140,6 +140,28 @@ kill $SERVER_PID
 wait $SERVER_PID
 set -e
 
+# Peer access GPU memory utilization Test
+SERVER_LOG="gpu_peer_memory_test_server.log"
+CLIENT_LOG="gpu_peer_memory_test_client.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=0 --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
+run_and_check_server
+memory_size_with_peering=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
+kill $SERVER_PID
+wait $SERVER_PID
+
+SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=0 --enable-peer-access=FALSE --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
+run_and_check_server
+memory_size_without_peering=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Check if memory usage HAS reduced after using the --enable-peer-access flag
+if [ "$memory_size_with_peering" -le "$memory_size_without_peering" ]; then
+   # Print the memory usage for each GPU
+  echo "Disabling PEERING does not reduce GPU memory usage"
+  echo -e "\n***\n*** GPU metric test failed. \n***"
+  RET=1
+fi
 
 ### GPU Metrics
 set +e
