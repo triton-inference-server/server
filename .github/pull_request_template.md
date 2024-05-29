@@ -1,5 +1,5 @@
 #### What does the PR do?
-_Describe your pull request here. Please read the text below the line, and make sure you follow the checklist._
+<!-- Describe your pull request here. Please read the text below the line, and make sure you follow the checklist.-->
 
 
 #### Checklist
@@ -9,27 +9,34 @@ _Describe your pull request here. Please read the text below the line, and make 
 - [ ] Added [test plan](#test-plan) and verified test passes.
 - [ ] Verified that the PR passes existing CI.
 - [ ] Added _succinct_ git squash message before merging [ref](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+- [ ] CodeQL suggestions resolved
+- [ ] Lint Gods are pleased ( i.e. pre-commit checks are green )
 
 #### Type:
-_remove any that do not apply_
+- [ ] Feature
+- [ ] Bugfix
+- [ ] Enhancement
+- [ ] Chore / doc / build etc
+- [ ] Other (please specify)
 
-- Feature
-- Bugfix
-- Enhancement
-- Chore / doc / build etc
+#### Related PRs:
+<!-- Related PRs from other Repositories -->
 
 #### Where should the reviewer start?
-_call out specific files that should be looked at closely_
+<!-- call out specific files that should be looked at closely -->
 
 #### Test plan:
-_list steps to verify_
-_were e2e tests added?_
+<!-- list steps to verify -->
+<!-- were e2e tests added?-->
+
+- CI Pipeline ID:
+<!-- Only Pipeline ID and no direct link here -->
 
 #### Caveats:
-_any limitations or possible things missing from this PR_
+<!-- any limitations or possible things missing from this PR -->
 
 #### Any background context you want to provide?
-_e.g. what led to this change being made. this is optional extra information to help the reviewer_
+<!-- e.g. what led to this change being made. this is optional extra information to help the reviewer -->
 
 #### Tickets: (use one of the action keywords Closes / Fixes / Resolves / Relates to)
 - closes GitHub issue: #xxx
