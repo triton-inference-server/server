@@ -10,7 +10,8 @@
 - [ ] Verified that the PR passes existing CI.
 - [ ] Added _succinct_ git squash message before merging [ref](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 - [ ] CodeQL suggestions resolved
-- [ ] Lint Gods are pleased ( i.e. pre-commit checks are green )
+- [ ] Lint Gods are pleased (i.e. pre-commit checks are green)
+- [ ] Optional: Additional screenshots for behavior/output changes with before/after.
 
 #### Type:
 - [ ] Feature
