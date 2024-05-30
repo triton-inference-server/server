@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
 import unittest
 
 import numpy as np
@@ -95,7 +94,6 @@ class ResponseSenderTest(unittest.TestCase):
         with grpcclient.InferenceServerClient("localhost:8001") as client:
             client.start_stream(callback)
             client.async_stream_infer(model_name, inputs)
-            time.sleep(2)  # to collect all responses
             client.stop_stream()
         return responses
 
