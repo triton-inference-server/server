@@ -37,6 +37,31 @@ class ResponseSenderModelCommon:
         self._background_tasks = set()
 
     def _get_instructions_from_request(self, request):
+        """
+        Determine the execution instructions from the inputs. This test tries to examine
+        all the corner cases with using response sender.
+
+        Assumptions: The request batch size can be larger than one.
+
+        There are 5 inputs in the model that control the model behavior:
+          * NUMBER_OF_RESPONSE_BEFORE_RETURN (UINT8):
+              Determines the number of responses before returning from execute function.
+          * SEND_COMPLETE_FINAL_FLAG_BEFORE_RETURN (BOOL):
+              Determines whether the final flag will be sent before return.
+          * RETURN_A_RESPONSE (BOOL):
+              Return the response when the model is returning from `execute` function.
+          * NUMBER_OF_RESPONSE_AFTER_RETURN (UINT8):
+              Determines the number of responses after return.
+          * SEND_COMPLETE_FINAL_FLAG_AFTER_RETURN (BOOL):
+              Determines whether the final flag will be sent before return.
+
+        Note:
+          * If the batch size of a request is larger than one, the sum of the values in
+            the batch will be used for determining the value of each input of the
+            request.
+          * The response_id is used to determine the difference between responses sent
+            during execute, when execute returns, or after execute returns.
+        """
         instr = {}
         return_a_response_np = self._pb_utils.get_input_tensor_by_name(
             request, "RETURN_A_RESPONSE"
