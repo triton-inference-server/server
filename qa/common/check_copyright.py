@@ -85,6 +85,8 @@ SKIP_PATHS = (
     "qa/openvino_models/fixed_batch",
     "CITATION.cff",
     "TRITON_VERSION",
+    ".github/ISSUE_TEMPLATE",
+    ".github/PULL_REQUEST_TEMPLATE",
 )
 
 COPYRIGHT_YEAR_RE = "Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved."
