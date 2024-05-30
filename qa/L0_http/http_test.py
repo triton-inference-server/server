@@ -84,6 +84,7 @@ class HttpTest(tu.TestResultCollector):
         headers = {"Inference-Header-Content-Length": "0"}
         r = requests.post(self._get_infer_url(model), data=input, headers=headers)
         r.raise_for_status()
+        # [FIXME] check content on failure
 
         # Get the inference header size so we can locate the output binary data
         header_size = int(r.headers["Inference-Header-Content-Length"])
