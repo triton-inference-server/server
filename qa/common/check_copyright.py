@@ -33,19 +33,20 @@ import re
 
 FLAGS = None
 SKIP_EXTS = (
-    "jpeg",
-    "jpg",
-    "pgm",
-    "png",
-    "log",
-    "preprocessed",
-    "jmx",
-    "gz",
-    "json",
-    "pdf",
-    "so",
-    "onnx",
-    "svg",
+    ".jpeg",
+    ".jpg",
+    ".pgm",
+    ".png",
+    ".log",
+    ".preprocessed",
+    ".jmx",
+    ".gz",
+    ".json",
+    ".pdf",
+    ".so",
+    ".onnx",
+    ".svg",
+    "pull_request_template.md",
 )
 REPO_PATH_FROM_THIS_FILE = "../.."
 SKIP_PATHS = (
@@ -130,7 +131,7 @@ def visit(path):
         print("visiting " + path)
 
     for skip in SKIP_EXTS:
-        if path.endswith("." + skip):
+        if path.endswith(skip):
             if FLAGS.verbose:
                 print("skipping due to extension: " + path)
             return True
