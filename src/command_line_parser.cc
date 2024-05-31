@@ -464,9 +464,9 @@ TritonParser::SetupOptions()
        "same name can be served if they are in different namespace."});
   model_repo_options_.push_back(
       {OPTION_ENABLE_PEER_ACCESS, "enable-peer-access", Option::ArgBool,
-       "Whether GPU peer access is enable or not. If true, GPUs can share "
-       "virtual memory address,"
-       "adds cuda context "});
+       "Whether the server tries to enable peer access or not. Even when this options is set to true,  "
+       "peer access could still be not enabled because the underlying system doesn't support it."
+       " The server will log a warning in this case. Default is true."});
 
 #if defined(TRITON_ENABLE_HTTP)
   http_options_.push_back(
