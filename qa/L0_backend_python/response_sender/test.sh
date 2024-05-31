@@ -51,6 +51,28 @@ mkdir -p models/response_sender_decoupled_async/1 && \
     cp ../../python_models/response_sender/model_async.py models/response_sender_decoupled_async/1/model.py && \
     cp ../../python_models/response_sender/config.pbtxt models/response_sender_decoupled_async && \
     echo "model_transaction_policy { decoupled: True }" >> models/response_sender_decoupled_async/config.pbtxt
+mkdir -p models/response_sender_batching/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_batching/1 && \
+    cp ../../python_models/response_sender/model.py models/response_sender_batching/1 && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_batching && \
+    echo "dynamic_batching { max_queue_delay_microseconds: 500000 }" >> models/response_sender_batching/config.pbtxt
+mkdir -p models/response_sender_decoupled_batching/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_decoupled_batching/1 && \
+    cp ../../python_models/response_sender/model.py models/response_sender_decoupled_batching/1 && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_decoupled_batching && \
+    echo "model_transaction_policy { decoupled: True }" >> models/response_sender_decoupled_batching/config.pbtxt && \
+    echo "dynamic_batching { max_queue_delay_microseconds: 500000 }" >> models/response_sender_decoupled_batching/config.pbtxt
+mkdir -p models/response_sender_async_batching/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_async_batching/1 && \
+    cp ../../python_models/response_sender/model_async.py models/response_sender_async_batching/1/model.py && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_async_batching && \
+    echo "dynamic_batching { max_queue_delay_microseconds: 500000 }" >> models/response_sender_async_batching/config.pbtxt
+mkdir -p models/response_sender_decoupled_async_batching/1 && \
+    cp ../../python_models/response_sender/model_common.py models/response_sender_decoupled_async_batching/1 && \
+    cp ../../python_models/response_sender/model_async.py models/response_sender_decoupled_async_batching/1/model.py && \
+    cp ../../python_models/response_sender/config.pbtxt models/response_sender_decoupled_async_batching && \
+    echo "model_transaction_policy { decoupled: True }" >> models/response_sender_decoupled_async_batching/config.pbtxt && \
+    echo "dynamic_batching { max_queue_delay_microseconds: 500000 }" >> models/response_sender_decoupled_async_batching/config.pbtxt
 
 TEST_LOG="response_sender_test.log"
 SERVER_LOG="response_sender_test.server.log"
