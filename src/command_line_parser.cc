@@ -374,7 +374,7 @@ enum TritonOptionId {
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
   OPTION_MODEL_NAMESPACING,
-  OPTION_PEER_ACCESS
+  OPTION_ENABLE_PEER_ACCESS
 };
 
 void
@@ -463,7 +463,7 @@ TritonParser::SetupOptions()
        "Whether model namespacing is enable or not. If true, models with the "
        "same name can be served if they are in different namespace."});
   model_repo_options_.push_back(
-      {OPTION_PEER_ACCESS, "enable-peer-access", Option::ArgBool,
+      {OPTION_ENABLE_PEER_ACCESS, "enable-peer-access", Option::ArgBool,
        "Whether GPU peer access is enable or not. If true, GPUs can share "
        "virtual memory address,"
        "adds cuda context "});
@@ -1732,7 +1732,7 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_MODEL_NAMESPACING:
           lparams.enable_model_namespacing_ = ParseOption<bool>(optarg);
           break;
-        case OPTION_PEER_ACCESS:
+        case OPTION_ENABLE_PEER_ACCESS:
           lparams.enable_peer_access_ = ParseOption<bool>(optarg);
           break;
       }
