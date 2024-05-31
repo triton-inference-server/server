@@ -8,7 +8,7 @@ input [
   {
     name: "INPUT1"
     data_type: TYPE_FP32
-    dims: [ 16, 1 ]
+    dims: [ 7 ]
   }
 ]
 output [

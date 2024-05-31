@@ -33,19 +33,20 @@ import re
 
 FLAGS = None
 SKIP_EXTS = (
-    "jpeg",
-    "jpg",
-    "pgm",
-    "png",
-    "log",
-    "preprocessed",
-    "jmx",
-    "gz",
-    "json",
-    "pdf",
-    "so",
-    "onnx",
-    "svg",
+    ".jpeg",
+    ".jpg",
+    ".pgm",
+    ".png",
+    ".log",
+    ".preprocessed",
+    ".jmx",
+    ".gz",
+    ".json",
+    ".pdf",
+    ".so",
+    ".onnx",
+    ".svg",
+    "pull_request_template.md",
 )
 REPO_PATH_FROM_THIS_FILE = "../.."
 SKIP_PATHS = (
@@ -85,6 +86,8 @@ SKIP_PATHS = (
     "qa/openvino_models/fixed_batch",
     "CITATION.cff",
     "TRITON_VERSION",
+    ".github/ISSUE_TEMPLATE",
+    ".github/PULL_REQUEST_TEMPLATE",
 )
 
 COPYRIGHT_YEAR_RE = "Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved."
@@ -128,7 +131,7 @@ def visit(path):
         print("visiting " + path)
 
     for skip in SKIP_EXTS:
-        if path.endswith("." + skip):
+        if path.endswith(skip):
             if FLAGS.verbose:
                 print("skipping due to extension: " + path)
             return True
