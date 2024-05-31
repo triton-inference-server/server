@@ -88,6 +88,20 @@ class ResponseSenderTest(unittest.TestCase):
         "number_of_response_after_return": 0,
         "send_complete_final_flag_after_return": False,
     }
+    _inputs_parameters_one_response_pre_and_on_return = {
+        "number_of_response_before_return": 1,
+        "send_complete_final_flag_before_return": True,
+        "return_a_response": True,
+        "number_of_response_after_return": 0,
+        "send_complete_final_flag_after_return": False,
+    }
+    _inputs_parameters_one_response_on_and_post_return = {
+        "number_of_response_before_return": 0,
+        "send_complete_final_flag_before_return": False,
+        "return_a_response": True,
+        "number_of_response_after_return": 1,
+        "send_complete_final_flag_after_return": True,
+    }
 
     def _get_inputs(
         self,
@@ -442,11 +456,7 @@ class ResponseSenderTest(unittest.TestCase):
         #       since the response sender is closed, nothing is passed to the client.
         responses = self._infer(
             model_name="response_sender_decoupled",
-            number_of_response_before_return=1,
-            send_complete_final_flag_before_return=True,
-            return_a_response=True,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            **self._inputs_parameters_one_response_pre_and_on_return,
         )
         self._assert_responses_valid(
             responses,
@@ -470,11 +480,7 @@ class ResponseSenderTest(unittest.TestCase):
         #       deleted response factory and causes a segmentation fault.
         responses = self._infer(
             model_name="response_sender_decoupled",
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=True,
-            number_of_response_after_return=1,
-            send_complete_final_flag_after_return=True,
+            **self._inputs_parameters_one_response_on_and_post_return,
         )
         self._assert_responses_exception(
             responses,
@@ -489,34 +495,20 @@ class ResponseSenderTest(unittest.TestCase):
         #       exception happens before the model returns, it will be caught by the
         #       stub process which pass it to the backend and sent an error response
         #       with final flag.
-        number_of_response_before_return = 0
-        send_complete_final_flag_before_return = True
-        return_a_response = False
-        number_of_response_after_return = 0
-        send_complete_final_flag_after_return = False
         expected_message = (
             "Non-decoupled model cannot send complete final before sending a response"
         )
-
         model_name = "response_sender"
         responses = self._infer(
             model_name,
-            number_of_response_before_return,
-            send_complete_final_flag_before_return,
-            return_a_response,
-            number_of_response_after_return,
-            send_complete_final_flag_after_return,
+            **self._inputs_parameters_zero_response_pre_return,
         )
         self._assert_responses_exception(responses, expected_message)
         # Do NOT group into a for-loop as it hides which model failed.
         model_name = "response_sender_async"
         responses = self._infer(
             model_name,
-            number_of_response_before_return,
-            send_complete_final_flag_before_return,
-            return_a_response,
-            number_of_response_after_return,
-            send_complete_final_flag_after_return,
+            **self._inputs_parameters_zero_response_pre_return,
         )
         self._assert_responses_exception(responses, expected_message)
 
@@ -540,11 +532,7 @@ class ResponseSenderTest(unittest.TestCase):
         #       with final flag. Since this is non-decoupled model using gRPC stream,
         #       any response after the 1st will be discarded by the frontend.
         self._assert_non_decoupled_infer_with_expected_response_success(
-            number_of_response_before_return=2,
-            send_complete_final_flag_before_return=True,
-            return_a_response=False,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            **self._inputs_parameters_two_response_pre_return,
             expected_number_of_response_before_return=1,
             expected_return_a_response=False,
             expected_number_of_response_after_return=0,
@@ -561,11 +549,7 @@ class ResponseSenderTest(unittest.TestCase):
         #       complete final flag is not sent and will hang when unloading the model.
         #       How to detect such event and close the response factory?
         self._assert_non_decoupled_infer_with_expected_response_success(
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=False,
-            number_of_response_after_return=2,
-            send_complete_final_flag_after_return=True,
+            **self._inputs_parameters_two_response_post_return,
             expected_number_of_response_before_return=0,
             expected_return_a_response=False,
             expected_number_of_response_after_return=1,
@@ -578,29 +562,21 @@ class ResponseSenderTest(unittest.TestCase):
         #       an exception. The backend should see the request is closed and do
         #       nothing upon receiving the error from stub.
         self._assert_non_decoupled_infer_with_expected_response_success(
-            number_of_response_before_return=1,
-            send_complete_final_flag_before_return=True,
-            return_a_response=True,
-            number_of_response_after_return=0,
-            send_complete_final_flag_after_return=False,
+            **self._inputs_parameters_one_response_pre_and_on_return,
             expected_number_of_response_before_return=1,
             expected_return_a_response=False,
             expected_number_of_response_after_return=0,
         )
 
     # Non-decoupled model return 1 response and send 1 response.
-    def test_non_decoupled_one_response_on_and_pre_return(self):
+    def test_non_decoupled_one_response_on_and_post_return(self):
         # Note: The returned response will send the response to the client and complete
         #       final. The sent response will see the response sender is closed and
         #       raise an exception. Since the exception happens after the model returns,
         #       it cannot be caught by the stub (i.e. in a daemon thread), so nothing
         #       will happen.
         self._assert_non_decoupled_infer_with_expected_response_success(
-            number_of_response_before_return=0,
-            send_complete_final_flag_before_return=False,
-            return_a_response=True,
-            number_of_response_after_return=1,
-            send_complete_final_flag_after_return=True,
+            **self._inputs_parameters_one_response_on_and_post_return,
             expected_number_of_response_before_return=0,
             expected_return_a_response=True,
             expected_number_of_response_after_return=0,
