@@ -39,7 +39,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 MODELDIR=`pwd`/models
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR=/data/inferenceserver/24.05dev/qa_model_repository
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
@@ -141,25 +141,30 @@ wait $SERVER_PID
 set -e
 
 # Peer access GPU memory utilization Test
+# Custom Pinned memory pool size
+export CUSTOM_PINNED_MEMORY_POOL_SIZE=0 # bytes
+export CUDA_VISIBLE_DEVICES=0
 SERVER_LOG="gpu_peer_memory_test_server.log"
 CLIENT_LOG="gpu_peer_memory_test_client.log"
-SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=0 --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
+
+SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE --enable-peer-access=FALSE --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
 run_and_check_server
-memory_size_with_peering=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
+#grep usage stats for triton server from nvidia-smi
+memory_size_without_peering=$(nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits | grep $(pgrep tritonserver) | awk '{print $3}')
+
+#nvidia-smi only lists process which use gpu memory with --enable-peer-access=FALSE nvidia-smi may not list tritonserver
+if [ -z $memory_size_without_peering ]; then
+  memory_size_without_peering=0
+fi
+
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=0 --enable-peer-access=FALSE --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
-run_and_check_server
-memory_size_without_peering=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
-kill $SERVER_PID
-wait $SERVER_PID
-
-# Check if memory usage HAS reduced after using the --enable-peer-access flag
-if [ "$memory_size_with_peering" -le "$memory_size_without_peering" ]; then
+# Check if memory usage HAS reduced to 0 after using the --enable-peer-access flag
+if [ $memory_size_without_peering -ne 0 ]; then
    # Print the memory usage for each GPU
-  echo "Disabling PEERING does not reduce GPU memory usage"
-  echo -e "\n***\n*** GPU metric test failed. \n***"
+  echo "Disabling PEERING does not reduce GPU memory usage to ZERO"
+  echo -e "\n***\n*** GPU Peer enable failed. \n***"
   RET=1
 fi
 
@@ -433,3 +438,4 @@ else
 fi
 
 exit $RET
+
