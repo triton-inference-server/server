@@ -46,7 +46,7 @@ PERF_ANALYZER=../clients/perf_analyzer
 IMAGE=../images/vulture.jpeg
 
 # Models
-CAFFE2PLAN=../common/caffe2plan
+TRTEXEC=/usr/src/tensorrt/bin/trtexec
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 # Server
@@ -103,23 +103,28 @@ export MAX_ALLOWED_ALLOC="100"
 mkdir -p models/
 cp -r $DATADIR/perf_model_store/resnet50* models/
 
-# Copy and prepare trt model
-cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/resnet50_fp16_plan
-mkdir -p models/resnet50_fp16_plan/1
-sed -i "s/^name:.*/name: \"resnet50_fp16_plan\"/" models/resnet50_fp16_plan/config.pbtxt
+# Create the TensorRT plan from ONNX model
+rm -fr models/resnet50_fp32_plan && mkdir -p models/resnet50_fp32_plan/1 && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/1/model.onnx models/resnet50_fp32_plan/ && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/labels.txt models/resnet50_fp32_plan/
 
 set +e
+# Build TRT engine
+$TRTEXEC --onnx=models/resnet50_fp32_plan/model.onnx --saveEngine=models/resnet50_fp32_plan/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:${STATIC_BATCH}x3x224x224 \
+         --maxShapes=input:${STATIC_BATCH}x3x224x224
 
-# Create the PLAN
-$CAFFE2PLAN -h -b ${STATIC_BATCH} \
-    -n prob -o models/resnet50_fp16_plan/1/model.plan \
-    $DATADIR/caffe_models/resnet50.prototxt $DATADIR/caffe_models/resnet50.caffemodel
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to generate resnet50 PLAN\n***"
     exit 1
 fi
 
 set -e
+
+rm models/resnet50_fp32_plan/model.onnx
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/config.pbtxt models/resnet50_fp32_plan/ && \
+sed -i "s/^name: .*/name: \"resnet50_fp32_plan\"/g" models/resnet50_fp32_plan/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' models/resnet50_fp32_plan/config.pbtxt
 
 RET=0
 
