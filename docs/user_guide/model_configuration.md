@@ -452,7 +452,7 @@ library.
 |TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
 |TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
 |TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
-|TYPE_BF16     |              |              |              |         |BF16     |              |
+|TYPE_BF16     | kBF16        |              |              |         |BF16     |              |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point

@@ -1076,6 +1076,103 @@ def create_plan_modelfile(
             )
 
 
+def create_plan_bf16_modelfile(
+    models_dir,
+    max_batch,
+    input_shape,
+    min_dim=None,
+    max_dim=None,
+    model_version=1,
+):
+    trt_memory_format = trt.TensorFormat.LINEAR
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(TRT_LOGGER)
+    network = builder.create_network()
+
+    if max_batch == 0:
+        input_with_batchsize = input_shape
+    else:
+        input_with_batchsize = [-1] + input_shape
+
+    # Define input tensors
+    input0 = network.add_input("INPUT0", trt.bfloat16, input_with_batchsize)
+    input1 = network.add_input("INPUT1", trt.bfloat16, input_with_batchsize)
+
+    # Element-wise add, sub layers
+    add_layer = network.add_elementwise(input0, input1, trt.ElementWiseOperation.SUM)
+    sub_layer = network.add_elementwise(input0, input1, trt.ElementWiseOperation.SUB)
+
+    # Define output tensors
+    output0 = add_layer.get_output(0)
+    output0.name = "OUTPUT0"
+    output0.dtype = trt.bfloat16
+    network.mark_output(output0)
+
+    output1 = sub_layer.get_output(0)
+    output1.name = "OUTPUT1"
+    output1.dtype = trt.bfloat16
+    network.mark_output(output1)
+
+    input0.allowed_formats = 1 << int(trt_memory_format)
+    input1.allowed_formats = 1 << int(trt_memory_format)
+    output0.allowed_formats = 1 << int(trt_memory_format)
+    output1.allowed_formats = 1 << int(trt_memory_format)
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+
+    for i in input_shape:
+        if i == -1:
+            min_shape = min_shape + [min_dim]
+            opt_shape = opt_shape + [int((max_dim + min_dim) / 2)]
+            max_shape = max_shape + [max_dim]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+
+    config = builder.create_builder_config()
+    config.flags = flags
+    config.add_optimization_profile(profile)
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
+
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
+
+    if max_batch == 0:
+        if tu.shape_is_fixed(input_shape):
+            model_name = "plan_nobatch_fixed_bf16"
+        else:
+            model_name = "plan_nobatch_dyna_bf16"
+    else:
+        if tu.shape_is_fixed(input_shape):
+            model_name = "plan_fixed_bf16"
+        else:
+            model_name = "plan_dyna_bf16"
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    os.makedirs(name=model_version_dir, exist_ok=True)
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine_bytes)
+
+
 def create_plan_modelconfig(
     models_dir,
     max_batch,
@@ -1233,6 +1330,75 @@ output [
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
         for l in range(output0_label_cnt):
             lfile.write("label" + str(l) + "\n")
+
+
+def create_plan_bf16_modelconfig(
+    models_dir, max_batch, input_shape, output_shape, profile_index=0
+):
+    if max_batch == 0:
+        if tu.shape_is_fixed(input_shape):
+            model_name = "plan_nobatch_fixed_bf16"
+        else:
+            model_name = "plan_nobatch_dyna_bf16"
+    else:
+        if tu.shape_is_fixed(input_shape):
+            model_name = "plan_fixed_bf16"
+        else:
+            model_name = "plan_dyna_bf16"
+    config_dir = models_dir + "/" + model_name
+    version_policy_str = "{ latest { num_versions: 1 }}"
+
+    config = """
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+version_policy: {}
+input [
+  {{
+    name: "INPUT0"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "INPUT1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT0"
+    data_type: {}
+    dims: [ {} ]
+   }},
+  {{
+    name: "OUTPUT1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+instance_group [
+  {{
+      profile:"{}"
+  }}
+]
+""".format(
+        model_name,
+        max_batch,
+        version_policy_str,
+        "TYPE_BF16",
+        tu.shape_to_dims_str(input_shape),
+        "TYPE_BF16",
+        tu.shape_to_dims_str(input_shape),
+        "TYPE_BF16",
+        tu.shape_to_dims_str(output_shape),
+        "TYPE_BF16",
+        tu.shape_to_dims_str(output_shape),
+        profile_index,
+    )
+    os.makedirs(name=config_dir, exist_ok=True)
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
 
 
 def create_onnx_modelfile(
@@ -2432,6 +2598,12 @@ if __name__ == "__main__":
         help="Generate TensorRT PLAN models",
     )
     parser.add_argument(
+        "--tensorrt-bf16",
+        required=False,
+        action="store_true",
+        help="Generate TensorRT BF16 datatype PLAN models",
+    )
+    parser.add_argument(
         "--onnx",
         required=False,
         action="store_true",
@@ -2477,7 +2649,7 @@ if __name__ == "__main__":
         from tensorflow.python.framework import graph_io
 
         tf.compat.v1.disable_eager_execution()
-    if FLAGS.tensorrt:
+    if FLAGS.tensorrt or FLAGS.tensorrt_bf16:
         import tensorrt as trt
     if FLAGS.onnx:
         import onnx
@@ -2853,6 +3025,24 @@ if __name__ == "__main__":
             (-1, 8, -1),
             32,
         )
+
+    if FLAGS.tensorrt_bf16:
+        if os.getenv("GPU_MODEL") == "A100":
+            create_plan_bf16_modelconfig(FLAGS.models_dir, 8, [-1, -1], [-1, -1])
+            create_plan_bf16_modelfile(FLAGS.models_dir, 8, [-1, -1], 1, 4)
+
+            create_plan_bf16_modelconfig(FLAGS.models_dir, 0, [-1, -1], [-1, -1])
+            create_plan_bf16_modelfile(FLAGS.models_dir, 0, [-1, -1], 1, 4)
+
+            create_plan_bf16_modelconfig(FLAGS.models_dir, 8, [4, 4], [4, 4])
+            create_plan_bf16_modelfile(FLAGS.models_dir, 8, [4, 4])
+
+            create_plan_bf16_modelconfig(FLAGS.models_dir, 0, [4, 4], [4, 4])
+            create_plan_bf16_modelfile(FLAGS.models_dir, 0, [4, 4])
+        else:
+            print(
+                "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+            )
 
     if FLAGS.ensemble:
         # Create utility models used in ensemble
