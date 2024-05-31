@@ -123,7 +123,7 @@ EOL
 
 cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
 
-SERVER_ARGS="--model-repository=`pwd`/models  --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
