@@ -208,46 +208,6 @@ class LifecycleTest(unittest.TestCase):
                         False, "Wrong exception raised or did not raise an exception"
                     )
 
-    @unittest.skip("Defer response sending test to response_sender tests")
-    def test_incorrect_execute_return(self):
-        model_name = "execute_return_error"
-        shape = [1, 1]
-        with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient(
-                f"{_tritonserver_ipaddr}:8000"
-            ) as client:
-                input_data = (5 * np.random.randn(*shape)).astype(np.float32)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                    )
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-
-                # The first request to this model will return None.
-                with self.assertRaises(InferenceServerException) as e:
-                    client.infer(model_name, inputs)
-
-                self.assertTrue(
-                    "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0_0', message: Expected a list in the "
-                    "execute return" in str(e.exception),
-                    "Exception message is not correct.",
-                )
-
-                # The second inference request will return a list of None object
-                # instead of Python InferenceResponse objects.
-                with self.assertRaises(InferenceServerException) as e:
-                    client.infer(model_name, inputs)
-
-                self.assertTrue(
-                    "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0_0', message: Expected an "
-                    "'InferenceResponse' object in the execute function return"
-                    " list" in str(e.exception),
-                    "Exception message is not correct.",
-                )
-
 
 if __name__ == "__main__":
     unittest.main()
