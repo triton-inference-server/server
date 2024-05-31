@@ -39,7 +39,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 MODELDIR=`pwd`/models
-DATADIR=/data/inferenceserver/24.05dev/qa_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
