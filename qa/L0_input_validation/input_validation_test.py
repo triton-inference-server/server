@@ -31,9 +31,10 @@ sys.path.append("../common")
 
 import unittest
 
+import infer_util as iu
 import numpy as np
 import tritonclient.grpc as tritongrpcclient
-from tritonclient.utils import InferenceServerException
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 
 class InputValTest(unittest.TestCase):
@@ -111,6 +112,105 @@ class InputValTest(unittest.TestCase):
         )
         response = result.get_response()
         self.assertIn(str(response.outputs[0].name), "OUTPUT0")
+
+
+class InputShapeTest(unittest.TestCase):
+    def test_input_shape_validation(self):
+        input_size = 8
+        model_name = "pt_identity"
+        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+
+        # Pass
+        input_data = np.arange(input_size)[None].astype(np.float32)
+        inputs = [
+            tritongrpcclient.InferInput(
+                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        triton_client.infer(model_name=model_name, inputs=inputs)
+
+        # Larger input byte size than expected
+        input_data = np.arange(input_size + 2)[None].astype(np.float32)
+        inputs = [
+            tritongrpcclient.InferInput(
+                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        # Compromised input shape
+        inputs[0].set_shape((1, input_size))
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(
+                model_name=model_name,
+                inputs=inputs,
+            )
+        err_str = str(e.exception)
+        self.assertIn(
+            "input byte size mismatch for input 'INPUT0' for model 'pt_identity'. Expected 32, got 40",
+            err_str,
+        )
+
+    def test_input_string_shape_validation(self):
+        input_size = 16
+        model_name = "graphdef_object_int32_int32"
+        np_dtype_string = np.dtype(object)
+        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+
+        def get_input_array(input_size, np_dtype):
+            rinput_dtype = iu._range_repr_dtype(np_dtype)
+            input_array = np.random.randint(
+                low=0, high=127, size=(1, input_size), dtype=rinput_dtype
+            )
+
+            # Convert to string type
+            inn = np.array(
+                [str(x) for x in input_array.reshape(input_array.size)], dtype=object
+            )
+            input_array = inn.reshape(input_array.shape)
+
+            inputs = []
+            inputs.append(
+                tritongrpcclient.InferInput(
+                    "INPUT0", input_array.shape, np_to_triton_dtype(np_dtype)
+                )
+            )
+            inputs.append(
+                tritongrpcclient.InferInput(
+                    "INPUT1", input_array.shape, np_to_triton_dtype(np_dtype)
+                )
+            )
+
+            inputs[0].set_data_from_numpy(input_array)
+            inputs[1].set_data_from_numpy(input_array)
+            return inputs
+
+        # Input size is less than expected
+        inputs = get_input_array(input_size - 2, np_dtype_string)
+        # Compromised input shape
+        inputs[0].set_shape((1, input_size))
+        inputs[1].set_shape((1, input_size))
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(model_name=model_name, inputs=inputs)
+        err_str = str(e.exception)
+        self.assertIn(
+            f"expected {input_size} strings for inference input 'INPUT1', got {input_size-2}",
+            err_str,
+        )
+
+        # Input size is greater than expected
+        inputs = get_input_array(input_size + 2, np_dtype_string)
+        # Compromised input shape
+        inputs[0].set_shape((1, input_size))
+        inputs[1].set_shape((1, input_size))
+        with self.assertRaises(InferenceServerException) as e:
+            triton_client.infer(model_name=model_name, inputs=inputs)
+        err_str = str(e.exception)
+        self.assertIn(
+            # Core will throw exception as soon as reading the "input_size+1"th byte.
+            f"unexpected number of string elements {input_size+1} for inference input 'INPUT1', expecting {input_size}",
+            err_str,
+        )
 
 
 if __name__ == "__main__":

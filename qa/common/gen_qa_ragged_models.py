@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -154,9 +154,7 @@ def create_plan_modelfile(models_dir, model_version, dtype):
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-    )
+    network = builder.create_network()
     trt_dtype = np_to_trt_dtype(dtype)
 
     in_node = network.add_input("RAGGED_INPUT", trt_dtype, [-1])
@@ -567,9 +565,7 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-    )
+    network = builder.create_network()
     trt_dtype = np_to_trt_dtype(dtype)
 
     in_node = network.add_input("RAGGED_INPUT", trt_dtype, [-1])

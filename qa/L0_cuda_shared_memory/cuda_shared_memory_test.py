@@ -283,7 +283,7 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         )
         if len(error_msg) > 0:
             self.assertIn(
-                "unexpected total byte size 128 for input 'INPUT1', expecting 64",
+                "input byte size mismatch for input 'INPUT1' for model 'simple'. Expected 64, got 128",
                 error_msg[-1],
             )
         shm_handles.append(shm_ip2_handle)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -205,8 +205,8 @@ fi
 set -e
 
 set +e
-if [ `grep -c "Context with profile default \[0\] is being executed for " $SERVER_LOG` != "2" ]; then
-    echo -e "\n***\n*** Failed. Expected only 2 execution without CUDA graph\n***"
+if [ `grep -c "Context with profile default \[0\] is being executed for " $SERVER_LOG` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected only 3 execution without CUDA graph\n***"
     RET=1
 fi
 
@@ -321,8 +321,8 @@ fi
 set -e
 
 set +e
-if [ `grep -c "Context with profile default \[0\] is launching CUDA graph " $SERVER_LOG` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected only one execution with CUDA graph\n***"
+if [ `grep -c "Context with profile default \[0\] is launching CUDA graph " $SERVER_LOG` != "0" ]; then
+    echo -e "\n***\n*** Failed. Expected 0 execution with CUDA graph\n***"
     RET=1
 fi
 

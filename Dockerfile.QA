@@ -154,11 +154,6 @@ RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
     cp -rf python/test/. qa/L0_python_api/.
 
-# caffe2plan will not exist if the build was done without TensorRT enabled
-RUN if [ -f bin/caffe2plan ]; then \
-       cp bin/caffe2plan qa/common/.; \
-    fi
-
 RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_simple_ensemble/models/simple/1/. && \
