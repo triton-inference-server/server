@@ -80,9 +80,9 @@ for FLAG in true false; do
 
     CUDNN_LOG="cuDNN is "
     if [ "$FLAG" == "true" ]; then
-        CUDNN_LOG+=enabled
-    else
         CUDNN_LOG+=disabled
+    else
+        CUDNN_LOG+=enabled
     fi
 
     if [ `grep -c "$CUDNN_LOG" $SERVER_LOG` != "3" ]; then
