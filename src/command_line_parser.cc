@@ -1110,7 +1110,8 @@ TritonServerParameters::BuildTritonServerOptions()
       "setting model namespacing");
   THROW_IF_ERR(
       ParseException,
-      TRITONSERVER_ServerOptionsSetPeerAccess(loptions, enable_peer_access_),
+      TRITONSERVER_ServerOptionsSetEnablePeerAccess(
+          loptions, enable_peer_access_),
       "setting peer access");
 
 #ifdef TRITON_ENABLE_LOGGING
