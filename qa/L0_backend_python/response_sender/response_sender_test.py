@@ -468,16 +468,12 @@ class ResponseSenderTest(unittest.TestCase):
         #       using `py_future.result()` with error hangs on exit.
 
     # Decoupled model return 1 response and send 1 response.
-    @unittest.skip("Response factory segmentation fault, see the TODO comment.")
     def test_decoupled_one_response_on_and_post_return(self):
         # Note: The returned response will send an error response and complete final
-        #       flag. The response sender is not yet closed due to the model is still
-        #       executing. Then, sending a response and final flag will make their way
-        #       to the frontend, but the request is completed at the frontend, so they
-        #       are not sent to the client.
-        # TODO: The error response will close the response factory, but not the response
-        #       sender, which enables the model to send response and final flag on the
-        #       deleted response factory and causes a segmentation fault.
+        #       flag, and close the response sender and factory. Then, sending a
+        #       response will raise an exception. Since the exception happens after the
+        #       model returns, it cannot be caught by the stub (i.e. in a daemon
+        #       thread), so nothing will happen.
         responses = self._infer(
             model_name="response_sender_decoupled",
             **self._inputs_parameters_one_response_on_and_post_return,
