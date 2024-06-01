@@ -820,6 +820,7 @@ def fastertransformer_cmake_args():
 
 def tensorrtllm_cmake_args(images):
     cargs = []
+    cargs.append(cmake_backend_enable("tensorrtllm","TRITON_BUILD", True))
     cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
