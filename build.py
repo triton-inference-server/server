@@ -76,7 +76,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "0.4.2",  # vLLM version
+        "0.4.3",  # vLLM version
     )
 }
 
