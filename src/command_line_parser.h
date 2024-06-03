@@ -125,6 +125,7 @@ struct TritonServerParameters {
 
   // Model repository manager configuration
   bool enable_model_namespacing_{false};
+  bool enable_peer_access_{true};
   std::set<std::string> model_repository_paths_{};
   TRITONSERVER_ModelControlMode control_mode_{TRITONSERVER_MODEL_CONTROL_NONE};
   std::set<std::string> startup_models_{};

@@ -373,7 +373,8 @@ enum TritonOptionId {
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
-  OPTION_MODEL_NAMESPACING
+  OPTION_MODEL_NAMESPACING,
+  OPTION_ENABLE_PEER_ACCESS
 };
 
 void
@@ -461,6 +462,13 @@ TritonParser::SetupOptions()
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
        "same name can be served if they are in different namespace."});
+  model_repo_options_.push_back(
+      {OPTION_ENABLE_PEER_ACCESS, "enable-peer-access", Option::ArgBool,
+       "Whether the server tries to enable peer access or not. Even when this "
+       "options is set to true,  "
+       "peer access could still be not enabled because the underlying system "
+       "doesn't support it."
+       " The server will log a warning in this case. Default is true."});
 
 #if defined(TRITON_ENABLE_HTTP)
   http_options_.push_back(
@@ -1100,6 +1108,11 @@ TritonServerParameters::BuildTritonServerOptions()
       TRITONSERVER_ServerOptionsSetModelNamespacing(
           loptions, enable_model_namespacing_),
       "setting model namespacing");
+  THROW_IF_ERR(
+      ParseException,
+      TRITONSERVER_ServerOptionsSetEnablePeerAccess(
+          loptions, enable_peer_access_),
+      "setting peer access");
 
 #ifdef TRITON_ENABLE_LOGGING
   TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file_.c_str());
@@ -1721,6 +1734,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_MODEL_NAMESPACING:
           lparams.enable_model_namespacing_ = ParseOption<bool>(optarg);
+          break;
+        case OPTION_ENABLE_PEER_ACCESS:
+          lparams.enable_peer_access_ = ParseOption<bool>(optarg);
           break;
       }
     }
