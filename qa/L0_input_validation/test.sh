@@ -64,7 +64,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY::InputValTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
@@ -96,9 +96,34 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Create the config.pbtxt file with the specified configuration
+cat > models/pt_identity/config.pbtxt << EOL
+name: "pt_identity"
+backend: "pytorch"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [8]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [8]
+  }
+]
+# ensure we batch requests together
+dynamic_batching {
+    max_queue_delay_microseconds: 1000000
+}
+EOL
+
 cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
 
-SERVER_ARGS="--model-repository=`pwd`/models  --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -107,7 +132,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $TEST_PY InputShapeTest >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="input_shape_validation.report.xml" $TEST_PY::InputShapeTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
