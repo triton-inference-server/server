@@ -41,7 +41,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 rm -rf ./models/ *.log* && mkdir ./models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_*_bf16 ./models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_*_bf16_bf16_bf16 ./models
 
 RET=0
 

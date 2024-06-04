@@ -77,24 +77,24 @@ class TrtBF16DataTypeTest(tu.TestResultCollector):
     def test_fixed(self):
         for bs in [1, 4, 8]:
             self._infer_helper(
-                "plan_fixed_bf16",
+                "plan_fixed_bf16_bf16_bf16",
                 [bs, 4, 4],
             )
 
         self._infer_helper(
-            "plan_nobatch_fixed_bf16",
+            "plan_nobatch_fixed_bf16_bf16_bf16",
             [4, 4],
         )
 
     def test_dynamic(self):
         for bs in [1, 4, 8]:
             self._infer_helper(
-                "plan_dyna_bf16",
+                "plan_dyna_bf16_bf16_bf16",
                 [bs, 4, 4],
             )
 
         self._infer_helper(
-            "plan_nobatch_dyna_bf16",
+            "plan_nobatch_dyna_bf16_bf16_bf16",
             [4, 4],
         )
 

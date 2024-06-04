@@ -38,6 +38,8 @@ from gen_common import (
     np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    trt_dtype_name,
+    trt_dtype_to_model_dtype,
 )
 
 FLAGS = None
@@ -469,9 +471,15 @@ def create_plan_dynamic_rf_modelfile(
     min_dim,
     max_dim,
 ):
-    trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
+    if input_dtype == trt.bfloat16:
+        trt_input_dtype = input_dtype
+        trt_output0_dtype = output0_dtype
+        trt_output1_dtype = output1_dtype
+    else:
+        trt_input_dtype = np_to_trt_dtype(input_dtype)
+        trt_output0_dtype = np_to_trt_dtype(output0_dtype)
+        trt_output1_dtype = np_to_trt_dtype(output1_dtype)
+
     trt_memory_format = trt.TensorFormat.LINEAR
 
     # Create the model
@@ -576,14 +584,22 @@ def create_plan_dynamic_rf_modelfile(
         del engine
 
     # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
-    if min_dim != 1 or max_dim != 32:
-        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+    if input_dtype == trt.bfloat16:
+        model_name = "{}_{}_{}_{}".format(
+            "plan_nobatch_dyna" if max_batch == 0 else "plan_dyna",
+            trt_dtype_name(input_dtype),
+            trt_dtype_name(output0_dtype),
+            trt_dtype_name(output1_dtype),
+        )
+    else:
+        model_name = tu.get_model_name(
+            "plan_nobatch" if max_batch == 0 else "plan",
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+        )
+        if min_dim != 1 or max_dim != 32:
+            model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -775,9 +791,15 @@ def create_plan_fixed_rf_modelfile(
     output1_dtype,
     swap,
 ):
-    trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
+    if input_dtype == trt.bfloat16:
+        trt_input_dtype = input_dtype
+        trt_output0_dtype = output0_dtype
+        trt_output1_dtype = output1_dtype
+    else:
+        trt_input_dtype = np_to_trt_dtype(input_dtype)
+        trt_output0_dtype = np_to_trt_dtype(output0_dtype)
+        trt_output1_dtype = np_to_trt_dtype(output1_dtype)
+
     trt_memory_format = trt.TensorFormat.LINEAR
 
     # Create the model
@@ -858,12 +880,20 @@ def create_plan_fixed_rf_modelfile(
         engine_bytes = engine.serialize()
         del engine
 
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
+    if input_dtype == trt.bfloat16:
+        model_name = "{}_{}_{}_{}".format(
+            "plan_nobatch_fixed" if max_batch == 0 else "plan_fixed",
+            trt_dtype_name(input_dtype),
+            trt_dtype_name(output0_dtype),
+            trt_dtype_name(output1_dtype),
+        )
+    else:
+        model_name = tu.get_model_name(
+            "plan_nobatch" if max_batch == 0 else "plan",
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+        )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -972,13 +1002,15 @@ def create_plan_modelfile(
     min_dim=1,
     max_dim=32,
 ):
-    if not tu.validate_for_trt_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
+    if (not input_dtype == trt.bfloat16) and (
+        not tu.validate_for_trt_model(
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+            input_shape,
+            output0_shape,
+            output1_shape,
+        )
     ):
         return
 
@@ -1076,103 +1108,6 @@ def create_plan_modelfile(
             )
 
 
-def create_plan_bf16_modelfile(
-    models_dir,
-    max_batch,
-    input_shape,
-    min_dim=None,
-    max_dim=None,
-    model_version=1,
-):
-    trt_memory_format = trt.TensorFormat.LINEAR
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network()
-
-    if max_batch == 0:
-        input_with_batchsize = input_shape
-    else:
-        input_with_batchsize = [-1] + input_shape
-
-    # Define input tensors
-    input0 = network.add_input("INPUT0", trt.bfloat16, input_with_batchsize)
-    input1 = network.add_input("INPUT1", trt.bfloat16, input_with_batchsize)
-
-    # Element-wise add, sub layers
-    add_layer = network.add_elementwise(input0, input1, trt.ElementWiseOperation.SUM)
-    sub_layer = network.add_elementwise(input0, input1, trt.ElementWiseOperation.SUB)
-
-    # Define output tensors
-    output0 = add_layer.get_output(0)
-    output0.name = "OUTPUT0"
-    output0.dtype = trt.bfloat16
-    network.mark_output(output0)
-
-    output1 = sub_layer.get_output(0)
-    output1.name = "OUTPUT1"
-    output1.dtype = trt.bfloat16
-    network.mark_output(output1)
-
-    input0.allowed_formats = 1 << int(trt_memory_format)
-    input1.allowed_formats = 1 << int(trt_memory_format)
-    output0.allowed_formats = 1 << int(trt_memory_format)
-    output1.allowed_formats = 1 << int(trt_memory_format)
-
-    min_shape = []
-    opt_shape = []
-    max_shape = []
-    if max_batch != 0:
-        min_shape = min_shape + [1]
-        opt_shape = opt_shape + [max(1, max_batch)]
-        max_shape = max_shape + [max(1, max_batch)]
-
-    for i in input_shape:
-        if i == -1:
-            min_shape = min_shape + [min_dim]
-            opt_shape = opt_shape + [int((max_dim + min_dim) / 2)]
-            max_shape = max_shape + [max_dim]
-        else:
-            min_shape = min_shape + [i]
-            opt_shape = opt_shape + [i]
-            max_shape = max_shape + [i]
-
-    profile = builder.create_optimization_profile()
-    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
-    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
-
-    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
-
-    config = builder.create_builder_config()
-    config.flags = flags
-    config.add_optimization_profile(profile)
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-
-    try:
-        engine_bytes = builder.build_serialized_network(network, config)
-    except AttributeError:
-        engine = builder.build_engine(network, config)
-        engine_bytes = engine.serialize()
-        del engine
-
-    if max_batch == 0:
-        if tu.shape_is_fixed(input_shape):
-            model_name = "plan_nobatch_fixed_bf16"
-        else:
-            model_name = "plan_nobatch_dyna_bf16"
-    else:
-        if tu.shape_is_fixed(input_shape):
-            model_name = "plan_fixed_bf16"
-        else:
-            model_name = "plan_dyna_bf16"
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-    os.makedirs(name=model_version_dir, exist_ok=True)
-
-    with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine_bytes)
-
-
 def create_plan_modelconfig(
     models_dir,
     max_batch,
@@ -1188,15 +1123,37 @@ def create_plan_modelconfig(
     min_dim=1,
     max_dim=32,
 ):
-    if not tu.validate_for_trt_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
-    ):
-        return
+    # Use a different model name for different kinds of models
+    if input_dtype == trt.bfloat16:
+        if tu.shape_is_fixed(input_shape):
+            model_name_base = "plan_nobatch_fixed" if max_batch == 0 else "plan_fixed"
+        else:
+            model_name_base = "plan_nobatch_dyna" if max_batch == 0 else "plan_dyna"
+        model_name = "{}_{}_{}_{}".format(
+            model_name_base,
+            trt_dtype_name(input_dtype),
+            trt_dtype_name(output0_dtype),
+            trt_dtype_name(output1_dtype),
+        )
+    else:
+        if not tu.validate_for_trt_model(
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+            input_shape,
+            output0_shape,
+            output1_shape,
+        ):
+            return
+
+        model_name = tu.get_model_name(
+            "plan_nobatch" if max_batch == 0 else "plan",
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+        )
+        if min_dim != 1 or max_dim != 32:
+            model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"
@@ -1208,16 +1165,6 @@ def create_plan_modelconfig(
             version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
         else:
             version_policy_str = "{ all { }}"
-
-    # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
-    if min_dim != 1 or max_dim != 32:
-        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
     config_dir = models_dir + "/" + model_name
     if -1 in input_shape:
@@ -1264,13 +1211,29 @@ instance_group [
             model_name,
             max_batch,
             version_policy_str,
-            np_to_model_dtype(input_dtype),
+            (
+                trt_dtype_to_model_dtype(input_dtype)
+                if input_dtype == trt.bfloat16
+                else np_to_model_dtype(input_dtype)
+            ),
             tu.shape_to_dims_str(input_shape),
-            np_to_model_dtype(input_dtype),
+            (
+                trt_dtype_to_model_dtype(input_dtype)
+                if input_dtype == trt.bfloat16
+                else np_to_model_dtype(input_dtype)
+            ),
             tu.shape_to_dims_str(input_shape),
-            np_to_model_dtype(output0_dtype),
+            (
+                trt_dtype_to_model_dtype(output0_dtype)
+                if output0_dtype == trt.bfloat16
+                else np_to_model_dtype(output0_dtype)
+            ),
             tu.shape_to_dims_str(output0_shape),
-            np_to_model_dtype(output1_dtype),
+            (
+                trt_dtype_to_model_dtype(output1_dtype)
+                if output1_dtype == trt.bfloat16
+                else np_to_model_dtype(output1_dtype)
+            ),
             tu.shape_to_dims_str(output1_shape),
             profile_index,
         )
@@ -1309,13 +1272,29 @@ output [
             model_name,
             max_batch,
             version_policy_str,
-            np_to_model_dtype(input_dtype),
+            (
+                trt_dtype_to_model_dtype(input_dtype)
+                if input_dtype == trt.bfloat16
+                else np_to_model_dtype(input_dtype)
+            ),
             tu.shape_to_dims_str(input_shape),
-            np_to_model_dtype(input_dtype),
+            (
+                trt_dtype_to_model_dtype(input_dtype)
+                if input_dtype == trt.bfloat16
+                else np_to_model_dtype(input_dtype)
+            ),
             tu.shape_to_dims_str(input_shape),
-            np_to_model_dtype(output0_dtype),
+            (
+                trt_dtype_to_model_dtype(output0_dtype)
+                if output0_dtype == trt.bfloat16
+                else np_to_model_dtype(output0_dtype)
+            ),
             tu.shape_to_dims_str(output0_shape),
-            np_to_model_dtype(output1_dtype),
+            (
+                trt_dtype_to_model_dtype(output1_dtype)
+                if output1_dtype == trt.bfloat16
+                else np_to_model_dtype(output1_dtype)
+            ),
             tu.shape_to_dims_str(output1_shape),
         )
 
@@ -1330,75 +1309,6 @@ output [
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
         for l in range(output0_label_cnt):
             lfile.write("label" + str(l) + "\n")
-
-
-def create_plan_bf16_modelconfig(
-    models_dir, max_batch, input_shape, output_shape, profile_index=0
-):
-    if max_batch == 0:
-        if tu.shape_is_fixed(input_shape):
-            model_name = "plan_nobatch_fixed_bf16"
-        else:
-            model_name = "plan_nobatch_dyna_bf16"
-    else:
-        if tu.shape_is_fixed(input_shape):
-            model_name = "plan_fixed_bf16"
-        else:
-            model_name = "plan_dyna_bf16"
-    config_dir = models_dir + "/" + model_name
-    version_policy_str = "{ latest { num_versions: 1 }}"
-
-    config = """
-name: "{}"
-platform: "tensorrt_plan"
-max_batch_size: {}
-version_policy: {}
-input [
-  {{
-    name: "INPUT0"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT1"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT0"
-    data_type: {}
-    dims: [ {} ]
-   }},
-  {{
-    name: "OUTPUT1"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-instance_group [
-  {{
-      profile:"{}"
-  }}
-]
-""".format(
-        model_name,
-        max_batch,
-        version_policy_str,
-        "TYPE_BF16",
-        tu.shape_to_dims_str(input_shape),
-        "TYPE_BF16",
-        tu.shape_to_dims_str(input_shape),
-        "TYPE_BF16",
-        tu.shape_to_dims_str(output_shape),
-        "TYPE_BF16",
-        tu.shape_to_dims_str(output_shape),
-        profile_index,
-    )
-    os.makedirs(name=config_dir, exist_ok=True)
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
 
 
 def create_onnx_modelfile(
@@ -3028,17 +2938,105 @@ if __name__ == "__main__":
 
     if FLAGS.tensorrt_bf16:
         if os.getenv("GPU_MODEL") == "A100":
-            create_plan_bf16_modelconfig(FLAGS.models_dir, 8, [-1, -1], [-1, -1])
-            create_plan_bf16_modelfile(FLAGS.models_dir, 8, [-1, -1], 1, 4)
+            # Dynamic shape
+            create_plan_modelconfig(
+                FLAGS.models_dir,
+                8,
+                1,
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+                0,
+                None,
+            )
+            create_plan_modelfile(
+                FLAGS.models_dir,
+                8,
+                1,
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+            )
+            create_plan_modelconfig(
+                FLAGS.models_dir,
+                0,
+                1,
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+                0,
+                None,
+            )
+            create_plan_modelfile(
+                FLAGS.models_dir,
+                0,
+                1,
+                [-1, -1],
+                [-1, -1],
+                [-1, -1],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+            )
 
-            create_plan_bf16_modelconfig(FLAGS.models_dir, 0, [-1, -1], [-1, -1])
-            create_plan_bf16_modelfile(FLAGS.models_dir, 0, [-1, -1], 1, 4)
-
-            create_plan_bf16_modelconfig(FLAGS.models_dir, 8, [4, 4], [4, 4])
-            create_plan_bf16_modelfile(FLAGS.models_dir, 8, [4, 4])
-
-            create_plan_bf16_modelconfig(FLAGS.models_dir, 0, [4, 4], [4, 4])
-            create_plan_bf16_modelfile(FLAGS.models_dir, 0, [4, 4])
+            # Fixed shape
+            create_plan_modelconfig(
+                FLAGS.models_dir,
+                8,
+                1,
+                [4, 4],
+                [4, 4],
+                [4, 4],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+                0,
+                None,
+            )
+            create_plan_modelfile(
+                FLAGS.models_dir,
+                8,
+                1,
+                [4, 4],
+                [4, 4],
+                [4, 4],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+            )
+            create_plan_modelconfig(
+                FLAGS.models_dir,
+                0,
+                1,
+                [4, 4],
+                [4, 4],
+                [4, 4],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+                0,
+                None,
+            )
+            create_plan_modelfile(
+                FLAGS.models_dir,
+                0,
+                1,
+                [4, 4],
+                [4, 4],
+                [4, 4],
+                trt.bfloat16,
+                trt.bfloat16,
+                trt.bfloat16,
+            )
         else:
             print(
                 "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
