@@ -159,6 +159,7 @@ def np_to_torch_dtype(np_dtype):
         return List[str]
     return None
 
+
 def trt_dtype_name(trt_dtype):
     import tensorrt as trt
 
@@ -179,6 +180,7 @@ def trt_dtype_name(trt_dtype):
     elif trt_dtype == trt.bfloat16:
         return "bf16"
     return None
+
 
 def trt_dtype_to_model_dtype(trt_dtype):
     import tensorrt as trt
