@@ -1143,12 +1143,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV UCX_MEM_EVENTS no
 """
 
-    # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
-    if "onnxruntime" in backends:
-        df += """
-ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
-"""
-
     # Necessary for libtorch.so to find correct HPCX libraries
     if "pytorch" in backends:
         df += """
