@@ -111,7 +111,7 @@ RET=0
 #done
 
 #
-# gRPC cancellation stress test
+# gRPC cancellation on step START test
 #
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
@@ -127,6 +127,87 @@ TEST_LOG="./grpc_cancellation_stress_test.log"
 SERVER_LOG="grpc_cancellation_stress_test.server.log"
 
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+export TRITONSERVER_DELAY_GRPC_PROCESS=10000
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+INIT_NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
+
+set +e
+while true; do
+    python3 -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1
+    sleep 30
+    CANCEL_AT_START_COUNT=$(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step START' $SERVER_LOG)
+    if [[ $CANCEL_AT_START_COUNT == 0 ]]; then
+        INIT_NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
+        continue
+    fi
+    NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
+    if [[ $NEW_REQ_HANDL_COUNT == $INIT_NEW_REQ_HANDL_COUNT ]]; then
+        echo -e "\n***\n*** gRPC Cancellation on step START Test Failed: New request handler for ModelInferHandler was not created \n***"
+        cat $TEST_LOG
+        RET=1
+        break
+    else
+        break
+    fi
+done
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+unset TRITONSERVER_DELAY_GRPC_PROCESS
+#
+# End-to-end scheduler tests
+
+rm -rf models && mkdir models
+mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
+    echo 'name: "dynamic_batch"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 2' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'dynamic_batching { max_queue_delay_microseconds: 600000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/sequence_direct/1 && (cd models/sequence_direct && \
+    echo 'name: "sequence_direct"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'sequence_batching { direct { } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
+    echo 'name: "sequence_oldest"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
+    echo 'name: "ensemble_model"' >> config.pbtxt && \
+    echo 'platform: "ensemble"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'ensemble_scheduling { step [' >> config.pbtxt && \
+    echo -e '{ model_name: "dynamic_batch" \n model_version: -1 \n input_map { key: "INPUT0" \n value: "INPUT0" } \n output_map { key: "OUTPUT0" \n value: "out" } },' >> config.pbtxt && \
+    echo -e '{ model_name: "dynamic_batch" \n model_version: -1 \n input_map { key: "INPUT0" \n value: "out" } \n output_map { key: "OUTPUT0" \n value: "OUTPUT0" } }' >> config.pbtxt && \
+    echo '] }' >> config.pbtxt)
+
+TEST_LOG="scheduler_test.log"
+SERVER_LOG="./scheduler_test.server.log"
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -135,141 +216,46 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1 &
-PYTHON_CLIENT_PID=$!
-PREV_NEW_REQ_HANDL_COUNT=-1
-NUMBER_RUNS=10
-while true; do
-    if ps -p $PYTHON_CLIENT_PID > /dev/null; then
-        echo "Python process stopped. Restarting..."
-        python -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1 &
-        PYTHON_CLIENT_PID=$!
-        (( NUMBER_RUNS -= 1 ))
-    fi
-    CUR_NEW_REQ_HANDL_COUNT=$(cat $SERVER_LOG | grep -c "New request handler for ModelStreamInferHandler")
-    echo $CUR_NEW_REQ_HANDL_COUNT
-    sleep 1
-    if [[ $CUR_NEW_REQ_HANDL_COUNT -gt $PREV_NEW_REQ_HANDL_COUNT ]]; then
-        # Update the previous count
-        PREV_NEW_REQ_HANDL_COUNT=$CUR_NEW_REQ_HANDL_COUNT
-    else
-        # Kill the Python process if the count hasn't increased
-        kill $PYTHON_CLIENT_PID
-        wait $PYTHON_CLIENT_PID
-        echo "Python process killed. Final 'New request handler' count: $CUR_NEW_REQ_HANDL_COUNT"
-        echo "Cancellation notification received count: $(grep -c 'Cancellation notification received for ModelStreamInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step' $SERVER_LOG)"
-        echo "Cancellation notification received for START count: $(grep -c 'Cancellation notification received for ModelStreamInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step START' $SERVER_LOG)"
-        RET=1
-        break
-    fi
-    if [ "$NUMBER_RUNS" -le 0 ]; then
-        kill $PYTHON_CLIENT_PID
-        wait $PYTHON_CLIENT_PID
-        echo "Python process killed. Final 'New request handler' count: $CUR_NEW_REQ_HANDL_COUNT"
-        echo "Cancellation notification received count: $(grep -c 'Cancellation notification received for ModelStreamInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step' $SERVER_LOG)"
-        echo "Cancellation notification received for START count: $(grep -c 'Cancellation notification received for ModelStreamInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step START' $SERVER_LOG)"
-        break
-    fi
-    sleep 20
-done
-
+python scheduler_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Scheduler Tests Failed\n***"
+    cat $TEST_LOG
+    RET=1
+fi
 set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
-#
-# End-to-end scheduler tests
+##
+## Implicit state tests
+##
+rm -rf models && mkdir models
+mkdir -p models/sequence_state/1 && (cd models/sequence_state && \
+    cp ../../implicit_state_model/config.pbtxt . && \
+    cp ../../implicit_state_model/model.pt 1)
 
-#rm -rf models && mkdir models
-#mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
-#    echo 'name: "dynamic_batch"' >> config.pbtxt && \
-#    echo 'backend: "identity"' >> config.pbtxt && \
-#    echo 'max_batch_size: 2' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-#    echo -e 'dynamic_batching { max_queue_delay_microseconds: 600000 }' >> config.pbtxt && \
-#    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
-#mkdir -p models/sequence_direct/1 && (cd models/sequence_direct && \
-#    echo 'name: "sequence_direct"' >> config.pbtxt && \
-#    echo 'backend: "identity"' >> config.pbtxt && \
-#    echo 'max_batch_size: 1' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-#    echo -e 'sequence_batching { direct { } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
-#    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
-#mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
-#    echo 'name: "sequence_oldest"' >> config.pbtxt && \
-#    echo 'backend: "identity"' >> config.pbtxt && \
-#    echo 'max_batch_size: 1' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-#    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
-#    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
-#mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
-#    echo 'name: "ensemble_model"' >> config.pbtxt && \
-#    echo 'platform: "ensemble"' >> config.pbtxt && \
-#    echo 'max_batch_size: 1' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo 'ensemble_scheduling { step [' >> config.pbtxt && \
-#    echo -e '{ model_name: "dynamic_batch" \n model_version: -1 \n input_map { key: "INPUT0" \n value: "INPUT0" } \n output_map { key: "OUTPUT0" \n value: "out" } },' >> config.pbtxt && \
-#    echo -e '{ model_name: "dynamic_batch" \n model_version: -1 \n input_map { key: "INPUT0" \n value: "out" } \n output_map { key: "OUTPUT0" \n value: "OUTPUT0" } }' >> config.pbtxt && \
-#    echo '] }' >> config.pbtxt)
-#
-#TEST_LOG="scheduler_test.log"
-#SERVER_LOG="./scheduler_test.server.log"
-#
-#SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
-#run_server
-#if [ "$SERVER_PID" == "0" ]; then
-#    echo -e "\n***\n*** Failed to start $SERVER\n***"
-#    cat $SERVER_LOG
-#    exit 1
-#fi
-#
-#set +e
-#python scheduler_test.py > $TEST_LOG 2>&1
-#if [ $? -ne 0 ]; then
-#    echo -e "\n***\n*** Scheduler Tests Failed\n***"
-#    cat $TEST_LOG
-#    RET=1
-#fi
-#set -e
-#
-#kill $SERVER_PID
-#wait $SERVER_PID
-#
-# Implicit state tests
-#
-#rm -rf models && mkdir models
-#mkdir -p models/sequence_state/1 && (cd models/sequence_state && \
-#    cp ../../implicit_state_model/config.pbtxt . && \
-#    cp ../../implicit_state_model/model.pt 1)
-#
-#TEST_LOG="implicit_state_test.log"
-#SERVER_LOG="implicit_state_test.server.log"
-#
-#SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-#run_server
-#if [ "$SERVER_PID" == "0" ]; then
-#    echo -e "\n***\n*** Failed to start $SERVER\n***"
-#    cat $SERVER_LOG
-#    exit 1
-#fi
-#
-#set +e
-#SERVER_LOG=$SERVER_LOG python implicit_state_test.py > $TEST_LOG 2>&1
-#if [ $? -ne 0 ]; then
-#    echo -e "\n***\n*** Implicit State Tests Failed\n***"
-#    cat $TEST_LOG
-#    RET=1
-#fi
-#set -e
-#
-#kill $SERVER_PID
-#wait $SERVER_PID
+TEST_LOG="implicit_state_test.log"
+SERVER_LOG="implicit_state_test.server.log"
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_LOG=$SERVER_LOG python implicit_state_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Implicit State Tests Failed\n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
