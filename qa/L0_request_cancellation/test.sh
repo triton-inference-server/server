@@ -65,9 +65,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-#
-# gRPC cancellation tests
-#
+##
+## gRPC cancellation tests
+##
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'name: "custom_identity_int32"' >> config.pbtxt && \
@@ -111,8 +111,74 @@ for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc
 done
 
 #
-# End-to-end scheduler tests
+# gRPC cancellation stress test
 #
+rm -rf models && mkdir models
+mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }]' >> config.pbtxt)
+
+TEST_LOG="./grpc_cancellation_stress_test.log"
+SERVER_LOG="grpc_cancellation_stress_test.server.log"
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1 &
+PYTHON_CLIENT_PID=$!
+PREV_NEW_REQ_HANDL_COUNT=-1
+NUMBER_RUNS=10
+while true; do
+    if ps -p $PYTHON_CLIENT_PID > /dev/null; then
+        echo "Python process stopped. Restarting..."
+        python -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1 &
+        PYTHON_CLIENT_PID=$!
+        (( NUMBER_RUNS -= 1 ))
+    fi
+    CUR_NEW_REQ_HANDL_COUNT=$(cat $SERVER_LOG | grep -c "New request handler for ModelInferHandler")
+    echo $CUR_NEW_REQ_HANDL_COUNT
+    sleep 1
+    if [[ $CUR_NEW_REQ_HANDL_COUNT -gt $PREV_NEW_REQ_HANDL_COUNT ]]; then
+        # Update the previous count
+        PREV_NEW_REQ_HANDL_COUNT=$CUR_NEW_REQ_HANDL_COUNT
+    else
+        # Kill the Python process if the count hasn't increased
+        kill $PYTHON_CLIENT_PID
+        wait $PYTHON_CLIENT_PID
+        echo "Python process killed. Final 'New request handler' count: $CUR_NEW_REQ_HANDL_COUNT"
+        echo "Cancellation notification received count: $(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context 0, [0-9]* step' $SERVER_LOG)"
+        echo "Cancellation notification received for START count: $(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context 0, [0-9]* step START' $SERVER_LOG)"
+        RET=1
+        break
+    fi
+    if [ "$NUMBER_RUNS" -le 0 ]; then
+        kill $PYTHON_CLIENT_PID
+        wait $PYTHON_CLIENT_PID
+        echo "Python process killed. Final 'New request handler' count: $CUR_NEW_REQ_HANDL_COUNT"
+        echo "Cancellation notification received count: $(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context 0, [0-9]* step' $SERVER_LOG)"
+        echo "Cancellation notification received for START count: $(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context 0, [0-9]* step START' $SERVER_LOG)"
+        break
+    fi
+    sleep 20
+done
+
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+#
+# End-to-end scheduler tests
+
 rm -rf models && mkdir models
 mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
     echo 'name: "dynamic_batch"' >> config.pbtxt && \
@@ -174,7 +240,6 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-
 #
 # Implicit state tests
 #

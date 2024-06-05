@@ -50,6 +50,29 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
+def prepare_inputs_outputs():
+    inputs, outputs = [], []
+    inputs.append(grpcclient.InferInput("INPUT0", [1, 1], "INT32"))
+    outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
+    inputs[0].set_data_from_numpy(np.array([[5]], dtype=np.int32))
+    return inputs, outputs
+
+
+def grpc_async_infer_request_with_instant_cancellation(model_name):
+    inputs_, outputs_ = prepare_inputs_outputs()
+    user_data = UserData()
+    with grpcclient.InferenceServerClient(url="localhost:8001") as client:
+        t_end = time.time() + 60
+        while time.time() < t_end:
+            future = client.async_infer(
+                model_name=model_name,
+                inputs=inputs_,
+                callback=partial(callback, user_data),
+                outputs=outputs_,
+            )
+            future.cancel()
+
+
 class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
     _model_name = "custom_identity_int32"
     _model_delay = 10.0  # seconds
@@ -68,11 +91,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         self._assert_max_duration()
 
     def _prepare_request(self):
-        self._inputs = []
-        self._inputs.append(grpcclient.InferInput("INPUT0", [1, 1], "INT32"))
-        self._outputs = []
-        self._outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
-        self._inputs[0].set_data_from_numpy(np.array([[10]], dtype=np.int32))
+        self._inputs, self._outputs = prepare_inputs_outputs()
 
     def _assert_max_duration(self):
         max_duration = self._model_delay * 0.5  # seconds
