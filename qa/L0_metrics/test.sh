@@ -143,11 +143,11 @@ set -e
 # Peer access GPU memory utilization Test
 # Custom Pinned memory pool size
 export CUSTOM_PINNED_MEMORY_POOL_SIZE=0 # bytes
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1,2
 SERVER_LOG="gpu_peer_memory_test_server.log"
 CLIENT_LOG="gpu_peer_memory_test_client.log"
 
-SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE --enable-peer-access=FALSE --cuda-memory-pool-byte-size 0:0 --log-verbose=1"
+SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE --enable-peer-access=FALSE --cuda-memory-pool-byte-size 0:0 1:0 2:0 --log-verbose=1"
 run_and_check_server
 #grep usage stats for triton server from nvidia-smi
 memory_size_without_peering=$(nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits | grep $(pgrep tritonserver) | awk '{print $3}')
