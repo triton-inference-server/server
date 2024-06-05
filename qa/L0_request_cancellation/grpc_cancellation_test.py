@@ -64,13 +64,8 @@ def grpc_async_infer_request_with_instant_cancellation(model_name):
     with grpcclient.InferenceServerClient(url="localhost:8001") as client:
         t_end = time.time() + 60
         while time.time() < t_end:
-            future = client.async_infer(
-                model_name=model_name,
-                inputs=inputs_,
-                callback=partial(callback, user_data),
-                outputs=outputs_,
-            )
-            future.cancel()
+            client.start_stream(callback=partial(callback, user_data))
+            client.stop_stream(cancel_requests=True)
 
 
 class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
