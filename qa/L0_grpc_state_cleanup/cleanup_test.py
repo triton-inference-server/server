@@ -70,7 +70,7 @@ class CleanUpTest(tu.TestResultCollector):
         self.repeat_non_decoupled_model_name = "repeat_int32_non_decoupled"
 
     def _prepare_inputs_and_outputs(self, kind):
-        if kind == "decoupled_streaming" or kind == "non_decoupled_streaming":
+        if kind in ("decoupled_streaming", "non_decoupled_streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("IN", [1], "INT32"))
             self.inputs_.append(grpcclient.InferInput("DELAY", [1], "UINT32"))
@@ -80,7 +80,7 @@ class CleanUpTest(tu.TestResultCollector):
             self.outputs_.append(grpcclient.InferRequestedOutput("OUT"))
             self.outputs_.append(grpcclient.InferRequestedOutput("IDX"))
             self.requested_outputs_ = self.outputs_
-        elif kind == "simple" or kind == "streaming":
+        elif kind in ("simple", "streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("INPUT0", [1, 1], "FP32"))
 
