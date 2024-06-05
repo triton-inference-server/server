@@ -208,7 +208,7 @@ class InputShapeTest(unittest.TestCase):
         err_str = str(e.exception)
         self.assertIn(
             # Core will return an error if it found more elements than expected within the provided buffers.
-            f"unexpected number of string elements {input_size+2} for inference input 'INPUT1', expecting {input_size}",
+            f"expected {input_size} strings for inference input 'INPUT1', got {input_size+2}",
             err_str,
         )
 
