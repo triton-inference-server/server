@@ -694,6 +694,16 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // Handle notification for cancellation which can be raised
   // asynchronously if detected on the network.
   if (state->IsGrpcContextCancelled()) {
+    if (rpc_ok && (state->step_ == Steps::START) &&
+        (state->context_->step_ != Steps::CANCELLED)) {
+#ifdef TRITON_ENABLE_TRACING
+      // Can't create trace as we don't know the model to be requested,
+      // track timestamps in 'state'
+      state->trace_timestamps_.emplace_back(std::make_pair(
+          "GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+      StartNewRequest();
+    }
     bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
     return resume;
   }
