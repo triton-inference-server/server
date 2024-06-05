@@ -125,7 +125,7 @@ apt-get install -y --no-install-recommends \
             jq
 
 pip3 install --upgrade wheel setuptools cython && \
-    pip3 install --upgrade grpcio-tools numpy attrdict pillow
+    pip3 install --upgrade grpcio-tools "numpy<2" attrdict pillow
 ```
 
 **Note**: OpenCV 4.2.0 is installed as a part of JetPack. It is one of the dependencies for the client build.
@@ -175,7 +175,7 @@ apt-get update && \
         jq
 
 pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools numpy attrdict pillow
+    pip3 install --upgrade grpcio-tools "numpy<2" attrdict pillow
 ```
 
 The PyTorch runtime dependencies are the same as the build dependencies listed above.
