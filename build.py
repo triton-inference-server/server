@@ -819,21 +819,7 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
-    cmake_script.cmd("apt-get update && apt-get install -y libcudnn8-dev && ldconfig")
-    cmake_script.cmd(
-        "python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt"
-    )
-    cargs = [
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TRT_LIB_DIR",
-            None,
-            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
-        ),
-        cmake_backend_arg(
-            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
-        ),
-    ]
+    cargs = []
     cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
@@ -1108,14 +1094,7 @@ RUN ARCH="$(uname -i)" \\
 RUN python3 -m pip install --upgrade pip \\
       && pip3 install transformers
 
-# Drop the static libs
-RUN ARCH="$(uname -i)" \\
-      && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
-          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
-
 # Install TensorRT-LLM
-RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
-        && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
 RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
 RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
 
@@ -1141,12 +1120,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 # Remove once https://github.com/openucx/ucx/pull/9148 is available
 # in the min container.
 ENV UCX_MEM_EVENTS no
-"""
-
-    # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
-    if "onnxruntime" in backends:
-        df += """
-ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 """
 
     # Necessary for libtorch.so to find correct HPCX libraries
@@ -1729,11 +1702,6 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
     # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
     cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
     cmake_script.mkdir(cmake_destination_dir)
-    # Copy over the TRT-LLM wheel for later installation
-    cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "tensorrt_llm", "build", "tensorrt_llm-*.whl"),
-        cmake_destination_dir,
-    )
 
     # Copy over the TRT-LLM backend libraries
     cmake_script.cp(
