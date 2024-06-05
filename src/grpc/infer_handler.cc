@@ -691,6 +691,16 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // Need to protect the state transitions for these cases.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
+  if (state->delay_process_ms_ != 0) {
+    // Will delay the write of the response by the specified time.
+    // This can be used to test the flow where there are other
+    // responses available to be written.
+    LOG_INFO << "Delaying the write of the response by "
+             << state->delay_process_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_process_ms_));
+  }
+
   // Handle notification for cancellation which can be raised
   // asynchronously if detected on the network.
   if (state->IsGrpcContextCancelled()) {
