@@ -65,9 +65,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-##
-## gRPC cancellation tests
-##
+#
+# gRPC cancellation tests
+#
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'name: "custom_identity_int32"' >> config.pbtxt && \
