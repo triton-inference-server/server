@@ -53,7 +53,7 @@ class ResponseSenderModelCommon:
           * NUMBER_OF_RESPONSE_AFTER_RETURN (UINT8):
               Determines the number of responses after return.
           * SEND_COMPLETE_FINAL_FLAG_AFTER_RETURN (BOOL):
-              Determines whether the final flag will be sent before return.
+              Determines whether the final flag will be sent after return.
 
         Note:
           * If the batch size of a request is larger than one, the sum of the values in
