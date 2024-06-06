@@ -32,6 +32,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -268,6 +269,10 @@ class TraceManager {
 
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
+
+    // Stack to hold spans
+    std::stack<opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>
+        span_stack_;
 
     /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
     /// Trace context follows W3C Trace Context specification.
