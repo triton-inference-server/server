@@ -114,7 +114,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
+  #GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
+  GIT_REPOSITORY oandreeva@oandreeva-dt:/home/oandreeva/Code/core
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
 FetchContent_Declare(
