@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,9 +67,10 @@ class CleanUpTest(tu.TestResultCollector):
     def setUp(self):
         self.decoupled_model_name_ = "repeat_int32"
         self.identity_model_name_ = "custom_zero_1_float32"
+        self.repeat_non_decoupled_model_name = "repeat_int32_non_decoupled"
 
     def _prepare_inputs_and_outputs(self, kind):
-        if kind == "decoupled_streaming":
+        if kind in ("decoupled_streaming", "non_decoupled_streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("IN", [1], "INT32"))
             self.inputs_.append(grpcclient.InferInput("DELAY", [1], "UINT32"))
@@ -79,7 +80,7 @@ class CleanUpTest(tu.TestResultCollector):
             self.outputs_.append(grpcclient.InferRequestedOutput("OUT"))
             self.outputs_.append(grpcclient.InferRequestedOutput("IDX"))
             self.requested_outputs_ = self.outputs_
-        elif kind == "simple" or kind == "streaming":
+        elif kind in ("simple", "streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("INPUT0", [1, 1], "FP32"))
 
@@ -562,6 +563,61 @@ class CleanUpTest(tu.TestResultCollector):
         with open(os.environ["SERVER_LOG"]) as f:
             server_log = f.read()
         self.assertNotIn("Should not print this", server_log)
+
+    def test_non_decoupled_streaming_multi_response(self):
+        # Test non-decoupled streaming infer with more than one response should return
+        # the first response.
+        response_count = 4
+        expected_response_count = 1
+        expected_response_index = 0
+
+        # Prepare input data
+        self._prepare_inputs_and_outputs("non_decoupled_streaming")
+        # Initialize data for IN
+        data_offset = 100
+        input_data = np.arange(
+            start=data_offset, stop=data_offset + response_count, dtype=np.int32
+        )
+        self.inputs_[0].set_shape([response_count])
+        self.inputs_[0].set_data_from_numpy(input_data)
+        # Initialize data for DELAY
+        delay_data = np.zeros([response_count], dtype=np.uint32)
+        self.inputs_[1].set_shape([response_count])
+        self.inputs_[1].set_data_from_numpy(delay_data)
+        # Initialize data for WAIT
+        wait_data = np.array([0], dtype=np.uint32)
+        self.inputs_[2].set_data_from_numpy(wait_data)
+
+        # Infer
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        ) as client:
+            # Establish stream
+            client.start_stream(
+                callback=partial(callback, user_data), stream_timeout=16
+            )
+            # Send a request
+            client.async_stream_infer(
+                model_name=self.repeat_non_decoupled_model_name,
+                inputs=self.inputs_,
+                request_id="0",
+                outputs=self.requested_outputs_,
+            )
+            # Wait for all results and stop stream
+            client.stop_stream()
+
+        # Check infer output
+        actual_response_count = 0
+        while not user_data._response_queue.empty():
+            actual_response_count += 1
+            data_item = user_data._response_queue.get()
+            if type(data_item) == InferenceServerException:
+                raise data_item
+            else:
+                response_idx = data_item.as_numpy("IDX")[0]
+                self.assertEqual(response_idx, expected_response_index)
+        self.assertEqual(actual_response_count, expected_response_count)
 
 
 if __name__ == "__main__":
