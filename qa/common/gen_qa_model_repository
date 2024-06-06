@@ -49,7 +49,6 @@
 ############################################################################
 
 TRITON_VERSION=${TRITON_VERSION:=24.05}
-MODEL_TYPE=${MODEL_TYPE:="V100"}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.13.0
@@ -484,8 +483,6 @@ python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chmod -R 777 $VARDESTDIR
-python3 $SRCDIR/gen_qa_models.py --tensorrt-bf16 --models_dir=$DESTDIR
-chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$IDENTITYDESTDIR
 chmod -R 777 $IDENTITYDESTDIR
@@ -526,7 +523,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --env GPU_MODEL=$MODEL_TYPE --entrypoint $SRCDIR/$TRTSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --env --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \

@@ -31,6 +31,10 @@ import numpy as np
 
 np_dtype_string = np.dtype(object)
 
+# Numpy does not support the BF16 datatype natively.
+# We use this dummy dtype as a representative for BF16.
+np_dtype_bfloat16 = np.dtype([("bf16", object)])
+
 
 def np_to_onnx_dtype(np_dtype):
     import onnx
@@ -83,6 +87,8 @@ def np_to_model_dtype(np_dtype):
         return "TYPE_FP64"
     elif np_dtype == np_dtype_string:
         return "TYPE_STRING"
+    elif np_dtype == np_dtype_bfloat16:
+        return "TYPE_BF16"
     return None
 
 
@@ -101,6 +107,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.float16
     elif np_dtype == np.float32:
         return trt.float32
+    elif np_dtype == np_dtype_bfloat16:
+        return trt.bfloat16
     return None
 
 
@@ -157,48 +165,4 @@ def np_to_torch_dtype(np_dtype):
         return torch.double
     elif np_dtype == np_dtype_string:
         return List[str]
-    return None
-
-
-def trt_dtype_name(trt_dtype):
-    import tensorrt as trt
-
-    if trt_dtype == trt.bool:
-        return "bool"
-    elif trt_dtype == trt.int8:
-        return "int8"
-    elif trt_dtype == trt.int32:
-        return "int32"
-    elif trt_dtype == trt.int64:
-        return "int64"
-    elif trt_dtype == trt.uint8:
-        return "uint8"
-    elif trt_dtype == trt.float16:
-        return "float16"
-    elif trt_dtype == trt.float32:
-        return "float32"
-    elif trt_dtype == trt.bfloat16:
-        return "bf16"
-    return None
-
-
-def trt_dtype_to_model_dtype(trt_dtype):
-    import tensorrt as trt
-
-    if trt_dtype == trt.bool:
-        return "TYPE_BOOL"
-    elif trt_dtype == trt.int8:
-        return "TYPE_INT8"
-    elif trt_dtype == trt.int32:
-        return "TYPE_INT32"
-    elif trt_dtype == trt.int64:
-        return "TYPE_INT64"
-    elif trt_dtype == trt.uint8:
-        return "TYPE_UINT8"
-    elif trt_dtype == trt.float16:
-        return "TYPE_FP16"
-    elif trt_dtype == trt.float32:
-        return "TYPE_FP32"
-    elif trt_dtype == trt.bfloat16:
-        return "TYPE_BF16"
     return None

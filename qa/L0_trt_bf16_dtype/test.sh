@@ -29,55 +29,58 @@ source ../common/util.sh
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
+  REPO_VERSION=$1
 fi
 if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
-fi
-
-rm -rf ./models/ *.log* && mkdir ./models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_*_bf16_bf16_bf16 ./models
-
-RET=0
-
-MODELDIR="./models"
-CLIENT_LOG="./client.log"
-SERVER_LOG="./inference_server.log"
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
-TRT_TEST="trt_bf16_dtype_test.py"
-TEST_RESULT_FILE="./test_results.txt"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
-  cat $SERVER_LOG
+  echo -e "Repository version must be specified"
+  echo -e "\n***\n*** Test Failed\n***"
   exit 1
 fi
-
-set +e
-python3 $TRT_TEST >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-  echo -e "\n***\n*** Running $TRT_TEST Failed\n***"
-  cat $CLIENT_LOG
-  RET=1
-else
-  check_test_results $TEST_RESULT_FILE 2
-  if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Result Verification Failed\n***"
-    RET=1
-  fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+  REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
-set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+RET=0
+TRT_TEST="trt_bf16_dtype_test.py"
+TEST_RESULT_FILE="./test_results.txt"
+SERVER=/opt/tritonserver/bin/tritonserver
+
+rm -rf ./fixed_models/ ./dynamic_models/ *.log* && mkdir ./fixed_models/ ./dynamic_models/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_*bf16_bf16_bf16 ./fixed_models/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_*bf16_bf16_bf16 ./dynamic_models/
+
+for TEST in "fixed" "dynamic"; do
+  MODELDIR="./${TEST}_models"
+  CLIENT_LOG="./${TEST}_client.log"
+  SERVER_LOG="./${TEST}_inference_server.log"
+  SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
+
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+  fi
+
+  set +e
+  python3 $TRT_TEST TrtBF16DataTypeTest.test_${TEST} >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Running $TRT_TEST TrtBF16DataTypeTest.test_${TEST} Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+  else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+      cat $CLIENT_LOG
+      echo -e "\n***\n*** Test Result Verification Failed\n***"
+      RET=1
+    fi
+  fi
+  set -e
+
+  kill $SERVER_PID
+  wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
