@@ -523,7 +523,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --env --entrypoint $SRCDIR/$TRTSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
