@@ -48,67 +48,67 @@ RET=0
 #
 # Unit tests
 #
-#rm -rf models && mkdir models
-#mkdir -p models/model/1 && (cd models/model && \
-#    echo 'name: "model"' >> config.pbtxt && \
-#    echo 'backend: "identity"' >> config.pbtxt && \
-#    echo 'max_batch_size: 64' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ 1000 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ 1000 ] }]' >> config.pbtxt && \
-#    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt)
-#
-#SERVER_LOG=server.log
-#LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
-#if [ $? -ne 0 ]; then
-#    echo -e "\n***\n*** Unit Tests Failed\n***"
-#    cat $SERVER_LOG
-#    RET=1
-#fi
+rm -rf models && mkdir models
+mkdir -p models/model/1 && (cd models/model && \
+    echo 'name: "model"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 64' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ 1000 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ 1000 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt)
+
+SERVER_LOG=server.log
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Unit Tests Failed\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
 
 #
 # gRPC cancellation tests
 #
-#rm -rf models && mkdir models
-#mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
-#    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
-#    echo 'backend: "identity"' >> config.pbtxt && \
-#    echo 'max_batch_size: 1024' >> config.pbtxt && \
-#    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-#    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
-#    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
-#
-#for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer"; do
-#
-#    TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
-#    SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
-#
-#    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-#    run_server
-#    if [ "$SERVER_PID" == "0" ]; then
-#        echo -e "\n***\n*** Failed to start $SERVER\n***"
-#        cat $SERVER_LOG
-#        exit 1
-#    fi
-#
-#    set +e
-#    python grpc_cancellation_test.py GrpcCancellationTest.$TEST_CASE > $TEST_LOG 2>&1
-#    if [ $? -ne 0 ]; then
-#        echo -e "\n***\n*** gRPC Cancellation Tests Failed on $TEST_CASE\n***"
-#        cat $TEST_LOG
-#        RET=1
-#    fi
-#    grep "Cancellation notification received for" $SERVER_LOG
-#    if [ $? -ne 0 ]; then
-#        echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
-#        cat $SERVER_LOG
-#        RET=1
-#    fi
-#    set -e
-#
-#    kill $SERVER_PID
-#    wait $SERVER_PID
-#done
+rm -rf models && mkdir models
+mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
+
+for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer"; do
+
+    TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
+    SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python grpc_cancellation_test.py GrpcCancellationTest.$TEST_CASE > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** gRPC Cancellation Tests Failed on $TEST_CASE\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+    grep "Cancellation notification received for" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 #
 # gRPC cancellation on step START test
@@ -226,9 +226,10 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-##
-## Implicit state tests
-##
+
+#
+# Implicit state tests
+#
 rm -rf models && mkdir models
 mkdir -p models/sequence_state/1 && (cd models/sequence_state && \
     cp ../../implicit_state_model/config.pbtxt . && \
