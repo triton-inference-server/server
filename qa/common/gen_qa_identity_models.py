@@ -37,8 +37,6 @@ from gen_common import (
     np_to_onnx_dtype,
     np_to_tf_dtype,
     np_to_trt_dtype,
-    trt_dtype_to_model_dtype,
-    trt_dtype_to_dtype_string,
 )
 
 FLAGS = None
@@ -794,10 +792,11 @@ def create_plan_shape_tensor_modelfile(
         dummy_shape = [-1] * shape_with_batchsize
 
     trt_dtype = np_to_trt_dtype(dtype)
+    trt_shape_dtype = np_to_trt_dtype(shape_tensor_input_dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
         in_node = network.add_input(
-            "INPUT{}".format(io_num), shape_tensor_input_dtype, [shape_with_batchsize]
+            "INPUT{}".format(io_num), trt_shape_dtype, [shape_with_batchsize]
         )
         in_node.allowed_formats = 1 << int(trt_memory_format)
         dummy_in_node = network.add_input(
@@ -873,7 +872,7 @@ def create_plan_shape_tensor_modelfile(
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype
     )
-    model_name = model_name + "_" + trt_dtype_to_dtype_string(shape_tensor_input_dtype)
+    model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
     os.makedirs(model_version_dir, exist_ok=True)
 
@@ -972,7 +971,7 @@ def create_plan_modelconfig(
         model_name_base += "_compatible"
     model_name = tu.get_zero_model_name(model_name_base, io_cnt, dtype)
     if shape_tensor_input_dtype:
-        model_name = model_name + "_" + trt_dtype_to_dtype_string(shape_tensor_input_dtype)
+        model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
     config_dir = os.path.join(models_dir, model_name)
 
     if FLAGS.tensorrt_shape_io:
@@ -1018,7 +1017,7 @@ output [
                 np_to_model_dtype(dtype),
                 shape_str,
                 io_num,
-                trt_dtype_to_model_dtype(shape_tensor_input_dtype),
+                np_to_model_dtype(shape_tensor_input_dtype),
                 shape_tensor_dim,
                 io_num,
                 np_to_model_dtype(dtype),
@@ -1073,17 +1072,38 @@ def create_shape_tensor_models(
     model_version = 1
 
     create_plan_modelconfig(
-        True, models_dir, model_version, io_cnt, 8, dtype, shape, shape_tensor_input_dtype
+        True,
+        models_dir,
+        model_version,
+        io_cnt,
+        8,
+        dtype,
+        shape,
+        shape_tensor_input_dtype,
     )
     create_plan_shape_tensor_modelfile(
         models_dir, model_version, io_cnt, 8, dtype, shape, 32, shape_tensor_input_dtype
     )
     if no_batch:
         create_plan_modelconfig(
-            True, models_dir, model_version, io_cnt, 0, dtype, shape, shape_tensor_input_dtype
+            True,
+            models_dir,
+            model_version,
+            io_cnt,
+            0,
+            dtype,
+            shape,
+            shape_tensor_input_dtype,
         )
         create_plan_shape_tensor_modelfile(
-            models_dir, model_version, io_cnt, 0, dtype, shape, 32, shape_tensor_input_dtype
+            models_dir,
+            model_version,
+            io_cnt,
+            0,
+            dtype,
+            shape,
+            32,
+            shape_tensor_input_dtype,
         )
 
 
@@ -1311,10 +1331,10 @@ if __name__ == "__main__":
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1, no_batch=False)
     elif FLAGS.tensorrt_shape_io:
         create_shape_tensor_models(
-            FLAGS.models_dir, np.float32, [-1, -1], trt.int32, io_cnt=1
+            FLAGS.models_dir, np.float32, [-1, -1], np.int32, io_cnt=1
         )
         create_shape_tensor_models(
-            FLAGS.models_dir, np.float32, [-1, -1], trt.int64, io_cnt=1
+            FLAGS.models_dir, np.float32, [-1, -1], np.int64, io_cnt=1
         )
     else:
         create_models(FLAGS.models_dir, bool, [-1], io_cnt=1)

@@ -95,6 +95,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
+    elif np_dtype == np.int64:
+        return trt.int64
     elif np_dtype == np.uint8:
         return trt.uint8
     elif np_dtype == np.float16:
@@ -158,22 +160,3 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np_dtype_string:
         return List[str]
     return None
-
-
-def trt_dtype_to_model_dtype(data_type):
-    import tensorrt as trt
-    if data_type == trt.int32:
-        return "TYPE_INT32"
-    if data_type == trt.int64:
-        return "TYPE_INT64"
-    else:
-        return None
-
-def trt_dtype_to_dtype_string(data_type):
-    import tensorrt as trt
-    if data_type == trt.int32:
-        return "int32"
-    if data_type == trt.int64:
-        return "int64"
-    else:
-        return None
