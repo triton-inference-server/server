@@ -162,9 +162,10 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 unset TRITONSERVER_DELAY_GRPC_PROCESS
+
 #
 # End-to-end scheduler tests
-
+#
 rm -rf models && mkdir models
 mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
     echo 'name: "dynamic_batch"' >> config.pbtxt && \
