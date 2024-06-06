@@ -78,10 +78,13 @@ mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
 
-for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer"; do
+for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer" "test_grpc_async_infer_cancellation_at_step_start"; do
 
     TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
     SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
+    if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
+        export TRITONSERVER_DELAY_GRPC_PROCESS=5000
+    fi
 
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     run_server
@@ -108,60 +111,11 @@ for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc
 
     kill $SERVER_PID
     wait $SERVER_PID
-done
 
-#
-# gRPC cancellation on step START test
-#
-rm -rf models && mkdir models
-mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
-    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
-    echo 'backend: "identity"' >> config.pbtxt && \
-    echo 'max_batch_size: 1024' >> config.pbtxt && \
-    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
-    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }]' >> config.pbtxt)
-
-TEST_LOG="./grpc_cancellation_stress_test.log"
-SERVER_LOG="grpc_cancellation_stress_test.server.log"
-
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
-export TRITONSERVER_DELAY_GRPC_PROCESS=10000
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-INIT_NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
-
-set +e
-while true; do
-    python3 -c "import grpc_cancellation_test; grpc_cancellation_test.grpc_async_infer_request_with_instant_cancellation(model_name=\"custom_identity_int32\")" > $TEST_LOG 2>&1
-    sleep 30
-    CANCEL_AT_START_COUNT=$(grep -c 'Cancellation notification received for ModelInferHandler, rpc_ok=1, context [0-9]*, [0-9]* step START' $SERVER_LOG)
-    if [[ $CANCEL_AT_START_COUNT == 0 ]]; then
-        INIT_NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
-        continue
-    fi
-    NEW_REQ_HANDL_COUNT=$(grep -c "New request handler for ModelInferHandler" $SERVER_LOG)
-    if [[ $NEW_REQ_HANDL_COUNT == $INIT_NEW_REQ_HANDL_COUNT ]]; then
-        echo -e "\n***\n*** gRPC Cancellation on step START Test Failed: New request handler for ModelInferHandler was not created \n***"
-        cat $TEST_LOG
-        RET=1
-        break
-    else
-        break
+    if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
+        unset TRITONSERVER_DELAY_GRPC_PROCESS
     fi
 done
-
-set -e
-kill $SERVER_PID
-wait $SERVER_PID
-
-unset TRITONSERVER_DELAY_GRPC_PROCESS
 
 #
 # End-to-end scheduler tests
