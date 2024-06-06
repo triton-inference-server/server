@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,6 +73,12 @@ rm -fr ./models/custom_zero_1_float32 && \
     echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
     echo "]" >> config.pbtxt)
 
+rm -rf models/repeat_int32_non_decoupled && \
+    cp -r models/repeat_int32 models/repeat_int32_non_decoupled && \
+    (cd models/repeat_int32_non_decoupled && \
+        sed -i "/model_transaction_policy/,+2d" config.pbtxt && \
+        sed -i "s/repeat_int32/repeat_int32_non_decoupled/" config.pbtxt)
+
 for i in test_simple_infer \
             test_simple_infer_cancellation \
             test_simple_infer_timeout \
@@ -81,7 +87,8 @@ for i in test_simple_infer \
             test_streaming_cancellation \
             test_decoupled_infer \
             test_decoupled_cancellation \
-            test_decoupled_timeout; do
+            test_decoupled_timeout \
+            test_non_decoupled_streaming_multi_response; do
   SERVER_LOG="./inference_server.$i.log"
   SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
   run_server
