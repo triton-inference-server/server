@@ -27,7 +27,10 @@
 #include "tracer.h"
 
 #include <stdlib.h>
+
+#include <iostream>
 #include <unordered_map>
+
 #include "common.h"
 #include "triton/common/logging.h"
 #ifdef TRITON_ENABLE_GPU
@@ -395,13 +398,33 @@ TraceManager::Trace::CaptureTimestamp(
 #endif
     }
   }
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceSetName(trace_, name.c_str()),
-      "set trace name");
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceReportActivity(trace_, timestamp_ns),
-      "report trace activity");
 }
+
+std::string
+TraceManager::Trace::RetrieveActivityName(
+    TRITONSERVER_InferenceTrace* trace,
+    TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns)
+{
+  std::string activity_name =
+      TRITONSERVER_InferenceTraceActivityString(activity);
+  if (activity != TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+    return activity_name;
+  }
+  const char* val = nullptr;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceContext(trace, &val),
+      "Failed to retrieve trace context");
+  std::string context_str = (val != nullptr) ? std::string(val) : "";
+  triton::common::TritonJson::Value context;
+  LOG_TRITONSERVER_ERROR(
+      context.Parse(context_str), "Failed to parse trace context");
+  std::string look_for_key = std::to_string(timestamp_ns);
+  if (context.Find(look_for_key.c_str())) {
+    context.MemberAsString(look_for_key.c_str(), &activity_name);
+  }
+  return activity_name;
+}
+
 
 void
 TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
@@ -651,7 +674,8 @@ TraceManager::Trace::GetSpanKeyForActivity(
   switch (activity) {
     case TRITONSERVER_TRACE_REQUEST_START:
     case TRITONSERVER_TRACE_QUEUE_START:
-    case TRITONSERVER_TRACE_REQUEST_END: {
+    case TRITONSERVER_TRACE_REQUEST_END:
+    case TRITONSERVER_TRACE_CUSTOM_ACTIVITY: {
       span_name = kRequestSpan + std::to_string(trace_id);
       break;
     }
@@ -688,9 +712,13 @@ TraceManager::Trace::AddEvent(
     StartSpan(span_key, trace, activity, timestamp_ns, id);
   }
 
-  AddEvent(
-      span_key, TRITONSERVER_InferenceTraceActivityString(activity),
-      timestamp_ns);
+  std::string activity_name =
+      TRITONSERVER_InferenceTraceActivityString(activity);
+  if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+    activity_name = RetrieveActivityName(trace, activity, timestamp_ns);
+  }
+
+  AddEvent(span_key, activity_name, timestamp_ns);
 
   if (activity == TRITONSERVER_TRACE_REQUEST_END ||
       activity == TRITONSERVER_TRACE_COMPUTE_END) {
@@ -846,17 +874,10 @@ TraceManager::TraceActivity(
     *ss << "},";
   }
 
-  *ss << "{\"id\":" << id << ",\"timestamps\":[";
-  if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
-    const char* name = "";
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceTraceName(trace, &name), "getting trace name");
-    *ss << "{\"name\":\"" << name;
-  } else {
-    *ss << "{\"name\":\""
-        << TRITONSERVER_InferenceTraceActivityString(activity);
-  }
-  *ss << "\",\"ns\":" << timestamp_ns << "}]}";
+  *ss << "{\"id\":" << id << ",\"timestamps\":["
+      << "{\"name\":\""
+      << ts->RetrieveActivityName(trace, activity, timestamp_ns)
+      << "\",\"ns\":" << timestamp_ns << "}]}";
 }
 
 void

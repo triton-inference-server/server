@@ -230,6 +230,10 @@ class TraceManager {
     // with this trace.
     void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
 
+    std::string RetrieveActivityName(
+        TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
+
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
     /// Reports TRITONSERVER_InferenceTraceActivity as event to
     /// the currently active span. If activity is an instance of
