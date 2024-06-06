@@ -2546,18 +2546,6 @@ if __name__ == "__main__":
         create_fixed_models(FLAGS.models_dir, np.int32, np.int32, np_dtype_string)
         create_fixed_models(FLAGS.models_dir, np.int32, np_dtype_string, np.int32)
 
-        if tu.check_gpus_compute_capability(min_capability=8.0):
-            create_fixed_models(
-                FLAGS.models_dir,
-                np_dtype_bfloat16,
-                np_dtype_bfloat16,
-                np_dtype_bfloat16,
-            )
-        else:
-            print(
-                "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
-            )
-
         # Make multiple versions of some models for version testing
         # (they use different version policies when created above)
         if FLAGS.graphdef:
@@ -2591,6 +2579,18 @@ if __name__ == "__main__":
                 )
 
         if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_fixed_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
+
             for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(
                     FLAGS.models_dir, 8, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
@@ -2867,21 +2867,22 @@ if __name__ == "__main__":
             32,
         )
 
-        if tu.check_gpus_compute_capability(min_capability=8.0):
-            create_models(
-                FLAGS.models_dir,
-                np_dtype_bfloat16,
-                np_dtype_bfloat16,
-                np_dtype_bfloat16,
-                (-1, -1),
-                (-1, -1),
-                (-1, -1),
-                0,
-            )
-        else:
-            print(
-                "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
-            )
+        if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    (-1, -1),
+                    (-1, -1),
+                    (-1, -1),
+                    0,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
 
     if FLAGS.ensemble:
         # Create utility models used in ensemble
