@@ -779,7 +779,6 @@ def create_plan_fixed_rf_modelfile(
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
-
     trt_memory_format = trt.TensorFormat.LINEAR
 
     # Create the model
@@ -1103,16 +1102,6 @@ def create_plan_modelconfig(
     ):
         return
 
-    # Use a different model name for different kinds of models
-    model_name = tu.get_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
-    if min_dim != 1 or max_dim != 32:
-        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
-
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"
     if version_policy is not None:
@@ -1123,6 +1112,16 @@ def create_plan_modelconfig(
             version_policy_str = "{{ specific {{ versions: {} }}}}".format(val)
         else:
             version_policy_str = "{ all { }}"
+
+    # Use a different model name for different kinds of models
+    model_name = tu.get_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan",
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+    )
+    if min_dim != 1 or max_dim != 32:
+        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
     config_dir = models_dir + "/" + model_name
     if -1 in input_shape:
