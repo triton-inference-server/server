@@ -194,7 +194,7 @@ class InputShapeTest(unittest.TestCase):
             triton_client.infer(model_name=model_name, inputs=inputs)
         err_str = str(e.exception)
         self.assertIn(
-            f"expected {input_size} strings for inference input 'INPUT1', got {input_size-2}",
+            f"expected {input_size} string elements for inference input 'INPUT1', got {input_size-2}",
             err_str,
         )
 
@@ -207,8 +207,7 @@ class InputShapeTest(unittest.TestCase):
             triton_client.infer(model_name=model_name, inputs=inputs)
         err_str = str(e.exception)
         self.assertIn(
-            # Core will throw exception as soon as reading the "input_size+1"th byte.
-            f"unexpected number of string elements {input_size+1} for inference input 'INPUT1', expecting {input_size}",
+            f"expected {input_size} string elements for inference input 'INPUT1', got {input_size+2}",
             err_str,
         )
 
