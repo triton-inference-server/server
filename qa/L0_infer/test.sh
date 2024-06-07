@@ -323,6 +323,7 @@ for TARGET in cpu gpu; do
         check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
+            cat $TEST_RESULT_FILE
             echo -e "\n***\n*** Test Result Verification Failed\n***"
             RET=1
         fi
