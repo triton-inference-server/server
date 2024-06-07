@@ -691,9 +691,35 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // Need to protect the state transitions for these cases.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
+  if (state->delay_process_ms_ != 0) {
+    // Will delay the Process execution by the specified time.
+    // This can be used to test the flow when cancellation request
+    // issued for the request, which is still at START step.
+    LOG_INFO << "Delaying the write of the response by "
+             << state->delay_process_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_process_ms_));
+  }
+
   // Handle notification for cancellation which can be raised
   // asynchronously if detected on the network.
   if (state->IsGrpcContextCancelled()) {
+    if (rpc_ok && (state->step_ == Steps::START) &&
+        (state->context_->step_ != Steps::CANCELLED)) {
+#ifdef TRITON_ENABLE_TRACING
+      // Can't create trace as we don't know the model to be requested,
+      // track timestamps in 'state'
+      state->trace_timestamps_.emplace_back(std::make_pair(
+          "GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+      // Need to create a new request object here explicitly for step START,
+      // because we will never leave this if body. Refer to PR 7325.
+      // This is a special case for ModelInferHandler, since we have 2 threads,
+      // and each of them can process cancellation. ModelStreamInfer has only 1
+      // thread, and  cancellation at step START was not reproducible in a
+      // single thread scenario.
+      StartNewRequest();
+    }
     bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
     return resume;
   }
