@@ -33,6 +33,10 @@ import numpy as np
 
 _last_request_id = 0
 
+# Numpy does not support the BF16 datatype natively.
+# We use this dummy dtype as a representative for BF16.
+np_dtype_bfloat16 = np.dtype([("bf16", object)])
+
 
 def shape_element_count(shape):
     cnt = 0
@@ -103,7 +107,15 @@ def validate_for_trt_model(
     input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
 ):
     """Return True if input and output dtypes are supported by a TRT model."""
-    supported_datatypes = [bool, np.int8, np.int32, np.uint8, np.float16, np.float32]
+    supported_datatypes = [
+        bool,
+        np.int8,
+        np.int32,
+        np.uint8,
+        np.float16,
+        np.float32,
+        np_dtype_bfloat16,
+    ]
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
         supported_datatypes.remove(np.uint8)
@@ -275,12 +287,19 @@ def validate_for_openvino_model(
     return True
 
 
+def get_dtype_name(dtype):
+    if dtype == np_dtype_bfloat16:
+        return "bf16"
+    else:
+        return np.dtype(dtype).name
+
+
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(
         pf,
-        np.dtype(input_dtype).name,
-        np.dtype(output0_dtype).name,
-        np.dtype(output1_dtype).name,
+        get_dtype_name(input_dtype),
+        get_dtype_name(output0_dtype),
+        get_dtype_name(output1_dtype),
     )
 
 
@@ -307,6 +326,31 @@ def support_trt_uint8():
         return not bool(int(os.environ.get("TEST_JETSON", 0)))
     # tensorrt library is found, return if uint8 is defined
     return hasattr(trt, "uint8")
+
+
+def check_gpus_compute_capability(min_capability):
+    """
+    Check if all GPUs have a compute capability greater than or equal to the given value.
+
+    Args:
+        min_capability (float): The minimum required compute capability (e.g., 8.0).
+
+    Returns:
+        bool
+    """
+    import pycuda.driver as cuda
+
+    cuda.init()
+
+    for device_index in range(cuda.Device.count()):
+        device = cuda.Device(device_index)
+        compute_capability = device.compute_capability()
+        compute_capability_value = compute_capability[0] + compute_capability[1] / 10.0
+
+        if compute_capability_value < min_capability:
+            return False
+
+    return True
 
 
 class TestResultCollector(unittest.TestCase):
