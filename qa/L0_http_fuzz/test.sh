@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,7 +64,7 @@ function_install_python38() {
     create_conda_env "3.8" "python-3-8"
 
     # Install test script dependencies
-    pip3 install --upgrade wheel setuptools boofuzz==0.3.0 numpy pillow attrdict future grpcio requests gsutil \
+    pip3 install --upgrade wheel setuptools boofuzz==0.3.0 "numpy<2" pillow attrdict future grpcio requests gsutil \
                             awscli six grpcio-channelz prettytable virtualenv
 }
 function_install_python38

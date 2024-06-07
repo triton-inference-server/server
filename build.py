@@ -1226,7 +1226,7 @@ RUN apt-get update \\
       && pip3 install --upgrade \\
             wheel \\
             setuptools \\
-            numpy \\
+            \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """

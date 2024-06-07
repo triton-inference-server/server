@@ -347,7 +347,7 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil \
+    pip3 install --upgrade "numpy<2" pillow attrdict future grpcio requests gsutil \
                            awscli six grpcio-channelz prettytable virtualenv \
                            check-jsonschema
 
