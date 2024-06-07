@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,7 +45,7 @@ RET=0
 apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-pip python3-protobuf
 python3 -m pip install --upgrade pip && \
-    pip3 install --upgrade numpy
+    pip3 install --upgrade "numpy<2"
 
 # install client libraries
 pip3 install tritonclient[all]
