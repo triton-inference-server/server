@@ -904,13 +904,30 @@ def infer_shape_tensor(
             if error is not None:
                 raise error
         else:
-            results = triton_client.infer(
-                model_name,
-                inputs,
-                outputs=outputs,
-                priority=priority,
-                timeout=timeout_us,
-            )
+            try:
+                results = triton_client.infer(
+                    model_name,
+                    inputs,
+                    outputs=outputs,
+                    priority=priority,
+                    timeout=timeout_us,
+                )
+            except Exception as e:
+                if use_system_shared_memory:
+                    for io_num in range(io_cnt):
+                        shm.destroy_shared_memory_region(
+                            input_shm_handle_list[io_num][0]
+                        )
+                        triton_client.unregister_system_shared_memory(
+                            f"INPUT{io_num}" + shm_suffix
+                        )
+                        shm.destroy_shared_memory_region(
+                            output_shm_handle_list[io_num][0]
+                        )
+                        triton_client.unregister_system_shared_memory(
+                            f"OUTPUT{io_num}" + shm_suffix
+                        )
+                raise e
 
         for io_num in range(io_cnt):
             output_name = "OUTPUT{}".format(io_num)
