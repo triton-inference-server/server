@@ -43,11 +43,11 @@ server_docs_abspath = os.path.join(server_abspath, "docs")
 """
 TODO: Needs to handle cross-branch linkage.
 
-For example, server/docs/user_guide/architecture.md on branch 24.05 links to
+For example, server/docs/user_guide/architecture.md on branch 24.06 links to
 server/docs/user_guide/model_analyzer.md on main branch. In this case, the
 hyperlink of model_analyzer.md should be a URL instead of relative path.
 
-Another example can be server/docs/user_guide/model_analyzer.md on branch 24.05
+Another example can be server/docs/user_guide/model_analyzer.md on branch 24.06
 links to a file in server repo with relative path. Currently all URLs are
 hardcoded to main branch. We need to make sure that the URL actually points to the
 correct branch. We also need to handle cases like deprecated or removed files from
