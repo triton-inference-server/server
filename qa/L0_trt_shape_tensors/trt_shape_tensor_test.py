@@ -303,9 +303,9 @@ class InferShapeTensorTest(tu.TestResultCollector):
             # InferenceServerException will be raised from different namespace,
             # use dynamic type characteristic to catch both ex
             except Exception as ex:
-                self.assertTrue(
-                    "The shape value at index 2 is expected to be in range from 1 to 32, Got: 33"
-                    in ex.message()
+                self.assertIn(
+                    "The shape value at index 2 is expected to be in range from 1 to 32, Got: 33",
+                    ex.message(),
                 )
 
     # Dynamic Batcher tests
