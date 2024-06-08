@@ -321,7 +321,7 @@ class InferShapeTensorTest(tu.TestResultCollector):
                 model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
 
                 threads = []
                 threads.append(
@@ -369,7 +369,7 @@ class InferShapeTensorTest(tu.TestResultCollector):
                 model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
 
                 threads = []
                 threads.append(
@@ -431,9 +431,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0
                 )
@@ -612,9 +612,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0
                 )
@@ -783,8 +783,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name("plan", dtype)
                 model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 corrids = [1001, 1002, 1003, 1004]
                 threads = []
@@ -960,8 +960,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name("plan", dtype)
                 model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 corrids = [1001, 1002, 1003, 1004]
                 threads = []
