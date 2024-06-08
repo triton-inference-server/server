@@ -141,16 +141,7 @@ RUN vcpkg.exe install \
       zlib:x64-windows
 RUN vcpkg.exe integrate install
 
-
 LABEL VCPGK_VERSION=${VCPGK_VERSION}
-
-# WORKDIR /tmp
-#
-#
-# Installing Boost
-#
-# RUN git clone --recurse-submodules -b boost-1.80.0 https://github.com/boostorg/boost.git
-# RUN cd boost &&  .\bootstrap.bat  && .\b2 install
 
 WORKDIR /
 
