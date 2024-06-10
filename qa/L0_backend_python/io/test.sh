@@ -145,6 +145,33 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# IOTest.test_requested_output_non_decoupled
+rm -rf models && mkdir models
+mkdir -p models/add_sub/1/
+cp ../../python_models/add_sub/model.py ./models/add_sub/1/
+cp ../../python_models/add_sub/config.pbtxt ./models/add_sub/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+SUBTEST="test_requested_output_non_decoupled"
+python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+    cat $CLIENT_LOG.${SUBTEST}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** IO test PASSED.\n***"
 else

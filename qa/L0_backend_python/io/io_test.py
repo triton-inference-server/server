@@ -162,6 +162,38 @@ class IOTest(unittest.TestCase):
                 self.assertEqual(output.size, i + 1)
                 np.testing.assert_almost_equal(output, np.ones(i + 1) * (i + 1))
 
+    # Non-decoupled models should filter outputs base on requested outputs.
+    def test_requested_output_non_decoupled(self):
+        model_name = "add_sub"
+        shape = [16]
+
+        input0_data = np.random.rand(*shape).astype(np.float32)
+        input1_data = np.random.rand(*shape).astype(np.float32)
+        inputs = [
+            grpcclient.InferInput(
+                "INPUT0", input0_data.shape, np_to_triton_dtype(input0_data.dtype)
+            ),
+            grpcclient.InferInput(
+                "INPUT1", input1_data.shape, np_to_triton_dtype(input1_data.dtype)
+            ),
+        ]
+        inputs[0].set_data_from_numpy(input0_data)
+        inputs[1].set_data_from_numpy(input1_data)
+
+        # request for output 1, among output 0 and 1.
+        requested_outputs = [grpcclient.InferRequestedOutput("OUTPUT1")]
+        with self._shm_leak_detector.Probe():
+            response = self._client.infer(
+                model_name=model_name,
+                inputs=inputs,
+                outputs=requested_outputs,
+            )
+
+        outputs = response.get_response().outputs
+        self.assertEqual(len(outputs), len(requested_outputs))
+        output1_data = response.as_numpy("OUTPUT1")
+        self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
+
 
 if __name__ == "__main__":
     unittest.main()
