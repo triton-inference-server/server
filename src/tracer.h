@@ -271,8 +271,10 @@ class TraceManager {
     opentelemetry::context::Context otel_context_;
 
     // Stack to hold spans
-    std::stack<opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>
-        span_stack_;
+    std::unordered_map<
+        uint64_t, std::unique_ptr<std::stack<
+                      opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>>>
+        span_stacks_;
 
     /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
     /// Trace context follows W3C Trace Context specification.

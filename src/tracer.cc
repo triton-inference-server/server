@@ -571,7 +571,7 @@ TraceManager::Trace::StartSpan(
   }
 
   // otel_context_ = otel_context_.SetValue(span_key, span);
-  span_stack_.push(span);
+  span_stack_[trace_id]->emplace(span);
 }
 
 opentelemetry::nostd::shared_ptr<otel_trace_api::Span>
@@ -695,6 +695,14 @@ TraceManager::Trace::AddEvent(
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
     uint64_t id)
 {
+  if (span_stacks_.find(id) == span_stacks_.end()) {
+    std::unique_ptr<
+        std::stack<opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>>
+        st(new std::stack<
+            opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>());
+    span_stacks_.emplace(id, std::move(st));
+  }
+
   if (activity == TRITONSERVER_TRACE_REQUEST_START ||
       activity == TRITONSERVER_TRACE_COMPUTE_START) {
     StartSpan(span_key, trace, activity, timestamp_ns, id);
