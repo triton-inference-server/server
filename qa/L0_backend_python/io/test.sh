@@ -106,7 +106,7 @@ fi
 
 set +e
 SUBTEST="test_empty_gpu_output"
-python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
@@ -133,7 +133,7 @@ fi
 
 set +e
 SUBTEST="test_variable_gpu_output"
-python3 -m pytest --junitxml=${SUBTEST}.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
