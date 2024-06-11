@@ -195,7 +195,7 @@ class IOTest(unittest.TestCase):
         output1_data = response.as_numpy("OUTPUT1")
         self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
 
-    # Decoupled models currently do not filter outputs base on requested outputs.
+    # Decoupled models should filter outputs base on requested outputs.
     def test_requested_output_decoupled(self):
         model_name = "dlpack_io_identity_decoupled"
         shape = [4]
@@ -230,10 +230,10 @@ class IOTest(unittest.TestCase):
         for _ in range(expected_response_repeat):
             self.assertFalse(user_data._completed_requests.empty())
             response = user_data._completed_requests.get()
+            outputs = response.get_response().outputs
+            self.assertEqual(len(outputs), len(requested_outputs))
             output0_data = response.as_numpy("OUTPUT0")
             self.assertTrue(np.allclose(input0_data, output0_data))
-            next_gpu_output_data = response.as_numpy("NEXT_GPU_OUTPUT")
-            self.assertTrue(np.allclose(gpu_output_data[1:], next_gpu_output_data))
         self.assertTrue(user_data._completed_requests.empty())
 
 
