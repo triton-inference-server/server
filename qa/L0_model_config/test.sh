@@ -220,14 +220,14 @@ for modelpath in \
         autofill_noplatform/python/model_transaction_policy_mismatch \
         autofill_noplatform/python/output_wrong_property ; do
     mkdir -p $modelpath/1
-    mv $modelpath/model.py $modelpath/1/.
+    cp $modelpath/model.py $modelpath/1/.
 done
 for modelpath in \
         autofill_noplatform_success/python/conflicting_scheduler_ensemble/conflicting_scheduler_ensemble \
         autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_first_step \
         autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_second_step ; do
     mkdir -p $modelpath/1
-    mv $modelpath/model.py $modelpath/1/.
+    cp $modelpath/model.py $modelpath/1/.
 done
 
 # Make version folders for custom test model repositories.
