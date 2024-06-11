@@ -182,23 +182,32 @@ class IOTest(unittest.TestCase):
 
         # request for output 1, among output 0 and 1.
         requested_outputs = [grpcclient.InferRequestedOutput("OUTPUT1")]
-
         with self._shm_leak_detector.Probe():
             response = self._client.infer(
                 model_name=model_name,
                 inputs=inputs,
                 outputs=requested_outputs,
             )
-
         outputs = response.get_response().outputs
         self.assertEqual(len(outputs), len(requested_outputs))
         output1_data = response.as_numpy("OUTPUT1")
+        self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
+
+        # without requested output should return all outputs
+        with self._shm_leak_detector.Probe():
+            response = self._client.infer(model_name=model_name, inputs=inputs)
+        outputs = response.get_response().outputs
+        self.assertEqual(len(outputs), len(inputs))
+        output0_data = response.as_numpy("OUTPUT0")
+        output1_data = response.as_numpy("OUTPUT1")
+        self.assertTrue(np.allclose(input0_data + input1_data, output0_data))
         self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
 
     # Decoupled models should filter outputs base on requested outputs.
     def test_requested_output_decoupled(self):
         model_name = "dlpack_io_identity_decoupled"
         shape = [4]
+        expected_response_repeat = 2
 
         input0_data = np.random.rand(*shape).astype(np.float32)
         gpu_output_data = np.random.rand(*shape).astype(np.bool_)
@@ -217,7 +226,6 @@ class IOTest(unittest.TestCase):
 
         # request for output 0, among output 0 and next gpu output.
         requested_outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
-
         user_data = UserData()
         with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             client.start_stream(callback=partial(callback, user_data))
@@ -225,8 +233,6 @@ class IOTest(unittest.TestCase):
                 model_name=model_name, inputs=inputs, outputs=requested_outputs
             )
             client.stop_stream()
-
-        expected_response_repeat = 2
         for _ in range(expected_response_repeat):
             self.assertFalse(user_data._completed_requests.empty())
             response = user_data._completed_requests.get()
@@ -234,6 +240,23 @@ class IOTest(unittest.TestCase):
             self.assertEqual(len(outputs), len(requested_outputs))
             output0_data = response.as_numpy("OUTPUT0")
             self.assertTrue(np.allclose(input0_data, output0_data))
+        self.assertTrue(user_data._completed_requests.empty())
+
+        # without requested output should return all outputs
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            client.async_stream_infer(model_name=model_name, inputs=inputs)
+            client.stop_stream()
+        for _ in range(expected_response_repeat):
+            self.assertFalse(user_data._completed_requests.empty())
+            response = user_data._completed_requests.get()
+            outputs = response.get_response().outputs
+            self.assertEqual(len(outputs), len(inputs))
+            output0_data = response.as_numpy("OUTPUT0")
+            next_gpu_output_data = response.as_numpy("NEXT_GPU_OUTPUT")
+            self.assertTrue(np.allclose(input0_data, output0_data))
+            self.assertTrue(np.allclose(gpu_output_data[1:], next_gpu_output_data))
         self.assertTrue(user_data._completed_requests.empty())
 
 
