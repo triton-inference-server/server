@@ -472,7 +472,7 @@ function kill_servers () {
 function gcs_upload () {
     local local_path=$1
     local gcs_path=$2
-    gsutil cp -r $local_path $gcs_path
+    gsutil -m cp -r $local_path $gcs_path
 }
 
 # Sort an array
