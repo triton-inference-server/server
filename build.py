@@ -1098,7 +1098,7 @@ RUN python3 -m pip install --upgrade pip \\
 RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
 RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
 
-RUN pip3 install setuptools==69.5.1 grpcio-tools==1.64.0
+RUN pip3 install setuptools==69.5.1
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
