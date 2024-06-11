@@ -145,11 +145,14 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# IOTest.test_requested_output_non_decoupled
+# IOTest.test_requested_output_default & IOTest.test_requested_output_decoupled
 rm -rf models && mkdir models
 mkdir -p models/add_sub/1/
 cp ../../python_models/add_sub/model.py ./models/add_sub/1/
 cp ../../python_models/add_sub/config.pbtxt ./models/add_sub/
+mkdir -p models/dlpack_io_identity_decoupled/1/
+cp ../../python_models/dlpack_io_identity_decoupled/model.py ./models/dlpack_io_identity_decoupled/1/
+cp ../../python_models/dlpack_io_identity_decoupled/config.pbtxt ./models/dlpack_io_identity_decoupled/
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -158,16 +161,17 @@ if [ "$SERVER_PID" == "0" ]; then
     RET=1
 fi
 
-set +e
-SUBTEST="test_requested_output_non_decoupled"
-python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
-
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
-    cat $CLIENT_LOG.${SUBTEST}
-    RET=1
-fi
-set -e
+SUBTESTS="test_requested_output_default test_requested_output_decoupled"
+for SUBTEST in $SUBTESTS; do
+    set +e
+    python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+        cat $CLIENT_LOG.${SUBTEST}
+        RET=1
+    fi
+    set -e
+done
 
 kill $SERVER_PID
 wait $SERVER_PID
