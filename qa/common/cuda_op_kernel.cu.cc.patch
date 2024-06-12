@@ -11,7 +11,7 @@ index a9d66f9..a92e218 100644
 -#include "tensorflow/core/util/gpu_kernel_helper.h"
 -#include "tensorflow/core/util/gpu_launch_config.h"
 +//#define EIGEN_USE_GPU
-+//#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
++//#include "unsupported/Eigen/CXX11/Tensor"
 +//#include "tensorflow/core/util/gpu_kernel_helper.h"
 +//#include "tensorflow/core/util/gpu_launch_config.h"
 +#include <algorithm>
