@@ -45,6 +45,7 @@ import numpy as np
 import test_util as tu
 import tritonhttpclient
 
+
 # Utility function to Generate N requests with appropriate sequence flags
 class RequestGenerator:
     def __init__(self, init_value, num_requests) -> None:
