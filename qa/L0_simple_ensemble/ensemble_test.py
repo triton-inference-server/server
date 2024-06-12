@@ -133,7 +133,6 @@ class EnsembleTest(tu.TestResultCollector):
 
     def test_ensemble_sequence_flags(self):
         request_generator = RequestGenerator(0, 3)
-        results_list = []
         # 3 request made expect the START of 1st req to be true and
         # END of last request to be true
         expected_flags = [[True, False], [False, False], [False, True]]
