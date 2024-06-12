@@ -34,6 +34,24 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
+    - name: Fetch base branch
+      run: git fetch origin ${{ github.base_ref }}
     - uses: actions/setup-python@v3
-    - uses: pre-commit/action@v3.0.0
-
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+    - name: pip/pre-commit cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ steps.pip-cache.outputs.dir }}
+          ~/.cache/pre-commit
+        key: ${{ runner.os }}-pip-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-pre-commit
+    - name: pre-commit  # uses: pre-commit/action@v3.0.0 is deprecated
+      run: |
+        pip install -U pre-commit
+        pre-commit install --install-hooks
+        pre-commit run --from-ref=origin/${{ github.base_ref }} --to-ref=HEAD
