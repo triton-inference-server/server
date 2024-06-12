@@ -1,1 +1,1 @@
-model input has different size for dims and reshape for reshape_nobatch_variable0
+model input 'input' has different size for dims and reshape for reshape_nobatch_variable0
