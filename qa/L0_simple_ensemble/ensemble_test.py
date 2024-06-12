@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import random
 import sys
+import time
+from functools import partial
+
+import numpy as np
+import tritonclient.grpc as grpcclient
 
 sys.path.append("../common")
 sys.path.append("../clients")
@@ -38,6 +44,29 @@ import infer_util as iu
 import numpy as np
 import test_util as tu
 import tritonhttpclient
+
+
+# Utility function to Generate N requests with appropriate sequence flags
+class RequestGenerator:
+    def __init__(self, init_value, num_requests) -> None:
+        self.count = 0
+        self.init_value = init_value
+        self.num_requests = num_requests
+
+    def __enter__(self):
+        return self
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> bytes:
+        value = self.init_value + self.count
+        if self.count == self.num_requests:
+            raise StopIteration
+        start = True if self.count == 0 else False
+        end = True if self.count == self.num_requests - 1 else False
+        self.count = self.count + 1
+        return start, end, self.count - 1, value
 
 
 class EnsembleTest(tu.TestResultCollector):
@@ -101,6 +130,52 @@ class EnsembleTest(tu.TestResultCollector):
             )
         elif infer_count[1] == 0:
             self.assertTrue(False, "unexpeced zero infer count for 'simple' version 2")
+
+    def test_ensemble_sequence_flags(self):
+        request_generator = RequestGenerator(0, 3)
+        # 3 request made expect the START of 1st req to be true and
+        # END of last request to be true
+        expected_flags = [[True, False], [False, False], [False, True]]
+        response_flags = []
+
+        def callback(start_time, result, error):
+            response = result.get_response()
+            arr = []
+            arr.append(response.parameters["sequence_start"].bool_param)
+            arr.append(response.parameters["sequence_end"].bool_param)
+            response_flags.append(arr)
+
+        start_time = time.time()
+        triton_client = grpcclient.InferenceServerClient("localhost:8001")
+        triton_client.start_stream(callback=partial(callback, start_time))
+        correlation_id = random.randint(1, 2**31 - 1)
+        # create input tensors
+        input0_data = np.random.randint(0, 100, size=(1, 16), dtype=np.int32)
+        input1_data = np.random.randint(0, 100, size=(1, 16), dtype=np.int32)
+
+        inputs = [
+            grpcclient.InferInput("INPUT0", input0_data.shape, "INT32"),
+            grpcclient.InferInput("INPUT1", input1_data.shape, "INT32"),
+        ]
+
+        inputs[0].set_data_from_numpy(input0_data)
+        inputs[1].set_data_from_numpy(input1_data)
+
+        # create output tensors
+        outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
+        for sequence_start, sequence_end, count, input_value in request_generator:
+            triton_client.async_stream_infer(
+                model_name="ensemble_add_sub_int32_int32_int32",
+                inputs=inputs,
+                outputs=outputs,
+                request_id=f"{correlation_id}_{count}",
+                sequence_id=correlation_id,
+                sequence_start=sequence_start,
+                sequence_end=sequence_end,
+            )
+        time.sleep(2)
+        if expected_flags != response_flags:
+            self.assertTrue(False, "unexpeced sequence flags mismatch error")
 
 
 if __name__ == "__main__":
