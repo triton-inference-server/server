@@ -1,1 +1,1 @@
-model input cannot have empty reshape for non-batching model as scalar tensors are not supported for reshape_nobatch_empty0
+model input 'input' cannot have empty reshape for non-batching model as scalar tensors are not supported for reshape_nobatch_empty0
