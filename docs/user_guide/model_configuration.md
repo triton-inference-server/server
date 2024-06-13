@@ -447,12 +447,12 @@ library.
 |TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |INT8     |int8          |
 |TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |INT16    |int16         |
 |TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |INT32    |int32         |
-|TYPE_INT64    |              |DT_INT64      |INT64         |kLong    |INT64    |int64         |
+|TYPE_INT64    | kINT64       |DT_INT64      |INT64         |kLong    |INT64    |int64         |
 |TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |FP16     |float16       |
 |TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
 |TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
 |TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
-|TYPE_BF16     |              |              |              |         |BF16     |              |
+|TYPE_BF16     | kBF16        |              |              |         |BF16     |              |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,83 +25,67 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
-fi
-
-export CUDA_VISIBLE_DEVICES=0
-
-TEST_RESULT_FILE='test_results.txt'
-RET=0
-rm -f *.log *.db
-EXPECTED_NUM_TESTS="1"
-
-mkdir -p models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
-
-FUZZTEST=fuzztest.py
-FUZZ_LOG=`pwd`/fuzz.log
-DATADIR=`pwd`/models
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
-# Remove this once foobuzz and tornado packages upgrade to work with python 3.10
-# This test tests the server's ability to handle poor input and not the compatibility
-# with python 3.10. Python 3.8 is ok to use here.
-function_install_python38() {
-    source ../L0_backend_python/common.sh
-    install_conda
-    create_conda_env "3.8" "python-3-8"
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+  REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+  echo -e "Repository version must be specified"
+  echo -e "\n***\n*** Test Failed\n***"
+  exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+  REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
-    # Install test script dependencies
-    pip3 install --upgrade wheel setuptools boofuzz==0.3.0 "numpy<2" pillow attrdict future grpcio requests gsutil \
-                            awscli six grpcio-channelz prettytable virtualenv
-}
-function_install_python38
+RET=0
+TRT_TEST="trt_bf16_dtype_test.py"
+TEST_RESULT_FILE="./test_results.txt"
+SERVER=/opt/tritonserver/bin/tritonserver
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
+rm -rf ./fixed_models/ ./dynamic_models/ *.log* && mkdir ./fixed_models/ ./dynamic_models/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_*bf16_bf16_bf16 ./fixed_models/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_*bf16_bf16_bf16 ./dynamic_models/
+
+for TEST in "fixed" "dynamic"; do
+  MODELDIR="./${TEST}_models"
+  CLIENT_LOG="./${TEST}_client.log"
+  SERVER_LOG="./${TEST}_inference_server.log"
+  SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
+
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
-fi
+  fi
 
-set +e
-
-# Test health
-python3 $FUZZTEST -v >> ${FUZZ_LOG} 2>&1
-if [ $? -ne 0 ]; then
-    cat ${FUZZ_LOG}
+  set +e
+  python3 $TRT_TEST TrtBF16DataTypeTest.test_${TEST} >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Running $TRT_TEST TrtBF16DataTypeTest.test_${TEST} Failed\n***"
+    cat $CLIENT_LOG
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+  else
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
-        cat $TEST_RESULT_FILE
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
+      cat $CLIENT_LOG
+      echo -e "\n***\n*** Test Result Verification Failed\n***"
+      RET=1
     fi
-fi
+  fi
+  set -e
 
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
+  kill $SERVER_PID
+  wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
+  echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+  echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET

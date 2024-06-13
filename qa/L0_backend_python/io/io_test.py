@@ -162,6 +162,103 @@ class IOTest(unittest.TestCase):
                 self.assertEqual(output.size, i + 1)
                 np.testing.assert_almost_equal(output, np.ones(i + 1) * (i + 1))
 
+    # Non-decoupled models should filter outputs base on requested outputs.
+    def test_requested_output_default(self):
+        model_name = "add_sub"
+        shape = [16]
+
+        input0_data = np.random.rand(*shape).astype(np.float32)
+        input1_data = np.random.rand(*shape).astype(np.float32)
+        inputs = [
+            grpcclient.InferInput(
+                "INPUT0", input0_data.shape, np_to_triton_dtype(input0_data.dtype)
+            ),
+            grpcclient.InferInput(
+                "INPUT1", input1_data.shape, np_to_triton_dtype(input1_data.dtype)
+            ),
+        ]
+        inputs[0].set_data_from_numpy(input0_data)
+        inputs[1].set_data_from_numpy(input1_data)
+
+        # request for output 1, among output 0 and 1.
+        requested_outputs = [grpcclient.InferRequestedOutput("OUTPUT1")]
+        with self._shm_leak_detector.Probe():
+            response = self._client.infer(
+                model_name=model_name,
+                inputs=inputs,
+                outputs=requested_outputs,
+            )
+        outputs = response.get_response().outputs
+        self.assertEqual(len(outputs), len(requested_outputs))
+        output1_data = response.as_numpy("OUTPUT1")
+        self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
+
+        # without requested output should return all outputs
+        with self._shm_leak_detector.Probe():
+            response = self._client.infer(model_name=model_name, inputs=inputs)
+        outputs = response.get_response().outputs
+        self.assertEqual(len(outputs), len(inputs))
+        output0_data = response.as_numpy("OUTPUT0")
+        output1_data = response.as_numpy("OUTPUT1")
+        self.assertTrue(np.allclose(input0_data + input1_data, output0_data))
+        self.assertTrue(np.allclose(input0_data - input1_data, output1_data))
+
+    # Decoupled models should filter outputs base on requested outputs.
+    def test_requested_output_decoupled(self):
+        model_name = "dlpack_io_identity_decoupled"
+        shape = [4]
+        expected_response_repeat = 2
+
+        input0_data = np.random.rand(*shape).astype(np.float32)
+        gpu_output_data = np.random.rand(*shape).astype(np.bool_)
+        inputs = [
+            grpcclient.InferInput(
+                "INPUT0", input0_data.shape, np_to_triton_dtype(input0_data.dtype)
+            ),
+            grpcclient.InferInput(
+                "GPU_OUTPUT",
+                gpu_output_data.shape,
+                np_to_triton_dtype(gpu_output_data.dtype),
+            ),
+        ]
+        inputs[0].set_data_from_numpy(input0_data)
+        inputs[1].set_data_from_numpy(gpu_output_data)
+
+        # request for output 0, among output 0 and next gpu output.
+        requested_outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            client.async_stream_infer(
+                model_name=model_name, inputs=inputs, outputs=requested_outputs
+            )
+            client.stop_stream()
+        for _ in range(expected_response_repeat):
+            self.assertFalse(user_data._completed_requests.empty())
+            response = user_data._completed_requests.get()
+            outputs = response.get_response().outputs
+            self.assertEqual(len(outputs), len(requested_outputs))
+            output0_data = response.as_numpy("OUTPUT0")
+            self.assertTrue(np.allclose(input0_data, output0_data))
+        self.assertTrue(user_data._completed_requests.empty())
+
+        # without requested output should return all outputs
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            client.async_stream_infer(model_name=model_name, inputs=inputs)
+            client.stop_stream()
+        for _ in range(expected_response_repeat):
+            self.assertFalse(user_data._completed_requests.empty())
+            response = user_data._completed_requests.get()
+            outputs = response.get_response().outputs
+            self.assertEqual(len(outputs), len(inputs))
+            output0_data = response.as_numpy("OUTPUT0")
+            next_gpu_output_data = response.as_numpy("NEXT_GPU_OUTPUT")
+            self.assertTrue(np.allclose(input0_data, output0_data))
+            self.assertTrue(np.allclose(gpu_output_data[1:], next_gpu_output_data))
+        self.assertTrue(user_data._completed_requests.empty())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,6 +74,15 @@ for MODEL in \
             echo "parameters: { key: \"cudnn_conv_algo_search\" value: { string_value: \"1\" }} \
             parameters: { key: \"arena_extend_strategy\" value: { string_value: \"1\" }}
             parameters: { key: \"gpu_mem_limit\" value: { string_value: \"18446744073709551614\" }} " \ >> config.pbtxt) && \
+    # CUDA EP optimization params specified in gpu_execution_accelerator field
+    cp -r models/${MODEL}_test models/${MODEL}_cuda_param_field && \
+    (cd models/${MODEL}_cuda_param_field && \
+            sed -i 's/_float32_test/_float32_cuda_param_field/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"cuda\" \
+            parameters { key: \"cudnn_conv_use_max_workspace\" value: \"0\" } \
+            parameters { key: \"use_ep_level_unified_stream\" value: \"1\" } }]}}" \
+            >> config.pbtxt) && \
     # CPU EP optimization params
     cp -r models/${MODEL}_test models/${MODEL}_cpu_config && \
     (cd models/${MODEL}_cpu_config && \
@@ -89,10 +98,10 @@ for MODEL in \
             sed -i 's/_float32_test/_float32_trt/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\"} ] } }" >> config.pbtxt) && \
-    # GPU execution accelerators with correct parameters
-    cp -r models/${MODEL}_test models/${MODEL}_param && \
-    (cd models/${MODEL}_param && \
-            sed -i 's/_float32_test/_float32_param/' \
+    # TRT execution accelerators with correct parameters
+    cp -r models/${MODEL}_test models/${MODEL}_trt_param && \
+    (cd models/${MODEL}_trt_param && \
+            sed -i 's/_float32_test/_float32_trt_param/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
@@ -103,10 +112,10 @@ for MODEL in \
             parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" } }]}}" \
             >> config.pbtxt) && \
-    # GPU execution accelerators with cache enabled
-    cp -r models/${MODEL}_test models/${MODEL}_cache_on && \
-    (cd models/${MODEL}_cache_on && \
-            sed -i 's/_float32_test/_float32_cache_on/' \
+    # TRT execution accelerators with cache enabled
+    cp -r models/${MODEL}_test models/${MODEL}_trt_cache_on && \
+    (cd models/${MODEL}_trt_cache_on && \
+            sed -i 's/_float32_test/_float32_trt_cache_on/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"trt_engine_cache_enable\" value: \"1\" } \
@@ -117,19 +126,19 @@ for MODEL in \
             parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } }]}}" \
             >> config.pbtxt) && \
-    # GPU execution accelerators with unknown parameters
-    cp -r models/${MODEL}_test models/${MODEL}_unknown_param && \
-    (cd models/${MODEL}_unknown_param && \
-            sed -i 's/_float32_test/_float32_unknown_param/' \
+    # TRT execution accelerators with unknown parameters
+    cp -r models/${MODEL}_test models/${MODEL}_trt_unknown_param && \
+    (cd models/${MODEL}_trt_unknown_param && \
+            sed -i 's/_float32_test/_float32_trt_unknown_param/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
             parameters { key: \"segment_size\" value: \"1\" } }]}}" \
             >> config.pbtxt) && \
-    # GPU execution accelerators with invalid parameters
-    cp -r models/${MODEL}_test models/${MODEL}_invalid_param && \
-    (cd models/${MODEL}_invalid_param && \
-            sed -i 's/_float32_test/_float32_invalid_param/' \
+    # TRT execution accelerators with invalid parameters
+    cp -r models/${MODEL}_test models/${MODEL}_trt_invalid_param && \
+    (cd models/${MODEL}_trt_invalid_param && \
+            sed -i 's/_float32_test/_float32_trt_invalid_param/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
@@ -157,25 +166,25 @@ for MODEL in \
         RET=1
     fi
 
-    grep "TensorRT Execution Accelerator is set for '${MODEL}_param'" $SERVER_LOG
+    grep "TensorRT Execution Accelerator is set for '${MODEL}_trt_param'" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_param'\n***"
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_trt_param'\n***"
         RET=1
     fi
 
-    grep "TensorRT Execution Accelerator is set for '${MODEL}_cache_on'" $SERVER_LOG
+    grep "TensorRT Execution Accelerator is set for '${MODEL}_trt_cache_on'" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_cache_on'\n***"
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_trt_cache_on'\n***"
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_unknown_param' version 1: Invalid argument: unknown parameter 'segment_size' is provided for TensorRT Execution Accelerator" $SERVER_LOG
+    grep "failed to load '${MODEL}_trt_unknown_param' version 1: Invalid argument: unknown parameter 'segment_size' is provided for TensorRT Execution Accelerator" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected unknown parameter 'segment_size' returns error\n***"
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to unsigned long long integral number" $SERVER_LOG
+    grep "failed to load '${MODEL}_trt_invalid_param' version 1: Invalid argument: failed to convert 'abc' to unsigned long long integral number" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected invalid parameter 'abc' returns error\n***"
         RET=1
@@ -196,6 +205,12 @@ for MODEL in \
     grep "CUDA Execution Accelerator is set for '${MODEL}_cpu_config'" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set for '${MODEL}_cpu_config'\n***"
+        RET=1
+    fi
+
+    matched_line=$(grep "CUDA Execution Accelerator is set for 'onnx_float32_float32_float32_cuda_param_field'" $SERVER_LOG)
+    if [[ "$matched_line" != *"use_ep_level_unified_stream=1"* ]] || [[ "$matched_line" != *"cudnn_conv_use_max_workspace=0"* ]]; then
+        echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator options correctly set for '${MODEL}_cuda_param_field'\n***"
         RET=1
     fi
 

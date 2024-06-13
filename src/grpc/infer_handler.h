@@ -1024,6 +1024,11 @@ class InferHandlerState {
     if (cstr != nullptr) {
       delay_complete_ms_ = atoi(cstr);
     }
+    const char* pstr = getenv("TRITONSERVER_DELAY_GRPC_PROCESS");
+    delay_process_ms_ = 0;
+    if (pstr != nullptr) {
+      delay_process_ms_ = atoi(pstr);
+    }
 
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
@@ -1120,6 +1125,7 @@ class InferHandlerState {
   // For testing and debugging
   int delay_response_ms_;
   int delay_complete_ms_;
+  int delay_process_ms_;
 
   // For inference requests the allocator payload, unused for other
   // requests.

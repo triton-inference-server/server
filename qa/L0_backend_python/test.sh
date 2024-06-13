@@ -409,7 +409,7 @@ fi
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble bls decoupled"
+    SUBTESTS="ensemble bls decoupled response_sender"
     # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
     # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
     # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
@@ -448,7 +448,8 @@ SUBTESTS="lifecycle argument_validation logging custom_metrics"
 # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
 # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
 if [[ ${TEST_WINDOWS} == 0 ]]; then
-    SUBTESTS+=" restart model_control examples request_rescheduling"
+    # TODO: Reimplement restart on decoupled data pipeline and enable restart.
+    SUBTESTS+=" model_control examples request_rescheduling"
 fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts

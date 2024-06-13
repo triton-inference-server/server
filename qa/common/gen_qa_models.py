@@ -33,6 +33,7 @@ from builtins import range
 import gen_ensemble_model_utils as emu
 import numpy as np
 from gen_common import (
+    np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_tf_dtype,
@@ -2578,6 +2579,18 @@ if __name__ == "__main__":
                 )
 
         if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_fixed_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
+
             for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(
                     FLAGS.models_dir, 8, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
@@ -2853,6 +2866,23 @@ if __name__ == "__main__":
             (-1, 8, -1),
             32,
         )
+
+        if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    (-1, -1),
+                    (-1, -1),
+                    (-1, -1),
+                    0,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
 
     if FLAGS.ensemble:
         # Create utility models used in ensemble
