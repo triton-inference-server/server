@@ -821,7 +821,7 @@ def fastertransformer_cmake_args():
 def tensorrtllm_cmake_args(images):
     cmake_script.cmd("apt-get update && apt-get install -y libcudnn8-dev && ldconfig")
     cmake_script.cmd(
-        "python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt -j 10"
+        "python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt -j 8"
     )
     cargs = [
         cmake_backend_arg(
