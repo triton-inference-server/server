@@ -69,7 +69,8 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.47.0": (
+    # WAR for gitlab/github mains being out of sync
+    "2.47.0dev": (
         "24.06",  # triton container
         "24.06",  # upstream container
         "1.18.0",  # ORT
