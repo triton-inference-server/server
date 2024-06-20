@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -101,6 +101,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
+    elif np_dtype == np.int64:
+        return trt.int64
     elif np_dtype == np.uint8:
         return trt.uint8
     elif np_dtype == np.float16:

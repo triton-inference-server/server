@@ -93,7 +93,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphde
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
 
 # Copy shape tensor models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32_int32 $DATADIR/
 
 # Copying ensemble including a sequential model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
@@ -564,7 +564,7 @@ for PROTOCOL in grpc http; do
     # Shape tensor I/O model (server needs the shape tensor on the CPU)
     for SHARED_MEMORY_TYPE in none system; do
         set +e
-        $PERF_ANALYZER -v -i $PROTOCOL -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
+        $PERF_ANALYZER -v -i $PROTOCOL -m plan_zero_1_float32_int32 --input-data=$SHAPETENSORADTAFILE \
     --shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 -s ${STABILITY_THRESHOLD} \
     >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
