@@ -141,8 +141,9 @@ apt-get update && apt-get install -y \
 
 pip install --upgrade \
   numpy \
-  wheel \
-  tensorrt
+  wheel 
+  
+find / -type f -name *.whl
 
 # Make all generated files accessible outside of container
 umask 0000
