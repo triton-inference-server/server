@@ -31,11 +31,6 @@
 ## container.
 ############################################################################
 #!/bin/bash -xe
-
-# Pre-Install packages needed to build models
-apt-get update && apt-get install -y \
-  python3-dev
-
 # Make all generated files accessible outside of container
 umask 0000
 # Set the version of the models
@@ -138,6 +133,11 @@ CONTAINER_VARSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_model_reposito
 # Set script to generate TensorRT models
 cat >$HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT <<EOF
 #!/bin/bash -xe
+
+# Pre-Install packages needed to build models
+apt-get update && apt-get install -y \
+  python3-dev
+
 # Make all generated files accessible outside of container
 umask 0000
 nvidia-smi -L || true
