@@ -139,7 +139,10 @@ apt-get update && apt-get install -y \
   python3-dev \
   python3-pip
 
-pip install --upgrade numpy
+pip install --upgrade \
+  numpy \
+  wheel \
+  tensorrt
 
 # Make all generated files accessible outside of container
 umask 0000
