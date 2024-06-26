@@ -267,6 +267,11 @@ class TraceManager {
         std::string display_name, const uint64_t& raw_timestamp_ns,
         std::string parent_span_key = "");
 
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartSpan(
+        std::string display_name, const uint64_t& raw_timestamp_ns,
+        uint64_t trace_id, uint64_t parent_id);
+
+
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
 
@@ -275,6 +280,8 @@ class TraceManager {
         uint64_t, std::unique_ptr<std::stack<
                       opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>>>
         span_stacks_;
+
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> root_span_;
 
     /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
     /// Trace context follows W3C Trace Context specification.
@@ -330,7 +337,7 @@ class TraceManager {
     ///
     /// \param span_key Span's key to retrieve the corresponding span from the
     /// OpenTelemetry context.
-    void EndSpan(std::string span_key);
+    void EndSpan(std::string span_key, uint64_t trace_id);
 
     /// Ends the provided span at specified steady timestamp.
     ///
@@ -338,7 +345,9 @@ class TraceManager {
     /// OpenTelemetry context.
     /// \param raw_timestamp_ns Steady timestamp to use as
     /// `EndSpanOptions::end_steady_time`.
-    void EndSpan(std::string span_key, const uint64_t& raw_timestamp_ns);
+    void EndSpan(
+        std::string span_key, const uint64_t& raw_timestamp_ns,
+        uint64_t trace_id);
 
     /// Returns the span key, for which the activity belongs.
     ///
@@ -373,7 +382,8 @@ class TraceManager {
     /// \param event An event to add to the span.
     /// \param timestamp_ns Timestamp of the provided event.
     void AddEvent(
-        std::string span_key, std::string event, uint64_t timestamp_ns);
+        std::string span_key, std::string event, uint64_t timestamp_ns,
+        uint64_t id);
 #endif
   };
 
