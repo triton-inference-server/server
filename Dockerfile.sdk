@@ -123,6 +123,7 @@ COPY ${TRITON_PA_REPO_SUBDIR} perf_analyzer
 # the CC clients twice.
 WORKDIR /workspace/pa_build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
