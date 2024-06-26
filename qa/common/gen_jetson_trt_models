@@ -138,6 +138,8 @@ cat >$HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT <<EOF
 apt-get update && apt-get install -y \
   python3-dev
 
+pip install --upgrade numpy
+
 # Make all generated files accessible outside of container
 umask 0000
 nvidia-smi -L || true
