@@ -31,6 +31,11 @@
 ## container.
 ############################################################################
 #!/bin/bash -xe
+
+# Pre-Install packages needed to build models
+apt-get update && apt-get install -y \
+  python3-dev
+
 # Make all generated files accessible outside of container
 umask 0000
 # Set the version of the models
