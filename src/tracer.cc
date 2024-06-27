@@ -336,18 +336,13 @@ TraceManager::SampleTrace(const TraceStartOptions& start_options)
           std::chrono::duration_cast<std::chrono::nanoseconds>(
               std::chrono::steady_clock::now().time_since_epoch())
               .count();
-      auto active_span =
-          otel_trace_api::GetSpan(start_options.propagated_context);
-      if (active_span->GetContext().IsValid()) {
-        ts->span_stack_.push(active_span);
-      }
+      ts->otel_context_ = start_options.propagated_context;
       opentelemetry::nostd::shared_ptr<otel_trace_api::Span> root_span;
       root_span = ts->StartSpan(
           "InferRequest", steady_timestamp_ns, otel_trace_api::kSpanKey);
       // Storing "InferRequest" span as a root span
       // to keep it alive for the duration of the request.
-      // ts->otel_context_ = ts->otel_context_.SetValue(kRootSpan, root_span);
-      ts->span_stack_.push(root_span);
+      ts->otel_context_ = ts->otel_context_.SetValue(kRootSpan, root_span);
 #else
       LOG_ERROR << "Unsupported trace mode: "
                 << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
@@ -597,8 +592,7 @@ TraceManager::Trace::StartSpan(
     TRITONSERVER_InferenceTraceSetContext(trace, buffer.Contents().c_str());
   }
 
-  // otel_context_ = otel_context_.SetValue(span_key, span);
-  span_stack_.push(span);
+  otel_context_ = otel_context_.SetValue(span_key, span);
 }
 
 opentelemetry::nostd::shared_ptr<otel_trace_api::Span>
@@ -615,14 +609,11 @@ TraceManager::Trace::StartSpan(
 
   // If the new span is a child span, we need to retrieve its parent from
   // the context and provide it through StartSpanOptions to the child span
-  // if (!parent_span_key.empty() && otel_context_.HasKey(parent_span_key)) {
-  //  auto parent_span = opentelemetry::nostd::get<
-  //      opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
-  //      otel_context_.GetValue(parent_span_key));
-  //  options.parent = parent_span->GetContext();
-  //}
-  if (!span_stack_.empty()) {
-    options.parent = span_stack_.top()->GetContext();
+  if (!parent_span_key.empty() && otel_context_.HasKey(parent_span_key)) {
+    auto parent_span = opentelemetry::nostd::get<
+        opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
+        otel_context_.GetValue(parent_span_key));
+    options.parent = parent_span->GetContext();
   }
   auto provider = opentelemetry::trace::Provider::GetTracerProvider();
   return provider->GetTracer(kTritonTracer)->StartSpan(display_name, options);
@@ -642,26 +633,19 @@ void
 TraceManager::Trace::EndSpan(
     std::string span_key, const uint64_t& raw_timestamp_ns)
 {
-  // if (otel_context_.HasKey(span_key)) {
-  //   auto span = opentelemetry::nostd::get<
-  //       opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
-  //       otel_context_.GetValue(span_key));
-  //
-  //  if (span == nullptr) {
-  //    return;
-  //  }
-  //
-  //  otel_trace_api::EndSpanOptions end_options;
-  //  end_options.end_steady_time = otel_common::SteadyTimestamp{
-  //      std::chrono::nanoseconds{raw_timestamp_ns}};
-  //  span->End(end_options);
-  //}
-  if (!span_stack_.empty()) {
+  if (otel_context_.HasKey(span_key)) {
+    auto span = opentelemetry::nostd::get<
+        opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
+        otel_context_.GetValue(span_key));
+
+    if (span == nullptr) {
+      return;
+    }
+
     otel_trace_api::EndSpanOptions end_options;
     end_options.end_steady_time = otel_common::SteadyTimestamp{
         std::chrono::nanoseconds{raw_timestamp_ns}};
-    span_stack_.top()->End(end_options);
-    span_stack_.pop();
+    span->End(end_options);
   }
 }
 
@@ -746,17 +730,11 @@ void
 TraceManager::Trace::AddEvent(
     std::string span_key, std::string event, uint64_t timestamp)
 {
-  // if (otel_context_.HasKey(span_key)) {
-  //   auto span = opentelemetry::nostd::get<
-  //       opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
-  //       otel_context_.GetValue(span_key));
-  //   span->AddEvent(event, time_offset_ +
-  //   std::chrono::nanoseconds{timestamp});
-  // }
-
-  if (!span_stack_.empty()) {
-    span_stack_.top()->AddEvent(
-        event, time_offset_ + std::chrono::nanoseconds{timestamp});
+  if (otel_context_.HasKey(span_key)) {
+    auto span = opentelemetry::nostd::get<
+        opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
+        otel_context_.GetValue(span_key));
+    span->AddEvent(event, time_offset_ + std::chrono::nanoseconds{timestamp});
   }
 }
 
