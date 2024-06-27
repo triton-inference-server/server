@@ -681,7 +681,7 @@ def create_plan_dynamic_rf_modelfile(
     models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size
 ):
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.DEBUG)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
