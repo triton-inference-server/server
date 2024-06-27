@@ -238,8 +238,8 @@ class TraceManager {
     /// `TRITONSERVER_TRACE_COMPUTE_START`,
     /// it starts a new request or compute span. For the request span it
     /// adds some triton related attributes, and adds this span to
-    /// `otel_context_`. Alternatively, if activity is
-    /// `TRITONSERVER_TRACE_REQUEST_END` or
+    /// a span stack, corresponding to the current trace. Alternatively,
+    /// if activity is `TRITONSERVER_TRACE_REQUEST_END` or
     /// `TRITONSERVER_TRACE_COMPUTE_END`, it ends the corresponding span.
     ///
     /// \param trace TRITONSERVER_InferenceTrace instance.
@@ -264,9 +264,6 @@ class TraceManager {
     opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartSpan(
         std::string display_name, const uint64_t& raw_timestamp_ns,
         uint64_t trace_id);
-
-    // OTel context to store spans, created in the current trace
-    opentelemetry::context::Context otel_context_;
 
     // A map to hold spans. Any trace can spawn any amount of chil traces,
     // e.g. ensemble model and BLS. This map holds
