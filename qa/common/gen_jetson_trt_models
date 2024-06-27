@@ -133,18 +133,6 @@ CONTAINER_VARSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_model_reposito
 # Set script to generate TensorRT models
 cat >$HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT <<EOF
 #!/bin/bash -xe
-
-# Pre-Install packages needed to build models
-apt-get update && apt-get install -y \
-  python3-dev \
-  python3-pip
-
-pip install --upgrade \
-  numpy \
-  wheel 
-  
-find / -type f -name *.whl
-
 # Make all generated files accessible outside of container
 umask 0000
 nvidia-smi -L || true
@@ -154,22 +142,22 @@ ldconfig || true
 cd $CONTAINER_SOURCE_DIR
 # Models using shape tensor i/o
 python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --models_dir=$CONTAINER_DESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$CONTAINER_VARDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$CONTAINER_IDENTITYDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$CONTAINER_IDENTITYBIGDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$CONTAINER_RESHAPEDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$CONTAINER_SEQDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$CONTAINER_IMPLICITSEQDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$CONTAINER_VARIMPLICITSEQDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$CONTAINER_VARSEQDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQIMPLICITDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$CONTAINER_RAGGEDDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_format_models.py --models_dir=$CONTAINER_FORMATDESTDIR
-python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$CONTAINER_DATADEPENDENTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$CONTAINER_SHAPEDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --models_dir=$CONTAINER_DESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$CONTAINER_VARDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$CONTAINER_IDENTITYDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$CONTAINER_IDENTITYBIGDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$CONTAINER_RESHAPEDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$CONTAINER_SEQDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$CONTAINER_IMPLICITSEQDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$CONTAINER_VARIMPLICITSEQDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$CONTAINER_VARSEQDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$CONTAINER_DYNASEQIMPLICITDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$CONTAINER_RAGGEDDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_format_models.py --models_dir=$CONTAINER_FORMATDESTDIR
+# python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$CONTAINER_DATADEPENDENTDIR
 
 chmod -R 777 $CONTAINER_MODEL_DIR
 EOF
