@@ -607,7 +607,8 @@ void
 TraceManager::Trace::EndSpan(
     const uint64_t& raw_timestamp_ns, uint64_t trace_id)
 {
-  if (!span_stacks_[trace_id]->empty()) {
+  if (span_stacks_.find(trace_id) != span_stacks_.end() &&
+      !span_stacks_[trace_id]->empty()) {
     otel_trace_api::EndSpanOptions end_options;
     end_options.end_steady_time = otel_common::SteadyTimestamp{
         std::chrono::nanoseconds{raw_timestamp_ns}};
@@ -660,7 +661,8 @@ void
 TraceManager::Trace::AddEvent(
     std::string event, uint64_t timestamp, uint64_t trace_id)
 {
-  if (!span_stacks_[trace_id]->empty()) {
+  if (span_stacks_.find(trace_id) != span_stacks_.end() &&
+      !span_stacks_[trace_id]->empty()) {
     span_stacks_[trace_id]->top()->AddEvent(
         event, time_offset_ + std::chrono::nanoseconds{timestamp});
   }
