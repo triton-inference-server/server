@@ -451,7 +451,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     //  Decoupled state transitions
     //
     if (state->step_ == Steps::WRITTEN) {
-      state->context_->ongoing_write_ = false;
 #ifdef TRITON_ENABLE_TRACING
       state->trace_timestamps_.emplace_back(
           std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
@@ -469,59 +468,77 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->finish_ok_ = false;
       }
 
+      InferHandler::State* writing_state = nullptr;
+      {
+        std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+        if (!state->context_->ready_to_write_states_.empty()) {
+          writing_state = state->context_->ready_to_write_states_.front();
+          state->context_->ready_to_write_states_.pop();
+        }
+      }
+      if (writing_state != nullptr) {
+        StateWriteResponse(writing_state);
+      }
+
       // Finish the state if all the transactions associated with
       // the state have completed.
-      if (state->IsComplete()) {
-        state->context_->DecrementRequestCounter();
-        finished = Finish(state);
-      } else {
+      {
         std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-
-        // If there is an available response to be written
-        // to the stream, then transition directly to WRITEREADY
-        // state and enqueue itself to the completion queue to be
-        // taken up later. Otherwise, go to ISSUED state and wait
-        // for the callback to make a response available.
-        if (state->response_queue_->HasReadyResponse()) {
-          state->step_ = Steps::WRITEREADY;
-          state->context_->PutTaskBackToQueue(state);
-        } else {
-          state->step_ = Steps::ISSUED;
+        if (state != writing_state) {
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          if (state->IsComplete()) {
+            state->context_->DecrementRequestCounter();
+            finished = Finish(state);
+          } else {
+            state->step_ = Steps::ISSUED;
+          }
+        }
+        if (writing_state == nullptr) {
+          std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+          state->context_->ongoing_write_ = false;
         }
       }
     } else if (state->step_ == Steps::WRITEREADY) {
-      if (state->delay_response_ms_ != 0) {
-        // Will delay the write of the response by the specified time.
-        // This can be used to test the flow where there are other
-        // responses available to be written.
-        LOG_INFO << "Delaying the write of the response by "
-                 << state->delay_response_ms_ << " ms...";
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(state->delay_response_ms_));
-      }
-
       // Finish the state if all the transactions associated with
       // the state have completed.
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
       } else {
-        // GRPC doesn't allow to issue another write till
-        // the notification from previous write has been
-        // delivered. If there is an ongoing write then
-        // defer writing and place the task at the back
-        // of the completion queue to be taken up later.
-        if (!state->context_->ongoing_write_) {
-          state->context_->ongoing_write_ = true;
-          state->context_->DecoupledWriteResponse(state);
-        } else {
-          state->context_->PutTaskBackToQueue(state);
-        }
+        LOG_ERROR << "Should not print this! Decoupled should NOT write via "
+                     "WRITEREADY!";
+        // Remove the state from the completion queue
+        std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+        state->step_ = Steps::ISSUED;
       }
     }
   }
 
   return !finished;
+}
+
+// For decoupled only. Caller must ensure exclusive write.
+void
+ModelStreamInferHandler::StateWriteResponse(InferHandler::State* state)
+{
+  if (state->delay_response_ms_ != 0) {
+    // Will delay the write of the response by the specified time.
+    // This can be used to test the flow where there are other
+    // responses available to be written.
+    LOG_INFO << "Delaying the write of the response by "
+             << state->delay_response_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_response_ms_));
+  }
+  {
+    std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+    state->step_ = Steps::WRITTEN;
+  }
+  state->context_->DecoupledWriteResponse(state);
+  if (state->response_queue_->HasReadyResponse()) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    state->context_->ready_to_write_states_.push(state);
+  }
 }
 
 bool
@@ -702,6 +719,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   // Update states to signal that response/error is ready to write to stream
+  InferHandler::State* writing_state = nullptr;  // decoupled only
   {
     // Need to hold lock because the handler thread processing context
     // cancellation might have cancelled or marked the state for cancellation.
@@ -726,14 +744,32 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     if (state->is_decoupled_) {
+      bool has_prev_ready_response = state->response_queue_->HasReadyResponse();
       if (response) {
         state->response_queue_->MarkNextResponseComplete();
       }
-      if (state->step_ == Steps::ISSUED) {
+      bool complete_state = false;
+      {
+        std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+        if (!has_prev_ready_response && response) {
+          state->context_->ready_to_write_states_.push(state);
+        }
+        if (!state->context_->ongoing_write_) {
+          if (!state->context_->ready_to_write_states_.empty()) {
+            state->context_->ongoing_write_ = true;
+            writing_state = state->context_->ready_to_write_states_.front();
+            state->context_->ready_to_write_states_.pop();
+          }
+          complete_state =
+              (writing_state == nullptr && is_complete &&
+               state->response_queue_->IsEmpty());
+        }
+      }
+      if (complete_state) {
         state->step_ = Steps::WRITEREADY;
         state->context_->PutTaskBackToQueue(state);
       }
-    } else {
+    } else {  // non-decoupled
       state->step_ = Steps::WRITEREADY;
       if (is_complete) {
         state->context_->WriteResponseIfReady(state);
@@ -741,6 +777,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     state->complete_ = is_complete;
+  }
+  if (writing_state != nullptr) {
+    StateWriteResponse(writing_state);
   }
 }
 

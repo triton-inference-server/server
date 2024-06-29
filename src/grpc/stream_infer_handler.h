@@ -112,6 +112,7 @@ class ModelStreamInferHandler
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
+  static void StateWriteResponse(InferHandler::State* state);
   bool Finish(State* state);
 
   TraceManager* trace_manager_;

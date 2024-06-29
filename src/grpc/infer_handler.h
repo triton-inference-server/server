@@ -979,6 +979,9 @@ class InferHandlerState {
     // Tracks all the states that have been created on this context.
     std::set<InferHandlerStateType*> all_states_;
 
+    // Ready to write queue for decoupled
+    std::queue<InferHandlerStateType*> ready_to_write_states_;
+
     // The step of the entire context.
     Steps step_;
 
