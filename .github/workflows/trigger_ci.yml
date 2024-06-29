@@ -1,0 +1,11 @@
+on:
+  pull_request:
+jobs:
+  mirror_repo:
+    environment: GITLAB
+    runs-on: self-hosted
+    steps:
+      - name: step1
+        run: |
+          #!/bin/bash
+          curl --request POST --header "PRIVATE-TOKEN:${{ secrets.TOKEN }}" "${{ secrets.MIRROR_URL }}"
