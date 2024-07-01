@@ -253,6 +253,7 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    aws s3 rb "${BUCKET_URL}" --force || true
     exit 1
 fi
 
@@ -286,6 +287,7 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    aws s3 rb "${BUCKET_URL}" --force || true
     exit 1
 fi
 
