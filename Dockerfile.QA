@@ -150,10 +150,7 @@ RUN mkdir -p qa/common && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
     cp bin/input_byte_size_test qa/L0_input_validation/. && \
-    mkdir -p qa/L0_input_validation/models/string_identity/1 && \
-    cp -r qa/python_models/string_identity/. qa/L0_input_validation/models/string_identity && \
-    mv qa/L0_input_validation/models/string_identity/model.py qa/L0_input_validation/models/string_identity/1 && \
-    sed -i "s/dims: \[ [0-9]\+ \]/dims: [ -1 ]/" "qa/L0_input_validation/models/string_identity/config.pbtxt"
+    cp -r docs/examples/model_repository/simple_identity qa/L0_input_validation/models
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
