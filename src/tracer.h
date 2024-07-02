@@ -360,7 +360,8 @@ class TraceManager {
     /// \param event An event to add to the span.
     /// \param timestamp_ns Timestamp of the provided event.
     /// \param trace_id Trace id.
-    void AddEvent(const std::string& event, uint64_t timestamp_ns, uint64_t trace_id);
+    void AddEvent(
+        const std::string& event, uint64_t timestamp_ns, uint64_t trace_id);
 #endif
   };
 
