@@ -265,7 +265,7 @@ class TraceManager {
         std::string display_name, const uint64_t& raw_timestamp_ns,
         uint64_t trace_id);
 
-    // A map to hold spans. Any trace can spawn any amount of chil traces,
+    // A map to hold spans. Any trace can spawn any amount of child traces,
     // e.g. ensemble model and BLS. This map holds
     // ( trace id, stack of started spans ) pair and for each trase keeps
     // started spans alive for the duration of the traced
@@ -340,7 +340,7 @@ class TraceManager {
     /// \param trace_id Trace id.
     void EndSpan(const uint64_t& raw_timestamp_ns, uint64_t trace_id);
 
-    /// Adds event to the span on the top of the stack, related to trace
+    /// Adds an event to the span on the top of the stack, related to trace
     /// with `trace_id`. If activity is TRITONSERVER_TRACE_REQUEST_START,
     /// or TRITONSERVER_TRACE_COMPUTE_START, starts a new span and adds it
     /// to the span's stack.
@@ -355,12 +355,12 @@ class TraceManager {
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
         uint64_t trace_id);
 
-    /// Adds event to the OpenTelemetry span.
+    /// Adds an event to the OpenTelemetry span.
     ///
     /// \param event An event to add to the span.
     /// \param timestamp_ns Timestamp of the provided event.
     /// \param trace_id Trace id.
-    void AddEvent(std::string event, uint64_t timestamp_ns, uint64_t trace_id);
+    void AddEvent(const std::string& event, uint64_t timestamp_ns, uint64_t trace_id);
 #endif
   };
 
