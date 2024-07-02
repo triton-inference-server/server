@@ -418,21 +418,26 @@ TraceManager::Trace::RetrieveActivityName(
 {
   std::string activity_name =
       TRITONSERVER_InferenceTraceActivityString(activity);
-  if (activity != TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+
+  if (setting_->mode_ == TRACE_MODE_TRITON) {
     return activity_name;
   }
-  const char* val = nullptr;
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceContext(trace, &val),
-      "Failed to retrieve trace context");
-  std::string context_str = (val != nullptr) ? std::string(val) : "";
-  triton::common::TritonJson::Value context;
-  LOG_TRITONSERVER_ERROR(
-      context.Parse(context_str), "Failed to parse trace context");
-  std::string look_for_key = std::to_string(timestamp_ns);
-  if (context.Find(look_for_key.c_str())) {
-    context.MemberAsString(look_for_key.c_str(), &activity_name);
+
+  if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+    const char* val = nullptr;
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceContext(trace, &val),
+        "Failed to retrieve trace context");
+    std::string context_str = (val != nullptr) ? std::string(val) : "";
+    triton::common::TritonJson::Value context;
+    LOG_TRITONSERVER_ERROR(
+        context.Parse(context_str), "Failed to parse trace context");
+    std::string look_for_key = std::to_string(timestamp_ns);
+    if (context.Find(look_for_key.c_str())) {
+      context.MemberAsString(look_for_key.c_str(), &activity_name);
+    }
   }
+
   return activity_name;
 }
 
@@ -541,7 +546,7 @@ void
 TraceManager::Trace::StartSpan(
     TRITONSERVER_InferenceTrace* trace,
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-    uint64_t trace_id)
+    uint64_t trace_id, std::string display_name)
 {
   uint64_t parent_id;
   LOG_TRITONSERVER_ERROR(
@@ -560,19 +565,10 @@ TraceManager::Trace::StartSpan(
   // the ensamble's main request. For this instance, the parent
   // span is the ensembles's request span.
   if ((parent_id == 0 && activity == TRITONSERVER_TRACE_REQUEST_START) ||
-      (activity == TRITONSERVER_TRACE_COMPUTE_START)) {
+      (activity == TRITONSERVER_TRACE_COMPUTE_START) ||
+      (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY)) {
     span_parent_id = trace_id;
   }
-
-  std::string display_name = "compute";
-  const char* model_name;
-  if (activity == TRITONSERVER_TRACE_REQUEST_START) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceTraceModelName(trace, &model_name),
-        "getting model name");
-    display_name = model_name;
-  }
-
   auto span = StartSpan(display_name, timestamp_ns, span_parent_id);
 
   if (activity == TRITONSERVER_TRACE_REQUEST_START) {
@@ -584,7 +580,7 @@ TraceManager::Trace::StartSpan(
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceRequestId(trace, &request_id),
         "getting request id");
-    span->SetAttribute("triton.model_name", model_name);
+    span->SetAttribute("triton.model_name", display_name);
     span->SetAttribute("triton.model_version", model_version);
     span->SetAttribute("triton.trace_id", trace_id);
     span->SetAttribute("triton.trace_parent_id", parent_id);
@@ -669,21 +665,40 @@ TraceManager::Trace::AddEvent(
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
     uint64_t trace_id)
 {
-  if (activity == TRITONSERVER_TRACE_REQUEST_START ||
-      activity == TRITONSERVER_TRACE_COMPUTE_START) {
-    StartSpan(trace, activity, timestamp_ns, trace_id);
-  }
-
   std::string activity_name =
-      TRITONSERVER_InferenceTraceActivityString(activity);
-  if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
-    activity_name = RetrieveActivityName(trace, activity, timestamp_ns);
+      RetrieveActivityName(trace, activity, timestamp_ns);
+  std::string start = "_START";
+  std::string end = "_END";
+  if (activity == TRITONSERVER_TRACE_REQUEST_START ||
+      activity == TRITONSERVER_TRACE_COMPUTE_START ||
+      (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY &&
+       activity_name.length() > start.length() &&
+       std::equal(start.rbegin(), start.rend(), activity_name.rbegin()))) {
+    std::string span_name = activity_name;
+
+    if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+      span_name =
+          activity_name.substr(0, activity_name.length() - start.length());
+    } else if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+      const char* model_name;
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceTraceModelName(trace, &model_name),
+          "getting model name");
+      span_name = model_name;
+    } else if (activity == TRITONSERVER_TRACE_COMPUTE_START) {
+      span_name = "compute";
+    }
+
+    StartSpan(trace, activity, timestamp_ns, trace_id, span_name);
   }
 
   AddEvent(activity_name, timestamp_ns, trace_id);
 
   if (activity == TRITONSERVER_TRACE_REQUEST_END ||
-      activity == TRITONSERVER_TRACE_COMPUTE_END) {
+      activity == TRITONSERVER_TRACE_COMPUTE_END ||
+      (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY &&
+       activity_name.length() > end.length() &&
+       std::equal(end.rbegin(), end.rend(), activity_name.rbegin()))) {
     EndSpan(timestamp_ns, trace_id);
   }
 }

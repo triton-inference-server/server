@@ -329,7 +329,7 @@ class TraceManager {
     void StartSpan(
         TRITONSERVER_InferenceTrace* trace,
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-        uint64_t trace_id);
+        uint64_t trace_id, std::string display_name);
 
     /// Ends the span on the top of the stack, related to trace with `trace_id`.
     ///
