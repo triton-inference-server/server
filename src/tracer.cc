@@ -419,10 +419,6 @@ TraceManager::Trace::RetrieveActivityName(
   std::string activity_name =
       TRITONSERVER_InferenceTraceActivityString(activity);
 
-  if (setting_->mode_ == TRACE_MODE_TRITON) {
-    return activity_name;
-  }
-
   if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
     const char* val = nullptr;
     LOG_TRITONSERVER_ERROR(
