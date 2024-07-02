@@ -659,7 +659,7 @@ TraceManager::Trace::AddEvent(
 
 void
 TraceManager::Trace::AddEvent(
-    std::string event, uint64_t timestamp, uint64_t trace_id)
+    const std::string& event, uint64_t timestamp, uint64_t trace_id)
 {
   if (span_stacks_.find(trace_id) != span_stacks_.end() &&
       !span_stacks_[trace_id]->empty()) {
