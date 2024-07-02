@@ -437,7 +437,6 @@ TraceManager::Trace::RetrieveActivityName(
   return activity_name;
 }
 
-
 void
 TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 {

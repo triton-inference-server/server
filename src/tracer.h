@@ -231,6 +231,8 @@ class TraceManager {
     // with this trace.
     void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
 
+    // Returns activity name. For custom activities, retrieves the name from
+    // the trace context. For other activities, returns default name.
     std::string RetrieveActivityName(
         TRITONSERVER_InferenceTrace* trace,
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
