@@ -474,6 +474,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         if (!state->context_->ready_to_write_states_.empty()) {
           writing_state = state->context_->ready_to_write_states_.front();
           state->context_->ready_to_write_states_.pop();
+        } else {
+          state->context_->ongoing_write_ = false;
         }
       }
       if (writing_state != nullptr) {
@@ -482,20 +484,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
       // Finish the state if all the transactions associated with
       // the state have completed.
-      {
+      if (state != writing_state) {
         std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-        if (state != writing_state) {
-          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-          if (state->IsComplete()) {
-            state->context_->DecrementRequestCounter();
-            finished = Finish(state);
-          } else {
-            state->step_ = Steps::ISSUED;
-          }
-        }
-        if (writing_state == nullptr) {
-          std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-          state->context_->ongoing_write_ = false;
+        if (state->IsComplete()) {
+          state->context_->DecrementRequestCounter();
+          finished = Finish(state);
+        } else {
+          state->step_ = Steps::ISSUED;
         }
       }
     } else if (state->step_ == Steps::WRITEREADY) {
@@ -533,11 +528,11 @@ ModelStreamInferHandler::StateWriteResponse(InferHandler::State* state)
   {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     state->step_ = Steps::WRITTEN;
-  }
-  state->context_->DecoupledWriteResponse(state);
-  if (state->response_queue_->HasReadyResponse()) {
-    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-    state->context_->ready_to_write_states_.push(state);
+    state->context_->DecoupledWriteResponse(state);
+    if (state->response_queue_->HasReadyResponse()) {
+      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+      state->context_->ready_to_write_states_.push(state);
+    }
   }
 }
 
@@ -748,24 +743,20 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       if (response) {
         state->response_queue_->MarkNextResponseComplete();
       }
-      bool complete_state = false;
       {
         std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
         if (!has_prev_ready_response && response) {
           state->context_->ready_to_write_states_.push(state);
         }
-        if (!state->context_->ongoing_write_) {
-          if (!state->context_->ready_to_write_states_.empty()) {
-            state->context_->ongoing_write_ = true;
-            writing_state = state->context_->ready_to_write_states_.front();
-            state->context_->ready_to_write_states_.pop();
-          }
-          complete_state =
-              (writing_state == nullptr && is_complete &&
-               state->response_queue_->IsEmpty());
+        if (!state->context_->ongoing_write_ &&
+            !state->context_->ready_to_write_states_.empty()) {
+          state->context_->ongoing_write_ = true;
+          writing_state = state->context_->ready_to_write_states_.front();
+          state->context_->ready_to_write_states_.pop();
         }
       }
-      if (complete_state) {
+      if (is_complete && state->response_queue_->IsEmpty() &&
+          state->step_ == Steps::ISSUED) {
         state->step_ = Steps::WRITEREADY;
         state->context_->PutTaskBackToQueue(state);
       }
