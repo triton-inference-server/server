@@ -115,6 +115,7 @@ class CleanUpTest(tu.TestResultCollector):
             for i in range(request_count):
                 if kill_server == i:
                     os.kill(int(self.SERVER_PID), signal.SIGINT)
+                    time.sleep(0.1)
                 this_timeout = None
                 if timeout_idx == i:
                     this_timeout = timeout_value
@@ -170,6 +171,7 @@ class CleanUpTest(tu.TestResultCollector):
                 self.inputs_[1].set_data_from_numpy(delay_data)
                 if kill_server == i:
                     os.kill(int(self.SERVER_PID), signal.SIGINT)
+                    time.sleep(0.1)
                 triton_client.async_stream_infer(
                     model_name=self.decoupled_model_name_,
                     inputs=self.inputs_,
@@ -241,6 +243,7 @@ class CleanUpTest(tu.TestResultCollector):
                     self.inputs_[1].set_data_from_numpy(delay_data)
                 if kill_server == i:
                     os.kill(int(self.SERVER_PID), signal.SIGINT)
+                    time.sleep(0.1)
                 triton_client.async_stream_infer(
                     model_name=model_name,
                     inputs=self.inputs_,
@@ -428,12 +431,13 @@ class CleanUpTest(tu.TestResultCollector):
     def test_simple_infer_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._simple_infer(request_count=10)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
-        )
+        self.assertIn(str(cm.exception), expected_exceptions)
 
     def test_simple_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
@@ -469,12 +473,13 @@ class CleanUpTest(tu.TestResultCollector):
     def test_streaming_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._streaming_infer(request_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
-        )
+        self.assertIn(str(cm.exception), expected_exceptions)
 
     def test_streaming_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
@@ -520,12 +525,13 @@ class CleanUpTest(tu.TestResultCollector):
     def test_decoupled_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._decoupled_infer(request_count=10, repeat_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
-        )
+        self.assertIn(str(cm.exception), expected_exceptions)
 
     def test_decoupled_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
