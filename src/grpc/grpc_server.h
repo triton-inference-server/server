@@ -39,6 +39,7 @@
 #include "infer_handler.h"
 #include "stream_infer_handler.h"
 #include "triton/core/tritonserver.h"
+#include "../server_interface.h"
 
 namespace triton { namespace server { namespace grpc {
 
@@ -92,7 +93,7 @@ struct Options {
   std::string forward_header_pattern_;
 };
 
-class Server {
+class Server : public Server_Interface {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,

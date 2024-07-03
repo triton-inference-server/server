@@ -44,6 +44,7 @@
 #include "tracer.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
+#include "server_interface.h"
 
 namespace triton { namespace server {
 
@@ -76,7 +77,7 @@ class MappingSchema {
 };
 
 // Generic HTTP server using evhtp
-class HTTPServer {
+class HTTPServer : public Server_Interface {
  public:
   virtual ~HTTPServer() { IGNORE_ERR(Stop()); }
 
