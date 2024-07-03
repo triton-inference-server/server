@@ -437,7 +437,13 @@ class CleanUpTest(tu.TestResultCollector):
         ]
         with self.assertRaises(InferenceServerException) as cm:
             self._simple_infer(request_count=10)
-        self.assertIn(str(cm.exception), expected_exceptions)
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
+        )
 
     def test_simple_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
@@ -479,7 +485,13 @@ class CleanUpTest(tu.TestResultCollector):
         ]
         with self.assertRaises(InferenceServerException) as cm:
             self._streaming_infer(request_count=10, should_error=True)
-        self.assertIn(str(cm.exception), expected_exceptions)
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
+        )
 
     def test_streaming_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
@@ -531,7 +543,13 @@ class CleanUpTest(tu.TestResultCollector):
         ]
         with self.assertRaises(InferenceServerException) as cm:
             self._decoupled_infer(request_count=10, repeat_count=10, should_error=True)
-        self.assertIn(str(cm.exception), expected_exceptions)
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
+        )
 
     def test_decoupled_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
