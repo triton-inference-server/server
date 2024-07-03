@@ -105,7 +105,7 @@ mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_in
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }]' >> config.pbtxt)
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }]' >> config.pbtxt)
 
 RET=0
 
@@ -845,7 +845,7 @@ mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_in
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "nested_span_count" \n value: { string_value: "6" } }, { key: "single_activity_frequency" \n value: { string_value: "3" } }]' >> config.pbtxt)
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }, { key: "nested_span_count" \n value: { string_value: "6" } }, { key: "single_activity_frequency" \n value: { string_value: "3" } }]' >> config.pbtxt)
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
