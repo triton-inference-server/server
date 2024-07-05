@@ -765,7 +765,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Send 1 inference request, should expect 3 cstom activities:
+# Send 1 inference request, should expect 3 custom activities:
 # CUSTOM_SINGLE_ACTIVITY, CUSTOM_ACTIVITY_START, CUSTOM_ACTIVITY_END
 rm -f ./curl.out
 data='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,1],"data":[4]}]}'
@@ -796,13 +796,13 @@ fi
 
 if [ `grep -c "CUSTOM_ACTIVITY_START" summary_custom_tracing_triton.log` != "1" ]; then
     cat summary_custom_tracing_triton.log
-    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY" events.\n***"
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_START" events.\n***"
     RET=1
 fi
 
 if [ `grep -c "CUSTOM_ACTIVITY_END" summary_custom_tracing_triton.log` != "1" ]; then
     cat summary_custom_tracing_triton.log
-    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY" events.\n***"
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_END" events.\n***"
     RET=1
 fi
 
