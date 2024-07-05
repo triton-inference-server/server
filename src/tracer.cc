@@ -659,8 +659,8 @@ TraceManager::Trace::AddEvent(
 {
   std::string activity_name =
       RetrieveActivityName(trace, activity, timestamp_ns);
-  std::string start = "_START";
-  std::string end = "_END";
+  static std::string start = "_START";
+  static std::string end = "_END";
   if (activity == TRITONSERVER_TRACE_REQUEST_START ||
       activity == TRITONSERVER_TRACE_COMPUTE_START ||
       (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY &&
