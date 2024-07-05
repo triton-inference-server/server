@@ -46,9 +46,10 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
-SHAPE_TEST_PY=./input_shape_validation_test.py
 TEST_RESULT_FILE='./test_results.txt'
 SERVER_LOG="./inference_server.log"
+TEST_LOG="./input_byte_size_test.log"
+TEST_EXEC=./input_byte_size_test
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -142,6 +143,15 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# input_byte_size_test
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
