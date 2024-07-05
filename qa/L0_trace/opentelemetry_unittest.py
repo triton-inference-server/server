@@ -115,12 +115,14 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.bls_model_name = "bls_simple"
         self.trace_context_model = "trace_context"
         self.non_decoupled_model_name_ = "repeat_int32"
+        self.identity_model = "custom_identity_int32"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
             self.bls_model_name,
             self.non_decoupled_model_name_,
             self.cancel_queue_model_name,
+            self.identity_model,
         ]
         self.root_span = "InferRequest"
         self._user_data = UserData()
@@ -219,6 +221,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertFalse(
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
+            self.assertEquals(len(events), len(compute_events))
 
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
@@ -230,16 +233,20 @@ class OpenTelemetryTest(tu.TestResultCollector):
             if "HTTP" in events:
                 self.assertTrue(all(entry in events for entry in root_events_http))
                 self.assertFalse(all(entry in events for entry in root_events_grpc))
+                self.assertEquals(len(events), len(root_events_http))
 
             elif "GRPC" in events:
                 self.assertTrue(all(entry in events for entry in root_events_grpc))
                 self.assertFalse(all(entry in events for entry in root_events_http))
+                self.assertEquals(len(events), len(root_events_grpc))
 
             if is_cancelled == False:
                 self.assertFalse(all(entry in events for entry in request_events))
                 self.assertFalse(all(entry in events for entry in compute_events))
 
         elif span_name in self.test_models:
+            if span_name == self.identity_model:
+                request_events.append("CUSTOM_SINGLE_ACTIVITY")
             # Check that all request related events (and only them)
             # are recorded in request span
             self.assertTrue(all(entry in events for entry in request_events))
@@ -247,6 +254,31 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
             self.assertFalse(all(entry in events for entry in compute_events))
+            self.assertEquals(len(events), len(request_events))
+
+        elif span_name.startswith("CUSTOM_ACTIVITY"):
+            custom_activity_events = []
+            if len(span_name) > len("CUSTOM_ACTIVITY"):
+                custom_activity_events.append(str(span_name + "_START"))
+                custom_activity_events.append(str(span_name + "_END"))
+                # Check `custom_identity_int32` config file,
+                # parameter `single_activity_frequency` identifies
+                # which custom spans contain "CUSTOM_SINGLE_ACTIVITY" event
+                if int(span_name[-1]) % 3 == 0:
+                    custom_activity_events.append("CUSTOM_SINGLE_ACTIVITY")
+            else:
+                custom_activity_events = [
+                    "CUSTOM_ACTIVITY_START",
+                    "CUSTOM_ACTIVITY_END",
+                ]
+
+            self.assertTrue(
+                all(entry in events for entry in custom_activity_events),
+                "Span " + span_name,
+            )
+            self.assertEquals(
+                len(events), len(custom_activity_events), "Span " + span_name
+            )
 
     def _test_resource_attributes(self, attributes):
         """
@@ -479,6 +511,52 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         expected_parent_span_dict = dict(
             {"InferRequest": ["simple"], "simple": ["compute"]}
+        )
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
+
+    def _test_custom_identity_trace(self, headers=None):
+        """
+        Helper function, that specifies expected parameters to evaluate trace,
+        collected from running 1 inference request for `custom_identity_int32`
+        model.
+        Number of custom spans defined by the identity backend.
+        `CUSTOM_ACTIVITY` span will always be there,
+        `CUSTOM_ACTIVITY<N>` defined by `config.pbtxt parameters`.
+        """
+        expected_number_of_spans = 10
+        expected_counts = dict(
+            {
+                "compute": 1,
+                self.identity_model: 1,
+                self.root_span: 1,
+                "CUSTOM_ACTIVITY": 1,
+                "CUSTOM_ACTIVITY0": 1,
+                "CUSTOM_ACTIVITY1": 1,
+                "CUSTOM_ACTIVITY2": 1,
+                "CUSTOM_ACTIVITY3": 1,
+                "CUSTOM_ACTIVITY4": 1,
+                "CUSTOM_ACTIVITY5": 1,
+            }
+        )
+        expected_parent_span_dict = dict(
+            {
+                "InferRequest": ["custom_identity_int32"],
+                "custom_identity_int32": [
+                    "CUSTOM_ACTIVITY",
+                    "CUSTOM_ACTIVITY0",
+                    "compute",
+                ],
+                "CUSTOM_ACTIVITY0": ["CUSTOM_ACTIVITY1"],
+                "CUSTOM_ACTIVITY1": ["CUSTOM_ACTIVITY2"],
+                "CUSTOM_ACTIVITY2": ["CUSTOM_ACTIVITY3"],
+                "CUSTOM_ACTIVITY3": ["CUSTOM_ACTIVITY4"],
+                "CUSTOM_ACTIVITY4": ["CUSTOM_ACTIVITY5"],
+            }
         )
         self._test_trace(
             headers=headers,
@@ -943,6 +1021,33 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.assertIn("traceparent", context.keys())
         context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
         self.assertIsNotNone(re.match(context_pattern, context["traceparent"]))
+
+    def test_custom_backend_tracing(self):
+        """
+        Tests custom activities reported from identity backend.
+        """
+        input0_ = np.array([[4]], dtype=np.int32)
+        with httpclient.InferenceServerClient("localhost:8000", verbose=True) as client:
+            inputs = []
+            inputs.append(httpclient.InferInput("INPUT0", [1, 1], "INT32"))
+            inputs[0].set_data_from_numpy(input0_)
+            client.infer(self.identity_model, inputs=inputs)
+        self._test_custom_identity_trace()
+
+    def test_custom_backend_tracing_context_propagation(self):
+        """
+        Tests custom activities reported from identity backend.
+        """
+        input0_ = np.array([[4]], dtype=np.int32)
+        with httpclient.InferenceServerClient("localhost:8000", verbose=True) as client:
+            inputs = []
+            inputs.append(httpclient.InferInput("INPUT0", [1, 1], "INT32"))
+            inputs[0].set_data_from_numpy(input0_)
+            client.infer(
+                self.identity_model, inputs=inputs, headers=self.client_headers
+            )
+
+        self._test_custom_identity_trace(headers=self.client_headers)
 
 
 if __name__ == "__main__":
