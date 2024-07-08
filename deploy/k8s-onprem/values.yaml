@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@ tags:
   loadBalancing: true
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:24.06-py3
+  imageName: nvcr.io/nvidia/tritonserver:24.07-py3
   pullPolicy: IfNotPresent
   modelRepositoryServer: < Replace with the IP Address of your file server >
   modelRepositoryPath: /srv/models
