@@ -367,14 +367,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
         {
           std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
-          bool has_prev_ready_response =
-              state->response_queue_->HasReadyResponse();
           state->response_queue_->MarkNextResponseComplete();
-          if (!has_prev_ready_response) {
-            state->context_->ready_to_write_states_.push(state);
-          }
-          if (!state->context_->ongoing_write_ &&
-              !state->context_->ready_to_write_states_.empty()) {
+          state->context_->ready_to_write_states_.push(state);
+          if (!state->context_->ongoing_write_) {
             state->context_->ongoing_write_ = true;
             writing_state = state->context_->ready_to_write_states_.front();
             state->context_->ready_to_write_states_.pop();
