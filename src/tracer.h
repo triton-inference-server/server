@@ -32,6 +32,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -230,6 +231,19 @@ class TraceManager {
     // with this trace.
     void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
 
+    /// Returns activity name. For custom activities, retrieves the name from
+    /// the trace context. For other activities, returns default name.
+    ///
+    /// \param trace TRITONSERVER_InferenceTrace instance.
+    /// \param activity  Trace activity.
+    /// \param timestamp_ns Steady timestamp, which is used to calculate
+    /// OpenTelemetry SystemTimestamp to display span on a timeline, and
+    /// OpenTelemetry SteadyTimestamp to calculate the duration on the span
+    /// with better precision.
+    std::string RetrieveActivityName(
+        TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
+
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
     /// Reports TRITONSERVER_InferenceTraceActivity as event to
     /// the currently active span. If activity is an instance of
@@ -237,8 +251,8 @@ class TraceManager {
     /// `TRITONSERVER_TRACE_COMPUTE_START`,
     /// it starts a new request or compute span. For the request span it
     /// adds some triton related attributes, and adds this span to
-    /// `otel_context_`. Alternatively, if activity is
-    /// `TRITONSERVER_TRACE_REQUEST_END` or
+    /// a span stack, corresponding to the current trace. Alternatively,
+    /// if activity is `TRITONSERVER_TRACE_REQUEST_END` or
     /// `TRITONSERVER_TRACE_COMPUTE_END`, it ends the corresponding span.
     ///
     /// \param trace TRITONSERVER_InferenceTrace instance.
@@ -258,16 +272,25 @@ class TraceManager {
     /// OpenTelemetry SystemTimestamp to display span on a timeline, and
     /// OpenTelemetry SteadyTimestamp to calculate the duration on the span
     /// with better precision.
-    /// \param parent_span_key A span key, to find a parent span in the
-    /// OpenTelemetry context. If empty, a root span will be started,
-    /// i.e. with no parent span specified.
+    /// \param trace_id Trace id.
     /// \return A shared pointer to a newly created OpenTelemetry span.
     opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartSpan(
         std::string display_name, const uint64_t& raw_timestamp_ns,
-        std::string parent_span_key = "");
+        uint64_t trace_id);
 
-    // OTel context to store spans, created in the current trace
-    opentelemetry::context::Context otel_context_;
+    // A map to hold spans. Any trace can spawn any amount of child traces,
+    // e.g. ensemble model and BLS. This map holds
+    // ( trace id, stack of started spans ) pair and for each trase keeps
+    // started spans alive for the duration of the traced
+    // event and helps to preserve parent-child relationship.
+    std::unordered_map<
+        uint64_t, std::unique_ptr<std::stack<
+                      opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>>>
+        span_stacks_;
+
+    // Root span. Some events should be recorded in the root span, while
+    // request span is still alive and present in the stack.
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> root_span_;
 
     /// Prepares trace context to propagate to TRITONSERVER_InferenceTrace.
     /// Trace context follows W3C Trace Context specification.
@@ -304,8 +327,6 @@ class TraceManager {
     /// For request spans, it will add the following attributes to the span:
     /// `model_name`, `model_version`, `trace_id`, `parent_id`.
     ///
-    /// \param span_key Span's key to retrieve the corresponding span from the
-    /// OpenTelemetry context.
     /// \param trace TRITONSERVER_InferenceTrace, used to request model's name,
     /// version, trace parent_id from the backend.
     /// \param activity Trace activity.
@@ -314,59 +335,47 @@ class TraceManager {
     /// OpenTelemetry SteadyTimestamp to calculate the duration on the span
     /// with better precision.
     /// \param trace_id Trace id.
+    /// \param display_name Span name.
     void StartSpan(
-        std::string span_key, TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTrace* trace,
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-        uint64_t trace_id);
+        uint64_t trace_id, std::string display_name);
 
-    /// Ends the provided span.
+    /// Ends the span on the top of the stack, related to trace with `trace_id`.
     ///
-    /// \param span_key Span's key to retrieve the corresponding span from the
-    /// OpenTelemetry context.
-    void EndSpan(std::string span_key);
+    /// \param trace_id Trace id.
+    void EndSpan(uint64_t trace_id);
 
-    /// Ends the provided span at specified steady timestamp.
+    /// Ends the span on the top of the stack, related to trace with `trace_id`
+    /// at specified steady timestamp.
     ///
-    /// \param span_key Span's key to retrieve the corresponding span from the
-    /// OpenTelemetry context.
     /// \param raw_timestamp_ns Steady timestamp to use as
     /// `EndSpanOptions::end_steady_time`.
-    void EndSpan(std::string span_key, const uint64_t& raw_timestamp_ns);
-
-    /// Returns the span key, for which the activity belongs.
-    ///
-    /// \param activity reported activity.
     /// \param trace_id Trace id.
-    /// \return A key to identify span, stored in the OpenTelemetry context.
-    std::string GetSpanKeyForActivity(
-        TRITONSERVER_InferenceTraceActivity activity, uint64_t trace_id);
+    void EndSpan(const uint64_t& raw_timestamp_ns, uint64_t trace_id);
 
-    /// Adds event to the span, which is retrieved from OpenTelemetry context
-    /// with the provided `span_key`. If activity is
-    /// TRITONSERVER_TRACE_REQUEST_START, or TRITONSERVER_TRACE_COMPUTE_START,
-    /// starts a new span and adds it to `otel_context_`.
+    /// Adds an event to the span on the top of the stack, related to trace
+    /// with `trace_id`. If activity is TRITONSERVER_TRACE_REQUEST_START,
+    /// or TRITONSERVER_TRACE_COMPUTE_START, starts a new span and adds it
+    /// to the span's stack.
     ///
-    /// \param span_key Span's key to retrieve the corresponding span from the
-    /// OpenTelemetry context.
     /// \param trace TRITONSERVER_InferenceTrace, used to request model's name,
     /// version, trace parent_id from the backend.
     /// \param activity Trace activity.
     /// \param timestamp_ns Timestamp of the provided event.
-    /// \param id Trace id.
+    /// \param trace_id Trace id.
     void AddEvent(
-        std::string span_key, TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTrace* trace,
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-        uint64_t id);
+        uint64_t trace_id);
 
-    /// Adds event to the OpenTelemetry span, retrieved from an OpenTelementry
-    /// context with the provided `span_key`.
+    /// Adds an event to the OpenTelemetry span.
     ///
-    /// \param span_key Span's key to retrieve the corresponding span from the
-    /// OpenTelemetry context.
     /// \param event An event to add to the span.
     /// \param timestamp_ns Timestamp of the provided event.
+    /// \param trace_id Trace id.
     void AddEvent(
-        std::string span_key, std::string event, uint64_t timestamp_ns);
+        const std::string& event, uint64_t timestamp_ns, uint64_t trace_id);
 #endif
   };
 
