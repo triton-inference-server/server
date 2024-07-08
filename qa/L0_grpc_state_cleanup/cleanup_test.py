@@ -437,10 +437,10 @@ class CleanUpTest(tu.TestResultCollector):
 
     def test_simple_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
-        # released when the server is interrupted to shutdown in middle of
-        # inference run with final parameters being returned.
+        # released when the server is interrupted to shutdown in the beginning
+        # of inference run with final parameters being returned.
         with self.assertRaises(InferenceServerException) as cm:
-            self._simple_infer(request_count=10, kill_server=5)
+            self._simple_infer(request_count=20, kill_server=5)
 
     ###
     ### Streaming Tests
@@ -469,11 +469,18 @@ class CleanUpTest(tu.TestResultCollector):
     def test_streaming_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._streaming_infer(request_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
         )
 
     def test_streaming_infer_shutdownserver(self):
@@ -520,11 +527,18 @@ class CleanUpTest(tu.TestResultCollector):
     def test_decoupled_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._decoupled_infer(request_count=10, repeat_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
         )
 
     def test_decoupled_infer_shutdownserver(self):

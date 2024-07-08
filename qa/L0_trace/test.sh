@@ -97,6 +97,16 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
 cp -r ../L0_decoupled/models/repeat_int32 $MODELSDIR
 sed -i "s/decoupled: True/decoupled: False/" $MODELSDIR/repeat_int32/config.pbtxt
 
+# set up identity model
+mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }]' >> config.pbtxt)
+
 RET=0
 
 # Helpers =======================================
@@ -742,6 +752,60 @@ wait $SERVER_PID
 
 set +e
 
+# Custom backend tracing
+SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR
+            --load-model=custom_identity_int32 --trace-config=level=TIMESTAMPS \
+            --trace-config=triton,file=custom_tracing_triton.log \
+            --trace-config=rate=1 --trace-config=mode=triton"
+SERVER_LOG="./custom_backend_tracing.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Send 1 inference request, should expect 3 custom activities:
+# CUSTOM_SINGLE_ACTIVITY, CUSTOM_ACTIVITY_START, CUSTOM_ACTIVITY_END
+rm -f ./curl.out
+data='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,1],"data":[4]}]}'
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/custom_identity_int32/infer -d ${data}`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+
+$TRACE_SUMMARY -t custom_tracing_triton.log > summary_custom_tracing_triton.log
+
+if [ `grep -c "CUSTOM_SINGLE_ACTIVITY" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c "CUSTOM_ACTIVITY_START" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_START" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c "CUSTOM_ACTIVITY_END" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_END" events.\n***"
+    RET=1
+fi
+
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
@@ -758,7 +822,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="17"
+EXPECTED_NUM_TESTS="19"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -772,10 +836,20 @@ cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
 # Add model to test trace context exposed to python backend
 mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_context/1/model.py
 
+# set up identity model
+rm -r ${MODELSDIR}/custom_identity_int32
+mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }, { key: "nested_span_count" \n value: { string_value: "6" } }, { key: "single_activity_frequency" \n value: { string_value: "3" } }]' >> config.pbtxt)
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
-                --load-model=repeat_int32 \
+                --load-model=repeat_int32 --load-model=custom_identity_int32\
                 --load-model=input_all_required \
                 --load-model=dynamic_batch \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
@@ -1164,5 +1238,4 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
-
 exit $RET

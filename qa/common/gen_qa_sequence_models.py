@@ -296,7 +296,7 @@ instance_group [
 
 
 def create_plan_shape_tensor_modelfile(
-    models_dir, model_version, max_batch, dtype, shape
+    models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype
 ):
     # Note that resize layer does not support int tensors.
     # The model takes two inputs (INPUT and SHAPE_INPUT)
@@ -308,6 +308,7 @@ def create_plan_shape_tensor_modelfile(
     # SHAPE_OUTPUT : The shape values of resized output
 
     trt_dtype = np_to_trt_dtype(dtype)
+    trt_shape_dtype = np_to_trt_dtype(shape_tensor_input_dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
@@ -316,12 +317,12 @@ def create_plan_shape_tensor_modelfile(
 
     unit_shape = [1] * len(shape)
     if max_batch != 0:
-        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [1 + len(shape)])
+        shape_in0 = network.add_input("SHAPE_INPUT", trt_shape_dtype, [1 + len(shape)])
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
         ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
     else:
-        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [len(shape)])
+        shape_in0 = network.add_input("SHAPE_INPUT", trt_shape_dtype, [len(shape)])
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
         ready0 = network.add_input("READY", trt_dtype, unit_shape)
@@ -416,6 +417,7 @@ def create_plan_shape_tensor_modelfile(
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype
     )
+    model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -637,13 +639,18 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+def create_plan_modelconfig(
+    models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype=None
+):
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype
     )
+    if shape_tensor_input_dtype:
+        model_name = model_name + "_" + np.dtype(shape_tensor_input_dtype).name
+
     config_dir = models_dir + "/" + model_name
     if FLAGS.tensorrt_shape_io:
         shape_tensor_dim = len(shape)
@@ -684,7 +691,7 @@ input [
 input [
   {{
     name: "SHAPE_INPUT"
-    data_type: TYPE_INT32
+    data_type: {}
     dims: [ {} ]
     is_shape_tensor: true
   }}
@@ -723,6 +730,7 @@ instance_group [
             "int32" if dtype == np.int32 else "fp32",
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(shape),
+            np_to_model_dtype(shape_tensor_input_dtype),
             shape_tensor_dim,
             np_to_model_dtype(dtype),
             tu.shape_to_dims_str(shape),
@@ -1234,14 +1242,24 @@ output [
         cfile.write(config)
 
 
-def create_shape_tensor_models(models_dir, dtype, shape, no_batch=True):
+def create_shape_tensor_models(
+    models_dir, dtype, shape, shape_tensor_input_dtype, no_batch=True
+):
     model_version = 1
 
-    create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
-    create_plan_shape_tensor_modelfile(models_dir, model_version, 8, dtype, shape)
+    create_plan_modelconfig(
+        models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
+    )
+    create_plan_shape_tensor_modelfile(
+        models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
+    )
     if no_batch:
-        create_plan_modelconfig(models_dir, model_version, 0, dtype, shape)
-        create_plan_shape_tensor_modelfile(models_dir, model_version, 0, dtype, shape)
+        create_plan_modelconfig(
+            models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
+        )
+        create_plan_shape_tensor_modelfile(
+            models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
+        )
 
 
 def create_models(models_dir, dtype, shape, no_batch=True):
@@ -1415,6 +1433,15 @@ if __name__ == "__main__":
             [
                 -1,
             ],
+            np.int32,
+        )
+        create_shape_tensor_models(
+            FLAGS.models_dir,
+            np.float32,
+            [
+                -1,
+            ],
+            np.int64,
         )
     else:
         # Tests with models that accept fixed-shape input/output tensors

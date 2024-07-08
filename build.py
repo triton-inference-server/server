@@ -69,14 +69,14 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.47.0dev": (
+    "2.48.0dev": (
         "24.06dev",  # triton container
-        "24.05",  # upstream container
-        "1.18.0",  # ORT
+        "24.06",  # upstream container
+        "1.18.1",  # ORT
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "0.4.3",  # vLLM version
+        "0.5.0.post1",  # vLLM version
     )
 }
 
@@ -1082,21 +1082,20 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Remove TRT contents that are not needed in runtime
-RUN apt-get update && apt-get install -y libcudnn8-dev && ldconfig
-
-RUN ARCH="$(uname -i)" \\
-      && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
-      && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
-      && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
-
 # Install required packages for TRT-LLM models
-RUN python3 -m pip install --upgrade pip \\
-      && pip3 install transformers
-
-# Install TensorRT-LLM
-RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
-RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
+# Remove contents that are not needed in runtime
+# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
+# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
+RUN ldconfig && \
+    ARCH="$(uname -i)" && \
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
+    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
+    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \
+    python3 -m pip install --upgrade pip && \
+    pip3 install --no-cache-dir transformers && \
+    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
+    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
