@@ -88,7 +88,7 @@ LABEL PYTHON_VERSION=${PYTHON_VERSION}
 #
 # Installing CMake
 #
-ARG CMAKE_VERSION=3.29.3
+ARG CMAKE_VERSION=3.30.0
 RUN pip install cmake==%CMAKE_VERSION%
 
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -125,7 +125,7 @@ WORKDIR /
 #
 # Installing Vcpkg
 #
-ARG VCPGK_VERSION=2024.06.15
+ARG VCPGK_VERSION=2024.03.19
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
