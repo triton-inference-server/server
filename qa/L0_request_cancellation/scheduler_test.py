@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,8 +30,8 @@ import concurrent.futures
 import time
 import unittest
 
-import requests
 import numpy as np
+import requests
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
@@ -90,7 +90,7 @@ class TestScheduler(unittest.TestCase):
         r = requests.get(metrics_url)
         r.raise_for_status()
         return r.text
-    
+
     def _assert_cancel_metrics_sequence_oldest(self, model_name, count, metrics):
         expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="CANCELED",version="1"}} {count}'
         self.assertIn(expected_metric, metrics)
@@ -242,7 +242,7 @@ class TestScheduler(unittest.TestCase):
         time.sleep(2)  # ensure the cancellation is delivered
         time.sleep(2)  # ensure reaper thread has responded
         self._assert_streaming_response_is_cancelled(response)
-    
+
     def test_zerror_metrics(self):
         metrics = self._get_metrics()
         # Check if we have counted correctly all cancellation for sequence_oldest model
