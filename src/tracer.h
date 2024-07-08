@@ -231,6 +231,19 @@ class TraceManager {
     // with this trace.
     void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
 
+    /// Returns activity name. For custom activities, retrieves the name from
+    /// the trace context. For other activities, returns default name.
+    ///
+    /// \param trace TRITONSERVER_InferenceTrace instance.
+    /// \param activity  Trace activity.
+    /// \param timestamp_ns Steady timestamp, which is used to calculate
+    /// OpenTelemetry SystemTimestamp to display span on a timeline, and
+    /// OpenTelemetry SteadyTimestamp to calculate the duration on the span
+    /// with better precision.
+    std::string RetrieveActivityName(
+        TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
+
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
     /// Reports TRITONSERVER_InferenceTraceActivity as event to
     /// the currently active span. If activity is an instance of
@@ -322,10 +335,11 @@ class TraceManager {
     /// OpenTelemetry SteadyTimestamp to calculate the duration on the span
     /// with better precision.
     /// \param trace_id Trace id.
+    /// \param display_name Span name.
     void StartSpan(
         TRITONSERVER_InferenceTrace* trace,
         TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-        uint64_t trace_id);
+        uint64_t trace_id, std::string display_name);
 
     /// Ends the span on the top of the stack, related to trace with `trace_id`.
     ///
