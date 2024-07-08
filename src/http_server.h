@@ -77,7 +77,7 @@ class MappingSchema {
 };
 
 // Generic HTTP server using evhtp
-class HTTPServer : public Server_Interface {
+class HTTPServer {
  public:
   virtual ~HTTPServer() { IGNORE_ERR(Stop()); }
 

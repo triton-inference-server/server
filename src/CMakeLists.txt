@@ -1,4 +1,4 @@
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,7 +29,6 @@ cmake_minimum_required (VERSION 3.18)
 project(tritonserverexe LANGUAGES C CXX)
 
 include(GNUInstallDirs)
-
 #
 # Dependencies
 #
@@ -54,12 +53,19 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 )
 
+# Add pybind11
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG v2.13.1 
+)
+
 if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
 
-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+FetchContent_MakeAvailable(repo-common repo-core repo-backend pybind11)
 
 # CUDA
 #
@@ -105,6 +111,7 @@ add_executable(
   common.h
   shared_memory_manager.h
   triton_signal.h
+  server_interface.h
 )
 
 # On windows a *.lib file can be generated for a exe. When creating
@@ -777,3 +784,15 @@ endif() # NOT WIN32
 if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
+
+message("add_library() is called.")
+message("add_library() finished.")
+message("target_link_libraries() is called.")
+message("target_link_libraries() finished.")
+
+message("pybind add module() called")
+pybind11_add_module(server_python MODULE bindings.cc)
+message("pybind add module() end")
+message("LINKING")
+target_link_libraries(server_python PRIVATE http-endpoint-library triton-core-serverapi triton-core-serverstub)
+message("LINKED")
