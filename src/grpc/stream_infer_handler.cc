@@ -780,6 +780,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       }
       if (is_complete && state->response_queue_->IsEmpty() &&
           state->step_ == Steps::ISSUED) {
+        // The response queue is empty and complete final flag is received, so
+        // mark the state as 'WRITEREADY' so it can be cleaned up later.
         state->step_ = Steps::WRITEREADY;
         state->context_->PutTaskBackToQueue(state);
       }
