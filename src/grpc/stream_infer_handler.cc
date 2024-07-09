@@ -370,6 +370,18 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           state->response_queue_->MarkNextResponseComplete();
           state->context_->ready_to_write_states_.push(state);
           if (!state->context_->ongoing_write_) {
+            // Only one write is allowed per gRPC stream / context at any time.
+            // If the stream is not currently writing, start writing the next
+            // ready to write response from the next ready to write state from
+            // 'ready_to_write_states_'. If there are other responses on the
+            // state ready to be written after starting the write, the state
+            // will be placed at the back of the 'ready_to_write_states_'. If
+            // there are no other response, the state will be marked as 'ISSUED'
+            // if complete final flag is not received yet from the backend or
+            // completed if complete final flag is received.
+            // The 'ongoing_write_' will reset once the completion queue returns
+            // a written state and no additional response on the stream is ready
+            // to be written.
             state->context_->ongoing_write_ = true;
             writing_state = state->context_->ready_to_write_states_.front();
             state->context_->ready_to_write_states_.pop();
