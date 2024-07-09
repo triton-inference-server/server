@@ -69,14 +69,14 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.48.0dev": (
-        "24.06dev",  # triton container
-        "24.06",  # upstream container
+    "2.48.0": (
+        "24.07",  # triton container
+        "24.07",  # upstream container
         "1.18.1",  # ORT
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "0.5.0.post1",  # vLLM version
+        "0.5.1",  # vLLM version
     )
 }
 
