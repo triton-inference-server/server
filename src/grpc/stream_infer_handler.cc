@@ -554,6 +554,8 @@ ModelStreamInferHandler::StateWriteResponse(InferHandler::State* state)
   {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     state->step_ = Steps::WRITTEN;
+    // gRPC doesn't allow to issue another write till the notification from
+    // previous write has been delivered.
     state->context_->DecoupledWriteResponse(state);
     if (state->response_queue_->HasReadyResponse()) {
       state->context_->ready_to_write_states_.push(state);
