@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,7 +64,7 @@ if [ "$SERVER_PID" != "0" ]; then
     exit 1
 fi
 
-EXPECTED_ERR="Internal Error (Cannot deserialize engine with lean runtime"
+EXPECTED_ERR="Cannot deserialize engine with lean runtime"
 if ! grep "$EXPECTED_ERR" $SERVER_LOG; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Failed to find expected error: ${EXPECTED_ERR} \n***"
