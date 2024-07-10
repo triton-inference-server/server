@@ -94,10 +94,6 @@ class ModelQueueTest(tu.TestResultCollector):
         expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
         self.assertIn(expected_metric, metrics)
 
-    def verify_metric_text(self, metrics, model_name, reason, count):
-        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {count}'
-        self.assertIn(expected_metric, metrics)
-
     def check_response(
         self,
         bs,
