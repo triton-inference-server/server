@@ -29,6 +29,8 @@
 import os
 import sys
 
+import requests
+
 sys.path.append("../../common")
 
 import queue
@@ -62,6 +64,22 @@ def callback(user_data, result, error):
 class LifecycleTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
+
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def verify_metric_text(self, metrics, model_name, reason, count):
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {count}'
+        self.assertIn(expected_metric, metrics)
+
+    # Name not a typo ensure test gets run last
+    def test_z_error_metrics(self):
+        metrics = self._get_metrics()
+        # Expect 5 reason="BACKEND" for wrong_model as test.sh runs test for 5 iterations 0 to 4
+        self.verify_metric_text(metrics, "wrong_model", "BACKEND", 1)
 
     def test_error_code(self):
         model_name = "error_code"

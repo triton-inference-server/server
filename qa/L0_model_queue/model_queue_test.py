@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ from ctypes import *
 
 import infer_util as iu
 import numpy as np
+import requests
 import test_util as tu
 from tritonclientutils import InferenceServerException
 
@@ -68,6 +69,23 @@ class ModelQueueTest(tu.TestResultCollector):
                 first_exception = _deferred_exceptions[0]
                 _deferred_exceptions.pop(0)
                 raise first_exception
+
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def verify_metric_text(self, metrics, model_name, reason, count):
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {count}'
+        self.assertIn(expected_metric, metrics)
+
+    def check_metrics(self):
+        metrics = self._get_metrics()
+        # Expect 2 reason="OTHER" for ensemble_zero_1_float32
+        self.verify_metric_text(metrics, "ensemble_zero_1_float32", "OTHER", 2)
+        # Expect 4 reason="REJECTED" for custom_zero_1_float32
+        self.verify_metric_text(metrics, "custom_zero_1_float32", "REJECTED", 4)
 
     def check_response(
         self,
@@ -283,6 +301,7 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        self.check_metrics()
 
     def test_timeout_override(self):
         # Send requests with batch sizes 1, 1, 3 where the first request

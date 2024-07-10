@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -91,11 +91,7 @@ class TestScheduler(unittest.TestCase):
         r.raise_for_status()
         return r.text
 
-    def _assert_cancel_metrics_sequence_oldest(self, model_name, count, metrics):
-        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="CANCELED",version="1"}} {count}'
-        self.assertIn(expected_metric, metrics)
-
-    def _assert_cancel_metrics_sequence_direct(self, model_name, count, metrics):
+    def _assert_metrics(self, model_name, count, metrics):
         expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="CANCELED",version="1"}} {count}'
         self.assertIn(expected_metric, metrics)
 
@@ -247,10 +243,10 @@ class TestScheduler(unittest.TestCase):
         metrics = self._get_metrics()
         # Check if we have counted correctly all cancellation for sequence_oldest model
         # total expected 2 * 16 + 1
-        self._assert_cancel_metrics_sequence_oldest("sequence_oldest", 33, metrics)
+        self._assert_metrics("sequence_oldest", 33, metrics)
         # Check if we have counted correctly all cancellation for sequence_direct model
         # total expected 2 * 2
-        self._assert_cancel_metrics_sequence_direct("sequence_direct", 4, metrics)
+        self._assert_metrics("sequence_direct", 4, metrics)
 
 
 if __name__ == "__main__":
