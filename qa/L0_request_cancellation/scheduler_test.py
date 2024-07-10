@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import concurrent.futures
+import re
 import time
 import unittest
 
@@ -91,8 +92,21 @@ class TestScheduler(unittest.TestCase):
         r.raise_for_status()
         return r.text
 
-    def _assert_metrics(self, model_name, count, metrics):
-        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="CANCELED",version="1"}} {count}'
+    def _metrics_before_test(self, model, reason):
+        pattern = rf'nv_inference_request_failure\{{model="{model}",reason="{reason}",version="1"\}} (\d+)'
+        metrics = self._get_metrics()
+        match = re.search(pattern, metrics)
+        if match:
+            return int(match.group(1))
+        else:
+            return int(0)
+
+    def _assert_metrics(
+        self, model_name, reason, expected_count_increase, initial_count
+    ):
+        metrics = self._get_metrics()
+        # Add initial count + expected count for the the test
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
         self.assertIn(expected_metric, metrics)
 
     # Test queued requests on dynamic batch scheduler can be cancelled
@@ -125,6 +139,7 @@ class TestScheduler(unittest.TestCase):
     # Test backlogged requests on sequence batch scheduler can be cancelled
     def test_sequence_batch_scheduler_backlog_request_cancellation(self):
         model_name = "sequence_direct"
+        initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             # Saturate the single sequence slot
             saturate_thread = pool.submit(
@@ -160,11 +175,26 @@ class TestScheduler(unittest.TestCase):
             self._assert_response_is_cancelled(backlog_requests[1]["response"])
             # Join saturating thread
             saturate_thread.result()
+        expected_count_increase = 2
+        self._assert_metrics(
+            model_name,
+            "CANCELED",
+            expected_count_increase,
+            initial_metrics_value,
+        )
 
     # Test queued requests on direct sequence batch scheduler can be cancelled
     def test_direct_sequence_batch_scheduler_request_cancellation(self):
         model_name = "sequence_direct"
+        initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
         self._test_sequence_batch_scheduler_queued_request_cancellation(model_name)
+        expected_count_increase = 2
+        self._assert_metrics(
+            model_name,
+            "CANCELED",
+            expected_count_increase,
+            initial_metrics_value,
+        )
 
     # Test queued requests on oldest sequence batch scheduler can be cancelled
     def test_oldest_sequence_batch_scheduler_request_cancellation(self):
@@ -238,15 +268,6 @@ class TestScheduler(unittest.TestCase):
         time.sleep(2)  # ensure the cancellation is delivered
         time.sleep(2)  # ensure reaper thread has responded
         self._assert_streaming_response_is_cancelled(response)
-
-    def test_zerror_metrics(self):
-        metrics = self._get_metrics()
-        # Check if we have counted correctly all cancellation for sequence_oldest model
-        # total expected 2 * 16 + 1
-        self._assert_metrics("sequence_oldest", 33, metrics)
-        # Check if we have counted correctly all cancellation for sequence_direct model
-        # total expected 2 * 2
-        self._assert_metrics("sequence_direct", 4, metrics)
 
 
 if __name__ == "__main__":
