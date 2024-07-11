@@ -1099,8 +1099,8 @@ RUN ldconfig && \\
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 
-# There are some ucc issues when spawning mpi processes with mpi 4.1.7a and
-# ucx 1.16.0. Downgrade to mpi 4.1.5rc2 and ucx 1.15.0 to avoid the issue.
+# There are some ucc issues when spawning mpi processes with mpi 4.1.7a.
+# Downgrade to mpi 4.1.5rc2 to avoid the issue.
 RUN rm -fr /opt/hpcx/ompi
 COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 """
