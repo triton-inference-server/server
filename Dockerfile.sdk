@@ -126,16 +126,19 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
-          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_ENABLE_PYTHON_HTTP=OFF -DTRITON_ENABLE_PYTHON_GRPC=OFF \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients python-clients java-clients && \
+RUN make -j16 cc-clients java-clients && \
     rm -fr ~/.m2
 
-# TODO: PA will build the CC clients since it depends on it.
+# TODO: PA will rebuild the CC clients since it depends on it.
 # This should be optimized so that we do not have to build
-# the CC clients twice.
+# the CC clients twice. Similarly, because the SDK expectation is
+# that PA is packaged with the python client, we hold off on building
+# the python client until now. Post-migration we should focus
+# effort on de-tangling these flows.
 WORKDIR /workspace/pa_build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
@@ -150,7 +153,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
           /workspace/perf_analyzer
-RUN make -j16 perf-analyzer
+RUN make -j16 perf-analyzer python-clients
 
 RUN pip3 install build \
     && cd /workspace/perf_analyzer/genai-perf \
