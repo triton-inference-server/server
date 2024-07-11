@@ -1101,9 +1101,10 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
 
 # There are some ucc issues when spawning mpi processes with mpi 4.1.7a and
 # ucx 1.16.0. Downgrade to mpi 4.1.5rc2 and ucx 1.15.0 to avoid the issue.
-RUN rm -fr /opt/hpcx/ompi /opt/hpcx/ucx
+RUN rm -fr /opt/hpcx/ompi /opt/hpcx/ucx /opt/hpcx/ucc
 COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ucx /opt/hpcx/ucx
+COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ucc /opt/hpcx/ucc
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
