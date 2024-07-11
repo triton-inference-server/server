@@ -79,7 +79,7 @@ class LifecycleTest(unittest.TestCase):
         if match:
             return int(match.group(1))
         else:
-            return int(0)
+            raise Exception(f"Failure metrics for model='{model}' not found")
 
     def _assert_metrics(
         self, model_name, reason, expected_count_increase, initial_count
