@@ -100,6 +100,19 @@ Count*. The count metrics are illustrated by the following examples:
 |              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Inference Request Metrics](#inference-request-metrics), does not include cached requests)|Per model|Per request|
 |              |Pending Request Count |`nv_inference_pending_request_count` |Number of inference requests awaiting execution by a backend. This number is incremented when a request is enqueued to the server (`TRITONSERVER_ServerInferAsync`) and is decremented when a backend is about to start executing the request. More details can be found below. |Per model|Per request|
 
+#### Failure Count is further classified into four distinct types:
+
+|Sub-Category      |Sub-Metric | Sub-Metric Name |Description |
+|--------------|----------------|------------|------------|
+|Failure Reason         |Rejected |REJECTED  | Number of inference failures due to request timeout in the schedular. |
+|              |Canceled |CANCELED  |  Number of inference failures due to request cancellation in the core. |
+|              |Backend  |BACKEND |  Number of inference failures due to errors from backend. |
+|              |Other | OTHER  | Number of inference failures due to unspecified reasons in the core. |
+
+
+> **Note**
+>
+> Ensemble failure metrics will reflect the failure counts of their composing models as well as the parent model, but currently do not capture the same granularity for the "reason" label and will default to the "OTHER" reason.
 #### Pending Request Count (Queue Size) Per-Model
 
 The *Pending Request Count* reflects the number of requests that have been

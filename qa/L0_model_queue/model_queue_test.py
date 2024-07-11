@@ -314,7 +314,10 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-        expected_count_increase = 2
+        expected_count_increase = 4
+        # NOTE: Ensemble failure metrics will reflect the failure counts
+        # of their composing models as well as the parent model, but currently do not capture the same granularity
+        # for the "reason" label and will default to the "OTHER" reason.
         self._assert_metrics(
             "ensemble_zero_1_float32",
             "OTHER",
