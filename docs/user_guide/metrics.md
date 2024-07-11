@@ -114,9 +114,9 @@ Count*. The count metrics are illustrated by the following examples:
 > Ensemble failure metrics will reflect the failure counts of their composing models as well as the parent model, but currently do not capture the same granularity for the "reason" label and will default to the "OTHER" reason.
 >
 > For example, if EnsembleA contains ModelA, and ModelA experiences a failed request due to a queue/backlog timeout in the scheduler, ModelA will have a failed request metric reflecting `reason=REJECTED` and `count=1`.
-> Additionally, EnsembleA will have a failed request metric reflecting `reason=OTHER` and `count=2`. 
+> Additionally, EnsembleA will have a failed request metric reflecting `reason=OTHER` and `count=2`.
 > The `count=2` reflects 1 from the internally failed request captured by ModelA, as well as 1 from the failed top-level request sent to EnsembleA by the user/client.
-> The `reason=OTHER` reflects that fact that the ensemble doesn't currently capture the specific reason why 
+> The `reason=OTHER` reflects that fact that the ensemble doesn't currently capture the specific reason why
 > ModelA's request failed at this time.
 
 #### Pending Request Count (Queue Size) Per-Model
