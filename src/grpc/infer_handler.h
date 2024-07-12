@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -978,6 +978,9 @@ class InferHandlerState {
 
     // Tracks all the states that have been created on this context.
     std::set<InferHandlerStateType*> all_states_;
+
+    // Ready to write queue for decoupled
+    std::queue<InferHandlerStateType*> ready_to_write_states_;
 
     // The step of the entire context.
     Steps step_;
