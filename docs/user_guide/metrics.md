@@ -100,6 +100,25 @@ Count*. The count metrics are illustrated by the following examples:
 |              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Inference Request Metrics](#inference-request-metrics), does not include cached requests)|Per model|Per request|
 |              |Pending Request Count |`nv_inference_pending_request_count` |Number of inference requests awaiting execution by a backend. This number is incremented when a request is enqueued to the server (`TRITONSERVER_ServerInferAsync`) and is decremented when a backend is about to start executing the request. More details can be found below. |Per model|Per request|
 
+#### Failure Count Categories
+
+| Failed Request Reason |Description |
+|------------|------------|
+| REJECTED  | Number of inference failures due to request timeout in the schedular. |
+| CANCELED  |  Number of inference failures due to request cancellation in the core. |
+| BACKEND |  Number of inference failures during execution of requests in the backend/model. |
+| OTHER  | Number of inference failures due to other uncategorized reasons in the core. |
+
+> **Note**
+>
+> Ensemble failure metrics will reflect the failure counts of their composing models as well as the parent model, but currently do not capture the same granularity for the "reason" label and will default to the "OTHER" reason.
+>
+> For example, if EnsembleA contains ModelA, and ModelA experiences a failed request due to a queue/backlog timeout in the scheduler, ModelA will have a failed request metric reflecting `reason=REJECTED` and `count=1`.
+> Additionally, EnsembleA will have a failed request metric reflecting `reason=OTHER` and `count=2`.
+> The `count=2` reflects 1 from the internally failed request captured by ModelA, as well as 1 from the failed top-level request sent to EnsembleA by the user/client.
+> The `reason=OTHER` reflects that fact that the ensemble doesn't currently capture the specific reason why
+> ModelA's request failed at this time.
+
 #### Pending Request Count (Queue Size) Per-Model
 
 The *Pending Request Count* reflects the number of requests that have been
