@@ -785,14 +785,5 @@ if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
 
-message("add_library() is called.")
-message("add_library() finished.")
-message("target_link_libraries() is called.")
-message("target_link_libraries() finished.")
-
-message("pybind add module() called")
-pybind11_add_module(server_python MODULE bindings.cc)
-message("pybind add module() end")
-message("LINKING")
-target_link_libraries(server_python PRIVATE http-endpoint-library triton-core-serverapi triton-core-serverstub)
-message("LINKED")
+pybind11_add_module(tritonfrontend PRIVATE bindings.cc)
+target_link_libraries(tritonfrontend PRIVATE http-endpoint-library triton-core-serverapi triton-core-serverstub triton-common-error)
