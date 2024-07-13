@@ -1097,6 +1097,12 @@ RUN ldconfig && \\
     find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
     pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
 
+#Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)  
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        openssh-client=1:8.9p1-3ubuntu0.10 \
+    && rm -rf /var/lib/apt/lists/*
+    
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 
 # There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
