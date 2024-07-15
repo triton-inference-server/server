@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,10 +27,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import concurrent.futures
+import re
 import time
 import unittest
 
 import numpy as np
+import requests
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
@@ -84,6 +86,29 @@ class TestScheduler(unittest.TestCase):
                     cancelled_count += 1
         self.assertEqual(cancelled_count, 1)
 
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def _metrics_before_test(self, model, reason):
+        pattern = rf'nv_inference_request_failure\{{model="{model}",reason="{reason}",version="1"\}} (\d+)'
+        metrics = self._get_metrics()
+        match = re.search(pattern, metrics)
+        if match:
+            return int(match.group(1))
+        else:
+            raise Exception(f"Failure metrics for model='{model}' not found")
+
+    def _assert_metrics(
+        self, model_name, reason, expected_count_increase, initial_count
+    ):
+        metrics = self._get_metrics()
+        # Add initial count + expected count for the the test
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
+        self.assertIn(expected_metric, metrics)
+
     # Test queued requests on dynamic batch scheduler can be cancelled
     def test_dynamic_batch_scheduler_request_cancellation(self):
         model_name = "dynamic_batch"
@@ -114,6 +139,7 @@ class TestScheduler(unittest.TestCase):
     # Test backlogged requests on sequence batch scheduler can be cancelled
     def test_sequence_batch_scheduler_backlog_request_cancellation(self):
         model_name = "sequence_direct"
+        initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             # Saturate the single sequence slot
             saturate_thread = pool.submit(
@@ -149,11 +175,26 @@ class TestScheduler(unittest.TestCase):
             self._assert_response_is_cancelled(backlog_requests[1]["response"])
             # Join saturating thread
             saturate_thread.result()
+        expected_count_increase = 2
+        self._assert_metrics(
+            model_name,
+            "CANCELED",
+            expected_count_increase,
+            initial_metrics_value,
+        )
 
     # Test queued requests on direct sequence batch scheduler can be cancelled
     def test_direct_sequence_batch_scheduler_request_cancellation(self):
         model_name = "sequence_direct"
+        initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
         self._test_sequence_batch_scheduler_queued_request_cancellation(model_name)
+        expected_count_increase = 2
+        self._assert_metrics(
+            model_name,
+            "CANCELED",
+            expected_count_increase,
+            initial_metrics_value,
+        )
 
     # Test queued requests on oldest sequence batch scheduler can be cancelled
     def test_oldest_sequence_batch_scheduler_request_cancellation(self):
