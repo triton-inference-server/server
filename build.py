@@ -1096,12 +1096,6 @@ RUN ldconfig && \\
     find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
     find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
     pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
-
-#Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)  
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        openssh-client=1:8.9p1-3ubuntu0.10 \
-    && rm -rf /var/lib/apt/lists/*
     
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 
@@ -2771,3 +2765,4 @@ if __name__ == "__main__":
             p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
         p.wait()
         fail_if(p.returncode != 0, "build failed")
+
