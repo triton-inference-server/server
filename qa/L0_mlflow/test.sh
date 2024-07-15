@@ -217,8 +217,8 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
 
 # Cleanup and delete S3 test bucket if it already exists (due to test failure)
-aws s3 rm $BUCKET_URL --recursive --include "*" && \
-    aws s3 rb $BUCKET_URL || true
+AWS_OUTDATED=$(date --date="$(date ) -10 days" +'%Y-%m-%d')
+for i in $(aws s3api list-buckets --query "Buckets[? contains(Name, 'bucket') && CreationDate<='${AWS_OUTDATED}'].Name" --output text) ; do aws s3 rb --force s3://$i; done || true
 
 # Make S3 test bucket
 aws s3 mb "${BUCKET_URL}"
