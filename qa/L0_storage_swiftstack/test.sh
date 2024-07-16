@@ -76,7 +76,7 @@ BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
 S3_REPO_URL="s3://https://pbss.s8k.io:443/triton-bucket-${CI_JOB_ID}"
 
 # Cleanup S3 test bucket if exists (due to test failure)
-AWS_OUTDATED=$(date --date="$(date ) -14 days" +'%Y-%m-%d')
+AWS_OUTDATED=$(date --date="$(date ) -10 days" +'%Y-%m-%d')
 for i in $(aws s3api list-buckets --query "Buckets[? contains(Name, 'bucket') && CreationDate<='${AWS_OUTDATED}'].Name" --output text) ; do aws s3 rb --force s3://$i; done || true
 
 # Make S3 test bucket
