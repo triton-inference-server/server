@@ -125,13 +125,16 @@ FetchContent_Declare(
 
 # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
 # of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
-set (LIB_DIR "lib")
+set(LIB_DIR "lib")
 # /etc/os-release does not exist on Windows
 if(EXISTS "/etc/os-release")
   file(STRINGS /etc/os-release DISTRO REGEX "^NAME=")
+  file(STRINGS /etc/os-release DISTRO_LIKE REGEX "^ID_LIKE=")
   string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" DISTRO "${DISTRO}")
+  string(REGEX REPLACE "ID_LIKE=\"(.*)\"" "\\1" DISTRO_LIKE "${DISTRO_LIKE}")
   message(STATUS "Distro Name: ${DISTRO}")
-  if(DISTRO MATCHES "CentOS.*")
+  message(STATUS "Distro Like: ${DISTRO_LIKE}")
+  if(DISTRO_LIKE MATCHES ".*rhel.*" OR DISTRO_LIKE MATCHES ".*centos.*")
     set (LIB_DIR "lib64")
   endif()
 endif()

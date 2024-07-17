@@ -138,6 +138,20 @@ else()
   )
 endif()
 
+set(LIB_DIR "lib")
+# /etc/os-release does not exist on Windows
+if(EXISTS "/etc/os-release")
+  file(STRINGS /etc/os-release DISTRO REGEX "^NAME=")
+  file(STRINGS /etc/os-release DISTRO_LIKE REGEX "^ID_LIKE=")
+  string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" DISTRO "${DISTRO}")
+  string(REGEX REPLACE "ID_LIKE=\"(.*)\"" "\\1" DISTRO_LIKE "${DISTRO_LIKE}")
+  message(STATUS "Distro Name: ${DISTRO}")
+  message(STATUS "Distro Like: ${DISTRO_LIKE}")
+  if(DISTRO_LIKE MATCHES ".*rhel.*" OR DISTRO_LIKE MATCHES ".*centos.*")
+    set (LIB_DIR "lib64")
+  endif()
+endif()
+
 set_target_properties(
   main
   PROPERTIES
@@ -145,7 +159,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../lib"
+    INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
 )
 
 target_link_libraries(
