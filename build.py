@@ -833,8 +833,27 @@ def install_dcgm_libraries(dcgm_version, target_machine):
         )
         return ""
     else:
-        if target_machine == "aarch64":
-            return """
+                # RHEL has the same install instructions for both aarch64 and x86
+        if target_platform() == "rhel":
+            if target_machine == "aarch64":
+                return """
+ENV DCGM_VERSION {}
+# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
+    && dnf clean expire-cache \\
+    && dnf install -y datacenter-gpu-manager-{}
+""".format(dcgm_version, dcgm_version)
+            else:
+                return """
+ENV DCGM_VERSION {}
+# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
+    && dnf clean expire-cache \\
+    && dnf install -y datacenter-gpu-manager-{}
+""".format(dcgm_version, dcgm_version)
+        else:
+            if target_machine == "aarch64":
+                return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -846,8 +865,8 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 """.format(
                 dcgm_version, dcgm_version
             )
-        else:
-            return """
+            else:
+                return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -860,6 +879,102 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 dcgm_version, dcgm_version
             )
 
+def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
+    df = """
+ARG TRITON_VERSION={}
+ARG TRITON_CONTAINER_VERSION={}
+ARG BASE_IMAGE={}
+""".format(
+        argmap["TRITON_VERSION"],
+        argmap["TRITON_CONTAINER_VERSION"],
+        argmap["BASE_IMAGE"],
+    )
+
+    df += """
+FROM ${BASE_IMAGE}
+
+ARG TRITON_VERSION
+ARG TRITON_CONTAINER_VERSION
+"""
+    df += """
+# Install docker docker buildx
+RUN yum install -y ca-certificates curl gnupg yum-utils \\
+      && yum-config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo \\
+      && yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+#   && yum install -y docker.io docker-buildx-plugin
+
+# libcurl4-openSSL-dev is needed for GCS
+# python3-dev is needed by Torchvision
+# python3-pip and libarchive-dev is needed by python backend
+# libxml2-dev is needed for Azure Storage
+# scons is needed for armnn_tflite backend build dep
+RUN yum install -y \\
+            ca-certificates \\
+            autoconf \\
+            automake \\
+            git \\
+            gperf \\
+            re2-devel \\
+            openssl-devel \\
+            libtool \\
+            libcurl-devel \\
+            libb64-devel \\
+            gperftools-devel \\
+            patchelf \\
+            python3.11-devel \\
+            python3-pip \\
+            python3-setuptools \\
+            rapidjson-devel \\
+            python3-scons \\
+            pkg-config \\
+            unzip \\
+            wget \\
+            zlib-devel \\
+            libarchive-devel \\
+            libxml2-devel \\
+            numactl-devel \\
+            wget 
+
+RUN pip3 install --upgrade pip \\
+      && pip3 install --upgrade \\
+          wheel \\
+          setuptools \\
+          docker \\
+          virtualenv
+
+# Install boost version >= 1.78 for boost::span
+# Current libboost-dev apt packages are < 1.78, so install from tar.gz
+RUN wget -O /tmp/boost.tar.gz \\
+          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+      && (cd /tmp && tar xzf boost.tar.gz) \\
+      && mv /tmp/boost_1_80_0/boost /usr/include/boost
+
+# Server build requires recent version of CMake (FetchContent required)
+# Might not need this if the installed version of cmake is high enough for our build.
+# RUN apt update -q=2 \\
+#       && apt install -y gpg wget \\
+#       && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
+#       && . /etc/os-release \\
+#       && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
+#       && apt-get update -q=2 \\
+#       && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
+"""
+    if FLAGS.enable_gpu:
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+    df += """
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+"""
+
+    df += """
+WORKDIR /workspace
+RUN rm -fr *
+COPY . .
+ENTRYPOINT []
+"""
+
+    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
+        dfile.write(df)
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = """
@@ -1017,6 +1132,10 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
+def create_dockerfile_rhel(    
+    ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
+):
+    pass 
 
 def create_dockerfile_linux(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
@@ -1161,7 +1280,28 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
         fi \\
       && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
       && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
+""".format(gpu_enabled=gpu_enabled)
 
+    # This 
+    if target_platform() == "rhel":
+        df += """
+# Common dpeendencies. 
+RUN yum install -y \\
+        git \\
+        gperf \\
+        re2-devel \\
+        openssl-devel \\
+        libtool \\
+        libcurl-devel \\
+        libb64-devel \\
+        gperftools-devel \\
+        patchelf \\
+        wget \\
+        numactl-devel \\
+        wget 
+"""
+    else:
+        df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -1184,12 +1324,12 @@ RUN apt-get update \\
               wget \\
               {backend_dependencies} \\
       && rm -rf /var/lib/apt/lists/*
-
+""".format(backend_dependencies=backend_dependencies)
+   
+    df += """
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
-""".format(
-        gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies
-    )
+"""
 
     if "fastertransformer" in backends:
         be = "fastertransformer"
@@ -1433,9 +1573,14 @@ def create_build_dockerfiles(
             )
         dockerfileargmap["GPU_BASE_IMAGE"] = gpu_base_image
 
-    create_dockerfile_buildbase(
-        FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
-    )
+    if target_platform() == "rhel":
+        create_dockerfile_buildbase_rhel(
+            FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
+        )
+    else:
+        create_dockerfile_buildbase(
+            FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
+        )
 
     if target_platform() == "windows":
         create_dockerfile_windows(
@@ -1446,6 +1591,16 @@ def create_build_dockerfiles(
             repoagents,
             caches,
         )
+    # elif target_platform() == "rhel":
+    #     create_dockerfile_rhel(
+    #         FLAGS.build_dir,
+    #         "Dockerfile",
+    #         dockerfileargmap,
+    #         backends,
+    #         repoagents,
+    #         caches,
+    #         endpoints,
+    #     )
     else:
         create_dockerfile_linux(
             FLAGS.build_dir,
@@ -1646,6 +1801,17 @@ def core_build(
         cmake_script.cp(
             os.path.join(repo_install_dir, "bin", "tritonserver.dll"),
             os.path.join(install_dir, "bin"),
+        )
+    elif target_platform() == "rhel":
+        cmake_script.mkdir(os.path.join(install_dir, "bin"))
+        cmake_script.cp(
+            os.path.join(repo_install_dir, "bin", "tritonserver"),
+            os.path.join(install_dir, "bin"),
+        )
+        cmake_script.mkdir(os.path.join(install_dir, "lib64"))
+        cmake_script.cp(
+            os.path.join(repo_install_dir, "lib64", "libtritonserver.so"),
+            os.path.join(install_dir, "lib64"),
         )
     else:
         cmake_script.mkdir(os.path.join(install_dir, "bin"))
@@ -2120,7 +2286,7 @@ if __name__ == "__main__":
         "--target-platform",
         required=False,
         default=None,
-        help='Target platform for build, can be "linux", "windows" or "igpu". If not specified, build targets the current platform.',
+        help='Target platform for build, can be "linux", "rhel", "windows" or "igpu". If not specified, build targets the current platform.',
     )
     parser.add_argument(
         "--target-machine",
