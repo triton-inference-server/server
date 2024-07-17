@@ -5,7 +5,16 @@ jobs:
     environment: GITLAB
     runs-on: self-hosted
     steps:
-      - name: step1
+      - name: Sync Mirror Repository
         run: |
           #!/bin/bash
           curl --request POST --header "PRIVATE-TOKEN:${{ secrets.TOKEN }}" "${{ secrets.MIRROR_URL }}"
+  trigger-ci:
+    environment: GITLAB
+    needs: mirror_repo
+    runs-on: self-hosted
+    steps:
+      - name: Trigger Pipeline
+        run: |
+          #!/bin/bash
+          curl --fail --request POST --form token=${{ secrets.PIPELINE_TOKEN }} -F ref=${GITHUB_HEAD_REF}  "${{ secrets.PIPELINE_URL }}"
