@@ -130,9 +130,9 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
                 fi
             done
 
-            set -e
-
             kill_server
+
+            set -e
 
             # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
             if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
