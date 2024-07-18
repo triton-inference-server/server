@@ -134,11 +134,15 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
 
             set -e
 
-            # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
-            if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
-                echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
-                cat $SERVER_LOG
-                RET=1
+            # Only check the timeout value if there is no error since the test
+            # may fail before the test_timeout case gets run.
+            if [ $RET -eq 0 ]; then
+                # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
+                if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
+                    echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
+                    cat $SERVER_LOG
+                    RET=1
+                fi
             fi
 
             if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
