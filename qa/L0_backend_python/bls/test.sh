@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
+CLIENT_PY=../test_infer_shm_leak.py
 CLIENT_LOG="./bls_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
@@ -33,7 +33,7 @@ source ../../common/util.sh
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-inference-server}
 
 RET=0
-rm -fr *.log ./models *.txt
+rm -fr *.log ./models *.txt *.xml
 
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
 if [[ ${TEST_WINDOWS} == 0 ]]; then
@@ -119,13 +119,14 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
 
             for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
                 export MODEL_NAME=${MODEL_NAME}
-
-                python3 -m pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
-                if [ $? -ne 0 ]; then
+                # Run with pytest to capture the return code correctly
+                pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
+                RET=$?
+                if [ $RET -ne 0 ]; then
+                    echo $RET
                     echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
-                    RET=1
                 fi
             done
 
