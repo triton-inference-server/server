@@ -123,7 +123,6 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
                 pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
                 RET=$?
                 if [ $RET -ne 0 ]; then
-                    echo $RET
                     echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
