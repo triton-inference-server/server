@@ -121,9 +121,10 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
                 export MODEL_NAME=${MODEL_NAME}
                 # Run with pytest to capture the return code correctly
                 pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
-                RET=$?
-                if [ $RET -ne 0 ]; then
+                EXIT_CODE=$?
+                if [ $EXIT_CODE -ne 0 ]; then
                     echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
+                    RET=$EXIT_CODE
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
                 fi
