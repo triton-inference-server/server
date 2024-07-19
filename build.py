@@ -1095,8 +1095,7 @@ RUN ldconfig && \
     pip3 install --no-cache-dir transformers && \
     find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
     find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
-    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
-    
+    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -2760,4 +2759,3 @@ if __name__ == "__main__":
             p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
         p.wait()
         fail_if(p.returncode != 0, "build failed")
-
