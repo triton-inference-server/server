@@ -2765,4 +2765,3 @@ if __name__ == "__main__":
             p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
         p.wait()
         fail_if(p.returncode != 0, "build failed")
-
