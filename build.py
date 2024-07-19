@@ -1086,17 +1086,24 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 # Remove contents that are not needed in runtime
 # Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
 # The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
-RUN ldconfig && \
-    ARCH="$(uname -i)" && \
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
-    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
-    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \
-    python3 -m pip install --upgrade pip && \
-    pip3 install --no-cache-dir transformers && \
-    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
-    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0 
+
+RUN ldconfig && \\
+    ARCH="$(uname -i)" && \\
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
+    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
+    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
+    python3 -m pip install --upgrade pip && \\
+    pip3 install --no-cache-dir transformers && \\
+    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
+    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
+
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+
+# There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
+# Downgrade to ompi v4.1.5rc2 to avoid the issue.
+RUN rm -fr /opt/hpcx/ompi
+COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
