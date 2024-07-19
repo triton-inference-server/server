@@ -1086,7 +1086,6 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 # Remove contents that are not needed in runtime
 # Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
 # The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
-
 RUN ldconfig && \\
     ARCH="$(uname -i)" && \\
     rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
