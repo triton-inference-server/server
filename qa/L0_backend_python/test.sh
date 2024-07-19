@@ -422,6 +422,7 @@ if [ "$TEST_JETSON" == "0" ]; then
         # between dependencies.
         setup_virtualenv
 
+        set +e
         (cd ${TEST} && bash -ex test.sh)
         EXIT_CODE=$?
         if [ $EXIT_CODE -ne 0 ]; then
@@ -434,6 +435,7 @@ if [ "$TEST_JETSON" == "0" ]; then
                 BLS_RET=$RET
             fi
         fi
+        set -e
 
         deactivate_virtualenv
     done
@@ -442,11 +444,13 @@ if [ "$TEST_JETSON" == "0" ]; then
     if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
+        set +e
         (cd env && bash -ex test.sh)
         if [ $? -ne 0 ]; then
             echo "Subtest env FAILED"
             RET=1
         fi
+        set -e
     fi
 fi
 
@@ -463,12 +467,14 @@ for TEST in ${SUBTESTS}; do
     # between dependencies.
     setup_virtualenv
 
+    set +e
     (cd ${TEST} && bash -ex test.sh)
 
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
     fi
+    set -e
 
     deactivate_virtualenv
 done
