@@ -1,3 +1,0 @@
-/home/kprashanth/code/server/_deps/pybind11-subbuild/CMakeFiles/pybind11-populate.dir
-/home/kprashanth/code/server/_deps/pybind11-subbuild/CMakeFiles/edit_cache.dir
-/home/kprashanth/code/server/_deps/pybind11-subbuild/CMakeFiles/rebuild_cache.dir
