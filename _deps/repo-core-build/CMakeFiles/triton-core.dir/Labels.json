@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/CMakeFiles/triton-core"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/CMakeFiles/triton-core.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/CMakeFiles/triton-core-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-core-build/triton-core/src/triton-core-stamp/triton-core-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"triton-core"
+		],
+		"name" : "triton-core"
+	}
+}

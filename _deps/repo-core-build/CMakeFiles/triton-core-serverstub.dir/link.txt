@@ -1,0 +1,1 @@
+/bin/c++ -fPIC -shared -Wl,-soname,libtritonserver.so -o libtritonserver.so "CMakeFiles/triton-core-serverstub.dir/src/tritonserver_stub.cc.o"

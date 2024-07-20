@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"cnmem"
+		],
+		"name" : "cnmem"
+	}
+}

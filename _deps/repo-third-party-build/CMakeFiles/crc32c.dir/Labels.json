@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"crc32c"
+		],
+		"name" : "crc32c"
+	}
+}

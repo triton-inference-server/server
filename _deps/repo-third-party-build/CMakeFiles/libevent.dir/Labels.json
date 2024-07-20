@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/libevent"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/libevent.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/libevent-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/libevent/src/libevent-stamp/libevent-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"libevent"
+		],
+		"name" : "libevent"
+	}
+}

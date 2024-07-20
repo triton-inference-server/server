@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/CMakeFiles/repo-third-party-populate"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/CMakeFiles/repo-third-party-populate.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/CMakeFiles/repo-third-party-populate-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-test.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-subbuild/repo-third-party-populate-prefix/src/repo-third-party-populate-stamp/repo-third-party-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"repo-third-party-populate"
+		],
+		"name" : "repo-third-party-populate"
+	}
+}

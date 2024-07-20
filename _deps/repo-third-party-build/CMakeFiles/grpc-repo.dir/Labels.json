@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc-repo"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc-repo.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc-repo-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-test.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/grpc-repo/src/grpc-repo-stamp/grpc-repo-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"grpc-repo"
+		],
+		"name" : "grpc-repo"
+	}
+}

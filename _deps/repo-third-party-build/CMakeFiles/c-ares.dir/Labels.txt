@@ -1,0 +1,13 @@
+# Target labels
+ c-ares
+# Source files and their labels
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/c-ares
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/c-ares.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/c-ares-complete.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-build.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-configure.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-download.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-install.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-mkdir.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-patch.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/c-ares/src/c-ares-stamp/c-ares-update.rule

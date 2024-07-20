@@ -53,19 +53,13 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 )
 
-# Add pybind11
-FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG v2.13.1 
-)
 
 if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
 
-FetchContent_MakeAvailable(repo-common repo-core repo-backend pybind11)
+FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 # CUDA
 #
@@ -785,5 +779,12 @@ if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
 
-pybind11_add_module(tritonfrontend PRIVATE bindings.cc)
-target_link_libraries(tritonfrontend PRIVATE http-endpoint-library triton-core-serverapi triton-core-serverstub triton-common-error)
+# add_library(server_lib STATIC
+#     http_server.h
+#     server_interface.h
+# )
+
+# target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(http-endpoint-library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(python python)

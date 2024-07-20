@@ -1,0 +1,7 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The patch step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+command (connected)=/home/kprashanth/.local/lib/python3.10/site-packages/cmake/data/bin/cmake;-Dcan_fetch=YES;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/tmp/crc32c-gitupdate.cmake
+command (disconnected)=/home/kprashanth/.local/lib/python3.10/site-packages/cmake/data/bin/cmake;-Dcan_fetch=NO;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/tmp/crc32c-gitupdate.cmake
+work_dir=/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c

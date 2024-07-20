@@ -1,0 +1,13 @@
+# Target labels
+ grpc
+# Source files and their labels
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/grpc-complete.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-build.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-configure.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-download.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-install.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-mkdir.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-patch.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/grpc/src/grpc-stamp/grpc-update.rule

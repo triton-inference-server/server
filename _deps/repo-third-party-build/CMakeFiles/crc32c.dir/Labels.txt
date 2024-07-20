@@ -1,0 +1,13 @@
+# Target labels
+ crc32c
+# Source files and their labels
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/crc32c-complete.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-build.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-configure.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-download.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-install.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-mkdir.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-patch.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/crc32c/src/crc32c-stamp/crc32c-update.rule

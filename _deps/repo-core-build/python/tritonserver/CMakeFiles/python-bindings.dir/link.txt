@@ -1,0 +1,1 @@
+/bin/c++ -fPIC -flto -shared -Wl,-soname,triton_bindings.cpython-310-x86_64-linux-gnu.so -o triton_bindings.cpython-310-x86_64-linux-gnu.so "CMakeFiles/python-bindings.dir/_c/tritonserver_pybind.cc.o"  -Wl,-rpath,"\$ORIGIN:/opt/tritonserver/lib:/home/kprashanth/code/server/_deps/repo-core-build" ../../libtritonserver.so

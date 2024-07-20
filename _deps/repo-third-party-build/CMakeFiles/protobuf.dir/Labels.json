@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/protobuf"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/protobuf.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/protobuf-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/protobuf/src/protobuf-stamp/protobuf-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"protobuf"
+		],
+		"name" : "protobuf"
+	}
+}

@@ -1,0 +1,15 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=git
+command=/home/kprashanth/.local/lib/python3.10/site-packages/cmake/data/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/kprashanth/code/server/_deps/pybind11-subbuild/pybind11-populate-prefix/tmp/pybind11-populate-gitclone.cmake
+source_dir=/home/kprashanth/code/server/_deps/pybind11-src
+work_dir=/home/kprashanth/code/server/_deps
+repository=https://github.com/pybind/pybind11
+remote=origin
+init_submodules=TRUE
+recurse_submodules=--recursive
+submodules=
+CMP0097=NEW
+      

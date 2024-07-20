@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/opentelemetry-cpp"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/opentelemetry-cpp.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/opentelemetry-cpp-complete.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-build.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-configure.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-download.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-install.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-mkdir.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-patch.rule"
+		},
+		{
+			"file" : "/home/kprashanth/code/server/_deps/repo-third-party-build/opentelemetry-cpp/src/opentelemetry-cpp-stamp/opentelemetry-cpp-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"opentelemetry-cpp"
+		],
+		"name" : "opentelemetry-cpp"
+	}
+}

@@ -1,0 +1,13 @@
+# Target labels
+ cnmem
+# Source files and their labels
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/CMakeFiles/cnmem-complete.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-build.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-configure.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-download.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-install.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-mkdir.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-patch.rule
+/home/kprashanth/code/server/_deps/repo-third-party-build/cnmem/src/cnmem-stamp/cnmem-update.rule
