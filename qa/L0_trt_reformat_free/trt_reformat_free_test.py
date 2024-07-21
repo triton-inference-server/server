@@ -167,7 +167,7 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         )
 
         with self.assertRaises(InferenceServerException) as e:
-            results = self.triton_client.infer(
+            self.triton_client.infer(
                 model_name=model_name, inputs=inputs, outputs=outputs
             )
 
@@ -253,7 +253,7 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             )
 
             with self.assertRaises(InferenceServerException) as e:
-                results = self.triton_client.infer(
+                self.triton_client.infer(
                     model_name=model_name, inputs=inputs, outputs=outputs
                 )
             err_str = str(e.exception)
