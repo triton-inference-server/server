@@ -34,8 +34,8 @@ import unittest
 import infer_util as iu
 import numpy as np
 import tritonclient.grpc as tritongrpcclient
-from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 import tritonclient.utils.shared_memory as shm
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 
 class InputValTest(unittest.TestCase):
