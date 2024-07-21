@@ -47,7 +47,7 @@ SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 function clone_tensorrt_llm_backend_repo {
     rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
     apt-get update && apt-get install git-lfs -y --no-install-recommends
-    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} https://github.com/triton-inference-server/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
+    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
     cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
 }
 
