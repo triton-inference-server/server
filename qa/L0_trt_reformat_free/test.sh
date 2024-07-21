@@ -75,7 +75,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 4
+    check_test_results $TEST_RESULT_FILE 6
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
