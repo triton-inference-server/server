@@ -5,3 +5,4 @@ sphinx_copybutton
 sphinx_design
 sphinx-prompt
 sphinx_tabs
+sphinx_sitemap
