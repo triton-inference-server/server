@@ -62,7 +62,7 @@ function upgrade_openmpi {
             exit 1
         }
     else
-        echo "Installed Open MPI version ($CURRENT_VERSION) is not less than 5.0.1. Skipping the upgrade."
+        echo "The installed Open MPI version ($CURRENT_VERSION) is 5.0.1 or higher. Skipping the upgrade."
         return
     fi
 
