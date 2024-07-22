@@ -2,3 +2,4 @@ Sphinx==7.4.7
 ablog
 myst-parser
 sphinx_copybutton
+sphinx_design
