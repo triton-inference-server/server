@@ -8,3 +8,4 @@ sphinx_tabs
 sphinx_sitemap
 sphinx-rtd-theme
 sphinx-book-theme
+pandas
