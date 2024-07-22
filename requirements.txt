@@ -4,3 +4,4 @@ myst-parser
 sphinx_copybutton
 sphinx_design
 sphinx-prompt
+sphinx_tabs
