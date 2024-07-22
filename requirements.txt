@@ -6,8 +6,6 @@ ipython==7.26.0
 nbconvert
 nbformat
 nbsphinx==0.8.9
-pandas==1.3.1
-plotly==5.1.0
 pydata-sphinx-theme==0.8.1
 readthedocs-sphinx-search==0.1.1
 sphinx-book-theme==0.3.3
