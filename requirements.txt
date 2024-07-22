@@ -1,5 +1,5 @@
 MarkupSafe==1.1.1
-Sphinx==4.5.0
+Sphinx==7.4.7
 ablog==0.10.29
 ipython-genutils==0.2.0
 ipython==7.26.0
