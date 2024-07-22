@@ -285,4 +285,4 @@ def sphinxSearchIndexFeed(
             self._mapping.setdefault(stemmed_word, set()).add(docname)
 
 
-search.IndexBuilder.feed = sphinxSearchIndexFeed
+# search.IndexBuilder.feed = sphinxSearchIndexFeed
