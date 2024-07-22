@@ -36,16 +36,6 @@ set(
   _c/tritonfrontend_pybind.cc
 )
 
-# set(
-#   Libevent_DIR ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
-# )
-
-# set(
-#   libevhtp_DIR ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
-# )
-
-
-
 find_package(libevhtp CONFIG REQUIRED)
 message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
@@ -58,18 +48,26 @@ target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(
     py-bindings 
     PRIVATE
-    # ${LIBEVENT_LIBRARIES}
-    http-endpoint-library     # from server-repo
-    # triton-core-serverapi     # from core-repo
-    # triton-core-serverstub    # from core-repo
-    # triton-common-error       # from common-repo
-    # triton-common-json      # from repo-common
-    # triton-common-logging   # from repo-common
-    # server_lib
+    ${LIBTRITONSERVER_LIBRARY}
+    triton-core-serverstub
+    triton-core-serverapi 
+    http-endpoint-library
+    triton-common-async-work-queue  # from repo-common
+    triton-common-error             # from repo-common
+    triton-common-json
+    triton-common-logging           # from repo-common
+    CUDA::cudart
+    # grpc-endpoint-library
+    shared-memory-manager
 )
 
-target_compile_features(py-bindings PRIVATE cxx_std_17)
+
+# target_compile_features(py-bindings PRIVATE cxx_std_17)
 
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 # Add Triton library default path in 'rpath' for runtime library lookup
-set_target_properties(py-bindings PROPERTIES BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib")
+set_target_properties(
+          py-bindings 
+          PROPERTIES   
+          BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
+          )

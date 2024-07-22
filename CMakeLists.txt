@@ -210,6 +210,10 @@ if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
 endif() # TRITON_ENABLE_TRACING
 
+
+set(LIBTRITONSERVER_LIBRARY "/opt/tritonserver/stubs/libtritonserver.so")
+
+
 ExternalProject_Add(triton-server
   PREFIX triton-server
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -271,14 +275,3 @@ ExternalProject_Add(triton-server
     -DTRITON_VERSION:STRING=${TRITON_VERSION}
   DEPENDS ${TRITON_DEPENDS}
 )
-
-# This is to create triton-frontend python bindings
-# add_subdirectory(python python)
-
-# set_directory_properties(PROPERTIES 
-#     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python 
-#     CMAKE_ARGS 
-#       -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
-#       -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
-# )
-

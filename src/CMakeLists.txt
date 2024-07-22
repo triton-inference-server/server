@@ -779,12 +779,43 @@ if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
 
-# add_library(server_lib STATIC
-#     http_server.h
-#     server_interface.h
-# )
+find_package(CUDAToolkit REQUIRED)
 
-# target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(http-endpoint-library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(
+  shared-memory-manager 
+  EXCLUDE_FROM_ALL
+  shared_memory_manager.h
+  shared_memory_manager.cc
+  data_compressor.h
+  common.h
+  common.cc
+  restricted_features.h
+  tracer.h
+  classification.cc
+)
+
+target_link_libraries(
+  shared-memory-manager 
+  PUBLIC 
+  CUDA::cudart
+  triton-core-serverapi           # from repo-core
+  triton-core-serverstub          # from repo-core
+  triton-common-json              # from repo-common
+)
+
+
+set_target_properties(shared-memory-manager PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_compile_features(shared-memory-manager PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+
+target_compile_definitions(
+    shared-memory-manager
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
+# Add the -fPIC flag
+# set_target_properties(server-src-lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 
 add_subdirectory(python python)

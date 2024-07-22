@@ -4,5 +4,5 @@ from dataclasses import dataclass
 class KServeHttpOptions():
     address: str
     port: int
-    thread_cnt: int
+    thread_count: int
     restricted_protocols: list

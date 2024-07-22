@@ -1,9 +1,7 @@
 #include <pybind11/pybind11.h>
-// #include <memory>
 #include "triton/core/tritonserver.h"
-#include "http_server.h"
-#include "server_interface.h"
-#include "restricted_features.h"
+#include "tritonfrontend.h"
+#include <memory>
 
 namespace py = pybind11;
 
@@ -32,7 +30,7 @@ class PyWrapper {
 
 struct TRITONSERVER_Server {};
 
-namespace triton { namespace server {
+namespace triton { namespace server { namespace python {
 
 // base exception for all Triton error code
 struct TritonError : public std::runtime_error {
@@ -128,19 +126,20 @@ ThrowIfError(TRITONSERVER_Error* err)
 bool CreateWrapper(uintptr_t server_ptr) {
       
       TRITONSERVER_Server* raw_ptr = reinterpret_cast<TRITONSERVER_Server*>(server_ptr);
-      // const std::shared_ptr<TRITONSERVER_Server> test_server(raw_ptr);
+      const std::shared_ptr<TRITONSERVER_Server> test_server(raw_ptr);
 
-      // std::unique_ptr<triton::server::HTTPServer>* service;
+      std::unique_ptr<triton::server::HTTPServer> service;
       std::cout << "This is the server_ptr" << server_ptr << std::endl;
       std::cout << raw_ptr << "object is successfully created." << std::endl;
-      // triton::server::RestrictedFeatures temp;
+      triton::server::RestrictedFeatures temp;
 
-      // TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(test_server, nullptr, nullptr, 8000,
-      // true, "0.0.0.0",
-      // "",
-      // 1, temp,
-      // service);
+      TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(test_server, nullptr, nullptr, 8000,
+      true, "0.0.0.0",
+      "",
+      1, temp,
+      &service);
 
+      std::cout << "Create is finished" << std::endl;
       // if(err == nullptr)
         // return true;
 
@@ -176,4 +175,4 @@ PYBIND11_MODULE(tritonfrontend_bindings, m) {
     m.def("create", &CreateWrapper, "Create HTTPAPIServer() Instance...");
 }
 
-}}
+}}}
