@@ -1,2 +1,3 @@
 Sphinx==7.4.7
 ablog
+myst-parser
