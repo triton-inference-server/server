@@ -3,3 +3,4 @@ ablog
 myst-parser
 sphinx_copybutton
 sphinx_design
+sphinx-prompt
