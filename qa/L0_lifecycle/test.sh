@@ -2131,6 +2131,72 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_add_custom_config
+rm -fr models config.pbtxt.*
+mkdir models
+for i in savedmodel; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    mkdir models/${i}_float32_float32_float32/configs
+    sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
+        $DATADIR/qa_model_repository/${i}_float32_float32_float32/config.pbtxt > config.pbtxt.custom.${i}
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
+             --model-control-mode=poll --exit-timeout-secs=5 \
+             --model-config-name=custom"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_add_custom_config >>$CLIENT_LOG 2>&1
+check_unit_test
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_delete_custom_config
+rm -fr models config.pbtxt.*
+mkdir models
+for i in savedmodel; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    mkdir models/${i}_float32_float32_float32/configs
+    sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
+        $DATADIR/qa_model_repository/${i}_float32_float32_float32/config.pbtxt \
+        > models/${i}_float32_float32_float32/configs/custom.pbtxt
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
+             --model-control-mode=poll --exit-timeout-secs=5 \
+             --model-config-name=custom"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_delete_custom_config >>$CLIENT_LOG 2>&1
+check_unit_test
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else

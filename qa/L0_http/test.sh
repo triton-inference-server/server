@@ -662,7 +662,7 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=15
+EXPECTED_NUM_TESTS=16
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -681,7 +681,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-### Test Restricted  APIs ###
+### Test Restricted APIs ###
 ### Repeated API not allowed
 
 MODELDIR="`pwd`/models"
@@ -703,7 +703,7 @@ elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
     RET=1
 fi
 
-### Test Unknown Restricted  API###
+### Test Unknown Restricted API###
 ### Unknown API not allowed
 
 MODELDIR="`pwd`/models"
@@ -723,7 +723,7 @@ elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
     RET=1
 fi
 
-### Test Restricted  APIs ###
+### Test Restricted APIs ###
 ### Restricted model-repository, metadata, and inference
 
 SERVER_ARGS="--model-repository=${MODELDIR} \

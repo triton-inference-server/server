@@ -49,7 +49,7 @@ from sphinx import search
 # -- Project information -----------------------------------------------------
 
 project = "NVIDIA Triton Inference Server"
-copyright = "2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved"
+copyright = "2018-2024, NVIDIA Corporation"
 author = "NVIDIA"
 
 # The full version, including alpha/beta/rc tags
@@ -168,7 +168,16 @@ html_theme_options = {
     "logo_only": False,
     "show_toc_level": 2,
     "extra_navbar": "",
-    "extra_footer": "",
+    "extra_footer": """
+      <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-policy/" target="_blank">Privacy Policy</a> |
+      <a href="https://www.nvidia.com/en-us/privacy-center/" target="_blank">Manage My Privacy</a> |
+      <a href="https://www.nvidia.com/en-us/preferences/email-preferences/" target="_blank">Do Not Sell or Share My
+        Data</a> |
+      <a href="https://www.nvidia.com/en-us/about-nvidia/terms-of-service/" target="_blank">Terms of Service</a> |
+      <a href="https://www.nvidia.com/en-us/about-nvidia/accessibility/" target="_blank">Accessibility</a> |
+      <a href="https://www.nvidia.com/en-us/about-nvidia/company-policies/" target="_blank">Corporate Policies</a> |
+      <a href="https://www.nvidia.com/en-us/product-security/" target="_blank">Product Security</a> |
+      <a href="https://www.nvidia.com/en-us/contact/" target="_blank">Contact</a>""",
     "repository_url": "https://github.com/triton-inference-server/server",
     "use_repository_button": True,
 }

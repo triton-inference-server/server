@@ -35,9 +35,9 @@ import unittest
 
 import numpy as np
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException, np_to_triton_dtype
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 
 class LargePayLoadTest(tu.TestResultCollector):

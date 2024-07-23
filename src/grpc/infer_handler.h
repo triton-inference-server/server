@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -336,7 +336,8 @@ InferAllocatorPayload(
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          region_name, offset, &base, &memory_type, &memory_type_id));
+          region_name, offset, byte_size, &base, &memory_type,
+          &memory_type_id));
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -978,6 +979,9 @@ class InferHandlerState {
     // Tracks all the states that have been created on this context.
     std::set<InferHandlerStateType*> all_states_;
 
+    // Ready to write queue for decoupled
+    std::queue<InferHandlerStateType*> ready_to_write_states_;
+
     // The step of the entire context.
     Steps step_;
 
@@ -1012,12 +1016,23 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver), async_notify_state_(false)
   {
-    // For debugging and testing,
+    // For debugging and testing
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_response_ms_ = 0;
     if (dstr != nullptr) {
       delay_response_ms_ = atoi(dstr);
     }
+    const char* cstr = getenv("TRITONSERVER_DELAY_GRPC_COMPLETE");
+    delay_complete_ms_ = 0;
+    if (cstr != nullptr) {
+      delay_complete_ms_ = atoi(cstr);
+    }
+    const char* pstr = getenv("TRITONSERVER_DELAY_GRPC_PROCESS");
+    delay_process_ms_ = 0;
+    if (pstr != nullptr) {
+      delay_process_ms_ = atoi(pstr);
+    }
+
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
   }
@@ -1112,6 +1127,8 @@ class InferHandlerState {
 
   // For testing and debugging
   int delay_response_ms_;
+  int delay_complete_ms_;
+  int delay_process_ms_;
 
   // For inference requests the allocator payload, unused for other
   // requests.

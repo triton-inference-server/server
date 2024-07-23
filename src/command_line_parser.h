@@ -125,6 +125,7 @@ struct TritonServerParameters {
 
   // Model repository manager configuration
   bool enable_model_namespacing_{false};
+  bool enable_peer_access_{true};
   std::set<std::string> model_repository_paths_{};
   TRITONSERVER_ModelControlMode control_mode_{TRITONSERVER_MODEL_CONTROL_NONE};
   std::set<std::string> startup_models_{};
@@ -134,6 +135,9 @@ struct TritonServerParameters {
   uint32_t model_load_thread_count_{4};
   uint32_t model_load_retry_count_{0};
   std::map<int, double> load_gpu_limit_;
+  // Custom model configuration file. Fall back to default config.pbtxt if not
+  // set.
+  std::string model_config_name_;
 
   // Rate limiter configuration
   // FIXME: Once the rate limiter implementation is complete make

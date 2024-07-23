@@ -42,17 +42,21 @@ source ../common/util.sh
 
 RET=0
 
+DATADIR=/data/inferenceserver/${REPO_VERSION}
+SERVER=/opt/tritonserver/bin/tritonserver
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
 TEST_RESULT_FILE='./test_results.txt'
+SERVER_LOG="./inference_server.log"
+TEST_LOG="./input_byte_size_test.log"
+TEST_EXEC=./input_byte_size_test
 
 export CUDA_VISIBLE_DEVICES=0
 
 rm -fr *.log
 
-SERVER=/opt/tritonserver/bin/tritonserver
+# input_validation_test
 SERVER_ARGS="--model-repository=`pwd`/models"
-SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -61,16 +65,93 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY >> $CLIENT_LOG 2>&1
+python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY::InputValTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
     RET=1
 fi
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# input_shape_validation_test
+pip install torch
+pip install pytest-asyncio
+
+mkdir -p models/pt_identity/1
+PYTHON_CODE=$(cat <<END
+import torch
+torch.jit.save(
+    torch.jit.script(torch.nn.Identity()),
+    "`pwd`/models/pt_identity/1/model.pt",
+)
+END
+)
+res="$(python3 -c "$PYTHON_CODE")"
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** model "pt_identity" initialization FAILED. \n***"
+    echo $res
+    exit 1
+fi
+
+# Create the config.pbtxt file with the specified configuration
+cat > models/pt_identity/config.pbtxt << EOL
+name: "pt_identity"
+backend: "pytorch"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [8]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [8]
+  }
+]
+# ensure we batch requests together
+dynamic_batching {
+    max_queue_delay_microseconds: 1000000
+}
+EOL
+
+cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
+
+SERVER_ARGS="--model-repository=`pwd`/models"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 -m pytest --junitxml="input_shape_validation.report.xml" $TEST_PY::InputShapeTest >> $CLIENT_LOG 2>&1
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# input_byte_size_test
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"

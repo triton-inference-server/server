@@ -96,11 +96,18 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] non-pinned" ${ENSEMBLE_NAME}.pinned.server.log
+    grep "non-pinned" ${ENSEMBLE_NAME}.pinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only pinned memory is allocated\n***"
         RET=1
     fi
+
+    grep "] \"Pinned memory pool is created" ${ENSEMBLE_NAME}.pinned.server.log
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected pinned memory is allocated\n***"
+        RET=1
+    fi
+
     set -e
 
     kill $SERVER_PID
@@ -148,7 +155,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] pinned" ${ENSEMBLE_NAME}.nonpinned.server.log
+    grep "] \"Pinned memory pool is created" ${ENSEMBLE_NAME}.nonpinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only non-pinned memory is allocated\n***"
         RET=1

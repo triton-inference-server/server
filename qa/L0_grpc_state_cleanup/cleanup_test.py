@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,9 +67,10 @@ class CleanUpTest(tu.TestResultCollector):
     def setUp(self):
         self.decoupled_model_name_ = "repeat_int32"
         self.identity_model_name_ = "custom_zero_1_float32"
+        self.repeat_non_decoupled_model_name = "repeat_int32_non_decoupled"
 
     def _prepare_inputs_and_outputs(self, kind):
-        if kind == "decoupled_streaming":
+        if kind in ("decoupled_streaming", "non_decoupled_streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("IN", [1], "INT32"))
             self.inputs_.append(grpcclient.InferInput("DELAY", [1], "UINT32"))
@@ -79,7 +80,7 @@ class CleanUpTest(tu.TestResultCollector):
             self.outputs_.append(grpcclient.InferRequestedOutput("OUT"))
             self.outputs_.append(grpcclient.InferRequestedOutput("IDX"))
             self.requested_outputs_ = self.outputs_
-        elif kind == "simple" or kind == "streaming":
+        elif kind in ("simple", "streaming"):
             self.inputs_ = []
             self.inputs_.append(grpcclient.InferInput("INPUT0", [1, 1], "FP32"))
 
@@ -436,10 +437,10 @@ class CleanUpTest(tu.TestResultCollector):
 
     def test_simple_infer_shutdownserver(self):
         # This test case is used to check whether all the state objects are
-        # released when the server is interrupted to shutdown in middle of
-        # inference run with final parameters being returned.
+        # released when the server is interrupted to shutdown in the beginning
+        # of inference run with final parameters being returned.
         with self.assertRaises(InferenceServerException) as cm:
-            self._simple_infer(request_count=10, kill_server=5)
+            self._simple_infer(request_count=20, kill_server=5)
 
     ###
     ### Streaming Tests
@@ -468,11 +469,18 @@ class CleanUpTest(tu.TestResultCollector):
     def test_streaming_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._streaming_infer(request_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
         )
 
     def test_streaming_infer_shutdownserver(self):
@@ -519,11 +527,18 @@ class CleanUpTest(tu.TestResultCollector):
     def test_decoupled_error_status(self):
         # This test case is used to check whether all the state objects are
         # released when RPC runs into error.
+        expected_exceptions = [
+            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
+            "The stream is no longer in valid state, the error detail is reported through provided callback. A new stream should be started after stopping the current stream.",
+        ]
         with self.assertRaises(InferenceServerException) as cm:
             self._decoupled_infer(request_count=10, repeat_count=10, should_error=True)
-        self.assertIn(
-            "This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'",
-            str(cm.exception),
+
+        exception_match = False
+        for expected_exception in expected_exceptions:
+            exception_match |= expected_exception in str(cm.exception)
+        self.assertTrue(
+            exception_match, "Raised unexpected exception {}".format(str(cm.exception))
         )
 
     def test_decoupled_infer_shutdownserver(self):
@@ -553,6 +568,70 @@ class CleanUpTest(tu.TestResultCollector):
                 should_error=True,
                 infer_helper_map=[False, True],
             )
+
+    def test_decoupled_infer_complete(self):
+        # Test if the Process() thread could release the state object before
+        # the StreamInferResponseComplete() thread is done accessing it.
+        self._decoupled_infer(request_count=1, repeat_count=1, stream_timeout=16)
+        # Check no error is printed to the log.
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertNotIn("Should not print this", server_log)
+
+    def test_non_decoupled_streaming_multi_response(self):
+        # Test non-decoupled streaming infer with more than one response should return
+        # the first response.
+        response_count = 4
+        expected_response_count = 1
+        expected_response_index = 0
+
+        # Prepare input data
+        self._prepare_inputs_and_outputs("non_decoupled_streaming")
+        # Initialize data for IN
+        data_offset = 100
+        input_data = np.arange(
+            start=data_offset, stop=data_offset + response_count, dtype=np.int32
+        )
+        self.inputs_[0].set_shape([response_count])
+        self.inputs_[0].set_data_from_numpy(input_data)
+        # Initialize data for DELAY
+        delay_data = np.zeros([response_count], dtype=np.uint32)
+        self.inputs_[1].set_shape([response_count])
+        self.inputs_[1].set_data_from_numpy(delay_data)
+        # Initialize data for WAIT
+        wait_data = np.array([0], dtype=np.uint32)
+        self.inputs_[2].set_data_from_numpy(wait_data)
+
+        # Infer
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        ) as client:
+            # Establish stream
+            client.start_stream(
+                callback=partial(callback, user_data), stream_timeout=16
+            )
+            # Send a request
+            client.async_stream_infer(
+                model_name=self.repeat_non_decoupled_model_name,
+                inputs=self.inputs_,
+                request_id="0",
+                outputs=self.requested_outputs_,
+            )
+            # Wait for all results and stop stream
+            client.stop_stream()
+
+        # Check infer output
+        actual_response_count = 0
+        while not user_data._response_queue.empty():
+            actual_response_count += 1
+            data_item = user_data._response_queue.get()
+            if type(data_item) == InferenceServerException:
+                raise data_item
+            else:
+                response_idx = data_item.as_numpy("IDX")[0]
+                self.assertEqual(response_idx, expected_response_index)
+        self.assertEqual(actual_response_count, expected_response_count)
 
 
 if __name__ == "__main__":

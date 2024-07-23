@@ -27,7 +27,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import re
 import sys
+
+import requests
 
 sys.path.append("../../common")
 
@@ -62,6 +65,29 @@ def callback(user_data, result, error):
 class LifecycleTest(unittest.TestCase):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
+
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def _metrics_before_test(self, model, reason):
+        pattern = rf'nv_inference_request_failure\{{model="{model}",reason="{reason}",version="1"\}} (\d+)'
+        metrics = self._get_metrics()
+        match = re.search(pattern, metrics)
+        if match:
+            return int(match.group(1))
+        else:
+            raise Exception(f"Failure metrics for model='{model}' not found")
+
+    def _assert_metrics(
+        self, model_name, reason, expected_count_increase, initial_count
+    ):
+        metrics = self._get_metrics()
+        # Add initial count + expected count for the the test
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
+        self.assertIn(expected_metric, metrics)
 
     def test_error_code(self):
         model_name = "error_code"
@@ -181,7 +207,7 @@ class LifecycleTest(unittest.TestCase):
     def test_infer_pymodel_error(self):
         model_name = "wrong_model"
         shape = [2, 2]
-
+        initial_metrics_value = self._metrics_before_test(model_name, "BACKEND")
         with self._shm_leak_detector.Probe() as shm_probe:
             with httpclient.InferenceServerClient(
                 f"{_tritonserver_ipaddr}:8000"
@@ -199,7 +225,7 @@ class LifecycleTest(unittest.TestCase):
                     print(e.message())
                     self.assertTrue(
                         e.message().startswith(
-                            "Failed to process the request(s) for model instance"
+                            "Failed to process the request(s) for model "
                         ),
                         "Exception message is not correct",
                     )
@@ -207,45 +233,13 @@ class LifecycleTest(unittest.TestCase):
                     self.assertTrue(
                         False, "Wrong exception raised or did not raise an exception"
                     )
-
-    def test_incorrect_execute_return(self):
-        model_name = "execute_return_error"
-        shape = [1, 1]
-        with self._shm_leak_detector.Probe() as shm_probe:
-            with httpclient.InferenceServerClient(
-                f"{_tritonserver_ipaddr}:8000"
-            ) as client:
-                input_data = (5 * np.random.randn(*shape)).astype(np.float32)
-                inputs = [
-                    httpclient.InferInput(
-                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                    )
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-
-                # The first request to this model will return None.
-                with self.assertRaises(InferenceServerException) as e:
-                    client.infer(model_name, inputs)
-
-                self.assertTrue(
-                    "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0_0', message: Expected a list in the "
-                    "execute return" in str(e.exception),
-                    "Exception message is not correct.",
-                )
-
-                # The second inference request will return a list of None object
-                # instead of Python InferenceResponse objects.
-                with self.assertRaises(InferenceServerException) as e:
-                    client.infer(model_name, inputs)
-
-                self.assertTrue(
-                    "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0_0', message: Expected an "
-                    "'InferenceResponse' object in the execute function return"
-                    " list" in str(e.exception),
-                    "Exception message is not correct.",
-                )
+        expected_count_increase = 1
+        self._assert_metrics(
+            model_name,
+            "BACKEND",
+            expected_count_increase,
+            initial_metrics_value,
+        )
 
 
 if __name__ == "__main__":

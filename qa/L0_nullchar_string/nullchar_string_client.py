@@ -28,9 +28,9 @@
 import argparse
 
 import numpy as np
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import np_to_triton_dtype
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import np_to_triton_dtype
 
 FLAGS = None
 

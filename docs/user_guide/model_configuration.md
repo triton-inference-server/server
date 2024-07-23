@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -321,6 +321,84 @@ configuration](#minimal-model-configuration). You must still provide
 the optional portions of the model configuration by editing the
 config.pbtxt file.
 
+## Custom Model Configuration
+
+Sometimes when multiple devices running Triton instances that share one
+model repository, it is necessary to have models configured differently
+on each platform in order to achieve the best performance. Triton allows
+users to pick the custom model configuration name by setting `--model-config-name` option.
+
+For example, when running `./tritonserver --model-repository=</path/to/model/repository> --model-config-name=h100`,
+the server will search the custom configuration file `h100.pbtxt` under
+`/path/to/model/repository/<model-name>/configs` directory for each model
+that is loaded. If `h100.pbtxt` exists, it will be used as the configuration
+for this model. Otherwise, the default configuration `/path/to/model/repository/<model-name>/config.pbtxt`
+or [auto-generated model configuration](#auto-generated-model-configuration)
+will be selected based on the settings.
+
+Custom model configuration also works with `Explicit` and `Poll` model
+control modes. Users may delete or add new custom configurations and the
+server will pick the configuration file for each loaded model dynamically.
+
+Note: custom model configuration name should not contain any space character.
+
+Example 1: --model-config-name=h100
+```
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── **h100.pbtxt**
+    │   └── config.pbtxt
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── config.pbtxt
+        └── **config.pbtxt**
+```
+
+Example 2: --model-config-name=config
+```
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── h100.pbtxt
+    │   └── **config.pbtxt**
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── **config.pbtxt**
+        └── config.pbtxt
+```
+
+Example 3: --model-config-name not set
+```
+.
+└── model_repository/
+    ├── model_a/
+    │   ├── configs/
+    │   │   ├── v100.pbtxt
+    │   │   └── h100.pbtxt
+    │   └── **config.pbtxt**
+    ├── model_b/
+    │   ├── configs/
+    │   │   └── v100.pbtxt
+    │   └── **config.pbtxt**
+    └── model_c/
+        ├── configs/
+        │   └── config.pbtxt
+        └── **config.pbtxt**
+```
+
 ### Default Max Batch Size and Dynamic Batcher
 
 When a model is using the auto-complete feature, a default maximum
@@ -369,12 +447,12 @@ library.
 |TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |INT8     |int8          |
 |TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |INT16    |int16         |
 |TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |INT32    |int32         |
-|TYPE_INT64    |              |DT_INT64      |INT64         |kLong    |INT64    |int64         |
+|TYPE_INT64    | kINT64       |DT_INT64      |INT64         |kLong    |INT64    |int64         |
 |TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |FP16     |float16       |
 |TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
 |TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
 |TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
-|TYPE_BF16     |              |              |              |         |BF16     |              |
+|TYPE_BF16     | kBF16        |              |              |         |BF16     |              |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point

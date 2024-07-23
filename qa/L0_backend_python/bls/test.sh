@@ -100,7 +100,8 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
         echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
 
     # Test with different sizes of CUDA memory pool
-    for CUDA_MEMORY_POOL_SIZE_MB in 64 128 ; do
+    # TODO: Why 256 worked in place of 128, on decoupled data pipeline?
+    for CUDA_MEMORY_POOL_SIZE_MB in 64 256 ; do
         CUDA_MEMORY_POOL_SIZE_BYTES=$((CUDA_MEMORY_POOL_SIZE_MB * 1024 * 1024))
         SERVER_ARGS="--model-repository=${MODELDIR}/bls/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
         for TRIAL in non_decoupled decoupled ; do

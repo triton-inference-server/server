@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,6 +57,8 @@ The corresponding repository layout must be:
     <model-name>/
       [config.pbtxt]
       [<output-labels-file> ...]
+      [configs]/
+        [<custom-config-file> ...]
       <version>/
         <model-definition-file>
       <version>/
@@ -65,6 +67,8 @@ The corresponding repository layout must be:
     <model-name>/
       [config.pbtxt]
       [<output-labels-file> ...]
+      [configs]/
+        [<custom-config-file> ...]
       <version>/
         <model-definition-file>
       <version>/
@@ -83,10 +87,15 @@ config.pbtxt is required while for others it is optional. See
 Configuration](model_configuration.md#auto-generated-model-configuration)
 for more information.
 
+Each <model-name> directory may include an optional sub-directory configs.
+Within the configs directory there must be zero or more <custom-config-file>
+with .pbtxt file extension. For more information about how the custom model
+configuration is handled by Triton see [Custom Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#custom-model-configuration).
+
 Each <model-name> directory must have at least one numeric
-sub-directory representing a version of the model.  For more
+sub-directory representing a version of the model. For more
 information about how the model versions are handled by Triton see
-[Model Versions](#model-versions).  Each model is executed by a
+[Model Versions](#model-versions). Each model is executed by a
 specific
 [backend](https://github.com/triton-inference-server/backend/blob/main/README.md).
 Within each version sub-directory there must be the files required by

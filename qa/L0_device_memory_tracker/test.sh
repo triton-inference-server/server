@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,6 +46,7 @@ TEST_PY=test.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 rm -f *.log
 
+TRTEXEC=/usr/src/tensorrt/bin/trtexec
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
@@ -61,32 +62,66 @@ rm -rf models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/onnx_model_store/* models/.
 rm -r models/*cpu
 
-# Convert to get TRT models against the system
-CAFFE2PLAN=../common/caffe2plan
 set +e
-mkdir -p models/vgg19_plan/1 && rm -f models/vgg19_plan/1/model.plan && \
-    $CAFFE2PLAN -b32 -n prob -o models/vgg19_plan/1/model.plan \
-                $DATADIR/caffe_models/vgg19.prototxt $DATADIR/caffe_models/vgg19.caffemodel
+
+# VGG19 plan
+rm -fr models/vgg19_plan && mkdir -p models/vgg19_plan/1 && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/vgg19_onnx/1/model.onnx models/vgg19_plan/ && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/vgg19_onnx/labels.txt models/vgg19_plan/
+
+$TRTEXEC --onnx=models/vgg19_plan/model.onnx --saveEngine=models/vgg19_plan/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:32x3x224x224 \
+         --maxShapes=input:32x3x224x224
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to generate vgg19 PLAN\n***"
     exit 1
 fi
 
-mkdir -p models/resnet50_plan/1 && rm -f models/resnet50_plan/1/model.plan && \
-    $CAFFE2PLAN -b32 -n prob -o models/resnet50_plan/1/model.plan \
-                $DATADIR/caffe_models/resnet50.prototxt $DATADIR/caffe_models/resnet50.caffemodel
+rm models/vgg19_plan/model.onnx
+cp $DATADIR/qa_dynamic_batch_image_model_repository/vgg19_onnx/config.pbtxt models/vgg19_plan/ && \
+sed -i "s/^name: .*/name: \"vgg19_plan\"/g" models/vgg19_plan/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' models/vgg19_plan/config.pbtxt
+
+# Resnet50 plan
+rm -fr models/resnet50_plan && mkdir -p models/resnet50_plan/1 && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/1/model.onnx models/resnet50_plan/ && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/labels.txt models/resnet50_plan/
+
+$TRTEXEC --onnx=models/resnet50_plan/model.onnx --saveEngine=models/resnet50_plan/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:32x3x224x224 \
+         --maxShapes=input:32x3x224x224
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to generate resnet50 PLAN\n***"
     exit 1
 fi
 
-mkdir -p models/resnet152_plan/1 && rm -f models/resnet152_plan/1/model.plan && \
-    $CAFFE2PLAN -h -b32 -n prob -o models/resnet152_plan/1/model.plan \
-                $DATADIR/caffe_models/resnet152.prototxt $DATADIR/caffe_models/resnet152.caffemodel
+rm models/resnet50_plan/model.onnx
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet50_onnx/config.pbtxt models/resnet50_plan/ && \
+sed -i "s/^name: .*/name: \"resnet50_plan\"/g" models/resnet50_plan/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' models/resnet50_plan/config.pbtxt
+
+
+# Resnet152 plan
+rm -fr models/resnet152_plan && mkdir -p models/resnet152_plan/1 && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet152_onnx/1/model.onnx models/resnet152_plan/ && \
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet152_onnx/labels.txt models/resnet152_plan/
+
+$TRTEXEC --onnx=models/resnet152_plan/model.onnx --saveEngine=models/resnet152_plan/1/model.plan \
+         --minShapes=input:1x3x224x224 --optShapes=input:32x3x224x224 \
+         --maxShapes=input:32x3x224x224
+
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to generate resnet152 PLAN\n***"
     exit 1
 fi
+
+rm models/resnet152_plan/model.onnx
+cp $DATADIR/qa_dynamic_batch_image_model_repository/resnet152_onnx/config.pbtxt models/resnet152_plan/ && \
+sed -i "s/^name: .*/name: \"resnet152_plan\"/g" models/resnet152_plan/config.pbtxt && \
+sed -i 's/^platform: .*/platform: "tensorrt_plan"/g' models/resnet152_plan/config.pbtxt
+
 set -e
 
 # Set multiple instances on selected model to test instance-wise collection

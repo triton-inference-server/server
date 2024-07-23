@@ -36,9 +36,9 @@ import unittest
 import infer_util as iu
 import numpy as np
 import test_util as tu
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import *
 
 
 class ServerMetadataTest(tu.TestResultCollector):

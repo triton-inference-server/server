@@ -69,7 +69,7 @@ the `$string` representation of the log setting and the “value” is a `$strin
 `$bool`, or `$number` representation of the setting value. Currently, the
 following log settings are defined:
 
-- "log_file" : a `$string` parameter defining the file where the log outputs will be saved. If an empty string is specified, log outputs will stream to the console.
+- "log_file" : a `$string` log file location where the log outputs will be saved. If empty, log outputs are streamed to the console.
 
 - "log_info" : a `$boolean` parameter that controls whether the Triton server logs INFO level messages.
 
@@ -117,8 +117,14 @@ $log_setting_request =
 }
 ```
 
-When a `$log_setting` JSON is received (defined above), only the specified
-settings will be updated.
+When a `$log_setting` JSON is received (defined above), only the
+specified settings will be updated. Currently, the following log
+settings (described above) can be updated:
+- "log_info"
+- "log_warning"
+- "log_error"
+- "log_verbose_level"
+- "log_format"
 
 ### Example Usage
 The logging protocol extension can be invoked using the curl library in the following manner (assuming
@@ -195,4 +201,75 @@ message LogSettingsResponse
   // The latest log settings values.
   map<string, SettingValue> settings = 1;
 }
+```
+
+## Logging Formats
+
+The logging extension offers two logging formats. The formats have a
+common set of fields but differ in how the timestamp for a log entry
+is represented. Messages are serialized according to JSON encoding
+rules by default. This behavior can be disabled by setting the
+environment variable TRITON_SERVER_ESCAPE_LOG_MESSAGES to "0" when
+launching the server but can not be changed through the logging
+extension.
+
+Log entries can be single-line or multi-line. Multi-line entries have
+a single optional heading followed by the structured representation of
+an object such as a table or protobuf message. Multi-line entries end
+when the next log entry begins.
+
+1. TRITONSERVER_LOG_DEFAULT
+
+### Single-line Entry
+```
+<level><month><day><hour>:<min>:<sec>.<usec> <pid> <file>:<line>] <message>
+```
+Example:
+```
+I0520 20:03:25.829575 3355 model_lifecycle.cc:441] "AsyncLoad() 'simple'"
+```
+### Multi-line Entry
+```
+<level><month><day><hour>:<min>:<sec>.<usec> <pid> <file>:<line>] <heading>
+<object>
+```
+Example:
+
+```
+I0520 20:03:25.912303 3355 server.cc:676]
++--------+---------+--------+
+| Model  | Version | Status |
++--------+---------+--------+
+| simple | 1       | READY  |
++--------+---------+--------+
+```
+
+
+2. TRITONSERVER_LOG_ISO8601
+
+### Single-line Entry
+```
+<year>-<month>-<day>T<hour>:<min>:<sec>Z <level> <pid> <file>:<line>] <message>
+```
+
+Example:
+```
+2024-05-20T20:03:26Z I 3415 model_lifecycle.cc:441] "AsyncLoad() 'simple'"
+```
+
+### Multi-line Entry
+```
+<year>-<month>-<day>T<hour>:<min>:<sec>Z <level> <pid> <file>:<line>] <heading>
+<object>
+```
+
+Example:
+
+```
+2024-05-20T20:03:26Z I 3415 server.cc:676]
++--------+---------+--------+
+| Model  | Version | Status |
++--------+---------+--------+
+| simple | 1       | READY  |
++--------+---------+--------+
 ```

@@ -623,6 +623,22 @@ Then, you can specify headers in the `infer` method. For references, please
 look at our [tests](https://github.com/triton-inference-server/server/blob/main/qa/L0_trace/opentelemetry_unittest.py),
 e.g. [http context propagation test](https://github.com/triton-inference-server/server/blob/main/qa/L0_trace/opentelemetry_unittest.py#L494-L508).
 
+### Custom Backend Tracing
+
+In the case when a custom activity needs to be traced in the backend, please
+use `TRITONSERVER_InferenceTraceReportActivity` API. For examples, please
+refer to the [identity backend](https://github.com/triton-inference-server/identity_backend/blob/main/src/identity.cc).
+
+In `openTelemetry` trace mode, if one wishes to start a new span, make sure
+that the name of your custom activity ends with `_START`. To end the new span,
+make sure that corresponding activity ends with `_END`. For example, in the
+identity backend, we start a `CUSTOM_ACTIVITY` span, by [reporting](https://github.com/triton-inference-server/identity_backend/blob/oandreeva-custom-trace-activity/src/identity.cc#L872-L876)
+`CUSTOM_ACTIVITY_START` event; and we close this span by [reporting](https://github.com/triton-inference-server/identity_backend/blob/oandreeva-custom-trace-activity/src/identity.cc#L880-L883)
+`CUSTOM_ACTIVITY_END` event.
+
+Please note, that it is user's responsibility to make sure that all custom started
+spans are properly ended.
+
 ### Limitations
 
 - OpenTelemetry trace mode is not supported on Windows systems.

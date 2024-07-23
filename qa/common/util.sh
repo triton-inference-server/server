@@ -517,7 +517,7 @@ function setup_virtualenv() {
     pip install pytest
 
     if [[ ${TEST_WINDOWS} == 1 ]]; then
-        pip3 install numpy tritonclient[all]
+        pip3 install "numpy<2" tritonclient[all]
     fi
 }
 

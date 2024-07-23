@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ import unittest
 import infer_util as iu
 import numpy as np
 import test_util as tu
-from tritonclientutils import *
+from tritonclient.utils import *
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):

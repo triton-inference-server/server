@@ -288,6 +288,10 @@ for BACKEND in ${BACKENDS}; do
     fi
 
     if [ "$BACKEND" == "graphdef" ]; then
+        # FIXME [DLIS-6660] Update TF image models to support dynamic batching
+        # Currently, models cannot load with TF-TRT optimization due to the removal of implicit batch support in TensorRT v10 onwards
+        continue
+
         # Show effect of warmup by using a TF model with TF-TRT optimization which is
         # known to be slow on first inference.
         # Note: model can be obatined via the fetching script in docs/example

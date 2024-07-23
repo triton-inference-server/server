@@ -27,6 +27,7 @@
 import sys
 
 sys.path.append("../common")
+import concurrent.futures
 import json
 import queue
 import re
@@ -82,6 +83,11 @@ def send_bls_request(model_name="simple", headers=None):
         client.infer("bls_simple", inputs, headers=headers)
 
 
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
         self.collector_subprocess = subprocess.Popen(
@@ -104,14 +110,29 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
+        self.input_all_required_model_name = "input_all_required"
+        self.cancel_queue_model_name = "dynamic_batch"
         self.bls_model_name = "bls_simple"
         self.trace_context_model = "trace_context"
+        self.non_decoupled_model_name_ = "repeat_int32"
+        self.identity_model = "custom_identity_int32"
         self.test_models = [
             self.simple_model_name,
             self.ensemble_model_name,
             self.bls_model_name,
+            self.non_decoupled_model_name_,
+            self.cancel_queue_model_name,
+            self.identity_model,
         ]
         self.root_span = "InferRequest"
+        self._user_data = UserData()
+        self._callback = partial(callback, self._user_data)
+        self._outputs = []
+        self.input_data = {
+            "IN": np.array([1], dtype=np.int32),
+            "DELAY": np.array([0], dtype=np.uint32),
+            "WAIT": np.array([0], dtype=np.uint32),
+        }
 
     def tearDown(self):
         self.collector_subprocess.kill()
@@ -119,6 +140,22 @@ class OpenTelemetryTest(tu.TestResultCollector):
         time.sleep(5)
         test_name = unittest.TestCase.id(self).split(".")[-1]
         shutil.copyfile(self.filename, self.filename + "_" + test_name + ".log")
+
+    def _get_inputs(self, batch_size):
+        shape = [batch_size, 8]
+        inputs = [grpcclient.InferInput("INPUT0", shape, "FP32")]
+        inputs[0].set_data_from_numpy(np.ones(shape, dtype=np.float32))
+        return inputs
+
+    def _generate_callback_and_response_pair(self):
+        response = {"responded": False, "result": None, "error": None}
+
+        def callback_queue(result, error):
+            response["responded"] = True
+            response["result"] = result
+            response["error"] = error
+
+        return callback_queue, response
 
     def _parse_trace_log(self, trace_log):
         """
@@ -138,7 +175,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
 
         return traces
 
-    def _check_events(self, span_name, events):
+    def _check_events(self, span_name, events, is_cancelled):
         """
         Helper function that verifies passed events contain expected entries.
 
@@ -160,6 +197,14 @@ class OpenTelemetryTest(tu.TestResultCollector):
             "GRPC_SEND_START",
             "GRPC_SEND_END",
         ]
+        cancel_root_events_http = [
+            "HTTP_RECV_START",
+            "HTTP_RECV_END",
+        ]
+        cancel_root_events_grpc = [
+            "GRPC_WAITREAD_START",
+            "GRPC_WAITREAD_END",
+        ]
         request_events = ["REQUEST_START", "QUEUE_START", "REQUEST_END"]
         compute_events = [
             "COMPUTE_START",
@@ -176,21 +221,32 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertFalse(
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
+            self.assertEquals(len(events), len(compute_events))
 
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
+            if is_cancelled == True:
+                root_events_http = cancel_root_events_http
+                root_events_grpc = cancel_root_events_grpc
+
             if "HTTP" in events:
                 self.assertTrue(all(entry in events for entry in root_events_http))
                 self.assertFalse(all(entry in events for entry in root_events_grpc))
+                self.assertEquals(len(events), len(root_events_http))
 
             elif "GRPC" in events:
                 self.assertTrue(all(entry in events for entry in root_events_grpc))
                 self.assertFalse(all(entry in events for entry in root_events_http))
-            self.assertFalse(all(entry in events for entry in request_events))
-            self.assertFalse(all(entry in events for entry in compute_events))
+                self.assertEquals(len(events), len(root_events_grpc))
+
+            if is_cancelled == False:
+                self.assertFalse(all(entry in events for entry in request_events))
+                self.assertFalse(all(entry in events for entry in compute_events))
 
         elif span_name in self.test_models:
+            if span_name == self.identity_model:
+                request_events.append("CUSTOM_SINGLE_ACTIVITY")
             # Check that all request related events (and only them)
             # are recorded in request span
             self.assertTrue(all(entry in events for entry in request_events))
@@ -198,6 +254,31 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
             self.assertFalse(all(entry in events for entry in compute_events))
+            self.assertEquals(len(events), len(request_events))
+
+        elif span_name.startswith("CUSTOM_ACTIVITY"):
+            custom_activity_events = []
+            if len(span_name) > len("CUSTOM_ACTIVITY"):
+                custom_activity_events.append(str(span_name + "_START"))
+                custom_activity_events.append(str(span_name + "_END"))
+                # Check `custom_identity_int32` config file,
+                # parameter `single_activity_frequency` identifies
+                # which custom spans contain "CUSTOM_SINGLE_ACTIVITY" event
+                if int(span_name[-1]) % 3 == 0:
+                    custom_activity_events.append("CUSTOM_SINGLE_ACTIVITY")
+            else:
+                custom_activity_events = [
+                    "CUSTOM_ACTIVITY_START",
+                    "CUSTOM_ACTIVITY_END",
+                ]
+
+            self.assertTrue(
+                all(entry in events for entry in custom_activity_events),
+                "Span " + span_name,
+            )
+            self.assertEquals(
+                len(events), len(custom_activity_events), "Span " + span_name
+            )
 
     def _test_resource_attributes(self, attributes):
         """
@@ -232,7 +313,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
-    def _verify_contents(self, spans, expected_counts):
+    def _verify_contents(self, spans, expected_counts, is_cancelled):
         """
         Helper function that:
          * iterates over `spans` and for every span it verifies that proper events are collected
@@ -247,6 +328,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                    and `events` are required.
             expected_counts (dict): dictionary, containing expected spans in the form:
                     span_name : #expected_number_of_entries
+            is_cancelled (bool): boolean, is true if called by cancelled workflow
         """
 
         span_names = []
@@ -256,7 +338,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             span_names.append(span_name)
             span_events = span["events"]
             event_names_only = [event["name"] for event in span_events]
-            self._check_events(span_name, event_names_only)
+            self._check_events(span_name, event_names_only, is_cancelled)
 
         self.assertEqual(
             len(span_names),
@@ -339,6 +421,24 @@ class OpenTelemetryTest(tu.TestResultCollector):
             ),
         )
 
+    def _test_trace_cancel(self, is_queued):
+        # We want to capture a cancellation request traces WHILE the inference is in the COMPUTE stage.
+        # Because the model "input_all_required" has a delay/wait in the compute phase so the cancellation request can be send while the request is waiting in the compute phase.
+        # The idea here is to wait before we try and read the traces from the file.
+        time.sleep(2 * COLLECTOR_TIMEOUT)
+        traces = self._parse_trace_log(self.filename)
+        if is_queued == False:
+            expected_counts = dict(
+                {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
+            )
+        else:
+            # Compute is expected to be 0 as cancelled in queue
+            expected_counts = dict(
+                {"compute": 0, self.cancel_queue_model_name: 1, self.root_span: 1}
+            )
+        parsed_spans = traces[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled=True)
+
     def _test_trace(
         self,
         headers,
@@ -396,8 +496,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             entry for entry in parsed_spans if entry["name"] == "InferRequest"
         ][0]
         self.assertEqual(len(parsed_spans), expected_number_of_spans)
-
-        self._verify_contents(parsed_spans, expected_counts)
+        self._verify_contents(parsed_spans, expected_counts, is_cancelled=False)
         self._verify_nesting(parsed_spans, expected_parent_span_dict)
         self._verify_headers_propagated_from_client_if_any(root_span, headers)
 
@@ -412,6 +511,70 @@ class OpenTelemetryTest(tu.TestResultCollector):
         )
         expected_parent_span_dict = dict(
             {"InferRequest": ["simple"], "simple": ["compute"]}
+        )
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
+
+    def _test_custom_identity_trace(self, headers=None):
+        """
+        Helper function, that specifies expected parameters to evaluate trace,
+        collected from running 1 inference request for `custom_identity_int32`
+        model.
+        Number of custom spans defined by the identity backend.
+        `CUSTOM_ACTIVITY` span will always be there,
+        `CUSTOM_ACTIVITY<N>` defined by `config.pbtxt parameters`.
+        """
+        expected_number_of_spans = 10
+        expected_counts = dict(
+            {
+                "compute": 1,
+                self.identity_model: 1,
+                self.root_span: 1,
+                "CUSTOM_ACTIVITY": 1,
+                "CUSTOM_ACTIVITY0": 1,
+                "CUSTOM_ACTIVITY1": 1,
+                "CUSTOM_ACTIVITY2": 1,
+                "CUSTOM_ACTIVITY3": 1,
+                "CUSTOM_ACTIVITY4": 1,
+                "CUSTOM_ACTIVITY5": 1,
+            }
+        )
+        expected_parent_span_dict = dict(
+            {
+                "InferRequest": ["custom_identity_int32"],
+                "custom_identity_int32": [
+                    "CUSTOM_ACTIVITY",
+                    "CUSTOM_ACTIVITY0",
+                    "compute",
+                ],
+                "CUSTOM_ACTIVITY0": ["CUSTOM_ACTIVITY1"],
+                "CUSTOM_ACTIVITY1": ["CUSTOM_ACTIVITY2"],
+                "CUSTOM_ACTIVITY2": ["CUSTOM_ACTIVITY3"],
+                "CUSTOM_ACTIVITY3": ["CUSTOM_ACTIVITY4"],
+                "CUSTOM_ACTIVITY4": ["CUSTOM_ACTIVITY5"],
+            }
+        )
+        self._test_trace(
+            headers=headers,
+            expected_number_of_spans=expected_number_of_spans,
+            expected_counts=expected_counts,
+            expected_parent_span_dict=expected_parent_span_dict,
+        )
+
+    def _test_non_decoupled_trace(self, headers=None):
+        """
+        Helper function, that collects trace for non decoupled model and verifies it.
+        """
+        expected_number_of_spans = 3
+        expected_counts = dict(
+            {"compute": 1, self.non_decoupled_model_name_: 1, self.root_span: 1}
+        )
+        expected_parent_span_dict = dict(
+            {"InferRequest": ["repeat_int32"], "repeat_int32": ["compute"]}
         )
         self._test_trace(
             headers=headers,
@@ -526,6 +689,86 @@ class OpenTelemetryTest(tu.TestResultCollector):
         triton_client_grpc.infer(self.simple_model_name, inputs)
 
         self._test_simple_trace()
+
+    def test_grpc_trace_all_input_required_model_cancel(self):
+        """
+        Tests trace, collected from executing one inference request and cancelling the request
+        for a model and GRPC client. Expects only 2 GRPC stage events
+        """
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        inputs = []
+        inputs.append(grpcclient.InferInput("INPUT0", [1], "FP32"))
+        inputs[0].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        inputs.append(grpcclient.InferInput("INPUT1", [1], "FP32"))
+        inputs[1].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        inputs.append(grpcclient.InferInput("INPUT2", [1], "FP32"))
+        inputs[2].set_data_from_numpy(np.arange(1, dtype=np.float32))
+        future = triton_client_grpc.async_infer(
+            model_name=self.input_all_required_model_name,
+            inputs=inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        time.sleep(2)  # ensure the inference has started
+        future.cancel()
+        time.sleep(0.1)  # context switch
+        self._test_trace_cancel(is_queued=False)
+
+    # Test queued requests on dynamic batch scheduler can be cancelled
+    def test_grpc_trace_model_cancel_in_queue(self):
+        """
+        Tests trace, collected from executing one inference request and cancelling the request
+        for a model and GRPC client while the request is in queue. Expects 0 compute stage traces
+        """
+        model_name = self.cancel_queue_model_name
+        triton_client_grpc = grpcclient.InferenceServerClient(
+            "localhost:8001", verbose=True
+        )
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # Saturate the slots on the model
+            saturate_thread = pool.submit(
+                triton_client_grpc.infer, model_name, self._get_inputs(batch_size=1)
+            )
+            time.sleep(2)  # ensure the slots are filled
+            # The next request should be queued
+            callback, response = self._generate_callback_and_response_pair()
+            future = triton_client_grpc.async_infer(
+                model_name, self._get_inputs(batch_size=1), callback
+            )
+            time.sleep(0.2)  # ensure the request is queued
+            future.cancel()
+            # Join saturating thread
+            saturate_thread.result()
+            self._test_trace_cancel(is_queued=True)
+
+    def test_non_decoupled(self):
+        """
+        Tests trace, collected from executing one inference request of non decoupled model.
+        """
+        inputs = [
+            grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                self.input_data["IN"]
+            ),
+            grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                self.input_data["DELAY"]
+            ),
+            grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                self.input_data["WAIT"]
+            ),
+        ]
+
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
+        # Expect the inference is successful
+        res = triton_client.infer(
+            model_name=self.non_decoupled_model_name_, inputs=inputs
+        )
+        self._test_non_decoupled_trace()
+        self.assertEqual(1, res.as_numpy("OUT")[0])
+        self.assertEqual(0, res.as_numpy("IDX")[0])
 
     def test_grpc_trace_simple_model_context_propagation(self):
         """
@@ -778,6 +1021,33 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.assertIn("traceparent", context.keys())
         context_pattern = re.compile(r"\d{2}-[0-9a-f]{32}-[0-9a-f]{16}-\d{2}")
         self.assertIsNotNone(re.match(context_pattern, context["traceparent"]))
+
+    def test_custom_backend_tracing(self):
+        """
+        Tests custom activities reported from identity backend.
+        """
+        input0_ = np.array([[4]], dtype=np.int32)
+        with httpclient.InferenceServerClient("localhost:8000", verbose=True) as client:
+            inputs = []
+            inputs.append(httpclient.InferInput("INPUT0", [1, 1], "INT32"))
+            inputs[0].set_data_from_numpy(input0_)
+            client.infer(self.identity_model, inputs=inputs)
+        self._test_custom_identity_trace()
+
+    def test_custom_backend_tracing_context_propagation(self):
+        """
+        Tests custom activities reported from identity backend.
+        """
+        input0_ = np.array([[4]], dtype=np.int32)
+        with httpclient.InferenceServerClient("localhost:8000", verbose=True) as client:
+            inputs = []
+            inputs.append(httpclient.InferInput("INPUT0", [1, 1], "INT32"))
+            inputs[0].set_data_from_numpy(input0_)
+            client.infer(
+                self.identity_model, inputs=inputs, headers=self.client_headers
+            )
+
+        self._test_custom_identity_trace(headers=self.client_headers)
 
 
 if __name__ == "__main__":

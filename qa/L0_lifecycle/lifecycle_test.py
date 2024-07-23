@@ -1259,7 +1259,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     model_version=1,
                 )
                 self.assertTrue(
-                    False, "expected error for unavailable model " + graphdef_name
+                    False, "expected error for unavailable model " + model_name
                 )
             except Exception as ex:
                 self.assertIn("Request for unknown model", ex.message())
@@ -3404,6 +3404,94 @@ class LifeCycleTest(tu.TestResultCollector):
             1,
             "exit timeout countdown restart detected",
         )
+
+    def test_add_custom_config(self):
+        models_base = ("savedmodel",)
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Add custom model configuration, which cause model to be
+        # re-loaded and use custom config inside configs folder, which
+        # means that version policy will change and only version 2 will
+        # be available.
+        for base_name, model_name in zip(models_base, models):
+            shutil.copyfile(
+                "config.pbtxt.custom." + base_name,
+                "models/" + model_name + "/configs/custom.pbtxt",
+            )
+
+        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_delete_custom_config(self):
+        models_base = ("savedmodel",)
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Delete custom model configuration, which cause model to be
+        # re-loaded and use default config, which means that version
+        # policy will be changed and so only version 1, 3 will be available
+        for model_name in models:
+            os.remove("models/" + model_name + "/configs/custom.pbtxt")
+
+        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            try:
+                for triton_client in (
+                    httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                    grpcclient.InferenceServerClient("localhost:8001", verbose=True),
+                ):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@
 
 import asyncio
 import queue
+import re
 import time
 import unittest
 from functools import partial
@@ -62,6 +63,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         self._callback = partial(callback, self._user_data)
         self._prepare_request()
         self._start_time = time.time()  # seconds
+        self.test_duration_delta = 0.5
 
     def tearDown(self):
         self._end_time = time.time()  # seconds
@@ -75,7 +77,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         self._inputs[0].set_data_from_numpy(np.array([[10]], dtype=np.int32))
 
     def _assert_max_duration(self):
-        max_duration = self._model_delay * 0.5  # seconds
+        max_duration = self._model_delay * self.test_duration_delta  # seconds
         duration = self._end_time - self._start_time  # seconds
         self.assertLess(
             duration,
@@ -135,6 +137,59 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             async for result, error in responses_iterator:
                 self._callback(result, error)
+
+    def test_grpc_async_infer_cancellation_at_step_start(self):
+        # This is a longer test
+        self.test_duration_delta = 4.5
+        server_log_name = "grpc_cancellation_test.test_grpc_async_infer_cancellation_at_step_start.server.log"
+        with open(server_log_name, "r") as f:
+            server_log = f.read()
+
+        prev_new_req_handl_count = len(
+            re.findall("New request handler for ModelInferHandler", server_log)
+        )
+        self.assertEqual(
+            prev_new_req_handl_count,
+            2,
+            "Expected 2 request handler for ModelInferHandler log entries, but got {}".format(
+                prev_new_req_handl_count
+            ),
+        )
+        future = self._client.async_infer(
+            model_name=self._model_name,
+            inputs=self._inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        time.sleep(2)  # ensure the inference request reached server
+        future.cancel()
+        # ensures TRITONSERVER_DELAY_GRPC_PROCESS delay passed on the server
+        time.sleep(self._model_delay * 2)
+
+        with open(server_log_name, "r") as f:
+            server_log = f.read()
+
+        cancel_at_start_count = len(
+            re.findall(
+                r"Cancellation notification received for ModelInferHandler, rpc_ok=1, context \d+, \d+ step START",
+                server_log,
+            )
+        )
+        cur_new_req_handl_count = len(
+            re.findall("New request handler for ModelInferHandler", server_log)
+        )
+        self.assertEqual(
+            cancel_at_start_count,
+            2,
+            "Expected 2 cancellation at step START log entries, but got {}".format(
+                cancel_at_start_count
+            ),
+        )
+        self.assertGreater(
+            cur_new_req_handl_count,
+            prev_new_req_handl_count,
+            "gRPC Cancellation on step START Test Failed: New request handler for ModelInferHandler was not created",
+        )
 
 
 if __name__ == "__main__":

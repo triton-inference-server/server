@@ -53,6 +53,8 @@ source ../common/util.sh
 
 RET=0
 
+# FIXME [DLIS-6660] Update TF image models to support dynamic batching
+# Currently, models cannot load with TF-TRT optimization due to the removal of implicit batch support in TensorRT v10 onwards
 for MODEL in \
         graphdef_float32_float32_float32 \
         savedmodel_float32_float32_float32; do

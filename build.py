@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,14 +69,14 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.45.0dev": (
-        "24.04dev",  # triton container
-        "24.03",  # upstream container
-        "1.17.2",  # ORT
-        "2023.3.0",  # ORT OpenVINO
-        "2023.3.0",  # Standalone OpenVINO
+    "2.48.0dev": (
+        "24.06dev",  # triton container
+        "24.06",  # upstream container
+        "1.18.1",  # ORT
+        "2024.0.0",  # ORT OpenVINO
+        "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "0.3.2",  # vLLM version
+        "0.5.0.post1",  # vLLM version
     )
 }
 
@@ -819,18 +819,8 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
-    cargs = [
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TRT_LIB_DIR",
-            None,
-            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
-        ),
-        cmake_backend_arg(
-            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
-        ),
-    ]
-    cargs.append(cmake_backend_enable("tensorrtllm", "TRITON_BUILD", True))
+    cargs = []
+    cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
 
@@ -1092,26 +1082,20 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Remove TRT contents that are not needed in runtime
-RUN ARCH="$(uname -i)" \\
-      && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
-      && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
-      && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
-
 # Install required packages for TRT-LLM models
-RUN python3 -m pip install --upgrade pip \\
-      && pip3 install transformers
-
-# Uninstall unused nvidia packages
-RUN if pip freeze | grep -q "nvidia.*"; then \\
-        pip freeze | grep "nvidia.*" | xargs pip uninstall -y; \\
-    fi
-RUN pip cache purge
-
-# Drop the static libs
-RUN ARCH="$(uname -i)" \\
-      && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
-          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
+# Remove contents that are not needed in runtime
+# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
+# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
+RUN ldconfig && \
+    ARCH="$(uname -i)" && \
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
+    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
+    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \
+    python3 -m pip install --upgrade pip && \
+    pip3 install --no-cache-dir transformers && \
+    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
+    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
@@ -1146,12 +1130,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 # Remove once https://github.com/openucx/ucx/pull/9148 is available
 # in the min container.
 ENV UCX_MEM_EVENTS no
-"""
-
-    # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
-    if "onnxruntime" in backends:
-        df += """
-ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 """
 
     # Necessary for libtorch.so to find correct HPCX libraries
@@ -1258,7 +1236,7 @@ RUN apt-get update \\
       && pip3 install --upgrade \\
             wheel \\
             setuptools \\
-            numpy \\
+            \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
@@ -1270,6 +1248,12 @@ RUN pip3 install vllm=={}
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][6]
         )
+
+    if "dali" in backends:
+        df += """
+# Update Python path to include DALI
+ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
+"""
 
     df += """
 WORKDIR /opt/tritonserver
@@ -1719,6 +1703,25 @@ def tensorrtllm_prebuild(cmake_script):
     # Export the TRT_ROOT environment variable
     cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
     cmake_script.cmd("export ARCH=$(uname -m)")
+    cmake_script.cmd(
+        'export LD_LIBRARY_PATH="/usr/local/cuda/compat/lib.real:${LD_LIBRARY_PATH}"'
+    )
+
+
+def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
+    # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
+    cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
+    cmake_script.mkdir(cmake_destination_dir)
+
+    # Copy over the TRT-LLM backend libraries
+    cmake_script.cp(
+        os.path.join(tensorrtllm_be_dir, "build", "libtriton_tensorrtllm*.so"),
+        cmake_destination_dir,
+    )
+    cmake_script.cp(
+        os.path.join(tensorrtllm_be_dir, "build", "trtllmExecutorWorker"),
+        cmake_destination_dir,
+    )
 
 
 def backend_build(
@@ -1752,6 +1755,10 @@ def backend_build(
         backend_cmake_args(images, components, be, repo_install_dir, library_paths)
     )
     cmake_script.makeinstall()
+
+    if be == "tensorrtllm":
+        tensorrtllm_be_dir = os.path.join(build_dir, be)
+        tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir)
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))

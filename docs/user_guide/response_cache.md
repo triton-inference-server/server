@@ -221,6 +221,30 @@ fast/cheap (the model is not compute-bound), the cache can negatively impact
 the overall performance due to the overhead of managing and communicating with
 the cache.
 
+## Ensemble Model Caching
+
+Top-level requests to ensemble models support caching if all composing models
+within the ensemble support caching as well.
+
+Similarly, if a composing model in the ensemble doesn't support caching,
+then the ensemble model would inherit this limitation and not support
+caching either. See the known limitations below for what types of models
+support caching.
+
+A cache hit on an ensemble will skip sending requests to the composing models
+entirely, and return the cached response from the ensemble model.
+
+A cache miss on an ensemble will fallback to standard inference and the request
+will proceed to the composing models as usual.
+
+The ensemble and its composing models can independently enable caching, and
+each maintain their own caches when enabled. It is possible for a request
+to be a cache miss at the ensemble level, but then for an intermediate model
+within the ensemble to have a cache hit, depending on the inputs and outputs
+of models being composed. Composing models do not need to enable caching to
+enable it at the ensemble level.
+
+
 ## Known Limitations
 
 - Only input tensors located in CPU memory will be hashable for accessing the
@@ -241,7 +265,4 @@ the cache.
   response caching.
 - The response cache does not currently support
   [decoupled models](decoupled_models.md).
-- Top-level requests to ensemble models do not currently support response
-  caching. However, composing models within an ensemble may have their
-  responses cached if supported and enabled by that composing model.
 

@@ -52,15 +52,28 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
+CANCELDIR=models/
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
-
 rm -f *.log
+rm -f *.log.*
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
+# set up model for inference delay queueing
+mkdir -p trace_models/dynamic_batch/1 && (cd trace_models/dynamic_batch && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'dynamic_batching {' >> config.pbtxt && \
+    echo -e '  preferred_batch_size: [ 1 ]' >> config.pbtxt && \
+    echo -e '  default_queue_policy { timeout_action: REJECT \n default_timeout_microseconds: 1000000 \n max_queue_size: 8 }' >> config.pbtxt && \
+    echo -e '}' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "8000" } }]' >> config.pbtxt)
 
 # set up simple and global_simple model using MODELBASE
 cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
@@ -71,12 +84,28 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
     cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+    # set up new dir for cancel model
+    cp -r $CANCELDIR/input_all_required $MODELSDIR/input_all_required && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
             sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
             sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt) && \
     mkdir -p $MODELSDIR/bls_simple/1 && cp $BLSDIR/bls_simple.py $MODELSDIR/bls_simple/1/model.py
+
+# set up repeat_int32 model
+cp -r ../L0_decoupled/models/repeat_int32 $MODELSDIR
+sed -i "s/decoupled: True/decoupled: False/" $MODELSDIR/repeat_int32/config.pbtxt
+
+# set up identity model
+mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }]' >> config.pbtxt)
 
 RET=0
 
@@ -188,6 +217,9 @@ fi
 if [ `grep -c "\"trace_file\":\"trace_off_to_min.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 send_inference_requests "client_min.log" 10
 
@@ -229,24 +261,18 @@ set +e
 
 # Add trace setting for 'simple' via trace API, first use the same trace file
 update_trace_setting "simple" '{"trace_file":"global_trace.log"}'
-assert_curl_success "Failed to modify trace settings for 'simple' model"
+assert_curl_failure "trace_file updated through network protocol expects an error"
 
 # Check if the current setting is returned (not specified setting from global)
-if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
 # Use a different name
-update_trace_setting "simple" '{"trace_file":"simple_trace.log","log_frequency":"2"}'
+update_trace_setting "simple" '{"log_frequency":"2"}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned (not specified setting from global)
@@ -262,7 +288,10 @@ fi
 if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"simple_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -275,35 +304,35 @@ wait $SERVER_PID
 
 set +e
 
-if [ -f ./global_trace.log ]; then
-    echo -e "\n***\n*** Test Failed, unexpected generation of global_trace.log\n***"
+if [ -f ./simple_trace.log ]; then
+    echo -e "\n***\n*** Test Failed, unexpected generation of simple_trace.log\n***"
     RET=1
 fi
 
-$TRACE_SUMMARY -t simple_trace.log.0 > summary_simple_trace.log.0
+$TRACE_SUMMARY -t global_trace.log.0 > summary_global_trace.log.0
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_simple_trace.log.0` != "2" ]; then
-    cat summary_simple_trace.log.0
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.0` != "2" ]; then
+    cat summary_global_trace.log.0
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_simple_trace.log.0` != "2" ]; then
-    cat summary_simple_trace.log.0
+if [ `grep -c ^simple summary_global_trace.log.0` != "2" ]; then
+    cat summary_global_trace.log.0
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-$TRACE_SUMMARY -t simple_trace.log.1 > summary_simple_trace.log.1
+$TRACE_SUMMARY -t global_trace.log.1 > summary_global_trace.log.1
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_simple_trace.log.1` != "1" ]; then
-    cat summary_simple_trace.log.1
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log.1` != "1" ]; then
+    cat summary_global_trace.log.1
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_simple_trace.log.1` != "1" ]; then
-    cat summary_simple_trace.log.1
+if [ `grep -c ^simple summary_global_trace.log.1` != "1" ]; then
+    cat summary_global_trace.log.1
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -323,10 +352,10 @@ fi
 set +e
 
 # Add model setting and update it
-update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_rate":"1"}'
+update_trace_setting "simple" '{"trace_rate":"1"}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
-update_trace_setting "simple" '{"trace_file":"update_trace.log","trace_level":["OFF"]}'
+update_trace_setting "simple" '{"trace_level":["OFF"]}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting is returned
@@ -342,7 +371,10 @@ fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"update_trace.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -353,7 +385,7 @@ rm -f ./curl.out
 set +e
 
 # Clear trace setting by explicitly asking removal for every field except 'trace_rate'
-update_trace_setting "simple" '{"trace_file":null,"trace_level":null}'
+update_trace_setting "simple" '{"trace_level":null}'
 assert_curl_success "Failed to modify trace settings for 'simple' model"
 
 # Check if the current setting (global) is returned
@@ -370,6 +402,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -440,6 +475,9 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 # Set trace count
 update_global_trace_setting '{"trace_count":"5"}'
@@ -459,6 +497,9 @@ if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -484,10 +525,13 @@ fi
 if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 # Check if the indexed file has been generated when trace count reaches 0
-if [ -f ./global_trace.log.0 ]; then
-    echo -e "\n***\n*** Test Failed, expect generation of global_trace.log.0 before stopping server\n***"
+if [ ! -f ./global_count.log.0 ]; then
+    echo -e "\n***\n*** Test Failed, expect generation of global_count.log.0 before stopping server\n***"
     RET=1
 fi
 
@@ -600,6 +644,9 @@ fi
 if [ `grep -c "\"trace_file\":\"bls_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 set +e
 # Send bls requests to make sure simple model is traced
@@ -705,6 +752,60 @@ wait $SERVER_PID
 
 set +e
 
+# Custom backend tracing
+SERVER_ARGS="--model-control-mode=explicit --model-repository=$MODELSDIR
+            --load-model=custom_identity_int32 --trace-config=level=TIMESTAMPS \
+            --trace-config=triton,file=custom_tracing_triton.log \
+            --trace-config=rate=1 --trace-config=mode=triton"
+SERVER_LOG="./custom_backend_tracing.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Send 1 inference request, should expect 3 custom activities:
+# CUSTOM_SINGLE_ACTIVITY, CUSTOM_ACTIVITY_START, CUSTOM_ACTIVITY_END
+rm -f ./curl.out
+data='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,1],"data":[4]}]}'
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/custom_identity_int32/infer -d ${data}`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+
+$TRACE_SUMMARY -t custom_tracing_triton.log > summary_custom_tracing_triton.log
+
+if [ `grep -c "CUSTOM_SINGLE_ACTIVITY" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c "CUSTOM_ACTIVITY_START" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_START" events.\n***"
+    RET=1
+fi
+
+if [ `grep -c "CUSTOM_ACTIVITY_END" summary_custom_tracing_triton.log` != "1" ]; then
+    cat summary_custom_tracing_triton.log
+    echo -e "\n***\n*** Test Failed: Unexpected number of traced "CUSTOM_ACTIVITY_END" events.\n***"
+    RET=1
+fi
+
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
 # OTLP exporter sends traces.
@@ -721,7 +822,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="14"
+EXPECTED_NUM_TESTS="19"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -735,9 +836,22 @@ cp -r $DATADIR/$MODELBASE/* ${MODEL_PATH} && \
 # Add model to test trace context exposed to python backend
 mkdir -p $MODELSDIR/trace_context/1 && cp ./trace_context.py $MODELSDIR/trace_context/1/model.py
 
+# set up identity model
+rm -r ${MODELSDIR}/custom_identity_int32
+mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_int32 && \
+    echo 'name: "custom_identity_int32"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1024' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_INT32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "500" } }, { key: "enable_custom_tracing" \n value: { string_value: "true" } }, { key: "nested_span_count" \n value: { string_value: "6" } }, { key: "single_activity_frequency" \n value: { string_value: "3" } }]' >> config.pbtxt)
 
 SERVER_ARGS="--allow-sagemaker=true --model-control-mode=explicit \
                 --load-model=simple --load-model=ensemble_add_sub_int32_int32_int32 \
+                --load-model=repeat_int32 --load-model=custom_identity_int32\
+                --load-model=input_all_required \
+                --load-model=dynamic_batch \
                 --load-model=bls_simple --trace-config=level=TIMESTAMPS \
                 --load-model=trace_context --trace-config=rate=1 \
                 --trace-config=count=-1 --trace-config=mode=opentelemetry \
@@ -806,6 +920,28 @@ fi
 if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_schedule_delay\":\"5000\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+
 
 set +e
 # Send bls requests to make sure bls_simple model is NOT traced
@@ -867,6 +1003,27 @@ if [ `grep -c "\"trace_rate\":\"5\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_count\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_mode\":\"opentelemetry\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"url\":\"localhost:$OTLP_PORT/v1/traces\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_export_batch_size\":\"512\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_schedule_delay\":\"5000\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"bsp_max_queue_size\":\"2048\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":" ./curl.out` != "0" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
     RET=1
 fi
 
@@ -1081,5 +1238,4 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
-
 exit $RET

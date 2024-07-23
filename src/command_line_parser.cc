@@ -354,6 +354,7 @@ enum TritonOptionId {
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
   OPTION_STARTUP_MODEL,
+  OPTION_CUSTOM_MODEL_CONFIG_NAME,
   OPTION_RATE_LIMIT,
   OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
@@ -372,7 +373,8 @@ enum TritonOptionId {
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
-  OPTION_MODEL_NAMESPACING
+  OPTION_MODEL_NAMESPACING,
+  OPTION_ENABLE_PEER_ACCESS
 };
 
 void
@@ -441,6 +443,13 @@ TritonParser::SetupOptions()
        "argument will result in error. Note that this option will only take "
        "effect if --model-control-mode=explicit is true."});
   model_repo_options_.push_back(
+      {OPTION_CUSTOM_MODEL_CONFIG_NAME, "model-config-name", Option::ArgStr,
+       "The custom configuration name for models to load."
+       "The name should not contain any space character."
+       "For example: --model-config-name=h100. "
+       "If --model-config-name is not set, Triton will use the default "
+       "config.pbtxt."});
+  model_repo_options_.push_back(
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
@@ -453,6 +462,13 @@ TritonParser::SetupOptions()
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
        "same name can be served if they are in different namespace."});
+  model_repo_options_.push_back(
+      {OPTION_ENABLE_PEER_ACCESS, "enable-peer-access", Option::ArgBool,
+       "Whether the server tries to enable peer access or not. Even when this "
+       "options is set to true,  "
+       "peer access could still be not enabled because the underlying system "
+       "doesn't support it."
+       " The server will log a warning in this case. Default is true."});
 
 #if defined(TRITON_ENABLE_HTTP)
   http_options_.push_back(
@@ -1013,6 +1029,11 @@ TritonServerParameters::BuildTritonServerOptions()
   }
   THROW_IF_ERR(
       ParseException,
+      TRITONSERVER_ServerOptionsSetModelConfigName(
+          loptions, model_config_name_.c_str()),
+      "setting custom model configuration name for models");
+  THROW_IF_ERR(
+      ParseException,
       TRITONSERVER_ServerOptionsSetRateLimiterMode(loptions, rate_limit_mode_),
       "setting rate limiter configuration");
   for (const auto& resource : rate_limit_resources_) {
@@ -1087,6 +1108,11 @@ TritonServerParameters::BuildTritonServerOptions()
       TRITONSERVER_ServerOptionsSetModelNamespacing(
           loptions, enable_model_namespacing_),
       "setting model namespacing");
+  THROW_IF_ERR(
+      ParseException,
+      TRITONSERVER_ServerOptionsSetEnablePeerAccess(
+          loptions, enable_peer_access_),
+      "setting peer access");
 
 #ifdef TRITON_ENABLE_LOGGING
   TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file_.c_str());
@@ -1353,7 +1379,6 @@ TritonParser::Parse(int argc, char** argv)
           lparams.http_forward_header_pattern_ =
               std::move(case_insensitive_prefix + optarg);
           break;
-          break;
         case OPTION_HTTP_THREAD_COUNT:
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
           break;
@@ -1591,6 +1616,13 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_STARTUP_MODEL:
           lparams.startup_models_.insert(optarg);
           break;
+        case OPTION_CUSTOM_MODEL_CONFIG_NAME:
+          if (std::strlen(optarg) == 0) {
+            throw ParseException(
+                "Error: empty argument for --model-config-name");
+          }
+          lparams.model_config_name_ = optarg;
+          break;
         case OPTION_MODEL_CONTROL_MODE: {
           std::string mode_str(optarg);
           std::transform(
@@ -1703,6 +1735,9 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_MODEL_NAMESPACING:
           lparams.enable_model_namespacing_ = ParseOption<bool>(optarg);
           break;
+        case OPTION_ENABLE_PEER_ACCESS:
+          lparams.enable_peer_access_ = ParseOption<bool>(optarg);
+          break;
       }
     }
     catch (const ParseException& pe) {
@@ -1731,6 +1766,14 @@ TritonParser::Parse(int argc, char** argv)
   if (lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_POLL) {
     lparams.repository_poll_secs_ = 0;
   }
+
+  if (lparams.startup_models_.size() > 0 &&
+      lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_EXPLICIT) {
+    throw ParseException(
+        "Error: Use of '--load-model' requires setting "
+        "'--model-control-mode=explicit' as well.");
+  }
+
 
 #ifdef TRITON_ENABLE_VERTEX_AI
   // Set default model repository if specific flag is set, postpone the
@@ -2214,8 +2257,8 @@ TritonParser::SetTritonTraceArgs(
         lparams.trace_filepath_ = value;
       } else if (setting == "log-frequency") {
         if (trace_log_frequency_present) {
-          std::cerr << "Warning: Overriding deprecated '--trace-file' "
-                       "in favor of provided file in --trace-config!"
+          std::cerr << "Warning: Overriding deprecated '--trace-log-frequency' "
+                       "in favor of provided log-frequency in --trace-config!"
                     << std::endl;
         }
         lparams.trace_log_frequency_ = ParseOption<int>(value);

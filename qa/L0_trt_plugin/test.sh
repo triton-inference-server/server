@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,13 +50,13 @@ PLUGIN_TEST=trt_plugin_test.py
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
-    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/clipplugin.dll}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/HardmaxPlugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=`pwd`/models}
-    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/libclipplugin.so}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/libcustomHardmaxPlugin.so}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     BACKEND_DIR=${TRITON_DIR}/backends
     SERVER=${TRITON_DIR}/bin/tritonserver
@@ -72,61 +72,11 @@ SERVER_TIMEOUT=20
 
 LOG_IDX=0
 
-## Default Plugin Tests
-
-## Create model folder with default plugin models
-rm -fr models && mkdir -p models
-set -e
-find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -rv {} models \;
-
-SERVER_ARGS=$SERVER_ARGS_BASE
-SERVER_LOG="./inference_server_$LOG_IDX.log"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-rm -f $CLIENT_LOG
-set +e
-python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-rm -f $CLIENT_LOG
-python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill_server
-
 ## Custom Plugin Tests
 
-## Create model folder with custom plugin models for remaining tests
+## Create model folder with custom plugin models
 rm -fr models && mkdir -p models
-find $DATADIR/qa_trt_plugin_model_repository/ -maxdepth 1 -iname '*clipplugin*' -exec cp -r {} models \;
+find $DATADIR/qa_trt_plugin_model_repository/ -maxdepth 1 -iname '*Hardmax*' -exec cp -r {} models \;
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -146,7 +96,7 @@ fi
 
 LOG_IDX=$((LOG_IDX+1))
 
-## Backend Config, Single Plugin Test
+## Backend Config, Plugin Test
 SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
@@ -159,7 +109,7 @@ fi
 
 rm -f $CLIENT_LOG
 set +e
-python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_hard_max >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -178,39 +128,7 @@ kill_server
 
 LOG_IDX=$((LOG_IDX+1))
 
-## Backend Config, Multiple Plugins Test
-SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-rm -f $CLIENT_LOG
-set +e
-python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill_server
-
-LOG_IDX=$((LOG_IDX+1))
-
-## LD_PRELOAD, Single Plugin Test
+## LD_PRELOAD, Plugin Test
 ## LD_PRELOAD is only on Linux
 
 SERVER_LD_PRELOAD=$CUSTOMPLUGIN
@@ -227,7 +145,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
 
     rm -f $CLIENT_LOG
     set +e
-    python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+    python3 $PLUGIN_TEST PluginModelTest.test_raw_hard_max >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"

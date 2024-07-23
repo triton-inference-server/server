@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@ from builtins import range
 import gen_ensemble_model_utils as emu
 import numpy as np
 from gen_common import (
+    np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_tf_dtype,
@@ -477,9 +478,7 @@ def create_plan_dynamic_rf_modelfile(
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-    )
+    network = builder.create_network()
     if max_batch == 0:
         input_with_batchsize = [i for i in input_shape]
     else:
@@ -556,7 +555,10 @@ def create_plan_dynamic_rf_modelfile(
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -616,9 +618,7 @@ def create_plan_dynamic_modelfile(
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
-    network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-    )
+    network = builder.create_network()
     if max_batch == 0:
         input_with_batchsize = [i for i in input_shape]
     else:
@@ -785,8 +785,13 @@ def create_plan_fixed_rf_modelfile(
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
-    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
+    if max_batch == 0:
+        input_with_batchsize = [i for i in input_shape]
+    else:
+        input_with_batchsize = [-1] + [i for i in input_shape]
+
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
 
@@ -814,17 +819,39 @@ def create_plan_fixed_rf_modelfile(
     if trt_output1_dtype == trt.int8:
         out1.get_output(0).dynamic_range = (-128.0, 127.0)
 
-    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+    config = builder.create_builder_config()
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in input_shape:
+        min_shape = min_shape + [i]
+        opt_shape = opt_shape + [i]
+        max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+
+    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
             flags |= 1 << int(trt.BuilderFlag.INT8)
         elif dt == trt.float16:
             flags |= 1 << int(trt.BuilderFlag.FP16)
+
     config = builder.create_builder_config()
     config.flags = flags
+    config.add_optimization_profile(profile)
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
+
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -869,8 +896,13 @@ def create_plan_fixed_modelfile(
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
-    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
+    if max_batch == 0:
+        input_with_batchsize = [i for i in input_shape]
+    else:
+        input_with_batchsize = [-1] + [i for i in input_shape]
+
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
 
@@ -883,8 +915,25 @@ def create_plan_fixed_modelfile(
     network.mark_output(out1.get_output(0))
 
     config = builder.create_builder_config()
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in input_shape:
+        min_shape = min_shape + [i]
+        opt_shape = opt_shape + [i]
+        max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+    config.add_optimization_profile(profile)
+
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -940,7 +989,6 @@ def create_plan_modelfile(
         or output1_dtype == np.uint8
     ):
         # TRT uint8 cannot be used to represent quantized floating-point value yet
-        # EXPLICIT_BATCH network and conversion are required to create models
         create_plan_dynamic_rf_modelfile(
             models_dir,
             max_batch,
@@ -2531,6 +2579,18 @@ if __name__ == "__main__":
                 )
 
         if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_fixed_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
+
             for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(
                     FLAGS.models_dir, 8, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
@@ -2806,6 +2866,23 @@ if __name__ == "__main__":
             (-1, 8, -1),
             32,
         )
+
+        if FLAGS.tensorrt:
+            if tu.check_gpus_compute_capability(min_capability=8.0):
+                create_models(
+                    FLAGS.models_dir,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    np_dtype_bfloat16,
+                    (-1, -1),
+                    (-1, -1),
+                    (-1, -1),
+                    0,
+                )
+            else:
+                print(
+                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+                )
 
     if FLAGS.ensemble:
         # Create utility models used in ensemble
