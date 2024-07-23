@@ -68,15 +68,15 @@ import requests
 # different versions are used then one backend or the other will
 # incorrectly load the other version of the openvino libraries.
 #
-TRITON_VERSION_MAP = {
-    "2.48.0dev": (
-        "24.06dev",  # triton container
-        "24.06",  # upstream container
-        "1.18.1",  # ORT
-        "2024.0.0",  # ORT OpenVINO
-        "2024.0.0",  # Standalone OpenVINO
-        "3.2.6",  # DCGM version
-        "0.5.0.post1",  # vLLM version
+DEFAULT_TRITON_VERSION_MAP = {
+    "release_version": "2.48.0dev",
+    "triton_container_version" : "24.06dev", 
+    "upstream_container_version": "24.06",  
+    "ort_version":    "1.18.1",  
+    "ort_openvino_version": "2024.0.0",
+    "standalone_openvino_version":   "2024.0.0",  
+    "dcgm_version":    "3.2.6",
+    "vllm_version":   "0.5.0.post1"
     )
 }
 
@@ -128,13 +128,13 @@ def target_machine():
 
 def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
-        if version not in TRITON_VERSION_MAP:
+        if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("container version not known for {}".format(version))
-        container_version = TRITON_VERSION_MAP[version][0]
+        container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
-        if version not in TRITON_VERSION_MAP:
+        if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("upstream container version not known for {}".format(version))
-        upstream_container_version = TRITON_VERSION_MAP[version][1]
+        upstream_container_version = DEFAULT_TRITON_VERSION_MAP["upstream_container_version"]
     return container_version, upstream_container_version
 
 
@@ -644,7 +644,7 @@ def onnxruntime_cmake_args(images, library_paths):
             "onnxruntime",
             "TRITON_BUILD_ONNXRUNTIME_VERSION",
             None,
-            TRITON_VERSION_MAP[FLAGS.version][2],
+            DEFAULT_TRITON_VERSION_MAP["ort_version"],
         )
     ]
 
@@ -676,12 +676,12 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][1],
+                    DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
                 )
             )
 
         if (target_machine() != "aarch64") and (
-            TRITON_VERSION_MAP[FLAGS.version][3] is not None
+            DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"] is not None
         ):
             cargs.append(
                 cmake_backend_enable(
@@ -693,7 +693,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][3],
+                    DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
                 )
             )
 
@@ -716,7 +716,7 @@ def openvino_cmake_args():
             "openvino",
             "TRITON_BUILD_OPENVINO_VERSION",
             None,
-            TRITON_VERSION_MAP[FLAGS.version][4],
+            DEFAULT_TRITON_VERSION_MAP["standalone_openvino_version"],
         )
     ]
     if target_platform() == "windows":
@@ -739,7 +739,7 @@ def openvino_cmake_args():
                     "openvino",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][1],
+                    DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
                 )
             )
     return cargs
@@ -794,7 +794,7 @@ def fil_cmake_args(images):
                 "fil",
                 "TRITON_BUILD_CONTAINER_VERSION",
                 None,
-                TRITON_VERSION_MAP[FLAGS.version][1],
+                DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
             )
         )
 
@@ -1235,7 +1235,7 @@ RUN apt-get update \\
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][6]
+            FLAGS.vllm_version
         )
 
     if "dali" in backends:
@@ -1400,8 +1400,8 @@ def create_build_dockerfiles(
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
         "DCGM_VERSION": ""
-        if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
-        else TRITON_VERSION_MAP[FLAGS.version][5],
+        if FLAGS.version is None or FLAGS.version not in DEFAULT_TRITON_VERSION_MAP
+        else DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
@@ -2344,6 +2344,13 @@ if __name__ == "__main__":
         action="append",
         required=False,
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
+    )
+    parser.add_argument(
+        "--vllm-version",
+        action="store_true",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"]
+        help="Do not include OSS source code in Docker container.",
     )
 
     FLAGS = parser.parse_args()
