@@ -781,6 +781,7 @@ endif() # NOT WIN32
 
 find_package(CUDAToolkit REQUIRED)
 
+# TODO: Remove excess stuff
 add_library(
   shared-memory-manager 
   EXCLUDE_FROM_ALL

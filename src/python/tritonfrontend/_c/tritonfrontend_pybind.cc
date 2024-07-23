@@ -2,6 +2,7 @@
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 #include <memory>
+#include<unistd.h>  
 
 namespace py = pybind11;
 
@@ -138,10 +139,22 @@ bool CreateWrapper(uintptr_t server_ptr) {
       "",
       1, temp,
       &service);
-
       std::cout << "Create is finished" << std::endl;
+
+      if (err == nullptr) {
+        err = service->Start();
+        std::cout << "Start is finished" << std::endl;
+      }
+
+      if (err != nullptr) {
+        // service->reset();
+        std::cout << "HTTP FRONTEND HAS BEEN RESET" << std::endl;
+      }
+
+      
       // if(err == nullptr)
         // return true;
+      sleep(60);
 
       return false;
 

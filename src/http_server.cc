@@ -1181,6 +1181,7 @@ HTTPAPIServer::HTTPAPIServer(
 
 HTTPAPIServer::~HTTPAPIServer()
 {
+  LOG_VERBOSE(2) << "~HTTPAPIServer()";
   if (server_metadata_err_ != nullptr) {
     TRITONSERVER_ErrorDelete(server_metadata_err_);
   }

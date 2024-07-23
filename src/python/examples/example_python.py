@@ -23,7 +23,7 @@ server_options = tritonserver.Options(
 
 server_options = tritonserver.Options(server_id="TestServer", model_repository="/root/models", log_error=True, log_warn=True, log_info=True)
 server = tritonserver.Server(server_options).start(wait_until_ready=True) # C Equivalent of TRITONSERVER_Server*
-
+res = tritonfrontend.Server.createServer(server.get_c_ptr())
 
 # Goal of connecting tritonserver(core) to tritonfrontend
 # From server (PyServer), grab the C pointer.
