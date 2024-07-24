@@ -70,7 +70,7 @@ import requests
 #
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.47.0",
-    "container_version" : "24.06", 
+    "triton_container_version" : "24.06", 
     "upstream_container_version": "24.06",  
     "ort_version":    "1.18.1",  
     "ort_openvino_version": "2024.0.0",
@@ -129,7 +129,7 @@ def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
         if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("container version not known for {}".format(version))
-        container_version = DEFAULT_TRITON_VERSION_MAP["container_version"]
+        container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
         if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("upstream container version not known for {}".format(version))
@@ -675,7 +675,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    DEFAULT_TRITON_VERSION_MAP["container_version"],
+                    DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
                 )
             )
 
