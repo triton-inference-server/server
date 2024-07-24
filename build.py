@@ -2427,7 +2427,7 @@ if __name__ == "__main__":
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
     default_repo_tag = "main"
-    cver = FLAGS.container_version
+    cver = FLAGS.upstream_container_version
     if cver is None:
         if FLAGS.version not in DEFAULT_TRITON_VERSION_MAP:
             fail(
