@@ -2348,8 +2348,8 @@ if __name__ == "__main__":
         "--vllm-version",
         action="store_true",
         required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"]
-        help="Do not include OSS source code in Docker container.",
+        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
+        help="Provide any released version of vllm project.",
     )
 
     FLAGS = parser.parse_args()
