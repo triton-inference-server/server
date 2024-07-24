@@ -127,8 +127,6 @@ def target_machine():
 
 def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
-        if version not in DEFAULT_TRITON_VERSION_MAP:
-            fail("container version not known for {}".format(version))
         container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
         if version not in DEFAULT_TRITON_VERSION_MAP:
