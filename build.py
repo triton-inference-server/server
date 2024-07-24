@@ -1141,7 +1141,7 @@ ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
 ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
-
+log("creating a non-root user: triton-server")
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
