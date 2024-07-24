@@ -70,7 +70,7 @@ import requests
 #
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.47.0",
-    "triton_container_version" : "24.06", 
+    "container_version" : "24.06", 
     "upstream_container_version": "24.06",  
     "ort_version":    "1.18.1",  
     "ort_openvino_version": "2024.0.0",
@@ -129,7 +129,7 @@ def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
         if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("container version not known for {}".format(version))
-        container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
+        container_version = DEFAULT_TRITON_VERSION_MAP["container_version"]
     if upstream_container_version is None:
         if version not in DEFAULT_TRITON_VERSION_MAP:
             fail("upstream container version not known for {}".format(version))
@@ -675,7 +675,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
+                    DEFAULT_TRITON_VERSION_MAP["container_version"],
                 )
             )
 
@@ -2429,12 +2429,6 @@ if __name__ == "__main__":
     default_repo_tag = "main"
     cver = FLAGS.upstream_container_version
     if cver is None:
-        if FLAGS.version not in DEFAULT_TRITON_VERSION_MAP:
-            fail(
-                "unable to determine default repo-tag, container version not known for {}".format(
-                    FLAGS.version
-                )
-            )
         cver = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if not cver.endswith("dev"):
         default_repo_tag = "r" + cver
