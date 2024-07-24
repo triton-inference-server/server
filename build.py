@@ -826,6 +826,7 @@ def install_dcgm_libraries(dcgm_version, target_machine):
     else:
         if target_machine == "aarch64":
             return """
+    
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -2377,6 +2378,7 @@ if __name__ == "__main__":
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
 
+    log(f"FLAGS: {FLAGS}")
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
