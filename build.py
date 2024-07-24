@@ -1420,6 +1420,7 @@ def create_build_dockerfiles(
     )
 
     if target_platform() == "windows":
+        log("Creating dockerfile for Windows")
         create_dockerfile_windows(
             FLAGS.build_dir,
             "Dockerfile",
@@ -1429,6 +1430,7 @@ def create_build_dockerfiles(
             caches,
         )
     else:
+        log("Creating dockerfile for Linux")
         create_dockerfile_linux(
             FLAGS.build_dir,
             "Dockerfile",
