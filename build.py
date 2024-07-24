@@ -820,7 +820,7 @@ def tensorrtllm_cmake_args(images):
 
 
 def install_dcgm_libraries(dcgm_version, target_machine):
-    log(f"dcgm_version is {dcgm_version}}")
+    log(f"dcgm_version is {dcgm_version}")
     if dcgm_version == "":
         dcgm_version = DEFAULT_TRITON_VERSION_MAP["dcgm_version"]
         log(f"Setting dcgm_version to {DEFAULT_TRITON_VERSION_MAP["dcgm_version"]}")
