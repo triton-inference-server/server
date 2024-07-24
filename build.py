@@ -2410,8 +2410,7 @@ if __name__ == "__main__":
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
-        with open(os.path.join(THIS_SCRIPT_DIR, "TRITON_VERSION"), "r") as vfile:
-            FLAGS.version = vfile.readline().strip()
+        FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
 
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
