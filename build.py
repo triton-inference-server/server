@@ -821,11 +821,7 @@ def tensorrtllm_cmake_args(images):
 
 def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == "":
-        fail(
-            "unable to determine default repo-tag, DCGM version not known for {}".format(
-                FLAGS.version
-            )
-        )
+        dcgm_version = DEFAULT_TRITON_VERSION_MAP["dcgm_version"]
         return ""
     else:
         if target_machine == "aarch64":
