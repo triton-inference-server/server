@@ -1008,7 +1008,7 @@ WORKDIR /workspace
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 """
-
+    log("writing df after create_dockerfile_cibase")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1069,7 +1069,6 @@ LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
 """
-
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
@@ -1078,7 +1077,6 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-log("Install required packages for TRT-LLM models")
 # Remove contents that are not needed in runtime
 # Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
 # The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
@@ -1095,6 +1093,7 @@ RUN ldconfig && \
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
+    log("writing dockerfile")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1446,7 +1445,7 @@ def create_build_dockerfiles(
             caches,
             endpoints,
         )
-
+    log("create_dockerfile_cibase")
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, "Dockerfile.cibase", dockerfileargmap)
 
@@ -1569,7 +1568,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         )
 
         #
-        # Final image... tritonserver
+        log("Final image... tritonserver")
         #
         docker_script.blankln()
         docker_script.commentln(8)
@@ -2741,6 +2740,7 @@ if __name__ == "__main__":
         create_build_dockerfiles(
             script_build_dir, images, backends, repoagents, caches, FLAGS.endpoint
         )
+        log("create_docker_build_script")
         create_docker_build_script(script_name, script_install_dir, script_ci_dir)
 
     # In not dry-run, execute the script to perform the build...  If a
