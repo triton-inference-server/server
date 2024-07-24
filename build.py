@@ -1134,7 +1134,8 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
         backend_dependencies += " openssh-server"
-
+    log(f"backend_dependencies: {backend_dependencies}")
+    
     df += """
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
