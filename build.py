@@ -1099,6 +1099,7 @@ ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrt
 
 
 def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_machine):
+    log("Preparing container for Linux")
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets environment variables, installs dependencies and adds entrypoint
