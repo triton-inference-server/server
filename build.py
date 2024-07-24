@@ -2753,6 +2753,9 @@ if __name__ == "__main__":
                 cwd=FLAGS.build_dir,
             )
         else:
-            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
-        p.wait()
+            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+        res = p.communicate()
+        print("retcode =", p.returncode)
+        print("res =", res)
+        print("stderr =", res[1])
         fail_if(p.returncode != 0, "build failed")
