@@ -48,7 +48,7 @@ import requests
 # information.
 #
 # The TRITON_VERSION file indicates the Triton version and
-# TRITON_VERSION_MAP is used to determine the corresponding container
+# DEFAULT_TRITON_VERSION_MAP is used to determine the corresponding container
 # version and upstream container version (upstream containers are
 # dependencies required by Triton). These versions may be overridden.
 
@@ -2429,13 +2429,13 @@ if __name__ == "__main__":
     default_repo_tag = "main"
     cver = FLAGS.container_version
     if cver is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
+        if FLAGS.version not in DEFAULT_TRITON_VERSION_MAP:
             fail(
                 "unable to determine default repo-tag, container version not known for {}".format(
                     FLAGS.version
                 )
             )
-        cver = TRITON_VERSION_MAP[FLAGS.version][0]
+        cver = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if not cver.endswith("dev"):
         default_repo_tag = "r" + cver
     log("default repo-tag: {}".format(default_repo_tag))
