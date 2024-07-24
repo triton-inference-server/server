@@ -1142,7 +1142,7 @@ ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
 ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
-log("creating a non-root user: triton-server")
+
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
@@ -1182,7 +1182,7 @@ ENV TCMALLOC_RELEASE_RATE 200
 """.format(
         gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies
     )
-
+    log("checking more backends")
     if "fastertransformer" in backends:
         be = "fastertransformer"
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
@@ -1197,6 +1197,7 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
 
     if enable_gpu:
+        log("install_dcgm_libraries")
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
         df += """
 # Extra defensive wiring for CUDA Compat lib
@@ -1206,8 +1207,10 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
       && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
+        log("install_cpu_libraries")
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
+    log("add dependencies for python backend")
     # Add dependencies needed for python backend
     if "python" in backends:
         df += """
