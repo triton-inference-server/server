@@ -1060,6 +1060,7 @@ WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
 """
+    log("Adding feature labels for sagemaker endpoint")
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
         if "sagemaker" in endpoints:
@@ -1077,7 +1078,7 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Install required packages for TRT-LLM models
+log("Install required packages for TRT-LLM models")
 # Remove contents that are not needed in runtime
 # Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
 # The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
@@ -1267,7 +1268,7 @@ LABEL com.nvidia.build.ref={}
 """.format(
         argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
     )
-
+    log("returning df")
     return df
 
 
