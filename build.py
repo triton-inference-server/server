@@ -1116,7 +1116,7 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 # in the min container.
 ENV UCX_MEM_EVENTS no
 """
-
+    log("setting dependencies per backend")
     # Necessary for libtorch.so to find correct HPCX libraries
     if "pytorch" in backends:
         df += """
