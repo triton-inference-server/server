@@ -1099,7 +1099,6 @@ RUN ldconfig && \
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
-
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
