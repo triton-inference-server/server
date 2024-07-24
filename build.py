@@ -2349,7 +2349,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--vllm-version",
-        action="store_true",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
         help="Provide any released version of vllm project.",
