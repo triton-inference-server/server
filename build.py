@@ -77,7 +77,6 @@ DEFAULT_TRITON_VERSION_MAP = {
     "standalone_openvino_version":   "2024.0.0",  
     "dcgm_version":    "3.2.6",
     "vllm_version":   "0.5.0.post1"
-    )
 }
 
 CORE_BACKENDS = ["ensemble"]
