@@ -69,8 +69,8 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.48.0dev",
-    "triton_container_version" : "24.06dev", 
+    "release_version": "2.47.0",
+    "triton_container_version" : "24.06", 
     "upstream_container_version": "24.06",  
     "ort_version":    "1.18.1",  
     "ort_openvino_version": "2024.0.0",
