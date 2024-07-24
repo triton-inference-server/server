@@ -43,7 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 STRESS_TEST=stress.py
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 

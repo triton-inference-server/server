@@ -46,7 +46,8 @@ export CUDA_VISIBLE_DEVICES=0
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 DLA_TEST=./dla_test.py
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 

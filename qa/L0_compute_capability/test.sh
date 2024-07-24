@@ -42,7 +42,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 source ../common/util.sh
 
 rm -f *.log

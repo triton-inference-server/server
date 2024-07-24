@@ -43,7 +43,8 @@ TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_corrid_batcher_test.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh

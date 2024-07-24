@@ -45,7 +45,8 @@ RATE_LIMITER_TEST=rate_limiter_test.py
 TEST_RESULT_FILE='test_results.txt'
 
 MODELDIR=${MODELDIR:=`pwd`}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends

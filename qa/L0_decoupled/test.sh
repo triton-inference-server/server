@@ -47,7 +47,8 @@ DECOUPLED_TEST=decoupled_test.py
 rm -f *.log
 
 CLIENT_LOG=`pwd`/client.log
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"

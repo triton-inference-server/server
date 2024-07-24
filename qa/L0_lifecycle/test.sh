@@ -41,7 +41,8 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 LC_TEST=lifecycle_test.py
 SLEEP_TIME=10
 SERVER=/opt/tritonserver/bin/tritonserver

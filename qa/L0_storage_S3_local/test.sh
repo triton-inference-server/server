@@ -45,7 +45,8 @@ TEST_RESULT_FILE='test_results.txt'
 INFER_TEST="../common/infer_test.py"
 EXPECTED_NUM_TESTS="3"
 
-DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 # Used to control which backends are run in infer_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 

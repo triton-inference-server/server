@@ -45,7 +45,8 @@ CLIENT_LOG="./client.log"
 CLIENT_TEST=client_test.py
 EXPECTED_NUM_TESTS="4"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository"

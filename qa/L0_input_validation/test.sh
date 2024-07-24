@@ -42,7 +42,8 @@ source ../common/util.sh
 
 RET=0
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py

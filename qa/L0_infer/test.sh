@@ -89,12 +89,14 @@ DEFAULT_SHM_SIZE_BYTES=$((1024*1024*$DEFAULT_SHM_SIZE_MB))
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     MODELDIR=${MODELDIR:=C:/models}
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/mnt/c/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends

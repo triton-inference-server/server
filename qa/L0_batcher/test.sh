@@ -81,13 +81,15 @@ TF_VERSION=${TF_VERSION:=2}
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     MODELDIR=${MODELDIR:=C:/models}
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/mnt/c/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
 else
     MODELDIR=${MODELDIR:=`pwd`}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends

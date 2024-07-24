@@ -39,7 +39,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 MODELSDIR=`pwd`/models
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 
 export CUDA_VISIBLE_DEVICES=0
 

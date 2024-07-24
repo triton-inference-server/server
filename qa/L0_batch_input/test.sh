@@ -44,8 +44,9 @@ CLIENT_LOG="./client.log"
 BATCH_INPUT_TEST=batch_input_test.py
 EXPECTED_NUM_TESTS="8"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
-IDENTITY_DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_ragged_model_repository"}
+IDENTITY_DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_identity_model_repository"
 
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver

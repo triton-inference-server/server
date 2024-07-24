@@ -42,7 +42,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose=1"

@@ -60,7 +60,8 @@ MULTI_MODEL_UNIT_TEST_COUNT=7
 UNIT_TEST_COUNT=9
 CLIENT_LOG="./client.log"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"

@@ -48,13 +48,15 @@ PLUGIN_TEST=trt_plugin_test.py
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/mnt/c/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/HardmaxPlugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=`pwd`/models}
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/libcustomHardmaxPlugin.so}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
