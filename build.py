@@ -129,8 +129,6 @@ def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
         container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
-        if version not in DEFAULT_TRITON_VERSION_MAP:
-            fail("upstream container version not known for {}".format(version))
         upstream_container_version = DEFAULT_TRITON_VERSION_MAP["upstream_container_version"]
     return container_version, upstream_container_version
 
