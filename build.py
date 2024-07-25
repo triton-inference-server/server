@@ -828,7 +828,6 @@ def install_dcgm_libraries(dcgm_version, target_machine):
     else:
         if target_machine == "aarch64":
             return """
-    
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
