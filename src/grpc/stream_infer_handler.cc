@@ -140,6 +140,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // This means that we only need to take care of
   // synchronizing this thread and the ResponseComplete
   // threads.
+  {
+    std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
+    if (state->IsStreamError() && state->context_->grpc_strict_) {
+      LOG_VERBOSE(1) << "Ignoring new client request in strict mode \n";
+      return false;
+    }
+  }
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
@@ -189,7 +196,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->responder_->Finish(status, state);
       return !finished;
     }
-
+    state->context_->ExtractStateFromHeaders(state);
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
     const inference::ModelInferRequest& request = state->request_;
@@ -328,7 +335,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // initiated... the completion callback will transition to
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
     // irequest to handle gRPC stream cancellation.
+    // std::time_t currentTime = std::time(nullptr);
+
+    // // Divide the current time by 2
+    // std::time_t modTime = currentTime % 2;
+
     if (err == nullptr) {
+      // if (modTime) {
       state->context_->InsertInflightState(state);
       // The payload will be cleaned in request release callback.
       request_release_payload.release();
@@ -355,6 +368,17 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
       response->set_error_message(status.error_message());
+      // if(state->context_->grpc_strict_) {
+      //   // Set to finish
+      //   state->status_ = status;
+      //   state->MarkIsStreamError();
+      //   LOG_VERBOSE(1) << "GRPC streaming error detected : " <<
+      //   status.error_code() << std::endl;
+      // } else {
+      //   LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict:
+      //   " << status.error_code() << std::endl;
+      // }
+
 
       response->mutable_infer_response()->Clear();
       // repopulate the id so that client knows which request failed.
@@ -633,12 +657,34 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       LOG_ERROR << "expected the response allocator to have added the response";
     }
 
-    if (err != nullptr) {
+    std::time_t currentTime = std::time(nullptr);
+
+    // Divide the current time by 2
+    std::time_t modTime = currentTime % 2;
+
+    if (modTime) {
+      LOG_VERBOSE(1) << "Generating fake error" << std::endl;
       failed = true;
       ::grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
+      if (state->context_->grpc_strict_) {
+        // Set to finish
+        std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
+        state->status_ = status;
+        if (!state->IsStreamError()) {
+          // Finish only once, if backend ignores cancellation
+          state->MarkIsStreamError();
+          LOG_VERBOSE(1) << "GRPC streaming error detected (Only once)"
+                         << status.error_code() << std::endl;
+          state->context_->sendGRPCStrictResponse(state);
+        }
+        return;
+      } else {
+        LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict: "
+                       << status.error_code() << std::endl;
+      }
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
     }
 
