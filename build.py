@@ -48,7 +48,7 @@ import requests
 # information.
 #
 # The TRITON_VERSION file indicates the Triton version and
-# TRITON_VERSION_MAP is used to determine the corresponding container
+# DEFAULT_TRITON_VERSION_MAP is used to determine the corresponding container
 # version and upstream container version (upstream containers are
 # dependencies required by Triton). These versions may be overridden.
 
@@ -68,16 +68,15 @@ import requests
 # different versions are used then one backend or the other will
 # incorrectly load the other version of the openvino libraries.
 #
-TRITON_VERSION_MAP = {
-    "2.47.0": (
-        "24.06",  # triton container
-        "24.06",  # upstream container
-        "1.18.0",  # ORT
-        "2024.0.0",  # ORT OpenVINO
-        "2024.0.0",  # Standalone OpenVINO
-        "3.2.6",  # DCGM version
-        "0.4.3",  # vLLM version
-    )
+DEFAULT_TRITON_VERSION_MAP = {
+    "release_version": "2.47.0",
+    "triton_container_version" : "24.06", 
+    "upstream_container_version": "24.06",  
+    "ort_version":    "1.18.1",  
+    "ort_openvino_version": "2024.0.0",
+    "standalone_openvino_version":   "2024.0.0",  
+    "dcgm_version":    "3.2.6",
+    "vllm_version":   "0.5.0.post1"
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -128,13 +127,9 @@ def target_machine():
 
 def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
-        if version not in TRITON_VERSION_MAP:
-            fail("container version not known for {}".format(version))
-        container_version = TRITON_VERSION_MAP[version][0]
+        container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
-        if version not in TRITON_VERSION_MAP:
-            fail("upstream container version not known for {}".format(version))
-        upstream_container_version = TRITON_VERSION_MAP[version][1]
+        upstream_container_version = DEFAULT_TRITON_VERSION_MAP["upstream_container_version"]
     return container_version, upstream_container_version
 
 
@@ -644,7 +639,7 @@ def onnxruntime_cmake_args(images, library_paths):
             "onnxruntime",
             "TRITON_BUILD_ONNXRUNTIME_VERSION",
             None,
-            TRITON_VERSION_MAP[FLAGS.version][2],
+            DEFAULT_TRITON_VERSION_MAP["ort_version"],
         )
     ]
 
@@ -676,12 +671,12 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][1],
+                    DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
                 )
             )
 
         if (target_machine() != "aarch64") and (
-            TRITON_VERSION_MAP[FLAGS.version][3] is not None
+            DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"] is not None
         ):
             cargs.append(
                 cmake_backend_enable(
@@ -693,7 +688,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][3],
+                    DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
                 )
             )
 
@@ -716,7 +711,7 @@ def openvino_cmake_args():
             "openvino",
             "TRITON_BUILD_OPENVINO_VERSION",
             None,
-            TRITON_VERSION_MAP[FLAGS.version][4],
+            DEFAULT_TRITON_VERSION_MAP["standalone_openvino_version"],
         )
     ]
     if target_platform() == "windows":
@@ -739,7 +734,7 @@ def openvino_cmake_args():
                     "openvino",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    TRITON_VERSION_MAP[FLAGS.version][1],
+                    DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
                 )
             )
     return cargs
@@ -794,7 +789,7 @@ def fil_cmake_args(images):
                 "fil",
                 "TRITON_BUILD_CONTAINER_VERSION",
                 None,
-                TRITON_VERSION_MAP[FLAGS.version][1],
+                DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
             )
         )
 
@@ -819,36 +814,16 @@ def fastertransformer_cmake_args():
 
 
 def tensorrtllm_cmake_args(images):
-    cmake_script.cmd("apt-get update && apt-get install -y libcudnn8-dev && ldconfig")
-    cmake_script.cmd(
-        "python3 ../tensorrt_llm/scripts/build_wheel.py --trt_root /usr/local/tensorrt -i -c -j 18"
-    )
-    cargs = [
-        cmake_backend_arg(
-            "tensorrtllm",
-            "TRT_LIB_DIR",
-            None,
-            "${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib",
-        ),
-        cmake_backend_arg(
-            "tensorrtllm", "TRT_INCLUDE_DIR", None, "${TRT_ROOT}/include"
-        ),
-    ]
+    cargs = []
     cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
 
 def install_dcgm_libraries(dcgm_version, target_machine):
-    if dcgm_version == "":
-        fail(
-            "unable to determine default repo-tag, DCGM version not known for {}".format(
-                FLAGS.version
-            )
-        )
-        return ""
-    else:
-        if target_machine == "aarch64":
-            return """
+    log(f"dcgm_version is {dcgm_version}")
+    
+    if target_machine == "aarch64":
+        return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -860,8 +835,8 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 """.format(
                 dcgm_version, dcgm_version
             )
-        else:
-            return """
+    else:
+        return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -1027,7 +1002,7 @@ WORKDIR /workspace
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 """
-
+    log("writing df after create_dockerfile_cibase")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1079,6 +1054,7 @@ WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
 """
+    log("Adding feature labels for sagemaker endpoint")
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
         if "sagemaker" in endpoints:
@@ -1087,7 +1063,6 @@ LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
 """
-
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
@@ -1096,38 +1071,29 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Remove TRT contents that are not needed in runtime
-RUN apt-get update && apt-get install -y libcudnn8-dev && ldconfig
-
-RUN ARCH="$(uname -i)" \\
-      && rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data \\
-      && rm -fr  ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python \\
-      && rm -fr ${TRT_ROOT}/samples  ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples
-
-# Install required packages for TRT-LLM models
-RUN python3 -m pip install --upgrade pip \\
-      && pip3 install transformers
-
-# Drop the static libs
-RUN ARCH="$(uname -i)" \\
-      && rm -f ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvinfer*.a \\
-          ${TRT_ROOT}/targets/${ARCH}-linux-gnu/lib/libnvonnxparser_*.a
-
-# Install TensorRT-LLM
-RUN python3 -m pip install /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl -U --pre --extra-index-url https://pypi.nvidia.com \\
-        && rm -fv /opt/tritonserver/backends/tensorrtllm/tensorrt_llm-*.whl
-RUN find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf
-RUN find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf
-
-RUN pip3 install setuptools==69.5.1 grpcio-tools==1.64.0
+# Remove contents that are not needed in runtime
+# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
+# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
+RUN ldconfig && \
+    ARCH="$(uname -i)" && \
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
+    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
+    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \
+    python3 -m pip install --upgrade pip && \
+    pip3 install --no-cache-dir transformers && \
+    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
+    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
+    log("writing dockerfile")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
 def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_machine):
+    log("Preparing container for Linux")
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets environment variables, installs dependencies and adds entrypoint
@@ -1144,7 +1110,7 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 # in the min container.
 ENV UCX_MEM_EVENTS no
 """
-
+    log("setting dependencies per backend")
     # Necessary for libtorch.so to find correct HPCX libraries
     if "pytorch" in backends:
         df += """
@@ -1162,7 +1128,8 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
         backend_dependencies += " openssh-server"
-
+    log(f"backend_dependencies: {backend_dependencies}")
+    
     df += """
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -1209,7 +1176,7 @@ ENV TCMALLOC_RELEASE_RATE 200
 """.format(
         gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies
     )
-
+    log("checking more backends")
     if "fastertransformer" in backends:
         be = "fastertransformer"
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
@@ -1224,6 +1191,7 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
 
     if enable_gpu:
+        log("install_dcgm_libraries")
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
         df += """
 # Extra defensive wiring for CUDA Compat lib
@@ -1233,8 +1201,10 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
       && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
+        log("install_cpu_libraries")
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
+    log("add dependencies for python backend")
     # Add dependencies needed for python backend
     if "python" in backends:
         df += """
@@ -1259,7 +1229,7 @@ RUN apt-get update \\
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
 """.format(
-            TRITON_VERSION_MAP[FLAGS.version][6]
+            FLAGS.vllm_version
         )
 
     if "dali" in backends:
@@ -1291,7 +1261,7 @@ LABEL com.nvidia.build.ref={}
 """.format(
         argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
     )
-
+    log("returning df")
     return df
 
 
@@ -1423,9 +1393,7 @@ def create_build_dockerfiles(
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
-        "DCGM_VERSION": ""
-        if FLAGS.version is None or FLAGS.version not in TRITON_VERSION_MAP
-        else TRITON_VERSION_MAP[FLAGS.version][5],
+        "DCGM_VERSION": DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
@@ -1449,6 +1417,7 @@ def create_build_dockerfiles(
     )
 
     if target_platform() == "windows":
+        log("Creating dockerfile for Windows")
         create_dockerfile_windows(
             FLAGS.build_dir,
             "Dockerfile",
@@ -1458,6 +1427,7 @@ def create_build_dockerfiles(
             caches,
         )
     else:
+        log("Creating dockerfile for Linux")
         create_dockerfile_linux(
             FLAGS.build_dir,
             "Dockerfile",
@@ -1467,7 +1437,7 @@ def create_build_dockerfiles(
             caches,
             endpoints,
         )
-
+    log("create_dockerfile_cibase")
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, "Dockerfile.cibase", dockerfileargmap)
 
@@ -1590,7 +1560,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         )
 
         #
-        # Final image... tritonserver
+        log("Final image... tritonserver")
         #
         docker_script.blankln()
         docker_script.commentln(8)
@@ -1725,11 +1695,6 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
     # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
     cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
     cmake_script.mkdir(cmake_destination_dir)
-    # Copy over the TRT-LLM wheel for later installation
-    cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "tensorrt_llm", "build", "tensorrt_llm-*.whl"),
-        cmake_destination_dir,
-    )
 
     # Copy over the TRT-LLM backend libraries
     cmake_script.cp(
@@ -2374,6 +2339,12 @@ if __name__ == "__main__":
         required=False,
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
+    parser.add_argument(
+        "--vllm-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
+        help="Provide any released version of vllm project.",
+    )
 
     FLAGS = parser.parse_args()
 
@@ -2402,6 +2373,7 @@ if __name__ == "__main__":
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
 
+    log(f"FLAGS: {FLAGS}")
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
@@ -2431,8 +2403,7 @@ if __name__ == "__main__":
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
-        with open(os.path.join(THIS_SCRIPT_DIR, "TRITON_VERSION"), "r") as vfile:
-            FLAGS.version = vfile.readline().strip()
+        FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
 
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
@@ -2450,15 +2421,9 @@ if __name__ == "__main__":
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
     default_repo_tag = "main"
-    cver = FLAGS.container_version
+    cver = FLAGS.upstream_container_version
     if cver is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail(
-                "unable to determine default repo-tag, container version not known for {}".format(
-                    FLAGS.version
-                )
-            )
-        cver = TRITON_VERSION_MAP[FLAGS.version][0]
+        cver = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if not cver.endswith("dev"):
         default_repo_tag = "r" + cver
     log("default repo-tag: {}".format(default_repo_tag))
@@ -2766,6 +2731,7 @@ if __name__ == "__main__":
         create_build_dockerfiles(
             script_build_dir, images, backends, repoagents, caches, FLAGS.endpoint
         )
+        log("create_docker_build_script")
         create_docker_build_script(script_name, script_install_dir, script_ci_dir)
 
     # In not dry-run, execute the script to perform the build...  If a
@@ -2778,6 +2744,9 @@ if __name__ == "__main__":
                 cwd=FLAGS.build_dir,
             )
         else:
-            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
-        p.wait()
+            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        res = p.communicate()
+        print("retcode =", p.returncode)
+        print("res =", res)
+        print("stderr =", res[1])
         fail_if(p.returncode != 0, "build failed")
