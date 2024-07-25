@@ -6,8 +6,10 @@ class Validation:
         if not isinstance(value, expected_type):
             raise TypeError(f"Incorrect Type for {param_name}. Expected {expected_type}, got {type(value)}")
     
+    #TODO: implement to catch ints in python that are too big for int32_t in C++
     def validate_range(self, value, lb, ub, param_name):
         pass
+    
     def validate():
         for param_name, param_type in self.__annotations__.items():
             value = getattr(self, param_name)
@@ -19,7 +21,7 @@ class KServeHttpOptions(Validation):
     port: int = 8000
     reuse_port: bool = False
     thread_count: int = 8
-    http_forward_header_pattern_: str = ""
+    header_forward_pattern: str = ""
     # restricted_protocols: list
 
 

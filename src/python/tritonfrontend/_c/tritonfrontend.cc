@@ -34,25 +34,47 @@ void TritonFrontend::register_options(const UnorderedMapType data) {
     print_unordered_map(options);
 }
 
-// VariantType get_option(const std::string& key) const {
-//         auto it = options.find(key);
-//         if (it != options.end()) {
-//             return it->second;
-//         }
-//         throw std::out_of_range("Key not found");
-//     }
+int TritonFrontend::get_option_int(const std::string& key)  {
+      auto it = options.find(key);
+      if (it != options.end()) {
+          return std::get<int>(it->second);
+      }
+      throw std::out_of_range("Key not found");
+  }
 
+bool TritonFrontend::get_option_bool(const std::string& key)  {
+      auto it = options.find(key);
+      if (it != options.end()) {
+          return std::get<bool>(it->second);
+      }
+      throw std::out_of_range("Key not found");
+  }
 
-bool TritonFrontend::CreateWrapper(uintptr_t server_ptr) {
+std::string TritonFrontend::get_option_string(const std::string& key)  {
+      auto it = options.find(key);
+      if (it != options.end()) {
+          return std::get<std::string>(it->second);
+      }
+      throw std::out_of_range("Key not found");
+  }
+
+bool TritonFrontend::CreateWrapper(uintptr_t server_ptr, UnorderedMapType data) {
       
       server.reset(reinterpret_cast<TRITONSERVER_Server*>(server_ptr));
+      register_options(data);
+      int port = get_option_int("port");
+      bool reuse_port = get_option_bool("reuse_port");
+      std::string address = get_option_string("address"); 
+      std::string header_forward_pattern = get_option_string("header_forward_pattern");
+      int thread_count = get_option_int("thread_count");
 
+      TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(server, 
+      nullptr, nullptr, // TraceManager, SharedMemoryManager 
+      port, reuse_port, address, // port, reuse_port, address
+      header_forward_pattern,  thread_count, // header_forward_pattern, thread_count 
+      restricted_features, // RestrictedFeatures
+      &service); // HTTPServer instance
 
-      TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(server, nullptr, nullptr, 8000,
-      true, "0.0.0.0",
-      "",
-      1, restricted_features,
-      &service);
       std::cout << "Create is finished" << std::endl;
 
       if (err == nullptr) {

@@ -1,8 +1,8 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 #include <memory>
-
 namespace py = pybind11;
 
 // Macro used by PyWrapper
@@ -130,14 +130,14 @@ ThrowIfError(TRITONSERVER_Error* err)
 // Wrapping TritonFrontend to 
 
 
-UnorderedMapType register_options(py::dict& data) {
+UnorderedMapType parse_options(py::dict& data) {
   UnorderedMapType options{};
   for(auto& item: data) {
         std::string key =  py::str(item.first);
-        py::object value = item.second;
+        py::object value = py::reinterpret_borrow<py::object>(item.second);
         if(py::isinstance<py::int_>(value)) options[key] = py::cast<int>(value);
         else if(py::isinstance<py::bool_>(value)) options[key] = py::cast<bool>(value);
-        else if(py::isinstance<py::str>(value)) options[key] = py::cast<bool>(value);
+        else if(py::isinstance<py::str>(value)) options[key] = py::cast<std::string>(value);
         else std::cout << "DATA TYPE NOT BOUND IN STD::VARIANT" << std::endl; 
     }
 
@@ -163,8 +163,8 @@ PYBIND11_MODULE(tritonfrontend_bindings, m) {
     // py::object CoreEnum = tritonserver.attr("TRITONSERVER_ServerOptions");
 
     m.def("create", &TritonFrontend::CreateWrapper, "Create HTTPAPIServer() Instance...");
-    m.def("parse_options", &register_options, "converting dataclass to unordered_map");
-    m.def("set_options", &TritonFrontend::register_options, "Setting options...");
+    m.def("parse_options", &parse_options, "converting dataclass to unordered_map");
+    // m.def("set_options", &TritonFrontend::register_options, "Setting options...");
     
 }
 

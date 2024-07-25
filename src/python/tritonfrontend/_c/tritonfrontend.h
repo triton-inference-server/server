@@ -24,11 +24,10 @@ private:
 public:
     TritonFrontend();
     void register_options(const UnorderedMapType data);
-    // void helper(std::unordered_map<std::string, VariantType> data);
-    bool CreateWrapper(uintptr_t server_ptr);
-    
-    
-
+    bool CreateWrapper(uintptr_t server_ptr, UnorderedMapType data);
+    int get_option_int(const std::string key);
+    bool get_option_bool(const std::string& key);
+    std::string get_option_string(const std::string& key);
 };
 
 }}}
