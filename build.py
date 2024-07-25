@@ -821,9 +821,6 @@ def tensorrtllm_cmake_args(images):
 
 def install_dcgm_libraries(dcgm_version, target_machine):
     log(f"dcgm_version is {dcgm_version}")
-    if dcgm_version == "":
-        dcgm_version = DEFAULT_TRITON_VERSION_MAP["dcgm_version"]
-        log("Setting dcgm_version to {}".format(DEFAULT_TRITON_VERSION_MAP["dcgm_version"]))
     
     if target_machine == "aarch64":
         return """
@@ -1396,9 +1393,7 @@ def create_build_dockerfiles(
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
-        "DCGM_VERSION": ""
-        if FLAGS.version is None or FLAGS.version not in DEFAULT_TRITON_VERSION_MAP
-        else DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
+        "DCGM_VERSION": DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
