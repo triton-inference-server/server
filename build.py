@@ -824,10 +824,9 @@ def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == "":
         dcgm_version = DEFAULT_TRITON_VERSION_MAP["dcgm_version"]
         log("Setting dcgm_version to {}".format(DEFAULT_TRITON_VERSION_MAP["dcgm_version"]))
-        return ""
-    else:
-        if target_machine == "aarch64":
-            return """
+    
+    if target_machine == "aarch64":
+        return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -839,8 +838,8 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 """.format(
                 dcgm_version, dcgm_version
             )
-        else:
-            return """
+    else:
+        return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
