@@ -2,7 +2,6 @@
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 #include <memory>
-#include<unistd.h>  
 
 namespace py = pybind11;
 
@@ -29,7 +28,6 @@ class PyWrapper {
   bool owned_{false};
 };
 
-struct TRITONSERVER_Server {};
 
 namespace triton { namespace server { namespace python {
 
@@ -124,49 +122,28 @@ ThrowIfError(TRITONSERVER_Error* err)
 
 
 
-bool CreateWrapper(uintptr_t server_ptr) {
-      
-      TRITONSERVER_Server* raw_ptr = reinterpret_cast<TRITONSERVER_Server*>(server_ptr);
-      const std::shared_ptr<TRITONSERVER_Server> test_server(raw_ptr);
-
-      std::unique_ptr<triton::server::HTTPServer> service;
-      std::cout << "This is the server_ptr" << server_ptr << std::endl;
-      std::cout << raw_ptr << "object is successfully created." << std::endl;
-      triton::server::RestrictedFeatures temp;
-
-      TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(test_server, nullptr, nullptr, 8000,
-      true, "0.0.0.0",
-      "",
-      1, temp,
-      &service);
-      std::cout << "Create is finished" << std::endl;
-
-      if (err == nullptr) {
-        err = service->Start();
-        std::cout << "Start is finished" << std::endl;
-      }
-
-      if (err != nullptr) {
-        // service->reset();
-        std::cout << "HTTP FRONTEND HAS BEEN RESET" << std::endl;
-      }
-
-      
-      // if(err == nullptr)
-        // return true;
-      sleep(60);
-
-      return false;
-
-}
-
 
 // void Func(/*args*/) {
 //   ThrowIfError(/*helper_func()*/)
 // }
 
+// Wrapping TritonFrontend to 
 
 
+UnorderedMapType register_options(py::dict& data) {
+  UnorderedMapType options{};
+  for(auto& item: data) {
+        std::string key =  py::str(item.first);
+        py::object value = item.second;
+        if(py::isinstance<py::int_>(value)) options[key] = py::cast<int>(value);
+        else if(py::isinstance<py::bool_>(value)) options[key] = py::cast<bool>(value);
+        else if(py::isinstance<py::str>(value)) options[key] = py::cast<bool>(value);
+        else std::cout << "DATA TYPE NOT BOUND IN STD::VARIANT" << std::endl; 
+    }
+
+    return options;
+
+}
     
 
 // [fixme] module name
@@ -185,7 +162,10 @@ PYBIND11_MODULE(tritonfrontend_bindings, m) {
     // py::module_ tritonserver = py::module_::import("tritonserver");
     // py::object CoreEnum = tritonserver.attr("TRITONSERVER_ServerOptions");
 
-    m.def("create", &CreateWrapper, "Create HTTPAPIServer() Instance...");
+    m.def("create", &TritonFrontend::CreateWrapper, "Create HTTPAPIServer() Instance...");
+    m.def("parse_options", &register_options, "converting dataclass to unordered_map");
+    m.def("set_options", &TritonFrontend::register_options, "Setting options...");
+    
 }
 
 }}}

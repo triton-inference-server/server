@@ -1,13 +1,34 @@
+
 #include "../../../http_server.h"
 #include "../../../server_interface.h"
 #include "../../../restricted_features.h"
-#include <memory>
+#include "triton/core/tritonserver.h"
+#include <memory> // For shared_ptr
+#include <unordered_map>
+#include <unistd.h> // For sleep 
 
-namespace triton { namespace server {
+struct TRITONSERVER_Server {};
 
-class Test{
-public:    
+namespace triton { namespace server { namespace python {
+
+using VariantType = std::variant<int, double, std::string>;
+using UnorderedMapType = std::unordered_map<std::string, VariantType>;
+
+class TritonFrontend{
+private:
+    std::shared_ptr<TRITONSERVER_Server> server;
+    std::unique_ptr<triton::server::HTTPServer> service;
+    triton::server::RestrictedFeatures restricted_features;
+    UnorderedMapType options;
+
+public:
+    TritonFrontend();
+    void register_options(const UnorderedMapType data);
+    // void helper(std::unordered_map<std::string, VariantType> data);
     bool CreateWrapper(uintptr_t server_ptr);
+    
+    
+
 };
 
-}}
+}}}

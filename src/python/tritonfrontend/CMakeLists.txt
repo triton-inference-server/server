@@ -28,7 +28,38 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(pybind11)
+
 # ================================= END =====================================
+
+
+add_library(
+  python-endpoint-wrapper
+    _c/tritonfrontend.h
+    _c/tritonfrontend.cc
+)
+
+target_link_libraries(
+  python-endpoint-wrapper
+  PUBLIC
+  shared-memory-manager 
+  http-endpoint-library 
+  triton-core-serverapi           # from repo-core
+  triton-core-serverstub          # from repo-core
+  triton-common-json              # from repo-common
+)
+
+set_target_properties(python-endpoint-wrapper PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(python-endpoint-wrapper PRIVATE ${pybind11_INCLUDE_DIRS})
+target_link_libraries(python-endpoint-wrapper PRIVATE ${pybind11_LIBRARIES})
+
+target_compile_features(python-endpoint-wrapper PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+
+target_compile_definitions(
+    python-endpoint-wrapper
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
 
 
 set(
@@ -59,6 +90,7 @@ target_link_libraries(
     CUDA::cudart
     # grpc-endpoint-library
     shared-memory-manager
+    python-endpoint-wrapper
 )
 
 

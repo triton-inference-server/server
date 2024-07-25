@@ -59,6 +59,7 @@ if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
 
+
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 # CUDA
@@ -797,7 +798,8 @@ add_library(
 
 target_link_libraries(
   shared-memory-manager 
-  PUBLIC 
+  PUBLIC
+  http-endpoint-library 
   CUDA::cudart
   triton-core-serverapi           # from repo-core
   triton-core-serverstub          # from repo-core

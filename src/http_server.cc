@@ -228,6 +228,9 @@ HTTPServer::Start()
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
 
+    const std::string addr = address_ + ":" + std::to_string(port_);
+    LOG_INFO << "Started HTTPService at " << addr;
+        
     return nullptr;
   }
 
@@ -4689,8 +4692,6 @@ HTTPAPIServer::Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_cnt, restricted_features));
 
-  const std::string addr = address + ":" + std::to_string(port);
-  LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
 }
