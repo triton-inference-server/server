@@ -161,7 +161,6 @@ class TestCpuMetrics(unittest.TestCase):
             for async_request in async_requests:
                 async_request.get_result()
 
-            print("ALL INFERENCES COMPLETE")
             # Set the event to indicate that inference is completed
             self.inference_completed.set()
 
@@ -171,12 +170,15 @@ class TestCpuMetrics(unittest.TestCase):
         self._validate_metric_variance(observed_metrics)
 
     def test_cpu_metrics_ranges(self):
+        # Test some simple sanity checks on the expected ranges of values
+        # for the CPU related metrics.
         utilization, used_memory, total_memory = get_metrics()
         self.assertGreaterEqual(utilization, 0)
         self.assertLessEqual(utilization, 1.0)
         self.assertGreater(used_memory, 0)
         self.assertLessEqual(used_memory, total_memory)
-        # NOTE: Can be improved in future to compare against psutil system memory
+        # NOTE: Can be improved in future to compare upper bound against psutil
+        # system memory if we introduce the dependency into the test/container.
         self.assertGreater(total_memory, 0)
 
 
