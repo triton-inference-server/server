@@ -104,7 +104,7 @@ Count*. The count metrics are illustrated by the following examples:
 
 | Failed Request Reason |Description |
 |------------|------------|
-| REJECTED  | Number of inference failures due to request timeout in the schedular. |
+| REJECTED  | Number of inference failures due to request timeout in the scheduler. |
 | CANCELED  |  Number of inference failures due to request cancellation in the core. |
 | BACKEND |  Number of inference failures during execution of requests in the backend/model. |
 | OTHER  | Number of inference failures due to other uncategorized reasons in the core. |

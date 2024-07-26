@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
 ```
 docker run --gpus all -it --network host \
     --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
-    -v ~:/scripts nvcr.io/nvidia/tensorrt:24.06-py3
+    -v ~:/scripts nvcr.io/nvidia/tensorrt:24.07-py3
 
 pip install onnx six torch tf2onnx tensorflow
 
@@ -57,7 +57,7 @@ mkdir -p engines
 
 python3 builder.py -m models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/model.ckpt -o engines/bert_large_int8_bs1_s128.engine -b 1 -s 128 -c models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/ -v models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/vocab.txt --int8 --fp16 --strict --calib-num 1 -iln -imh
 
-gsutil cp bert_large_int8_bs1_s128.engine gs://triton_sample_models/24.06/bert/1/model.plan
+gsutil cp bert_large_int8_bs1_s128.engine gs://triton_sample_models/24.07/bert/1/model.plan
 ```
 
-For each Triton upgrade, container version used to generate the model, and the model path in GCS `gs://triton_sample_models/24.06/` should be updated accordingly with the correct version.
+For each Triton upgrade, container version used to generate the model, and the model path in GCS `gs://triton_sample_models/24.07/` should be updated accordingly with the correct version.
