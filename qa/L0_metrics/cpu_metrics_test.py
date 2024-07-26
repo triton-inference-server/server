@@ -147,9 +147,10 @@ class TestCpuMetrics(unittest.TestCase):
             metrics_thread.start()
 
             # Fire off many asynchronous inference requests to keep server
-            # busy while monitoring the CPU metrics.
+            # busy while monitoring the CPU metrics. Ideal target is about
+            # 20-30 seconds of inference to get a good number of metric samples.
             async_requests = []
-            for _ in range(1000):
+            for _ in range(2000):
                 async_requests.append(
                     client.async_infer(
                         model_name=self.model_name,
