@@ -41,7 +41,7 @@ CPU_TOTAL_MEMORY = "nv_cpu_memory_total_bytes"
 
 
 def get_metrics():
-    utilization_pattern = re.compile(rf"{CPU_UTILIZATION} (\d+\.?\d+)")
+    utilization_pattern = re.compile(rf"{CPU_UTILIZATION} (\d+\.?\d*)")
     used_bytes_pattern = re.compile(rf"{CPU_USED_MEMORY} (\d+)")
     total_bytes_pattern = re.compile(rf"{CPU_TOTAL_MEMORY} (\d+)")
 
