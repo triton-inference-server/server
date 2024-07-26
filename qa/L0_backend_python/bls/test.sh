@@ -145,9 +145,9 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
                 fi
             fi
 
-            if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
+            if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 256 ]]; then
                 if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
-                    echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
+                    echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 256 MB for 'bls' $BLS_KIND test\n***"
                     cat $SERVER_LOG
                     RET=1
                 fi
