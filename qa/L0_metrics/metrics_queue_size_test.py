@@ -40,6 +40,8 @@ import test_util as tu
 import tritonclient.http
 from tritonclient.utils import triton_to_np_dtype
 
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 QUEUE_METRIC_TEMPLATE = (
     'nv_inference_pending_request_count{{model="{model_name}",version="1"}}'
 )
@@ -50,8 +52,8 @@ EXEC_METRIC_TEMPLATE = 'nv_inference_exec_count{{model="{model_name}",version="1
 class MetricsPendingRequestCountTest(tu.TestResultCollector):
     def setUp(self):
         self.metrics = None
-        self.metrics_url = "http://localhost:8002/metrics"
-        self.server_url = "localhost:8000"
+        self.metrics_url = f"http://{_tritonserver_ipaddr}:8002/metrics"
+        self.server_url = f"{_tritonserver_ipaddr}:8000"
 
         # Used to verify model config is set to expected values
         self.max_batch_size = 4

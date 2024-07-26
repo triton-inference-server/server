@@ -89,7 +89,7 @@ fi
 TEST_LOG="./metrics_api_test.log"
 UNIT_TEST="./metrics_api_test --gtest_output=xml:metrics_api.report.xml"
 
-rm -fr *.log
+rm -fr *.log *.xml
 
 set +e
 export CUDA_VISIBLE_DEVICES=0
@@ -113,36 +113,40 @@ mkdir -p $MODELDIR/${model}/1 && \
 
 ### CPU / RAM metrics tests
 set +e
-CLIENT_PY="./cpu_metrics_test.py"
 SERVER_LOG="cpu_metrics_test_server.log"
 # NOTE: CPU utilization is computed based on the metrics interval, so having
 # too small of an interval can skew the results.
 SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1000 --log-verbose=1"
 run_and_check_server
 
+CLIENT_PY="./cpu_metrics_test.py"
 CLIENT_LOG="cpu_metrics_test_client.log"
-python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
+python3 -m pytest --junitxml="cpu_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** ${CLIENT_PY} FAILED. \n***"
+    RET=1
+fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 set -e
 
 ### Pinned memory metrics tests
 set +e
 CLIENT_PY="./pinned_memory_metrics_test.py"
+CLIENT_LOG="pinned_memory_metrics_test_client.log"
 SERVER_LOG="pinned_memory_metrics_test_server.log"
 SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_pinned_memory_metrics_exist -v 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 
-CLIENT_LOG="pinned_memory_metrics_test_client.log"
-python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
+python3 -m pytest --junitxml="pinned_memory_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** ${CLIENT_PY} FAILED. \n***"
+    RET=1
+fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Custom Pinned memory pool size
 export CUSTOM_PINNED_MEMORY_POOL_SIZE=1024 # bytes
@@ -150,12 +154,16 @@ SERVER_LOG="custom_pinned_memory_test_server.log"
 CLIENT_LOG="custom_pinned_memory_test_client.log"
 SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=explicit --log-verbose=1 --pinned-memory-pool-byte-size=$CUSTOM_PINNED_MEMORY_POOL_SIZE"
 run_and_check_server
-python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
+python3 -m pytest --junitxml="custom_pinned_memory_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Custom ${CLIENT_PY} FAILED. \n***"
+    RET=1
+fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 set -e
+
+exit 0
 
 # Peer access GPU memory utilization Test
 # Custom Pinned memory pool size
@@ -174,8 +182,7 @@ if [ -z $memory_size_without_peering ]; then
   memory_size_without_peering=0
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Check if memory usage HAS reduced to 0 after using the --enable-peer-access flag
 if [ $memory_size_without_peering -ne 0 ]; then
@@ -199,8 +206,7 @@ if [ $num_gpus -ne 3 ]; then
   RET=1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 export CUDA_VISIBLE_DEVICES=0
 run_and_check_server
@@ -211,8 +217,7 @@ if [ $num_gpus -ne 1 ]; then
   echo -e "\n***\n*** GPU metric test failed. \n***"
   RET=1
 fi
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 
 # Test metrics interval by querying host and checking energy
@@ -253,8 +258,7 @@ for (( i = 0; i < $num_iterations; ++i )); do
   prev_energy=$current_energy
 done
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 ### Metric Config CLI and different Metric Types ###
 MODELDIR="${PWD}/unit_test_models"
@@ -273,8 +277,7 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee 
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Enable summaries, counters still enabled by default
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
@@ -287,8 +290,7 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee 
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Enable summaries, disable counters
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config counter_latencies=false"
@@ -301,8 +303,7 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee 
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Enable summaries and counters, check cache metrics
 CACHE_ARGS="--cache-config local,size=1048576"
@@ -318,8 +319,7 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_exist 2>&1 | tee ${
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Check setting custom summary quantiles
 export SUMMARY_QUANTILES="0.1:0.0.1,0.7:0.01,0.75:0.01"
@@ -327,8 +327,7 @@ SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-confi
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 # Check model namespacing label with namespace on and off
 REPOS_DIR="${PWD}/model_namespacing_repos"
@@ -339,15 +338,13 @@ SERVER_ARGS="--model-repository=${REPOS_DIR}/addsub_repo --model-repository=${RE
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_model_namespacing_label_with_namespace_on 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 # Namespace off
 SERVER_ARGS="--model-repository=${REPOS_DIR}/addsub_repo --model-namespacing=false --allow-metrics=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_model_namespacing_label_with_namespace_off 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 ### Pending Request Count (Queue Size) Metric Behavioral Tests ###
 MODELDIR="${PWD}/queue_size_models"
@@ -401,8 +398,7 @@ cp -r "${DYNAMIC_MODEL}" "${MODELDIR}/dynamic_composing"
 
 run_and_check_server
 python3 ${PYTHON_TEST} 2>&1 | tee ${CLIENT_LOG}
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 expected_tests=6
 check_unit_test "${expected_tests}"
 

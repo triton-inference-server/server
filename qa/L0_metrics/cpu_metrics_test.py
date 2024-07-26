@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import re
 import threading
 import time
@@ -35,6 +36,7 @@ import numpy as np
 import requests
 import tritonclient.http as httpclient
 
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 CPU_UTILIZATION = "nv_cpu_utilization"
 CPU_USED_MEMORY = "nv_cpu_memory_used_bytes"
 CPU_TOTAL_MEMORY = "nv_cpu_memory_total_bytes"
@@ -45,7 +47,7 @@ def get_metrics():
     used_bytes_pattern = re.compile(rf"{CPU_USED_MEMORY} (\d+)")
     total_bytes_pattern = re.compile(rf"{CPU_TOTAL_MEMORY} (\d+)")
 
-    r = requests.get("http://localhost:8002/metrics")
+    r = requests.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
     r.raise_for_status()
 
     utilization_match = utilization_pattern.search(r.text)
@@ -136,7 +138,7 @@ class TestCpuMetrics(unittest.TestCase):
 
     def test_cpu_metrics_during_inference(self):
         with httpclient.InferenceServerClient(
-            url="localhost:8000", concurrency=10
+            url=f"{_tritonserver_ipaddr}:8000", concurrency=10
         ) as client:
             # Start a thread to collect metrics asynchronously while inferences are
             # executing, store them in a dictionary for postprocessing validation.
