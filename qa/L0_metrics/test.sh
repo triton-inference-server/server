@@ -111,6 +111,21 @@ mkdir -p $MODELDIR/${model}/1 && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
+### CPU  / RAM metrics tests
+set +e
+CLIENT_PY="./cpu_memory_metrics_test.py"
+SERVER_LOG="cpu_memory_metrics_test_server.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --log-verbose=1"
+run_and_check_server
+
+CLIENT_LOG="cpu_memory_metrics_test_client.log"
+python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+
+kill $SERVER_PID
+wait $SERVER_PID
+set -e
+
 ### Pinned memory metrics tests
 set +e
 CLIENT_PY="./pinned_memory_metrics_test.py"
@@ -235,48 +250,6 @@ for (( i = 0; i < $num_iterations; ++i )); do
   fi
   prev_energy=$current_energy
 done
-
-### CPU / RAM Metrics
-
-# The underlying values for these metrics do not always update frequently,
-# so give ample WAIT time to make sure they change and are being updated.
-CPU_METRICS="nv_cpu_utilization nv_cpu_memory_used_bytes"
-WAIT_INTERVAL_SECS=2.0
-for metric in ${CPU_METRICS}; do
-    echo -e "\n=== Checking Metric: ${metric} ===\n"
-    prev_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
-
-    num_not_updated=0
-    num_not_updated_threshold=3
-    for (( i = 0; i < $num_iterations; ++i )); do
-      sleep $WAIT_INTERVAL_SECS
-      current_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
-      if [ $current_value == $prev_value ]; then
-        num_not_updated=$((num_not_updated+1))
-      fi
-      prev_value=$current_value
-    done
-
-    # Give CPU metrics some tolerance to not update, up to a threshold
-    # DLIS-4304: An alternative may be to run some busy work on CPU in the
-    #            background rather than allowing a tolerance threshold
-    if [[ ${num_not_updated} -gt ${num_not_updated_threshold} ]]; then
-        cat $SERVER_LOG
-        echo "Metrics were not updated ${num_not_updated}/${num_iterations} times for interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
-        echo -e "\n***\n*** Metric Interval test failed. \n***"
-        RET=1
-        break
-    fi
-done
-
-# Verify reported total memory is non-zero
-total_memory=`curl -s localhost:8002/metrics | grep "nv_cpu_memory_total_bytes" | grep -v "HELP\|TYPE" | awk '{print $2}'`
-test -z "${total_memory}" && total_memory=0
-if [ ${total_memory} -eq 0 ]; then
-  echo "Found nv_cpu_memory_total_bytes had a value of zero, this should not happen."
-  echo -e "\n***\n*** CPU total memory test failed. \n***"
-  RET=1
-fi
 
 kill $SERVER_PID
 wait $SERVER_PID
