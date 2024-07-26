@@ -115,7 +115,9 @@ mkdir -p $MODELDIR/${model}/1 && \
 set +e
 CLIENT_PY="./cpu_metrics_test.py"
 SERVER_LOG="cpu_metrics_test_server.log"
-SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --log-verbose=1"
+# NOTE: CPU utilization is computed based on the metrics interval, so having
+# too small of an interval can skew the results.
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1000 --log-verbose=1"
 run_and_check_server
 
 CLIENT_LOG="cpu_metrics_test_client.log"
