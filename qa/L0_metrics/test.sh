@@ -111,14 +111,14 @@ mkdir -p $MODELDIR/${model}/1 && \
   sed -i "s/label_filename:.*//" config.pbtxt && \
   echo "instance_group [{ kind: KIND_GPU }]" >> config.pbtxt)
 
-### CPU  / RAM metrics tests
+### CPU / RAM metrics tests
 set +e
-CLIENT_PY="./cpu_memory_metrics_test.py"
-SERVER_LOG="cpu_memory_metrics_test_server.log"
+CLIENT_PY="./cpu_metrics_test.py"
+SERVER_LOG="cpu_metrics_test_server.log"
 SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --log-verbose=1"
 run_and_check_server
 
-CLIENT_LOG="cpu_memory_metrics_test_client.log"
+CLIENT_LOG="cpu_metrics_test_client.log"
 python3 ${CLIENT_PY} -v 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 
