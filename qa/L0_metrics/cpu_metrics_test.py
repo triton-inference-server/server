@@ -176,10 +176,8 @@ class TestCpuMetrics(unittest.TestCase):
         # Test some simple sanity checks on the expected ranges of values
         # for the CPU related metrics.
         utilization, used_memory, total_memory = get_metrics()
-        self.assertGreaterEqual(utilization, 0)
-        self.assertLessEqual(utilization, 1.0)
-        self.assertGreater(used_memory, 0)
-        self.assertLessEqual(used_memory, total_memory)
+        self.assertTrue(0 <= utilization <= 1.0)
+        self.assertTrue(0 <= used_memory <= total_memory)
         # NOTE: Can be improved in future to compare upper bound against psutil
         # system memory if we introduce the dependency into the test/container.
         self.assertGreater(total_memory, 0)
