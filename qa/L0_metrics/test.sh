@@ -123,6 +123,8 @@ CLIENT_PY="./cpu_metrics_test.py"
 CLIENT_LOG="cpu_metrics_test_client.log"
 python3 -m pytest --junitxml="cpu_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
+    cat ${SERVER_LOG}
+    cat ${CLIENT_LOG}
     echo -e "\n***\n*** ${CLIENT_PY} FAILED. \n***"
     RET=1
 fi
@@ -142,6 +144,8 @@ check_unit_test
 
 python3 -m pytest --junitxml="pinned_memory_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
+    cat ${SERVER_LOG}
+    cat ${CLIENT_LOG}
     echo -e "\n***\n*** ${CLIENT_PY} FAILED. \n***"
     RET=1
 fi
@@ -156,14 +160,14 @@ SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=1 --model-control-mode=expl
 run_and_check_server
 python3 -m pytest --junitxml="custom_pinned_memory_metrics.report.xml" ${CLIENT_PY} >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
+    cat ${SERVER_LOG}
+    cat ${CLIENT_LOG}
     echo -e "\n***\n*** Custom ${CLIENT_PY} FAILED. \n***"
     RET=1
 fi
 
 kill_server
 set -e
-
-exit 0
 
 # Peer access GPU memory utilization Test
 # Custom Pinned memory pool size
