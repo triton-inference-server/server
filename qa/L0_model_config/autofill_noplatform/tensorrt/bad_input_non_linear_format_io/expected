@@ -1,0 +1,1 @@
+'INPUT0' uses a linear IO format, but 'is_non_linear_format_io' is incorrectly set to true in the model configuration.
