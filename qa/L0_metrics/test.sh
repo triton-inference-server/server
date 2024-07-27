@@ -199,7 +199,7 @@ SERVER_LOG="./inference_server.log"
 CLIENT_LOG="client.log"
 run_and_check_server
 
-num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
+num_gpus=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 3 ]; then
   echo "Found $num_gpus GPU(s) instead of 3 GPUs being monitored."
   echo -e "\n***\n*** GPU metric test failed. \n***"
@@ -211,7 +211,7 @@ kill_server
 export CUDA_VISIBLE_DEVICES=0
 run_and_check_server
 
-num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
+num_gpus=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 1 ]; then
   echo "Found $num_gpus GPU(s) instead of 1 GPU being monitored."
   echo -e "\n***\n*** GPU metric test failed. \n***"
@@ -233,10 +233,10 @@ num_iterations=10
 
 # Add "warm up" iteration because in some cases the GPU metrics collection
 # doesn't start immediately
-prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+prev_energy=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
 for (( i = 0; i < $num_iterations; ++i )); do
   sleep $WAIT_INTERVAL_SECS
-  current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+  current_energy=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
   if [ $current_energy != $prev_energy ]; then
     echo -e "\n***\n*** Detected changing metrics, warmup completed.\n***"
     break
@@ -244,10 +244,10 @@ for (( i = 0; i < $num_iterations; ++i )); do
   prev_energy=$current_energy
 done
 
-prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+prev_energy=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
 for (( i = 0; i < $num_iterations; ++i )); do
   sleep $WAIT_INTERVAL_SECS
-  current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+  current_energy=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
   if [ $current_energy == $prev_energy ]; then
     cat $SERVER_LOG
     echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds"
