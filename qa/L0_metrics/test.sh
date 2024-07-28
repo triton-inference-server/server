@@ -198,14 +198,14 @@ fi
 
 ### GPU Metrics
 set +e
-export CUDA_VISIBLE_DEVICES=0,1,2
+export CUDA_VISIBLE_DEVICES=0,1
 SERVER_LOG="./inference_server.log"
 CLIENT_LOG="client.log"
 run_and_check_server
 
 num_gpus=`curl -s ${TRITONSERVER_IPADDR}:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
-if [ $num_gpus -ne 3 ]; then
-  echo "Found $num_gpus GPU(s) instead of 3 GPUs being monitored."
+if [ $num_gpus -ne 2 ]; then
+  echo "Found $num_gpus GPU(s) instead of 2 GPUs being monitored."
   echo -e "\n***\n*** GPU metric test failed. \n***"
   RET=1
 fi
