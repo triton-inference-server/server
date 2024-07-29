@@ -2,26 +2,40 @@ from typing import Union
 from dataclasses import asdict
 from tritonfrontend._api._options import KServeHttpOptions, KServeGrpcOptions
 from tritonfrontend._api._options import MetricsOptions, SageMakerOptions, VertexAIOptions
-from tritonfrontend._c.tritonfrontend_bindings import create
-from tritonfrontend._c.tritonfrontend_bindings import parse_options
-from tritonfrontend._c.tritonfrontend_bindings import set_options
+from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendCWrapper
 import tritonserver
+
+
 optionsGroup = Union[KServeHttpOptions, KServeGrpcOptions, MetricsOptions, SageMakerOptions, VertexAIOptions]
 
-class Server:
+class Frontend:
     # def __init__(self, triton_core: Union[TritonCore, int], options: KServeHttpOptions):
-    def __init():
-        pass
-    def __del__():
+    def __init__(self, server: tritonserver, options: dict):
+        server_ptr = server.get_c_ptr()
+        options_dict: dict[str, Union[int, bool, str]] = asdict(options)
+
+        # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>> 
+        print(f"Options: {options_dict}, Type: {type(options_dict)}")
+        self.triton_c_object = TritonFrontendCWrapper(server, options)
+        self.triton_c_object.CreateWrapper(server_ptr, options_dict)
+
+    def __del__(self):
+        print("Need to delete pointers and assign them to nullptr?")
         pass
         # Need to bind a function which is
-    def createServer(server: tritonserver, options: dict):
+    
+    def start():
+        triton_c_object.start()
+    
+    def stop()
+        triton_c_object.stop()
+
+    def createFrontend(self):
+        pass
         
-        # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
-        options_dict = asdict(optionsGroup)
-        c_options = parse_options(options_dict)
         
-        server_ptr = server.get_c_ptr()
-        create(server_ptr, c_options)
+        
+        
+
 
     

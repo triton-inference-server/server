@@ -150,22 +150,21 @@ UnorderedMapType parse_options(py::dict& data) {
 PYBIND11_MODULE(tritonfrontend_bindings, m) {
     m.doc() = "Python bindings for Triton Inference Server Frontend Endpoints";
     
-    auto tfe = pybind11::register_exception<TritonError>(m, "TritonError");
-    pybind11::register_exception<UnknownError>(m, "UnknownError", tfe.ptr());
-    pybind11::register_exception<InternalError>(m, "InternalError", tfe.ptr());
-    pybind11::register_exception<NotFoundError>(m, "NotFoundError", tfe.ptr());
-    pybind11::register_exception<InvalidArgumentError>(m, "InvalidArgumentError", tfe.ptr());
-    pybind11::register_exception<UnavailableError>(m, "UnavailableError", tfe.ptr());
-    pybind11::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
-    pybind11::register_exception<AlreadyExistsError>(m, "AlreadyExistsError", tfe.ptr());
-
-    // py::module_ tritonserver = py::module_::import("tritonserver");
-    // py::object CoreEnum = tritonserver.attr("TRITONSERVER_ServerOptions");
-
-    m.def("create", &TritonFrontend::CreateWrapper, "Create HTTPAPIServer() Instance...");
-    m.def("parse_options", &parse_options, "converting dataclass to unordered_map");
-    // m.def("set_options", &TritonFrontend::register_options, "Setting options...");
+    auto tfe = py::register_exception<TritonError>(m, "TritonError");
+    py::register_exception<UnknownError>(m, "UnknownError", tfe.ptr());
+    py::register_exception<InternalError>(m, "InternalError", tfe.ptr());
+    py::register_exception<NotFoundError>(m, "NotFoundError", tfe.ptr());
+    py::register_exception<InvalidArgumentError>(m, "InvalidArgumentError", tfe.ptr());
+    py::register_exception<UnavailableError>(m, "UnavailableError", tfe.ptr());
+    py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
+    py::register_exception<AlreadyExistsError>(m, "AlreadyExistsError", tfe.ptr());
     
+    py::class_<triton::server::python::TritonFrontend>(m, "TritonFrontendCWrapper")
+        // .def(py::init<>())
+        .def(py::init<uintptr_t, UnorderedMapType>())
+        // .def("CreateWrapper", &triton::server::python::TritonFrontend::CreateWrapper)
+        .def("start", &triton::server::python::TritonFrontend::StartService)
+        .def("stop", &triton::server::python::TritonFrontend::StopService);
 }
 
 }}}

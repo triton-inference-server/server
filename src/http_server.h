@@ -36,6 +36,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <variant>
 
 #include "common.h"
 #include "data_compressor.h"
@@ -45,6 +46,7 @@
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #include "server_interface.h"
+
 
 namespace triton { namespace server {
 
@@ -196,6 +198,15 @@ class HTTPAPIServer : public HTTPServer {
       const std::string& header_forward_pattern, const int thread_cnt,
       const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* http_server);
+
+
+  template <typename T>
+  T get_value(const UnorderedMapType& options, const std::string& key);
+
+  static bool Create_Wrapper(
+      uintptr_t server_mem_addr, 
+      UnorderedMapType data, 
+      std::unique_ptr<HTTPServer>* service);
 
   virtual ~HTTPAPIServer();
 

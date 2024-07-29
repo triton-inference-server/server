@@ -23,6 +23,7 @@ class KServeHttpOptions(Validation):
     thread_count: int = 8
     header_forward_pattern: str = ""
     # restricted_protocols: list
+    a: str = ""
 
 
 # triton::server::grpc::Options

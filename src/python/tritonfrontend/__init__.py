@@ -8,9 +8,6 @@ from tritonfrontend._api._options import MetricsOptions
 from tritonfrontend._api._options import SageMakerOptions
 from tritonfrontend._api._options import VertexAIOptions
 
-from tritonfrontend._api._server import Server 
+from tritonfrontend._api._server import Frontend 
 
-from tritonfrontend._c.tritonfrontend_bindings import create
-from tritonfrontend._c.tritonfrontend_bindings import parse_options
-from tritonfrontend._c.tritonfrontend_bindings import set_options
-
+from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendCWrapper
