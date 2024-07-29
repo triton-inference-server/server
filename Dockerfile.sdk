@@ -32,8 +32,10 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.07-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
+ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
@@ -103,8 +105,10 @@ RUN rm -f /usr/bin/python && \
 # Build the client library and examples
 ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CLIENT_REPO_SUBDIR
+ARG TRITON_PA_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
+ARG TRITON_CLIENT_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
@@ -114,26 +118,53 @@ ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
+COPY ${TRITON_PA_REPO_SUBDIR} perf_analyzer
 
-WORKDIR /workspace/build
+WORKDIR /workspace/client_build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
+          -DTRITON_ENABLE_PERF_ANALYZER=OFF \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
-          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_ENABLE_PYTHON_HTTP=OFF -DTRITON_ENABLE_PYTHON_GRPC=OFF \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
-          -DTRITON_ENABLE_PERF_ANALYZER=ON \
+          -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
+          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
+RUN make -j16 cc-clients java-clients && \
+    rm -fr ~/.m2
+
+# TODO: PA will rebuild the CC clients since it depends on it.
+# This should be optimized so that we do not have to build
+# the CC clients twice. Similarly, because the SDK expectation is
+# that PA is packaged with the python client, we hold off on building
+# the python client until now. Post-migration we should focus
+# effort on de-tangling these flows.
+WORKDIR /workspace/pa_build
+RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
+          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+          -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
-          -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
-          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients python-clients java-clients && \
-    rm -fr ~/.m2
+          -DTRITON_ENABLE_CC_HTTP=ON \
+          -DTRITON_ENABLE_CC_GRPC=ON \
+          -DTRITON_ENABLE_PYTHON_HTTP=ON \
+          -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_PACKAGE_PERF_ANALYZER=ON \
+          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
+          /workspace/perf_analyzer
+RUN make -j16 perf-analyzer python-clients
+
+RUN pip3 install build \
+    && cd /workspace/perf_analyzer/genai-perf \
+    && python3 -m build --wheel --outdir /workspace/install/python
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
@@ -144,9 +175,6 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-RUN pip3 install build \
-    && cd /workspace/client/src/c++/perf_analyzer/genai-perf \
-    && python3 -m build --wheel --outdir /workspace/install/python
 ############################################################################
 ## Create sdk container
 ############################################################################
