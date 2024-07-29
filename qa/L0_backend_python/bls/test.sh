@@ -347,10 +347,10 @@ set -e
 
 kill_server
 
-if [ $RET -eq 1 ]; then
-    echo -e "\n***\n*** BLS test FAILED. \n***"
-else
+if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** BLS test PASSED. \n***"
+else
+    echo -e "\n***\n*** BLS test FAILED. \n***"
 fi
 
 exit $RET
