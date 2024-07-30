@@ -691,17 +691,21 @@ class InferHandlerState {
     {
       // Check if streaming error detected AND grpc_mode is strict
       if (state->context_->grpc_strict_) {
-        if (state->IsStreamError()) {
-          ::grpc::Status dummy_status = ::grpc::Status(
-              ::grpc::StatusCode::UNAVAILABLE, std::string("Dummy Status"));
-          //      state->context_->responder_->Finish(state->status_, state);
-          state->context_->step_ = Steps::COMPLETE;
-          state->step_ = Steps::PARTIAL_COMPLETION;
+        {
+          std::lock_guard<std::recursive_mutex> lock(grpc_strict_mu_);
+          if (!state->context_->IsStreamError()) {
+            ::grpc::Status dummy_status = ::grpc::Status(
+                ::grpc::StatusCode::UNAVAILABLE, std::string("Dummy Status"));
+            //      state->context_->responder_->Finish(state->status_, state);
+            state->context_->step_ = Steps::COMPLETE;
+            state->step_ = Steps::PARTIAL_COMPLETION;
 
-          state->context_->responder_->Finish(dummy_status, state);
-          LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
-                         << state->status_.error_code() << std::endl;
-          IssueRequestCancellation();
+            state->context_->responder_->Finish(dummy_status, state);
+            LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
+                            << state->status_.error_code() << std::endl;
+            state->context_->MarkIsStreamError();
+            IssueRequestCancellation(false);
+          }
         }
       } else {
         LOG_VERBOSE(1) << "GRPC mode NOT strict in Finish" << std::endl;
@@ -784,7 +788,7 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    void IssueRequestCancellation()
+    void IssueRequestCancellation(bool grpc_strict)
     {
       {
         std::lock_guard<std::recursive_mutex> lock(mu_);
@@ -817,7 +821,9 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            PutTaskBackToQueue(state);
+            if(!grpc_strict) {
+              PutTaskBackToQueue(state);
+            }
           }
         }
       }
@@ -851,7 +857,7 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation();
+          IssueRequestCancellation(false);
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
 
@@ -979,6 +985,11 @@ class InferHandlerState {
       return false;
     }
 
+    void MarkIsStreamError() { 
+      grpc_stream_error_state_ = true; }
+    bool IsStreamError() { 
+      return grpc_stream_error_state_; }
+
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
     {
@@ -1006,6 +1017,7 @@ class InferHandlerState {
     // orders. A state enters this queue when it has successfully read
     // a request and exits the queue when it is written.
     std::recursive_mutex mu_;
+    std::recursive_mutex grpc_strict_mu_;
     std::queue<InferHandlerStateType*> states_;
     std::atomic<uint32_t> ongoing_requests_;
 
@@ -1037,6 +1049,8 @@ class InferHandlerState {
 
     // True if there is an ongoing write to the grpc stream
     std::atomic<bool> grpc_strict_;
+
+    bool grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object
@@ -1044,11 +1058,8 @@ class InferHandlerState {
   // object is used to distinguish a tag from AsyncNotifyWhenDone()
   // signal.
   explicit InferHandlerState(Steps start_step, InferHandlerState* state)
-      : step_(start_step), state_ptr_(state), async_notify_state_(false),
-        grpc_stream_error_state_(false)
+      : step_(start_step), state_ptr_(state), async_notify_state_(false)
   {
-    LOG_VERBOSE(1)
-        << "grpc_stream_error_state_ init called in InferHandlerState \n";
     state->MarkAsAsyncNotifyState();
   }
 
@@ -1104,7 +1115,6 @@ class InferHandlerState {
     // wrapper state object in WAITING_NOTIFICATION step.
     state_ptr_ = nullptr;
     async_notify_state_ = false;
-    grpc_stream_error_state_ = false;
   }
 
   void Release()
@@ -1134,8 +1144,6 @@ class InferHandlerState {
 
   void MarkAsAsyncNotifyState() { async_notify_state_ = true; }
   bool IsAsyncNotifyState() { return async_notify_state_; }
-  void MarkIsStreamError() { grpc_stream_error_state_ = true; }
-  bool IsStreamError() { return grpc_stream_error_state_; }
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
 
@@ -1146,7 +1154,7 @@ class InferHandlerState {
   std::shared_ptr<Context> context_;
   Steps step_;
   std::recursive_mutex step_mtx_;
-  std::recursive_mutex grpc_strict_mtx_;
+  // std::recursive_mutex grpc_strict_mtx_;
 
   // Shared pointer to the inference request object. The lifetime of
   // inference request object is extended till all the responses from
@@ -1188,7 +1196,6 @@ class InferHandlerState {
   // Tracks whether this state object has been wrapped and send to
   // AsyncNotifyWhenDone() function as a tag.
   bool async_notify_state_;
-  bool grpc_stream_error_state_;
 };
 
 
