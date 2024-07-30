@@ -42,8 +42,9 @@ from tritonclient.utils import *
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
-# The exit code 123 is used to indicate that the shm leak probe detected a 480 bytes leak.
-# Any leak other than 480 bytes will cause the test to fail with the default exit code 1.
+# The exit code 123 is used to indicate that the shm leak probe detected a 480
+# bytes leak in the bls sub-test. Any leak other than 480 bytes will cause the
+# test to fail with the default exit code 1.
 ALLOWED_FAILURE_EXIT_CODE = 123
 
 
