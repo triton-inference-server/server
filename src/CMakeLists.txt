@@ -800,6 +800,7 @@ target_link_libraries(
   shared-memory-manager 
   PUBLIC
   http-endpoint-library 
+  grpc-endpoint-library
   CUDA::cudart
   triton-core-serverapi           # from repo-core
   triton-core-serverstub          # from repo-core

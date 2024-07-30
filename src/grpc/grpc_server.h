@@ -100,6 +100,13 @@ class Server : public Server_Interface {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options, std::unique_ptr<Server>* server);
+  
+  static bool Create_Wrapper(
+      std::shared_ptr<TRITONSERVER_Server>& server, 
+      UnorderedMapType& data, 
+      std::unique_ptr<triton::server::grpc::Server>* service,
+      const RestrictedFeatures& restricted_features); 
+
 
   ~Server();
 

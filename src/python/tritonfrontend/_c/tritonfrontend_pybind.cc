@@ -130,20 +130,7 @@ ThrowIfError(TRITONSERVER_Error* err)
 // Wrapping TritonFrontend to 
 
 
-UnorderedMapType parse_options(py::dict& data) {
-  UnorderedMapType options{};
-  for(auto& item: data) {
-        std::string key =  py::str(item.first);
-        py::object value = py::reinterpret_borrow<py::object>(item.second);
-        if(py::isinstance<py::int_>(value)) options[key] = py::cast<int>(value);
-        else if(py::isinstance<py::bool_>(value)) options[key] = py::cast<bool>(value);
-        else if(py::isinstance<py::str>(value)) options[key] = py::cast<std::string>(value);
-        else std::cout << "DATA TYPE NOT BOUND IN STD::VARIANT" << std::endl; 
-    }
 
-    return options;
-
-}
     
 
 // [fixme] module name
@@ -159,7 +146,7 @@ PYBIND11_MODULE(tritonfrontend_bindings, m) {
     py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
     py::register_exception<AlreadyExistsError>(m, "AlreadyExistsError", tfe.ptr());
     
-    py::class_<triton::server::python::TritonFrontend>(m, "TritonFrontendCWrapper")
+    py::class_<triton::server::python::TritonFrontend>(m, "TritonFrontend")
         // .def(py::init<>())
         .def(py::init<uintptr_t, UnorderedMapType>())
         // .def("CreateWrapper", &triton::server::python::TritonFrontend::CreateWrapper)

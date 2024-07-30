@@ -79,7 +79,7 @@ class MappingSchema {
 };
 
 // Generic HTTP server using evhtp
-class HTTPServer {
+class HTTPServer : public Server_Interface {
  public:
   virtual ~HTTPServer() { IGNORE_ERR(Stop()); }
 
@@ -200,13 +200,11 @@ class HTTPAPIServer : public HTTPServer {
       std::unique_ptr<HTTPServer>* http_server);
 
 
-  template <typename T>
-  T get_value(const UnorderedMapType& options, const std::string& key);
-
-  static bool Create_Wrapper(
-      uintptr_t server_mem_addr, 
-      UnorderedMapType data, 
-      std::unique_ptr<HTTPServer>* service);
+static bool Create_Wrapper(
+      std::shared_ptr<TRITONSERVER_Server>& server, 
+      UnorderedMapType& data, 
+      std::unique_ptr<HTTPServer>* service,
+      const RestrictedFeatures& restricted_features); 
 
   virtual ~HTTPAPIServer();
 

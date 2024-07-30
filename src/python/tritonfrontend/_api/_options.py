@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
+from enum import Enum
 
 class Validation:
     def validate_type(self, value: Any, expected_type: Any, param_name: str):
@@ -10,7 +11,7 @@ class Validation:
     def validate_range(self, value, lb, ub, param_name):
         pass
     
-    def validate():
+    def validate(self):
         for param_name, param_type in self.__annotations__.items():
             value = getattr(self, param_name)
             self.validate_type(value, param_type, param_name)
@@ -23,8 +24,13 @@ class KServeHttpOptions(Validation):
     thread_count: int = 8
     header_forward_pattern: str = ""
     # restricted_protocols: list
-    a: str = ""
 
+class Grpc_compression_level(Enum):
+    NONE  = 0
+    LOW   = 1
+    MED   = 2
+    HIGH  = 3 
+    COUNT = 4
 
 # triton::server::grpc::Options
 @dataclass
@@ -50,7 +56,14 @@ class KServeGrpcOptions(Validation):
     max_connection_age_grace_ms: int = 0
     
     #triton::server::grpc::Options
+    
+    infer_compression_level: Union[int, Grpc_compression_level] = Grpc_compression_level.NONE
     infer_allocation_pool_size: int = 8
+    forward_header_pattern: str = ""
+
+    def __post_init__(self):
+        if isinstance(self.infer_compression_level, Grpc_compression_level):
+            self.infer_compression_level = self.infer_compression_level.value
 
 @dataclass
 class MetricsOptions(Validation):

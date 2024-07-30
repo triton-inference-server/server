@@ -10,4 +10,4 @@ from tritonfrontend._api._options import VertexAIOptions
 
 from tritonfrontend._api._server import Frontend 
 
-from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendCWrapper
+from tritonfrontend._c.tritonfrontend_bindings import TritonFrontend

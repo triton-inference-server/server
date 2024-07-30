@@ -46,6 +46,11 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
+#include <unistd.h> // For sleep 
+
+// #define LOG_VERBOSE_IS_ON ... something like that
+// TODO: hard code log verbose mode to see output in Handle()
+
 extern "C" {
 #include <b64/cdecode.h>
 }
@@ -4696,51 +4701,7 @@ HTTPAPIServer::Create(
   return nullptr;
 }
 
-
-
-template <typename T>
-T get_value(const UnorderedMapType& options, const std::string& key) {
-  auto curr = options.find(key);
-  bool is_present = (curr != options.end());
-  bool correct_type = std::holds_alternative<T>(curr->second);
-
-  if(!is_present || !correct_type) {
-    if(curr == options.end()) std::cerr << "Error: Key " << key << " not found." << std::endl;
-    else std::cerr << "Error: Type mismatch for key." << std::endl;
-  } 
-
-  return std::get<T>(curr->second); 
-}
-
-static bool Create_Wrapper(
-      uintptr_t server_mem_addr, 
-      UnorderedMapType data, 
-      std::unique_ptr<HTTPServer>* service) 
-{
-
-    server.reset(reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr));
-
-    int port = get_value<int>(data, "port");
-    bool reuse_port = get_value<bool>(data, "reuse_port");
-    std::string address = get_value<std::string>(data, "address"); 
-    std::string header_forward_pattern = get_value<std::string>(data, "header_forward_pattern");
-    int thread_count = get_value<int>(data, "thread_count");
-
-    triton::server::RestrictedFeatures restricted_features;
-
-    TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(server, 
-    nullptr, nullptr, // TraceManager, SharedMemoryManager 
-    port, reuse_port, address, // port, reuse_port, address
-    header_forward_pattern,  thread_count, // header_forward_pattern, thread_count 
-    restricted_features, // RestrictedFeatures
-    service); // HTTPServer instance
-
-    if(err == nullptr) return true;
-
-    return false;
-}
-
-HTTPAPIServer::RespondIfRestricted(
+bool HTTPAPIServer::RespondIfRestricted(
     evhtp_request_t* req, const Restriction& restriction)
 {
   auto header = restriction.first;
@@ -4756,5 +4717,31 @@ HTTPAPIServer::RespondIfRestricted(
   }
   return false;
 }
+
+bool HTTPAPIServer::Create_Wrapper(
+      std::shared_ptr<TRITONSERVER_Server>& server, 
+      UnorderedMapType& data, 
+      std::unique_ptr<HTTPServer>* service,
+      const RestrictedFeatures& restricted_features) 
+{
+    
+    int port = get_value<int>(data, "port");
+    bool reuse_port = get_value<int>(data, "reuse_port");
+    std::string address = get_value<std::string>(data, "address"); 
+    std::string header_forward_pattern = get_value<std::string>(data, "header_forward_pattern");
+    int thread_count = get_value<int>(data, "thread_count");
+    
+    TRITONSERVER_Error* err = Create(server, // shared_ptr<TRITONSERVER_Server>
+                                     nullptr, nullptr, // TraceManager, SharedMemoryManager 
+                                     port, reuse_port, address, // port, reuse_port, address
+                                     header_forward_pattern,  thread_count, // header_forward_pattern, thread_count 
+                                     restricted_features, // RestrictedFeatures
+                                     service); // HTTPServer instance
+
+    if(err == nullptr) return true;
+
+    return false;
+}
+
 
 }}  // namespace triton::server
