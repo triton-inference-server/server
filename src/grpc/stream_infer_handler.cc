@@ -140,12 +140,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // This means that we only need to take care of
   // synchronizing this thread and the ResponseComplete
   // threads.
-  {
-    std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
-    if (state->IsStreamError() && state->context_->grpc_strict_) {
-      LOG_VERBOSE(1) << "Ignoring new client request in strict mode \n";
-      return false;
-    }
+  // We need an explicit finish indicator. Can't use 'state->step_'
+  // because we launch an async thread that could update 'state's
+  // step_ to be FINISH before this thread exits this function.
+  bool finished = false;
+
+  if(state->context_ == nullptr) {
+    return !finished;
   }
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
@@ -162,11 +163,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
-
-  // We need an explicit finish indicator. Can't use 'state->step_'
-  // because we launch an async thread that could update 'state's
-  // step_ to be FINISH before this thread exits this function.
-  bool finished = false;
 
   if (state->step_ == Steps::START) {
     // A new stream connection... If RPC failed on a new request then
@@ -671,22 +667,18 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       response->set_error_message(status.error_message());
       if (state->context_->grpc_strict_) {
         // Set to finish
-        std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
+        // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
         state->status_ = status;
-        if (!state->IsStreamError()) {
           // Finish only once, if backend ignores cancellation
-          state->MarkIsStreamError();
           LOG_VERBOSE(1) << "GRPC streaming error detected (Only once)"
                          << status.error_code() << std::endl;
           state->context_->sendGRPCStrictResponse(state);
         }
         return;
       } else {
-        LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict: "
-                       << status.error_code() << std::endl;
+        LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict";
       }
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
-    }
 
     TRITONSERVER_ErrorDelete(err);
     LOG_TRITONSERVER_ERROR(
