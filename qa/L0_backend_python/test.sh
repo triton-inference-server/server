@@ -95,6 +95,8 @@ fi
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+cp ../python_models/identity_bf16/model.py ./models/identity_bf16/1/model.py
+cp ../python_models/identity_bf16/config.pbtxt ./models/identity_bf16/config.pbtxt
 RET=0
 
 cp -r ./models/identity_fp32 ./models/identity_uint8
