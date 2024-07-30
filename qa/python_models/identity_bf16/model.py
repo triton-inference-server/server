@@ -26,7 +26,6 @@
 
 import json
 
-import numpy as np
 import torch
 import triton_python_backend_utils as pb_utils
 
@@ -47,18 +46,18 @@ class TritonPythonModel:
     def validate_bf16_tensor(self, tensor, tensor_config):
         # I/O datatypes can be queried from the model config if needed
         dtype = tensor_config["data_type"]
-        if dtype == "TYPE_BF16":
-            # Converting BF16 tensors to numpy is not supported, and DLPack
-            # should be used instead via to_dlpack and from_dlpack.
-            try:
-                _ = tensor.as_numpy()
-            except pb_utils.TritonModelException as e:
-                expected_error = "tensor dtype is bf16 and cannot be converted to numpy"
-                assert expected_error in str(e).lower()
-            else:
-                raise Exception("Expected BF16 conversion to numpy to fail")
-        else:
+        if dtype != "TYPE_BF16":
             raise Exception(f"Expected a BF16 tensor, but got {dtype} instead.")
+
+        # Converting BF16 tensors to numpy is not supported, and DLPack
+        # should be used instead via to_dlpack and from_dlpack.
+        try:
+            _ = tensor.as_numpy()
+        except pb_utils.TritonModelException as e:
+            expected_error = "tensor dtype is bf16 and cannot be converted to numpy"
+            assert expected_error in str(e).lower()
+        else:
+            raise Exception("Expected BF16 conversion to numpy to fail")
 
     def execute(self, requests):
         """
