@@ -441,7 +441,7 @@ class ShmLeakDetector:
                     print(
                         f"Shared memory leak detected [{shm_region}]: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
                     )
-                    # Known shared memory leak of 480 bytes in BLS test.
+                    # FIXME DLIS-7122: Known shared memory leak of 480 bytes in BLS test.
                     if curr_shm_free_size == 1006576 and prev_shm_free_size == 1007056:
                         assert False, f"Known shared memory leak of 480 bytes detected."
             assert not shm_leak_detected, f"Shared memory leak detected."
