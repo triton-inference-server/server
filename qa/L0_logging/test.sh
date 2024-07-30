@@ -60,6 +60,11 @@ source ../common/util.sh
 rm -f *.log
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
 
+if [ ! -d ${DATADIR} ]; then
+  echo -e "\n***\n*** ${DATADIR} does not exist!\n***"
+  exit 1
+fi
+
 # set up simple repository MODELBASE
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
     cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
