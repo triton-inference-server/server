@@ -642,7 +642,8 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false), grpc_strict_(false)
+          received_notification_(false), grpc_strict_(false),
+          grpc_stream_error_state_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -702,7 +703,7 @@ class InferHandlerState {
 
             state->context_->responder_->Finish(dummy_status, state);
             LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
-                            << state->status_.error_code() << std::endl;
+                           << state->status_.error_code() << std::endl;
             state->context_->MarkIsStreamError();
             IssueRequestCancellation(false);
           }
@@ -821,7 +822,7 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            if(!grpc_strict) {
+            if (!grpc_strict) {
               PutTaskBackToQueue(state);
             }
           }
@@ -985,10 +986,8 @@ class InferHandlerState {
       return false;
     }
 
-    void MarkIsStreamError() { 
-      grpc_stream_error_state_ = true; }
-    bool IsStreamError() { 
-      return grpc_stream_error_state_; }
+    void MarkIsStreamError() { grpc_stream_error_state_ = true; }
+    bool IsStreamError() { return grpc_stream_error_state_; }
 
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
@@ -1050,7 +1049,7 @@ class InferHandlerState {
     // True if there is an ongoing write to the grpc stream
     std::atomic<bool> grpc_strict_;
 
-    bool grpc_stream_error_state_;
+    std::atomic<bool> grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object

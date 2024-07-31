@@ -144,10 +144,14 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
-
-  if(state->context_ == nullptr) {
+  if (state->context_ == nullptr) {
     return !finished;
   }
+  std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+  if (state->context_->IsStreamError()) {
+    return !finished;
+  }
+
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
@@ -577,7 +581,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
-
+  // Ignore Response from CORE in case GRPC Strict as we dont care about
+  LOG_VERBOSE(1) << "Dead Response from CORE";
+  std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+  if (state->context_->IsStreamError()) {
+    return;
+  }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
 
@@ -662,6 +671,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       LOG_VERBOSE(1) << "Generating fake error" << std::endl;
       failed = true;
       ::grpc::Status status;
+      // Converts CORE errors to GRPC error codes
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
@@ -669,16 +679,16 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         // Set to finish
         // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
         state->status_ = status;
-          // Finish only once, if backend ignores cancellation
-          LOG_VERBOSE(1) << "GRPC streaming error detected (Only once)"
-                         << status.error_code() << std::endl;
-          state->context_->sendGRPCStrictResponse(state);
-        }
-        return;
-      } else {
-        LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict";
+        // Finish only once, if backend ignores cancellation
+        LOG_VERBOSE(1) << "GRPC streaming error detected (Only once)"
+                       << status.error_code() << std::endl;
+        state->context_->sendGRPCStrictResponse(state);
       }
-      LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
+      return;
+    } else {
+      LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict";
+    }
+    LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
 
     TRITONSERVER_ErrorDelete(err);
     LOG_TRITONSERVER_ERROR(
