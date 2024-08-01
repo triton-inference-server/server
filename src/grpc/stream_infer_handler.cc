@@ -657,6 +657,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
+      LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
       if (state->context_->grpc_strict_) {
         // Set to finish
         // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
@@ -665,9 +666,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_VERBOSE(1) << "GRPC streaming error detected: "
                        << status.error_code() << std::endl;
         state->context_->sendGRPCStrictResponse(state);
+        return;
       }
     }
-    LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
 
     TRITONSERVER_ErrorDelete(err);
     LOG_TRITONSERVER_ERROR(
