@@ -37,8 +37,8 @@ python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_PERF_ANALYZER_REPO_TAG="${TRITON_PERF_ANALYZER_REPO_TAG:=main}"
 git clone -b ${TRITON_PERF_ANALYZER_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/perf_analyzer.git
-cp `pwd`/client/src/c++/perf_analyzer/README.md .
-cp -rf `pwd`/client/src/c++/perf_analyzer/docs .
+cp `pwd`/perf_analyzer/README.md .
+cp -rf `pwd`/perf_analyzer/docs .
 
 # Need to remove all links that start with -- or -. Mkdocs converts all -- to - for anchor links.
 # This breaks all links to cli commands throughout the docs. This will iterate over all
