@@ -144,11 +144,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
-  if (state->context_ == nullptr) {
-    return !finished;
-  }
   std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-  if (state->context_->IsStreamError()) {
+  // Check if stream error detected and already connection ended
+  if (state->context_->IsGRPCStrictError()) {
     return !finished;
   }
 
@@ -368,18 +366,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
       response->set_error_message(status.error_message());
-      // if(state->context_->grpc_strict_) {
-      //   // Set to finish
-      //   state->status_ = status;
-      //   state->MarkIsStreamError();
-      //   LOG_VERBOSE(1) << "GRPC streaming error detected : " <<
-      //   status.error_code() << std::endl;
-      // } else {
-      //   LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict:
-      //   " << status.error_code() << std::endl;
-      // }
-
-
       response->mutable_infer_response()->Clear();
       // repopulate the id so that client knows which request failed.
       response->mutable_infer_response()->set_id(request.id());
@@ -584,7 +570,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   // Ignore Response from CORE in case GRPC Strict as we dont care about
   LOG_VERBOSE(1) << "Dead Response from CORE";
   std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-  if (state->context_->IsStreamError()) {
+  if (state->context_->IsGRPCStrictError()) {
     return;
   }
   // Increment the callback index
@@ -661,14 +647,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     } else {
       LOG_ERROR << "expected the response allocator to have added the response";
     }
-
-    std::time_t currentTime = std::time(nullptr);
-
-    // Divide the current time by 2
-    std::time_t modTime = currentTime % 2;
-
-    if (modTime) {
-      LOG_VERBOSE(1) << "Generating fake error" << std::endl;
+    if (err != nullptr) {
       failed = true;
       ::grpc::Status status;
       // Converts CORE errors to GRPC error codes
@@ -680,13 +659,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
         state->status_ = status;
         // Finish only once, if backend ignores cancellation
-        LOG_VERBOSE(1) << "GRPC streaming error detected (Only once)"
+        LOG_VERBOSE(1) << "GRPC streaming error detected: "
                        << status.error_code() << std::endl;
         state->context_->sendGRPCStrictResponse(state);
       }
       return;
-    } else {
-      LOG_VERBOSE(1) << "GRPC streaming error detected BUT mode NOT strict";
     }
     LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
 

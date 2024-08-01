@@ -694,22 +694,19 @@ class InferHandlerState {
       if (state->context_->grpc_strict_) {
         {
           std::lock_guard<std::recursive_mutex> lock(grpc_strict_mu_);
-          if (!state->context_->IsStreamError()) {
-            ::grpc::Status dummy_status = ::grpc::Status(
-                ::grpc::StatusCode::UNAVAILABLE, std::string("Dummy Status"));
-            //      state->context_->responder_->Finish(state->status_, state);
+          // Check if Error not responded previously
+          // Avoid closing connection twice on multiple errors from core
+          if (!state->context_->IsGRPCStrictError()) {
             state->context_->step_ = Steps::COMPLETE;
             state->step_ = Steps::PARTIAL_COMPLETION;
-
-            state->context_->responder_->Finish(dummy_status, state);
+            state->context_->responder_->Finish(state->status_, state);
             LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
                            << state->status_.error_code() << std::endl;
-            state->context_->MarkIsStreamError();
-            IssueRequestCancellation(false);
+            // Mark error for this stream
+            state->context_->MarkGRPCStrictError();
+            IssueRequestCancellation();
           }
         }
-      } else {
-        LOG_VERBOSE(1) << "GRPC mode NOT strict in Finish" << std::endl;
       }
     }
     // Increments the ongoing request counter
@@ -789,7 +786,7 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    void IssueRequestCancellation(bool grpc_strict)
+    void IssueRequestCancellation()
     {
       {
         std::lock_guard<std::recursive_mutex> lock(mu_);
@@ -822,9 +819,7 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            if (!grpc_strict) {
-              PutTaskBackToQueue(state);
-            }
+            PutTaskBackToQueue(state);
           }
         }
       }
@@ -858,7 +853,7 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation(false);
+          IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
 
@@ -986,8 +981,11 @@ class InferHandlerState {
       return false;
     }
 
-    void MarkIsStreamError() { grpc_stream_error_state_ = true; }
-    bool IsStreamError() { return grpc_stream_error_state_; }
+    // Marks error after it has been responded to
+    void MarkGRPCStrictError() { grpc_stream_error_state_ = true; }
+
+    // Checks if error already responded to in grpc_strict mode
+    bool IsGRPCStrictError() { return grpc_stream_error_state_; }
 
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
