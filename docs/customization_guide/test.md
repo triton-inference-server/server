@@ -57,14 +57,17 @@ in the scripts for how to target a specific GPU.
 ## Build SDK Image
 
 Build the *tritonserver_sdk* image that contains the client
-libraries, model analyzer, and examples using the following
+libraries, model analyzer, perf analyzer and examples using the following
 commands. You must first checkout the <client branch> branch of the
-*client* repo into the clientrepo/ subdirectory. Typically you want to
-set <client branch> to be the same as your current server branch.
+*client* repo into the clientrepo/ subdirectory and the <perf analyzer branch>
+branch of the *perf_analyzer* repo into the perfanalyzerrepo/ subdirectory
+respectively. Typically you want to set both <client branch> and <perf analyzer branch>
+to be the same as your current server branch.
 
 ```
 $ cd <server repo root>
 $ git clone --single-branch --depth=1 -b <client branch> https://github.com/triton-inference-server/client.git clientrepo
+$ git clone --single-branch --depth=1 -b <perf analyzer branch> https://github.com/triton-inference-server/perf_analyzer.git perfanalyzerrepo
 $ docker build -t tritonserver_sdk -f Dockerfile.sdk .
 ```
 
