@@ -144,12 +144,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
-  std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-  // Check if stream error detected and already connection ended
-  if (state->context_->IsGRPCStrictError()) {
-    return !finished;
+  if (state->context_->grpc_strict_) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    // Check if stream error detected and already connection ended
+    if (state->context_->IsGRPCStrictError()) {
+      return !finished;
+    }
   }
-
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
@@ -568,10 +569,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 {
   State* state = reinterpret_cast<State*>(userp);
   // Ignore Response from CORE in case GRPC Strict as we dont care about
-  LOG_VERBOSE(1) << "Dead Response from CORE";
-  std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-  if (state->context_->IsGRPCStrictError()) {
-    return;
+  if (state->context_->grpc_strict_) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    if (state->context_->IsGRPCStrictError()) {
+      return;
+    }
   }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
@@ -648,6 +650,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       LOG_ERROR << "expected the response allocator to have added the response";
     }
     if (err != nullptr) {
+      LOG_VERBOSE(1) << "Error in CORE Response";
       failed = true;
       ::grpc::Status status;
       // Converts CORE errors to GRPC error codes
@@ -663,7 +666,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                        << status.error_code() << std::endl;
         state->context_->sendGRPCStrictResponse(state);
       }
-      return;
     }
     LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
 

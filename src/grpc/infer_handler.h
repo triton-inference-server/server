@@ -645,6 +645,7 @@ class InferHandlerState {
           received_notification_(false), grpc_strict_(false),
           grpc_stream_error_state_(false)
     {
+      LOG_VERBOSE(1) << "Context Constructor getting called";
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
     }
@@ -690,23 +691,18 @@ class InferHandlerState {
 
     void sendGRPCStrictResponse(InferHandlerStateType* state)
     {
-      // Check if streaming error detected AND grpc_mode is strict
-      if (state->context_->grpc_strict_) {
-        {
-          std::lock_guard<std::recursive_mutex> lock(grpc_strict_mu_);
-          // Check if Error not responded previously
-          // Avoid closing connection twice on multiple errors from core
-          if (!state->context_->IsGRPCStrictError()) {
-            state->context_->step_ = Steps::COMPLETE;
-            state->step_ = Steps::PARTIAL_COMPLETION;
-            state->context_->responder_->Finish(state->status_, state);
-            LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
-                           << state->status_.error_code() << std::endl;
-            // Mark error for this stream
-            state->context_->MarkGRPCStrictError();
-            IssueRequestCancellation();
-          }
-        }
+      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+      // Check if Error not responded previously
+      // Avoid closing connection twice on multiple errors from core
+      if (!state->context_->IsGRPCStrictError()) {
+        state->context_->step_ = Steps::COMPLETE;
+        state->step_ = Steps::PARTIAL_COMPLETION;
+        state->context_->responder_->Finish(state->status_, state);
+        LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
+                       << state->status_.error_code() << std::endl;
+        // Mark error for this stream
+        state->context_->MarkGRPCStrictError();
+        IssueRequestCancellation();
       }
     }
     // Increments the ongoing request counter
