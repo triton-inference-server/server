@@ -365,6 +365,36 @@ class PythonTest(unittest.TestCase):
                 self.assertIsNotNone(output0)
                 self.assertTrue(np.all(output0 == input_data))
 
+    def test_bf16(self):
+        model_name = "identity_bf16"
+        shape = [2, 2]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
+                # NOTE: Client will truncate FP32 to BF16 internally
+                # since numpy has no built-in BF16 representation.
+                np_input = np.ones(shape, dtype=np.float32)
+                inputs = [
+                    httpclient.InferInput(
+                        "INPUT0", np_input.shape, "BF16"
+                    ).set_data_from_numpy(np_input)
+                ]
+                result = client.infer(model_name, inputs)
+
+                # Assert that Triton correctly returned a BF16 tensor.
+                response = result.get_response()
+                triton_output = response["outputs"][0]
+                triton_dtype = triton_output["datatype"]
+                self.assertEqual(triton_dtype, "BF16")
+
+                np_output = result.as_numpy("OUTPUT0")
+                self.assertIsNotNone(np_output)
+                # BF16 tensors are held in FP32 when converted to numpy due to
+                # lack of native BF16 support in numpy, so verify that.
+                self.assertEqual(np_output.dtype, np.float32)
+                self.assertTrue(np.allclose(np_output, np_input))
+
     def test_infer_pytorch(self):
         # FIXME: This model requires torch. Because windows tests are not run in a docker
         # environment with torch installed, we need to think about how we want to install

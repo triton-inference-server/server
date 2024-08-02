@@ -36,6 +36,7 @@ import requests
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 # Triton server reserves 256 MB for pinned memory by default.
 DEFAULT_TOTAL_PINNED_MEMORY_SIZE = 2**28  # bytes, Equivalent to 256 MB
 TOTAL_PINNED_MEMORY_SIZE = int(
@@ -51,7 +52,7 @@ def get_metrics():
     total_bytes_pattern = re.compile(r"pool_total_bytes (\d+)")
     used_bytes_pattern = re.compile(r"pool_used_bytes (\d+)")
 
-    r = requests.get("http://localhost:8002/metrics")
+    r = requests.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
     r.raise_for_status()
 
     total_bytes_match = total_bytes_pattern.search(r.text)
@@ -103,7 +104,7 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
 
     def test_pinned_memory_metrics_asynchronous_requests(self):
         with httpclient.InferenceServerClient(
-            url="localhost:8000", concurrency=10
+            url=f"{_tritonserver_ipaddr}:8000", concurrency=10
         ) as client:
             if not client.is_model_ready(self.model_name):
                 client.load_model(self.model_name)
@@ -142,7 +143,9 @@ class TestPinnedMemoryMetrics(unittest.TestCase):
         self._assert_pinned_memory_utilization()
 
     def test_pinned_memory_metrics_synchronous_requests(self):
-        with httpclient.InferenceServerClient(url="localhost:8000") as client:
+        with httpclient.InferenceServerClient(
+            url=f"{_tritonserver_ipaddr}:8000"
+        ) as client:
             if not client.is_model_ready(self.model_name):
                 client.load_model(self.model_name)
 

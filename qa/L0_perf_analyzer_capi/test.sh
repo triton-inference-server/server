@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,7 +73,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphde
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
 
 # Copy shape tensor models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32_int32 $DATADIR/
 
 # Copying ensemble including a sequential model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
@@ -201,7 +201,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 
 # Shape tensor I/O model (server needs the shape tensor on the CPU)
-$PERF_ANALYZER -v -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
+$PERF_ANALYZER -v -m plan_zero_1_float32_int32 --input-data=$SHAPETENSORADTAFILE \
 --shape DUMMY_INPUT0:4,4 -p2000 -b 8 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
