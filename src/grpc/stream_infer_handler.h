@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -112,6 +112,7 @@ class ModelStreamInferHandler
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
+  static void StateWriteResponse(InferHandler::State* state);
   bool Finish(State* state);
 
   TraceManager* trace_manager_;

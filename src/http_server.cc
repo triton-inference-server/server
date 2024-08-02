@@ -3327,6 +3327,8 @@ HTTPAPIServer::HandleGenerate(
   //   thus the string must live as long as the JSON message).
   triton::common::TritonJson::Value request;
   RETURN_AND_CALLBACK_IF_ERR(EVRequestToJson(req, &request), error_callback);
+  RETURN_AND_CALLBACK_IF_ERR(
+      ParseJsonTritonRequestID(request, irequest), error_callback);
 
   RETURN_AND_CALLBACK_IF_ERR(
       generate_request->ConvertGenerateRequest(

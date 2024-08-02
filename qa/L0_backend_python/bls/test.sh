@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
+CLIENT_PY=../test_infer_shm_leak.py
 CLIENT_LOG="./bls_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
@@ -33,7 +33,7 @@ source ../../common/util.sh
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-inference-server}
 
 RET=0
-rm -fr *.log ./models *.txt
+rm -fr *.log ./models *.txt *.xml
 
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
 if [[ ${TEST_WINDOWS} == 0 ]]; then
@@ -119,30 +119,35 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
 
             for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
                 export MODEL_NAME=${MODEL_NAME}
-
-                python3 -m pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
-                if [ $? -ne 0 ]; then
+                # Run with pytest to capture the return code correctly
+                pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
+                EXIT_CODE=$?
+                if [ $EXIT_CODE -ne 0 ]; then
                     echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
+                    RET=$EXIT_CODE
                     cat $SERVER_LOG
                     cat $CLIENT_LOG
-                    RET=1
                 fi
             done
 
-            set -e
-
             kill_server
 
-            # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
-            if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
-                echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
-                cat $SERVER_LOG
-                RET=1
+            set -e
+
+            # Only check the timeout value if there is no error since the test
+            # may fail before the test_timeout case gets run.
+            if [ $RET -eq 0 ]; then
+                # Check for bls 'test_timeout' to ensure timeout value is being correctly passed
+                if [ `grep -c "Request timeout: 11000000000" $SERVER_LOG` == "0" ]; then
+                    echo -e "\n***\n*** BLS timeout value not correctly passed to model: line ${LINENO}\n***"
+                    cat $SERVER_LOG
+                    RET=1
+                fi
             fi
 
-            if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 128 ]]; then
+            if [[ $CUDA_MEMORY_POOL_SIZE_MB -eq 256 ]]; then
                 if [ `grep -c "Failed to allocate memory from CUDA memory pool" $SERVER_LOG` != "0" ]; then
-                    echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMOY_POOL_SIZE_MB is 128 MB for 'bls' $BLS_KIND test\n***"
+                    echo -e "\n***\n*** Expected to use CUDA memory pool for all tests when CUDA_MEMORY_POOL_SIZE_MB is 256 MB for 'bls' $BLS_KIND test\n***"
                     cat $SERVER_LOG
                     RET=1
                 fi
@@ -342,10 +347,10 @@ set -e
 
 kill_server
 
-if [ $RET -eq 1 ]; then
-    echo -e "\n***\n*** BLS test FAILED. \n***"
-else
+if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** BLS test PASSED. \n***"
+else
+    echo -e "\n***\n*** BLS test FAILED. \n***"
 fi
 
 exit $RET

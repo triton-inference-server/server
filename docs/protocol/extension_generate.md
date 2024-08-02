@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -87,10 +87,12 @@ return an error.
 
     $generate_request =
     {
+      "id" : $string, #optional
       "text_input" : $string,
       "parameters" : $parameters #optional
     }
 
+* "id": An identifier for this request. Optional, but if specified this identifier must be returned in the response.
 * "text_input" : The text input that the model should generate output from.
 * "parameters" : An optional object containing zero or more parameters for this
   generate request expressed as key/value pairs. See
@@ -121,14 +123,15 @@ specification to set the parameters.
 Below is an example to send generate request with additional model parameters `stream` and `temperature`.
 
 ```
-$ curl -X POST localhost:8000/v2/models/mymodel/generate -d '{"text_input": "client input", "parameters": {"stream": false, "temperature": 0}}'
+$ curl -X POST localhost:8000/v2/models/mymodel/generate -d '{"id": "42", "text_input": "client input", "parameters": {"stream": false, "temperature": 0}}'
 
 POST /v2/models/mymodel/generate HTTP/1.1
 Host: localhost:8000
 Content-Type: application/json
 Content-Length: <xx>
 {
-  "text_input":  "client input",
+  "id" : "42",
+  "text_input" :  "client input",
   "parameters" :
     {
       "stream": false,
@@ -145,11 +148,13 @@ the HTTP body.
 
     $generate_response =
     {
+      "id" : $string
       "model_name" : $string,
       "model_version" : $string,
       "text_output" : $string
     }
 
+* "id" : The "id" identifier given in the request, if any.
 * "model_name" : The name of the model used for inference.
 * "model_version" : The specific model version used for inference.
 * "text_output" : The output of the inference.
@@ -159,6 +164,7 @@ the HTTP body.
 ```
 200
 {
+  "id" : "42"
   "model_name" : "mymodel",
   "model_version" : "1",
   "text_output" : "model output"
