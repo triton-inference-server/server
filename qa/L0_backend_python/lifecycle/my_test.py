@@ -1,18 +1,22 @@
+import queue
+from functools import partial
+
 import numpy as np
 import tritonclient.grpc as grpcclient
-from functools import partial
-import queue
 from tritonclient.utils import *
+
 
 class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
+
 
 def callback(user_data, result, error):
     if error:
         user_data._completed_requests.put(error)
     else:
         user_data._completed_requests.put(result)
+
 
 def grpc_strict_error():
     model_name = "execute_error"
@@ -25,7 +29,9 @@ def grpc_strict_error():
         triton_client = grpcclient.InferenceServerClient(triton_server_url)
         metadata = {"grpc_strict": "true"}
 
-        triton_client.start_stream(callback=partial(callback, user_data), headers=metadata)
+        triton_client.start_stream(
+            callback=partial(callback, user_data), headers=metadata
+        )
 
         input_datas = []
         for i in range(number_of_requests):
@@ -48,6 +54,7 @@ def grpc_strict_error():
         print(f"Error occurred: {str(e)}")
     finally:
         triton_client.stop_stream()
+
 
 if __name__ == "__main__":
     grpc_strict_error()

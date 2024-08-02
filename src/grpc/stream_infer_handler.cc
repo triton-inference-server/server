@@ -334,13 +334,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // initiated... the completion callback will transition to
     // WRITEREADY or WRITTEN or CANCELLED. Recording the state and the
     // irequest to handle gRPC stream cancellation.
-    // std::time_t currentTime = std::time(nullptr);
-
-    // // Divide the current time by 2
-    // std::time_t modTime = currentTime % 2;
-
     if (err == nullptr) {
-      // if (modTime) {
       state->context_->InsertInflightState(state);
       // The payload will be cleaned in request release callback.
       request_release_payload.release();
@@ -702,8 +696,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
         state->status_ = status;
         // Finish only once, if backend ignores cancellation
-        LOG_VERBOSE(1) << "GRPC streaming error detected: "
-                       << status.error_code() << std::endl;
+        LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
+                       << status.error_code() << "Closing stream connection."
+                       << std::endl;
         state->context_->sendGRPCStrictResponse(state);
         return;
       }

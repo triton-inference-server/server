@@ -645,7 +645,6 @@ class InferHandlerState {
           received_notification_(false), grpc_strict_(false),
           grpc_stream_error_state_(false)
     {
-      LOG_VERBOSE(1) << "Context Constructor getting called";
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
     }
@@ -674,17 +673,13 @@ class InferHandlerState {
     // Extracts headers from GRPC request and updates state
     void ExtractStateFromHeaders(InferHandlerStateType* state)
     {
-      // Probably need to lock
-      LOG_VERBOSE(1) << "GRPC ExtractStateFromHeaders called" << std::endl;
       const auto& metadata = state->context_->ctx_->client_metadata();
       for (const auto& pair : metadata) {
         auto& key = pair.first;
         std::string param_key = std::string(key.begin(), key.end());
         std::string grpc_strict_key = "grpc_strict";
         if (param_key.compare(grpc_strict_key) == 0) {
-          // They are equal
           state->context_->grpc_strict_ = true;
-          LOG_VERBOSE(1) << "GRPC streaming strict flag detected" << std::endl;
         }
       }
     }
@@ -698,8 +693,6 @@ class InferHandlerState {
         state->context_->step_ = Steps::COMPLETE;
         state->step_ = Steps::PARTIAL_COMPLETION;
         state->context_->responder_->Finish(state->status_, state);
-        LOG_VERBOSE(1) << "GRPC streaming error detected inside finish: "
-                       << state->status_.error_code() << std::endl;
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
         IssueRequestCancellation();
@@ -1010,7 +1003,6 @@ class InferHandlerState {
     // orders. A state enters this queue when it has successfully read
     // a request and exits the queue when it is written.
     std::recursive_mutex mu_;
-    std::recursive_mutex grpc_strict_mu_;
     std::queue<InferHandlerStateType*> states_;
     std::atomic<uint32_t> ongoing_requests_;
 
@@ -1043,9 +1035,11 @@ class InferHandlerState {
     // completion queue.
     bool received_notification_;
 
-    // True if there is an ongoing write to the grpc stream
+    // True if set by user via header
     std::atomic<bool> grpc_strict_;
 
+    // True if stream already encountered error and closed connection
+    // State maintained to avoid writes on closed stream
     std::atomic<bool> grpc_stream_error_state_;
   };
 
@@ -1064,8 +1058,6 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver), async_notify_state_(false)
   {
-    LOG_VERBOSE(1)
-        << "grpc_stream_error_state_ init called in InferHandlerState 2 \n";
     // For debugging and testing
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_response_ms_ = 0;
@@ -1150,7 +1142,6 @@ class InferHandlerState {
   std::shared_ptr<Context> context_;
   Steps step_;
   std::recursive_mutex step_mtx_;
-  // std::recursive_mutex grpc_strict_mtx_;
 
   // Shared pointer to the inference request object. The lifetime of
   // inference request object is extended till all the responses from
