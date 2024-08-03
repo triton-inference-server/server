@@ -146,12 +146,19 @@ PYBIND11_MODULE(tritonfrontend_bindings, m) {
     py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
     py::register_exception<AlreadyExistsError>(m, "AlreadyExistsError", tfe.ptr());
     
-    py::class_<triton::server::python::TritonFrontend>(m, "TritonFrontend")
+    py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
         // .def(py::init<>())
         .def(py::init<uintptr_t, UnorderedMapType>())
-        // .def("CreateWrapper", &triton::server::python::TritonFrontend::CreateWrapper)
-        .def("start", &triton::server::python::TritonFrontend::StartService)
-        .def("stop", &triton::server::python::TritonFrontend::StopService);
+        // .def("CreateWrapper", &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
+        .def("start", &TritonFrontend<HTTPServer, HTTPAPIServer>::StartService)
+        .def("stop", &TritonFrontend<HTTPServer, HTTPAPIServer>::StopService);
+    
+    py::class_<TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>>(m, "TritonFrontendGrpc")
+        // .def(py::init<>())
+        .def(py::init<uintptr_t, UnorderedMapType>())
+        // .def("CreateWrapper", &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
+        .def("start", &TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>::StartService)
+        .def("stop", &TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>::StopService);
 }
 
 }}}

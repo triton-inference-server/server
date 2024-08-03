@@ -109,6 +109,15 @@ add_executable(
   server_interface.h
 )
 
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+add_library(server-interface-library server_interface.h)
+set_target_properties(server-interface-library 
+                      PROPERTIES 
+                      POSITION_INDEPENDENT_CODE ON
+                      LINKER_LANGUAGE CXX)
+target_compile_features(server-interface-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_definitions(server-interface-library PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY})
+
 # On windows a *.lib file can be generated for a exe. When creating
 # tritonserver.exe if we try to create tritonserver.lib it will fail
 # because there is already a trtionserver.lib for tritonserver.dll,
@@ -355,7 +364,6 @@ if(${TRITON_ENABLE_HTTP}
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
 
-  target_compile_features(http-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(
       http-endpoint-library
@@ -369,7 +377,7 @@ if(${TRITON_ENABLE_HTTP}
         -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
     )
   endif()
-
+ 
   set_target_properties(
     http-endpoint-library
     PROPERTIES
@@ -784,7 +792,7 @@ find_package(CUDAToolkit REQUIRED)
 
 # TODO: Remove excess stuff
 add_library(
-  shared-memory-manager 
+  python-binding-dependency 
   EXCLUDE_FROM_ALL
   shared_memory_manager.h
   shared_memory_manager.cc
@@ -797,7 +805,7 @@ add_library(
 )
 
 target_link_libraries(
-  shared-memory-manager 
+  python-binding-dependency
   PUBLIC
   http-endpoint-library 
   grpc-endpoint-library
@@ -808,12 +816,12 @@ target_link_libraries(
 )
 
 
-set_target_properties(shared-memory-manager PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(python-binding-dependency PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_compile_features(shared-memory-manager PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_features(python-binding-dependency PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 
 target_compile_definitions(
-    shared-memory-manager
+    python-binding-dependency
     PRIVATE TRITON_ENABLE_GPU=1
     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
   )

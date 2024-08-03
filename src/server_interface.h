@@ -1,6 +1,10 @@
 #pragma once
 
 #include "triton/core/tritonserver.h"
+#include <memory>
+#include <variant>
+#include <unordered_map>
+
 namespace triton { namespace server { 
 
 using VariantType = std::variant<int, bool, std::string>;
@@ -20,15 +24,12 @@ T get_value(const UnorderedMapType& options, const std::string& key) {
   return std::get<T>(curr->second); 
 }
 
-
-
-
 class Server_Interface {
 public:
-    virtual  bool Create_Wrapper(
+    virtual bool Create_Wrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, 
       UnorderedMapType& data, 
-      std::unique_ptr<HTTPServer>* service,
+      std::unique_ptr<Server_Interface>* service,
       const RestrictedFeatures& restricted_features); 
     virtual TRITONSERVER_Error* Start() = 0;
     virtual TRITONSERVER_Error* Stop() = 0;

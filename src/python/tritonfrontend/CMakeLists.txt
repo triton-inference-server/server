@@ -32,39 +32,37 @@ FetchContent_MakeAvailable(pybind11)
 # ================================= END =====================================
 
 
-add_library(
-  python-endpoint-wrapper
-    _c/tritonfrontend.h
-    _c/tritonfrontend.cc
-)
+# add_library(
+#   python-endpoint-wrapper
+#     _c/tritonfrontend.h
+#     ../../server_interface.h
+# )
 
-target_link_libraries(
-  python-endpoint-wrapper
-  PUBLIC
-  shared-memory-manager 
-  http-endpoint-library 
-  triton-core-serverapi           # from repo-core
-  triton-core-serverstub          # from repo-core
-  triton-common-json              # from repo-common
-)
+# target_link_libraries(
+#   python-endpoint-wrapper
+#   PUBLIC
+#   python-binding-dependency
+#   shared-memory-manager 
+# )
 
-set_target_properties(python-endpoint-wrapper PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(python-endpoint-wrapper PRIVATE ${pybind11_INCLUDE_DIRS})
-target_link_libraries(python-endpoint-wrapper PRIVATE ${pybind11_LIBRARIES})
+# set_target_properties(python-endpoint-wrapper PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# target_include_directories(python-endpoint-wrapper PRIVATE ${pybind11_INCLUDE_DIRS})
+# target_link_libraries(python-endpoint-wrapper PRIVATE ${pybind11_LIBRARIES})
 
-target_compile_features(python-endpoint-wrapper PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+# target_compile_features(python-endpoint-wrapper PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 
-target_compile_definitions(
-    python-endpoint-wrapper
-    PRIVATE TRITON_ENABLE_GPU=1
-    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-  )
+# target_compile_definitions(
+#     python-endpoint-wrapper
+#     PRIVATE TRITON_ENABLE_GPU=1
+#     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+#   )
 
 
 
 set(
   PYTHON_FRONTEND_BINDING_SRCS
   _c/tritonfrontend_pybind.cc
+  _c/tritonfrontend.h
 )
 
 find_package(libevhtp CONFIG REQUIRED)
@@ -88,9 +86,10 @@ target_link_libraries(
     triton-common-json
     triton-common-logging           # from repo-common
     CUDA::cudart
-    # grpc-endpoint-library
-    shared-memory-manager
-    python-endpoint-wrapper
+    grpc-endpoint-library
+    python-binding-dependency 
+    # shared-memory-manager
+    # python-endpoint-wrapper
 )
 
 
@@ -102,4 +101,4 @@ set_target_properties(
           py-bindings 
           PROPERTIES   
           BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
-          )
+)

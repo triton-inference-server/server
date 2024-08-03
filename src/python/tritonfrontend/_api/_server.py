@@ -4,8 +4,6 @@ from dataclasses import asdict
 import tritonserver
 
 # Internal Imports
-from tritonfrontend._api._options import KServeHttpOptions, KServeGrpcOptions
-from tritonfrontend._api._options import MetricsOptions, SageMakerOptions, VertexAIOptions
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontend
 
 

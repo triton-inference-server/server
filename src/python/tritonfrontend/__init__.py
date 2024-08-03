@@ -2,12 +2,15 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from tritonfrontend._api._options import KServeHttpOptions
-from tritonfrontend._api._options import KServeGrpcOptions
-from tritonfrontend._api._options import MetricsOptions
-from tritonfrontend._api._options import SageMakerOptions
-from tritonfrontend._api._options import VertexAIOptions
+# Bindings from C++. TritonFrontend exposes C++ Classes and Functions.
+from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendHttp
+from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendGrpc
 
-from tritonfrontend._api._server import Frontend 
 
-from tritonfrontend._c.tritonfrontend_bindings import TritonFrontend
+
+from tritonfrontend._api._kservehttp import KServeHttp
+from tritonfrontend._api._kservegrpc import KServeGrpc
+# from tritonfrontend._api._metrics import Metrics
+# from tritonfrontend._api._sagemaker import Sagemaker
+# from tritonfrontend._api._vertexai import VertexAI
+
