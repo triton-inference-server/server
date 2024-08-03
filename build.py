@@ -701,7 +701,7 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-        if target_platform() == "igpu":
+        if (target_platform() == "igpu") or (target_platform() == "rhel"):
             cargs.append(
                 cmake_backend_arg(
                     "onnxruntime",
