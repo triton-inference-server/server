@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import AnyUrl, BaseModel, Extra, Field, RootModel, confloat, conint
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel, confloat, conint
 
 
 class Error(BaseModel):
@@ -72,12 +72,12 @@ class CreateCompletionRequest(BaseModel):
     max_tokens: Optional[conint(ge=0)] = Field(
         16,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
-        example=16,
+        examples=[16],
     )
     n: Optional[conint(ge=1, le=128)] = Field(
         1,
         description="How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n",
-        example=1,
+        examples=[1],
     )
     presence_penalty: Optional[confloat(ge=-2.0, le=2.0)] = Field(
         0,
@@ -98,22 +98,22 @@ class CreateCompletionRequest(BaseModel):
     suffix: Optional[str] = Field(
         None,
         description="The suffix that comes after a completion of inserted text.\n\nThis parameter is only supported for `gpt-3.5-turbo-instruct`.\n",
-        example="test.",
+        examples=["test."],
     )
     temperature: Optional[confloat(ge=0.0, le=2.0)] = Field(
         1,
         description="What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.\n\nWe generally recommend altering this or `top_p` but not both.\n",
-        example=1,
+        examples=[1],
     )
     top_p: Optional[confloat(ge=0.0, le=1.0)] = Field(
         1,
         description="An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.\n\nWe generally recommend altering this or `temperature` but not both.\n",
-        example=1,
+        examples=[1],
     )
     user: Optional[str] = Field(
         None,
         description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
-        example="user-1234",
+        examples=["user-1234"],
     )
 
 
@@ -251,10 +251,11 @@ class ChatCompletionRequestFunctionMessage(BaseModel):
 
 
 class FunctionParameters(BaseModel):
-    pass
-
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
+    # class Config:
+    #    # TODO: Remove
+    #    #extra = Extra.allow
+    #    extra = "allow"
 
 
 class ChatCompletionFunctions(BaseModel):
@@ -420,7 +421,7 @@ class ResponseFormat(BaseModel):
     type: Optional[Type6] = Field(
         "text",
         description="Must be one of `text` or `json_object`.",
-        example="json_object",
+        examples=["json_object"],
     )
 
 
@@ -773,12 +774,12 @@ class CreateChatCompletionRequest(BaseModel):
     messages: List[ChatCompletionRequestMessage] = Field(
         ...,
         description="A list of messages comprising the conversation so far. [Example Python code](https://cookbook.openai.com/examples/how_to_format_inputs_to_chatgpt_models).",
-        min_items=1,
+        min_length=1,
     )
     model: Union[str, Model2] = Field(
         ...,
         description="ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.",
-        example="gpt-4-turbo",
+        examples=["gpt-4-turbo"],
     )
     frequency_penalty: Optional[confloat(ge=-2.0, le=2.0)] = Field(
         0,
@@ -803,7 +804,7 @@ class CreateChatCompletionRequest(BaseModel):
     n: Optional[conint(ge=1, le=128)] = Field(
         1,
         description="How many chat completion choices to generate for each input message. Note that you will be charged based on the number of generated tokens across all of the choices. Keep `n` as `1` to minimize costs.",
-        example=1,
+        examples=[1],
     )
     presence_penalty: Optional[confloat(ge=-2.0, le=2.0)] = Field(
         0,
@@ -828,12 +829,12 @@ class CreateChatCompletionRequest(BaseModel):
     temperature: Optional[confloat(ge=0.0, le=2.0)] = Field(
         0.7,
         description="What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.\n\nWe generally recommend altering this or `top_p` but not both.\n",
-        example=1,
+        examples=[1],
     )
     top_p: Optional[confloat(ge=0.0, le=1.0)] = Field(
         1,
         description="An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.\n\nWe generally recommend altering this or `temperature` but not both.\n",
-        example=1,
+        examples=[1],
     )
     tools: Optional[List[ChatCompletionTool]] = Field(
         None,
@@ -843,7 +844,7 @@ class CreateChatCompletionRequest(BaseModel):
     user: Optional[str] = Field(
         None,
         description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
-        example="user-1234",
+        examples=["user-1234"],
     )
     function_call: Optional[
         Union[FunctionCall3, ChatCompletionFunctionCallOption]
@@ -854,8 +855,8 @@ class CreateChatCompletionRequest(BaseModel):
     functions: Optional[List[ChatCompletionFunctions]] = Field(
         None,
         description="Deprecated in favor of `tools`.\n\nA list of functions the model may generate JSON inputs for.\n",
-        max_items=128,
-        min_items=1,
+        max_length=128,
+        min_length=1,
     )
 
 

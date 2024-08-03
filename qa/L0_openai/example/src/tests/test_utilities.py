@@ -5,9 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 from src.api_server import app
 
-client = TestClient(app)
-
-
 # TODO: Use fixture for less verbose model repo prep
 # @pytest.fixture(scope="session")
 # def setup_model_repository():

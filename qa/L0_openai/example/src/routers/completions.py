@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Request
+import time
+import uuid
+
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from src.schemas.openai import (
     Choice,
@@ -7,7 +10,7 @@ from src.schemas.openai import (
     FinishReason,
     ObjectType,
 )
-from src.utils.triton import get_output
+from src.utils.triton import create_vllm_inference_request, get_output
 
 router = APIRouter()
 
@@ -45,17 +48,24 @@ def create_completion(
     Creates a completion for the provided prompt and parameters.
     """
 
-    if not model or not tokenizer or not create_inference_request:
-        raise Exception("Unknown Model")
+    if not request.model:
+        raise Exception("No Model Provided")
+
+    model = raw_request.app.server.model(request.model)
+
+    # if not not tokenizer or not create_inference_request:
+    #    raise Exception("Unknown Model")
 
     if request.suffix is not None:
         raise HTTPException(status_code=400, detail="suffix is not currently supported")
 
-    if request.model != model.name and request.model != model_source_name:
+    if request.model != model.name:
         raise HTTPException(status_code=404, detail=f"Unknown model: {request.model}")
 
-    if request.prompt is None:
-        request.prompt = "<|endoftext|>"
+    if not request.prompt:
+        # TODO: Needed?
+        # request.prompt = "<|endoftext|>"
+        raise HTTPException(status_code=400, detail="prompt must be non-empty")
 
     # Currently only support single string as input
     if not isinstance(request.prompt, str):
@@ -71,7 +81,11 @@ def create_completion(
     request_id = f"cmpl-{uuid.uuid1()}"
     created = int(time.time())
 
-    responses = model.infer(create_inference_request(model, request.prompt, request))
+    # TODO: Determine backend, using hard-coded vllm for simplicity
+    # responses = model.infer(create_inference_request(model, request.prompt, request))
+    responses = model.infer(
+        create_vllm_inference_request(model, request.prompt, request)
+    )
     if request.stream:
         return StreamingResponse(
             streaming_completion_response(request_id, created, model.name, responses)

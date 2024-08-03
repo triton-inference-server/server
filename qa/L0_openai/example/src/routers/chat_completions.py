@@ -90,6 +90,8 @@ def create_chat_completion(
         for message in request.messages
     ]
 
+    # TODO: Use HF tokenizer or use Jinja/templater directly?
+    # TODO: Function Calling / tools related to this?
     prompt = tokenizer.apply_chat_template(
         conversation=conversation,
         tokenize=False,

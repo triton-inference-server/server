@@ -1,4 +1,5 @@
 import os
+import time
 
 import numpy as np
 import tritonserver
@@ -33,15 +34,15 @@ def load_model(server):
 
 
 def init_tritonserver():
-    # TODO: How to pass arguments to server here?
     model_repository = os.environ.get(
         "TRITON_MODEL_REPOSITORY", "/opt/tritonserver/models"
     )
+    log_verbose_level = int(os.environ.get("TRITON_LOG_VERBOSE_LEVEL", "0"))
 
     print("Starting Triton Server Core...")
     server = tritonserver.Server(
         model_repository=model_repository,
-        log_verbose=1,
+        log_verbose=log_verbose_level,
         log_info=True,
         log_warn=True,
         log_error=True,
@@ -49,14 +50,14 @@ def init_tritonserver():
     ).start(wait_until_ready=True)
 
     # TODO: Cleanup
-    # print("Loading Model...\n\n")
+    print("Loading Model...\n\n")
 
-    # model, model_create_time, backend, tokenizer, model_source_name = load_model(server)
+    model, model_create_time, backend, tokenizer, model_source_name = load_model(server)
 
-    # if not (model and backend and tokenizer and model_create_time):
-    #    raise Exception("Unknown Model")
+    if not (model and backend and tokenizer and model_create_time):
+        raise Exception("Unknown Model")
 
-    # print(f"\n\nModel: {model.name} Loaded with Backend: {backend}\n\n")
+    print(f"\n\nModel: {model.name} Loaded with Backend: {backend}\n\n")
 
     # if backend == "vllm":
     #    create_inference_request = create_vllm_inference_request
@@ -79,9 +80,12 @@ def create_vllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
     inputs = {}
-    sampling_parameters = request.copy(
-        exclude={"model", "stream", "messages", "prompt", "echo"},
-    ).model_dump(exclude_none=True)
+    excludes = {"model", "stream", "messages", "prompt", "echo"}
+    # FIXME: It seems that some subset of these keys will cause the model to not return a response
+    addl_excludes = {"user", "seed", "stop", "suffix", "logprobs", "logit_bias"}
+    sampling_parameters = request.model_dump(
+        exclude=excludes.union(addl_excludes),
+    )
     inputs["text_input"] = [prompt]
     inputs["stream"] = [request.stream]
     exclude_input_in_output = True

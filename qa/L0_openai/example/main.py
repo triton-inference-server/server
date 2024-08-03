@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import uvicorn
 from src.api_server import app
@@ -8,6 +9,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Triton OpenAI Compatible RESTful API server."
     )
+    # Uvicorn
     parser.add_argument("--host", type=str, default=None, help="host name")
     parser.add_argument("--port", type=int, default=8000, help="port number")
     parser.add_argument(
@@ -17,29 +19,30 @@ def parse_args():
         choices=["debug", "info", "warning", "error", "critical", "trace"],
         help="log level for uvicorn",
     )
-    parser.add_argument(
-        "--response-role", type=str, default="assistant", help="The role name to return"
-    )
 
+    # Triton
     parser.add_argument(
         "--tritonserver-log-level",
         type=int,
         default=0,
-        help="The tritonserver log level",
+        help="The tritonserver log verbosity level",
     )
 
     parser.add_argument(
         "--model-repository",
         type=str,
-        default="/workspace/llm-models",
+        default="/opt/tritonserver/models",
         help="model repository",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    # TODO: Cleanup
     args = parse_args()
+    # NOTE: Think about other ways to pass triton args to fastapi app,
+    # but use env vars for simplicity for now.
+    os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
+    os.environ["TRITON_LOG_VERBOSE_LEVEL"] = args.tritonserver_log_level
 
     uvicorn.run(
         app,
