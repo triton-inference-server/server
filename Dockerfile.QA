@@ -149,8 +149,8 @@ RUN mkdir -p qa/common && \
     cp bin/triton_json_test qa/L0_json/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
-    cp bin/input_byte_size_test qa/L0_input_validation/. && \
-    cp -r docs/examples/model_repository/simple_identity qa/L0_input_validation/models
+    cp -r docs/examples/model_repository/{simple,simple_identity,simple_string} qa/L0_input_validation/models && \
+    cp bin/input_byte_size_test qa/L0_input_validation/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
