@@ -95,6 +95,9 @@ fi
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+mkdir -p models/identity_bf16/1/
+cp ../python_models/identity_bf16/model.py ./models/identity_bf16/1/model.py
+cp ../python_models/identity_bf16/config.pbtxt ./models/identity_bf16/config.pbtxt
 RET=0
 
 cp -r ./models/identity_fp32 ./models/identity_uint8
@@ -422,11 +425,20 @@ if [ "$TEST_JETSON" == "0" ]; then
         # between dependencies.
         setup_virtualenv
 
+        set +e
         (cd ${TEST} && bash -ex test.sh)
-        if [ $? -ne 0 ]; then
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -ne 0 ]; then
             echo "Subtest ${TEST} FAILED"
-            RET=1
+            RET=$EXIT_CODE
+
+            # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
+            # Propagate the exit code to make sure it's not overwritten by other tests.
+            if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
+                BLS_RET=$RET
+            fi
         fi
+        set -e
 
         deactivate_virtualenv
     done
@@ -435,11 +447,13 @@ if [ "$TEST_JETSON" == "0" ]; then
     if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
+        set +e
         (cd env && bash -ex test.sh)
         if [ $? -ne 0 ]; then
             echo "Subtest env FAILED"
             RET=1
         fi
+        set -e
     fi
 fi
 
@@ -456,12 +470,14 @@ for TEST in ${SUBTESTS}; do
     # between dependencies.
     setup_virtualenv
 
+    set +e
     (cd ${TEST} && bash -ex test.sh)
 
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
     fi
+    set -e
 
     deactivate_virtualenv
 done
@@ -472,4 +488,14 @@ else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 
-exit $RET
+# Exit with RET if it is 1, meaning that the test failed.
+# Otherwise, exit with BLS_RET if it is set, meaning that the known memory leak is captured.
+if [ $RET -eq 1 ]; then
+    exit $RET
+else
+    if [ -z "$BLS_RET" ]; then
+        exit $RET
+    else
+        exit $BLS_RET
+    fi
+fi

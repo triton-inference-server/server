@@ -69,14 +69,14 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.47.0",
-    "triton_container_version" : "24.06", 
-    "upstream_container_version": "24.06",  
+    "release_version": "2.49.0dev",
+    "triton_container_version" : "24.08dev", 
+    "upstream_container_version": "24.07",  
     "ort_version":    "1.18.1",  
     "ort_openvino_version": "2024.0.0",
     "standalone_openvino_version":   "2024.0.0",  
     "dcgm_version":    "3.2.6",
-    "vllm_version":   "0.5.0.post1"
+    "vllm_version":   "0.5.3.post"
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -1070,18 +1070,23 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends
 # Remove contents that are not needed in runtime
 # Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
 # The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
-RUN ldconfig && \
-    ARCH="$(uname -i)" && \
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \
-    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \
-    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \
-    python3 -m pip install --upgrade pip && \
-    pip3 install --no-cache-dir transformers && \
-    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \
-    pip3 install --no-cache-dir setuptools==69.5.1 grpcio-tools==1.64.0
-
+RUN ldconfig && \\
+    ARCH="$(uname -i)" && \\
+    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
+    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
+    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
+    python3 -m pip install --upgrade pip && \\
+    pip3 install --no-cache-dir transformers && \\
+    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
+    pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
+    pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+
+# There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
+# Downgrade to ompi v4.1.5rc2 to avoid the issue.
+RUN rm -fr /opt/hpcx/ompi
+COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1211,6 +1216,14 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
+    if "tensorrtllm" in backends:
+        df += """
+# Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)
+RUN apt-get update \\
+    && apt-get install -y --no-install-recommends \\
+        openssh-client \\
+    && rm -rf /var/lib/apt/lists/*
+    """
 
     if "vllm" in backends:
         df += """
@@ -1611,6 +1624,10 @@ def core_build(
         )
         cmake_script.cp(
             os.path.join(repo_install_dir, "bin", "tritonserver.dll"),
+            os.path.join(install_dir, "bin"),
+        )
+        cmake_script.cp(
+            os.path.join(repo_install_dir, "lib", "tritonserver.lib"),
             os.path.join(install_dir, "bin"),
         )
     else:

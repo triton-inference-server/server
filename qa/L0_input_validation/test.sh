@@ -123,6 +123,8 @@ dynamic_batching {
 EOL
 
 cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
+cp -r $DATADIR/qa_shapetensor_model_repository/plan_nobatch_zero_1_float32_int32 models/.
+cp -r $DATADIR/qa_shapetensor_model_repository/plan_zero_1_float32_int32 models/.
 
 SERVER_ARGS="--model-repository=`pwd`/models"
 run_server
