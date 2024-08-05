@@ -1422,6 +1422,7 @@ def create_build_dockerfiles(
             caches,
             endpoints,
         )
+
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, "Dockerfile.cibase", dockerfileargmap)
 
@@ -1543,6 +1544,8 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             check_exitcode=True,
         )
 
+        #
+        # Final image... tritonserver
         #
         docker_script.blankln()
         docker_script.commentln(8)
@@ -2724,9 +2727,6 @@ if __name__ == "__main__":
                 cwd=FLAGS.build_dir,
             )
         else:
-            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        res = p.communicate()
-        print("retcode =", p.returncode)
-        print("res =", res)
-        print("stderr =", res[1])
+            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
+        p.wait()
         fail_if(p.returncode != 0, "build failed")
