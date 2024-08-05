@@ -102,11 +102,6 @@ T get_value(const UnorderedMapType& options, const std::string& key) {
   bool is_present = (curr != options.end());
   bool correct_type = std::holds_alternative<T>(curr->second);
 
-  if(!is_present || !correct_type) {
-    if(curr == options.end()) std::cerr << "Error: Key " << key << " not found." << std::endl;
-    else std::cerr << "Error: Type mismatch for key." << std::endl;
-  } 
-
   return std::get<T>(curr->second); 
 }
 

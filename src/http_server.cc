@@ -4701,30 +4701,14 @@ HTTPAPIServer::Create(
   return nullptr;
 }
 
-bool HTTPAPIServer::RespondIfRestricted(
-    evhtp_request_t* req, const Restriction& restriction)
-{
-  auto header = restriction.first;
-  auto expected_value = restriction.second;
-  const char* actual_value = evhtp_kv_find(req->headers_in, header.c_str());
-  if ((actual_value == nullptr) || (actual_value != expected_value)) {
-    EVBufferAddErrorJson(
-        req->buffer_out,
-        std::string("This API is restricted, expecting header '" + header + "'")
-            .c_str());
-    evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
-    return true;
-  }
-  return false;
-}
 
-bool HTTPAPIServer::Create_Wrapper(
+bool
+HTTPAPIServer::Create_Wrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, 
       UnorderedMapType& data, 
       std::unique_ptr<HTTPServer>* service,
       const RestrictedFeatures& restricted_features) 
-{
-    
+{ 
     int port = get_value<int>(data, "port");
     bool reuse_port = get_value<int>(data, "reuse_port");
     std::string address = get_value<std::string>(data, "address"); 
@@ -4741,6 +4725,25 @@ bool HTTPAPIServer::Create_Wrapper(
     if(err == nullptr) return true;
 
     return false;
+}
+
+
+bool
+HTTPAPIServer::RespondIfRestricted(
+    evhtp_request_t* req, const Restriction& restriction)
+{
+  auto header = restriction.first;
+  auto expected_value = restriction.second;
+  const char* actual_value = evhtp_kv_find(req->headers_in, header.c_str());
+  if ((actual_value == nullptr) || (actual_value != expected_value)) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        std::string("This API is restricted, expecting header '" + header + "'")
+            .c_str());
+    evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
+    return true;
+  }
+  return false;
 }
 
 

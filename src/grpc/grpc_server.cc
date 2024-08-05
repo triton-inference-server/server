@@ -2435,7 +2435,8 @@ Server::Create(
   return nullptr;  // success
 }
 
-bool Server::Create_Wrapper(
+bool
+Server::Create_Wrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, 
       UnorderedMapType& data, 
       std::unique_ptr<triton::server::grpc::Server>* service,
