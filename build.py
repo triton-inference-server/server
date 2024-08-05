@@ -820,8 +820,6 @@ def tensorrtllm_cmake_args(images):
 
 
 def install_dcgm_libraries(dcgm_version, target_machine):
-    log(f"dcgm_version is {dcgm_version}")
-    
     if target_machine == "aarch64":
         return """
 ENV DCGM_VERSION {}
@@ -1002,7 +1000,6 @@ WORKDIR /workspace
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 """
-    log("writing df after create_dockerfile_cibase")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1054,7 +1051,6 @@ WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
 """
-    log("Adding feature labels for sagemaker endpoint")
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
         if "sagemaker" in endpoints:
@@ -1087,13 +1083,11 @@ RUN ldconfig && \
 
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 """
-    log("writing dockerfile")
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
 
 def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_machine):
-    log("Preparing container for Linux")
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets environment variables, installs dependencies and adds entrypoint
@@ -1110,7 +1104,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 # in the min container.
 ENV UCX_MEM_EVENTS no
 """
-    log("setting dependencies per backend")
     # Necessary for libtorch.so to find correct HPCX libraries
     if "pytorch" in backends:
         df += """
@@ -1128,7 +1121,6 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
         backend_dependencies += " openssh-server"
-    log(f"backend_dependencies: {backend_dependencies}")
     
     df += """
 ENV TF_ADJUST_HUE_FUSED         1
@@ -1176,7 +1168,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 """.format(
         gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies
     )
-    log("checking more backends")
     if "fastertransformer" in backends:
         be = "fastertransformer"
         url = "https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py".format(
@@ -1191,7 +1182,6 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
 
     if enable_gpu:
-        log("install_dcgm_libraries")
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
         df += """
 # Extra defensive wiring for CUDA Compat lib
@@ -1201,10 +1191,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
       && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
-        log("install_cpu_libraries")
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
-    log("add dependencies for python backend")
     # Add dependencies needed for python backend
     if "python" in backends:
         df += """
@@ -1261,7 +1249,6 @@ LABEL com.nvidia.build.ref={}
 """.format(
         argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
     )
-    log("returning df")
     return df
 
 
@@ -1417,7 +1404,6 @@ def create_build_dockerfiles(
     )
 
     if target_platform() == "windows":
-        log("Creating dockerfile for Windows")
         create_dockerfile_windows(
             FLAGS.build_dir,
             "Dockerfile",
@@ -1427,7 +1413,6 @@ def create_build_dockerfiles(
             caches,
         )
     else:
-        log("Creating dockerfile for Linux")
         create_dockerfile_linux(
             FLAGS.build_dir,
             "Dockerfile",
@@ -1437,7 +1422,6 @@ def create_build_dockerfiles(
             caches,
             endpoints,
         )
-    log("create_dockerfile_cibase")
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, "Dockerfile.cibase", dockerfileargmap)
 
@@ -1559,8 +1543,6 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             check_exitcode=True,
         )
 
-        #
-        log("Final image... tritonserver")
         #
         docker_script.blankln()
         docker_script.commentln(8)
@@ -2373,7 +2355,6 @@ if __name__ == "__main__":
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
 
-    log(f"FLAGS: {FLAGS}")
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
@@ -2731,7 +2712,6 @@ if __name__ == "__main__":
         create_build_dockerfiles(
             script_build_dir, images, backends, repoagents, caches, FLAGS.endpoint
         )
-        log("create_docker_build_script")
         create_docker_build_script(script_name, script_install_dir, script_ci_dir)
 
     # In not dry-run, execute the script to perform the build...  If a
