@@ -43,6 +43,9 @@ class KServeHttp:
         header_forward_pattern: str = ""
         # restricted_protocols: list
 
+        def __post_init__(self):
+            self.validate()
+
     class Server:
         def __init__(
             self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"

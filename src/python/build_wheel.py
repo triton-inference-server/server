@@ -55,19 +55,17 @@ def cpdir(src, dest):
 
 
 def sed(pattern, replace, source, dest=None):
-    fin = open(source, "r")
+    name = None
     if dest:
-        fout = open(dest, "w")
-    else:
+        name = dest
+    if dest is None:
         fd, name = mkstemp()
-        fout = open(name, "w")
 
-    for line in fin:
-        out = re.sub(pattern, replace, line)
-        fout.write(out)
+    with open(source, "r") as fin, open(name, "w") as fout:
+        for line in fin:
+            out = re.sub(pattern, replace, line)
+            fout.write(out)
 
-    fin.close()
-    fout.close()
     if not dest:
         shutil.copyfile(name, source)
 

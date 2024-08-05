@@ -86,9 +86,7 @@ class KServeGrpc:
             self.validate()
 
     class Server:
-        def __init__(
-            self, server: tritonserver, options: "KServeHTTP.KServeGrpcOptions"
-        ):
+        def __init__(self, server: tritonserver, options: "KServeGrpc.Options"):
             server_ptr = server.get_c_ptr()
             options_dict: dict[str, Union[int, bool, str]] = asdict(options)
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
