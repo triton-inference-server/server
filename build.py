@@ -649,7 +649,8 @@ def onnxruntime_cmake_args(images, library_paths):
     ]
 
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
-    if FLAGS.enable_gpu:
+    # TODO: TPRD-334 TensorRT extension is not currently supported by our manylinux build
+    if FLAGS.enable_gpu and target_platform() != "rhel":
         cargs.append(
             cmake_backend_enable(
                 "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
@@ -680,8 +681,11 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-        if (target_machine() != "aarch64") and (
-            TRITON_VERSION_MAP[FLAGS.version][3] is not None
+        # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
+        if (
+            (target_machine() != "aarch64")
+            and (target_platform() != "rhel")
+            and (TRITON_VERSION_MAP[FLAGS.version][3] is not None)
         ):
             cargs.append(
                 cmake_backend_enable(
@@ -697,7 +701,7 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-        if target_platform() == "igpu":
+        if (target_platform() == "igpu") or (target_platform() == "rhel"):
             cargs.append(
                 cmake_backend_arg(
                     "onnxruntime",
@@ -833,7 +837,7 @@ def install_dcgm_libraries(dcgm_version, target_machine):
         )
         return ""
     else:
-                # RHEL has the same install instructions for both aarch64 and x86
+        # RHEL has the same install instructions for both aarch64 and x86
         if target_platform() == "rhel":
             if target_machine == "aarch64":
                 return """
@@ -842,7 +846,9 @@ ENV DCGM_VERSION {}
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
     && dnf install -y datacenter-gpu-manager-{}
-""".format(dcgm_version, dcgm_version)
+""".format(
+                    dcgm_version, dcgm_version
+                )
             else:
                 return """
 ENV DCGM_VERSION {}
@@ -850,7 +856,9 @@ ENV DCGM_VERSION {}
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
     && dnf install -y datacenter-gpu-manager-{}
-""".format(dcgm_version, dcgm_version)
+""".format(
+                    dcgm_version, dcgm_version
+                )
         else:
             if target_machine == "aarch64":
                 return """
@@ -863,8 +871,8 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt-get update \\
       && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
-                dcgm_version, dcgm_version
-            )
+                    dcgm_version, dcgm_version
+                )
             else:
                 return """
 ENV DCGM_VERSION {}
@@ -876,8 +884,9 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt-get update \\
       && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
-                dcgm_version, dcgm_version
-            )
+                    dcgm_version, dcgm_version
+                )
+
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
@@ -933,7 +942,7 @@ RUN yum install -y \\
             libarchive-devel \\
             libxml2-devel \\
             numactl-devel \\
-            wget 
+            wget
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
@@ -975,6 +984,7 @@ ENTRYPOINT []
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
+
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = """
@@ -1132,10 +1142,12 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
-def create_dockerfile_rhel(    
+
+def create_dockerfile_rhel(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
 ):
-    pass 
+    pass
+
 
 def create_dockerfile_linux(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
@@ -1280,12 +1292,14 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
         fi \\
       && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
       && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
-""".format(gpu_enabled=gpu_enabled)
+""".format(
+        gpu_enabled=gpu_enabled
+    )
 
-    # This 
+    # This
     if target_platform() == "rhel":
         df += """
-# Common dpeendencies. 
+# Common dpeendencies.
 RUN yum install -y \\
         git \\
         gperf \\
@@ -1298,7 +1312,7 @@ RUN yum install -y \\
         patchelf \\
         wget \\
         numactl-devel \\
-        wget 
+        wget
 """
     else:
         df += """
@@ -1324,8 +1338,10 @@ RUN apt-get update \\
               wget \\
               {backend_dependencies} \\
       && rm -rf /var/lib/apt/lists/*
-""".format(backend_dependencies=backend_dependencies)
-   
+""".format(
+            backend_dependencies=backend_dependencies
+        )
+
     df += """
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
