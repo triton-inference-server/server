@@ -1050,7 +1050,7 @@ RUN yum install -y \\
             libarchive-devel \\
             libxml2-devel \\
             numactl-devel \\
-            wget 
+            wget
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
@@ -1092,6 +1092,7 @@ ENTRYPOINT []
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
+
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = """
@@ -1249,10 +1250,12 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
-def create_dockerfile_rhel(    
+
+def create_dockerfile_rhel(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
 ):
-    pass 
+    pass
+
 
 def create_dockerfile_linux(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
