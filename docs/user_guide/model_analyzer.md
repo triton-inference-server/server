@@ -30,7 +30,7 @@
 
 The Triton [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
  is a tool that uses
-[Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+[Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 to send requests to your model while measuring GPU memory and compute
 utilization. The Model Analyzer is specifically useful for characterizing the
 GPU memory requirements for your model under different batching and model

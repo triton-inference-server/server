@@ -179,7 +179,7 @@ configuration](docs/user_guide/model_configuration.md) for the model.
   [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/blob/main/docs/backend_platform_support_matrix.md)
   to learn which backends are supported on your target platform.
 - Learn how to [optimize performance](docs/user_guide/optimization.md) using the
-  [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+  [Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
   and
   [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
 - Learn how to [manage loading and unloading models](docs/user_guide/model_management.md) in

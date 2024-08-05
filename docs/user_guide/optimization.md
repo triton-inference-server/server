@@ -44,7 +44,7 @@ single GPU.
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
 yourself with
-[Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md).
+[Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md).
 The Performance Analyzer is an essential tool for optimizing your model's
 performance.
 
