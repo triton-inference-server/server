@@ -81,9 +81,7 @@ public:
     };
     
     static TRITONSERVER_Error* TRITONSERVER_CustomDestroy(TRITONSERVER_Server* obj) {
-        std::cout << "[TritonFrontend] CustomDestroy is called!" << std::endl;
-        if(obj == nullptr) std::cout << "[TritonFrontend] server is nullptr" << std::endl;
-        return nullptr;
+        return nullptr; // Prevents double-free
     };
 };
 

@@ -550,6 +550,4 @@ main(int argc, char** argv)
 #endif  // TRITON_ENABLE_ASAN
 
   return 0;
-
-  // 234234234
 }
