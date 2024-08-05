@@ -29,6 +29,7 @@ cmake_minimum_required (VERSION 3.18)
 project(tritonserverexe LANGUAGES C CXX)
 
 include(GNUInstallDirs)
+
 #
 # Dependencies
 #
@@ -53,12 +54,10 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_BACKEND_REPO_TAG}
 )
 
-
 if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
-
 
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
