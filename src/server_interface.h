@@ -57,7 +57,7 @@ get_value(const UnorderedMapType& options, const std::string& key)
 
 class Server_Interface {
  public:
-  virtual bool Create_Wrapper(
+  virtual bool CreateWrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
       std::unique_ptr<Server_Interface>* service,
       const RestrictedFeatures& restricted_features);

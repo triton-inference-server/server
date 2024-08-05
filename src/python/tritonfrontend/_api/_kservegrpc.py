@@ -27,7 +27,7 @@
 
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Union
 
 import tritonserver
 from tritonfrontend._api.validation import Validation
@@ -98,8 +98,6 @@ class KServeGrpc:
         def __del__(self):
             # Delete called on C++ side, so assigning to None to prevent double-free
             self.triton_c_object = None
-            pass
-            # Need to bind a function which is
 
         def start(self):
             return self.triton_c_object.start()

@@ -2436,7 +2436,7 @@ Server::Create(
 }
 
 bool
-Server::Create_Wrapper(
+Server::CreateWrapper(
     std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
     std::unique_ptr<triton::server::grpc::Server>* service,
     const RestrictedFeatures& restricted_features)

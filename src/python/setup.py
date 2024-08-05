@@ -27,7 +27,6 @@
 
 import os
 import sys
-from itertools import chain
 
 from setuptools import find_packages, setup
 

@@ -64,7 +64,7 @@ class TritonFrontend {
     //     printVariant(value);
     // }
 
-    bool res = Frontend_Server::Create_Wrapper(
+    bool res = Frontend_Server::CreateWrapper(
         server_, data, &service, restricted_features);
   };
 

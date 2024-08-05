@@ -4703,7 +4703,7 @@ HTTPAPIServer::Create(
 
 
 bool
-HTTPAPIServer::Create_Wrapper(
+HTTPAPIServer::CreateWrapper(
     std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
     std::unique_ptr<HTTPServer>* service,
     const RestrictedFeatures& restricted_features)
@@ -4716,13 +4716,9 @@ HTTPAPIServer::Create_Wrapper(
   int thread_count = get_value<int>(data, "thread_count");
 
   TRITONSERVER_Error* err = Create(
-      server,                     // shared_ptr<TRITONSERVER_Server>
-      nullptr, nullptr,           // TraceManager, SharedMemoryManager
-      port, reuse_port, address,  // port, reuse_port, address
-      header_forward_pattern,
-      thread_count,         // header_forward_pattern, thread_count
-      restricted_features,  // RestrictedFeatures
-      service);             // HTTPServer instance
+      server, nullptr, nullptr,  // TraceManager, SharedMemoryManager
+      port, reuse_port, address, header_forward_pattern, thread_count,
+      restricted_features, service);
 
   if (err == nullptr)
     return true;

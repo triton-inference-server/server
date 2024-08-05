@@ -826,8 +826,4 @@ target_compile_definitions(
     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
   )
 
-# Add the -fPIC flag
-# set_target_properties(server-src-lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-
 add_subdirectory(python python)

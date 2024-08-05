@@ -1,7 +1,3 @@
-import subprocess
-
-import tritonclient.grpc as grpcclient
-import tritonclient.http as httpclient
 import tritonserver
 from tritonfrontend import KServeGrpc, KServeHttp
 

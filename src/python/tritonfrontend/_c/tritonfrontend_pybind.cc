@@ -170,20 +170,14 @@ PYBIND11_MODULE(tritonfrontend_bindings, m)
       m, "AlreadyExistsError", tfe.ptr());
 
   py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
-      // .def(py::init<>())
       .def(py::init<uintptr_t, UnorderedMapType>())
-      // .def("CreateWrapper",
-      // &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
       .def("start", &TritonFrontend<HTTPServer, HTTPAPIServer>::StartService)
       .def("stop", &TritonFrontend<HTTPServer, HTTPAPIServer>::StopService);
 
   py::class_<TritonFrontend<
       triton::server::grpc::Server, triton::server::grpc::Server>>(
       m, "TritonFrontendGrpc")
-      // .def(py::init<>())
       .def(py::init<uintptr_t, UnorderedMapType>())
-      // .def("CreateWrapper",
-      // &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
       .def(
           "start", &TritonFrontend<
                        triton::server::grpc::Server,

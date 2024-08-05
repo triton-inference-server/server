@@ -24,11 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from contextlib import contextmanager
 from subprocess import call
-from typing import Union
 
-import pytest
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
@@ -60,7 +57,7 @@ grpc_service.start()
 
 
 # Context Manager to start and stop/close respective client
-class MockClient:  # Default http settings
+class ClientHelper:  # Default http settings
     def __init__(self, frontend_service=httpclient, url="localhost:8000"):
         self.frontend_service = frontend_service
         self.url = url
@@ -77,31 +74,31 @@ class MockClient:  # Default http settings
 
 class TestKServeHttp:
     def test_server_ready(self):
-        with MockClient(httpclient) as http_client:
+        with ClientHelper(httpclient) as http_client:
             assert http_client.is_server_ready()
 
     def test_server_live(self):
-        with MockClient(httpclient) as http_client:
+        with ClientHelper(httpclient) as http_client:
             assert http_client.is_server_live()
 
-    def test_load_model(model_name):
+    def test_load_model(self, model_name):
         pass
 
-    def test_unload_model(model_name):
+    def test_unload_model(self, model_name):
         pass
 
-    def test_get_model_metadata(model_name):
+    def test_get_model_metadata(self, model_name):
         pass
 
-    def test_get_model_config(model_name):
+    def test_get_model_config(self, model_name):
         pass
 
 
 class TestKServeGrpc:
     def test_server_ready(self):
-        with MockClient(grpcclient, url="localhost:8001") as grpc_client:
+        with ClientHelper(grpcclient, url="localhost:8001") as grpc_client:
             assert grpc_client.is_server_ready()
 
     def test_server_live(self):
-        with MockClient(grpcclient, url="localhost:8001") as grpc_client:
+        with ClientHelper(grpcclient, url="localhost:8001") as grpc_client:
             assert grpc_client.is_server_live()
