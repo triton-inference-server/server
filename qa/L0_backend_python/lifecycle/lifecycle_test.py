@@ -244,7 +244,7 @@ class LifecycleTest(unittest.TestCase):
     def test_grpc_strict_error_on(self):
         model_name = "execute_grpc_error"
         shape = [2, 2]
-        number_of_requests = 3
+        number_of_requests = 2
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         metadata = {"grpc_strict": "true"}
@@ -265,7 +265,11 @@ class LifecycleTest(unittest.TestCase):
                 inputs[0].set_data_from_numpy(input_data)
                 triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
                 result = user_data._completed_requests.get()
-                if i == 1:
+                if i == 0:
+                    # Stream is not killed
+                    output_data = result.as_numpy("OUT")
+                    self.assertIsNotNone(output_data, "error: expected 'OUT'")
+                elif i == 1:
                     # execute_grpc_error intentionally returns error with StatusCode.INTERNAL status on 2nd request
                     self.assertIsInstance(result, InferenceServerException)
                     self.assertEqual(str(result.status()), "StatusCode.INTERNAL")
@@ -273,7 +277,7 @@ class LifecycleTest(unittest.TestCase):
     def test_grpc_strict_error_off(self):
         model_name = "execute_grpc_error"
         shape = [2, 2]
-        number_of_requests = 3
+        number_of_requests = 4
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
@@ -291,14 +295,15 @@ class LifecycleTest(unittest.TestCase):
                 inputs[0].set_data_from_numpy(input_data)
                 triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
                 result = user_data._completed_requests.get()
-                if i == 1:
+                if i == 1 or i == 3:
                     # execute_grpc_error intentionally returns error with StatusCode.INTERNAL status on 2nd request
                     self.assertIsInstance(result, InferenceServerException)
                     # Existing Behaviour
-                    self.assertEqual(str(result.status()), "NONE")
-                if i == 2:
+                    self.assertEqual(str(result.status()), "None")
+                elif i == 0 or i == 2:
                     # Stream is not killed
-                    self.assertIsInstance(result, InferResult)
+                    output_data = result.as_numpy("OUT")
+                    self.assertIsNotNone(output_data, "error: expected 'OUT'")
 
 
 if __name__ == "__main__":

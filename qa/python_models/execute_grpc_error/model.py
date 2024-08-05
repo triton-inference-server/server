@@ -30,7 +30,7 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     def __init__(self):
         # Maintain total inference count, so as to return error on 2nd request, all of this to simulate model failure
-        self.inf_count = 0
+        self.inf_count = 1
 
     def execute(self, requests):
         """This function is called on inference request."""
@@ -40,13 +40,13 @@ class TritonPythonModel:
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
             out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
-            if self.inf_count == 0:
+            if self.inf_count % 2:
+                # Every odd request is success
                 responses.append(pb_utils.InferenceResponse([out_tensor]))
-            elif self.inf_count == 1:
+            else:
+                # Every even request is failure
                 error = pb_utils.TritonError("An error occurred during execution")
                 responses.append(pb_utils.InferenceResponse([out_tensor], error))
-            elif self.inf_count == 2:
-                responses.append(pb_utils.InferenceResponse([out_tensor]))
             self.inf_count += 1
 
         return responses
