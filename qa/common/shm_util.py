@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -441,6 +441,9 @@ class ShmLeakDetector:
                     print(
                         f"Shared memory leak detected [{shm_region}]: {curr_shm_free_size} (curr free) < {prev_shm_free_size} (prev free)."
                     )
+                    # FIXME DLIS-7122: Known shared memory leak of 480 bytes in BLS test.
+                    if curr_shm_free_size == 1006576 and prev_shm_free_size == 1007056:
+                        assert False, f"Known shared memory leak of 480 bytes detected."
             assert not shm_leak_detected, f"Shared memory leak detected."
 
         def _get_shm_free_sizes(self, delay_sec=0):

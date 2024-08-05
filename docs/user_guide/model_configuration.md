@@ -598,6 +598,40 @@ input1: [4, 4, 6] <== shape of this tensor [3]
 Currently, only TensorRT supports shape tensors. Read [Shape Tensor I/O](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#shape_tensor_io)
 to learn more about shape tensors.
 
+## Non-Linear I/O Formats
+
+For models that process input or output data in non-linear formats, the _is_non_linear_format_io_ property
+must be set. The following example model configuration shows how to specify that INPUT0 and INPUT1 use non-linear I/O data formats.
+
+```
+  name: "mytensorrtmodel"
+  platform: "tensorrt_plan"
+  max_batch_size: 8
+  input [
+    {
+      name: "INPUT0"
+      data_type: TYPE_FP16
+      dims: [ 3,224,224 ]
+      is_non_linear_format_io: true
+    },
+    {
+      name: "INPUT1"
+      data_type: TYPE_FP16
+      dims: [ 3,224,224 ]
+      is_non_linear_format_io: true
+    }
+  ]
+  output [
+    {
+      name: "OUTPUT0"
+      data_type: TYPE_FP16
+      dims: [ 1,3 ]
+     }
+  ]
+```
+
+Currently, only TensorRT supports this property. To learn more about I/O formats, refer to the [I/O Formats documentation](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#reformat-free-network-tensors).
+
 ## Version Policy
 
 Each model can have one or more

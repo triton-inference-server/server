@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,6 +59,11 @@ source ../common/util.sh
 
 rm -f *.log
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
+
+if [ ! -d ${DATADIR} ]; then
+  echo -e "\n***\n*** ${DATADIR} does not exist!\n***"
+  exit 1
+fi
 
 # set up simple repository MODELBASE
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \

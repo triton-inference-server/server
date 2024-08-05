@@ -405,6 +405,9 @@ class TestLogFormat:
         if not os.path.exists(self._server_options["log-file"]):
             raise Exception("Log not found")
 
+        # Give server a little time to have the endpoints up and ready
+        time.sleep(10)
+
     def _validate_log_record(self, record, format_regex, escaped):
         match = format_regex.search(record)
         assert match, "Invalid log line"
@@ -483,18 +486,29 @@ class TestLogFormat:
             # TODO Refactor server launch, shutdown into reusable class
             wait_time = 10
 
-            while wait_time and not triton_client.is_server_ready():
+            while wait_time:
+                try:
+                    if triton_client.is_server_ready():
+                        break
+                # Gracefully handle connection error if server endpoint isn't up yet
+                except Exception as e:
+                    print(
+                        f"Client failed to connect, retries remaining: {wait_time}. Error: {e}"
+                    )
+
                 time.sleep(1)
                 wait_time -= 1
+                print(f"Server not ready yet, retries remaining: {wait_time}")
 
             while wait_time and not triton_client.is_model_ready("simple"):
                 time.sleep(1)
                 wait_time -= 1
 
-            if not triton_client.is_server_ready() or not triton_client.is_model_ready(
-                "simple"
-            ):
-                raise Exception("Model or Server not Ready")
+            if not triton_client.is_server_ready():
+                raise Exception("Server not Ready")
+
+            if not triton_client.is_model_ready("simple"):
+                raise Exception("Model not Ready")
 
         except Exception as e:
             self._shutdown_server()
