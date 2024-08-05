@@ -33,6 +33,7 @@ ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.07-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
+ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_CLIENT_REPO_TAG=main
