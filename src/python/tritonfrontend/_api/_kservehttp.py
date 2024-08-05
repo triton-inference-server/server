@@ -18,18 +18,15 @@ class KServeHttp:
 
     class Server:
         def __init__(self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"):
-
             server_ptr = server.get_c_ptr()
             options_dict: dict[str, Union[int, bool, str]] = asdict(options)
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>> 
-
             self.triton_c_object = TritonFrontendHttp(server_ptr, options_dict)
 
         def __del__(self):
-            # Delete called on C++ side, so assigning to None to prevent double-free
+            # Delete called on C++ side, so assigning to None for safety and preventing potential double-free
             self.triton_c_object = None
             pass
-            # Need to bind a function which is
         
         def start(self):
             return self.triton_c_object.start()

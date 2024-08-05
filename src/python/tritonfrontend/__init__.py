@@ -1,11 +1,10 @@
-# triton/server/python/tritonfrontend/__init__.py
+# triton/server/src/python/tritonfrontend/__init__.py
 
 from importlib.metadata import PackageNotFoundError, version
 
 # Bindings from C++. TritonFrontend exposes C++ Classes and Functions.
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendHttp
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendGrpc
-
 
 
 from tritonfrontend._api._kservehttp import KServeHttp

@@ -1,20 +1,23 @@
 import subprocess, tritonserver
 from tritonfrontend import KServeHttp, KServeGrpc
+import tritonclient.http as httpclient
+import tritonclient.grpc as grpcclient
 
-server_options = tritonserver.Options(server_id="TestServer", model_repository="/root/models", log_error=True, log_warn=True, log_info=True)
-server = tritonserver.Server(server_options).start(wait_until_ready=True) # C Equivalent of TRITONSERVER_Server*
+model_path = "/server/docs/examples/model_repository"
+server_options = tritonserver.Options(server_id="ExampleServer", model_repository=model_path, log_error=True, log_warn=True, log_info=True)
+server = tritonserver.Server(server_options).start() 
 
-http_options = KServeHttp.Options(thread_count = 1)
-grpc_options = KServeGrpc.Options()
-
+http_options = KServeHttp.Options()
 http_service = KServeHttp.Server(server, http_options)
 http_service.start()
 
-
+grpc_options = KServeGrpc.Options()
 grpc_service = KServeGrpc.Server(server, grpc_options)
 grpc_service.start()
 
 
-
 http_service.stop()
 grpc_service.stop()
+
+
+

@@ -134,12 +134,6 @@ StartHttpService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  std::cout << "HTTP PORT: "                   << g_triton_params.http_port_ << std::endl;
-  std::cout << "Reuse HTTP PORT: "             << g_triton_params.reuse_http_port_ << std::endl;
-  std::cout << "HTTP Address: "                << g_triton_params.http_address_ << std::endl;
-  std::cout << "HTTP Forward Header Pattern: " << g_triton_params.http_forward_header_pattern_ << std::endl;
-  std::cout << "HTTP Thread Count: "           << g_triton_params.http_thread_cnt_ << std::endl;
-  // std::cout << "HTTP Restricted APIs: "        << g_triton_params.http_restricted_apis_ << std::endl;
   
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
