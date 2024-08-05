@@ -70,13 +70,13 @@ import requests
 #
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.49.0dev",
-    "triton_container_version" : "24.08dev", 
-    "upstream_container_version": "24.07",  
-    "ort_version":    "1.18.1",  
+    "triton_container_version": "24.08dev",
+    "upstream_container_version": "24.07",
+    "ort_version": "1.18.1",
     "ort_openvino_version": "2024.0.0",
-    "standalone_openvino_version":   "2024.0.0",  
-    "dcgm_version":    "3.2.6",
-    "vllm_version":   "0.5.3.post"
+    "standalone_openvino_version": "2024.0.0",
+    "dcgm_version": "3.2.6",
+    "vllm_version": "0.5.3.post",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -129,7 +129,9 @@ def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
         container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
     if upstream_container_version is None:
-        upstream_container_version = DEFAULT_TRITON_VERSION_MAP["upstream_container_version"]
+        upstream_container_version = DEFAULT_TRITON_VERSION_MAP[
+            "upstream_container_version"
+        ]
     return container_version, upstream_container_version
 
 
@@ -832,7 +834,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
-            )
+        )
     else:
         return """
 ENV DCGM_VERSION {}
@@ -845,7 +847,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt-get install -y datacenter-gpu-manager=1:{}
 """.format(
                 dcgm_version, dcgm_version
-            )
+        )
 
 
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
@@ -1126,7 +1128,7 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
         backend_dependencies += " openssh-server"
-    
+
     df += """
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
