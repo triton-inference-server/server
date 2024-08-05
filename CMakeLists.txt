@@ -211,9 +211,6 @@ if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
 endif() # TRITON_ENABLE_TRACING
 
 
-set(LIBTRITONSERVER_LIBRARY "/opt/tritonserver/stubs/libtritonserver.so")
-
-
 ExternalProject_Add(triton-server
   PREFIX triton-server
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
