@@ -110,8 +110,8 @@ add_executable(
 
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_library(server-interface-library server_interface.h)
-set_target_properties(server-interface-library 
-                      PROPERTIES 
+set_target_properties(server-interface-library
+                      PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       LINKER_LANGUAGE CXX)
 target_compile_features(server-interface-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
@@ -362,7 +362,7 @@ if(${TRITON_ENABLE_HTTP}
     http-endpoint-library EXCLUDE_FROM_ALL
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
-  
+
   target_compile_features(http-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(
@@ -377,7 +377,7 @@ if(${TRITON_ENABLE_HTTP}
         -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
     )
   endif()
- 
+
   set_target_properties(
     http-endpoint-library
     PROPERTIES
@@ -792,7 +792,7 @@ find_package(CUDAToolkit REQUIRED)
 
 # TODO: Remove excess stuff
 add_library(
-  python-binding-dependency 
+  python-binding-dependency
   EXCLUDE_FROM_ALL
   shared_memory_manager.h
   shared_memory_manager.cc
@@ -807,7 +807,7 @@ add_library(
 target_link_libraries(
   python-binding-dependency
   PUBLIC
-  http-endpoint-library 
+  http-endpoint-library
   grpc-endpoint-library
   CUDA::cudart
   triton-core-serverapi           # from repo-core

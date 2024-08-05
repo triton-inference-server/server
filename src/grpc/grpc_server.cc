@@ -2437,54 +2437,70 @@ Server::Create(
 
 bool
 Server::Create_Wrapper(
-      std::shared_ptr<TRITONSERVER_Server>& server, 
-      UnorderedMapType& data, 
-      std::unique_ptr<triton::server::grpc::Server>* service,
-      const RestrictedFeatures& restricted_features) {
+    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    std::unique_ptr<triton::server::grpc::Server>* service,
+    const RestrictedFeatures& restricted_features)
+{
+  std::string address = get_value<std::string>(data, "address");
+  int port = get_value<int>(data, "port");
+  bool reuse_port = get_value<int>(data, "reuse_port");
 
-    std::string address = get_value<std::string>(data, "address");
-    int port = get_value<int>(data, "port");
-    bool reuse_port = get_value<int>(data, "reuse_port");
-    
-    SocketOptions socket_selection{address, port, reuse_port};
-    
-    bool use_ssl = get_value<int>(data, "use_ssl");
-    std::string server_cert = get_value<std::string>(data, "server_cert");
-    std::string server_key = get_value<std::string>(data, "server_key");
-    std::string root_cert = get_value<std::string>(data, "root_cert");
-    bool use_mutual_auth = get_value<int>(data, "use_mutual_auth");
+  SocketOptions socket_selection{address, port, reuse_port};
 
-    SslOptions ssl_selection{use_ssl, server_cert, server_key, root_cert, use_mutual_auth};
+  bool use_ssl = get_value<int>(data, "use_ssl");
+  std::string server_cert = get_value<std::string>(data, "server_cert");
+  std::string server_key = get_value<std::string>(data, "server_key");
+  std::string root_cert = get_value<std::string>(data, "root_cert");
+  bool use_mutual_auth = get_value<int>(data, "use_mutual_auth");
 
-    int keepalive_time_ms = get_value<int>(data, "keepalive_time_ms");
-    int keepalive_timeout_ms = get_value<int>(data, "keepalive_timeout_ms");
-    bool keepalive_permit_without_calls = get_value<int>(data, "keepalive_permit_without_calls");
-    int http2_max_pings_without_data = get_value<int>(data, "http2_max_pings_without_data");
-    int http2_min_recv_ping_interval_without_data_ms = get_value<int>(data, "http2_min_recv_ping_interval_without_data_ms");
-    int http2_max_ping_strikes = get_value<int>(data, "http2_max_ping_strikes");
-    int max_connection_age_ms = get_value<int>(data, "max_connection_age_ms");
-    int max_connection_age_grace_ms = get_value<int>(data, "max_connection_age_grace_ms");
+  SslOptions ssl_selection{
+      use_ssl, server_cert, server_key, root_cert, use_mutual_auth};
 
-    KeepAliveOptions keep_alive_selection{keepalive_time_ms, keepalive_timeout_ms,
-                     keepalive_permit_without_calls, http2_max_pings_without_data,
-                     http2_min_recv_ping_interval_without_data_ms, http2_max_ping_strikes,
-                     max_connection_age_ms, max_connection_age_grace_ms};
+  int keepalive_time_ms = get_value<int>(data, "keepalive_time_ms");
+  int keepalive_timeout_ms = get_value<int>(data, "keepalive_timeout_ms");
+  bool keepalive_permit_without_calls =
+      get_value<int>(data, "keepalive_permit_without_calls");
+  int http2_max_pings_without_data =
+      get_value<int>(data, "http2_max_pings_without_data");
+  int http2_min_recv_ping_interval_without_data_ms =
+      get_value<int>(data, "http2_min_recv_ping_interval_without_data_ms");
+  int http2_max_ping_strikes = get_value<int>(data, "http2_max_ping_strikes");
+  int max_connection_age_ms = get_value<int>(data, "max_connection_age_ms");
+  int max_connection_age_grace_ms =
+      get_value<int>(data, "max_connection_age_grace_ms");
 
-    grpc_compression_level infer_compression_level = static_cast<grpc_compression_level>(get_value<int>(data, "infer_compression_level"));
-    int infer_allocation_pool_size = get_value<int>(data, "infer_allocation_pool_size");
-    std::string forward_header_pattern = get_value<std::string>(data, "forward_header_pattern");
-    
-    
-    Options grpc_options{socket_selection, ssl_selection, keep_alive_selection,
-                        infer_compression_level, infer_allocation_pool_size, 
-                        restricted_features, forward_header_pattern};
-    
-    TRITONSERVER_Error* err = Create(server, nullptr, nullptr, 
-                                      grpc_options, service);
-    if(err == nullptr) {return true;}
+  KeepAliveOptions keep_alive_selection{
+      keepalive_time_ms,
+      keepalive_timeout_ms,
+      keepalive_permit_without_calls,
+      http2_max_pings_without_data,
+      http2_min_recv_ping_interval_without_data_ms,
+      http2_max_ping_strikes,
+      max_connection_age_ms,
+      max_connection_age_grace_ms};
 
-    return false;
-}   
+  grpc_compression_level infer_compression_level =
+      static_cast<grpc_compression_level>(
+          get_value<int>(data, "infer_compression_level"));
+  int infer_allocation_pool_size =
+      get_value<int>(data, "infer_allocation_pool_size");
+  std::string forward_header_pattern =
+      get_value<std::string>(data, "forward_header_pattern");
+
+
+  Options grpc_options{socket_selection,           ssl_selection,
+                       keep_alive_selection,       infer_compression_level,
+                       infer_allocation_pool_size, restricted_features,
+                       forward_header_pattern};
+
+  TRITONSERVER_Error* err =
+      Create(server, nullptr, nullptr, grpc_options, service);
+  if (err == nullptr) {
+    return true;
+  }
+
+  return false;
+}
 
 TRITONSERVER_Error*
 Server::Start()

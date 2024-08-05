@@ -97,12 +97,12 @@ using VariantType = std::variant<int, bool, std::string>;
 using UnorderedMapType = std::unordered_map<std::string, VariantType>;
 
 template <typename T>
-T get_value(const UnorderedMapType& options, const std::string& key) {
+T
+get_value(const UnorderedMapType& options, const std::string& key)
+{
   auto curr = options.find(key);
-  bool is_present = (curr != options.end());
-  bool correct_type = std::holds_alternative<T>(curr->second);
 
-  return std::get<T>(curr->second); 
+  return std::get<T>(curr->second);
 }
 
 class Server {
@@ -112,12 +112,11 @@ class Server {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options, std::unique_ptr<Server>* server);
-  
+
   static bool Create_Wrapper(
-      std::shared_ptr<TRITONSERVER_Server>& server, 
-      UnorderedMapType& data, 
+      std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
       std::unique_ptr<triton::server::grpc::Server>* service,
-      const RestrictedFeatures& restricted_features); 
+      const RestrictedFeatures& restricted_features);
 
 
   ~Server();

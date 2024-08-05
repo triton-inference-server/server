@@ -26,9 +26,11 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
+#include <memory>
+
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
-#include <memory>
 namespace py = pybind11;
 
 // Macro used by PyWrapper
@@ -46,7 +48,10 @@ class PyWrapper {
   {
   }
   PyWrapper() = default;
-  TritonStruct* Ptr() { return triton_object_; } // Get ptr of underlying Triton Object
+  TritonStruct* Ptr()
+  {
+    return triton_object_;
+  }  // Get ptr of underlying Triton Object
   DISALLOW_COPY_AND_ASSIGN(PyWrapper);
 
  protected:
@@ -116,7 +121,8 @@ CreateTRITONSERVER_ErrorFrom(const py::error_already_set& ex)
   } else if (ex.matches(ae.ptr())) {
     code = TRITONSERVER_ERROR_ALREADY_EXISTS;
   }
-  return TRITONSERVER_ErrorNew(code, ex.what()); // TRITONSERVER_ErrorNew in tritonserver.cc
+  return TRITONSERVER_ErrorNew(
+      code, ex.what());  // TRITONSERVER_ErrorNew in tritonserver.cc
 }
 
 void
@@ -147,44 +153,45 @@ ThrowIfError(TRITONSERVER_Error* err)
 }
 
 
-
-
-// void Func(/*args*/) {
-//   ThrowIfError(/*helper_func()*/)
-// }
-
-// Wrapping TritonFrontend to 
-
-
-
-    
-
 // [fixme] module name
-PYBIND11_MODULE(tritonfrontend_bindings, m) {
-    m.doc() = "Python bindings for Triton Inference Server Frontend Endpoints";
-    
-    auto tfe = py::register_exception<TritonError>(m, "TritonError");
-    py::register_exception<UnknownError>(m, "UnknownError", tfe.ptr());
-    py::register_exception<InternalError>(m, "InternalError", tfe.ptr());
-    py::register_exception<NotFoundError>(m, "NotFoundError", tfe.ptr());
-    py::register_exception<InvalidArgumentError>(m, "InvalidArgumentError", tfe.ptr());
-    py::register_exception<UnavailableError>(m, "UnavailableError", tfe.ptr());
-    py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
-    py::register_exception<AlreadyExistsError>(m, "AlreadyExistsError", tfe.ptr());
-    
-    py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
-        // .def(py::init<>())
-        .def(py::init<uintptr_t, UnorderedMapType>())
-        // .def("CreateWrapper", &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
-        .def("start", &TritonFrontend<HTTPServer, HTTPAPIServer>::StartService)
-        .def("stop", &TritonFrontend<HTTPServer, HTTPAPIServer>::StopService);
-    
-    py::class_<TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>>(m, "TritonFrontendGrpc")
-        // .def(py::init<>())
-        .def(py::init<uintptr_t, UnorderedMapType>())
-        // .def("CreateWrapper", &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
-        .def("start", &TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>::StartService)
-        .def("stop", &TritonFrontend<triton::server::grpc::Server, triton::server::grpc::Server>::StopService);
+PYBIND11_MODULE(tritonfrontend_bindings, m)
+{
+  m.doc() = "Python bindings for Triton Inference Server Frontend Endpoints";
+
+  auto tfe = py::register_exception<TritonError>(m, "TritonError");
+  py::register_exception<UnknownError>(m, "UnknownError", tfe.ptr());
+  py::register_exception<InternalError>(m, "InternalError", tfe.ptr());
+  py::register_exception<NotFoundError>(m, "NotFoundError", tfe.ptr());
+  py::register_exception<InvalidArgumentError>(
+      m, "InvalidArgumentError", tfe.ptr());
+  py::register_exception<UnavailableError>(m, "UnavailableError", tfe.ptr());
+  py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
+  py::register_exception<AlreadyExistsError>(
+      m, "AlreadyExistsError", tfe.ptr());
+
+  py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
+      // .def(py::init<>())
+      .def(py::init<uintptr_t, UnorderedMapType>())
+      // .def("CreateWrapper",
+      // &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
+      .def("start", &TritonFrontend<HTTPServer, HTTPAPIServer>::StartService)
+      .def("stop", &TritonFrontend<HTTPServer, HTTPAPIServer>::StopService);
+
+  py::class_<TritonFrontend<
+      triton::server::grpc::Server, triton::server::grpc::Server>>(
+      m, "TritonFrontendGrpc")
+      // .def(py::init<>())
+      .def(py::init<uintptr_t, UnorderedMapType>())
+      // .def("CreateWrapper",
+      // &TritonFrontend<triton::server::HTTPAPIServer>::CreateWrapper)
+      .def(
+          "start", &TritonFrontend<
+                       triton::server::grpc::Server,
+                       triton::server::grpc::Server>::StartService)
+      .def(
+          "stop", &TritonFrontend<
+                      triton::server::grpc::Server,
+                      triton::server::grpc::Server>::StopService);
 }
 
-}}}
+}}}  // namespace triton::server::python

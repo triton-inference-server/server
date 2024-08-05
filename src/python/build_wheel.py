@@ -71,6 +71,7 @@ def sed(pattern, replace, source, dest=None):
     if not dest:
         shutil.copyfile(name, source)
 
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -78,7 +79,10 @@ def main():
         "--dest-dir", type=str, required=True, help="Destination directory."
     )
     parser.add_argument(
-        "--binding-path", type=str, required=True, help="Path to Triton Frontend Python binding."
+        "--binding-path",
+        type=str,
+        required=True,
+        help="Path to Triton Frontend Python binding.",
     )
 
     FLAGS = parser.parse_args()
@@ -93,10 +97,14 @@ def main():
     print("=== Using builddir: {}".format(FLAGS.whl_dir))
     print("Adding package files")
     mkdir(os.path.join(FLAGS.whl_dir, "tritonfrontend"))
-    shutil.copy("tritonfrontend/__init__.py", os.path.join(FLAGS.whl_dir, "tritonfrontend"))
+    shutil.copy(
+        "tritonfrontend/__init__.py", os.path.join(FLAGS.whl_dir, "tritonfrontend")
+    )
     # Type checking marker file indicating support for type checkers.
     # https://peps.python.org/pep-0561/
-    shutil.copy("tritonfrontend/py.typed", os.path.join(FLAGS.whl_dir, "tritonfrontend"))
+    shutil.copy(
+        "tritonfrontend/py.typed", os.path.join(FLAGS.whl_dir, "tritonfrontend")
+    )
     cpdir("tritonfrontend/_c", os.path.join(FLAGS.whl_dir, "tritonfrontend", "_c"))
     cpdir("tritonfrontend/_api", os.path.join(FLAGS.whl_dir, "tritonfrontend", "_api"))
     PYBIND_LIB = os.path.basename(FLAGS.binding_path)
@@ -123,6 +131,7 @@ def main():
 
     print(f"=== Output wheel file is in: {FLAGS.dest_dir}")
     touch(os.path.join(FLAGS.dest_dir, "stamp.whl"))
+
 
 if __name__ == "__main__":
     main()

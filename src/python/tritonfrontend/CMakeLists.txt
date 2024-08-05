@@ -48,7 +48,7 @@ include(FetchContent)
 FetchContent_Declare(
     pybind11
     GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG v2.13.1 
+    GIT_TAG v2.13.1
     GIT_SHALLOW ON
 )
 
@@ -67,7 +67,7 @@ FetchContent_MakeAvailable(pybind11)
 #   python-endpoint-wrapper
 #   PUBLIC
 #   python-binding-dependency
-#   shared-memory-manager 
+#   shared-memory-manager
 # )
 
 # set_target_properties(python-endpoint-wrapper PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -100,11 +100,11 @@ pybind11_add_module(py-bindings MODULE ${PYTHON_FRONTEND_BINDING_SRCS})
 target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
-    py-bindings 
+    py-bindings
     PRIVATE
     ${LIBTRITONSERVER_LIBRARY}
     triton-core-serverstub
-    triton-core-serverapi 
+    triton-core-serverapi
     http-endpoint-library
     triton-common-async-work-queue  # from repo-common
     triton-common-error             # from repo-common
@@ -112,7 +112,7 @@ target_link_libraries(
     triton-common-logging           # from repo-common
     CUDA::cudart
     grpc-endpoint-library
-    python-binding-dependency 
+    python-binding-dependency
     # shared-memory-manager
     # python-endpoint-wrapper
 )
@@ -123,7 +123,7 @@ target_link_libraries(
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 # Add Triton library default path in 'rpath' for runtime library lookup
 set_target_properties(
-          py-bindings 
-          PROPERTIES   
+          py-bindings
+          PROPERTIES
           BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
 )

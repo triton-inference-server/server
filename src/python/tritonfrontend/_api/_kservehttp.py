@@ -25,13 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from dataclasses import dataclass, asdict
-from typing import Any, Union
+from dataclasses import asdict, dataclass
 from enum import Enum
-from tritonfrontend._api.validation import Validation
-import tritonserver
+from typing import Any, Union
 
+import tritonserver
+from tritonfrontend._api.validation import Validation
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendHttp
+
 
 class KServeHttp:
     @dataclass
@@ -44,21 +45,21 @@ class KServeHttp:
         # restricted_protocols: list
 
     class Server:
-        def __init__(self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"):
+        def __init__(
+            self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"
+        ):
             server_ptr = server.get_c_ptr()
             options_dict: dict[str, Union[int, bool, str]] = asdict(options)
-            # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>> 
+            # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
             self.triton_c_object = TritonFrontendHttp(server_ptr, options_dict)
 
         def __del__(self):
             # Delete called on C++ side, so assigning to None for safety and preventing potential double-free
             self.triton_c_object = None
             pass
-        
+
         def start(self):
             return self.triton_c_object.start()
-        
+
         def stop(self):
             return self.triton_c_object.stop()
-
-

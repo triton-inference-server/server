@@ -44,9 +44,9 @@
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
-#include "triton/common/triton_json.h"
+#include <unistd.h>  // For sleep
 
-#include <unistd.h> // For sleep 
+#include "triton/common/triton_json.h"
 
 // #define LOG_VERBOSE_IS_ON ... something like that
 // TODO: hard code log verbose mode to see output in Handle()
@@ -235,7 +235,7 @@ HTTPServer::Start()
 
     const std::string addr = address_ + ":" + std::to_string(port_);
     LOG_INFO << "Started HTTPService at " << addr;
-        
+
     return nullptr;
   }
 
@@ -4704,27 +4704,30 @@ HTTPAPIServer::Create(
 
 bool
 HTTPAPIServer::Create_Wrapper(
-      std::shared_ptr<TRITONSERVER_Server>& server, 
-      UnorderedMapType& data, 
-      std::unique_ptr<HTTPServer>* service,
-      const RestrictedFeatures& restricted_features) 
-{ 
-    int port = get_value<int>(data, "port");
-    bool reuse_port = get_value<int>(data, "reuse_port");
-    std::string address = get_value<std::string>(data, "address"); 
-    std::string header_forward_pattern = get_value<std::string>(data, "header_forward_pattern");
-    int thread_count = get_value<int>(data, "thread_count");
-    
-    TRITONSERVER_Error* err = Create(server, // shared_ptr<TRITONSERVER_Server>
-                                     nullptr, nullptr, // TraceManager, SharedMemoryManager 
-                                     port, reuse_port, address, // port, reuse_port, address
-                                     header_forward_pattern,  thread_count, // header_forward_pattern, thread_count 
-                                     restricted_features, // RestrictedFeatures
-                                     service); // HTTPServer instance
+    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    std::unique_ptr<HTTPServer>* service,
+    const RestrictedFeatures& restricted_features)
+{
+  int port = get_value<int>(data, "port");
+  bool reuse_port = get_value<int>(data, "reuse_port");
+  std::string address = get_value<std::string>(data, "address");
+  std::string header_forward_pattern =
+      get_value<std::string>(data, "header_forward_pattern");
+  int thread_count = get_value<int>(data, "thread_count");
 
-    if(err == nullptr) return true;
+  TRITONSERVER_Error* err = Create(
+      server,                     // shared_ptr<TRITONSERVER_Server>
+      nullptr, nullptr,           // TraceManager, SharedMemoryManager
+      port, reuse_port, address,  // port, reuse_port, address
+      header_forward_pattern,
+      thread_count,         // header_forward_pattern, thread_count
+      restricted_features,  // RestrictedFeatures
+      service);             // HTTPServer instance
 
-    return false;
+  if (err == nullptr)
+    return true;
+
+  return false;
 }
 
 
