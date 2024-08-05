@@ -362,7 +362,8 @@ if(${TRITON_ENABLE_HTTP}
     http-endpoint-library EXCLUDE_FROM_ALL
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
-
+  
+  target_compile_features(http-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(
       http-endpoint-library
