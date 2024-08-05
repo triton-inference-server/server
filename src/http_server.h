@@ -207,7 +207,7 @@ class HTTPAPIServer : public HTTPServer {
       std::unique_ptr<HTTPServer>* http_server);
 
 
-  static bool Create_Wrapper(
+  static bool CreateWrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
       std::unique_ptr<HTTPServer>* service,
       const RestrictedFeatures& restricted_features);

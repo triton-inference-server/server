@@ -113,7 +113,7 @@ class Server {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options, std::unique_ptr<Server>* server);
 
-  static bool Create_Wrapper(
+  static bool CreateWrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
       std::unique_ptr<triton::server::grpc::Server>* service,
       const RestrictedFeatures& restricted_features);
