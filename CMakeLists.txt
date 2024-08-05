@@ -210,7 +210,6 @@ if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
 endif() # TRITON_ENABLE_TRACING
 
-
 ExternalProject_Add(triton-server
   PREFIX triton-server
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
