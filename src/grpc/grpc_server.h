@@ -115,7 +115,7 @@ class Server {
 
   static bool CreateWrapper(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
-      std::unique_ptr<triton::server::grpc::Server>* service,
+      std::unique_ptr<Server>* service,
       const RestrictedFeatures& restricted_features);
 
 
