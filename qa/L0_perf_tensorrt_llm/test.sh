@@ -157,6 +157,7 @@ function prepare_model_repository {
     replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${max_queue_size}' "8" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
 }
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
