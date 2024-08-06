@@ -9,9 +9,9 @@ TEST_MODEL = "gpt2"
 
 
 # TODO: May need to modify fixture scope
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def setup_model_repository():
-    model_repository = Path(__file__).parent / "test_models"
+    model_repository = Path(__file__).parent / "vllm_models"
     os.environ["TRITON_MODEL_REPOSITORY"] = str(model_repository)
 
 

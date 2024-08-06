@@ -46,7 +46,7 @@ def load_model(server):
         backends.append(current_model.config()["backend"])
         if model_name in KNOWN_MODELS.keys():
             source_name = KNOWN_MODELS[model_name].replace("hf:", "")
-            tokenizer = get_tokenizer(model_source_name)
+            tokenizer = get_tokenizer(source_name)
 
     create_time = int(time.time())
     backend = None
@@ -56,7 +56,6 @@ def load_model(server):
             break
 
     # TODO
-    # return model, model_creation_time, backend, tokenizer, model_source_name
     return TritonModelMetadata(
         name=model_name,
         backend=backend,
