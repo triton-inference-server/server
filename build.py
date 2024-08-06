@@ -2191,12 +2191,6 @@ if __name__ == "__main__":
         help="The Triton container version to build. If not specified the container version will be chosen automatically based on --version value.",
     )
     parser.add_argument(
-        "--upstream-container-version",
-        type=str,
-        required=False,
-        help="The upstream container version to use for the build. If not specified the upstream container version will be chosen automatically based on --version value.",
-    )
-    parser.add_argument(
         "--container-prebuild-command",
         type=str,
         required=False,
