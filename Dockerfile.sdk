@@ -218,6 +218,7 @@ WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=sdk_build /workspace/client/ client/
+COPY --from=sdk_build /workspace/perf_analyzer/ perf_analyzer/
 COPY --from=sdk_build /workspace/install/ install/
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
