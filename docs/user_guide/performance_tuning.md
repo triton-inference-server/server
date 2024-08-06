@@ -73,7 +73,7 @@ For additional material, see the
     verify that we can run inference requests and get a baseline performance
     benchmark of your model.
     Triton's
-    [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+    [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
     tool specifically fits this purpose. Here is a simplified output for
     demonstration purposes:
 
@@ -103,7 +103,7 @@ For additional material, see the
     There are many variables that can be tweaked just within your model
     configuration (`config.pbtxt`) to obtain different results.
     - As your model, config, or use case evolves,
-    [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+    [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
     is a great tool to quickly verify model functionality and performance.
 
 3. How can I improve my model performance?

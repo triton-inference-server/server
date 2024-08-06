@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,10 +35,10 @@ python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
 
 #Download perf_analyzer docs
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
-TRITON_CLIENT_REPO_TAG="${TRITON_CLIENT_REPO_TAG:=main}"
-git clone -b ${TRITON_CLIENT_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/client.git
-cp `pwd`/client/src/c++/perf_analyzer/README.md .
-cp -rf `pwd`/client/src/c++/perf_analyzer/docs .
+TRITON_PERF_ANALYZER_REPO_TAG="${TRITON_PERF_ANALYZER_REPO_TAG:=main}"
+git clone -b ${TRITON_PERF_ANALYZER_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/perf_analyzer.git
+cp `pwd`/perf_analyzer/README.md .
+cp -rf `pwd`/perf_analyzer/docs .
 
 # Need to remove all links that start with -- or -. Mkdocs converts all -- to - for anchor links.
 # This breaks all links to cli commands throughout the docs. This will iterate over all
