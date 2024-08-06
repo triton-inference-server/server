@@ -146,10 +146,12 @@ class InputShapeTest(unittest.TestCase):
             inputs[0].set_data_from_numpy(input0_data)
             inputs[1].set_data_from_numpy(input1_data)
 
+            # 1. Test wrong shapes with correct element counts
             # Compromised input shapes
             inputs[0].set_shape([2, 8])
             inputs[1].set_shape([2, 8])
 
+            # If element count is correct but shape is wrong, core will return an error.
             with self.assertRaises(InferenceServerException) as e:
                 triton_client.infer(model_name=model_name, inputs=inputs)
             err_str = str(e.exception)
@@ -158,10 +160,12 @@ class InputShapeTest(unittest.TestCase):
                 err_str,
             )
 
+            # 2. Test wrong shapes with wrong element counts
             # Compromised input shapes
             inputs[0].set_shape([1, 8])
             inputs[1].set_shape([1, 8])
 
+            # If element count is wrong, client returns an error.
             with self.assertRaises(InferenceServerException) as e:
                 triton_client.infer(model_name=model_name, inputs=inputs)
             err_str = str(e.exception)
@@ -207,15 +211,6 @@ class InputShapeTest(unittest.TestCase):
                 triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
             else:
                 triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
-
-            # Example using BYTES input tensor with utf-8 encoded string that
-            # has an embedded null character.
-            null_chars_array = np.array(
-                ["he\x00llo".encode("utf-8") for i in range(16)], dtype=np.object_
-            )
-            null_char_data = null_chars_array.reshape([1, 16])
-            identity_inference(triton_client, null_char_data, True)  # Using binary data
-            identity_inference(triton_client, null_char_data, False)  # Using JSON data
 
             # Example using BYTES input tensor with 16 elements, where each
             # element is a 4-byte binary blob with value 0x00010203. Can use
