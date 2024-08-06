@@ -353,6 +353,8 @@ function kill_server () {
         fi
 
         set +vx; eval "$oldstate"
+    elif [[ ! -v $MSYSTEM ]] ; then
+        taskkill //F //IM tritonserver.exe
     else
         # Non-windows...
         kill $SERVER_PID
