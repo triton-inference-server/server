@@ -131,11 +131,12 @@ fi
 
 # TODO: These tests should be PA CI test cases
 # not Triton test cases
+rm -fr /workspace/build
+mkdir -p /workspace/build
 #
 # Build without C API in Perf Analyzer
 #
 (cd /workspace/build && \
-        rm -fr cc_clients && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
