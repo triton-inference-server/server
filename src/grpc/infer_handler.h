@@ -690,12 +690,11 @@ class InferHandlerState {
       // Check if Error not responded previously
       // Avoid closing connection twice on multiple errors from core
       if (!state->context_->IsGRPCStrictError()) {
-        state->context_->step_ = Steps::COMPLETE;
-        state->step_ = Steps::PARTIAL_COMPLETION;
         state->context_->responder_->Finish(state->status_, state);
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
-        IssueRequestCancellation();
+        // Fix Me : Last argument not sure for HandleCancellation      
+        state->context_->HandleCancellation(state, true, "grpc_strict_name");
       }
     }
     // Increments the ongoing request counter
@@ -731,6 +730,7 @@ class InferHandlerState {
           } else {
             state->step_ = Steps::FINISH;
           }
+          LOG_VERBOSE(1) << "PutTaskBackToQueue inside HandleCompletion for " << state->unique_id_;
           PutTaskBackToQueue(state);
         }
         step_ = Steps::FINISH;
@@ -808,6 +808,7 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
+            LOG_VERBOSE(1) << "PutTaskBackToQueue inside IssueRequestCancellation for " << state->unique_id_;
             PutTaskBackToQueue(state);
           }
         }
@@ -845,7 +846,6 @@ class InferHandlerState {
           IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
-
           // The state returns true because the CancelExecution
           // call above would have raised alarm objects on all
           // pending inflight states objects. This state will
@@ -1355,6 +1355,7 @@ InferHandler<
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;
       }
+      LOG_VERBOSE(2) << "Inside Next " << state->unique_id_;
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
       if (!Process(state, ok)) {
