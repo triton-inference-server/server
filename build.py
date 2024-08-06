@@ -2344,6 +2344,48 @@ if __name__ == "__main__":
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
+        "--release-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["release_version"],
+        help="Provide any release version.",
+    )
+    parser.add_argument(
+        "--triton-container-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
+        help="Provide any released version of project.",
+    )
+    parser.add_argument(
+        "--upstream-container-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
+        help="Provide any upstream container version of project.",
+    )
+    parser.add_argument(
+        "--ort-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["ort_version"],
+        help="Provide any ORT version of project.",
+    )
+    parser.add_argument(
+        "--ort-openvino-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
+        help="Provide any openvino version of project.",
+    )
+    parser.add_argument(
+        "--standalone-openvino-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["standalone_openvino_version"],
+        help="Provide any standalone openvino version of project.",
+    )
+    parser.add_argument(
+        "--dcgm-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
+        help="Provide any DCGM version of project.",
+    )
+    parser.add_argument(
         "--vllm-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
