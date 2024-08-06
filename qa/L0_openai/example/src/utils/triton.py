@@ -1,36 +1,69 @@
 import os
 import time
+import typing
+from dataclasses import dataclass
 
 import numpy as np
 import tritonserver
 from src.schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 from src.utils.tokenizer import get_tokenizer
 
-# TODO: Remove
-SUPPORTED_BACKENDS: set = {"vllm", "tensorrtllm"}
+# TODO: Refactor
+# NOTE: Allow python backend for testing purposes
+# TODO: How did this interact with BLS/TRTLLM models before this change?
+SUPPORTED_BACKENDS: set = {"vllm", "tensorrtllm", "python"}
+LLM_BACKENDS = {"vllm", "tensorrtllm"}  # TODO
 KNOWN_MODELS = {"gpt2": "hf:gpt2"}
 
 
-# TODO: Re-organize helpers
+@dataclass
+class TritonModelMetadata:
+    # Name used in Triton model repository
+    name: str
+    # Name of backend used by Triton
+    backend: str
+
+    # TODO: Address typing
+    tokenizer: typing.Any
+    # Name in terms of a HuggingFace model or remote model registry name
+    source_name: str
+    # Time that model was loaded by Triton
+    create_time: int
+
+
+# TODO: Refactor - this function seems to load a single model,
+# but iterates through all models?
 def load_model(server):
     model = None
     backends = []
     tokenizer = None
-    model_source_name = None
+    source_name = None
+    model_name = None
     for model_name, version in server.models().keys():
         if version != -1:
             continue
         current_model = server.load(model_name)
         backends.append(current_model.config()["backend"])
         if model_name in KNOWN_MODELS.keys():
-            model = current_model
-            model_source_name = KNOWN_MODELS[model_name].replace("hf:", "")
+            source_name = KNOWN_MODELS[model_name].replace("hf:", "")
             tokenizer = get_tokenizer(model_source_name)
-    if model and tokenizer:
-        for backend in backends:
-            if backend in SUPPORTED_BACKENDS:
-                return model, int(time.time()), backend, tokenizer, model_source_name
-    return None, None, None, None, None
+
+    create_time = int(time.time())
+    backend = None
+    for be in backends:
+        if be in SUPPORTED_BACKENDS:
+            backend = be
+            break
+
+    # TODO
+    # return model, model_creation_time, backend, tokenizer, model_source_name
+    return TritonModelMetadata(
+        name=model_name,
+        backend=backend,
+        tokenizer=tokenizer,
+        source_name=source_name,
+        create_time=create_time,
+    )
 
 
 def init_tritonserver():
@@ -52,19 +85,30 @@ def init_tritonserver():
     # TODO: Cleanup
     print("Loading Model...\n\n")
 
-    model, model_create_time, backend, tokenizer, model_source_name = load_model(server)
+    # model, model_create_time, backend, tokenizer, _ = load_model(server)
+    metadata = load_model(server)
 
-    if not (model and backend and tokenizer and model_create_time):
+    if not metadata.name:
         raise Exception("Unknown Model")
 
-    print(f"\n\nModel: {model.name} Loaded with Backend: {backend}\n\n")
+    if not metadata.backend:
+        raise Exception("Unsupported Backend")
+
+    # NOTE: Allow no tokenizer for mock python model for testing purposes
+    if not metadata.tokenizer and metadata.backend in LLM_BACKENDS:
+        raise Exception("Unsupported Tokenizer")
+
+    if not metadata.create_time:
+        raise Exception("Unknown Model Creation Time")
+
+    print(f"\n\nModel: {metadata.name} Loaded with Backend: {metadata.backend}\n\n")
 
     # if backend == "vllm":
     #    create_inference_request = create_vllm_inference_request
     # elif backend == "tensorrtllm":
     #    create_inference_request = create_trtllm_inference_request
 
-    return server
+    return server, metadata
 
 
 def get_output(response):

@@ -5,16 +5,37 @@ from typing import Union
 
 import tritonserver
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.routers import chat_completions, completions, models, utilities
 from src.utils.triton import init_tritonserver
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
+
+
+def add_cors_middleware(app: FastAPI):
+    # Allow API calls through browser /docs route for debug purposes
+    origins = [
+        "http://localhost",
+    ]
+
+    print(f"[WARNING] Adding CORS for the following origins: {origins}")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting FastAPI app lifespan...")
     # Start the tritonserver on FastAPI app startup
-    app.server = init_tritonserver()
+    server, model_metadata = init_tritonserver()
+    app.server = server
+    # TODO: Clean up or refactor this flow to store models for /v1/models endpoints
+    app.models = {}
+    app.models[model_metadata.name] = model_metadata
 
     yield
 
@@ -35,7 +56,8 @@ app = FastAPI(
         "name": "MIT",
         "url": "https://github.com/openai/openai-openapi/blob/master/LICENSE",
     },
-    servers=[{"url": "https://api.openai.com/v1"}],
+    # TODO: Do we need this? This affects the endpoints used in /docs endpoint.
+    # servers=[{"url": "https://api.openai.com/v1"}],
     lifespan=lifespan,
 )
 
@@ -44,6 +66,10 @@ app.include_router(models.router)
 app.include_router(completions.router)
 app.include_router(chat_completions.router)
 
+# NOTE: For debugging purposes, should generally be restricted or removed
+add_cors_middleware(app)
+
+# TODO: Refactor/remove globals where not necessary
 server: tritonserver.Server
 model: tritonserver.Model
 model_source_name: str
