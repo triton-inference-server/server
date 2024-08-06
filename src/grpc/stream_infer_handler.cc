@@ -148,7 +148,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
     // Check if stream error detected and already connection ended
     if (state->context_->IsGRPCStrictError()) {
-      return !finished;
+      return finished;
     }
   }
   if (state->context_->ReceivedNotification()) {
@@ -653,7 +653,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-      state->context_->PutTaskBackToQueue(state);
+            state->context_->PutTaskBackToQueue(state);
     }
 
     state->complete_ = is_complete;
@@ -683,7 +683,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       LOG_ERROR << "expected the response allocator to have added the response";
     }
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "Error in CORE Response";
       failed = true;
       ::grpc::Status status;
       // Converts CORE errors to GRPC error codes
@@ -700,6 +699,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                        << status.error_code() << "Closing stream connection."
                        << std::endl;
         state->context_->sendGRPCStrictResponse(state);
+        TRITONSERVER_ErrorDelete(err);
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceResponseDelete(iresponse),
+            "deleting GRPC inference response");
         return;
       }
     }
@@ -778,7 +781,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-      state->context_->PutTaskBackToQueue(state);
+            state->context_->PutTaskBackToQueue(state);
     }
 
     state->complete_ = is_complete;
