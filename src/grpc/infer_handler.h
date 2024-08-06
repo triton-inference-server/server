@@ -693,7 +693,7 @@ class InferHandlerState {
         state->context_->responder_->Finish(state->status_, state);
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
-        // Fix Me : Last argument not sure for HandleCancellation      
+        // Fix Me : Last argument not sure for HandleCancellation
         state->context_->HandleCancellation(state, true, "grpc_strict_name");
       }
     }
@@ -730,7 +730,6 @@ class InferHandlerState {
           } else {
             state->step_ = Steps::FINISH;
           }
-          LOG_VERBOSE(1) << "PutTaskBackToQueue inside HandleCompletion for " << state->unique_id_;
           PutTaskBackToQueue(state);
         }
         step_ = Steps::FINISH;
@@ -808,7 +807,9 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            LOG_VERBOSE(1) << "PutTaskBackToQueue inside IssueRequestCancellation for " << state->unique_id_;
+            LOG_VERBOSE(1)
+                << "PutTaskBackToQueue inside IssueRequestCancellation for "
+                << state->unique_id_;
             PutTaskBackToQueue(state);
           }
         }

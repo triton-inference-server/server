@@ -653,7 +653,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-            state->context_->PutTaskBackToQueue(state);
+      state->context_->PutTaskBackToQueue(state);
     }
 
     state->complete_ = is_complete;
@@ -781,7 +781,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-            state->context_->PutTaskBackToQueue(state);
+      state->context_->PutTaskBackToQueue(state);
     }
 
     state->complete_ = is_complete;
