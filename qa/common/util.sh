@@ -354,7 +354,10 @@ function kill_server () {
 
         set +vx; eval "$oldstate"
     elif [[ -v MSYSTEM ]] ; then
+        oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
+        echo "=== killing windows tritonserver.exe"
         taskkill //F //IM tritonserver.exe
+        eval "$oldstate"
     else
         # Non-windows...
         kill $SERVER_PID
