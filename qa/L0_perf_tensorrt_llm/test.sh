@@ -144,12 +144,10 @@ function prepare_model_repository {
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
     replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
     replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_type}' 'auto' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
 
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
     replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
     replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_type}' 'auto' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
 
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
@@ -157,7 +155,7 @@ function prepare_model_repository {
     replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "8" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
 }
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
