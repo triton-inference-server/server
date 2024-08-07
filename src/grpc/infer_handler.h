@@ -680,9 +680,10 @@ class InferHandlerState {
         std::string param_key = std::string(key.begin(), key.end());
         std::string value_key = std::string(value.begin(), value.end());
         std::string triton_grpc_error_key = "triton_grpc_error";
-        if(param_key == triton_grpc_error_key) {
-          if(value_key == "true") {
-            LOG_VERBOSE(2) << "GRPC: triton_grpc_error mode detected in new grpc stream";
+        if (param_key == triton_grpc_error_key) {
+          if (value_key == "true") {
+            LOG_VERBOSE(2)
+                << "GRPC: triton_grpc_error mode detected in new grpc stream";
             state->context_->triton_grpc_error_ = true;
           }
         }
