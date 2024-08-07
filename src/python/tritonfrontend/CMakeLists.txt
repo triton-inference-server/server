@@ -95,9 +95,6 @@ target_compile_definitions(
     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
   )
 
-
-
-
 set(
   PYTHON_FRONTEND_BINDING_SRCS
   _c/tritonfrontend_pybind.cc
@@ -116,19 +113,7 @@ target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(
     py-bindings
     PRIVATE
-    ${LIBTRITONSERVER_LIBRARY}
-    triton-core-serverstub
-    triton-core-serverapi
-    http-endpoint-library
-    triton-common-async-work-queue  # from repo-common
-    triton-common-error             # from repo-common
-    triton-common-json
-    triton-common-logging           # from repo-common
-    CUDA::cudart
-    grpc-endpoint-library
     python-binding-dependency
-    # shared-memory-manager
-    # python-endpoint-wrapper
 )
 
 
