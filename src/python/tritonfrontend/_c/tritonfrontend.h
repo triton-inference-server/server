@@ -53,7 +53,7 @@ class TritonFrontend {
   {
     TRITONSERVER_Server* server_ptr =
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
-    server_.reset(server_ptr, TRITONSERVER_CustomDestroy);
+    server_.reset(server_ptr, DummyDeleter);
 
     // For debugging
     // for (const auto& [key, value] : data) {
@@ -85,8 +85,7 @@ class TritonFrontend {
         v);
   };
 
-  static TRITONSERVER_Error* TRITONSERVER_CustomDestroy(
-      TRITONSERVER_Server* obj)
+  static TRITONSERVER_Error* DummyDeleter(TRITONSERVER_Server* obj)
   {
     return nullptr;  // Prevents double-free
   };
