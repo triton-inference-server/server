@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@ Inference Server as a shared library.
 ## Part 2. Analyzing model performance with perf_analyzer
 
 To analyze model performance on Jetson,
-[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+[perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 tool is used. The `perf_analyzer` is included in the release tar file or can be
 compiled from source.
 
@@ -65,4 +65,4 @@ From this directory of the repository, execute the following to evaluate model p
 
 In the example above we saved the results as a `.csv` file. To visualize these
 results, follow the steps described
-[here](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md).
+[here](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md).
