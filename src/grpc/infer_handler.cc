@@ -720,7 +720,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // single thread scenario.
       StartNewRequest();
     }
-    bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+    bool resume = state->context_->HandleCancellation(
+        state, rpc_ok, Name(), false /* is_grpc_strict */);
     return resume;
   }
 

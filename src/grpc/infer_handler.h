@@ -684,7 +684,7 @@ class InferHandlerState {
       }
     }
 
-    void sendGRPCStrictResponse(InferHandlerStateType* state)
+    void SendGRPCStrictResponse(InferHandlerStateType* state)
     {
       std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
       // Check if Error not responded previously
@@ -694,7 +694,9 @@ class InferHandlerState {
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
         // Fix Me : Last argument not sure for HandleCancellation
-        state->context_->HandleCancellation(state, true, "grpc_strict_name");
+        state->context_->HandleCancellation(
+            state, true /* rpc_ok */, "grpc_strict_name",
+            true /* is_grpc_strict */);
       }
     }
     // Increments the ongoing request counter
@@ -807,9 +809,6 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            LOG_VERBOSE(1)
-                << "PutTaskBackToQueue inside IssueRequestCancellation for "
-                << state->unique_id_;
             PutTaskBackToQueue(state);
           }
         }
@@ -822,9 +821,11 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
+        bool is_grpc_strict)
     {
-      if (!IsCancelled()) {
+      // Check to avoid early exit in case of grpc_strict
+      if (!IsCancelled() && !(is_grpc_strict)) {
         LOG_ERROR
             << "[INTERNAL] HandleCancellation called even when the context was "
                "not cancelled for "
@@ -1349,23 +1350,26 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
-      if (state->step_ == Steps::WAITING_NOTIFICATION) {
-        State* state_wrapper = state;
-        state = state_wrapper->state_ptr_;
-        state->context_->SetReceivedNotification(true);
-        LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
-                       << state->unique_id_;
-      }
-      LOG_VERBOSE(2) << "Inside Next " << state->unique_id_;
-      LOG_VERBOSE(2) << "Grpc::CQ::Next() "
-                     << state->context_->DebugString(state);
-      if (!Process(state, ok)) {
-        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
-        state->context_->EraseState(state);
-        StateRelease(state);
-      } else {
-        LOG_VERBOSE(2) << "Returning from " << Name() << ", "
-                       << state->unique_id_ << ", " << state->step_;
+      // FIX ME : Ideally should not need this nullptr check, added to resolve
+      // crash is grpc_strict mode
+      if (state->context_ != nullptr) {
+        if (state->step_ == Steps::WAITING_NOTIFICATION) {
+          State* state_wrapper = state;
+          state = state_wrapper->state_ptr_;
+          state->context_->SetReceivedNotification(true);
+          LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
+                         << state->unique_id_;
+        }
+        LOG_VERBOSE(2) << "Grpc::CQ::Next() "
+                       << state->context_->DebugString(state);
+        if (!Process(state, ok)) {
+          LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+          state->context_->EraseState(state);
+          StateRelease(state);
+        } else {
+          LOG_VERBOSE(2) << "Returning from " << Name() << ", "
+                         << state->unique_id_ << ", " << state->step_;
+        }
       }
     }
   }));
