@@ -129,8 +129,8 @@ else
     exit 1
 fi
 
-# TODO: These tests should be PA CI test cases
-# not Triton test cases
+# TODO: TPRD-342 These tests should be PA CI test
+# cases not Triton test cases
 rm -fr /workspace/build
 mkdir -p /workspace/build
 #
