@@ -148,13 +148,15 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
     // Check if stream error detected and already connection ended
     if (state->context_->IsGRPCStrictError()) {
+      state->step_ = Steps::FINISH;
       return finished;
     }
   }
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
-      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+      bool resume = state->context_->HandleCancellation(
+          state, rpc_ok, Name(), false /* is_grpc_strict */);
       return resume;
     } else {
       if (state->context_->HandleCompletion()) {
@@ -691,14 +693,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       response->set_error_message(status.error_message());
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
       if (state->context_->grpc_strict_) {
-        // Set to finish
-        // std::lock_guard<std::recursive_mutex> lock(state->grpc_strict_mtx_);
         state->status_ = status;
         // Finish only once, if backend ignores cancellation
         LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
                        << status.error_code() << "Closing stream connection."
                        << std::endl;
-        state->context_->sendGRPCStrictResponse(state);
+        state->context_->SendGRPCStrictResponse(state);
         TRITONSERVER_ErrorDelete(err);
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),
