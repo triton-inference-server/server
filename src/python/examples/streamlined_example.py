@@ -1,5 +1,5 @@
 import tritonserver
-from tritonfrontend import AlreadyExistsError, KServeGrpc, KServeHttp
+from tritonfrontend import KServeGrpc, KServeHttp
 
 model_path = "/server/docs/examples/model_repository"
 server_options = tritonserver.Options(
