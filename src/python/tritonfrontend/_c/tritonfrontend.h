@@ -41,6 +41,62 @@ struct TRITONSERVER_Server {};
 
 namespace triton { namespace server { namespace python {
 
+// base exception for all Triton error code
+struct TritonError : public std::runtime_error {
+  explicit TritonError(const std::string& what) : std::runtime_error(what) {}
+};
+
+// triton::core::python exceptions map 1:1 to TRITONSERVER_Error_Code.
+struct UnknownError : public TritonError {
+  explicit UnknownError(const std::string& what) : TritonError(what) {}
+};
+struct InternalError : public TritonError {
+  explicit InternalError(const std::string& what) : TritonError(what) {}
+};
+struct NotFoundError : public TritonError {
+  explicit NotFoundError(const std::string& what) : TritonError(what) {}
+};
+struct InvalidArgumentError : public TritonError {
+  explicit InvalidArgumentError(const std::string& what) : TritonError(what) {}
+};
+struct UnavailableError : public TritonError {
+  explicit UnavailableError(const std::string& what) : TritonError(what) {}
+};
+struct UnsupportedError : public TritonError {
+  explicit UnsupportedError(const std::string& what) : TritonError(what) {}
+};
+struct AlreadyExistsError : public TritonError {
+  explicit AlreadyExistsError(const std::string& what) : TritonError(what) {}
+};
+
+void
+ThrowIfError(TRITONSERVER_Error* err)
+{
+  if (err == nullptr) {
+    return;
+  }
+  std::shared_ptr<TRITONSERVER_Error> managed_err(
+      err, TRITONSERVER_ErrorDelete);
+  std::string msg = TRITONSERVER_ErrorMessage(err);
+  switch (TRITONSERVER_ErrorCode(err)) {
+    case TRITONSERVER_ERROR_INTERNAL:
+      throw InternalError(std::move(msg));
+    case TRITONSERVER_ERROR_NOT_FOUND:
+      throw NotFoundError(std::move(msg));
+    case TRITONSERVER_ERROR_INVALID_ARG:
+      throw InvalidArgumentError(std::move(msg));
+    case TRITONSERVER_ERROR_UNAVAILABLE:
+      throw UnavailableError(std::move(msg));
+    case TRITONSERVER_ERROR_UNSUPPORTED:
+      throw UnsupportedError(std::move(msg));
+    case TRITONSERVER_ERROR_ALREADY_EXISTS:
+      throw AlreadyExistsError(std::move(msg));
+    default:
+      throw UnknownError(std::move(msg));
+  }
+}
+
+
 template <typename Base, typename Frontend_Server>
 class TritonFrontend {
  private:
@@ -61,12 +117,12 @@ class TritonFrontend {
     //     printVariant(value);
     // }
 
-    TRITONSERVER_Error* res =
-        Frontend_Server::Create(server_, data, restricted_features, &service);
+    ThrowIfError(
+        Frontend_Server::Create(server_, data, restricted_features, &service));
   };
 
-  bool StartService() { return (service->Start() == nullptr); };
-  bool StopService() { return (service->Stop() == nullptr); };
+  void StartService() { ThrowIfError(service->Start()); };
+  void StopService() { ThrowIfError(service->Stop()); };
 
 
   void printVariant(const VariantType& v)

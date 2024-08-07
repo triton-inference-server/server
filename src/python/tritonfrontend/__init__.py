@@ -36,7 +36,38 @@ from tritonfrontend._api._kservehttp import KServeHttp
 #     TritonFrontendGrpc,
 #     TritonFrontendHttp,
 # )
+from tritonfrontend._c.tritonfrontend_bindings import (
+    AlreadyExistsError,
+    InternalError,
+    InvalidArgumentError,
+    NotFoundError,
+    TritonError,
+    UnavailableError,
+    UnknownError,
+    UnsupportedError,
+)
 
 # from tritonfrontend._api._metrics import Metrics
 # from tritonfrontend._api._sagemaker import Sagemaker
 # from tritonfrontend._api._vertexai import VertexAI
+
+
+_exceptions = (
+    TritonError,
+    NotFoundError,
+    UnknownError,
+    InternalError,
+    InvalidArgumentError,
+    UnavailableError,
+    AlreadyExistsError,
+    UnsupportedError,
+)
+
+
+# Rename module for exceptions to simplify stack trace
+for exception in _exceptions:
+    exception.__module__ = "tritonfrontend"
+    globals()[exception.__name__] = exception
+
+
+del _exceptions

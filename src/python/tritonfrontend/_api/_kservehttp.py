@@ -57,10 +57,10 @@ class KServeHttp:
 
         def __del__(self):
             # Delete called on C++ side, so assigning to None for safety and preventing potential double-free
-            self.triton_c_object = None
+            pass
 
         def start(self):
-            return self.triton_c_object.start()
+            self.triton_c_object.start()
 
         def stop(self):
-            return self.triton_c_object.stop()
+            self.triton_c_object.stop()
