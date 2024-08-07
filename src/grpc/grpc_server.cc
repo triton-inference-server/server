@@ -2443,7 +2443,7 @@ Server::Create(
 {
   Options grpc_options;
 
-  getOptions(grpc_options, data);
+  GetOptions(grpc_options, data);
 
   TRITONSERVER_Error* err =
       Create(server, nullptr, nullptr, grpc_options, service);
@@ -2451,15 +2451,15 @@ Server::Create(
 }
 
 void
-Server::getOptions(Options& options, UnorderedMapType& data)
+Server::GetOptions(Options& options, UnorderedMapType& data)
 {
   SocketOptions socket_selection;
   SslOptions ssl_selection;
   KeepAliveOptions keep_alive_selection;
 
-  getSocketOptions(socket_selection, data);
-  getSslOptions(ssl_selection, data);
-  getKeepAliveOptions(keep_alive_selection, data);
+  GetSocketOptions(socket_selection, data);
+  GetSslOptions(ssl_selection, data);
+  GetKeepAliveOptions(keep_alive_selection, data);
 
   grpc_compression_level infer_compression_level =
       static_cast<grpc_compression_level>(
@@ -2478,7 +2478,7 @@ Server::getOptions(Options& options, UnorderedMapType& data)
 }
 
 void
-Server::getSocketOptions(SocketOptions& options, UnorderedMapType& data)
+Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& data)
 {
   std::string address = get_value<std::string>(data, "address");
   int port = get_value<int>(data, "port");
@@ -2490,7 +2490,7 @@ Server::getSocketOptions(SocketOptions& options, UnorderedMapType& data)
 }
 
 void
-Server::getSslOptions(SslOptions& options, UnorderedMapType& data)
+Server::GetSslOptions(SslOptions& options, UnorderedMapType& data)
 {
   bool use_ssl = get_value<int>(data, "use_ssl");
   std::string server_cert = get_value<std::string>(data, "server_cert");
@@ -2506,7 +2506,7 @@ Server::getSslOptions(SslOptions& options, UnorderedMapType& data)
 }
 
 void
-Server::getKeepAliveOptions(KeepAliveOptions& options, UnorderedMapType& data)
+Server::GetKeepAliveOptions(KeepAliveOptions& options, UnorderedMapType& data)
 {
   int keepalive_time_ms = get_value<int>(data, "keepalive_time_ms");
   int keepalive_timeout_ms = get_value<int>(data, "keepalive_timeout_ms");

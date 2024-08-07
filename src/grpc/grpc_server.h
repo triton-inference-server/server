@@ -106,12 +106,12 @@ class Server {
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<Server>* service);
 
-  static void getSocketOptions(SocketOptions& options, UnorderedMapType& data);
-  static void getSslOptions(SslOptions& options, UnorderedMapType& data);
-  static void getKeepAliveOptions(
+  static void GetSocketOptions(SocketOptions& options, UnorderedMapType& data);
+  static void GetSslOptions(SslOptions& options, UnorderedMapType& data);
+  static void GetKeepAliveOptions(
       KeepAliveOptions& options, UnorderedMapType& data);
 
-  static void getOptions(Options& options, UnorderedMapType& data);
+  static void GetOptions(Options& options, UnorderedMapType& data);
 
 
   ~Server();

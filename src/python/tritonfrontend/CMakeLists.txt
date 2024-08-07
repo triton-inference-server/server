@@ -117,8 +117,6 @@ target_link_libraries(
 )
 
 
-# target_compile_features(py-bindings PRIVATE cxx_std_17)
-
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 # Add Triton library default path in 'rpath' for runtime library lookup
 set_target_properties(

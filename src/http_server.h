@@ -38,7 +38,6 @@
 
 #include "common.h"
 #include "data_compressor.h"
-#include "python/tritonfrontend/_c/tritonfrontend.h"
 #include "restricted_features.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
