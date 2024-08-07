@@ -32,23 +32,20 @@
 #include <unordered_map>
 #include <variant>
 
-#include "../../../grpc/grpc_server.h"
-#include "../../../http_server.h"
+#include "../../../common.h"
 #include "../../../restricted_features.h"
 #include "triton/core/tritonserver.h"
+
 
 struct TRITONSERVER_Server {};
 
 namespace triton { namespace server { namespace python {
 
-template <typename Base_Server, typename Frontend_Server>
+template <typename Base, typename Frontend_Server>
 class TritonFrontend {
-  // static_assert(std::is_base_of<Server_Interface, Frontend_Server>::value, "T
-  // must be derived from Base");
-
  private:
   std::shared_ptr<TRITONSERVER_Server> server_;
-  std::unique_ptr<Base_Server> service;
+  std::unique_ptr<Base> service;
   triton::server::RestrictedFeatures restricted_features;
 
  public:
@@ -64,8 +61,8 @@ class TritonFrontend {
     //     printVariant(value);
     // }
 
-    bool res = Frontend_Server::CreateWrapper(
-        server_, data, &service, restricted_features);
+    TRITONSERVER_Error* res =
+        Frontend_Server::Create(server_, data, restricted_features, &service);
   };
 
   bool StartService() { return (service->Start() == nullptr); };

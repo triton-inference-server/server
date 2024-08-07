@@ -44,8 +44,6 @@
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
-#include <unistd.h>  // For sleep
-
 #include "triton/common/triton_json.h"
 
 // #define LOG_VERBOSE_IS_ON ... something like that
@@ -4702,11 +4700,11 @@ HTTPAPIServer::Create(
 }
 
 
-bool
-HTTPAPIServer::CreateWrapper(
+TRITONSERVER_Error*
+HTTPAPIServer::Create(
     std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
-    std::unique_ptr<HTTPServer>* service,
-    const RestrictedFeatures& restricted_features)
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<HTTPServer>* service)
 {
   int port = get_value<int>(data, "port");
   bool reuse_port = get_value<int>(data, "reuse_port");
@@ -4720,10 +4718,7 @@ HTTPAPIServer::CreateWrapper(
       port, reuse_port, address, header_forward_pattern, thread_count,
       restricted_features, service);
 
-  if (err == nullptr)
-    return true;
-
-  return false;
+  return err;
 }
 
 

@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include "../common.h"
 #include "../restricted_features.h"
 #include "../shared_memory_manager.h"
 #include "../tracer.h"
@@ -39,7 +40,6 @@
 #include "infer_handler.h"
 #include "stream_infer_handler.h"
 #include "triton/core/tritonserver.h"
-// #include "../server_interface.h"
 
 namespace triton { namespace server { namespace grpc {
 
@@ -93,18 +93,6 @@ struct Options {
   std::string forward_header_pattern_;
 };
 
-using VariantType = std::variant<int, bool, std::string>;
-using UnorderedMapType = std::unordered_map<std::string, VariantType>;
-
-template <typename T>
-T
-get_value(const UnorderedMapType& options, const std::string& key)
-{
-  auto curr = options.find(key);
-
-  return std::get<T>(curr->second);
-}
-
 class Server {
  public:
   static TRITONSERVER_Error* Create(
@@ -113,10 +101,17 @@ class Server {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options, std::unique_ptr<Server>* server);
 
-  static bool CreateWrapper(
+  static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
-      std::unique_ptr<Server>* service,
-      const RestrictedFeatures& restricted_features);
+      const RestrictedFeatures& restricted_features,
+      std::unique_ptr<Server>* service);
+
+  static void getSocketOptions(SocketOptions& options, UnorderedMapType& data);
+  static void getSslOptions(SslOptions& options, UnorderedMapType& data);
+  static void getKeepAliveOptions(
+      KeepAliveOptions& options, UnorderedMapType& data);
+
+  static void getOptions(Options& options, UnorderedMapType& data);
 
 
   ~Server();

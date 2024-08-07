@@ -29,8 +29,11 @@
 
 #include <memory>
 
+#include "../../../grpc/grpc_server.h"
+#include "../../../http_server.h"
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
+
 namespace py = pybind11;
 
 // Macro used by PyWrapper

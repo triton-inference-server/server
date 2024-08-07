@@ -28,6 +28,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "triton/core/tritonserver.h"
@@ -182,6 +184,28 @@ Join(const T& container, const std::string& delim)
     ss << delim << container[i];
   }
   return ss.str();
+}
+
+
+using VariantType = std::variant<int, bool, std::string>;
+using UnorderedMapType = std::unordered_map<std::string, VariantType>;
+
+template <typename T>
+T
+get_value(const UnorderedMapType& options, const std::string& key)
+{
+  auto curr = options.find(key);
+  bool is_present = (curr != options.end());
+  bool correct_type = std::holds_alternative<T>(curr->second);
+
+  if (!is_present || !correct_type) {
+    if (curr == options.end())
+      std::cerr << "Error: Key " << key << " not found." << std::endl;
+    else
+      std::cerr << "Error: Type mismatch for key." << std::endl;
+  }
+  std::cout << "Key " << key << " found." << std::endl;
+  return std::get<T>(curr->second);
 }
 
 }}  // namespace triton::server

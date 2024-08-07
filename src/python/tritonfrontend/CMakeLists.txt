@@ -57,30 +57,44 @@ FetchContent_MakeAvailable(pybind11)
 # ================================= END =====================================
 
 
-# add_library(
-#   python-endpoint-wrapper
-#     _c/tritonfrontend.h
-#     ../../server_interface.h
-# )
+find_package(CUDAToolkit REQUIRED)
 
-# target_link_libraries(
-#   python-endpoint-wrapper
-#   PUBLIC
-#   python-binding-dependency
-#   shared-memory-manager
-# )
+# TODO: Remove excess stuff
+add_library(
+  python-binding-dependency
+  EXCLUDE_FROM_ALL
+  ../../shared_memory_manager.h
+  ../../shared_memory_manager.cc
+  ../../data_compressor.h
+  ../../common.h
+  ../../common.cc
+  ../../restricted_features.h
+  ../../tracer.h
+  ../../classification.cc
+)
 
-# set_target_properties(python-endpoint-wrapper PROPERTIES POSITION_INDEPENDENT_CODE ON)
-# target_include_directories(python-endpoint-wrapper PRIVATE ${pybind11_INCLUDE_DIRS})
-# target_link_libraries(python-endpoint-wrapper PRIVATE ${pybind11_LIBRARIES})
+target_link_libraries(
+  python-binding-dependency
+  PUBLIC
+  http-endpoint-library
+  grpc-endpoint-library
+  CUDA::cudart
+  triton-core-serverapi           # from repo-core
+  triton-core-serverstub          # from repo-core
+  triton-common-json              # from repo-common
+)
 
-# target_compile_features(python-endpoint-wrapper PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 
-# target_compile_definitions(
-#     python-endpoint-wrapper
-#     PRIVATE TRITON_ENABLE_GPU=1
-#     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-#   )
+set_target_properties(python-binding-dependency PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_compile_features(python-binding-dependency PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+
+target_compile_definitions(
+    python-binding-dependency
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
 
 
 

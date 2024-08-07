@@ -32,10 +32,10 @@ from tritonfrontend._api._kservegrpc import KServeGrpc
 from tritonfrontend._api._kservehttp import KServeHttp
 
 # Bindings from C++. TritonFrontend exposes C++ Classes and Functions.
-from tritonfrontend._c.tritonfrontend_bindings import (
-    TritonFrontendGrpc,
-    TritonFrontendHttp,
-)
+# from tritonfrontend._c.tritonfrontend_bindings import (
+#     TritonFrontendGrpc,
+#     TritonFrontendHttp,
+# )
 
 # from tritonfrontend._api._metrics import Metrics
 # from tritonfrontend._api._sagemaker import Sagemaker

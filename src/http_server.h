@@ -38,6 +38,7 @@
 
 #include "common.h"
 #include "data_compressor.h"
+#include "python/tritonfrontend/_c/tritonfrontend.h"
 #include "restricted_features.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
@@ -84,7 +85,6 @@ class HTTPServer {
       uint32_t* exit_timeout_secs = nullptr,
       const std::string& service_name = "HTTP");
 
- protected:
   explicit HTTPServer(
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt)
@@ -182,17 +182,6 @@ using HttpTextMapCarrier = void*;
 #endif
 
 
-using VariantType = std::variant<int, bool, std::string>;
-using UnorderedMapType = std::unordered_map<std::string, VariantType>;
-
-template <typename T>
-T
-get_value(const UnorderedMapType& options, const std::string& key)
-{
-  auto curr = options.find(key);
-  return std::get<T>(curr->second);
-}
-
 // HTTP API server that implements KFServing community standard inference
 // protocols and extensions used by Triton.
 class HTTPAPIServer : public HTTPServer {
@@ -207,10 +196,10 @@ class HTTPAPIServer : public HTTPServer {
       std::unique_ptr<HTTPServer>* http_server);
 
 
-  static bool CreateWrapper(
+  static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
-      std::unique_ptr<HTTPServer>* service,
-      const RestrictedFeatures& restricted_features);
+      const RestrictedFeatures& restricted_features,
+      std::unique_ptr<HTTPServer>* service);
 
   virtual ~HTTPAPIServer();
 
