@@ -241,13 +241,13 @@ class LifecycleTest(unittest.TestCase):
             initial_metrics_value,
         )
 
-    def test_grpc_strict_error_on(self):
+    def test_triton_grpc_error_error_on(self):
         model_name = "execute_grpc_error"
         shape = [2, 2]
         number_of_requests = 2
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
-        metadata = {"grpc_strict": "true"}
+        metadata = {"triton_grpc_error": "true"}
         triton_client.start_stream(
             callback=partial(callback, user_data), headers=metadata
         )
@@ -274,7 +274,7 @@ class LifecycleTest(unittest.TestCase):
                     self.assertIsInstance(result, InferenceServerException)
                     self.assertEqual(str(result.status()), "StatusCode.INTERNAL")
 
-    def test_grpc_strict_error_off(self):
+    def test_triton_grpc_error_error_off(self):
         model_name = "execute_grpc_error"
         shape = [2, 2]
         number_of_requests = 4

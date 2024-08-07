@@ -721,7 +721,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       StartNewRequest();
     }
     bool resume = state->context_->HandleCancellation(
-        state, rpc_ok, Name(), false /* is_grpc_strict */);
+        state, rpc_ok, Name(), false /* is_triton_grpc_error */);
     return resume;
   }
 
