@@ -515,7 +515,11 @@ remove_array_outliers() {
 function setup_virtualenv() {
     # Create and activate virtual environment
     virtualenv --system-site-packages venv
-    source venv/bin/activate
+    if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
+      source venv/Scripts/activate
+    else
+      source venv/bin/activate
+    fi
     pip install pytest
 
     if [[ ${TEST_WINDOWS} == 1 ]]; then
