@@ -27,8 +27,8 @@
 -->
 
 ```{toctree}
-:maxdepth: 1
-:caption: Getting Started
+:maxdepth: 2
+:caption: Quick Start
 
 getting_started/quickstart
 ```
