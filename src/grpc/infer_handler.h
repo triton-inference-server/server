@@ -642,7 +642,7 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false), grpc_strict_(false),
+          received_notification_(false), triton_grpc_error_(false),
           grpc_stream_error_state_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
@@ -676,10 +676,15 @@ class InferHandlerState {
       const auto& metadata = state->context_->ctx_->client_metadata();
       for (const auto& pair : metadata) {
         auto& key = pair.first;
+        auto& value = pair.second;
         std::string param_key = std::string(key.begin(), key.end());
-        std::string grpc_strict_key = "grpc_strict";
-        if (param_key.compare(grpc_strict_key) == 0) {
-          state->context_->grpc_strict_ = true;
+        std::string value_key = std::string(value.begin(), value.end());
+        std::string triton_grpc_error_key = "triton_grpc_error";
+        if(param_key == triton_grpc_error_key) {
+          if(value_key == "true") {
+            LOG_VERBOSE(2) << "GRPC: triton_grpc_error mode detected in new grpc stream";
+            state->context_->triton_grpc_error_ = true;
+          }
         }
       }
     }
@@ -695,8 +700,8 @@ class InferHandlerState {
         state->context_->MarkGRPCStrictError();
         // Fix Me : Last argument not sure for HandleCancellation
         state->context_->HandleCancellation(
-            state, true /* rpc_ok */, "grpc_strict_name",
-            true /* is_grpc_strict */);
+            state, true /* rpc_ok */, "triton_grpc_error_name",
+            true /* is_triton_grpc_error */);
       }
     }
     // Increments the ongoing request counter
@@ -822,10 +827,10 @@ class InferHandlerState {
     // completion queue or not.
     bool HandleCancellation(
         InferHandlerStateType* state, bool rpc_ok, const std::string& name,
-        bool is_grpc_strict)
+        bool is_triton_grpc_error)
     {
-      // Check to avoid early exit in case of grpc_strict
-      if (!IsCancelled() && !(is_grpc_strict)) {
+      // Check to avoid early exit in case of triton_grpc_error
+      if (!IsCancelled() && !(is_triton_grpc_error)) {
         LOG_ERROR
             << "[INTERNAL] HandleCancellation called even when the context was "
                "not cancelled for "
@@ -975,7 +980,7 @@ class InferHandlerState {
     // Marks error after it has been responded to
     void MarkGRPCStrictError() { grpc_stream_error_state_ = true; }
 
-    // Checks if error already responded to in grpc_strict mode
+    // Checks if error already responded to in triton_grpc_error mode
     bool IsGRPCStrictError() { return grpc_stream_error_state_; }
 
     // Return true if this context has completed all reads and writes.
@@ -1038,10 +1043,12 @@ class InferHandlerState {
     bool received_notification_;
 
     // True if set by user via header
-    std::atomic<bool> grpc_strict_;
+    // Can be accessed without a lock, as set only once in startstream
+    std::atomic<bool> triton_grpc_error_;
 
     // True if stream already encountered error and closed connection
     // State maintained to avoid writes on closed stream
+    // Need to acquire lock before access
     std::atomic<bool> grpc_stream_error_state_;
   };
 
@@ -1351,7 +1358,7 @@ InferHandler<
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
       // FIX ME : Ideally should not need this nullptr check, added to resolve
-      // crash is grpc_strict mode
+      // crash is triton_grpc_error mode
       if (state->context_ != nullptr) {
         if (state->step_ == Steps::WAITING_NOTIFICATION) {
           State* state_wrapper = state;
