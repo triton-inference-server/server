@@ -49,6 +49,7 @@ def retrieve_model(request: Request, model_name: str) -> Model:
     if not model:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
 
+    # TODO: Do we want to accept both triton name or source name interchangeably?
     if model_name == model.name:
         return Model(
             id=model.name,

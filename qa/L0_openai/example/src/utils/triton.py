@@ -22,6 +22,8 @@ class TritonModelMetadata:
     name: str
     # Name of backend used by Triton
     backend: str
+    # Triton model object handle
+    model: tritonserver.Model
 
     # TODO: Address typing
     tokenizer: typing.Any
@@ -42,8 +44,8 @@ def load_model(server):
     for model_name, version in server.models().keys():
         if version != -1:
             continue
-        current_model = server.load(model_name)
-        backends.append(current_model.config()["backend"])
+        model = server.load(model_name)
+        backends.append(model.config()["backend"])
         if model_name in KNOWN_MODELS.keys():
             source_name = KNOWN_MODELS[model_name].replace("hf:", "")
             tokenizer = get_tokenizer(source_name)
@@ -59,6 +61,7 @@ def load_model(server):
     return TritonModelMetadata(
         name=model_name,
         backend=backend,
+        model=model,
         tokenizer=tokenizer,
         source_name=source_name,
         create_time=create_time,
@@ -87,7 +90,11 @@ def init_tritonserver():
     # model, model_create_time, backend, tokenizer, _ = load_model(server)
     metadata = load_model(server)
 
+    # TODO: pydantic validation?
     if not metadata.name:
+        raise Exception("Unknown Model Name")
+
+    if not metadata.model:
         raise Exception("Unknown Model")
 
     if not metadata.backend:
@@ -124,11 +131,15 @@ def create_vllm_inference_request(
 ):
     inputs = {}
     excludes = {"model", "stream", "messages", "prompt", "echo"}
-    # FIXME: It seems that some subset of these keys will cause the model to not return a response
-    addl_excludes = {"user", "seed", "stop", "suffix", "logprobs", "logit_bias"}
+
+    # NOTE: The exclude_none is important, as internals may not support
+    # values of NoneType at this time.
     sampling_parameters = request.model_dump(
-        exclude=excludes.union(addl_excludes),
+        exclude=excludes,
+        exclude_none=True,
     )
+    print(f"[DEBUG] {sampling_parameters=}")
+
     inputs["text_input"] = [prompt]
     inputs["stream"] = [request.stream]
     exclude_input_in_output = True
@@ -136,9 +147,12 @@ def create_vllm_inference_request(
     if echo:
         exclude_input_in_output = not echo
     inputs["exclude_input_in_output"] = [exclude_input_in_output]
+    print(f"[DEBUG] {inputs=}")
+
     return model.create_request(inputs=inputs, parameters=sampling_parameters)
 
 
+# TODO: test
 def create_trtllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):

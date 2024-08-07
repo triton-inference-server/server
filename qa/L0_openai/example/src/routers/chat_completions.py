@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+import time
+import uuid
+
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from src.schemas.openai import (
     ChatCompletionChoice,
@@ -11,14 +14,13 @@ from src.schemas.openai import (
     CreateChatCompletionStreamResponse,
     ObjectType,
 )
-from src.utils.triton import get_output
+from src.utils.triton import create_vllm_inference_request, get_output
 
 router = APIRouter()
 
 
 def streaming_chat_completion_response(request_id, created, model, role, responses):
     # first chunk
-
     choice = ChatCompletionStreamingResponseChoice(
         index=0,
         delta=ChatCompletionStreamResponseDelta(
@@ -68,18 +70,33 @@ def streaming_chat_completion_response(request_id, created, model, role, respons
 )
 def create_chat_completion(
     request: CreateChatCompletionRequest,
+    raw_request: Request,
 ) -> CreateChatCompletionResponse | StreamingResponse:
     """
     Creates a model response for the given chat conversation.
     """
 
-    if not model or not tokenizer or not create_inference_request:
-        raise Exception("Unknown Model")
+    # TODO: Cleanup
+    model_metadatas = raw_request.app.models
+    if not model_metadatas:
+        raise HTTPException(status_code=400, detail="No known models")
+
+    metadata = model_metadatas.get(request.model)
+    if not metadata:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+
+    # TODO: python models? default tokenizer? no tokenization OK?
+    if not metadata.tokenizer:
+        raise HTTPException(status_code=400, detail="No known tokenizer")
+
+    if not metadata.backend:
+        raise HTTPException(status_code=400, detail="No known backend")
 
     add_generation_prompt_default = True
     default_role = "assistant"
 
-    if request.model != model.name and request.model != model_source_name:
+    model = raw_request.app.server.model(request.model)
+    if request.model != model.name and request.model != metadata.source_name:
         raise HTTPException(status_code=404, detail=f"Unknown model: {request.model}")
 
     if request.n and request.n > 1:
@@ -92,7 +109,7 @@ def create_chat_completion(
 
     # TODO: Use HF tokenizer or use Jinja/templater directly?
     # TODO: Function Calling / tools related to this?
-    prompt = tokenizer.apply_chat_template(
+    prompt = metadata.tokenizer.apply_chat_template(
         conversation=conversation,
         tokenize=False,
         add_generation_prompt=add_generation_prompt_default,
@@ -101,7 +118,11 @@ def create_chat_completion(
     request_id = f"cmpl-{uuid.uuid1()}"
     created = int(time.time())
 
-    responses = model.infer(create_inference_request(model, prompt, request))
+    # TODO: Associate request function / backend with model metadata
+    # responses = model.infer(create_inference_request(model, prompt, request))
+    print(f"[DEBUG] {model=}")
+    print(f"[DEBUG] {metadata=}")
+    responses = model.infer(create_vllm_inference_request(model, prompt, request))
 
     if request.stream:
         return StreamingResponse(
