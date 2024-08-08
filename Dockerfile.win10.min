@@ -78,9 +78,8 @@ ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/5e7b923b-7d89-4e14-95b8-a84ab168e243/96b21d216c7954aaf606c6d7ba59a3de991884a8a86c578c767ba349c23188a9/vs_BuildTools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
-ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
-      --installPath %VS_INSTALL_PATH_WP% \
+      --installPath "C:\BuildTools" \
       --add Microsoft.VisualStudio.Workload.VCTools \
       --includeRecommended \
       --locale "En-us"
@@ -158,7 +157,6 @@ ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cupti_${CUDA_MAJOR}.${CUDA_MINOR} \
                    thrust_${CUDA_MAJOR}.${CUDA_MINOR} \
                    visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
-ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
 
 ARG CUDA_SOURCE=https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_windows_network.exe
 ADD ${CUDA_SOURCE} cuda_${CUDA_VERSION}_windows_network.exe
@@ -166,16 +164,16 @@ ADD ${CUDA_SOURCE} cuda_${CUDA_VERSION}_windows_network.exe
 RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 # Copy the CUDA visualstudio integration from where it was installed
 # into the appropriate place in BuildTools
-RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v170\BuildCustomizations"
+RUN copy "%CUDA_PATH%\extras\visual_studio_integration\MSBuildExtensions\*" "C:\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations"
 
-RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
+RUN setx PATH "%CUDA_PATH%\bin;%PATH%"
 
 ARG CUDNN_VERSION=9.3.0.75
 ENV CUDNN_VERSION ${CUDNN_VERSION}
 COPY --from=build_dependencies /cudnn /cudnn
-RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
-RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
-RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+RUN copy cudnn\bin\cudnn*.dll "%CUDA_PATH%\bin\."
+RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_PATH%\lib\x64\."
+RUN copy cudnn\include\cudnn*.h "%CUDA_PATH%\include\."
 LABEL CUDNN_VERSION="${CUDNN_VERSION}"
 
 ARG TENSORRT_VERSION=10.3.0.26
