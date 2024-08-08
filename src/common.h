@@ -27,7 +27,11 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <typeinfo>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "triton/core/tritonserver.h"
@@ -182,6 +186,49 @@ Join(const T& container, const std::string& delim)
     ss << delim << container[i];
   }
   return ss.str();
+}
+
+
+// Used by Python Bindings to accept arguments to initialize Frontends.
+using VariantType = std::variant<int, bool, std::string>;
+using UnorderedMapType = std::unordered_map<std::string, VariantType>;
+
+// void
+// printVariant(const VariantType& v)
+// {
+//   std::visit(
+//       [](auto&& arg) {
+//         using T = std::decay_t<decltype(arg)>;
+//         if constexpr (std::is_same_v<T, std::string>) {
+//           std::cout << "Value (string): " << arg << std::endl;
+//         } else if constexpr (std::is_same_v<T, int>) {
+//           std::cout << "Value (int): " << arg << std::endl;
+//         } else if constexpr (std::is_same_v<T, bool>) {
+//           std::cout << "Value (bool): " << std::boolalpha << arg <<
+//           std::endl;
+//         }
+//       },
+//       v);
+// };
+
+template <typename T>
+T
+get_value(const UnorderedMapType& options, const std::string& key)
+{
+  auto curr = options.find(key);
+  bool is_present = (curr != options.end());
+
+  if (!is_present) {
+    throw std::runtime_error("Key: " + key + " not found in options provided.");
+  }
+
+  bool correct_type = std::holds_alternative<T>(curr->second);
+
+  if (!correct_type) {
+    throw std::runtime_error("Key: " + key + " found, but incorrect type.");
+  }
+
+  return std::get<T>(curr->second);
 }
 
 }}  // namespace triton::server

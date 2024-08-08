@@ -29,6 +29,7 @@
 
 #include <vector>
 
+#include "../common.h"
 #include "../restricted_features.h"
 #include "../shared_memory_manager.h"
 #include "../tracer.h"
@@ -99,6 +100,19 @@ class Server {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options, std::unique_ptr<Server>* server);
+
+  static TRITONSERVER_Error* Create(
+      std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+      const RestrictedFeatures& restricted_features,
+      std::unique_ptr<Server>* service);
+
+  static void GetSocketOptions(SocketOptions& options, UnorderedMapType& data);
+  static void GetSslOptions(SslOptions& options, UnorderedMapType& data);
+  static void GetKeepAliveOptions(
+      KeepAliveOptions& options, UnorderedMapType& data);
+
+  static void GetOptions(Options& options, UnorderedMapType& data);
+
 
   ~Server();
 

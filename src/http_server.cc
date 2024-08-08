@@ -46,6 +46,9 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
+// #define LOG_VERBOSE_IS_ON ... something like that
+// TODO: hard code log verbose mode to see output in Handle()
+
 extern "C" {
 #include <b64/cdecode.h>
 }
@@ -227,6 +230,9 @@ HTTPServer::Start()
     break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
+
+    const std::string addr = address_ + ":" + std::to_string(port_);
+    LOG_INFO << "Started HTTPService at " << addr;
 
     return nullptr;
   }
@@ -1181,6 +1187,7 @@ HTTPAPIServer::HTTPAPIServer(
 
 HTTPAPIServer::~HTTPAPIServer()
 {
+  LOG_VERBOSE(2) << "~HTTPAPIServer()";
   if (server_metadata_err_ != nullptr) {
     TRITONSERVER_ErrorDelete(server_metadata_err_);
   }
@@ -4690,11 +4697,32 @@ HTTPAPIServer::Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_cnt, restricted_features));
 
-  const std::string addr = address + ":" + std::to_string(port);
-  LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
 }
+
+
+TRITONSERVER_Error*
+HTTPAPIServer::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<HTTPServer>* service)
+{
+  int port = get_value<int>(data, "port");
+  bool reuse_port = get_value<int>(data, "reuse_port");
+  std::string address = get_value<std::string>(data, "address");
+  std::string header_forward_pattern =
+      get_value<std::string>(data, "header_forward_pattern");
+  int thread_count = get_value<int>(data, "thread_count");
+
+  TRITONSERVER_Error* err = Create(
+      server, nullptr, nullptr,  // TraceManager, SharedMemoryManager
+      port, reuse_port, address, header_forward_pattern, thread_count,
+      restricted_features, service);
+
+  return err;
+}
+
 
 bool
 HTTPAPIServer::RespondIfRestricted(
@@ -4713,5 +4741,6 @@ HTTPAPIServer::RespondIfRestricted(
   }
   return false;
 }
+
 
 }}  // namespace triton::server
