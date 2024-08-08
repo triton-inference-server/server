@@ -57,8 +57,8 @@ grpc_service.start()
 
 
 # Context Manager to start and stop/close respective client
-class ClientHelper:  # Default http settings
-    def __init__(self, frontend_service=httpclient, url="localhost:8000"):
+class Client:  # Default http settings
+    def __init__(self, frontend_service=httpclient, url="0.0.0.0:8000"):
         self.frontend_service = frontend_service
         self.url = url
 
@@ -74,31 +74,45 @@ class ClientHelper:  # Default http settings
 
 class TestKServeHttp:
     def test_server_ready(self):
-        with ClientHelper(httpclient) as http_client:
+        with Client(httpclient) as http_client:
             assert http_client.is_server_ready()
 
     def test_server_live(self):
-        with ClientHelper(httpclient) as http_client:
+        with Client(httpclient) as http_client:
             assert http_client.is_server_live()
 
-    def test_load_model(self, model_name):
-        pass
+    # def test_already_exists_error(self):
+    #     with Client(httpclient) as http_client:
+    #         http_options = KServeHttp.Options()
+    #         http_service = KServeHttp.Server(server, http_options)
+    #         http_service.start()
+    #         # Should throw error because http service already started.
+    #         with pytest.raises(UnavailableError):
+    #             http_service.start()
+    #         http_service.stop()
 
-    def test_unload_model(self, model_name):
-        pass
-
-    def test_get_model_metadata(self, model_name):
-        pass
-
-    def test_get_model_config(self, model_name):
-        pass
+    # def test_wrong_parameter(self):
+    #     pass
 
 
 class TestKServeGrpc:
     def test_server_ready(self):
-        with ClientHelper(grpcclient, url="localhost:8001") as grpc_client:
+        with Client(grpcclient, url="0.0.0.0:8001") as grpc_client:
             assert grpc_client.is_server_ready()
 
     def test_server_live(self):
-        with ClientHelper(grpcclient, url="localhost:8001") as grpc_client:
+        with Client(grpcclient, url="0.0.0.0:8001") as grpc_client:
             assert grpc_client.is_server_live()
+
+    # def test_already_exists_error(self):
+    #     with Client(grpcclient, url="0.0.0.0:8001") as http_client:
+    #         grpc_options = KServeGrpc.Options()
+    #         grpc_service = KServeGrpc.Server(server, grpc_options)
+    #         grpc_service.start()
+    #         # Should throw error because http service already started.
+    #         with pytest.raises(UnavailableError):
+    #             grpc_service.start()
+    #         grpc_service.stop()
+
+    # def test_wrong_parameter(self):
+    #     pass

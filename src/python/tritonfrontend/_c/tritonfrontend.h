@@ -125,22 +125,6 @@ class TritonFrontend {
   void StopService() { ThrowIfError(service->Stop()); };
 
 
-  void printVariant(const VariantType& v)
-  {
-    std::visit(
-        [](auto&& arg) {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, std::string>) {
-            std::cout << "Value (string): " << arg << std::endl;
-          } else if constexpr (std::is_same_v<T, int>) {
-            std::cout << "Value (int): " << arg << std::endl;
-          } else if constexpr (std::is_same_v<T, bool>) {
-            std::cout << "Value (bool): " << std::boolalpha << arg << std::endl;
-          }
-        },
-        v);
-  };
-
   static TRITONSERVER_Error* DummyDeleter(TRITONSERVER_Server* obj)
   {
     return nullptr;  // Prevents double-free

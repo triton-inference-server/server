@@ -1,7 +1,7 @@
 import tritonserver
 from tritonfrontend import KServeGrpc, KServeHttp
 
-model_path = "/server/docs/examples/model_repository"
+model_path = "/root/models"
 server_options = tritonserver.Options(
     server_id="ExampleServer",
     model_repository=model_path,

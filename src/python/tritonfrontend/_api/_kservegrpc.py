@@ -23,19 +23,17 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import IntEnum
 from typing import Union
 
 import tritonserver
-from tritonfrontend._api.validation import Validation
+from pydantic import Field
+from pydantic.dataclasses import dataclass
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendGrpc
 
 
 # Enum (mirroring C++ format)
-class Grpc_compression_level(Enum):
+class Grpc_compression_level(IntEnum):
     NONE = 0
     LOW = 1
     MED = 2
@@ -50,10 +48,10 @@ class KServeGrpc:
 
     # triton::server::grpc::Options
     @dataclass
-    class Options(Validation):
+    class Options:
         # triton::server::grpc::SocketOptions
         address: str = "0.0.0.0"
-        port: int = 8001
+        port: int = Field(8001, ge=0, le=65535)
         reuse_port: bool = False
         # triton::server::grpc::SslOptions
         use_ssl: bool = False
@@ -62,40 +60,34 @@ class KServeGrpc:
         root_cert: str = ""
         use_mutual_auth: bool = False
         # triton::server::grpc::KeepAliveOptions
-        keepalive_time_ms: int = 7_200_000
-        keepalive_timeout_ms: int = 20_000
+        keepalive_time_ms: int = Field(7_200_000, ge=0)
+        keepalive_timeout_ms: int = Field(20_000, ge=0)
         keepalive_permit_without_calls: bool = False
-        http2_max_pings_without_data: int = 2
-        http2_min_recv_ping_interval_without_data_ms: int = 300_000
-        http2_max_ping_strikes: int = 2
-        max_connection_age_ms: int = 0
-        max_connection_age_grace_ms: int = 0
+        http2_max_pings_without_data: int = Field(2, ge=0)
+        http2_min_recv_ping_interval_without_data_ms: int = Field(300_000, ge=0)
+        http2_max_ping_strikes: int = Field(2, ge=0)
+        max_connection_age_ms: int = Field(0, ge=0)
+        max_connection_age_grace_ms: int = Field(0, ge=0)
 
         # triton::server::grpc::Options
 
         infer_compression_level: Union[
             int, Grpc_compression_level
         ] = Grpc_compression_level.NONE
-        infer_allocation_pool_size: int = 8
+        infer_allocation_pool_size: int = Field(8, ge=0)
         forward_header_pattern: str = ""
 
         def __post_init__(self):
             if isinstance(self.infer_compression_level, Grpc_compression_level):
                 self.infer_compression_level = self.infer_compression_level.value
 
-            self.validate()
-
     class Server:
         def __init__(self, server: tritonserver, options: "KServeGrpc.Options"):
             server_ptr = server.get_c_ptr()
-            options_dict: dict[str, Union[int, bool, str]] = asdict(options)
+            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
 
             self.triton_c_object = TritonFrontendGrpc(server_ptr, options_dict)
-
-        def __del__(self):
-            # Delete called on C++ side, so assigning to None to prevent double-free
-            self.triton_c_object = None
 
         def start(self):
             return self.triton_c_object.start()

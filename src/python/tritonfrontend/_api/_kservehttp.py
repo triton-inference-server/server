@@ -25,39 +25,32 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from dataclasses import asdict, dataclass
 from typing import Union
 
 import tritonserver
-from tritonfrontend._api.validation import Validation
+from pydantic import Field
+from pydantic.dataclasses import dataclass
 from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendHttp
 
 
 class KServeHttp:
     @dataclass
-    class Options(Validation):
+    class Options:
         address: str = "0.0.0.0"
-        port: int = 8000
+        port: int = Field(8001, ge=0, le=65535)
         reuse_port: bool = False
-        thread_count: int = 8
+        thread_count: int = Field(8, ge=0)
         header_forward_pattern: str = ""
         # restricted_protocols: list
-
-        def __post_init__(self):
-            self.validate()
 
     class Server:
         def __init__(
             self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"
         ):
             server_ptr = server.get_c_ptr()
-            options_dict: dict[str, Union[int, bool, str]] = asdict(options)
+            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
             self.triton_c_object = TritonFrontendHttp(server_ptr, options_dict)
-
-        def __del__(self):
-            # Delete called on C++ side, so assigning to None for safety and preventing potential double-free
-            pass
 
         def start(self):
             self.triton_c_object.start()

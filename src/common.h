@@ -187,8 +187,27 @@ Join(const T& container, const std::string& delim)
 }
 
 
+// Used by Python Bindings to accept arguments to initialize Frontends.
 using VariantType = std::variant<int, bool, std::string>;
 using UnorderedMapType = std::unordered_map<std::string, VariantType>;
+
+// void
+// printVariant(const VariantType& v)
+// {
+//   std::visit(
+//       [](auto&& arg) {
+//         using T = std::decay_t<decltype(arg)>;
+//         if constexpr (std::is_same_v<T, std::string>) {
+//           std::cout << "Value (string): " << arg << std::endl;
+//         } else if constexpr (std::is_same_v<T, int>) {
+//           std::cout << "Value (int): " << arg << std::endl;
+//         } else if constexpr (std::is_same_v<T, bool>) {
+//           std::cout << "Value (bool): " << std::boolalpha << arg <<
+//           std::endl;
+//         }
+//       },
+//       v);
+// };
 
 template <typename T>
 T
