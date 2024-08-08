@@ -43,7 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models"
 SERVER_LOG="./server.log"
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 source ../common/util.sh
 
 # Test unsupported INPUT data type

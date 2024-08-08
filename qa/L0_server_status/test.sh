@@ -46,7 +46,8 @@ SERVER_STATUS_TEST=server_status_test.py
 EXPECTED_NUM_TESTS_MMDT="4"
 EXPECTED_NUM_TESTS_SMDT="5"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--repository-poll-secs=1 --model-control-mode=poll --model-repository=`pwd`/models"

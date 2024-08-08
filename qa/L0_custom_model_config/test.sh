@@ -40,7 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-DATADIR="/data/inferenceserver/${REPO_VERSION}"
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 CLIENT_LOG="./client.log"
 SERVER_LOG="./inference_server.log"
 

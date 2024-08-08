@@ -52,7 +52,8 @@ CLIENT_TEST_SCRIPT=vertex_ai_test.py
 UNIT_TEST_COUNT=8
 CLIENT_LOG="./client.log"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
 source ../common/util.sh

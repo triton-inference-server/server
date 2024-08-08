@@ -45,7 +45,8 @@ source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh -b
 cd ..
 
 CLIENT_LOG="client_cpu_only.log"
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 MODEL_REPO=`pwd`/models
 
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple

@@ -44,7 +44,8 @@ IO_TEST_UTIL=./memory_alloc
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/mnt/c/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
 
 # Must explicitly set LD_LIBRARY_PATH so that IO_TEST_UTIL can find

@@ -40,19 +40,21 @@ fi
 # must be C:/ style.
 export TEST_WINDOWS=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    export DATADIR=${DATADIR:="/c/data/inferenceserver/${REPO_VERSION}"}
+    export DATADIR_ROOT=${DATADIR_ROOT:="/c/data/inferenceserver"}
+    export DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
     # This will run in WSL, but Triton will run in windows, so environment
     # variables meant for loaded models must be exported using WSLENV.
     # The /w flag indicates the value should only be included when invoking
     # Win32 from WSL.
-    export WSLENV=TRITON_DIR/w
+    export WSLENV=TRITON_DIR
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
     TEST_WINDOWS=1
 else
-    export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    export DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    export DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     export SERVER=${TRITON_DIR}/bin/tritonserver
     export BACKEND_DIR=${TRITON_DIR}/backends

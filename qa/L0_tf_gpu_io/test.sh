@@ -43,7 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 TF_TEST=tf_gpu_io_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh

@@ -41,7 +41,8 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 IO_NAMES_CLIENT=./io_names_client.py
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 
 rm -rf models && mkdir -p models
 

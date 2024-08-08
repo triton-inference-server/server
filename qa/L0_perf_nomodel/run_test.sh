@@ -55,7 +55,8 @@ source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then
-    DATADIR="/data/inferenceserver/${REPO_VERSION}"
+    DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 fi
 
 # Select the single GPU that will be available to the inference server

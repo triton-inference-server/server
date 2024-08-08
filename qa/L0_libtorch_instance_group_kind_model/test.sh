@@ -41,7 +41,8 @@ fi
 pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose=1"
 SERVER_LOG="./inference_server.log"

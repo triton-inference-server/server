@@ -43,7 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_LOG="./test.log"
 TEST_PY=test.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 rm -f *.log
 
 TRTEXEC=/usr/src/tensorrt/bin/trtexec

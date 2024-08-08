@@ -44,7 +44,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 BATCH_CUSTOM_TEST=batch_custom_test.py
 CLIENT_LOG_BASE="./client.log"
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_identity_model_repository"}
 EXPECTED_NUM_TESTS="1"
 MODEL_NAME="onnx_zero_1_float16"
 SERVER=/opt/tritonserver/bin/tritonserver

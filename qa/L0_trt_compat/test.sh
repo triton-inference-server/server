@@ -38,7 +38,8 @@ fi
 TEST_RESULT_FILE='test_results.txt'
 COMPATIBILITY_TEST_PY=trt_compatibility_test.py
 CLIENT_LOG="client.log"
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"

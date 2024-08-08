@@ -41,7 +41,8 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 TEST_RESULT_FILE='test_results.txt'
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 CLIENT_LOG="./client.log"
 TFTRT_OPTIMIZATION_TEST=tftrt_optimization_test.py
