@@ -25,12 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 # Determine the operating system to call the correct package manager.
-ID_LIKE=$(grep -Po '(?<=ID_LIKE=).*' /etc/os-release | awk -F= '{print $1}' | grep -o 'debian')
+ID_LIKE=$(grep -Po '(?<=ID_LIKE=).*' /etc/os-release | awk -F= '{print $1}' |  tr -d '"' | awk '{print $1}')
+
 # Note: This script is to be used with customized triton containers that need
 # dependencies to run L0_infer tests
-if [[ "$ID_LIKE" == "debian" ]]; then
+if [[ "$ID_LIKE" =~ "debian" ]]; then
     apt-get update && \
         apt-get install -y --no-install-recommends \
             curl \
