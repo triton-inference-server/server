@@ -48,7 +48,7 @@ NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
     CLIENT_PLUGIN_MODELDIR=${MODELDIR:=C:/client_plugin_models}

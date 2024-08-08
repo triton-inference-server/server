@@ -257,7 +257,7 @@ function run_server_nowait () {
         return
     fi
 
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
         # LD_PRELOAD not yet supported on windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
@@ -329,7 +329,7 @@ function kill_server () {
     # causes the entire WSL shell to just exit. So instead we must use
     # taskkill.exe which can only forcefully kill tritonserver which
     # means that it does not gracefully exit.
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    if [[ -v WSL_DISTRO_NAME ]]; then
         # Disable -x as it makes output below hard to read
         oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
         set +x
@@ -353,6 +353,8 @@ function kill_server () {
         fi
 
         set +vx; eval "$oldstate"
+    elif [[ -v MSYSTEM ]] ; then
+        taskkill //F //IM tritonserver.exe
     else
         # Non-windows...
         kill $SERVER_PID
@@ -513,7 +515,11 @@ remove_array_outliers() {
 function setup_virtualenv() {
     # Create and activate virtual environment
     virtualenv --system-site-packages venv
-    source venv/bin/activate
+    if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
+      source venv/Scripts/activate
+    else
+      source venv/bin/activate
+    fi
     pip install pytest
 
     if [[ ${TEST_WINDOWS} == 1 ]]; then

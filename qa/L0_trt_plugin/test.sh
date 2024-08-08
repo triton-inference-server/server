@@ -47,7 +47,7 @@ PLUGIN_TEST=trt_plugin_test.py
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/HardmaxPlugin.dll}
@@ -135,7 +135,7 @@ SERVER_LD_PRELOAD=$CUSTOMPLUGIN
 SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
-if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
+if  [[ ! -v WSL_DISTRO_NAME ]] || [[ ! -v MSYSTEM ]]; then
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
