@@ -696,6 +696,9 @@ class InferHandlerState {
       // Check if Error not responded previously
       // Avoid closing connection twice on multiple errors from core
       if (!state->context_->IsGRPCStrictError()) {
+        // check state object
+        // state->context_->step_ = Steps::COMPLETE;
+        // state->step_ = Steps::COMPLETE; 
         state->context_->responder_->Finish(state->status_, state);
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
@@ -782,7 +785,7 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    void IssueRequestCancellation()
+    void IssueRequestCancellation(bool is_triton_grpc_error)
     {
       {
         std::lock_guard<std::recursive_mutex> lock(mu_);
@@ -815,7 +818,10 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            PutTaskBackToQueue(state);
+            // CHeck for writeready
+            if(!is_triton_grpc_error) {
+              PutTaskBackToQueue(state);
+            }
           }
         }
       }
@@ -851,7 +857,7 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation();
+          IssueRequestCancellation(is_triton_grpc_error);
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
           // The state returns true because the CancelExecution
@@ -1378,7 +1384,7 @@ InferHandler<
           LOG_VERBOSE(2) << "Returning from " << Name() << ", "
                          << state->unique_id_ << ", " << state->step_;
         }
-      }
+     }
     }
   }));
 
