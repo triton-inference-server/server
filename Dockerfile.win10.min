@@ -28,60 +28,27 @@
 
 ARG BASE_IMAGE=mcr.microsoft.com/windows:10.0.19042.1889
 
-FROM ${BASE_IMAGE} as dependency_base
-
-RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
-RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
-RUN choco install unzip -y
-
-#
-# Installing TensorRT
-#
-ARG TENSORRT_VERSION=10.3.0.26
-ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.5.zip"
-ARG TENSORRT_SOURCE=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/zip/TensorRT-10.3.0.26.Windows10.x86_64.cuda-12.5.zip
-# COPY ${TENSORRT_ZIP} /tmp/${TENSORRT_ZIP}
-ADD ${TENSORRT_SOURCE} /tmp/${TENSORRT_ZIP}
-RUN unzip /tmp/%TENSORRT_ZIP%
-RUN move TensorRT-* TensorRT
-
-LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
-
-
-#
-# Installing cuDNN
-#
-ARG CUDNN_VERSION=9.3.0.75
-ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
-ARG CUDNN_SOURCE=https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.3.0.75_cuda12-archive.zip
-ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
-RUN unzip /tmp/%CUDNN_ZIP%
-RUN move cudnn-* cudnn
-
-LABEL CUDNN_VERSION="${CUDNN_VERSION}"
-
-#
-# Install ccache
-#
-ARG CCACHE_VERSION=4.10.2
-ARG CCACHE_SOURCE=https://github.com/ccache/ccache/releases/download/v${CCACHE_VERSION}/ccache-${CCACHE_VERSION}-windows-x86_64.zip 
-ARG CCACHE_ZIP=ccache-${CCACHE_VERSION}-windows-x86_64.zip
-ADD ${CCACHE_SOURCE} /tmp/${CCACHE_ZIP}
-RUN unzip /tmp/%CCACHE_ZIP%
-RUN move ccache-* ccache
-
-
 FROM ${BASE_IMAGE} as build_base
 
 SHELL ["cmd", "/S", "/C"]
 
-RUN mkdir c:\tmp
-WORKDIR /tmp
-
 RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
 RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
-RUN choco install git docker unzip -y
+
+RUN choco install -y git docker unzip
 RUN git config --system core.longpaths true
+
+ARG CMAKE_VERSION=3.30.1
+RUN choco install -y cmake --version 3.30.1 --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+LABEL CMAKE_VERSION=${CMAKE_VERSION}
+
+ARG NINJA_VERSION=1.12.1
+RUN choco install -y ninja --version 1.12.1
+LABEL NINJA_VERSION=${NINJA_VERSION}
+
+ARG CCACHE_VERSION=4.10.2
+RUN choco install -y ccache --version 4.10.2
+LABEL CCACHE_VERSION=${CCACHE_VERSION}
 
 #
 # Installing python
@@ -95,19 +62,6 @@ RUN pip install --upgrade wheel setuptools docker
 RUN pip install grpcio-tools psutil
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
-
-#
-# Installing CMake
-#
-ARG CMAKE_VERSION=3.30.0
-ARG NINJA_VERSION=1.11.1.1
-RUN pip install cmake==%CMAKE_VERSION% ninja==%NINJA_VERSION%
-
-ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
-ENV VCPKG_TARGET_TRIPLET x64-windows
-
-LABEL CMAKE_VERSION=${CMAKE_VERSION}
-LABEL NINJA_VERSION=${NINJA_VERSION}
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
@@ -133,8 +87,6 @@ RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
-WORKDIR /
-
 #
 # Installing Vcpkg
 #
@@ -155,6 +107,36 @@ RUN vcpkg.exe install \
 RUN vcpkg.exe integrate install
 
 LABEL VCPGK_VERSION=${VCPGK_VERSION}
+
+FROM build_base as build_dependencies
+
+#
+# Installing TensorRT
+#
+ARG TENSORRT_VERSION=10.3.0.26
+ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.5.zip"
+ARG TENSORRT_SOURCE=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/zip/TensorRT-10.3.0.26.Windows10.x86_64.cuda-12.5.zip
+# COPY ${TENSORRT_ZIP} /tmp/${TENSORRT_ZIP}
+ADD ${TENSORRT_SOURCE} /tmp/${TENSORRT_ZIP}
+RUN unzip /tmp/%TENSORRT_ZIP%
+RUN move TensorRT-* TensorRT
+
+LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
+
+#
+# Installing cuDNN
+#
+ARG CUDNN_VERSION=9.3.0.75
+ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
+ARG CUDNN_SOURCE=https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.3.0.75_cuda12-archive.zip
+ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
+RUN unzip /tmp/%CUDNN_ZIP%
+RUN move cudnn-* cudnn
+
+LABEL CUDNN_VERSION="${CUDNN_VERSION}"
+
+
+FROM build_base as final
 
 WORKDIR /
 
@@ -190,7 +172,7 @@ RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
 
 ARG CUDNN_VERSION=9.3.0.75
 ENV CUDNN_VERSION ${CUDNN_VERSION}
-COPY --from=dependency_base /cudnn /cudnn
+COPY --from=build_dependencies /cudnn /cudnn
 RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
 RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
 RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
@@ -198,17 +180,12 @@ LABEL CUDNN_VERSION="${CUDNN_VERSION}"
 
 ARG TENSORRT_VERSION=10.3.0.26
 ENV TRT_VERSION ${TENSORRT_VERSION}
-COPY --from=dependency_base /TensorRT /TensorRT
+COPY --from=build_dependencies /TensorRT /TensorRT
 RUN setx PATH "c:\TensorRT\lib;%PATH%"
 LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 
 LABEL CUDA_VERSION="${CUDA_VERSION}"
 
-ARG CCACHE_VERSION=4.10.2
-ENV CCACHE_VERSION=${CCACHE_VERSION}
-COPY --from=dependency_base /ccache /ccache
-RUN setx PATH "C:\ccache;%PATH%"
-LABEL CCACHE_VERSION="${CCACHE_VERSION}"
 # It is important that the entrypoint initialize VisualStudio
 # environment otherwise the build will fail. Also set
 # CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
