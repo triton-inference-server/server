@@ -50,6 +50,7 @@ ARG CCACHE_VERSION=4.10.2
 RUN choco install -y ccache --version 4.10.2
 LABEL CCACHE_VERSION=${CCACHE_VERSION}
 
+WORKDIR /tmp
 #
 # Installing python
 #
@@ -109,6 +110,7 @@ LABEL VCPGK_VERSION=${VCPGK_VERSION}
 
 FROM build_base as build_dependencies
 
+WORKDIR /
 #
 # Installing TensorRT
 #
@@ -137,8 +139,7 @@ LABEL CUDNN_VERSION="${CUDNN_VERSION}"
 
 FROM build_base as final
 
-WORKDIR /
-
+WORKDIR /tmp
 #
 # Installing CUDA
 #
@@ -167,6 +168,8 @@ RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 RUN copy "%CUDA_PATH%\extras\visual_studio_integration\MSBuildExtensions\*" "C:\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations"
 
 RUN setx PATH "%CUDA_PATH%\bin;%PATH%"
+
+WORKDIR /
 
 ARG CUDNN_VERSION=9.3.0.75
 ENV CUDNN_VERSION ${CUDNN_VERSION}
