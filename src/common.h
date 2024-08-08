@@ -27,7 +27,9 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -215,15 +217,17 @@ get_value(const UnorderedMapType& options, const std::string& key)
 {
   auto curr = options.find(key);
   bool is_present = (curr != options.end());
+
+  if (!is_present) {
+    throw std::runtime_error("Key: " + key + " not found in options provided.");
+  }
+
   bool correct_type = std::holds_alternative<T>(curr->second);
 
-  if (!is_present || !correct_type) {
-    if (curr == options.end())
-      std::cerr << "Error: Key " << key << " not found." << std::endl;
-    else
-      std::cerr << "Error: Type mismatch for key." << std::endl;
+  if (!correct_type) {
+    throw std::runtime_error("Key: " + key + " found, but incorrect type.");
   }
-  std::cout << "Key " << key << " found." << std::endl;
+
   return std::get<T>(curr->second);
 }
 
