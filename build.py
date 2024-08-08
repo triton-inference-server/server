@@ -1244,6 +1244,8 @@ RUN apt-get update \\
     """
 
     if "vllm" in backends:
+        # [DLIS-5606] Build Conda environment for vLLM backend
+        # Remove Pip install once vLLM backend moves to Conda environment.
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
@@ -1477,11 +1479,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         )
         docker_script.comment()
 
-        cachefrommap = [
-            "tritonserver_buildbase",
-            "tritonserver_buildbase_cache0",
-            "tritonserver_buildbase_cache1",
-        ]
+        cachefrommap = FLAGS.cache_from_map
 
         baseargs = [
             "docker",
@@ -1554,7 +1552,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             docker_script.cmd(["docker", "rm", "tritonserver_builder"])
         else:
             docker_script._file.write(
-                'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm -f tritonserver_builder; fi\n'
+                'if [ ! -z $( docker ps -a --filter "name=tritonserver_builder$" -q ) ]; then  docker rm tritonserver_builder; fi\n'
             )
 
         docker_script.cmd(runargs, check_exitcode=True)
@@ -1568,57 +1566,59 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             ],
             check_exitcode=True,
         )
-        docker_script.cmd(
-            [
+
+        if not FLAGS.split_build:
+            docker_script.cmd(
+                [
+                    "docker",
+                    "cp",
+                    "tritonserver_builder:/tmp/tritonbuild/ci",
+                    FLAGS.build_dir,
+                ],
+                check_exitcode=True,
+            )
+
+            #
+            # Final image... tritonserver
+            #
+            docker_script.blankln()
+            docker_script.commentln(8)
+            docker_script.comment("Create final tritonserver image")
+            docker_script.comment()
+
+            finalargs = [
                 "docker",
-                "cp",
-                "tritonserver_builder:/tmp/tritonbuild/ci",
-                FLAGS.build_dir,
-            ],
-            check_exitcode=True,
-        )
+                "build",
+                "-t",
+                "tritonserver",
+                "-f",
+                os.path.join(FLAGS.build_dir, "Dockerfile"),
+                ".",
+            ]
 
-        #
-        # Final image... tritonserver
-        #
-        docker_script.blankln()
-        docker_script.commentln(8)
-        docker_script.comment("Create final tritonserver image")
-        docker_script.comment()
+            docker_script.cwd(THIS_SCRIPT_DIR)
+            docker_script.cmd(finalargs, check_exitcode=True)
 
-        finalargs = [
-            "docker",
-            "build",
-            "-t",
-            "tritonserver",
-            "-f",
-            os.path.join(FLAGS.build_dir, "Dockerfile"),
-            ".",
-        ]
+            #
+            # CI base image... tritonserver_cibase
+            #
+            docker_script.blankln()
+            docker_script.commentln(8)
+            docker_script.comment("Create CI base image")
+            docker_script.comment()
 
-        docker_script.cwd(THIS_SCRIPT_DIR)
-        docker_script.cmd(finalargs, check_exitcode=True)
+            cibaseargs = [
+                "docker",
+                "build",
+                "-t",
+                "tritonserver_cibase",
+                "-f",
+                os.path.join(FLAGS.build_dir, "Dockerfile.cibase"),
+                ".",
+            ]
 
-        #
-        # CI base image... tritonserver_cibase
-        #
-        docker_script.blankln()
-        docker_script.commentln(8)
-        docker_script.comment("Create CI base image")
-        docker_script.comment()
-
-        cibaseargs = [
-            "docker",
-            "build",
-            "-t",
-            "tritonserver_cibase",
-            "-f",
-            os.path.join(FLAGS.build_dir, "Dockerfile.cibase"),
-            ".",
-        ]
-
-        docker_script.cwd(THIS_SCRIPT_DIR)
-        docker_script.cmd(cibaseargs, check_exitcode=True)
+            docker_script.cwd(THIS_SCRIPT_DIR)
+            docker_script.cmd(cibaseargs, check_exitcode=True)
 
 
 def core_build(
@@ -2071,6 +2071,16 @@ def enable_all():
             FLAGS.endpoint += [ep]
 
 
+def split_cmake_script(script_name):
+    if target_platform() == "windows":
+        script_name += ".ps1"
+    return BuildScript(
+        os.path.join(FLAGS.build_dir, script_name),
+        verbose=FLAGS.verbose,
+        desc=("Build script for Triton Inference Server"),
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -2361,6 +2371,23 @@ if __name__ == "__main__":
         action="append",
         required=False,
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
+    )
+    parser.add_argument(
+        "--split-build",
+        action="store_true",
+        required=False,
+        help="Split the intermediate build artifacts into independent build-able targets",
+    )
+    parser.add_argument(
+        "--cache-from-map",
+        action="append",
+        required=False,
+        help="A set of docker images to `--cache-from` where applicable to help speedup builds",
+        default=[
+            "tritonserver_buildbase",
+            "tritonserver_buildbase_cache0",
+            "tritonserver_buildbase_cache1",
+        ],
     )
 
     FLAGS = parser.parse_args()
@@ -2663,9 +2690,12 @@ if __name__ == "__main__":
                 components,
                 backends,
             )
-
         # Commands to build each backend...
         for be in backends:
+            # Define function to create cmake_script with backend name as suffix
+            if FLAGS.split_build:
+                cmake_script = split_cmake_script("cmake_build_backend_" + be)
+
             # Core backends are not built separately from core so skip...
             if be in CORE_BACKENDS:
                 continue
@@ -2700,6 +2730,8 @@ if __name__ == "__main__":
 
         # Commands to build each repo agent...
         for ra in repoagents:
+            if FLAGS.split_build:
+                cmake_script = split_cmake_script("cmake_build_agent_" + ra)
             repo_agent_build(
                 ra,
                 cmake_script,
@@ -2711,6 +2743,8 @@ if __name__ == "__main__":
 
         # Commands to build each cache...
         for cache in caches:
+            if FLAGS.split_build:
+                cmake_script = split_cmake_script("cmake_build_cache_" + cache)
             cache_build(
                 cache,
                 cmake_script,
@@ -2724,6 +2758,8 @@ if __name__ == "__main__":
         if not FLAGS.no_container_build:
             # Commands to collect all the build artifacts needed for CI
             # testing.
+            if FLAGS.split_build:
+                cmake_script = split_cmake_script("cmake_build_collect")
             cibase_build(
                 cmake_script,
                 script_repo_dir,
