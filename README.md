@@ -28,6 +28,17 @@
 
 # Triton Inference Server
 
+📣 **vLLM x Triton Meetup at Fort Mason on Sept 9th 4:00 - 9:00 pm**
+
+We are excited to announce that we will be hosting our Triton user meetup with the vLLM team at
+[Fort Mason](https://maps.app.goo.gl/9Lr3fxRssrpQCGK58) on Sept 9th 4:00 - 9:00 pm. Join us for this
+exclusive event where you will learn about the newest vLLM and Triton features, get a
+glimpse into the roadmaps, and connect with fellow users, the NVIDIA Triton and vLLM teams. Seating is limited and registration confirmation
+is required to attend - please register [here](https://lu.ma/87q3nvnh) to join
+the meetup.
+
+___
+
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 [!WARNING]
