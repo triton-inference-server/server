@@ -28,7 +28,7 @@
 
 # Triton Inference Server
 
-📣 **vLLM x Triton Meetup at Fort Mason on Sept 9th 4:00 - 6:30 pm**
+📣 **vLLM x Triton Meetup at Fort Mason on Sept 9th 4:00 - 9:00 pm**
 
 We are excited to announce that we will be hosting our Triton user meetup with the vLLM team at
 [Fort Mason](https://maps.app.goo.gl/9Lr3fxRssrpQCGK58) on Sept 9th 4:00 - 9:00 pm. Join us for this
