@@ -797,8 +797,8 @@ class CreateChatCompletionRequest(BaseModel):
         None,
         description="An integer between 0 and 20 specifying the number of most likely tokens to return at each token position, each with an associated log probability. `logprobs` must be set to `true` if this parameter is used.",
     )
-    max_tokens: Optional[int] = Field(
-        8168,
+    max_tokens: Optional[conint(ge=0)] = Field(
+        16,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
     )
     n: Optional[conint(ge=1, le=128)] = Field(
