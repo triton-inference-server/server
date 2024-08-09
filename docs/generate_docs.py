@@ -388,6 +388,10 @@ def main():
     if "client" in repo_tags:
         clone_from_github("client", repo_tags["client"], github_org)
 
+    # Usage generate_docs.py --repo-tag=perf_analyzer:main
+    if "perf_analyzer" in repo_tags:
+        clone_from_github("perf_analyzer", repo_tags["perf_analyzer"], github_org)
+
     # Usage generate_docs.py --repo-tag=python_backend:main
     if "python_backend" in repo_tags:
         clone_from_github("python_backend", repo_tags["python_backend"], github_org)
