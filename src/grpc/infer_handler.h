@@ -665,13 +665,19 @@ class InferHandlerState {
 
     bool ReceivedNotification() { return received_notification_; }
 
+    // Changes the state of grpc_stream_error_state_ to ERROR_CANCELED,
+    // indicating we have closed the stream and initiated the cancel flow
+    void SetGRPCErrorCancelled()
+    {
+      grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_CANCELED;
+    }
     // Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
-    bool IsGRPCError()
+    bool CheckAndUpdateGRPCError()
     {
       if (grpc_stream_error_state_ == Triton_grpc_error_steps::ERROR_WAITING) {
         // Change the state to ERROR_CANCELED as we have called
         // HandleCancellation
-        grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_CANCELED;
+        SetGRPCErrorCancelled();
         return true;
       }
       return false;
@@ -679,8 +685,9 @@ class InferHandlerState {
 
     bool IsCancelled()
     {
-      return received_notification_ ? (ctx_->IsCancelled() || IsGRPCError())
-                                    : false;
+      return received_notification_
+                 ? (ctx_->IsCancelled() || CheckAndUpdateGRPCError())
+                 : false;
     }
 
     // Extracts headers from GRPC request and updates state
@@ -792,7 +799,7 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    void IssueRequestCancellation(bool is_triton_grpc_error)
+    void IssueRequestCancellation()
     {
       {
         std::lock_guard<std::recursive_mutex> lock(mu_);
@@ -825,7 +832,6 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
-            // CHeck for writeready
             PutTaskBackToQueue(state);
           }
         }
@@ -838,11 +844,10 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
-        bool is_triton_grpc_error)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
     {
       // Check to avoid early exit in case of triton_grpc_error
-      if (!IsCancelled() && !(is_triton_grpc_error)) {
+      if (!IsCancelled()) {
         LOG_ERROR
             << "[INTERNAL] HandleCancellation called even when the context was "
                "not cancelled for "
@@ -862,7 +867,7 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation(is_triton_grpc_error);
+          IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
           // The state returns true because the CancelExecution
@@ -1067,10 +1072,9 @@ class InferHandlerState {
     // Can be accessed without a lock, as set only once in startstream
     std::atomic<bool> triton_grpc_error_;
 
-    // True if stream already encountered error and closed connection
-    // State maintained to avoid writes on closed stream
-    // Need to acquire lock before access
-    int grpc_stream_error_state_;
+    // Indicates the state of triton_grpc_error, only relevant if special
+    // triton_grpc_error feature set to true by client
+    Triton_grpc_error_steps grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object
