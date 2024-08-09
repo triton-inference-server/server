@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -119,17 +119,24 @@ client/src/grpc_generated/java/README
 :maxdepth: 1
 :caption: Performance Analyzer
 
-client/src/c++/perf_analyzer/README
-client/src/c++/perf_analyzer/docs/README
-client/src/c++/perf_analyzer/docs/install
-client/src/c++/perf_analyzer/docs/quick_start
-client/src/c++/perf_analyzer/docs/cli
-client/src/c++/perf_analyzer/docs/inference_load_modes
-client/src/c++/perf_analyzer/docs/input_data
-client/src/c++/perf_analyzer/docs/measurements_metrics
-client/src/c++/perf_analyzer/docs/benchmarking
-client/src/c++/perf_analyzer/genai-perf/README
-client/src/c++/perf_analyzer/genai-perf/examples/tutorial
+perf_analyzer/README
+perf_analyzer/docs/README
+perf_analyzer/docs/install
+perf_analyzer/docs/quick_start
+perf_analyzer/docs/cli
+perf_analyzer/docs/inference_load_modes
+perf_analyzer/docs/input_data
+perf_analyzer/docs/measurements_metrics
+perf_analyzer/docs/benchmarking
+perf_analyzer/genai-perf/README
+perf_analyzer/genai-perf/docs/compare
+perf_analyzer/genai-perf/docs/embeddings
+perf_analyzer/genai-perf/docs/files
+perf_analyzer/genai-perf/docs/lora
+perf_analyzer/genai-perf/docs/multi_modal
+perf_analyzer/genai-perf/docs/rankings
+perf_analyzer/genai-perf/docs/tutorial
+perf_analyzer/genai-perf/examples/tutorial
 ```
 
 ```{toctree}
