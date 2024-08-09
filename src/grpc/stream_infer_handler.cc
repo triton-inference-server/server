@@ -144,14 +144,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
-  if (state->context_->triton_grpc_error_) {
-    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-    // Check if stream error detected and already connection ended
-    if (state->context_->IsGRPCStrictError()) {
-      state->step_ = Steps::FINISH;
-      return finished;
-    }
-  }
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
