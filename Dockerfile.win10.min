@@ -92,7 +92,7 @@ LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 #
 ARG VCPGK_VERSION=2024.03.19
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
-WORKDIR /vcpkg
+WORKDIR /tmp/vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install \
