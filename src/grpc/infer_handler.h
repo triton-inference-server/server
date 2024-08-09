@@ -642,7 +642,8 @@ class InferHandlerState {
         ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false)
+          received_notification_(false), triton_grpc_error_(false),
+          grpc_stream_error_state_(Triton_grpc_error_steps::NONE)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -664,11 +665,56 @@ class InferHandlerState {
 
     bool ReceivedNotification() { return received_notification_; }
 
-    bool IsCancelled()
+    // Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+    bool IsGRPCError()
     {
-      return received_notification_ ? ctx_->IsCancelled() : false;
+      if (grpc_stream_error_state_ == Triton_grpc_error_steps::ERROR_WAITING) {
+        // Change the state to ERROR_CANCELED as we have called
+        // HandleCancellation
+        grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_CANCELED;
+        return true;
+      }
+      return false;
     }
 
+    bool IsCancelled()
+    {
+      return received_notification_ ? (ctx_->IsCancelled() || IsGRPCError())
+                                    : false;
+    }
+
+    // Extracts headers from GRPC request and updates state
+    void ExtractStateFromHeaders(InferHandlerStateType* state)
+    {
+      const auto& metadata = state->context_->ctx_->client_metadata();
+      for (const auto& pair : metadata) {
+        auto& key = pair.first;
+        auto& value = pair.second;
+        std::string param_key = std::string(key.begin(), key.end());
+        std::string value_key = std::string(value.begin(), value.end());
+        std::string triton_grpc_error_key = "triton_grpc_error";
+        if (param_key == triton_grpc_error_key) {
+          if (value_key == "true") {
+            LOG_VERBOSE(2)
+                << "GRPC: triton_grpc_error mode detected in new grpc stream";
+            state->context_->triton_grpc_error_ = true;
+          }
+        }
+      }
+    }
+
+    void SendGRPCStrictResponse(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+      // Check if Error not responded previously
+      // Avoid closing connection twice on multiple errors from core
+      if (!state->context_->IsGRPCStrictError()) {
+        state->step_ = Steps::COMPLETE;
+        state->context_->responder_->Finish(state->status_, state);
+        // Mark error for this stream
+        state->context_->MarkGRPCStrictError();
+      }
+    }
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
 
@@ -746,7 +792,7 @@ class InferHandlerState {
 
     // Issues the cancellation for all inflight requests
     // being tracked by this context.
-    void IssueRequestCancellation()
+    void IssueRequestCancellation(bool is_triton_grpc_error)
     {
       {
         std::lock_guard<std::recursive_mutex> lock(mu_);
@@ -779,6 +825,7 @@ class InferHandlerState {
             // The RPC is complete and no callback will be invoked to retrieve
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
+            // CHeck for writeready
             PutTaskBackToQueue(state);
           }
         }
@@ -791,9 +838,11 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
+        bool is_triton_grpc_error)
     {
-      if (!IsCancelled()) {
+      // Check to avoid early exit in case of triton_grpc_error
+      if (!IsCancelled() && !(is_triton_grpc_error)) {
         LOG_ERROR
             << "[INTERNAL] HandleCancellation called even when the context was "
                "not cancelled for "
@@ -813,10 +862,9 @@ class InferHandlerState {
         // issue cancellation request to all the inflight
         // states belonging to the context.
         if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation();
+          IssueRequestCancellation(is_triton_grpc_error);
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
-
           // The state returns true because the CancelExecution
           // call above would have raised alarm objects on all
           // pending inflight states objects. This state will
@@ -941,6 +989,21 @@ class InferHandlerState {
       return false;
     }
 
+    // Marks error after it has been responded to
+    void MarkGRPCStrictError()
+    {
+      grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_WAITING;
+    }
+
+    // Checks if error already responded to in triton_grpc_error mode
+    bool IsGRPCStrictError()
+    {
+      if (grpc_stream_error_state_ == Triton_grpc_error_steps::NONE) {
+        return false;
+      }
+      return true;
+    }
+
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
     {
@@ -999,6 +1062,15 @@ class InferHandlerState {
     // Tracks whether the async notification has been delivered by
     // completion queue.
     bool received_notification_;
+
+    // True if set by user via header
+    // Can be accessed without a lock, as set only once in startstream
+    std::atomic<bool> triton_grpc_error_;
+
+    // True if stream already encountered error and closed connection
+    // State maintained to avoid writes on closed stream
+    // Need to acquire lock before access
+    int grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object
@@ -1090,7 +1162,6 @@ class InferHandlerState {
 
   void MarkAsAsyncNotifyState() { async_notify_state_ = true; }
   bool IsAsyncNotifyState() { return async_notify_state_; }
-
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
 
