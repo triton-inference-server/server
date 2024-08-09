@@ -140,15 +140,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   // This means that we only need to take care of
   // synchronizing this thread and the ResponseComplete
   // threads.
-  // We need an explicit finish indicator. Can't use 'state->step_'
-  // because we launch an async thread that could update 'state's
-  // step_ to be FINISH before this thread exits this function.
-  bool finished = false;
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
-      bool resume = state->context_->HandleCancellation(
-          state, rpc_ok, Name(), false /* is_triton_grpc_error */);
+      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
       return resume;
     } else {
       if (state->context_->HandleCompletion()) {
@@ -160,6 +155,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
+
+  // We need an explicit finish indicator. Can't use 'state->step_'
+  // because we launch an async thread that could update 'state's
+  // step_ to be FINISH before this thread exits this function.
+  bool finished = false;
 
   if (state->step_ == Steps::START) {
     // A new stream connection... If RPC failed on a new request then
