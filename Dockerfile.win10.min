@@ -28,12 +28,49 @@
 
 ARG BASE_IMAGE=mcr.microsoft.com/windows:10.0.19042.1889
 
+FROM ${BASE_IMAGE} as dependency_base
+
+RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
+RUN choco install unzip -y
+
+#
+# Installing TensorRT
+#
+ARG TENSORRT_VERSION=10.3.0.26
+ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.5.zip"
+ARG TENSORRT_SOURCE=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.2.0/zip/TensorRT-10.2.0.19.Windows10.x86_64.cuda-12.5.zip
+# COPY ${TENSORRT_ZIP} /tmp/${TENSORRT_ZIP}
+ADD ${TENSORRT_SOURCE} /tmp/${TENSORRT_ZIP}
+RUN unzip /tmp/%TENSORRT_ZIP%
+RUN move TensorRT-* TensorRT
+
+LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
+
+
+#
+# Installing cuDNN
+#
+ARG CUDNN_VERSION=9.3.0.75
+ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
+ARG CUDNN_SOURCE=https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.2.1.18_cuda12-archive.zip
+ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
+RUN unzip /tmp/%CUDNN_ZIP%
+RUN move cudnn-* cudnn
+
+LABEL CUDNN_VERSION="${CUDNN_VERSION}"
+
+
 FROM ${BASE_IMAGE} as build_base
 
 SHELL ["cmd", "/S", "/C"]
 
+RUN mkdir c:\tmp
+WORKDIR /tmp
+
 RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
 RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
+RUN choco install git docker unzip -y
 
 RUN choco install -y git docker unzip
 RUN git config --system core.longpaths true
@@ -50,7 +87,6 @@ ARG CCACHE_VERSION=4.10.2
 RUN choco install -y ccache --version 4.10.2
 LABEL CCACHE_VERSION=${CCACHE_VERSION}
 
-WORKDIR /tmp
 #
 # Installing python
 #
@@ -63,6 +99,9 @@ RUN pip install --upgrade wheel setuptools docker
 RUN pip install grpcio-tools psutil
 
 LABEL PYTHON_VERSION=${PYTHON_VERSION}
+
+ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV VCPKG_TARGET_TRIPLET x64-windows
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
@@ -79,20 +118,23 @@ ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/5e7b923b-7d89-4e14-95b8-a84ab168e243/96b21d216c7954aaf606c6d7ba59a3de991884a8a86c578c767ba349c23188a9/vs_BuildTools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
+ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
-      --installPath "C:\BuildTools" \
+      --installPath %VS_INSTALL_PATH_WP% \
       --add Microsoft.VisualStudio.Workload.VCTools \
       --includeRecommended \
       --locale "En-us"
 
 LABEL BUILDTOOLS_VERSION=${BUILDTOOLS_VERSION}
 
+WORKDIR /
+
 #
 # Installing Vcpkg
 #
 ARG VCPGK_VERSION=2024.03.19
 RUN git clone --single-branch --depth=1 -b %VCPGK_VERSION% https://github.com/microsoft/vcpkg.git
-WORKDIR /tmp/vcpkg
+WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install \
@@ -108,44 +150,14 @@ RUN vcpkg.exe integrate install
 
 LABEL VCPGK_VERSION=${VCPGK_VERSION}
 
-FROM build_base as build_dependencies
-
 WORKDIR /
-#
-# Installing TensorRT
-#
-ARG TENSORRT_VERSION=10.3.0.26
-ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.5.zip"
-ARG TENSORRT_SOURCE=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/zip/TensorRT-10.3.0.26.Windows10.x86_64.cuda-12.5.zip
-# COPY ${TENSORRT_ZIP} /tmp/${TENSORRT_ZIP}
-ADD ${TENSORRT_SOURCE} /tmp/${TENSORRT_ZIP}
-RUN unzip /tmp/%TENSORRT_ZIP%
-RUN move TensorRT-* TensorRT
 
-LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
-
-#
-# Installing cuDNN
-#
-ARG CUDNN_VERSION=9.3.0.75
-ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
-ARG CUDNN_SOURCE=https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.3.0.75_cuda12-archive.zip
-ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
-RUN unzip /tmp/%CUDNN_ZIP%
-RUN move cudnn-* cudnn
-
-LABEL CUDNN_VERSION="${CUDNN_VERSION}"
-
-
-FROM build_base as final
-
-WORKDIR /tmp
 #
 # Installing CUDA
 #
 ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=6
-ARG CUDA_PATCH=0
+ARG CUDA_MINOR=5
+ARG CUDA_PATCH=1
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -158,6 +170,7 @@ ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cupti_${CUDA_MAJOR}.${CUDA_MINOR} \
                    thrust_${CUDA_MAJOR}.${CUDA_MINOR} \
                    visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
+ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
 
 ARG CUDA_SOURCE=https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_windows_network.exe
 ADD ${CUDA_SOURCE} cuda_${CUDA_VERSION}_windows_network.exe
@@ -165,28 +178,25 @@ ADD ${CUDA_SOURCE} cuda_${CUDA_VERSION}_windows_network.exe
 RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 # Copy the CUDA visualstudio integration from where it was installed
 # into the appropriate place in BuildTools
-RUN copy "%CUDA_PATH%\extras\visual_studio_integration\MSBuildExtensions\*" "C:\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations"
+RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v170\BuildCustomizations"
 
-RUN setx PATH "%CUDA_PATH%\bin;%PATH%"
-
-WORKDIR /
+RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
 
 ARG CUDNN_VERSION=9.3.0.75
 ENV CUDNN_VERSION ${CUDNN_VERSION}
-COPY --from=build_dependencies /cudnn /cudnn
-RUN copy cudnn\bin\cudnn*.dll "%CUDA_PATH%\bin\."
-RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_PATH%\lib\x64\."
-RUN copy cudnn\include\cudnn*.h "%CUDA_PATH%\include\."
+COPY --from=dependency_base /cudnn /cudnn
+RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
 LABEL CUDNN_VERSION="${CUDNN_VERSION}"
 
 ARG TENSORRT_VERSION=10.3.0.26
 ENV TRT_VERSION ${TENSORRT_VERSION}
-COPY --from=build_dependencies /TensorRT /TensorRT
+COPY --from=dependency_base /TensorRT /TensorRT
 RUN setx PATH "c:\TensorRT\lib;%PATH%"
 LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 
 LABEL CUDA_VERSION="${CUDA_VERSION}"
-
 # It is important that the entrypoint initialize VisualStudio
 # environment otherwise the build will fail. Also set
 # CMAKE_TOOLCHAIN_FILE and VCPKG_TARGET_TRIPLET so
