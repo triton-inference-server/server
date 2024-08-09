@@ -643,7 +643,7 @@ class InferHandlerState {
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
           received_notification_(false), triton_grpc_error_(false),
-          grpc_stream_error_state_(false)
+          grpc_stream_error_state_(Triton_grpc_error_steps::NONE)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -665,9 +665,22 @@ class InferHandlerState {
 
     bool ReceivedNotification() { return received_notification_; }
 
+    // Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+    bool IsGRPCError()
+    {
+      if (grpc_stream_error_state_ == Triton_grpc_error_steps::ERROR_WAITING) {
+        // Change the state to ERROR_CANCELED as we have called
+        // HandleCancellation
+        grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_CANCELED;
+        return true;
+      }
+      return false;
+    }
+
     bool IsCancelled()
     {
-      return received_notification_ ? ctx_->IsCancelled() : false;
+      return received_notification_ ? (ctx_->IsCancelled() || IsGRPCError())
+                                    : false;
     }
 
     // Extracts headers from GRPC request and updates state
@@ -696,16 +709,10 @@ class InferHandlerState {
       // Check if Error not responded previously
       // Avoid closing connection twice on multiple errors from core
       if (!state->context_->IsGRPCStrictError()) {
-        // check state object
-        // state->context_->step_ = Steps::COMPLETE;
-        // state->step_ = Steps::COMPLETE; 
+        state->step_ = Steps::COMPLETE;
         state->context_->responder_->Finish(state->status_, state);
         // Mark error for this stream
         state->context_->MarkGRPCStrictError();
-        // Fix Me : Last argument not sure for HandleCancellation
-        state->context_->HandleCancellation(
-            state, true /* rpc_ok */, "triton_grpc_error_name",
-            true /* is_triton_grpc_error */);
       }
     }
     // Increments the ongoing request counter
@@ -819,9 +826,7 @@ class InferHandlerState {
             // the object. Hence, need to explicitly place the state on the
             // completion queue.
             // CHeck for writeready
-            if(!is_triton_grpc_error) {
-              PutTaskBackToQueue(state);
-            }
+            PutTaskBackToQueue(state);
           }
         }
       }
@@ -985,10 +990,19 @@ class InferHandlerState {
     }
 
     // Marks error after it has been responded to
-    void MarkGRPCStrictError() { grpc_stream_error_state_ = true; }
+    void MarkGRPCStrictError()
+    {
+      grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_WAITING;
+    }
 
     // Checks if error already responded to in triton_grpc_error mode
-    bool IsGRPCStrictError() { return grpc_stream_error_state_; }
+    bool IsGRPCStrictError()
+    {
+      if (grpc_stream_error_state_ == Triton_grpc_error_steps::NONE) {
+        return false;
+      }
+      return true;
+    }
 
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
@@ -1056,7 +1070,7 @@ class InferHandlerState {
     // True if stream already encountered error and closed connection
     // State maintained to avoid writes on closed stream
     // Need to acquire lock before access
-    std::atomic<bool> grpc_stream_error_state_;
+    int grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object
@@ -1364,27 +1378,23 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
-      // FIX ME : Ideally should not need this nullptr check, added to resolve
-      // crash is triton_grpc_error mode
-      if (state->context_ != nullptr) {
-        if (state->step_ == Steps::WAITING_NOTIFICATION) {
-          State* state_wrapper = state;
-          state = state_wrapper->state_ptr_;
-          state->context_->SetReceivedNotification(true);
-          LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
-                         << state->unique_id_;
-        }
-        LOG_VERBOSE(2) << "Grpc::CQ::Next() "
-                       << state->context_->DebugString(state);
-        if (!Process(state, ok)) {
-          LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
-          state->context_->EraseState(state);
-          StateRelease(state);
-        } else {
-          LOG_VERBOSE(2) << "Returning from " << Name() << ", "
-                         << state->unique_id_ << ", " << state->step_;
-        }
-     }
+      if (state->step_ == Steps::WAITING_NOTIFICATION) {
+        State* state_wrapper = state;
+        state = state_wrapper->state_ptr_;
+        state->context_->SetReceivedNotification(true);
+        LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
+                       << state->unique_id_;
+      }
+      LOG_VERBOSE(2) << "Grpc::CQ::Next() "
+                     << state->context_->DebugString(state);
+      if (!Process(state, ok)) {
+        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+        state->context_->EraseState(state);
+        StateRelease(state);
+      } else {
+        LOG_VERBOSE(2) << "Returning from " << Name() << ", "
+                       << state->unique_id_ << ", " << state->step_;
+      }
     }
   }));
 

@@ -76,6 +76,17 @@ typedef enum {
   PARTIAL_COMPLETION
 } Steps;
 
+typedef enum {
+  // No error from CORE seen yet
+  NONE,
+  // Error from CORE encountered, waiting to be picked up by completion queue to
+  // initiate cancellation
+  ERROR_WAITING,
+  // Error from CORE encountered, stream closed
+  // This state is added to avoid double cancellation
+  ERROR_CANCELED
+} Triton_grpc_error_steps;
+
 // Debugging helper
 std::ostream& operator<<(std::ostream& out, const Steps& step);
 
