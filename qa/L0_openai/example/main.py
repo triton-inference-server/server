@@ -33,7 +33,7 @@ def parse_args():
     triton_group.add_argument(
         "--model-repository",
         type=str,
-        default="/opt/tritonserver/models",
+        default=None,
         help="model repository",
     )
 
@@ -44,7 +44,8 @@ if __name__ == "__main__":
     args = parse_args()
     # NOTE: Think about other ways to pass triton args to fastapi app,
     # but use env vars for simplicity for now.
-    os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
+    if args.model_repository:
+        os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
     uvicorn.run(

@@ -78,3 +78,7 @@ class TestOpenAIClient:
         assert chat_completion.choices[0]
         assert chat_completion.choices[0].finish_reason == "stop"
         print(f"Chat completion results: {chat_completion}")
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_openai_client_function_calling(self):
+        pass

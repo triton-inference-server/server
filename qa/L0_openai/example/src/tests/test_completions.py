@@ -6,25 +6,24 @@ from fastapi.testclient import TestClient
 from src.api_server import app
 
 TEST_MODEL = "gpt2"
+TEST_PROMPT = "The capital of France is"
 
 
-# TODO: Test TRTLLM too
-class TestChatCompletion:
+class TestCompletions:
     # TODO: Consider module/package scope, or join ChatCompletions tests into same file
     # to run server only once for both sets of tests for faster iteration.
     @pytest.fixture(scope="class")
     def client(self):
+        # TODO: Test TRT-LLM models as well
         model_repository = Path(__file__).parent / "vllm_models"
         os.environ["TRITON_MODEL_REPOSITORY"] = str(model_repository)
         with TestClient(app) as test_client:
             yield test_client
 
     def test_completions_defaults(self, client):
-        prompt = "Hello"
-
         response = client.post(
             "/v1/completions",
-            json={"model": TEST_MODEL, "prompt": prompt},
+            json={"model": TEST_MODEL, "prompt": TEST_PROMPT},
         )
 
         print("Response:", response.json())
@@ -41,16 +40,19 @@ class TestChatCompletion:
             ("top_p", 0.9),
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
+            # logprobs is an integer for completions
             ("logprobs", 5),
             ("logit_bias", {"0": 0}),
         ],
     )
     def test_completions_sampling_parameters(self, client, sampling_parameter, value):
-        prompt = "Hello"
-
         response = client.post(
             "/v1/completions",
-            json={"model": TEST_MODEL, "prompt": prompt, sampling_parameter: value},
+            json={
+                "model": TEST_MODEL,
+                "prompt": TEST_PROMPT,
+                sampling_parameter: value,
+            },
         )
         print("Response:", response.json())
 
@@ -66,28 +68,29 @@ class TestChatCompletion:
 
     # Simple tests to verify max_tokens roughly behaves as expected
     def test_completions_max_tokens(self, client):
-        prompt = "Hello"
         responses = []
+        payload = {"model": TEST_MODEL, "prompt": TEST_PROMPT, "max_tokens": 1}
 
-        max_tokens = 1
+        # Send two requests with max_tokens = 1 to check their similarity
+        payload["max_tokens"] = 1
         responses.append(
             client.post(
                 "/v1/completions",
-                json={"model": TEST_MODEL, "prompt": prompt, "max_tokens": max_tokens},
+                json=payload,
             )
         )
-        max_tokens = 1
         responses.append(
             client.post(
                 "/v1/completions",
-                json={"model": TEST_MODEL, "prompt": prompt, "max_tokens": max_tokens},
+                json=payload,
             )
         )
-        max_tokens = 100
+        # Send one requests with larger max_tokens to check its dis-similarity
+        payload["max_tokens"] = 100
         responses.append(
             client.post(
                 "/v1/completions",
-                json={"model": TEST_MODEL, "prompt": prompt, "max_tokens": max_tokens},
+                json=payload,
             )
         )
 
@@ -98,6 +101,7 @@ class TestChatCompletion:
         response1_text = responses[0].json()["choices"][0]["text"].strip().split()
         response2_text = responses[1].json()["choices"][0]["text"].strip().split()
         response3_text = responses[2].json()["choices"][0]["text"].strip().split()
+        # Simplification: One token shouldn't be more than one space-delimited word
         assert len(response1_text) == len(response2_text) == 1
         assert len(response3_text) > len(response1_text)
 
@@ -117,17 +121,23 @@ class TestChatCompletion:
     def test_completions_invalid_sampling_parameters(
         self, client, sampling_parameter, value
     ):
-        prompt = "Hello"
-
         response = client.post(
             "/v1/completions",
-            json={"model": TEST_MODEL, "prompt": prompt, sampling_parameter: value},
+            json={
+                "model": TEST_MODEL,
+                "prompt": TEST_PROMPT,
+                sampling_parameter: value,
+            },
         )
 
         print("Response:", response.json())
         assert response.status_code == 422
 
-    def test_empty_prompt(self, client):
+    def test_completions_no_prompt(self, client):
+        response = client.post("/v1/completions", json={"model": TEST_MODEL})
+        assert response.status_code == 422
+
+    def test_completions_empty_prompt(self, client):
         response = client.post(
             "/v1/completions", json={"model": TEST_MODEL, "prompt": ""}
         )
@@ -141,3 +151,11 @@ class TestChatCompletion:
 
         # 422 Error returned by schema validation
         assert response.status_code == 422
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_lora(self):
+        pass
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_multi_lora(self):
+        pass

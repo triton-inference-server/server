@@ -102,6 +102,11 @@ def create_chat_completion(
     if request.n and request.n > 1:
         raise HTTPException(status_code=400, detail=f"Only single choice is supported")
 
+    if request.logit_bias is not None or request.logprobs:
+        raise HTTPException(
+            status_code=400, detail="logit bias and log probs not supported"
+        )
+
     conversation = [
         {"role": str(message.role), "content": str(message.content)}
         for message in request.messages
