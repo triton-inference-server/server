@@ -639,13 +639,16 @@ def pytorch_cmake_args(images):
         cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
     ]
 
-    if FLAGS.enable_gpu:
+    # TODO: TPRD-372 TorchTRT extension is not currently supported by our manylinux build
+    # TODO: TPRD-373 NVTX extension is not currently supported by our manylinux build
+    if target_platform() != "rhel":
+        if FLAGS.enable_gpu:
+            cargs.append(
+                cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
+            )
         cargs.append(
-            cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
+            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
         )
-    cargs.append(
-        cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
-    )
     return cargs
 
 
