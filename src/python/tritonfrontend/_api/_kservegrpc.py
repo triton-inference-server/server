@@ -87,10 +87,10 @@ class KServeGrpc:
             options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
 
-            self.triton_c_object = TritonFrontendGrpc(server_ptr, options_dict)
+            self.triton_frontend = TritonFrontendGrpc(server_ptr, options_dict)
 
         def start(self):
-            return self.triton_c_object.start()
+            return self.triton_frontend.start()
 
         def stop(self):
-            return self.triton_c_object.stop()
+            return self.triton_frontend.stop()

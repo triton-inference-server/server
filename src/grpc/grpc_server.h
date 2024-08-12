@@ -106,12 +106,15 @@ class Server {
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<Server>* service);
 
-  static void GetSocketOptions(SocketOptions& options, UnorderedMapType& data);
-  static void GetSslOptions(SslOptions& options, UnorderedMapType& data);
-  static void GetKeepAliveOptions(
+  static TRITONSERVER_Error* GetSocketOptions(
+      SocketOptions& options, UnorderedMapType& data);
+  static TRITONSERVER_Error* GetSslOptions(
+      SslOptions& options, UnorderedMapType& data);
+  static TRITONSERVER_Error* GetKeepAliveOptions(
       KeepAliveOptions& options, UnorderedMapType& data);
 
-  static void GetOptions(Options& options, UnorderedMapType& data);
+  static TRITONSERVER_Error* GetOptions(
+      Options& options, UnorderedMapType& data);
 
 
   ~Server();

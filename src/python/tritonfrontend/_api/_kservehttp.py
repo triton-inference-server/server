@@ -37,7 +37,7 @@ class KServeHttp:
     @dataclass
     class Options:
         address: str = "0.0.0.0"
-        port: int = Field(8001, ge=0, le=65535)
+        port: int = Field(8000, ge=0, le=65535)
         reuse_port: bool = False
         thread_count: int = Field(8, ge=0)
         header_forward_pattern: str = ""
@@ -50,10 +50,10 @@ class KServeHttp:
             server_ptr = server.get_c_ptr()
             options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
-            self.triton_c_object = TritonFrontendHttp(server_ptr, options_dict)
+            self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
 
         def start(self):
-            self.triton_c_object.start()
+            self.triton_frontend.start()
 
         def stop(self):
-            self.triton_c_object.stop()
+            self.triton_frontend.stop()

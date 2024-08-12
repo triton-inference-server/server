@@ -4706,16 +4706,24 @@ HTTPAPIServer::Create(
     const RestrictedFeatures& restricted_features,
     std::unique_ptr<HTTPServer>* service)
 {
-  int port = get_value<int>(data, "port");
-  bool reuse_port = get_value<int>(data, "reuse_port");
-  std::string address = get_value<std::string>(data, "address");
-  std::string header_forward_pattern =
-      get_value<std::string>(data, "header_forward_pattern");
-  int thread_count = get_value<int>(data, "thread_count");
+  int port;
+  int reuse_port;
+  std::string address;
+  std::string header_forward_pattern;
+  int thread_count;
 
-  TRITONSERVER_Error* err = Create(
+
+  RETURN_IF_ERR(get_value(data, "port", port));
+  RETURN_IF_ERR(get_value<int>(data, "reuse_port", reuse_port));
+  RETURN_IF_ERR(get_value(data, "address", address));
+  RETURN_IF_ERR(
+      get_value(data, "header_forward_pattern", header_forward_pattern));
+  RETURN_IF_ERR(get_value(data, "thread_count", thread_count));
+
+  TRITONSERVER_Error* err = nullptr;
+  err = Create(
       server, nullptr, nullptr,  // TraceManager, SharedMemoryManager
-      port, reuse_port, address, header_forward_pattern, thread_count,
+      port, (bool)reuse_port, address, header_forward_pattern, thread_count,
       restricted_features, service);
 
   return err;

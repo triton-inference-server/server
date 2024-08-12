@@ -193,42 +193,29 @@ Join(const T& container, const std::string& delim)
 using VariantType = std::variant<int, bool, std::string>;
 using UnorderedMapType = std::unordered_map<std::string, VariantType>;
 
-// void
-// printVariant(const VariantType& v)
-// {
-//   std::visit(
-//       [](auto&& arg) {
-//         using T = std::decay_t<decltype(arg)>;
-//         if constexpr (std::is_same_v<T, std::string>) {
-//           std::cout << "Value (string): " << arg << std::endl;
-//         } else if constexpr (std::is_same_v<T, int>) {
-//           std::cout << "Value (int): " << arg << std::endl;
-//         } else if constexpr (std::is_same_v<T, bool>) {
-//           std::cout << "Value (bool): " << std::boolalpha << arg <<
-//           std::endl;
-//         }
-//       },
-//       v);
-// };
-
 template <typename T>
-T
-get_value(const UnorderedMapType& options, const std::string& key)
+TRITONSERVER_Error*
+get_value(const UnorderedMapType& options, const std::string& key, T& arg)
 {
   auto curr = options.find(key);
   bool is_present = (curr != options.end());
-
+  std::string msg;
+  TRITONSERVER_Error* err = nullptr;
   if (!is_present) {
-    throw std::runtime_error("Key: " + key + " not found in options provided.");
+    msg = "Key: " + key + " not found in options provided.";
+    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
+    return err;
   }
 
   bool correct_type = std::holds_alternative<T>(curr->second);
-
   if (!correct_type) {
-    throw std::runtime_error("Key: " + key + " found, but incorrect type.");
+    msg = "Key: " + key + " found, but incorrect type.";
+    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
+    return err;
   }
 
-  return std::get<T>(curr->second);
+  arg = std::get<T>(curr->second);
+  return nullptr;
 }
 
 }}  // namespace triton::server

@@ -97,7 +97,7 @@ ThrowIfError(TRITONSERVER_Error* err)
 }
 
 
-template <typename Base, typename Frontend_Server>
+template <typename Base, typename FrontendServer>
 class TritonFrontend {
  private:
   std::shared_ptr<TRITONSERVER_Server> server_;
@@ -118,7 +118,7 @@ class TritonFrontend {
     // }
 
     ThrowIfError(
-        Frontend_Server::Create(server_, data, restricted_features, &service));
+        FrontendServer::Create(server_, data, restricted_features, &service));
   };
 
   void StartService() { ThrowIfError(service->Start()); };
