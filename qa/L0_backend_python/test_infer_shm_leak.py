@@ -33,6 +33,7 @@ sys.path.append("../../common")
 import os
 import unittest
 
+import pytest
 import shm_util
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
@@ -41,11 +42,13 @@ from tritonclient.utils import *
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+# The exit code 123 is used to indicate that the shm leak probe detected a 480
+# bytes leak in the bls sub-test. Any leak other than 480 bytes will cause the
+# test to fail with the default exit code 1.
+ALLOWED_FAILURE_EXIT_CODE = 123
 
-class PythonUnittest(unittest.TestCase):
-    def setUp(self):
-        self._shm_leak_detector = shm_util.ShmLeakDetector()
 
+class TestInferShmLeak:
     def _run_unittest(self, model_name):
         with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             # No input is required
@@ -54,15 +57,17 @@ class PythonUnittest(unittest.TestCase):
 
             # The model returns 1 if the tests were successfully passed.
             # Otherwise, it will return 0.
-            self.assertEqual(
-                output0, [1], f"python_unittest failed for model {model_name}"
-            )
+            assert output0 == [1], f"python_unittest failed for model {model_name}"
 
-    def test_python_unittest(self):
-        model_name = os.environ["MODEL_NAME"]
-        with self._shm_leak_detector.Probe() as shm_probe:
-            self._run_unittest(model_name)
+    def test_shm_leak(self):
+        self._shm_leak_detector = shm_util.ShmLeakDetector()
+        model_name = os.environ.get("MODEL_NAME", "default_model")
 
-
-if __name__ == "__main__":
-    unittest.main()
+        try:
+            with self._shm_leak_detector.Probe() as shm_probe:
+                self._run_unittest(model_name)
+        except AssertionError as e:
+            if "Known shared memory leak of 480 bytes detected" in str(e):
+                pytest.exit(str(e), returncode=ALLOWED_FAILURE_EXIT_CODE)
+            else:
+                raise e

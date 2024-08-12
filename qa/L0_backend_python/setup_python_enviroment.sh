@@ -151,7 +151,7 @@ apt-get update && apt-get -y install \
                             libboost-dev
 rm -f /usr/bin/python3 && \
 ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3
-pip3 install --upgrade install requests numpy virtualenv protobuf
+pip3 install --upgrade requests numpy virtualenv protobuf
 find /opt/tritonserver/qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade

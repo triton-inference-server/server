@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -99,7 +99,7 @@ available through the [HTTP/REST, GRPC, and C
 APIs](../customization_guide/inference_protocols.md).
 
 A client application,
-[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md),
+[perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md),
 allows you to measure the performance of an individual model using a synthetic
 load. The perf_analyzer application is designed to show you the tradeoff of
 latency vs. throughput.

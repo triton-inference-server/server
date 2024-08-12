@@ -37,6 +37,7 @@ import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
 import tritonclient.utils.shared_memory as shm
+from tritonclient.utils import InferenceServerException
 
 
 def div_up(a, b):
@@ -141,6 +142,41 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             "OUTPUT0 expected: {}, got {}".format(expected_output1_np, output1_np),
         )
 
+    def test_wrong_nobatch_chw2_input(self):
+        model_name = "plan_nobatch_CHW2_LINEAR_float16_float16_float16"
+        input_np = np.arange(26, dtype=np.float16).reshape((13, 2, 1))
+
+        # Use shared memory to bypass the shape check in client library, because
+        # for non-linear format tensor, the data buffer is padded and thus the
+        # data byte size may not match what is calculated from tensor shape
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput("INPUT0", [13, 2, 1], "FP16"))
+        # Send the original size input instead of the reformatted size input.
+        self.add_reformat_free_data_as_shared_memory("input0", inputs[-1], input_np)
+
+        inputs.append(tritonhttpclient.InferInput("INPUT1", [13, 2, 1], "FP16"))
+        # Send the original size input instead of the reformatted size input.
+        self.add_reformat_free_data_as_shared_memory("input1", inputs[-1], input_np)
+
+        outputs = []
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput("OUTPUT0", binary_data=True)
+        )
+        outputs.append(
+            tritonhttpclient.InferRequestedOutput("OUTPUT1", binary_data=True)
+        )
+
+        with self.assertRaises(InferenceServerException) as e:
+            self.triton_client.infer(
+                model_name=model_name, inputs=inputs, outputs=outputs
+            )
+
+        err_str = str(e.exception)
+        self.assertIn(
+            "input byte size mismatch for input 'INPUT0' for model 'plan_nobatch_CHW2_LINEAR_float16_float16_float16'. Expected 56, got 52",
+            err_str,
+        )
+
     def test_chw2_input(self):
         model_name = "plan_CHW2_LINEAR_float16_float16_float16"
         for bs in [1, 8]:
@@ -184,6 +220,50 @@ class TrtReformatFreeTest(tu.TestResultCollector):
             self.assertTrue(
                 np.array_equal(output1_np, expected_output1_np),
                 "OUTPUT0 expected: {}, got {}".format(expected_output1_np, output1_np),
+            )
+
+    def test_wrong_chw2_input(self):
+        model_name = "plan_CHW2_LINEAR_float16_float16_float16"
+        for bs in [1, 8]:
+            input_np = np.arange(26 * bs, dtype=np.float16).reshape((bs, 13, 2, 1))
+
+            # Use shared memory to bypass the shape check in client library,
+            # because for non-linear format tensor, the data buffer is padded
+            # and thus the data byte size may not match what is calculated from
+            # tensor shape
+            inputs = []
+            inputs.append(tritonhttpclient.InferInput("INPUT0", [bs, 13, 2, 1], "FP16"))
+            # Send the original size input instead of the reformatted size input.
+            self.add_reformat_free_data_as_shared_memory(
+                "input0" + str(bs), inputs[-1], input_np
+            )
+
+            inputs.append(tritonhttpclient.InferInput("INPUT1", [bs, 13, 2, 1], "FP16"))
+            # Send the original size input instead of the reformatted size input.
+            self.add_reformat_free_data_as_shared_memory(
+                "input1" + str(bs), inputs[-1], input_np
+            )
+
+            outputs = []
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput("OUTPUT0", binary_data=True)
+            )
+            outputs.append(
+                tritonhttpclient.InferRequestedOutput("OUTPUT1", binary_data=True)
+            )
+
+            with self.assertRaises(InferenceServerException) as e:
+                self.triton_client.infer(
+                    model_name=model_name, inputs=inputs, outputs=outputs
+                )
+            err_str = str(e.exception)
+            # reformatted input size - (bs, 14, 2, 1) * size(float16)
+            expected_size = bs * 28 * 2
+            # original input size - (bs, 13, 2, 1) * size(float16)
+            received_size = bs * 26 * 2
+            self.assertIn(
+                f"input byte size mismatch for input 'INPUT0' for model 'plan_CHW2_LINEAR_float16_float16_float16'. Expected {expected_size}, got {received_size}",
+                err_str,
             )
 
     def test_nobatch_chw32_input(self):

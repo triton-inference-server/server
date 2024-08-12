@@ -35,6 +35,8 @@ import unittest
 import requests
 import test_util as tu
 
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 INF_COUNTER_PATTERNS = [
     "nv_inference_request_duration",
     "nv_inference_queue_duration",
@@ -64,7 +66,7 @@ CACHE_SUMMARY_PATTERNS = ["nv_cache_hit_summary", "nv_cache_miss_summary"]
 
 class MetricsConfigTest(tu.TestResultCollector):
     def _get_metrics(self):
-        metrics_url = "http://localhost:8002/metrics"
+        metrics_url = f"http://{_tritonserver_ipaddr}:8002/metrics"
         r = requests.get(metrics_url)
         r.raise_for_status()
         return r.text
