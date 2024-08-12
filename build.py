@@ -1831,16 +1831,6 @@ def create_build_dockerfiles(
             repoagents,
             caches,
         )
-    # elif target_platform() == "rhel":
-    #     create_dockerfile_rhel(
-    #         FLAGS.build_dir,
-    #         "Dockerfile",
-    #         dockerfileargmap,
-    #         backends,
-    #         repoagents,
-    #         caches,
-    #         endpoints,
-    #     )
     else:
         create_dockerfile_linux(
             FLAGS.build_dir,
