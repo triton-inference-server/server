@@ -908,6 +908,16 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 """
+
+    df += """
+# Point to python 3.10 which is what triton expects the default to be
+ENV PYVER 3.10
+ENV PYTHONPATH /opt/python/v
+RUN ln -sf /opt/python/cp${PYVER/./}* ${PYTHONPATH}
+ENV PYBIN ${PYTHONPATH}/bin
+ENV PYTHON_BIN_PATH ${PYBIN}/python${PYVER}
+ENV PATH ${PYBIN}:${PATH}
+"""
     df += """
 # Install docker docker buildx
 RUN yum install -y ca-certificates curl gnupg yum-utils \\
