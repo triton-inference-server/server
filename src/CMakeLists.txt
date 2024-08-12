@@ -107,8 +107,6 @@ add_executable(
   triton_signal.h
 )
 
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-
 # On windows a *.lib file can be generated for a exe. When creating
 # tritonserver.exe if we try to create tritonserver.lib it will fail
 # because there is already a trtionserver.lib for tritonserver.dll,
