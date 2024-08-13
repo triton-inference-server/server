@@ -43,6 +43,5 @@ ___
 
 > [!Warning]
 >
-> ##### LATEST RELEASE
 >
 > You are currently on the `r24.08` branch which tracks under-development progress towards the next release. <br>
