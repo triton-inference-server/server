@@ -209,8 +209,7 @@ get_value(const UnorderedMapType& options, const std::string& key, T& arg)
   bool correct_type = std::holds_alternative<T>(curr->second);
   if (!correct_type) {
     msg = "Key: " + key + " found, but incorrect type.";
-    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
-    return err;
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
   }
 
   arg = std::get<T>(curr->second);
