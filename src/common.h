@@ -203,8 +203,7 @@ get_value(const UnorderedMapType& options, const std::string& key, T& arg)
   TRITONSERVER_Error* err = nullptr;
   if (!is_present) {
     msg = "Key: " + key + " not found in options provided.";
-    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
-    return err;
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
   }
 
   bool correct_type = std::holds_alternative<T>(curr->second);
