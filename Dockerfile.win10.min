@@ -72,7 +72,6 @@ RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Loca
 RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
 RUN choco install git docker unzip -y
 
-RUN choco install -y git docker unzip
 RUN git config --system core.longpaths true
 
 ARG CMAKE_VERSION=3.30.1
