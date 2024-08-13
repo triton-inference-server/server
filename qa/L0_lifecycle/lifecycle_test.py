@@ -3493,6 +3493,84 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_load_new_model_version(self):
+        model_name = "identity_fp32"
+        client = self._get_client(use_grpc=True)
+
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertFalse(client.is_model_ready(model_name, "2"))
+
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 0)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 1)
+
+        # Update model config to also load version 2
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [1] } }",
+                "version_policy: { specific: { versions: [1, 2] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # Reload the model and version 1 should not be reloaded
+        client.load_model(model_name)
+
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertTrue(client.is_model_ready(model_name, "2"))
+
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(
+            server_log.count("[PB model] Loading version 1"),
+            1,
+            "version 1 should not be reloaded",
+        )
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 1)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 2)
+
+    def test_update_loaded_version_and_load_new_version(self):
+        model_name = "identity_fp32"
+        client = self._get_client(use_grpc=True)
+
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertFalse(client.is_model_ready(model_name, "2"))
+
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 0)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 1)
+
+        # Update model file of version 1
+        Path(os.path.join("models", model_name, "1", "model.py")).touch()
+        # Update model config to also load version 2
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [1] } }",
+                "version_policy: { specific: { versions: [1, 2] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # Reload the model and version 1 should be reloaded
+        client.load_model(model_name)
+
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertTrue(client.is_model_ready(model_name, "2"))
+
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 1)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
