@@ -969,6 +969,15 @@ ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 """
 
+    if os.getenv("CCACHE_REMOTE_ONLY"):
+        df += """
+ENV CCACHE_REMOTE_ONLY="true"
+ENV CCACHE_REMOTE_STORAGE="{}"
+ENV CMAKE_CXX_COMPILER_LAUNCHER="ccache"
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends ccache
+""".format( os.getenv("CCACHE_REMOTE_STORAGE") )
+
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
     if target_platform() == "windows":
