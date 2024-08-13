@@ -1,9 +1,11 @@
+import pathlib
+
 import numpy as np
 import tritonclient.http as httpclient
 import tritonserver
 from tritonfrontend import KServeHttp
 
-model_path = "../test/test_model_repository"
+model_path = f"{pathlib.Path(__file__).parent.resolve()}/../test/test_model_repository"
 server_options = tritonserver.Options(
     server_id="ExampleServer",
     model_repository=model_path,
@@ -17,7 +19,7 @@ http_options = KServeHttp.Options()
 http_service = KServeHttp.Server(server, http_options)
 http_service.start()
 
-model_name = "simple_identity"
+model_name = "identity"
 url = "0.0.0.0:8000"
 
 # Create a Triton client

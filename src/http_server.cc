@@ -46,9 +46,6 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
-// #define LOG_VERBOSE_IS_ON ... something like that
-// TODO: hard code log verbose mode to see output in Handle()
-
 extern "C" {
 #include <b64/cdecode.h>
 }

@@ -34,12 +34,17 @@
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 
+
 namespace py = pybind11;
 
 namespace triton { namespace server { namespace python {
 
+static void
+EnableLoggingVerbose(int log_verbose_level)
+{
+  LOG_SET_VERBOSE(log_verbose_level);
+}
 
-// [fixme] module name
 PYBIND11_MODULE(tritonfrontend_bindings, m)
 {
   m.doc() = "Python bindings for Triton Inference Server Frontend Endpoints";
@@ -54,6 +59,8 @@ PYBIND11_MODULE(tritonfrontend_bindings, m)
   py::register_exception<UnsupportedError>(m, "UnsupportedError", tfe.ptr());
   py::register_exception<AlreadyExistsError>(
       m, "AlreadyExistsError", tfe.ptr());
+
+  m.def("setLoggingVerbose", &EnableLoggingVerbose);
 
   py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
       .def(py::init<uintptr_t, UnorderedMapType>())

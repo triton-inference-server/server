@@ -30,6 +30,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from tritonfrontend._api._kservegrpc import KServeGrpc
 from tritonfrontend._api._kservehttp import KServeHttp
+from tritonfrontend._api.logging import enable_logging
 
 # Bindings from C++. TritonFrontend exposes C++ Classes and Functions.
 # from tritonfrontend._c.tritonfrontend_bindings import (

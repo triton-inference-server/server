@@ -34,8 +34,8 @@
 
 #include "../../../common.h"
 #include "../../../restricted_features.h"
+#include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
-
 
 struct TRITONSERVER_Server {};
 

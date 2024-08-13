@@ -26,8 +26,6 @@
 
 cmake_minimum_required (VERSION 3.18)
 
-project(tritonfrontend-bindings LANGUAGES C CXX)
-
 # ================= Ensures Package is Structured Properly ==================
 # Top level module entry point and typed marker
 file(COPY __init__.py DESTINATION .)
@@ -35,7 +33,7 @@ file(COPY py.typed DESTINATION .)
 # Copy the '__init__.py' for the '_c' module
 file(COPY _c/__init__.py DESTINATION ./_c/.)
 file(COPY _c/__init__.pyi DESTINATION ./_c/.)
-# file(COPY _c/triton_bindings.pyi DESTINATION ./_c/.)
+
 # Find and copy _api modules
 file(GLOB PYTHON_MODULE_FILES ./_api/*.py)
 file(COPY ${PYTHON_MODULE_FILES} DESTINATION ./_api/.)
@@ -59,7 +57,6 @@ FetchContent_MakeAvailable(pybind11)
 
 find_package(CUDAToolkit REQUIRED)
 
-# TODO: Remove excess stuff
 add_library(
   python-binding-dependency
   EXCLUDE_FROM_ALL
@@ -82,6 +79,7 @@ target_link_libraries(
   triton-core-serverapi           # from repo-core
   triton-core-serverstub          # from repo-core
   triton-common-json              # from repo-common
+  triton-common-logging
 )
 
 
