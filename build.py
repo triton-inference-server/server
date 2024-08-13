@@ -117,7 +117,17 @@ def fail_if(p, msg):
 def target_platform():
     if FLAGS.target_platform is not None:
         return FLAGS.target_platform
-    return platform.system().lower()
+    platform_string = platform.system().lower()
+    if platform_string == "linux":
+        # Need to inspect the /etc/os-release file to get
+        # the distribution of linux
+        id_like_list = platform.freedesktop_os_release()["ID_LIKE"].split()
+        if "debian" in id_like_list:
+            return "linux"
+        else:
+            return "rhel"
+    else:
+        return platform_string
 
 
 def target_machine():
