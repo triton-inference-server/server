@@ -373,7 +373,7 @@ class LifecycleTest(unittest.TestCase):
             triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
             result = user_data._completed_requests.get()
             response_counter += 1
-        # we expect response_counter == number_of_requests, 
+        # we expect response_counter == number_of_requests,
         # which indicates that after the first reported grpc error stream did NOT close and mode != triton_grpc_error
         self.assertEqual(response_counter, number_of_requests)
 
