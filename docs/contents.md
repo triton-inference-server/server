@@ -27,125 +27,95 @@
 -->
 
 ```{toctree}
-:maxdepth: 2
-:caption: Quick Start
+:caption: Getting Started
+:maxdepth: 4
 
-getting_started/quickstart
+quickstart
+llminference
+vision
+vlm
+embedding
+stablediffusion
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: User Guide
+:caption: Introduction
+:maxdepth: 4
 
-user_guide/performance_tuning
 user_guide/architecture
-user_guide/model_repository
-customization_guide/repository_agents
-user_guide/model_configuration
-user_guide/request_cancellation
-user_guide/optimization
-user_guide/ragged_batching
-user_guide/rate_limiter
-user_guide/model_analyzer
-user_guide/model_management
-user_guide/custom_operations
-user_guide/decoupled_models
-user_guide/response_cache
-user_guide/metrics
-user_guide/trace
-user_guide/jetson
-user_guide/v1_to_v2
-customization_guide/deploy
+deployment
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: Debugging
+:caption: API Reference
+:maxdepth: 4
 
-user_guide/debugging_guide
-user_guide/faq
+quickstart
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: Protocol Guides
+:caption: Protocols
+:maxdepth: 4
 
-protocol/README
-customization_guide/inference_protocols
-protocol/extension_binary_data
-protocol/extension_classification
-protocol/extension_generate
-protocol/extension_logging
-protocol/extension_model_configuration
-protocol/extension_model_repository
-protocol/extension_schedule_policy
-protocol/extension_sequence
-protocol/extension_shared_memory
-protocol/extension_statistics
-protocol/extension_trace
-protocol/extension_parameters
+quickstart
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: Customization Guide
-
-customization_guide/build
-customization_guide/compose
-customization_guide/test
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Examples
-
-examples/jetson/README
-examples/jetson/concurrency_and_dynamic_batching/README
-```
-
-```{toctree}
-:maxdepth: 1
 :caption: Client
+:maxdepth: 4
 
-client/README
-_reference/tritonclient_api.rst
-client/src/java/README
-client/src/grpc_generated/go/README
-client/src/grpc_generated/javascript/README
-client/src/grpc_generated/java/README
+quickstart
 ```
 
 ```{toctree}
-:maxdepth: 2
+:caption: Server
+:maxdepth: 4
+
+serverfeatures
+distributedserve
+```
+
+```{toctree}
+:caption: Model Management
+:maxdepth: 4
+
+Repository <user_guide/model_repository>
+Configuration <user_guide/model_configuration>
+Optimization <user_guide/optimization>
+Controls <user_guide/model_management>
+Decoupled models <user_guide/decoupled_models>
+Custom operators <user_guide/custom_operations>
+
+```
+
+```{toctree}
+:caption: Backends
+:maxdepth: 4
+
+trtllm
+vllm
+Python <python_backend/README>
+Pytorch <pytorch_backend/README>
+TensorRT <tensorrt_backend/README>
+TensorFlow <tensorflow_backend/README>
+FIL <fil_backend/README>
+Custom <backend/README>
+DALI Backend <dali_backend/README>
+```
+
+```{toctree}
 :caption: Performance benchmarking and tuning
+:maxdepth: 4
 
 Perf Analyzer <perf_analyzer/README>
-perf_analyzer/docs/README
-perf_analyzer/docs/install
-perf_analyzer/docs/quick_start
-perf_analyzer/docs/cli
-perf_analyzer/docs/inference_load_modes
-perf_analyzer/docs/input_data
-perf_analyzer/docs/measurements_metrics
-perf_analyzer/docs/benchmarking
-GenAI Perf Analyzer <perf_analyzer/genai-perf/README>
-client/src/c++/perf_analyzer/genai-perf/examples/tutorial
-Model Navigator <model_navigator/README>
 Model Analyzer <model_analyzer/README>
+Model Navigator <model_navigator/README>
+GenAI Perf Analyzer <perf_analyzer/genai-perf/README>
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: Python Backend
+:caption: Debugging
+:maxdepth: 4
 
-python_backend/README
-python_backend/inferentia/README
-python_backend/examples/auto_complete/README
-python_backend/examples/bls/README
-python_backend/examples/bls_decoupled/README
-python_backend/examples/custom_metrics/README
-python_backend/examples/decoupled/README
-python_backend/examples/instance_kind/README
-python_backend/examples/jax/README
-python_backend/examples/preprocessing/README
+Guide <user_guide/debugging_guide>
 ```
