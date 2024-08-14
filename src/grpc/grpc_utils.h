@@ -81,11 +81,11 @@ typedef enum {
   NONE,
   // Error from CORE encountered, waiting to be picked up by completion queue to
   // initiate cancellation
-  ERROR_WAITING,
+  ERROR_ENCOUNTERED,
   // Error from CORE encountered, stream closed
   // This state is added to avoid double cancellation
-  ERROR_CANCELED
-} Triton_grpc_error_steps;
+  ERROR_HANDLING_COMPLETE
+} TritonGRPCErrorSteps;
 
 // Debugging helper
 std::ostream& operator<<(std::ostream& out, const Steps& step);
