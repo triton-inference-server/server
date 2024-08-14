@@ -596,9 +596,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 {
   State* state = reinterpret_cast<State*>(userp);
   // Ignore Response from CORE in case GRPC Strict as we dont care about
-  if (state->context_->triton_grpc_error_) {
+  if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
     std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-    if (state->context_->GRPCErrorEncountered()) {
+    if (state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
       return;
     }
   }
@@ -684,7 +684,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
-      if (state->context_->triton_grpc_error_) {
+      if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
         state->status_ = status;
         // Finish only once, if backend ignores cancellation
         LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
@@ -818,6 +818,44 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
     state->complete_ = is_complete;
   }
+}
+
+// Changes the state of grpc_stream_error_state_ to ERROR_HANDLING_COMPLETE,
+// indicating we have closed the stream and initiated the cancel flow
+void
+gRPCErrorTracker::MarkGRPCErrorHandlingComplete()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_HANDLING_COMPLETE;
+}
+
+// Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+bool
+gRPCErrorTracker::CheckAndUpdateGRPCError()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::ERROR_ENCOUNTERED) {
+    // Change the state to ERROR_HANDLING_COMPLETE as we have called
+    // HandleCancellation
+    MarkGRPCErrorHandlingComplete();
+    return true;
+  }
+  return false;
+}
+
+// Marks error after it has been responded to
+void
+gRPCErrorTracker::MarkGRPCErrorEncountered()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_ENCOUNTERED;
+}
+
+// Checks if error already responded to in triton_grpc_error mode
+bool
+gRPCErrorTracker::GRPCErrorEncountered()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::NONE) {
+    return false;
+  }
+  return true;
 }
 
 }}}  // namespace triton::server::grpc
