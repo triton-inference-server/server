@@ -598,7 +598,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   // Ignore Response from CORE in case GRPC Strict as we dont care about
   if (state->context_->triton_grpc_error_) {
     std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-    if (state->context_->IsGRPCStrictError()) {
+    if (state->context_->GRPCErrorEncountered()) {
       return;
     }
   }
@@ -690,7 +690,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
                        << status.error_code() << "Closing stream connection."
                        << std::endl;
-        state->context_->SendGRPCStrictResponse(state);
+        state->context_->WriteGRPCErrorResponse(state);
         TRITONSERVER_ErrorDelete(err);
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),

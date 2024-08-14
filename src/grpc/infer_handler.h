@@ -643,7 +643,7 @@ class InferHandlerState {
         : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
           step_(Steps::START), finish_ok_(true), ongoing_write_(false),
           received_notification_(false), triton_grpc_error_(false),
-          grpc_stream_error_state_(Triton_grpc_error_steps::NONE)
+          grpc_stream_error_state_(TritonGRPCErrorSteps::NONE)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -665,19 +665,19 @@ class InferHandlerState {
 
     bool ReceivedNotification() { return received_notification_; }
 
-    // Changes the state of grpc_stream_error_state_ to ERROR_CANCELED,
+    // Changes the state of grpc_stream_error_state_ to ERROR_HANDLING_COMPLETE,
     // indicating we have closed the stream and initiated the cancel flow
-    void SetGRPCErrorCancelled()
+    void MarkGRPCErrorHandlingComplete()
     {
-      grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_CANCELED;
+      grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_HANDLING_COMPLETE;
     }
     // Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
     bool CheckAndUpdateGRPCError()
     {
-      if (grpc_stream_error_state_ == Triton_grpc_error_steps::ERROR_WAITING) {
-        // Change the state to ERROR_CANCELED as we have called
+      if (grpc_stream_error_state_ == TritonGRPCErrorSteps::ERROR_ENCOUNTERED) {
+        // Change the state to ERROR_HANDLING_COMPLETE as we have called
         // HandleCancellation
-        SetGRPCErrorCancelled();
+        MarkGRPCErrorHandlingComplete();
         return true;
       }
       return false;
@@ -688,39 +688,6 @@ class InferHandlerState {
       return received_notification_
                  ? (ctx_->IsCancelled() || CheckAndUpdateGRPCError())
                  : false;
-    }
-
-    // Extracts headers from GRPC request and updates state
-    void ExtractStateFromHeaders(InferHandlerStateType* state)
-    {
-      const auto& metadata = state->context_->ctx_->client_metadata();
-      for (const auto& pair : metadata) {
-        auto& key = pair.first;
-        auto& value = pair.second;
-        std::string param_key = std::string(key.begin(), key.end());
-        std::string value_key = std::string(value.begin(), value.end());
-        std::string triton_grpc_error_key = "triton_grpc_error";
-        if (param_key == triton_grpc_error_key) {
-          if (value_key == "true") {
-            LOG_VERBOSE(2)
-                << "GRPC: triton_grpc_error mode detected in new grpc stream";
-            state->context_->triton_grpc_error_ = true;
-          }
-        }
-      }
-    }
-
-    void SendGRPCStrictResponse(InferHandlerStateType* state)
-    {
-      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-      // Check if Error not responded previously
-      // Avoid closing connection twice on multiple errors from core
-      if (!state->context_->IsGRPCStrictError()) {
-        state->step_ = Steps::COMPLETE;
-        state->context_->responder_->Finish(state->status_, state);
-        // Mark error for this stream
-        state->context_->MarkGRPCStrictError();
-      }
     }
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
@@ -761,6 +728,37 @@ class InferHandlerState {
         return true;
       }
       return false;
+    }
+
+    // Extracts headers from GRPC request and updates state
+    void ExtractStateFromHeaders(InferHandlerStateType* state)
+    {
+      const auto& metadata = state->context_->ctx_->client_metadata();
+      std::string triton_grpc_error_key = "triton_grpc_error";
+
+      auto it = metadata.find(
+          {triton_grpc_error_key.data(), triton_grpc_error_key.size()});
+
+      if (it != metadata.end()) {
+        if (it->second == "true") {
+          LOG_VERBOSE(2)
+              << "GRPC: triton_grpc_error mode detected in new grpc stream";
+          triton_grpc_error_ = true;
+        }
+      }
+    }
+
+    void WriteGRPCErrorResponse(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+      // Check if Error not responded previously
+      // Avoid closing connection twice on multiple errors from core
+      if (!state->context_->GRPCErrorEncountered()) {
+        state->step_ = Steps::COMPLETE;
+        state->context_->responder_->Finish(state->status_, state);
+        // Mark error for this stream
+        state->context_->MarkGRPCErrorEncountered();
+      }
     }
 
     const std::string DebugString(InferHandlerStateType* state)
@@ -995,15 +993,15 @@ class InferHandlerState {
     }
 
     // Marks error after it has been responded to
-    void MarkGRPCStrictError()
+    void MarkGRPCErrorEncountered()
     {
-      grpc_stream_error_state_ = Triton_grpc_error_steps::ERROR_WAITING;
+      grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_ENCOUNTERED;
     }
 
     // Checks if error already responded to in triton_grpc_error mode
-    bool IsGRPCStrictError()
+    bool GRPCErrorEncountered()
     {
-      if (grpc_stream_error_state_ == Triton_grpc_error_steps::NONE) {
+      if (grpc_stream_error_state_ == TritonGRPCErrorSteps::NONE) {
         return false;
       }
       return true;
@@ -1074,7 +1072,7 @@ class InferHandlerState {
 
     // Indicates the state of triton_grpc_error, only relevant if special
     // triton_grpc_error feature set to true by client
-    Triton_grpc_error_steps grpc_stream_error_state_;
+    TritonGRPCErrorSteps grpc_stream_error_state_;
   };
 
   // This constructor is used to build a wrapper state object
