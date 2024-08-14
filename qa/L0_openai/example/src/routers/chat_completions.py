@@ -14,7 +14,7 @@ from src.schemas.openai import (
     CreateChatCompletionStreamResponse,
     ObjectType,
 )
-from src.utils.triton import create_vllm_inference_request, get_output
+from src.utils.triton import get_output
 
 router = APIRouter()
 
@@ -77,6 +77,9 @@ def create_chat_completion(
     """
 
     # TODO: Cleanup
+    print(f"[DEBUG] Available model metadata: {raw_request.app.models.keys()=}")
+    print(f"[DEBUG] Fetching model metadata for {request.model=}")
+
     model_metadatas = raw_request.app.models
     if not model_metadatas:
         raise HTTPException(status_code=400, detail="No known models")
@@ -85,22 +88,29 @@ def create_chat_completion(
     if not metadata:
         raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
 
-    # TODO: python models? default tokenizer? no tokenization OK?
+    if not metadata.request_convert_fn:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown request format for model: {request.model}"
+        )
+
     if not metadata.tokenizer:
-        raise HTTPException(status_code=400, detail="No known tokenizer")
+        raise HTTPException(status_code=400, detail="Unknown tokenizer")
 
     if not metadata.backend:
-        raise HTTPException(status_code=400, detail="No known backend")
+        raise HTTPException(status_code=400, detail="Unknown backend")
 
     add_generation_prompt_default = True
     default_role = "assistant"
 
-    model = raw_request.app.server.model(request.model)
-    if request.model != model.name and request.model != metadata.source_name:
-        raise HTTPException(status_code=404, detail=f"Unknown model: {request.model}")
+    triton_model = raw_request.app.server.model(request.model)
+    if request.model != triton_model.name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mismatched model name: {request.model} != {triton_model.name}",
+        )
 
     if request.n and request.n > 1:
-        raise HTTPException(status_code=400, detail=f"Only single choice is supported")
+        raise HTTPException(status_code=400, detail="Only single choice is supported")
 
     if request.logit_bias is not None or request.logprobs:
         raise HTTPException(
@@ -123,11 +133,9 @@ def create_chat_completion(
     request_id = f"cmpl-{uuid.uuid1()}"
     created = int(time.time())
 
-    # TODO: Associate request function / backend with model metadata
-    # responses = model.infer(create_inference_request(model, prompt, request))
-    print(f"[DEBUG] {model=}")
-    print(f"[DEBUG] {metadata=}")
-    responses = model.infer(create_vllm_inference_request(model, prompt, request))
+    responses = triton_model.infer(
+        metadata.request_convert_fn(triton_model, prompt, request)
+    )
 
     if request.stream:
         return StreamingResponse(

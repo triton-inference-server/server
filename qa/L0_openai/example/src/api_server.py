@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Union
 
 import tritonserver
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.routers import chat_completions, completions, models, utilities
+from src.routers import chat_completions, completions, models, observability
 from src.utils.triton import init_tritonserver
-from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
 
 def add_cors_middleware(app: FastAPI):
@@ -31,11 +29,9 @@ def add_cors_middleware(app: FastAPI):
 async def lifespan(app: FastAPI):
     print("Starting FastAPI app lifespan...")
     # Start the tritonserver on FastAPI app startup
-    server, model_metadata = init_tritonserver()
+    server, model_metadatas = init_tritonserver()
     app.server = server
-    # TODO: Clean up or refactor this flow to store models for /v1/models endpoints
-    app.models = {}
-    app.models[model_metadata.name] = model_metadata
+    app.models = {metadata.name: metadata for metadata in model_metadatas}
 
     yield
 
@@ -43,37 +39,36 @@ async def lifespan(app: FastAPI):
     print("Shutting down FastAPI app lifespan...")
     if app.server:
         print("Shutting down Triton Inference Server...")
-        app.server.stop()
+        try:
+            app.server.stop()
+        # Log error, but don't raise on shutdown
+        except tritonserver.InternalError as e:
+            print(e)
 
 
-app = FastAPI(
-    title="OpenAI API",
-    description="The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.",
-    version="2.0.0",
-    termsOfService="https://openai.com/policies/terms-of-use",
-    contact={"name": "OpenAI Support", "url": "https://help.openai.com/"},
-    license={
-        "name": "MIT",
-        "url": "https://github.com/openai/openai-openapi/blob/master/LICENSE",
-    },
-    # TODO: Do we need this? This affects the endpoints used in /docs endpoint.
-    # servers=[{"url": "https://api.openai.com/v1"}],
-    lifespan=lifespan,
-)
+def init_app():
+    app = FastAPI(
+        title="OpenAI API",
+        description="The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.",
+        version="2.0.0",
+        termsOfService="https://openai.com/policies/terms-of-use",
+        contact={"name": "OpenAI Support", "url": "https://help.openai.com/"},
+        license={
+            "name": "MIT",
+            "url": "https://github.com/openai/openai-openapi/blob/master/LICENSE",
+        },
+        lifespan=lifespan,
+    )
 
-app.include_router(utilities.router)
-app.include_router(models.router)
-app.include_router(completions.router)
-app.include_router(chat_completions.router)
+    app.include_router(observability.router)
+    app.include_router(models.router)
+    app.include_router(completions.router)
+    app.include_router(chat_completions.router)
 
-# NOTE: For debugging purposes, should generally be restricted or removed
-add_cors_middleware(app)
+    # NOTE: For debugging purposes, should generally be restricted or removed
+    add_cors_middleware(app)
 
-# TODO: Refactor/remove globals where not necessary
-server: tritonserver.Server
-model: tritonserver.Model
-model_source_name: str
-model_create_time: int
-backend: str
-tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
-create_inference_request = None
+    # TODO: Add common logger and use logger.debug in place of current print
+    # statements for debugging purposes.
+
+    return app

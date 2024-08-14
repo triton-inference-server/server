@@ -2,7 +2,7 @@ import argparse
 import os
 
 import uvicorn
-from src.api_server import app
+from src.api_server import init_app
 
 
 def parse_args():
@@ -48,6 +48,7 @@ if __name__ == "__main__":
         os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
+    app = init_app()
     uvicorn.run(
         app,
         host=args.host,

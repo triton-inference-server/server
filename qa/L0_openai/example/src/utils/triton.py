@@ -10,12 +10,11 @@ from src.utils.tokenizer import get_tokenizer
 
 # TODO: Refactor
 # NOTE: Allow python backend for testing purposes
-# TODO: How did this interact with BLS/TRTLLM models before this change?
 SUPPORTED_BACKENDS: set = {"vllm", "tensorrtllm", "python"}
-LLM_BACKENDS = {"vllm", "tensorrtllm"}  # TODO
-KNOWN_MODELS = {"gpt2": "hf:gpt2"}
+LLM_BACKENDS: set = {"vllm", "tensorrtllm"}
 
 
+# TODO: pydantic validation?
 @dataclass
 class TritonModelMetadata:
     # Name used in Triton model repository
@@ -24,48 +23,96 @@ class TritonModelMetadata:
     backend: str
     # Triton model object handle
     model: tritonserver.Model
-
     # TODO: Address typing
-    tokenizer: typing.Any
-    # Name in terms of a HuggingFace model or remote model registry name
-    source_name: str
+    tokenizer: typing.Optional[typing.Any]
     # Time that model was loaded by Triton
     create_time: int
+    # TODO: Address typing
+    request_convert_fn: typing.Optional[typing.Any]
 
 
-# TODO: Refactor - this function seems to load a single model,
-# but iterates through all models?
-def load_model(server):
-    model = None
+def determine_request_format(backend):
+    # Request conversion from OpenAI format to backend-specific format
+    if backend == "vllm":
+        request_convert_fn = create_vllm_inference_request
+    # Python included to support TRT-LLM BLS model and TRT-LLM python runtime
+    elif backend in ["tensorrtllm", "python"]:
+        request_convert_fn = create_trtllm_inference_request
+    else:
+        request_convert_fn = None
+
+    return request_convert_fn
+
+
+# TODO: Refactor:
+# NOTE: We need to figure out a few things while looking at the models in the
+# triton model repository.
+#   1. Which model should we interact with when sending requests to Triton core?
+#       a. For a single model, this is trivial, and would support any backend.
+#       b. For TRT-LLM, this should be 'ensemble' or 'tensorrt_llm_bls' following
+#          TRT-LLM defaults/examples. However, this could also be renamed by the user
+#          to have a more intuitive front-facing name, such as "llama3-8b". Note that
+#          TRT-LLM pipelines produced by the Triton CLI will generally be renamed like
+#          this. FIXME: This is a relatively fragile flow and should be improved.
+#   2. Which tokenizer to use for things like applying a chat template or making
+#      a tool/function call. These are primarily relevant for the /chat/completions
+#      endpoint, but not the /completions endpoint.
+#     - For now, require user-defined TOKENIZER for simplicity.
+#   3. Which inputs/outputs/parameters should be set when creating the underlying
+#      triton inference request? The inference request fields required will differ
+#      for vLLM, TRT-LLM, and user-defined models like a custom python model. So we
+#      need to know how to correctly translate the OpenAI schema parameters to
+#      a triton inference request.
+#     - For now, we will look for either vllm or trtllm in list of loaded backends,
+#       and we consider python==trtllm for now due to possibility of python runtime.
+#       We may want to consider using Triton's "runtime" config field for this for
+#       easier detection instead.
+def load_models(server):
+    model_metadatas = []
     backends = []
+
+    # TODO: Support tokenizers more generically or custom tokenizers, possibly
+    # by looking for tokenizer.json in a pre-specified location?
     tokenizer = None
-    source_name = None
-    model_name = None
-    for model_name, version in server.models().keys():
+    tokenizer_model = os.environ.get("TOKENIZER")
+    if tokenizer_model:
+        print(f"Using env var TOKENIZER={tokenizer_model} to determine the tokenizer")
+        tokenizer = get_tokenizer(tokenizer_model)
+
+    models = []
+    backends = []
+    names = []
+    # Load all triton models and gather the respective backends of each
+    for name, version in server.models().keys():
+        # TODO: Why skip known version? Already loaded?
         if version != -1:
             continue
-        model = server.load(model_name)
-        backends.append(model.config()["backend"])
-        if model_name in KNOWN_MODELS.keys():
-            source_name = KNOWN_MODELS[model_name].replace("hf:", "")
-            tokenizer = get_tokenizer(source_name)
+
+        model = server.load(name)
+        backend = model.config()["backend"]
+
+        names.append(name)
+        models.append(model)
+        backends.append(backend)
+        print(f"Loaded: Model={name}, Backend={backend}.")
 
     create_time = int(time.time())
-    backend = None
-    for be in backends:
-        if be in SUPPORTED_BACKENDS:
-            backend = be
-            break
 
-    # TODO
-    return TritonModelMetadata(
-        name=model_name,
-        backend=backend,
-        model=model,
-        tokenizer=tokenizer,
-        source_name=source_name,
-        create_time=create_time,
-    )
+    # One tokenizer, convert function, and creation time for all loaded models.
+    # NOTE: This doesn't currently support having both a vLLM and TRT-LLM
+    # model loaded at the same time.
+    for name, model, backend in zip(names, models, backends):
+        metadata = TritonModelMetadata(
+            name=name,
+            backend=backend,
+            model=model,
+            tokenizer=tokenizer,
+            create_time=create_time,
+            request_convert_fn=determine_request_format(backend),
+        )
+        model_metadatas.append(metadata)
+
+    return model_metadatas
 
 
 def init_tritonserver():
@@ -84,37 +131,9 @@ def init_tritonserver():
         model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
     ).start(wait_until_ready=True)
 
-    # TODO: Cleanup
     print("Loading Model...\n\n")
-
-    # model, model_create_time, backend, tokenizer, _ = load_model(server)
-    metadata = load_model(server)
-
-    # TODO: pydantic validation?
-    if not metadata.name:
-        raise Exception("Unknown Model Name")
-
-    if not metadata.model:
-        raise Exception("Unknown Model")
-
-    if not metadata.backend:
-        raise Exception("Unsupported Backend")
-
-    # NOTE: Allow no tokenizer for mock python model for testing purposes
-    if not metadata.tokenizer and metadata.backend in LLM_BACKENDS:
-        raise Exception("Unsupported Tokenizer")
-
-    if not metadata.create_time:
-        raise Exception("Unknown Model Creation Time")
-
-    print(f"\n\nModel: {metadata.name} Loaded with Backend: {metadata.backend}\n\n")
-
-    # if backend == "vllm":
-    #    create_inference_request = create_vllm_inference_request
-    # elif backend == "tensorrtllm":
-    #    create_inference_request = create_trtllm_inference_request
-
-    return server, metadata
+    metadatas = load_models(server)
+    return server, metadatas
 
 
 def get_output(response):
@@ -147,8 +166,8 @@ def create_vllm_inference_request(
     if echo:
         exclude_input_in_output = not echo
     inputs["exclude_input_in_output"] = [exclude_input_in_output]
-    print(f"[DEBUG] {inputs=}")
 
+    print(f"[DEBUG] Triton Inference Request {inputs=}")
     return model.create_request(inputs=inputs, parameters=sampling_parameters)
 
 
@@ -157,8 +176,6 @@ def create_trtllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
     inputs = {}
-    if model.name == "llama-3-8b-instruct":
-        inputs["stop_words"] = [["<|eot_id|>", "<|end_of_text|>"]]
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = [[request.stream]]
     if request.max_tokens:
@@ -167,15 +184,17 @@ def create_trtllm_inference_request(
         if isinstance(request.stop, str):
             request.stop = [request.stop]
         inputs["stop_words"] = [request.stop]
-    if request.top_p:
+    # Check "is not None" specifically, because values of zero are valid.
+    if request.top_p is not None:
         inputs["top_p"] = np.float32([[request.top_p]])
-    if request.frequency_penalty:
+    if request.frequency_penalty is not None:
         inputs["frequency_penalty"] = np.float32([[request.frequency_penalty]])
-    if request.presence_penalty:
-        inputs["presence_penalty":] = np.int32([[request.presence_penalty]])
-    if request.seed:
+    if request.presence_penalty is not None:
+        inputs["presence_penalty"] = np.float32([[request.presence_penalty]])
+    if request.seed is not None:
         inputs["random_seed"] = np.uint64([[request.seed]])
-    if request.temperature:
+    if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
 
+    print(f"[DEBUG] Triton Inference Request {inputs=}")
     return model.create_request(inputs=inputs)

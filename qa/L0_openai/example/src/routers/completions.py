@@ -10,7 +10,7 @@ from src.schemas.openai import (
     FinishReason,
     ObjectType,
 )
-from src.utils.triton import create_vllm_inference_request, get_output
+from src.utils.triton import get_output
 
 router = APIRouter()
 
@@ -49,22 +49,29 @@ def create_completion(
     """
 
     if not request.model:
-        raise Exception("No Model Provided")
+        raise Exception("Request must provide a valid 'model'")
 
-    model = raw_request.app.server.model(request.model)
+    print(f"[DEBUG] Available model metadata: {raw_request.app.models.keys()=}")
+    print(f"[DEBUG] Fetching model metadata for {request.model=}")
+    metadata = raw_request.app.models.get(request.model)
 
-    # if not not tokenizer or not create_inference_request:
-    #    raise Exception("Unknown Model")
+    if not metadata:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown model metadata for model: {request.model}"
+        )
+
+    if not metadata.request_convert_fn:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown request format for model: {request.model}"
+        )
 
     if request.suffix is not None:
         raise HTTPException(status_code=400, detail="suffix is not currently supported")
 
-    if request.model != model.name:
+    if request.model != metadata.name:
         raise HTTPException(status_code=404, detail=f"Unknown model: {request.model}")
 
     if not request.prompt:
-        # TODO: Needed?
-        # request.prompt = "<|endoftext|>"
         raise HTTPException(status_code=400, detail="prompt must be non-empty")
 
     # Currently only support single string as input
@@ -72,6 +79,9 @@ def create_completion(
         raise HTTPException(
             status_code=400, detail="only single string input is supported"
         )
+
+    if request.n and request.n > 1:
+        raise HTTPException(status_code=400, detail="Only single choice is supported")
 
     if request.logit_bias is not None or request.logprobs is not None:
         raise HTTPException(
@@ -81,14 +91,13 @@ def create_completion(
     request_id = f"cmpl-{uuid.uuid1()}"
     created = int(time.time())
 
-    # TODO: Determine backend, using hard-coded vllm for simplicity
-    # responses = model.infer(create_inference_request(model, request.prompt, request))
-    responses = model.infer(
-        create_vllm_inference_request(model, request.prompt, request)
+    triton_model = raw_request.app.server.model(request.model)
+    responses = triton_model.infer(
+        metadata.request_convert_fn(triton_model, request.prompt, request)
     )
     if request.stream:
         return StreamingResponse(
-            streaming_completion_response(request_id, created, model.name, responses)
+            streaming_completion_response(request_id, created, metadata.name, responses)
         )
     response = list(responses)[0]
     text = get_output(response)
@@ -105,5 +114,5 @@ def create_completion(
         system_fingerprint=None,
         object=ObjectType.text_completion,
         created=created,
-        model=model.name,
+        model=metadata.name,
     )
