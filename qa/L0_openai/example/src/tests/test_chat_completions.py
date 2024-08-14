@@ -51,28 +51,6 @@ class TestChatCompletions:
         app = init_app()
         return app
 
-    # A TOKENIZER must be known for /chat/completions endpoint in order to
-    # apply chat templates, and for simplicity in determination, users should
-    # define the TOKENIZER. So, explicitly raise an error if none is provided.
-    def test_chat_completions_no_tokenizer(self):
-        model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-        app = self.setup_app(tokenizer="", model_repository=model_repository)
-        with TestClient(app) as client:
-            response = client.post(
-                "/v1/chat/completions",
-                json={"model": TEST_MODEL, "messages": TEST_MESSAGES},
-            )
-            assert response.status_code == 400
-            assert response.json()["detail"] == "Unknown tokenizer"
-
-    @pytest.mark.skip(reason="Not Implemented Yet")
-    def test_chat_completions_streaming(self, client):
-        pass
-
-    @pytest.mark.skip(reason="Not Implemented Yet")
-    def test_chat_completions_no_streaming(self, client):
-        pass
-
     def test_chat_completions_defaults(self, client):
         response = client.post(
             "/v1/chat/completions",
@@ -427,6 +405,14 @@ class TestChatCompletions:
         assert response.json()["detail"] == "Only single choice is supported"
 
     @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_chat_completions_streaming(self, client):
+        pass
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_chat_completions_no_streaming(self, client):
+        pass
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
     def test_function_calling(self):
         pass
 
@@ -442,3 +428,27 @@ class TestChatCompletions:
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_usage_response(self):
         pass
+
+
+# For tests that won't use the same pytest fixture for server startup across
+# the whole class test suite.
+class TestChatCompletionsNoFixture:
+    def setup_app(self, tokenizer: str, model_repository: str):
+        os.environ["TOKENIZER"] = tokenizer
+        os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
+        app = init_app()
+        return app
+
+    # A TOKENIZER must be known for /chat/completions endpoint in order to
+    # apply chat templates, and for simplicity in determination, users should
+    # define the TOKENIZER. So, explicitly raise an error if none is provided.
+    def test_chat_completions_no_tokenizer(self):
+        model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
+        app = self.setup_app(tokenizer="", model_repository=model_repository)
+        with TestClient(app) as client:
+            response = client.post(
+                "/v1/chat/completions",
+                json={"model": TEST_MODEL, "messages": TEST_MESSAGES},
+            )
+            assert response.status_code == 400
+            assert response.json()["detail"] == "Unknown tokenizer"
