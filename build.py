@@ -121,7 +121,7 @@ def target_platform():
     if platform_string == "linux":
         # Need to inspect the /etc/os-release file to get
         # the distribution of linux
-        id_like_list = platform.freedesktop_os_release()["ID_LIKE"].split()
+        id_like_list = distro.like().split()
         if "debian" in id_like_list:
             return "linux"
         else:
