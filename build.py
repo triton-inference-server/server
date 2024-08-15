@@ -1316,8 +1316,7 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
-        numactl-devel \\
-        wget
+        numactl-devel
 """
     else:
         df += """
