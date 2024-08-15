@@ -30,12 +30,11 @@ input_data = np.array([["Roger Roger"]], dtype=object)
 
 # Create input and output objects
 inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
 
 # Set the data for the input tensor
 inputs[0].set_data_from_numpy(input_data)
 
-results = client.infer(model_name, inputs=inputs, outputs=outputs)
+results = client.infer(model_name, inputs=inputs)
 
 # Get the output data
 output_data = results.as_numpy("OUTPUT0")
