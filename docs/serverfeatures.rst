@@ -7,4 +7,4 @@ Features
     :maxdepth: 2
     :titlesonly:
 
-    Deployment <tutorials/Popular_Models_Guide/StableDiffusion/README.md>
+    Default Scheduler <user_guide/model_configuration>
