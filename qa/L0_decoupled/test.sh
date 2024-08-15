@@ -55,51 +55,60 @@ source ../common/util.sh
 
 
 TRIALS="python custom"
+GRPC_TRIALS="triton_grpc_error_true triton_grpc_error_false"
 
-for trial in $TRIALS; do
-  if [ $trial == "python" ]; then
-    MODELDIR=`pwd`/python_models
-  else
-    MODELDIR=`pwd`/models
-  fi
+for grpc_trial in $GRPC_TRIALS; do
+  for trial in $TRIALS; do
+    if [ $trial == "python" ]; then
+      MODELDIR=`pwd`/python_models
+    else
+      MODELDIR=`pwd`/models
+    fi
 
-  SERVER_ARGS="--model-repository=$MODELDIR"
-  cp -r $DATADIR/libtorch_nobatch_int32_int32_int32 $MODELDIR/.
-  (cd $MODELDIR/libtorch_nobatch_int32_int32_int32 && \
-   sed -i "s/dims:.*\[.*\]/dims: \[ 1 \]/g" config.pbtxt)
+    if [ $grpc_trial == "triton_grpc_error_true" ]; then
+      export TRITONSERVER_GRPC_STATUS_FLAG=true
+    else
+      unset TRITONSERVER_GRPC_STATUS_FLAG
+    fi
 
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      cat $SERVER_LOG
-      exit 1
-  fi
+    SERVER_ARGS="--model-repository=$MODELDIR"
+    cp -r $DATADIR/libtorch_nobatch_int32_int32_int32 $MODELDIR/.
+    (cd $MODELDIR/libtorch_nobatch_int32_int32_int32 && \
+     sed -i "s/dims:.*\[.*\]/dims: \[ 1 \]/g" config.pbtxt)
 
-  for i in \
-              test_one_to_none \
-              test_one_to_one \
-              test_one_to_many \
-              test_no_streaming \
-              test_response_order \
-	      test_wrong_shape; do
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-      echo "Test: $i" >>$CLIENT_LOG
-      set +e
-      python $DECOUPLED_TEST DecoupledTest.$i >>$CLIENT_LOG 2>&1
-      if [ $? -ne 0 ]; then
-              echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-              echo -e "\n***\n*** Test $i Failed\n***"
-              RET=1
-      else
-          check_test_results $TEST_RESULT_FILE 1
-          if [ $? -ne 0 ]; then
-              cat $CLIENT_LOG
-              echo -e "\n***\n*** Test Result Verification Failed\n***"
-              RET=1
-          fi
-      fi
-      set -e
-  done
+    for i in \
+                test_one_to_none \
+                test_one_to_one \
+                test_one_to_many \
+                test_no_streaming \
+                test_response_order \
+	        test_wrong_shape; do
+
+        echo "Test: $i" >>$CLIENT_LOG
+        set +e
+        python $DECOUPLED_TEST DecoupledTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+                echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+                echo -e "\n***\n*** Test $i Failed\n***"
+                RET=1
+        else
+            check_test_results $TEST_RESULT_FILE 1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+            fi
+        fi
+        set -e
+    done
+done
 
   # Will delay the writing of each response by the specified many milliseconds.
   # This will ensure that there are multiple responses available to be written.
