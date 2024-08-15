@@ -35,9 +35,9 @@ import platform
 import stat
 import subprocess
 import sys
-import distro
 from inspect import getsourcefile
 
+import distro
 import requests
 
 #
