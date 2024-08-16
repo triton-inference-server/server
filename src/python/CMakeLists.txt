@@ -29,13 +29,13 @@ cmake_minimum_required(VERSION 3.18)
 add_subdirectory(tritonfrontend)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION ${TRITON_VERSION})
-# configure_file(../LICENSE LICENSE.txt COPYONLY)
+# configure_file(../../LICENSE LICENSE.txt COPYONLY)
 configure_file(setup.py setup.py @ONLY)
 file(COPY test/  DESTINATION ./test/.)
 
 set(WHEEL_DEPENDS
       ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION
-      # ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
+      # ${CMAKE_CURRENT_BINARY_DIR}/../LICENSE.txt
       ${CMAKE_CURRENT_BINARY_DIR}/setup.py
       ${CMAKE_CURRENT_BINARY_DIR}/tritonfrontend
       py-bindings

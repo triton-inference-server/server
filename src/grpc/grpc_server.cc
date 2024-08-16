@@ -2445,9 +2445,9 @@ Server::Create(
 
   RETURN_IF_ERR(GetOptions(grpc_options, data));
 
-  TRITONSERVER_Error* err =
-      Create(server, nullptr, nullptr, grpc_options, service);
-  return err;
+  return Create(
+      server, nullptr /* TraceManager */, nullptr /* SharedMemoryManager */,
+      grpc_options, service);
 }
 
 TRITONSERVER_Error*
@@ -2457,29 +2457,30 @@ Server::GetOptions(Options& options, UnorderedMapType& data)
   SslOptions ssl_selection;
   KeepAliveOptions keep_alive_selection;
 
-  RETURN_IF_ERR(GetSocketOptions(socket_selection, data));
-  RETURN_IF_ERR(GetSslOptions(ssl_selection, data));
-  RETURN_IF_ERR(GetKeepAliveOptions(keep_alive_selection, data));
+  RETURN_IF_ERR(GetSocketOptions(options.socket_, data));
+  RETURN_IF_ERR(GetSslOptions(options.ssl_, data));
+  RETURN_IF_ERR(GetKeepAliveOptions(options.keep_alive_, data));
 
   int infer_compression_level_key;
-  int infer_allocation_pool_size;
-  std::string forward_header_pattern;
 
   RETURN_IF_ERR(
-      get_value(data, "infer_compression_level", infer_compression_level_key));
+      get_value(data, "infer_compression_level", &infer_compression_level_key));
 
-  RETURN_IF_ERR(get_value(
-      data, "infer_allocation_pool_size", infer_allocation_pool_size));
-  RETURN_IF_ERR(
-      get_value(data, "forward_header_pattern", forward_header_pattern));
-
-  options.socket_ = socket_selection;
-  options.ssl_ = ssl_selection;
-  options.keep_alive_ = keep_alive_selection;
   options.infer_compression_level_ =
       static_cast<grpc_compression_level>(infer_compression_level_key);
-  options.infer_allocation_pool_size_ = infer_allocation_pool_size;
-  options.forward_header_pattern_ = forward_header_pattern;
+
+  RETURN_IF_ERR(get_value(
+      data, "infer_allocation_pool_size",
+      &options.infer_allocation_pool_size_));
+  RETURN_IF_ERR(get_value(
+      data, "forward_header_pattern", &options.forward_header_pattern_));
+
+  // options.socket_ = socket_selection;
+  // options.ssl_ = ssl_selection;
+  // options.keep_alive_ = keep_alive_selection;
+
+  // options.infer_allocation_pool_size_ = infer_allocation_pool_size;
+  // options.forward_header_pattern_ = forward_header_pattern;
 
   return nullptr;
 }
@@ -2487,16 +2488,13 @@ Server::GetOptions(Options& options, UnorderedMapType& data)
 TRITONSERVER_Error*
 Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& data)
 {
-  std::string address;
-  int port;
-  int reuse_port;
-  RETURN_IF_ERR(get_value(data, "address", address));
-  RETURN_IF_ERR(get_value(data, "port", port));
-  RETURN_IF_ERR(get_value(data, "reuse_port", reuse_port));
+  // std::string address;
+  // int port;
+  // bool reuse_port;
 
-  options.address_ = address;
-  options.port_ = port;
-  options.reuse_port_ = reuse_port;
+  RETURN_IF_ERR(get_value(data, "address", &options.address_));
+  RETURN_IF_ERR(get_value(data, "port", &options.port_));
+  RETURN_IF_ERR(get_value(data, "reuse_port", &options.reuse_port_));
 
   return nullptr;
 }
@@ -2504,23 +2502,23 @@ Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& data)
 TRITONSERVER_Error*
 Server::GetSslOptions(SslOptions& options, UnorderedMapType& data)
 {
-  int use_ssl;
-  std::string server_cert;
-  std::string server_key;
-  std::string root_cert;
-  int use_mutual_auth;
+  // int use_ssl;
+  // std::string server_cert;
+  // std::string server_key;
+  // std::string root_cert;
+  // int use_mutual_auth;
 
-  RETURN_IF_ERR(get_value(data, "use_ssl", use_ssl));
-  RETURN_IF_ERR(get_value(data, "server_cert", server_cert));
-  RETURN_IF_ERR(get_value(data, "server_key", server_key));
-  RETURN_IF_ERR(get_value(data, "root_cert", root_cert));
-  RETURN_IF_ERR(get_value(data, "use_mutual_auth", use_mutual_auth));
+  RETURN_IF_ERR(get_value(data, "use_ssl", &options.use_ssl_));
+  RETURN_IF_ERR(get_value(data, "server_cert", &options.server_cert_));
+  RETURN_IF_ERR(get_value(data, "server_key", &options.server_key_));
+  RETURN_IF_ERR(get_value(data, "root_cert", &options.root_cert_));
+  RETURN_IF_ERR(get_value(data, "use_mutual_auth", &options.use_mutual_auth_));
 
-  options.use_ssl_ = use_ssl;
-  options.server_cert_ = server_cert;
-  options.server_key_ = server_key;
-  options.root_cert_ = root_cert;
-  options.use_mutual_auth_ = use_mutual_auth;
+  // options.use_ssl_ = use_ssl;
+  // options.server_cert_ = server_cert;
+  // options.server_key_ = server_key;
+  // options.root_cert_ = root_cert;
+  // options.use_mutual_auth_ = use_mutual_auth;
 
   return nullptr;
 }
@@ -2528,41 +2526,35 @@ Server::GetSslOptions(SslOptions& options, UnorderedMapType& data)
 TRITONSERVER_Error*
 Server::GetKeepAliveOptions(KeepAliveOptions& options, UnorderedMapType& data)
 {
-  int keepalive_time_ms;
-  int keepalive_timeout_ms;
-  int keepalive_permit_without_calls;
-  int http2_max_pings_without_data;
-  int http2_min_recv_ping_interval_without_data_ms;
-  int http2_max_ping_strikes;
-  int max_connection_age_ms;
-  int max_connection_age_grace_ms;
+  // int keepalive_time_ms;
+  // int keepalive_timeout_ms;
+  // int keepalive_permit_without_calls;
+  // int http2_max_pings_without_data;
+  // int http2_min_recv_ping_interval_without_data_ms;
+  // int http2_max_ping_strikes;
+  // int max_connection_age_ms;
+  // int max_connection_age_grace_ms;
 
-  RETURN_IF_ERR(get_value(data, "keepalive_time_ms", keepalive_time_ms));
-  RETURN_IF_ERR(get_value(data, "keepalive_timeout_ms", keepalive_timeout_ms));
+  RETURN_IF_ERR(
+      get_value(data, "keepalive_time_ms", &options.keepalive_time_ms_));
+  RETURN_IF_ERR(
+      get_value(data, "keepalive_timeout_ms", &options.keepalive_timeout_ms_));
   RETURN_IF_ERR(get_value(
-      data, "keepalive_permit_without_calls", keepalive_permit_without_calls));
+      data, "keepalive_permit_without_calls",
+      &options.keepalive_permit_without_calls_));
   RETURN_IF_ERR(get_value(
-      data, "http2_max_pings_without_data", http2_max_pings_without_data));
+      data, "http2_max_pings_without_data",
+      &options.http2_max_pings_without_data_));
   RETURN_IF_ERR(get_value(
       data, "http2_min_recv_ping_interval_without_data_ms",
-      http2_min_recv_ping_interval_without_data_ms));
-  RETURN_IF_ERR(
-      get_value(data, "http2_max_ping_strikes", http2_max_ping_strikes));
-  RETURN_IF_ERR(
-      get_value(data, "max_connection_age_ms", max_connection_age_ms));
+      &options.http2_min_recv_ping_interval_without_data_ms_));
   RETURN_IF_ERR(get_value(
-      data, "max_connection_age_grace_ms", max_connection_age_grace_ms));
-
-
-  options.keepalive_time_ms_ = keepalive_time_ms;
-  options.keepalive_timeout_ms_ = keepalive_timeout_ms;
-  options.keepalive_permit_without_calls_ = keepalive_permit_without_calls;
-  options.http2_max_pings_without_data_ = http2_max_pings_without_data;
-  options.http2_min_recv_ping_interval_without_data_ms_ =
-      http2_min_recv_ping_interval_without_data_ms;
-  options.http2_max_ping_strikes_ = http2_max_ping_strikes;
-  options.max_connection_age_ms_ = max_connection_age_ms;
-  options.max_connection_age_grace_ms_ = max_connection_age_grace_ms;
+      data, "http2_max_ping_strikes", &options.http2_max_ping_strikes_));
+  RETURN_IF_ERR(get_value(
+      data, "max_connection_age_ms", &options.max_connection_age_ms_));
+  RETURN_IF_ERR(get_value(
+      data, "max_connection_age_grace_ms",
+      &options.max_connection_age_grace_ms_));
 
   return nullptr;
 }

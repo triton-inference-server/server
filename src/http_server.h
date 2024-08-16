@@ -84,6 +84,7 @@ class HTTPServer {
       uint32_t* exit_timeout_secs = nullptr,
       const std::string& service_name = "HTTP");
 
+ protected:
   explicit HTTPServer(
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt)
@@ -196,7 +197,8 @@ class HTTPAPIServer : public HTTPServer {
 
 
   static TRITONSERVER_Error* Create(
-      std::shared_ptr<TRITONSERVER_Server>& server, const UnorderedMapType& data,
+      std::shared_ptr<TRITONSERVER_Server>& server,
+      const UnorderedMapType& data,
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<HTTPServer>* service);
 

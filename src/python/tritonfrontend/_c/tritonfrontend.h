@@ -26,8 +26,6 @@
 
 #pragma once
 
-#include <unistd.h>  // For sleep
-
 #include <memory>  // For shared_ptr
 #include <unordered_map>
 #include <variant>
@@ -109,13 +107,8 @@ class TritonFrontend {
   {
     TRITONSERVER_Server* server_ptr =
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
-    server_.reset(server_ptr, DummyDeleter);
 
-    // For debugging
-    // for (const auto& [key, value] : data) {
-    //     std::cout << "Key: " << key << std::endl;
-    //     printVariant(value);
-    // }
+    server_.reset(server_ptr, DummyDeleter);
 
     ThrowIfError(
         FrontendServer::Create(server_, data, restricted_features, &service));
@@ -127,7 +120,11 @@ class TritonFrontend {
 
   static TRITONSERVER_Error* DummyDeleter(TRITONSERVER_Server* obj)
   {
-    return nullptr;  // Prevents double-free
+    // The frontend does not own the TRITONSERVER_Server* object.
+    // Hence, deleting the underlying server instance,
+    // will cause a double-free when the core bindings attempt to
+    // delete the TRITONSERVER_Server instance.
+    return nullptr;
   };
 };
 

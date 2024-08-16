@@ -62,7 +62,7 @@ class TestKServeHttp:
             log_info=True,
         )
 
-        server = tritonserver.Server(server_options).start()
+        server = tritonserver.Server(server_options).start(wait_until_ready=True)
 
         http_options = KServeHttp.Options()
         http_service = KServeHttp.Server(server, http_options)
@@ -75,12 +75,12 @@ class TestKServeHttp:
 
     def test_server_ready(self, server_service):
         server, http_service = server_service
-        with Client(httpclient, url="0.0.0.0:8000") as http_client:
+        with Client(httpclient, url="localhost:8000") as http_client:
             assert http_client.is_server_ready()
 
     def test_server_live(self, server_service):
         server, http_service = server_service
-        with Client(httpclient, url="0.0.0.0:8000") as http_client:
+        with Client(httpclient, url="localhost:8000") as http_client:
             assert http_client.is_server_live()
 
     def test_already_exists_error(self, server_service):
@@ -103,7 +103,7 @@ class TestKServeHttp:
 
     def test_inference(self):
         model_name = "identity"
-        with Client(httpclient, url="0.0.0.0:8000") as http_client:
+        with Client(httpclient, url="localhost:8000") as http_client:
             input_data = np.array([["testing"]], dtype=object)
             # Create input and output objects
             inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
@@ -148,12 +148,12 @@ class TestKServeGrpc:
 
     def test_server_ready(self, server_service):
         server, grpc_service = server_service
-        with Client(grpcclient, url="0.0.0.0:8001") as grpc_client:
+        with Client(grpcclient, url="localhost:8001") as grpc_client:
             assert grpc_client.is_server_ready()
 
     def test_server_live(self, server_service):
         server, grpc_service = server_service
-        with Client(grpcclient, url="0.0.0.0:8001") as grpc_client:
+        with Client(grpcclient, url="localhost:8001") as grpc_client:
             assert grpc_client.is_server_live()
 
     def test_already_exists_error(self, server_service):
@@ -176,7 +176,7 @@ class TestKServeGrpc:
 
     def test_inference(self):
         model_name = "identity"
-        with Client(grpcclient, url="0.0.0.0:8001") as grpc_client:
+        with Client(grpcclient, url="localhost:8001") as grpc_client:
             input_data = np.array([["testing"]], dtype=object)
             # Create input and output objects
             inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "BYTES")]

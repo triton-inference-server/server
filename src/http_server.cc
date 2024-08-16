@@ -4699,31 +4699,34 @@ HTTPAPIServer::Create(
 
 TRITONSERVER_Error*
 HTTPAPIServer::Create(
-    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    std::shared_ptr<TRITONSERVER_Server>& server, const UnorderedMapType& data,
     const RestrictedFeatures& restricted_features,
     std::unique_ptr<HTTPServer>* service)
 {
   int port;
-  int reuse_port;
+  bool reuse_port;
   std::string address;
   std::string header_forward_pattern;
   int thread_count;
 
 
-  RETURN_IF_ERR(get_value(data, "port", port));
-  RETURN_IF_ERR(get_value<int>(data, "reuse_port", reuse_port));
-  RETURN_IF_ERR(get_value(data, "address", address));
+  RETURN_IF_ERR(get_value(data, "port", &port));
+  RETURN_IF_ERR(get_value(data, "reuse_port", &reuse_port));
+  RETURN_IF_ERR(get_value(data, "address", &address));
   RETURN_IF_ERR(
-      get_value(data, "header_forward_pattern", header_forward_pattern));
-  RETURN_IF_ERR(get_value(data, "thread_count", thread_count));
+      get_value(data, "header_forward_pattern", &header_forward_pattern));
+  RETURN_IF_ERR(get_value(data, "thread_count", &thread_count));
 
-  TRITONSERVER_Error* err = nullptr;
-  err = Create(
-      server, nullptr, nullptr,  // TraceManager, SharedMemoryManager
-      port, (bool)reuse_port, address, header_forward_pattern, thread_count,
+  std::cout << "port " << port << std::endl;
+  std::cout << "reuse_port " << std::boolalpha << reuse_port << std::endl;
+  std::cout << "address " << address << std::endl;
+  std::cout << "header_forward_pattern " << header_forward_pattern << std::endl;
+  std::cout << "thread_count " << thread_count << std::endl;
+
+  return Create(
+      server, nullptr /* TraceManager */, nullptr /* SharedMemoryManager */,
+      port, reuse_port, address, header_forward_pattern, thread_count,
       restricted_features, service);
-
-  return err;
 }
 
 

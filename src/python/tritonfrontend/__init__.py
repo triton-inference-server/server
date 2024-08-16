@@ -31,12 +31,6 @@ from importlib.metadata import PackageNotFoundError, version
 from tritonfrontend._api._kservegrpc import KServeGrpc
 from tritonfrontend._api._kservehttp import KServeHttp
 from tritonfrontend._api.logging import enable_logging
-
-# Bindings from C++. TritonFrontend exposes C++ Classes and Functions.
-# from tritonfrontend._c.tritonfrontend_bindings import (
-#     TritonFrontendGrpc,
-#     TritonFrontendHttp,
-# )
 from tritonfrontend._c.tritonfrontend_bindings import (
     AlreadyExistsError,
     InternalError,
@@ -47,11 +41,6 @@ from tritonfrontend._c.tritonfrontend_bindings import (
     UnknownError,
     UnsupportedError,
 )
-
-# from tritonfrontend._api._metrics import Metrics
-# from tritonfrontend._api._sagemaker import Sagemaker
-# from tritonfrontend._api._vertexai import VertexAI
-
 
 _exceptions = (
     TritonError,
