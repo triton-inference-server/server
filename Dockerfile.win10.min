@@ -107,14 +107,14 @@ ENV VCPKG_TARGET_TRIPLET x64-windows
 #
 # Installing Visual Studio BuildTools: VS17 2022
 #
-ARG BUILDTOOLS_VERSION=17.11.35208.52
+ARG BUILDTOOLS_VERSION=17.10.35201.131
 # Download collect.exe in case of an install failure.
 ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
 # Use the latest release channel. For more control, specify the location of an internal layout.
 # Download the Build Tools bootstrapper.
 # ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
-ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/394f0f54-a258-4a53-9479-0356ed9778f6/547b7f2dab1e3ff5489e65ec8dfd98a786a9b130591acb57d712ce0bb26c92c0/vs_BuildTools.exe
+ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/28626b4b-f88f-4b55-a0cf-f3eaa2c643fb/e6c43d4dfb36338d954cdb3ad9010ab2a479e712088f4f6b016eadcc721bab28/vs_BuildTools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
