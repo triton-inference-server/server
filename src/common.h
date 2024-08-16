@@ -190,6 +190,7 @@ Join(const T& container, const std::string& delim)
 
 
 // Used by Python Bindings to accept arguments to initialize Frontends.
+// Known pybind11 issue: bool has to come before int for std::variant
 using VariantType = std::variant<bool, int, std::string>;
 using UnorderedMapType = std::unordered_map<std::string, VariantType>;
 

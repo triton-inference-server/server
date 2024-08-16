@@ -2438,6 +2438,8 @@ Server::Create(
 TRITONSERVER_Error*
 Server::Create(
     std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const RestrictedFeatures& restricted_features,
     std::unique_ptr<Server>* service)
 {
@@ -2445,9 +2447,7 @@ Server::Create(
 
   RETURN_IF_ERR(GetOptions(grpc_options, data));
 
-  return Create(
-      server, nullptr /* TraceManager */, nullptr /* SharedMemoryManager */,
-      grpc_options, service);
+  return Create(server, trace_manager, shm_manager, grpc_options, service);
 }
 
 TRITONSERVER_Error*

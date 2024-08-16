@@ -103,6 +103,8 @@ class Server {
 
   static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+      triton::server::TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<Server>* service);
 

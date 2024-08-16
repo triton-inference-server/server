@@ -47,7 +47,7 @@ class KServeHttp:
         def __init__(
             self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"
         ):
-            server_ptr = server.get_c_ptr()
+            server_ptr = server._ptr()
             options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
             self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)

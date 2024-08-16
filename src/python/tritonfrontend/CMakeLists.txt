@@ -50,7 +50,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 # ================================= END =====================================
 
-# ================== Add the Dependency Library ===================================
+# ================== Collect the Dependencies ===============================
 set(
   PYTHON_BINDING_REQUIREMENTS
   ../../shared_memory_manager.h
@@ -90,7 +90,7 @@ if(${TRITON_ENABLE_GPU})
   )
 endif()
 
-# ===================== End of Library ======================================
+# ===================== End of Collection ===================================
 
 
 # ================== Create Python Frontend Bindings ========================

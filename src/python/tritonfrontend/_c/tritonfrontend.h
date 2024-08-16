@@ -32,6 +32,8 @@
 
 #include "../../../common.h"
 #include "../../../restricted_features.h"
+#include "../../../shared_memory_manager.h"
+#include "../../../tracer.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 
@@ -102,6 +104,7 @@ class TritonFrontend {
   std::unique_ptr<Base> service;
   triton::server::RestrictedFeatures restricted_features;
 
+
  public:
   TritonFrontend(uintptr_t server_mem_addr, UnorderedMapType data)
   {
@@ -110,8 +113,9 @@ class TritonFrontend {
 
     server_.reset(server_ptr, DummyDeleter);
 
-    ThrowIfError(
-        FrontendServer::Create(server_, data, restricted_features, &service));
+    ThrowIfError(FrontendServer::Create(
+        server_, data, nullptr /* TraceManager */,
+        nullptr /* SharedMemoryManager */, restricted_features, &service));
   };
 
   void StartService() { ThrowIfError(service->Start()); };
