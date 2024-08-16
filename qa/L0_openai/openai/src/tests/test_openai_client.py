@@ -161,6 +161,12 @@ class TestAsyncOpenAIClient:
         assert chat_completion.choices[0].finish_reason == "stop"
         print(f"Chat completion results: {chat_completion}")
 
+    # TODO: Add this test
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    @pytest.mark.asyncio
+    async def test_completion_streaming(self, client: openai.AsyncOpenAI):
+        pass
+
     @pytest.mark.asyncio
     async def test_chat_streaming(self, client: openai.AsyncOpenAI):
         messages = [

@@ -99,11 +99,31 @@ def create_completion(
         return StreamingResponse(
             streaming_completion_response(request_id, created, metadata.name, responses)
         )
-    response = list(responses)[0]
+
+    # Response validation with decoupled models in mind
+    responses = list(responses)
+    num_responses = len(responses)
+    if num_responses == 1 and responses[0].final != True:
+        raise HTTPException(
+            status_code=400,
+            detail="Unexpected internal error with incorrect response flags",
+        )
+    if num_responses == 2 and responses[-1].final != True:
+        raise HTTPException(
+            status_code=400,
+            detail="Unexpected internal error with incorrect response flags",
+        )
+    if num_responses > 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unexpected number of responses: {num_responses}, expected 1.",
+        )
+
+    response = responses[0]
     text = get_output(response)
 
     choice = Choice(
-        finish_reason=FinishReason.stop if response.final else None,
+        finish_reason=FinishReason.stop,
         index=0,
         logprobs=None,
         text=text,
