@@ -79,17 +79,130 @@ rm -rf models/repeat_int32_non_decoupled && \
         sed -i "/model_transaction_policy/,+2d" config.pbtxt && \
         sed -i "s/repeat_int32/repeat_int32_non_decoupled/" config.pbtxt)
 
-for i in test_simple_infer \
-            test_simple_infer_cancellation \
-            test_simple_infer_timeout \
-            test_streaming_infer \
-            test_streaming_timeout \
-            test_streaming_cancellation \
-            test_decoupled_infer \
-            test_decoupled_cancellation \
-            test_decoupled_timeout \
-            test_non_decoupled_streaming_multi_response; do
-  SERVER_LOG="./inference_server.$i.log"
+GRPC_TRIALS="triton_grpc_error_true triton_grpc_error_true"
+
+for grpc_trial in $GRPC_TRIALS; do
+  if [ $grpc_trial == "triton_grpc_error_true" ]; then
+    export TRITONSERVER_GRPC_STATUS_FLAG=true
+  else
+    unset TRITONSERVER_GRPC_STATUS_FLAG
+  fi
+  for i in test_simple_infer \
+              test_simple_infer_cancellation \
+              test_simple_infer_timeout \
+              test_streaming_infer \
+              test_streaming_timeout \
+              test_streaming_cancellation \
+              test_decoupled_infer \
+              test_decoupled_cancellation \
+              test_decoupled_timeout \
+              test_non_decoupled_streaming_multi_response; do
+    SERVER_LOG="./inference_server.$i.log"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+      echo -e "\n***\n*** Test $i Failed\n***"
+      RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    check_state_release $SERVER_LOG
+    if [ $? -ne 0 ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** State Verification Failed for $i\n***"
+        RET=1
+    fi
+    set -e
+  done
+
+
+  for i in test_simple_infer_error_status \
+                  test_streaming_error_status \
+                  test_decoupled_error_status; do
+    SERVER_LOG="./inference_server.$i.log"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --grpc-restricted-protocol=inference:infer-key=infer-value"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+      echo -e "\n***\n*** Test $i Failed\n***"
+      RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    check_state_release $SERVER_LOG
+    if [ $? -ne 0 ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** State Verification Failed for $i\n***"
+        RET=1
+    fi
+
+    set -e
+  done
+
+  for i in test_simple_infer_shutdownserver \
+          test_streaming_infer_shutdownserver \
+          test_decoupled_infer_shutdownserver \
+          test_decoupled_infer_with_params_shutdownserver; do
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+    SERVER_LOG="./inference_server.$i.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    SERVER_PID=$SERVER_PID python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+      echo -e "\n***\n*** Test $i Failed\n***"
+      RET=1
+    fi
+
+    wait $SERVER_PID
+
+    check_state_release $SERVER_LOG
+    if [ $? -ne 0 ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** State Verification Failed for $i\n***"
+        RET=1
+    fi
+
+    set -e
+  done
+
+  TEST_NAME=test_decoupled_infer_complete
+  export TRITONSERVER_DELAY_GRPC_COMPLETE=2000
+
+  SERVER_LOG="./inference_server.$TEST_NAME.log"
   SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
   run_server
   if [ "$SERVER_PID" == "0" ]; then
@@ -98,13 +211,14 @@ for i in test_simple_infer \
     exit 1
   fi
 
-  echo "Test: $i" >>$CLIENT_LOG
+  echo "Test: $TEST_NAME" >>$CLIENT_LOG
 
   set +e
-  python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
+
+  SERVER_LOG=$SERVER_LOG python $CLEANUP_TEST CleanUpTest.$TEST_NAME >>$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-    echo -e "\n***\n*** Test $i Failed\n***"
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test $TEST_NAME Failed\n***"
     RET=1
   fi
 
@@ -114,117 +228,12 @@ for i in test_simple_infer \
   check_state_release $SERVER_LOG
   if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed for $i\n***"
-      RET=1
-  fi
-  set -e
-done
-
-
-for i in test_simple_infer_error_status \
-                test_streaming_error_status \
-                test_decoupled_error_status; do
-  SERVER_LOG="./inference_server.$i.log"
-  SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --grpc-restricted-protocol=inference:infer-key=infer-value"
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-  fi
-
-  echo "Test: $i" >>$CLIENT_LOG
-
-  set +e
-  python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
-  if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-    echo -e "\n***\n*** Test $i Failed\n***"
+    echo -e "\n***\n*** State Verification Failed for $TEST_NAME\n***"
     RET=1
   fi
 
-  kill $SERVER_PID
-  wait $SERVER_PID
-
-  check_state_release $SERVER_LOG
-  if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed for $i\n***"
-      RET=1
-  fi
-
   set -e
 done
-
-for i in test_simple_infer_shutdownserver \
-         test_streaming_infer_shutdownserver \
-         test_decoupled_infer_shutdownserver \
-         test_decoupled_infer_with_params_shutdownserver; do
-  SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
-  SERVER_LOG="./inference_server.$i.log"
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-  fi
-
-  echo "Test: $i" >>$CLIENT_LOG
-
-  set +e
-  SERVER_PID=$SERVER_PID python $CLEANUP_TEST CleanUpTest.$i >>$CLIENT_LOG 2>&1
-  if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-    echo -e "\n***\n*** Test $i Failed\n***"
-    RET=1
-  fi
-
-  wait $SERVER_PID
-
-  check_state_release $SERVER_LOG
-  if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** State Verification Failed for $i\n***"
-      RET=1
-  fi
-
-  set -e
-done
-
-TEST_NAME=test_decoupled_infer_complete
-export TRITONSERVER_DELAY_GRPC_COMPLETE=2000
-
-SERVER_LOG="./inference_server.$TEST_NAME.log"
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
-  cat $SERVER_LOG
-  exit 1
-fi
-
-echo "Test: $TEST_NAME" >>$CLIENT_LOG
-
-set +e
-
-SERVER_LOG=$SERVER_LOG python $CLEANUP_TEST CleanUpTest.$TEST_NAME >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-  cat $CLIENT_LOG
-  echo -e "\n***\n*** Test $TEST_NAME Failed\n***"
-  RET=1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-check_state_release $SERVER_LOG
-if [ $? -ne 0 ]; then
-  cat $SERVER_LOG
-  echo -e "\n***\n*** State Verification Failed for $TEST_NAME\n***"
-  RET=1
-fi
-
-set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
