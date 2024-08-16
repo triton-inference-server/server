@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
+import sys
+
 from openai import OpenAI
+
+model = "tensorrt_llm_bls"
+if len(sys.argv) > 1:
+    model = sys.argv[1]
 
 client = OpenAI(
     base_url="http://localhost:8000/v1",
@@ -7,7 +13,7 @@ client = OpenAI(
 )
 
 completion = client.chat.completions.create(
-    model="tensorrt_llm_bls",
+    model=model,
     messages=[
         {
             "role": "system",
