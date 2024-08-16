@@ -161,9 +161,17 @@ class CleanUpTest(tu.TestResultCollector):
             url="localhost:8001", verbose=True
         ) as triton_client:
             # Establish stream
-            triton_client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=stream_timeout
-            )
+            if "TRITONSERVER_GRPC_STATUS_FLAG" in os.environ:
+                metadata = {"triton_grpc_error": "true"}
+                triton_client.start_stream(
+                    callback=partial(callback, user_data),
+                    stream_timeout=stream_timeout,
+                    headers=metadata,
+                )
+            else:
+                triton_client.start_stream(
+                    callback=partial(callback, user_data), stream_timeout=stream_timeout
+                )
             # Send specified many requests in parallel
             for i in range(request_count):
                 time.sleep((request_delay / 1000))
@@ -229,9 +237,17 @@ class CleanUpTest(tu.TestResultCollector):
             url="localhost:8001", verbose=True
         ) as triton_client:
             # Establish stream
-            triton_client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=stream_timeout
-            )
+            if "TRITONSERVER_GRPC_STATUS_FLAG" in os.environ:
+                metadata = {"triton_grpc_error": "true"}
+                triton_client.start_stream(
+                    callback=partial(callback, user_data),
+                    stream_timeout=stream_timeout,
+                    headers=metadata,
+                )
+            else:
+                triton_client.start_stream(
+                    callback=partial(callback, user_data), stream_timeout=stream_timeout
+                )
             # Send specified many requests in parallel
             for i in range(request_count):
                 time.sleep((request_delay / 1000))
@@ -594,9 +610,17 @@ class CleanUpTest(tu.TestResultCollector):
             url="localhost:8001", verbose=True
         ) as client:
             # Establish stream
-            client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=16
-            )
+            if "TRITONSERVER_GRPC_STATUS_FLAG" in os.environ:
+                metadata = {"triton_grpc_error": "true"}
+                client.start_stream(
+                    callback=partial(callback, user_data),
+                    stream_timeout=16,
+                    headers=metadata,
+                )
+            else:
+                client.start_stream(
+                    callback=partial(callback, user_data), stream_timeout=16
+                )
             # Send a request
             client.async_stream_infer(
                 model_name=self.repeat_non_decoupled_model_name,
