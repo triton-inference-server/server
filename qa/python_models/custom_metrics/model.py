@@ -233,16 +233,11 @@ class PBCustomMetricsTest(unittest.TestCase):
             description="test metric histogram kind end to end",
             kind=pb_utils.MetricFamily.HISTOGRAM,
         )
+
         labels = {"example1": "histogram_label1", "example2": "histogram_label2"}
-
-        # Test non-ascending order buckets
-        with self.assertRaises(pb_utils.TritonModelException):
-            metric = metric_family.Metric(
-                labels=labels, buckets=[2.5, 0.1, 1.0, 10.0, 5.0]
-            )
-
         buckets = [0.1, 1.0, 2.5, 5.0, 10.0]
         metric = metric_family.Metric(labels=labels, buckets=buckets)
+
         labels_str = 'example1="histogram_label1",example2="histogram_label2"'
         self._histogram_api_helper(metric, name, labels_str)
 
@@ -253,6 +248,25 @@ class PBCustomMetricsTest(unittest.TestCase):
         self.assertEqual(metrics.count(count_pattern), 1)
         self.assertEqual(metrics.count(sum_pattern), 1)
         self.assertEqual(metrics.count(bucket_pattern), len(buckets) + 1)
+
+    def test_histogram_args(self):
+        name = "test_histogram_args"
+        metric_family = pb_utils.MetricFamily(
+            name=name,
+            description="test metric histogram args",
+            kind=pb_utils.MetricFamily.HISTOGRAM,
+        )
+
+        # Test non-ascending order buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=[2.5, 0.1, 1.0, 10.0, 5.0])
+
+        # Test duplicate value buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=[1, 1, 2, 5, 5])
+
+        # Test non-ascending order buckets
+        metric_family.Metric(labels={}, buckets=[])
 
     def test_dup_metric_family_diff_kind(self):
         # Test that a duplicate metric family can't be added with a conflicting type/kind
