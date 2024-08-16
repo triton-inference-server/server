@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import tritonserver
+from fastapi import HTTPException
 from src.schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 from src.utils.tokenizer import get_tokenizer
 
@@ -145,6 +146,25 @@ def get_output(response):
     return ""
 
 
+def validate_triton_responses(responses):
+    num_responses = len(responses)
+    if num_responses == 1 and responses[0].final != True:
+        raise HTTPException(
+            status_code=400,
+            detail="Unexpected internal error with incorrect response flags",
+        )
+    if num_responses == 2 and responses[-1].final != True:
+        raise HTTPException(
+            status_code=400,
+            detail="Unexpected internal error with incorrect response flags",
+        )
+    if num_responses > 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unexpected number of responses: {num_responses}, expected 1.",
+        )
+
+
 def create_vllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
@@ -171,7 +191,6 @@ def create_vllm_inference_request(
     return model.create_request(inputs=inputs, parameters=sampling_parameters)
 
 
-# TODO: test
 def create_trtllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
