@@ -257,6 +257,12 @@ class PBCustomMetricsTest(unittest.TestCase):
             kind=pb_utils.MetricFamily.HISTOGRAM,
         )
 
+        # Test none buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={})
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=None)
+
         # Test non-ascending order buckets
         with self.assertRaises(pb_utils.TritonModelException):
             metric_family.Metric(labels={}, buckets=[2.5, 0.1, 1.0, 10.0, 5.0])
