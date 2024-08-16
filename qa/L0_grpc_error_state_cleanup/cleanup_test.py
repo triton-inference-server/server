@@ -163,7 +163,9 @@ class CleanUpTest(tu.TestResultCollector):
             # Establish stream
             metadata = {"triton_grpc_error": "true"}
             triton_client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=stream_timeout, headers=metadata
+                callback=partial(callback, user_data),
+                stream_timeout=stream_timeout,
+                headers=metadata,
             )
             # Send specified many requests in parallel
             for i in range(request_count):
@@ -232,7 +234,9 @@ class CleanUpTest(tu.TestResultCollector):
             # Establish stream
             metadata = {"triton_grpc_error": "true"}
             triton_client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=stream_timeout, headers=metadata
+                callback=partial(callback, user_data),
+                stream_timeout=stream_timeout,
+                headers=metadata,
             )
             # Send specified many requests in parallel
             for i in range(request_count):
@@ -612,7 +616,9 @@ class CleanUpTest(tu.TestResultCollector):
             # Establish stream
             metadata = {"triton_grpc_error": "true"}
             client.start_stream(
-                callback=partial(callback, user_data), stream_timeout=16, headers=metadata
+                callback=partial(callback, user_data),
+                stream_timeout=16,
+                headers=metadata,
             )
             # Send a request
             client.async_stream_infer(

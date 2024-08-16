@@ -117,7 +117,9 @@ class DecoupledTest(tu.TestResultCollector):
         ) as triton_client:
             # Establish stream
             metadata = {"triton_grpc_error": "true"}
-            triton_client.start_stream(callback=partial(callback, user_data), headers=metadata)
+            triton_client.start_stream(
+                callback=partial(callback, user_data), headers=metadata
+            )
             # Send specified many requests in parallel
             for i in range(request_count):
                 time.sleep((request_delay / 1000))
@@ -177,7 +179,9 @@ class DecoupledTest(tu.TestResultCollector):
         ) as triton_client:
             # Establish stream
             metadata = {"triton_grpc_error": "true"}
-            triton_client.start_stream(callback=partial(callback, user_data), headers=metadata)
+            triton_client.start_stream(
+                callback=partial(callback, user_data), headers=metadata
+            )
             # Send specified many requests in parallel
             for i in range(request_count):
                 time.sleep((request_delay / 1000))
