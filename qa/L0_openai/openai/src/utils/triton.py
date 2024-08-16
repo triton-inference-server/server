@@ -94,7 +94,7 @@ def load_models(server):
         names.append(name)
         models.append(model)
         backends.append(backend)
-        print(f"Loaded: Model={name}, Backend={backend}.")
+        print(f"Loaded: {name=}, {backend=}, tokenizer={tokenizer_model}")
 
     create_time = int(time.time())
 
@@ -131,7 +131,7 @@ def init_tritonserver():
         model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
     ).start(wait_until_ready=True)
 
-    print("Loading Model...\n\n")
+    print("Loading Models...")
     metadatas = load_models(server)
     return server, metadatas
 
@@ -142,7 +142,7 @@ def get_output(response):
             return response.outputs["text_output"].to_string_array()[0]
         except:
             return str(response.outputs["text_output"].to_bytes_array()[0])
-    return None
+    return ""
 
 
 def create_vllm_inference_request(

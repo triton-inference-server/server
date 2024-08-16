@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import os
 
@@ -29,12 +30,17 @@ def parse_args():
         default=0,
         help="The tritonserver log verbosity level",
     )
-
     triton_group.add_argument(
         "--model-repository",
         type=str,
         default=None,
-        help="model repository",
+        help="Path to the Triton model repository holding the models to be served",
+    )
+    triton_group.add_argument(
+        "--tokenizer",
+        type=str,
+        default=None,
+        help="HuggingFace ID of the Tokenizer to use for chat templates",
     )
 
     return parser.parse_args()
@@ -46,6 +52,9 @@ if __name__ == "__main__":
     # but use env vars for simplicity for now.
     if args.model_repository:
         os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
+    if args.tokenizer:
+        os.environ["TOKENIZER"] = args.tokenizer
+
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
     app = init_app()

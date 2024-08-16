@@ -19,12 +19,19 @@ from src.utils.triton import get_output
 router = APIRouter()
 
 
+def get_first_response_role(conversation, add_generation_prompt, default_role):
+    if add_generation_prompt:
+        return default_role
+
+    return conversation[-1]["role"]
+
+
 def streaming_chat_completion_response(request_id, created, model, role, responses):
     # first chunk
     choice = ChatCompletionStreamingResponseChoice(
         index=0,
         delta=ChatCompletionStreamResponseDelta(
-            role=role, content=None, function_call=None
+            role=role, content="", function_call=None
         ),
         logprobs=None,
         finish_reason=None,
@@ -99,9 +106,6 @@ def create_chat_completion(
     if not metadata.backend:
         raise HTTPException(status_code=400, detail="Unknown backend")
 
-    add_generation_prompt_default = True
-    default_role = "assistant"
-
     triton_model = raw_request.app.server.model(request.model)
     if request.model != triton_model.name:
         raise HTTPException(
@@ -122,12 +126,16 @@ def create_chat_completion(
         for message in request.messages
     ]
 
-    # TODO: Use HF tokenizer or use Jinja/templater directly?
-    # TODO: Function Calling / tools related to this?
+    # NOTE: This behavior should be tested further
+    # TODO: Do these need to be exposed to the user?
+    add_generation_prompt = True
+    default_role = "assistant"
+    role = get_first_response_role(conversation, add_generation_prompt, default_role)
+
     prompt = metadata.tokenizer.apply_chat_template(
         conversation=conversation,
         tokenize=False,
-        add_generation_prompt=add_generation_prompt_default,
+        add_generation_prompt=add_generation_prompt,
     )
 
     request_id = f"cmpl-{uuid.uuid1()}"
@@ -140,7 +148,7 @@ def create_chat_completion(
     if request.stream:
         return StreamingResponse(
             streaming_chat_completion_response(
-                request_id, created, request.model, conversation[-1]["role"], responses
+                request_id, created, request.model, role, responses
             )
         )
 

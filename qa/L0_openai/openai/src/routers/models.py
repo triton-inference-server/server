@@ -3,8 +3,7 @@ from src.schemas.openai import ListModelsResponse, Model, ObjectType
 
 router = APIRouter()
 
-# TODO: What is this for?
-OWNED_BY = "ACME"
+OWNED_BY = "Triton Inference Server"
 
 
 @router.get("/v1/models", response_model=ListModelsResponse, tags=["Models"])

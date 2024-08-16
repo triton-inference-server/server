@@ -36,7 +36,7 @@ if not TEST_BACKEND or not TEST_MODEL:
 class TestChatCompletions:
     # TODO: Consider module/package scope, or join Completions tests into same file
     # to run server only once for both sets of tests for faster iteration.
-    @pytest.fixture(scope="class", autouse=False)
+    @pytest.fixture(scope="class")
     def client(self):
         model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
         app = self.setup_app(
@@ -323,7 +323,7 @@ class TestChatCompletions:
         assert response1_text == response2_text
         assert response1_text != response3_text
 
-    # Simple tests to verify seed roughly behaves as expected
+    # Simple tests to verify random seed roughly behaves as expected
     def test_chat_completions_seed(self, client):
         responses = []
         payload1 = {
@@ -408,9 +408,16 @@ class TestChatCompletions:
     def test_chat_completions_streaming(self, client):
         pass
 
-    @pytest.mark.skip(reason="Not Implemented Yet")
     def test_chat_completions_no_streaming(self, client):
-        pass
+        response = client.post(
+            "/v1/chat/completions",
+            json={"model": TEST_MODEL, "messages": TEST_MESSAGES, "stream": False},
+        )
+
+        assert response.status_code == 200
+        message = response.json()["choices"][0]["message"]
+        assert message["content"].strip()
+        assert message["role"] == "assistant"
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_function_calling(self):
@@ -424,6 +431,18 @@ class TestChatCompletions:
     def test_multi_lora(self):
         pass
 
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_request_n_choices(self):
+        pass
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_request_logprobs(self):
+        pass
+
+    @pytest.mark.skip(reason="Not Implemented Yet")
+    def test_request_logit_bias(self):
+        pass
+
     # TODO: Do we want to support "usage" field for token counts in response?
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_usage_response(self):
@@ -432,7 +451,7 @@ class TestChatCompletions:
 
 # For tests that won't use the same pytest fixture for server startup across
 # the whole class test suite.
-class TestChatCompletionsNoFixture:
+class TestChatCompletionsCustomFixture:
     def setup_app(self, tokenizer: str, model_repository: str):
         os.environ["TOKENIZER"] = tokenizer
         os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
