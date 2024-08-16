@@ -7,6 +7,14 @@ from typing import Dict, List, Optional
 
 import openai
 import requests
+from src.api_server import init_app
+
+
+def setup_fastapi_app(tokenizer: str, model_repository: str):
+    os.environ["TOKENIZER"] = tokenizer
+    os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
+    app = init_app()
+    return app
 
 
 # Heavily inspired by vLLM's test infrastructure
@@ -44,7 +52,8 @@ class OpenAIServer:
     def __exit__(self, exc_type, exc_value, traceback):
         self.proc.terminate()
         try:
-            self.proc.wait(3)
+            wait_secs = 30
+            self.proc.wait(wait_secs)
         except subprocess.TimeoutExpired:
             # force kill if needed
             self.proc.kill()

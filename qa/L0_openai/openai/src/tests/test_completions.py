@@ -1,51 +1,17 @@
 import copy
-import os
-from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
-from src.api_server import init_app
-
-### TEST ENVIRONMENT SETUP ###
-TEST_BACKEND = ""
-TEST_MODEL = ""
-TEST_PROMPT = "Machine learning is"
-try:
-    import vllm as _
-
-    TEST_BACKEND = "vllm"
-    TEST_MODEL = "llama-3-8b-instruct"
-except ImportError:
-    pass
-
-try:
-    import tensorrt_llm as _
-
-    TEST_BACKEND = "tensorrtllm"
-    TEST_MODEL = "tensorrt_llm_bls"
-except ImportError:
-    pass
-
-if not TEST_BACKEND or not TEST_MODEL:
-    raise Exception("Unknown test environment")
-###
 
 
 class TestCompletions:
-    # TODO: Consider module/package scope, or join ChatCompletions tests into same file
-    # to run server only once for both sets of tests for faster iteration.
     @pytest.fixture(scope="class")
-    def client(self):
-        model_repository = Path(__file__).parent / f"{TEST_BACKEND}_models"
-        os.environ["TRITON_MODEL_REPOSITORY"] = str(model_repository)
-        app = init_app()
-        with TestClient(app) as test_client:
-            yield test_client
+    def client(self, fastapi_client_class_scope):
+        yield fastapi_client_class_scope
 
-    def test_completions_defaults(self, client):
+    def test_completions_defaults(self, client, model: str, prompt: str):
         response = client.post(
             "/v1/completions",
-            json={"model": TEST_MODEL, "prompt": TEST_PROMPT},
+            json={"model": model, "prompt": prompt},
         )
 
         print("Response:", response.json())
@@ -69,12 +35,14 @@ class TestCompletions:
             ("logit_bias", {"0": 0}),
         ],
     )
-    def test_completions_sampling_parameters(self, client, sampling_parameter, value):
+    def test_completions_sampling_parameters(
+        self, client, sampling_parameter, value, model: str, prompt: str
+    ):
         response = client.post(
             "/v1/completions",
             json={
-                "model": TEST_MODEL,
-                "prompt": TEST_PROMPT,
+                "model": model,
+                "prompt": prompt,
                 sampling_parameter: value,
             },
         )
@@ -91,9 +59,9 @@ class TestCompletions:
         assert response.json()["choices"][0]["text"].strip()
 
     # Simple tests to verify max_tokens roughly behaves as expected
-    def test_completions_max_tokens(self, client):
+    def test_completions_max_tokens(self, client, model: str, prompt: str):
         responses = []
-        payload = {"model": TEST_MODEL, "prompt": TEST_PROMPT, "max_tokens": 1}
+        payload = {"model": model, "prompt": prompt, "max_tokens": 1}
 
         # Send two requests with max_tokens = 1 to check their similarity
         payload["max_tokens"] = 1
@@ -129,17 +97,21 @@ class TestCompletions:
         assert len(response1_text) == len(response2_text) == 1
         assert len(response3_text) > len(response1_text)
 
-    @pytest.mark.skipif(TEST_BACKEND != "vllm", reason="Only used to test vLLM backend")
     @pytest.mark.parametrize(
         "temperature",
         [0.0, 1.0],
     )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_completions_temperature_vllm(self, client, temperature):
+    def test_completions_temperature_vllm(
+        self, client, temperature, backend: str, model: str, prompt: str
+    ):
+        if backend != "vllm":
+            pytest.skip(reason="Only used to test vLLM-specific temperature behavior")
+
         responses = []
         payload = {
-            "model": TEST_MODEL,
-            "prompt": TEST_PROMPT,
+            "model": model,
+            "prompt": prompt,
             "temperature": temperature,
         }
 
@@ -184,15 +156,17 @@ class TestCompletions:
     @pytest.mark.xfail(
         reason="TRT-LLM BLS model will ignore temperature until a later release"
     )
-    @pytest.mark.skipif(
-        TEST_BACKEND != "tensorrtllm", reason="Only used to test TRT-LLM backend"
-    )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_completions_temperature_tensorrtllm(self, client):
+    def test_completions_temperature_tensorrtllm(
+        self, client, backend: str, model: str, prompt: str
+    ):
+        if backend != "tensorrtllm":
+            pytest.skip(reason="Only used to test vLLM-specific temperature behavior")
+
         responses = []
         payload1 = {
-            "model": TEST_MODEL,
-            "prompt": TEST_PROMPT,
+            "model": model,
+            "prompt": prompt,
             "temperature": 0.0,
             # TRT-LLM requires certain settings of `top_k` / `top_p` to
             # respect changes in `temperature`
@@ -234,9 +208,9 @@ class TestCompletions:
         assert response1_text != response3_text
 
     # Simple tests to verify seed roughly behaves as expected
-    def test_completions_seed(self, client):
+    def test_completions_seed(self, client, model: str, prompt: str):
         responses = []
-        payload1 = {"model": TEST_MODEL, "prompt": TEST_PROMPT, "seed": 1}
+        payload1 = {"model": model, "prompt": prompt, "seed": 1}
         payload2 = copy.deepcopy(payload1)
         payload2["seed"] = 2
 
@@ -286,13 +260,13 @@ class TestCompletions:
         ],
     )
     def test_completions_invalid_sampling_parameters(
-        self, client, sampling_parameter, value
+        self, client, sampling_parameter, value, model: str, prompt: str
     ):
         response = client.post(
             "/v1/completions",
             json={
-                "model": TEST_MODEL,
-                "prompt": TEST_PROMPT,
+                "model": model,
+                "prompt": prompt,
                 sampling_parameter: value,
             },
         )
@@ -304,32 +278,30 @@ class TestCompletions:
         response = client.post("/v1/completions", json={})
         assert response.status_code == 422
 
-    def test_completions_no_model(self, client):
-        response = client.post("/v1/completions", json={"prompt": TEST_PROMPT})
+    def test_completions_no_model(self, client, prompt: str):
+        response = client.post("/v1/completions", json={"prompt": prompt})
         assert response.status_code == 422
 
-    def test_completions_no_prompt(self, client):
-        response = client.post("/v1/completions", json={"model": TEST_MODEL})
+    def test_completions_no_prompt(self, client, model: str):
+        response = client.post("/v1/completions", json={"model": model})
         assert response.status_code == 422
 
-    def test_completions_empty_prompt(self, client):
-        response = client.post(
-            "/v1/completions", json={"model": TEST_MODEL, "prompt": ""}
-        )
+    def test_completions_empty_prompt(self, client, model: str):
+        response = client.post("/v1/completions", json={"model": model, "prompt": ""})
 
         # NOTE: Should this be validated in schema instead?
         # 400 Error returned in route handler
         assert response.status_code == 400
 
-    def test_no_prompt(self, client):
-        response = client.post("/v1/completions", json={"model": TEST_MODEL})
+    def test_no_prompt(self, client, model: str):
+        response = client.post("/v1/completions", json={"model": model})
 
         # 422 Error returned by schema validation
         assert response.status_code == 422
 
-    def test_completions_multiple_choices(self, client):
+    def test_completions_multiple_choices(self, client, model: str, prompt: str):
         response = client.post(
-            "/v1/completions", json={"model": TEST_MODEL, "prompt": TEST_PROMPT, "n": 2}
+            "/v1/completions", json={"model": model, "prompt": prompt, "n": 2}
         )
 
         assert response.status_code == 400

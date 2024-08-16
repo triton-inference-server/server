@@ -5,7 +5,11 @@ import pytest
 from fastapi.testclient import TestClient
 from src.api_server import init_app
 
-TEST_MODEL = "mock_llm"
+
+# Override conftest.py default model
+@pytest.fixture
+def model():
+    return "mock_llm"
 
 
 class TestObservability:
@@ -41,27 +45,27 @@ class TestObservability:
         response = client.get("/metrics")
         assert response.status_code == 200
         # FIXME: Flesh out more
-        # NOTE: response.json() works even on non-json prometheus data?
+        # NOTE: response.json() works even on non-json prometheus data
         assert "nv_cpu_utilization" in response.json()
 
     ### Models ###
-    def test_models_list(self, client):
+    def test_models_list(self, client, model):
         # TODO: Load multiple models and make sure exactly ALL are returned
         response = client.get("/v1/models")
         assert response.status_code == 200
-        # TODO: Flesh out
         models = response.json()["data"]
         assert len(models) == 1
-        assert models[0]["id"] == TEST_MODEL
+        assert models[0]["id"] == model
         assert models[0]["object"] == "model"
         assert models[0]["created"] > 0
+        assert models[0]["owned_by"] == "Triton Inference Server"
 
-    def test_models_get(self, client):
+    def test_models_get(self, client, model):
         # TODO: Load multiple models and make sure exactly 1 is returned
-        response = client.get(f"/v1/models/{TEST_MODEL}")
+        response = client.get(f"/v1/models/{model}")
         assert response.status_code == 200
-        # TODO: Flesh out
-        model = response.json()
-        assert model["id"] == TEST_MODEL
-        assert model["object"] == "model"
-        assert model["created"] > 0
+        model_resp = response.json()
+        assert model_resp["id"] == model
+        assert model_resp["object"] == "model"
+        assert model_resp["created"] > 0
+        assert model_resp["owned_by"] == "Triton Inference Server"

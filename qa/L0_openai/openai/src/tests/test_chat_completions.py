@@ -1,60 +1,21 @@
 import copy
-import os
 from pathlib import Path
+from typing import List
 
 import pytest
 from fastapi.testclient import TestClient
-from src.api_server import init_app
-
-### TEST ENVIRONMENT SETUP ###
-TEST_BACKEND = ""
-TEST_MODEL = ""
-TEST_PROMPT = "What is machine learning?"
-TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
-TEST_TOKENIZER = "meta-llama/Meta-Llama-3-8B-Instruct"
-try:
-    import vllm as _
-
-    TEST_BACKEND = "vllm"
-    TEST_MODEL = "llama-3-8b-instruct"
-except ImportError:
-    pass
-
-try:
-    import tensorrt_llm as _
-
-    TEST_BACKEND = "tensorrtllm"
-    TEST_MODEL = "tensorrt_llm_bls"
-except ImportError:
-    pass
-
-if not TEST_BACKEND or not TEST_MODEL:
-    raise Exception("Unknown test environment")
-###
+from src.tests.utils import setup_fastapi_app
 
 
 class TestChatCompletions:
-    # TODO: Consider module/package scope, or join Completions tests into same file
-    # to run server only once for both sets of tests for faster iteration.
     @pytest.fixture(scope="class")
-    def client(self):
-        model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-        app = self.setup_app(
-            tokenizer=TEST_TOKENIZER, model_repository=model_repository
-        )
-        with TestClient(app) as test_client:
-            yield test_client
+    def client(self, fastapi_client_class_scope):
+        yield fastapi_client_class_scope
 
-    def setup_app(self, tokenizer: str, model_repository: str):
-        os.environ["TOKENIZER"] = tokenizer
-        os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
-        app = init_app()
-        return app
-
-    def test_chat_completions_defaults(self, client):
+    def test_chat_completions_defaults(self, client, model: str, messages: List[dict]):
         response = client.post(
             "/v1/chat/completions",
-            json={"model": TEST_MODEL, "messages": TEST_MESSAGES},
+            json={"model": model, "messages": messages},
         )
 
         assert response.status_code == 200
@@ -64,17 +25,17 @@ class TestChatCompletions:
         # "usage" currently not supported
         assert response.json()["usage"] == None
 
-    def test_chat_completions_system_prompt(self, client):
+    def test_chat_completions_system_prompt(self, client, model: str):
         # NOTE: Currently just sanity check that there are no issues when a
         # system role is provided. There is no test logic to measure the quality
         # of the response yet.
         messages = [
             {"role": "system", "content": "You are a Triton Inference Server expert."},
-            {"role": "user", "content": TEST_PROMPT},
+            {"role": "user", "content": "What is machine learning?"},
         ]
 
         response = client.post(
-            "/v1/chat/completions", json={"model": TEST_MODEL, "messages": messages}
+            "/v1/chat/completions", json={"model": model, "messages": messages}
         )
 
         assert response.status_code == 200
@@ -82,14 +43,14 @@ class TestChatCompletions:
         assert message["content"].strip()
         assert message["role"] == "assistant"
 
-    def test_chat_completions_system_prompt_only(self, client):
+    def test_chat_completions_system_prompt_only(self, client, model: str):
         # No user prompt provided
         messages = [
             {"role": "system", "content": "You are a Triton Inference Server expert."}
         ]
 
         response = client.post(
-            "/v1/chat/completions", json={"model": TEST_MODEL, "messages": messages}
+            "/v1/chat/completions", json={"model": model, "messages": messages}
         )
 
         assert response.status_code == 200
@@ -98,7 +59,7 @@ class TestChatCompletions:
         assert message["role"] == "assistant"
 
     @pytest.mark.parametrize(
-        "sampling_parameter, value",
+        "param_key, param_value",
         [
             ("temperature", 0.7),
             ("max_tokens", 10),
@@ -111,20 +72,20 @@ class TestChatCompletions:
         ],
     )
     def test_chat_completions_sampling_parameters(
-        self, client, sampling_parameter, value
+        self, client, param_key, param_value, model: str, messages: List[dict]
     ):
         response = client.post(
             "/v1/chat/completions",
             json={
-                "model": TEST_MODEL,
-                "messages": TEST_MESSAGES,
-                sampling_parameter: value,
+                "model": model,
+                "messages": messages,
+                param_key: param_value,
             },
         )
 
         # TODO: Add support and remove this check
         unsupported_parameters = ["logprobs", "logit_bias"]
-        if sampling_parameter in unsupported_parameters:
+        if param_key in unsupported_parameters:
             assert response.status_code == 400
             assert response.json()["detail"] == "logit bias and log probs not supported"
             return
@@ -134,7 +95,7 @@ class TestChatCompletions:
         assert response.json()["choices"][0]["message"]["role"] == "assistant"
 
     @pytest.mark.parametrize(
-        "sampling_parameter, value",
+        "param_key, param_value",
         [
             ("temperature", 2.1),
             ("temperature", -0.1),
@@ -147,14 +108,14 @@ class TestChatCompletions:
         ],
     )
     def test_chat_completions_invalid_sampling_parameters(
-        self, client, sampling_parameter, value
+        self, client, param_key, param_value, model: str, messages: List[dict]
     ):
         response = client.post(
             "/v1/chat/completions",
             json={
-                "model": TEST_MODEL,
-                "messages": TEST_MESSAGES,
-                sampling_parameter: value,
+                "model": model,
+                "messages": messages,
+                param_key: param_value,
             },
         )
 
@@ -162,9 +123,11 @@ class TestChatCompletions:
         assert response.status_code == 422
 
     # Simple tests to verify max_tokens roughly behaves as expected
-    def test_chat_completions_max_tokens(self, client):
+    def test_chat_completions_max_tokens(
+        self, client, model: str, messages: List[dict]
+    ):
         responses = []
-        payload = {"model": TEST_MODEL, "messages": TEST_MESSAGES, "max_tokens": 1}
+        payload = {"model": model, "messages": messages, "max_tokens": 1}
 
         # Send two requests with max_tokens = 1 to check their similarity
         payload["max_tokens"] = 1
@@ -206,17 +169,22 @@ class TestChatCompletions:
         assert len(response1_text) == len(response2_text) == 1
         assert len(response3_text) > len(response1_text)
 
-    @pytest.mark.skipif(TEST_BACKEND != "vllm", reason="Only used to test vLLM backend")
     @pytest.mark.parametrize(
         "temperature",
         [0.0, 1.0],
     )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_chat_completions_temperature_vllm(self, client, temperature):
+    def test_chat_completions_temperature_vllm(
+        self, client, temperature, backend: str, model: str, messages: List[dict]
+    ):
+        if backend != "vllm":
+            pytest.skip(reason="Only used to test vLLM-specific temperature behavior")
+
         responses = []
         payload = {
-            "model": TEST_MODEL,
-            "messages": TEST_MESSAGES,
+            "model": model,
+            "messages": messages,
+            "max_tokens": 256,
             "temperature": temperature,
         }
 
@@ -248,14 +216,12 @@ class TestChatCompletions:
         # that two equivalent requests produce the same response.
         if temperature == 0.0:
             # NOTE: This check may be ambitious to get an exact match in all
-            # frameworks depending on how other parameter defaults are set, so
+            # cases depending on how other parameter defaults are set, so
             # it can probably be removed if it introduces flakiness.
-            print(f"Comparing '{response1_text}' == '{response2_text}'")
             assert response1_text == response2_text
         # Temperature of 1.0 indicates maximum randomness, so check
         # that two equivalent requests produce different responses.
         elif temperature == 1.0:
-            print(f"Comparing '{response1_text}' != '{response2_text}'")
             assert response1_text != response2_text
         # Don't bother checking values other than the extremes
         else:
@@ -265,15 +231,19 @@ class TestChatCompletions:
     @pytest.mark.xfail(
         reason="TRT-LLM BLS model will ignore temperature until a later release"
     )
-    @pytest.mark.skipif(
-        TEST_BACKEND != "tensorrtllm", reason="Only used to test TRT-LLM backend"
-    )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_chat_completions_temperature_tensorrtllm(self, client):
+    def test_chat_completions_temperature_tensorrtllm(
+        self, client, backend: str, model: str, messages: List[dict]
+    ):
+        if backend != "tensorrtllm":
+            pytest.skip(
+                reason="Only used to test TRT-LLM-specific temperature behavior"
+            )
+
         responses = []
         payload1 = {
-            "model": TEST_MODEL,
-            "messages": TEST_MESSAGES,
+            "model": model,
+            "messages": messages,
             # Increase token length to allow more room for variability
             "max_tokens": 200,
             "temperature": 0.0,
@@ -324,11 +294,11 @@ class TestChatCompletions:
         assert response1_text != response3_text
 
     # Simple tests to verify random seed roughly behaves as expected
-    def test_chat_completions_seed(self, client):
+    def test_chat_completions_seed(self, client, model: str, messages: List[dict]):
         responses = []
         payload1 = {
-            "model": TEST_MODEL,
-            "messages": TEST_MESSAGES,
+            "model": model,
+            "messages": messages,
             # Increase token length to allow more room for variability
             "max_tokens": 200,
             "seed": 1,
@@ -374,11 +344,13 @@ class TestChatCompletions:
         assert response1_text == response2_text
         assert response1_text != response3_text
 
-    def test_chat_completions_no_message(self, client):
+    def test_chat_completions_no_message(
+        self, client, model: str, messages: List[dict]
+    ):
         # Message validation requires min_length of 1
         messages = []
         response = client.post(
-            "/v1/chat/completions", json={"model": TEST_MODEL, "messages": messages}
+            "/v1/chat/completions", json={"model": model, "messages": messages}
         )
         assert response.status_code == 422
         assert (
@@ -386,19 +358,23 @@ class TestChatCompletions:
             == "List should have at least 1 item after validation, not 0"
         )
 
-    def test_chat_completions_empty_message(self, client):
+    def test_chat_completions_empty_message(
+        self, client, model: str, messages: List[dict]
+    ):
         # Message validation requires min_length of 1
         messages = [{}]
         response = client.post(
-            "/v1/chat/completions", json={"model": TEST_MODEL, "messages": messages}
+            "/v1/chat/completions", json={"model": model, "messages": messages}
         )
         assert response.status_code == 422
         assert response.json()["detail"][0]["msg"] == "Field required"
 
-    def test_chat_completions_multiple_choices(self, client):
+    def test_chat_completions_multiple_choices(
+        self, client, model: str, messages: List[dict]
+    ):
         response = client.post(
             "/v1/chat/completions",
-            json={"model": TEST_MODEL, "messages": TEST_MESSAGES, "n": 2},
+            json={"model": model, "messages": messages, "n": 2},
         )
 
         assert response.status_code == 400
@@ -408,10 +384,12 @@ class TestChatCompletions:
     def test_chat_completions_streaming(self, client):
         pass
 
-    def test_chat_completions_no_streaming(self, client):
+    def test_chat_completions_no_streaming(
+        self, client, model: str, messages: List[dict]
+    ):
         response = client.post(
             "/v1/chat/completions",
-            json={"model": TEST_MODEL, "messages": TEST_MESSAGES, "stream": False},
+            json={"model": model, "messages": messages, "stream": False},
         )
 
         assert response.status_code == 200
@@ -452,22 +430,18 @@ class TestChatCompletions:
 # For tests that won't use the same pytest fixture for server startup across
 # the whole class test suite.
 class TestChatCompletionsCustomFixture:
-    def setup_app(self, tokenizer: str, model_repository: str):
-        os.environ["TOKENIZER"] = tokenizer
-        os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
-        app = init_app()
-        return app
-
     # A TOKENIZER must be known for /chat/completions endpoint in order to
     # apply chat templates, and for simplicity in determination, users should
     # define the TOKENIZER. So, explicitly raise an error if none is provided.
-    def test_chat_completions_no_tokenizer(self):
-        model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-        app = self.setup_app(tokenizer="", model_repository=model_repository)
+    def test_chat_completions_no_tokenizer(
+        self, backend: str, model: str, messages: List[dict]
+    ):
+        model_repository = str(Path(__file__).parent / f"{backend}_models")
+        app = setup_fastapi_app(model_repository=model_repository, tokenizer="")
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
-                json={"model": TEST_MODEL, "messages": TEST_MESSAGES},
+                json={"model": model, "messages": messages},
             )
             assert response.status_code == 400
             assert response.json()["detail"] == "Unknown tokenizer"
