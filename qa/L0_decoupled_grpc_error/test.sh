@@ -49,7 +49,7 @@ rm -f *.log
 CLIENT_LOG=`pwd`/client.log
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=../L0_decoupled/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -58,9 +58,9 @@ TRIALS="python custom"
 
 for trial in $TRIALS; do
   if [ $trial == "python" ]; then
-    MODELDIR=`pwd`/python_models
+    MODELDIR=../L0_decoupled/python_models
   else
-    MODELDIR=`pwd`/models
+    MODELDIR=../L0_decoupled/models
   fi
 
   SERVER_ARGS="--model-repository=$MODELDIR"
@@ -134,7 +134,7 @@ done
 # the client's perspective there will still be one response.
 NON_DECOUPLED_DIR=`pwd`/non_decoupled_models
 rm -rf ${NON_DECOUPLED_DIR} && mkdir -p ${NON_DECOUPLED_DIR}
-cp -r `pwd`/models/repeat_int32 ${NON_DECOUPLED_DIR}/. && \
+cp -r ../L0_decoupled/models/repeat_int32 ${NON_DECOUPLED_DIR}/. && \
     (cd ${NON_DECOUPLED_DIR}/repeat_int32 && \
         sed -i "s/decoupled: True/decoupled: False/" config.pbtxt)
 
