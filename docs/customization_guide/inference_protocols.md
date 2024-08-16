@@ -115,6 +115,16 @@ These options can be used to configure the KeepAlive settings:
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
+#### GRPC Status Codes
+
+Triton implements GRPC error handling for streaming requests when a specific flag is enabled through headers. Upon encountering an error, Triton returns the appropriate GRPC error code and subsequently closes the stream.
+
+* `triton_grpc_error` : The header value needs to be set to true while starting the stream.
+
+GRPC status codes can be used for better visibility and monitoring. For more details, see [gRPC Status Codes](https://grpc.io/docs/guides/status-codes/)
+
+For client-side documentation, see [Client-Side GRPC Status Codes](https://github.com/triton-inference-server/client/tree/main#GRPC-Status-Codes)
+
 ### Limit Endpoint Access (BETA)
 
 Triton users may want to restrict access to protocols or APIs that are

@@ -35,6 +35,7 @@ import requests
 sys.path.append("../../common")
 
 import queue
+import threading
 import time
 import unittest
 from functools import partial
@@ -240,6 +241,135 @@ class LifecycleTest(unittest.TestCase):
             expected_count_increase,
             initial_metrics_value,
         )
+
+    # Test grpc stream behavior when triton_grpc_error is set to true.
+    # Expected to close stream and return GRPC error when model returns error.
+    def test_triton_grpc_error_error_on(self):
+        model_name = "execute_grpc_error"
+        shape = [2, 2]
+        number_of_requests = 2
+        user_data = UserData()
+        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        metadata = {"triton_grpc_error": "true"}
+        triton_client.start_stream(
+            callback=partial(callback, user_data), headers=metadata
+        )
+        stream_end = False
+        for i in range(number_of_requests):
+            input_data = np.random.randn(*shape).astype(np.float32)
+            inputs = [
+                grpcclient.InferInput(
+                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                )
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            try:
+                triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
+                result = user_data._completed_requests.get()
+                if type(result) == InferenceServerException:
+                    # execute_grpc_error intentionally returns error with StatusCode.INTERNAL status on 2nd request
+                    self.assertEqual(str(result.status()), "StatusCode.INTERNAL")
+                    stream_end = True
+                else:
+                    # Stream is not killed
+                    output_data = result.as_numpy("OUT")
+                    self.assertIsNotNone(output_data, "error: expected 'OUT'")
+            except Exception as e:
+                if stream_end == True:
+                    # We expect the stream to have closed
+                    self.assertTrue(
+                        True,
+                        "This should always pass as cancellation should succeed",
+                    )
+                else:
+                    self.assertFalse(
+                        True, "Unexpected Stream killed without Error from CORE"
+                    )
+
+    # Test grpc stream behavior when triton_grpc_error is set to true in multiple open streams.
+    # Expected to close stream and return GRPC error when model returns error.
+    def test_triton_grpc_error_multithreaded(self):
+        thread1 = threading.Thread(target=self.test_triton_grpc_error_error_on)
+        thread2 = threading.Thread(target=self.test_triton_grpc_error_error_on)
+        # Start the threads
+        thread1.start()
+        thread2.start()
+        # Wait for both threads to finish
+        thread1.join()
+        thread2.join()
+
+    # Test grpc stream behavior when triton_grpc_error is set to true and subsequent stream is cancelled.
+    # Expected cancellation is successful.
+    def test_triton_grpc_error_cancel(self):
+        model_name = "execute_grpc_error"
+        shape = [2, 2]
+        number_of_requests = 1
+        user_data = UserData()
+        triton_server_url = "localhost:8001"  # Replace with your Triton server address
+        stream_end = False
+        triton_client = grpcclient.InferenceServerClient(triton_server_url)
+
+        metadata = {"triton_grpc_error": "true"}
+
+        triton_client.start_stream(
+            callback=partial(callback, user_data), headers=metadata
+        )
+
+        for i in range(number_of_requests):
+            input_data = np.random.randn(*shape).astype(np.float32)
+            inputs = [
+                grpcclient.InferInput(
+                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                )
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            try:
+                triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
+                result = user_data._completed_requests.get()
+                if type(result) == InferenceServerException:
+                    stream_end = True
+                if i == 0:
+                    triton_client.stop_stream(cancel_requests=True)
+            except Exception as e:
+                if stream_end == True:
+                    # We expect the stream to have closed
+                    self.assertTrue(
+                        True,
+                        "This should always pass as cancellation should succeed",
+                    )
+                else:
+                    self.assertFalse(
+                        True, "Unexpected Stream killed without Error from CORE"
+                    )
+        self.assertTrue(
+            True,
+            "This should always pass as cancellation should succeed without any exception",
+        )
+
+    # Test grpc stream behavior when triton_grpc_error is set to false
+    # and subsequent stream is NOT closed when error is reported from CORE
+    def test_triton_grpc_error_error_off(self):
+        model_name = "execute_grpc_error"
+        shape = [2, 2]
+        number_of_requests = 4
+        response_counter = 0
+        user_data = UserData()
+        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        triton_client.start_stream(callback=partial(callback, user_data))
+        for i in range(number_of_requests):
+            input_data = np.random.randn(*shape).astype(np.float32)
+            inputs = [
+                grpcclient.InferInput(
+                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                )
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
+            _ = user_data._completed_requests.get()
+            response_counter += 1
+        # we expect response_counter == number_of_requests,
+        # which indicates that after the first reported grpc error stream did NOT close and mode != triton_grpc_error
+        self.assertEqual(response_counter, number_of_requests)
 
 
 if __name__ == "__main__":

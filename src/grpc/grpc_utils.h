@@ -76,6 +76,46 @@ typedef enum {
   PARTIAL_COMPLETION
 } Steps;
 
+typedef enum {
+  // No error from CORE seen yet
+  NONE,
+  // Error from CORE encountered, waiting to be picked up by completion queue to
+  // initiate cancellation
+  ERROR_ENCOUNTERED,
+  // Error from CORE encountered, stream closed
+  // This state is added to avoid double cancellation
+  ERROR_HANDLING_COMPLETE
+} TritonGRPCErrorSteps;
+
+class gRPCErrorTracker {
+ public:
+  // True if set by user via header
+  // Can be accessed without a lock, as set only once in startstream
+  std::atomic<bool> triton_grpc_error_;
+
+  // Indicates the state of triton_grpc_error, only relevant if special
+  // triton_grpc_error feature set to true by client
+  TritonGRPCErrorSteps grpc_stream_error_state_;
+
+  // Constructor
+  gRPCErrorTracker()
+      : triton_grpc_error_(false),
+        grpc_stream_error_state_(TritonGRPCErrorSteps::NONE)
+  {
+  }
+  // Changes the state of grpc_stream_error_state_ to ERROR_HANDLING_COMPLETE,
+  // indicating we have closed the stream and initiated the cancel flow
+  void MarkGRPCErrorHandlingComplete();
+
+  // Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+  bool CheckAndUpdateGRPCError();
+
+  // Marks error after it has been responded to
+  void MarkGRPCErrorEncountered();
+
+  // Checks if error already responded to in triton_grpc_error mode
+  bool GRPCErrorEncountered();
+};
 // Debugging helper
 std::ostream& operator<<(std::ostream& out, const Steps& step);
 
@@ -183,5 +223,4 @@ TRITONSERVER_Error* ParseClassificationParams(
 
 
 void ReadFile(const std::string& filename, std::string& data);
-
 }}}  // namespace triton::server::grpc

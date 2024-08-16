@@ -52,6 +52,14 @@ cp ../../python_models/execute_error/config.pbtxt ./models/execute_error/
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
 
+mkdir -p models/execute_grpc_error/1/
+cp ../../python_models/execute_grpc_error/model.py ./models/execute_grpc_error/1/
+cp ../../python_models/execute_grpc_error/config.pbtxt ./models/execute_grpc_error/
+(cd models/execute_grpc_error && \
+          sed -i "s/^name:.*/name: \"execute_grpc_error\"/" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 1200000 }" >> config.pbtxt)
+
 mkdir -p models/execute_return_error/1/
 cp ../../python_models/execute_return_error/model.py ./models/execute_return_error/1/
 cp ../../python_models/execute_return_error/config.pbtxt ./models/execute_return_error/
