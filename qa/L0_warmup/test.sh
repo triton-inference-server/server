@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT=../clients/image_client
 CLIENT_LOG="./client.log"
-CLIENT_PY=./python_unittest.py
+CLIENT_PY=./test_infer_shm_leak.py
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 
@@ -288,10 +288,6 @@ for BACKEND in ${BACKENDS}; do
     fi
 
     if [ "$BACKEND" == "graphdef" ]; then
-        # FIXME [DLIS-6660] Update TF image models to support dynamic batching
-        # Currently, models cannot load with TF-TRT optimization due to the removal of implicit batch support in TensorRT v10 onwards
-        continue
-
         # Show effect of warmup by using a TF model with TF-TRT optimization which is
         # known to be slow on first inference.
         # Note: model can be obatined via the fetching script in docs/example
@@ -453,8 +449,8 @@ mkdir -p models/bls_onnx_warmup/1/
 cp ../python_models/bls_onnx_warmup/model.py models/bls_onnx_warmup/1/
 cp ../python_models/bls_onnx_warmup/config.pbtxt models/bls_onnx_warmup/.
 
-cp ../L0_backend_python/python_unittest.py .
-sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' python_unittest.py
+cp ../L0_backend_python/test_infer_shm_leak.py .
+sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' test_infer_shm_leak.py
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

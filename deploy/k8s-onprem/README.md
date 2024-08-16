@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -295,7 +295,7 @@ Image 'images/mug.jpg':
 After you have confirmed that your Triton cluster is operational and can perform inference,
 you can test the load balancing and autoscaling features by sending a heavy load of requests.
 One option for doing this is using the
-[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+[perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 application.
 
 You can apply a progressively increasing load with a command like:

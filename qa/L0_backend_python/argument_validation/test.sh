@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=../python_unittest.py
+CLIENT_PY=../test_infer_shm_leak.py
 CLIENT_LOG="./arg_validation_client.log"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_ARGS="--model-repository=${MODELDIR}/argument_validation/models --backend-directory=${BACKEND_DIR} --log-verbose=1"

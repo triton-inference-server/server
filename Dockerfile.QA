@@ -148,7 +148,9 @@ RUN mkdir -p qa/common && \
     cp bin/request_cancellation_test qa/L0_request_cancellation/. && \
     cp bin/triton_json_test qa/L0_json/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
-    cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
+    cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
+    cp bin/input_byte_size_test qa/L0_input_validation/. && \
+    cp -r docs/examples/model_repository/simple_identity qa/L0_input_validation/models
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \

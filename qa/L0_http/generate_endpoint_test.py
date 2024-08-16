@@ -142,6 +142,49 @@ class GenerateEndpointTest(tu.TestResultCollector):
         self.assertIn("TEXT", data)
         self.assertEqual(text, data["TEXT"])
 
+    def test_request_id(self):
+        # Setup text based input
+        text = "hello world"
+        request_id = "42"
+
+        # Test when request id in request body
+        inputs = {"PROMPT": text, "id": request_id, "STREAM": False}
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("id", data)
+        self.assertEqual(request_id, data["id"])
+        self.assertIn("TEXT", data)
+        self.assertEqual(text, data["TEXT"])
+
+        # Test when request id not in request body
+        inputs = {"PROMPT": text, "STREAM": False}
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertNotIn("id", data)
+
+        # Test when request id is empty
+        inputs = {"PROMPT": text, "id": "", "STREAM": False}
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertNotIn("id", data)
+        self.assertIn("TEXT", data)
+        self.assertEqual(text, data["TEXT"])
+
     def test_generate_stream(self):
         # Setup text-based input
         text = "hello world"

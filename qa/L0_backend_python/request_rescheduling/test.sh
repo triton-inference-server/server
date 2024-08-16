@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY="../python_unittest.py"
+CLIENT_PY="../test_infer_shm_leak.py"
 CLIENT_LOG="./request_rescheduling_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@ import sys
 
 sys.path.append("../common")
 
+import re
 import threading
 import time
 import unittest
@@ -38,6 +39,7 @@ from ctypes import *
 
 import infer_util as iu
 import numpy as np
+import requests
 import test_util as tu
 from tritonclientutils import InferenceServerException
 
@@ -68,6 +70,29 @@ class ModelQueueTest(tu.TestResultCollector):
                 first_exception = _deferred_exceptions[0]
                 _deferred_exceptions.pop(0)
                 raise first_exception
+
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def _metrics_before_test(self, model, reason):
+        pattern = rf'nv_inference_request_failure\{{model="{model}",reason="{reason}",version="1"\}} (\d+)'
+        metrics = self._get_metrics()
+        match = re.search(pattern, metrics)
+        if match:
+            return int(match.group(1))
+        else:
+            raise Exception(f"Failure metrics for model='{model}' not found")
+
+    def _assert_metrics(
+        self, model_name, reason, expected_count_increase, initial_count
+    ):
+        metrics = self._get_metrics()
+        # Add initial count + expected count for the the test
+        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
+        self.assertIn(expected_metric, metrics)
 
     def check_response(
         self,
@@ -235,6 +260,12 @@ class ModelQueueTest(tu.TestResultCollector):
         # requests are sent after 'default_timeout_microseconds'.
         # Expect the first request is timed-out and rejected, which makes the
         # second and third request be batched together and executed.
+        initial_metrics_value_ensemble = self._metrics_before_test(
+            "ensemble_zero_1_float32", "OTHER"
+        )
+        initial_metrics_value_custom = self._metrics_before_test(
+            "custom_zero_1_float32", "REJECTED"
+        )
         dtype = np.float32
         shapes = ([16],)
         for trial in self.trials_:
@@ -283,6 +314,23 @@ class ModelQueueTest(tu.TestResultCollector):
                 self.check_deferred_exception()
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        expected_count_increase = 4
+        # NOTE: Ensemble failure metrics will reflect the failure counts
+        # of their composing models as well as the parent model, but currently do not capture the same granularity
+        # for the "reason" label and will default to the "OTHER" reason.
+        self._assert_metrics(
+            "ensemble_zero_1_float32",
+            "OTHER",
+            expected_count_increase,
+            initial_metrics_value_ensemble,
+        )
+        expected_count_increase = 4
+        self._assert_metrics(
+            "custom_zero_1_float32",
+            "REJECTED",
+            expected_count_increase,
+            initial_metrics_value_custom,
+        )
 
     def test_timeout_override(self):
         # Send requests with batch sizes 1, 1, 3 where the first request
