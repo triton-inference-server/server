@@ -203,6 +203,8 @@ class BuildScript:
 
         self.comment("Exit script immediately if any command fails")
         if target_platform() == "windows":
+            self._file.write("$UseStructuredOutput = $false\n")
+            self.blankln()
             self._file.write("function ExitWithCode($exitcode) {\n")
             self._file.write("    $host.SetShouldExit($exitcode)\n")
             self._file.write("    exit $exitcode\n")
