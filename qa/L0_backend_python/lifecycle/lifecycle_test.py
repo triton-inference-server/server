@@ -255,10 +255,8 @@ class LifecycleTest(unittest.TestCase):
             callback=partial(callback, user_data), headers=metadata
         )
         stream_end = False
-        input_datas = []
         for i in range(number_of_requests):
             input_data = np.random.randn(*shape).astype(np.float32)
-            input_datas.append(input_data)
             inputs = [
                 grpcclient.InferInput(
                     "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
@@ -317,10 +315,8 @@ class LifecycleTest(unittest.TestCase):
             callback=partial(callback, user_data), headers=metadata
         )
 
-        input_datas = []
         for i in range(number_of_requests):
             input_data = np.random.randn(*shape).astype(np.float32)
-            input_datas.append(input_data)
             inputs = [
                 grpcclient.InferInput(
                     "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
@@ -360,10 +356,8 @@ class LifecycleTest(unittest.TestCase):
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
-        input_datas = []
         for i in range(number_of_requests):
             input_data = np.random.randn(*shape).astype(np.float32)
-            input_datas.append(input_data)
             inputs = [
                 grpcclient.InferInput(
                     "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
