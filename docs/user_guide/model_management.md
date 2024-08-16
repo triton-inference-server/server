@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -235,6 +235,11 @@ the model file), Triton does not guarantee any remaining request(s) from the
 in-flight sequence(s) will be routed to the same model instance for processing.
 It is currently the responsibility of the user to ensure any in-flight
 sequence(s) are completed before reloading a sequence model.
+
+* Starting from r24.09, if the version policy on the model configuration is
+modified to load/unload some model version(s), already loaded and unmodified
+model version(s), i.e. version(s) which the timestamps of its version directory
+and content(s) within the directory are unchanged, will not be reloaded.
 
 ## Concurrently Loading Models
 
