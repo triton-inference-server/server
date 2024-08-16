@@ -1806,6 +1806,10 @@ def backend_clone(
         os.path.join(build_dir, be, "src", "model.py"),
         backend_dir,
     )
+    clone_script.cpdir(
+        os.path.join(build_dir, be, "src", "utils"),
+        backend_dir,
+    )
 
     clone_script.comment()
     clone_script.comment(f"end '{be}' backend")
