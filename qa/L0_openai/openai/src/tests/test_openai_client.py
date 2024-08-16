@@ -67,8 +67,9 @@ class TestOpenAIClient:
             model=TEST_MODEL,
         )
 
-        assert completion
         print(f"Completion results: {completion}")
+        assert completion.choices[0].text
+        assert completion.choices[0].finish_reason == "stop"
 
     def test_openai_client_chat_completion(self, client: openai.OpenAI):
         chat_completion = client.chat.completions.create(
@@ -84,9 +85,27 @@ class TestOpenAIClient:
             model=TEST_MODEL,
         )
 
+        print(f"Chat completion results: {chat_completion}")
         assert chat_completion.choices[0].message.content
         assert chat_completion.choices[0].finish_reason == "stop"
-        print(f"Chat completion results: {chat_completion}")
+
+    @pytest.mark.skipif(
+        TEST_BACKEND == "tensorrtllm",
+        reason="TRT-LLM backend currently only supports setting this parameter at model load time",
+    )
+    @pytest.mark.parametrize("echo", [False, True])
+    def test_openai_client_completion_echo(self, client: openai.OpenAI, echo: bool):
+        prompt = "What is the capital of France?"
+        completion = client.completions.create(
+            prompt=prompt, model=TEST_MODEL, echo=echo
+        )
+
+        print(f"Completion results: {completion}")
+        response = completion.choices[0].text
+        if echo:
+            assert prompt in response
+        else:
+            assert prompt not in response
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_openai_client_function_calling(self):
@@ -119,8 +138,9 @@ class TestAsyncOpenAIClient:
             model=TEST_MODEL,
         )
 
-        assert completion
         print(f"Completion results: {completion}")
+        assert completion.choices[0].text
+        assert completion.choices[0].finish_reason == "stop"
 
     @pytest.mark.asyncio
     async def test_openai_client_chat_completion(self, client: openai.AsyncOpenAI):
