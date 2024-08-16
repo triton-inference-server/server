@@ -218,11 +218,11 @@ class PBCustomMetricsTest(unittest.TestCase):
             description="test metric gauge kind end to end",
             kind=pb_utils.MetricFamily.GAUGE,
         )
-        labels = {"example1": "counter_label1", "example2": "counter_label2"}
+        labels = {"example1": "gauge_label1", "example2": "gauge_label2"}
         metric = metric_family.Metric(labels=labels)
         self._metric_api_helper(metric, "gauge")
 
-        pattern = 'test_gauge_e2e{example1="counter_label1",example2="counter_label2"}'
+        pattern = 'test_gauge_e2e{example1="gauge_label1",example2="gauge_label2"}'
         metrics = self._get_metrics()
         self.assertIn(pattern, metrics)
 
@@ -233,10 +233,17 @@ class PBCustomMetricsTest(unittest.TestCase):
             description="test metric histogram kind end to end",
             kind=pb_utils.MetricFamily.HISTOGRAM,
         )
-        labels = {"example1": "counter_label1", "example2": "counter_label2"}
+        labels = {"example1": "histogram_label1", "example2": "histogram_label2"}
+
+        # Test non-ascending order buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric = metric_family.Metric(
+                labels=labels, buckets=[2.5, 0.1, 1.0, 10.0, 5.0]
+            )
+
         buckets = [0.1, 1.0, 2.5, 5.0, 10.0]
         metric = metric_family.Metric(labels=labels, buckets=buckets)
-        labels_str = 'example1="counter_label1",example2="counter_label2"'
+        labels_str = 'example1="histogram_label1",example2="histogram_label2"'
         self._histogram_api_helper(metric, name, labels_str)
 
         metrics = self._get_metrics()
