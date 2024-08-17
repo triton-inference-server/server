@@ -514,21 +514,23 @@ remove_array_outliers() {
 
 function setup_virtualenv() {
     # Create and activate virtual environment
-    virtualenv --system-site-packages venv
-    if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
-      source venv/Scripts/activate
+    if [[ -v MSYSTEM ]]; then
+      pip3 install pytest
     else
+      virtualenv --system-site-packages venv
       source venv/bin/activate
+      pip install pytest
     fi
-    pip install pytest
 
     if [[ ${TEST_WINDOWS} == 1 ]]; then
-        pip3 install "numpy<2" tritonclient[all]
-    fi
+      pip3 install "numpy<2" tritonclient[all]
+    else
 }
 
 function deactivate_virtualenv() {
     # Deactivate virtual environment and clean up
+  if [[ ! -v MSYSTEM ]]; then
     deactivate
     rm -fr venv
+  fi
 }
