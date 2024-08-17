@@ -257,7 +257,7 @@ class PBCustomMetricsTest(unittest.TestCase):
             kind=pb_utils.MetricFamily.HISTOGRAM,
         )
 
-        # Test none buckets
+        # Test "None" value buckets
         with self.assertRaises(pb_utils.TritonModelException):
             metric_family.Metric(labels={})
         with self.assertRaises(pb_utils.TritonModelException):
@@ -271,7 +271,7 @@ class PBCustomMetricsTest(unittest.TestCase):
         with self.assertRaises(pb_utils.TritonModelException):
             metric_family.Metric(labels={}, buckets=[1, 1, 2, 5, 5])
 
-        # Test non-ascending order buckets
+        # Test empty list bucket
         metric_family.Metric(labels={}, buckets=[])
 
     def test_dup_metric_family_diff_kind(self):
