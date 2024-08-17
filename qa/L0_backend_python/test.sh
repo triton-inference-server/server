@@ -50,7 +50,7 @@ if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
-    TEST_WINDOWS=1
+    export TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
