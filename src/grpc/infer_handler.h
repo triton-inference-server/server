@@ -666,6 +666,7 @@ class InferHandlerState {
 
     bool IsCancelled()
     {
+      std::lock_guard<std::recursive_mutex> lock(mu_);
       return received_notification_ ? ctx_->IsCancelled() : false;
     }
 
