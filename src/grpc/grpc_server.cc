@@ -2475,23 +2475,12 @@ Server::GetOptions(Options& options, UnorderedMapType& data)
   RETURN_IF_ERR(get_value(
       data, "forward_header_pattern", &options.forward_header_pattern_));
 
-  // options.socket_ = socket_selection;
-  // options.ssl_ = ssl_selection;
-  // options.keep_alive_ = keep_alive_selection;
-
-  // options.infer_allocation_pool_size_ = infer_allocation_pool_size;
-  // options.forward_header_pattern_ = forward_header_pattern;
-
   return nullptr;
 }
 
 TRITONSERVER_Error*
 Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& data)
 {
-  // std::string address;
-  // int port;
-  // bool reuse_port;
-
   RETURN_IF_ERR(get_value(data, "address", &options.address_));
   RETURN_IF_ERR(get_value(data, "port", &options.port_));
   RETURN_IF_ERR(get_value(data, "reuse_port", &options.reuse_port_));
@@ -2502,23 +2491,11 @@ Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& data)
 TRITONSERVER_Error*
 Server::GetSslOptions(SslOptions& options, UnorderedMapType& data)
 {
-  // int use_ssl;
-  // std::string server_cert;
-  // std::string server_key;
-  // std::string root_cert;
-  // int use_mutual_auth;
-
   RETURN_IF_ERR(get_value(data, "use_ssl", &options.use_ssl_));
   RETURN_IF_ERR(get_value(data, "server_cert", &options.server_cert_));
   RETURN_IF_ERR(get_value(data, "server_key", &options.server_key_));
   RETURN_IF_ERR(get_value(data, "root_cert", &options.root_cert_));
   RETURN_IF_ERR(get_value(data, "use_mutual_auth", &options.use_mutual_auth_));
-
-  // options.use_ssl_ = use_ssl;
-  // options.server_cert_ = server_cert;
-  // options.server_key_ = server_key;
-  // options.root_cert_ = root_cert;
-  // options.use_mutual_auth_ = use_mutual_auth;
 
   return nullptr;
 }
@@ -2526,15 +2503,6 @@ Server::GetSslOptions(SslOptions& options, UnorderedMapType& data)
 TRITONSERVER_Error*
 Server::GetKeepAliveOptions(KeepAliveOptions& options, UnorderedMapType& data)
 {
-  // int keepalive_time_ms;
-  // int keepalive_timeout_ms;
-  // int keepalive_permit_without_calls;
-  // int http2_max_pings_without_data;
-  // int http2_min_recv_ping_interval_without_data_ms;
-  // int http2_max_ping_strikes;
-  // int max_connection_age_ms;
-  // int max_connection_age_grace_ms;
-
   RETURN_IF_ERR(
       get_value(data, "keepalive_time_ms", &options.keepalive_time_ms_));
   RETURN_IF_ERR(

@@ -111,7 +111,7 @@ class TritonFrontend {
     TRITONSERVER_Server* server_ptr =
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
 
-    server_.reset(server_ptr, DummyDeleter);
+    server_.reset(server_ptr, EmptyDeleter);
 
     ThrowIfError(FrontendServer::Create(
         server_, data, nullptr /* TraceManager */,
@@ -122,7 +122,7 @@ class TritonFrontend {
   void StopService() { ThrowIfError(service->Stop()); };
 
 
-  static TRITONSERVER_Error* DummyDeleter(TRITONSERVER_Server* obj)
+  static TRITONSERVER_Error* EmptyDeleter(TRITONSERVER_Server* obj)
   {
     // The frontend does not own the TRITONSERVER_Server* object.
     // Hence, deleting the underlying server instance,
