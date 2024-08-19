@@ -1,0 +1,2 @@
+backend: "vllm"
+instance_group [{kind: KIND_MODEL}]
