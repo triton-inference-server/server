@@ -1,6 +1,0 @@
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.07-vllm-python-py3
-FROM ${BASE_IMAGE}
-RUN pip install /opt/tritonserver/python/*.whl
-# NOTE: Newer vllm version upgrade to support Llama3.1 in 24.07 container.
-#       This should be unnecessary in 24.08 container.
-RUN pip install "fastapi==0.111.1" "pytest==8.1.1" "openai==1.40.6" "pytest-asyncio==0.23.8" "vllm==0.5.3.post1"
