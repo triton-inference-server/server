@@ -36,7 +36,7 @@ class OpenAIServer:
             env.update(env_dict)
 
         this_dir = Path(__file__).resolve().parent
-        script_path = this_dir / ".." / ".." / "main.py"
+        script_path = this_dir / ".." / "main.py"
         self.proc = subprocess.Popen(
             ["python3", script_path] + cli_args,
             env=env,
