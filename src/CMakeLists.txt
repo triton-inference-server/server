@@ -138,6 +138,15 @@ else()
   )
 endif()
 
+set(LIB_DIR "lib")
+if(LINUX)
+  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
+  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+    set (LIB_DIR "lib64")
+  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+endif(LINUX)
+set(TRITON_CORE_HEADERS_ONLY OFF)
+
 set_target_properties(
   main
   PROPERTIES
@@ -145,7 +154,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../lib"
+    INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
 )
 
 target_link_libraries(

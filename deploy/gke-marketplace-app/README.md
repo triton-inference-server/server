@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -172,7 +172,7 @@ The client example push about ~650 QPS(Query per second) to Triton Server, and w
 ![Locust Client Chart](client.png)
 
 Alternatively, user can opt to use
-[Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+[Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 to profile and study the performance of Triton Inference Server. Here we also
 provide a
 [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh)
