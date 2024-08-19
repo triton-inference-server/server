@@ -98,6 +98,10 @@ With this workflow, you can avoid having to stop each service after client reque
 
 
 ## Known Issues
-- Tracing (`TraceManager`) is not supported by the bindings.
-- Shared Memory (`SharedMemoryManager`) is not supported by the bindings.
-- Metrics (`HTTPMetrics`) is not supported by the bindings.
+- The following features are not currently supported when launching the Triton frontend services through the python bindings:
+    - [Tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md)
+    - [Shared Memory](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md)
+    - [Metrics](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/metrics.md)
+    - VertexAI
+    - Sagemaker
+    - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
