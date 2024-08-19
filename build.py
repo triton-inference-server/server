@@ -116,7 +116,8 @@ def fail_if(p, msg):
 
 
 def target_platform():
-    if FLAGS.target_platform is not None:
+    # When called by compose.py, FLAGS will be None
+    if FLAGS and FLAGS.target_platform is not None:
         return FLAGS.target_platform
     platform_string = platform.system().lower()
     if platform_string == "linux":
@@ -132,7 +133,8 @@ def target_platform():
 
 
 def target_machine():
-    if FLAGS.target_machine is not None:
+    # When called by compose.py, FLAGS will be None
+    if FLAGS and FLAGS.target_machine is not None:
         return FLAGS.target_machine
     return platform.machine().lower()
 
@@ -1499,7 +1501,6 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
         gpu_enabled=gpu_enabled
     )
 
-    # This
     if target_platform() == "rhel":
         df += """
 # Common dpeendencies.
