@@ -1,5 +1,5 @@
 #!/bin/bash
-MODEL=${1:-"tensorrt_llm_bls"}
+MODEL=${1:-"llama-3.1-8b-instruct"}
 genai-perf \
   --model ${MODEL} \
   --tokenizer meta-llama/Meta-Llama-3-8B-Instruct \

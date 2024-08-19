@@ -3,7 +3,8 @@ import sys
 
 from openai import OpenAI
 
-model = "tensorrt_llm_bls"
+# or "tensorrt_llm_bls" for TRT-LLM
+model = "llama-3.1-8b-instruct"
 if len(sys.argv) > 1:
     model = sys.argv[1]
 
