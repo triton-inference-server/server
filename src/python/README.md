@@ -1,13 +1,16 @@
 ### Triton Server (tritonfrontend) Bindings
 
-These are bindings to the battle-tested frontends contained in the server repo.
+The `tritonfrontend` python package is a set of bindings to Triton's existing frontends implemented in C++. Currently, `tritonfrontend` supports starting up `KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination with Triton's Python In-Process API (`tritonserver`) and `tritonclient` extend the ability to use Triton's full feature set with a couple of lines of Python.
 
-Here is a code example of how these bindings will be used in conjunction with the Python In-Process API:
+Let us walk through a simple example:
+1. First we need to load the desired models and start the server with `tritonserver`.
 ```python
 import tritonserver
-from tritonfrontend import KServeGrpc, KServeHttp
+import pathlib
 
-model_path = "/root/models"
+# Constructing path to Model Repository
+model_path = f"{pathlib.Path(__file__).parent.resolve()}/examples/example_model_repository"
+
 server_options = tritonserver.Options(
     server_id="ExampleServer",
     model_repository=model_path,
@@ -16,22 +19,83 @@ server_options = tritonserver.Options(
     log_info=True,
 )
 server = tritonserver.Server(server_options).start(wait_until_ready=True)
+```
 
+2. Now, to start up the respective services with `tritonfrontend`
+```python
+from tritonfrontend import KServeHttp, KServeGrpc
 http_options = KServeHttp.Options(thread_count=5)
 http_service = KServeHttp.Server(server, http_options)
 http_service.start()
 
-grpc_options = KServeGrpc.Options()
-grpc_service = KServeGrpc.Server(server, grpc_options)
+# Default options (if none provided)
+grpc_service = KServeGrpc.Server(server)
 grpc_service.start()
+```
 
-# Client Logic
-# ...
+3. Finally, with running services, we can use `tritonclient` or simple `curl` commands to send requests and receive responses from the frontends.
 
+```python
+model_name = "identity"
+url = "localhost:8001"
+
+# Create a Triton client
+client = httpclient.InferenceServerClient(url=url)
+
+# Prepare input data
+input_data = np.array([["Roger Roger"]], dtype=object)
+
+# Create input and output objects
+inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+
+# Set the data for the input tensor
+inputs[0].set_data_from_numpy(input_data)
+
+results = client.infer(model_name, inputs=inputs)
+
+# Get the output data
+output_data = results.as_numpy("OUTPUT0")
+
+# Stop respective services and server.
 http_service.stop()
 grpc_service.stop()
 server.stop()
 ```
+
+---
+
+Additionally, `tritonfrontend` provides context manager support as well. So steps 2-3, could also be achieved through:
+```python
+with KServeHttp.Server(server) as http_service:
+    # The identity model returns an exact duplicate of the input data as output
+    model_name = "identity"
+    url = "localhost:8005"
+
+    # Create a Triton client
+    client = httpclient.InferenceServerClient(url=url)
+
+    # Prepare input data
+    input_data = np.array([["Roger Roger"]], dtype=object)
+
+    # Create input and output objects
+    inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+
+    # Set the data for the input tensor
+    inputs[0].set_data_from_numpy(input_data)
+
+    results = client.infer(model_name, inputs=inputs)
+
+    # Get the output data
+    output_data = results.as_numpy("OUTPUT0")
+
+    print("[INFERENCE RESULTS]")
+    print("Input data:", input_data)
+    print("Output data:", output_data)
+
+server.stop()
+```
+With this workflow, you can avoid having to stop each service after client requests has terminated.
+
 
 ## Known Issues
 - Tracing (`TraceManager`) is not supported by the bindings.

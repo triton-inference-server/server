@@ -5,7 +5,10 @@ import tritonclient.http as httpclient
 import tritonserver
 from tritonfrontend import KServeHttp
 
-model_path = f"{pathlib.Path(__file__).parent.resolve()}/../test/test_model_repository"
+# Constructing path to Model Repository
+model_path = f"{pathlib.Path(__file__).parent.resolve()}/example_model_repository"
+
+# Selecting Server Options
 server_options = tritonserver.Options(
     server_id="ExampleServer",
     model_repository=model_path,
@@ -13,32 +16,39 @@ server_options = tritonserver.Options(
     log_warn=True,
     log_info=True,
 )
-server = tritonserver.Server(server_options).start()
 
-http_options = KServeHttp.Options()
-http_service = KServeHttp.Server(server, http_options)
-http_service.start()
+# Creating server instance
+server = tritonserver.Server(server_options).start(wait_until_ready=True)
 
-model_name = "identity"
-url = "0.0.0.0:8000"
+# Selecting Options for KServeHttp Frontend
+http_options = KServeHttp.Options(port=8005)
 
-# Create a Triton client
-client = httpclient.InferenceServerClient(url=url)
+with KServeHttp.Server(server, http_options) as http_service:
+    # The identity model returns an exact duplicate of the input data as output
+    model_name = "identity"
+    url = "localhost:8005"
 
-# Prepare input data
-input_data = np.array([["Roger Roger"]], dtype=object)
+    # Create a Triton client
+    client = httpclient.InferenceServerClient(url=url)
 
-# Create input and output objects
-inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+    # Prepare input data
+    input_data = np.array([["Roger Roger"]], dtype=object)
 
-# Set the data for the input tensor
-inputs[0].set_data_from_numpy(input_data)
+    # Create input and output objects
+    inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
 
-results = client.infer(model_name, inputs=inputs)
+    # Set the data for the input tensor
+    inputs[0].set_data_from_numpy(input_data)
 
-# Get the output data
-output_data = results.as_numpy("OUTPUT0")
-print("Input data:", input_data)
-print("Output data:", output_data)
+    results = client.infer(model_name, inputs=inputs)
 
-http_service.stop()
+    # Get the output data
+    output_data = results.as_numpy("OUTPUT0")
+
+    print("--------------------- INFERENCE RESULTS ---------------------")
+    print("Input data:", input_data)
+    print("Output data:", output_data)
+    print("-------------------------------------------------------------")
+
+
+server.stop()

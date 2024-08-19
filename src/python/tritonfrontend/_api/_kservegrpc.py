@@ -29,7 +29,10 @@ from typing import Union
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
-from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendGrpc
+from tritonfrontend._c.tritonfrontend_bindings import (
+    InvalidArgumentError,
+    TritonFrontendGrpc,
+)
 
 
 # Enum (mirroring C++ format)
@@ -82,12 +85,29 @@ class KServeGrpc:
                 self.infer_compression_level = self.infer_compression_level.value
 
     class Server:
-        def __init__(self, server: tritonserver, options: "KServeGrpc.Options"):
+        def __init__(self, server: tritonserver, options: "KServeGrpc.Options" = None):
             server_ptr = server._ptr()
-            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
+
+            # If no options provided, default options are selected
+            if options is None:
+                options = KServeGrpc.Options()
+
+            if not isinstance(options, KServeGrpc.Options):
+                raise InvalidArgumentError(
+                    "Incorrect type for options. options argument must be of type KServeGrpc.Options"
+                )
+
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
+            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
 
             self.triton_frontend = TritonFrontendGrpc(server_ptr, options_dict)
+
+        def __enter__(self):
+            self.triton_frontend.start()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.triton_frontend.stop()
 
         def start(self):
             return self.triton_frontend.start()

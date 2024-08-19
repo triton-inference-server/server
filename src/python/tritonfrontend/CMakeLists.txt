@@ -52,7 +52,7 @@ FetchContent_MakeAvailable(pybind11)
 
 # ================== Collect the Dependencies ===============================
 set(
-  PYTHON_BINDING_REQUIREMENTS
+  PYTHON_FRONTEND_BINDING_DEPS
   ../../shared_memory_manager.h
   ../../shared_memory_manager.cc
   ../../data_compressor.h
@@ -60,6 +60,7 @@ set(
   ../../common.cc
   ../../restricted_features.h
   ../../tracer.h
+  ../../tracer.cc
   ../../classification.cc
 )
 
@@ -90,6 +91,17 @@ if(${TRITON_ENABLE_GPU})
   )
 endif()
 
+if(${TRITON_ENABLE_TRACING} OR ${TRITON_ENABLE_STATS})
+  message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
+  find_package(absl CONFIG REQUIRED)
+  find_package(CURL CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
+  find_package(opentelemetry-cpp CONFIG REQUIRED)
+  list(APPEND PY_BINDING_DEPENDENCY_LIBS
+    tracing-library
+  )
+endif()
+
 # ===================== End of Collection ===================================
 
 
@@ -103,7 +115,7 @@ set(
 pybind11_add_module(
   py-bindings
   MODULE
-  ${PYTHON_BINDING_REQUIREMENTS}
+  ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
 
@@ -134,6 +146,28 @@ if(${TRITON_ENABLE_GPU})
     py-bindings
     PRIVATE TRITON_ENABLE_GPU=1
     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+endif()
+
+if(${TRITON_ENABLE_TRACING})
+  target_include_directories(
+      py-bindings
+      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+    )
+  target_compile_definitions(
+    py-bindings
+    PRIVATE TRITON_ENABLE_TRACING=1
+  )
+endif()
+
+if(${TRITON_ENABLE_STATS})
+  target_include_directories(
+      py-bindings
+      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+    )
+  target_compile_definitions(
+    py-bindings
+    PRIVATE TRITON_ENABLE_STATS=1
   )
 endif()
 

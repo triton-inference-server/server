@@ -30,7 +30,10 @@ from typing import Union
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
-from tritonfrontend._c.tritonfrontend_bindings import TritonFrontendHttp
+from tritonfrontend._c.tritonfrontend_bindings import (
+    InvalidArgumentError,
+    TritonFrontendHttp,
+)
 
 
 class KServeHttp:
@@ -44,13 +47,28 @@ class KServeHttp:
         # restricted_protocols: list
 
     class Server:
-        def __init__(
-            self, server: tritonserver, options: "KServeHTTP.KServeHttpOptions"
-        ):
+        def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
             server_ptr = server._ptr()
+
+            # If no options provided, default options are selected
+            if options is None:
+                options = KServeHttp.Options()
+
+            if not isinstance(options, KServeHttp.Options):
+                raise InvalidArgumentError(
+                    "Incorrect type for options. options argument must be of type KServeHttp.Options"
+                )
+
             options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
             self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
+
+        def __enter__(self):
+            self.triton_frontend.start()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.triton_frontend.stop()
 
         def start(self):
             self.triton_frontend.start()

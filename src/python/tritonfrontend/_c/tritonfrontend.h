@@ -37,6 +37,7 @@
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 
+
 struct TRITONSERVER_Server {};
 
 namespace triton { namespace server { namespace python {
@@ -103,7 +104,6 @@ class TritonFrontend {
   std::shared_ptr<TRITONSERVER_Server> server_;
   std::unique_ptr<Base> service;
   triton::server::RestrictedFeatures restricted_features;
-
 
  public:
   TritonFrontend(uintptr_t server_mem_addr, UnorderedMapType data)

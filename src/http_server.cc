@@ -3590,10 +3590,12 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_RESPOND_IF_ERR(
       req, CheckTransactionPolicy(req, model_name, requested_model_version));
 
-  // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (this->trace_manager_) {  // Checks if trace_manager_ != nullptr
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
@@ -3626,8 +3628,9 @@ HTTPAPIServer::HandleInfer(
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req, irequest_shared);
-  infer_request->trace_ = trace;
-
+  if (this->trace_manager_) {
+    infer_request->trace_ = trace;
+  }
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
   // by reference to capture local updates, except for shared pointers which
