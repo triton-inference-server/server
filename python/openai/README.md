@@ -18,6 +18,7 @@
 
 ```bash
 docker build -t tritonserver-openai-vllm -f docker/Dockerfile.vllm .
+
 docker run -it --net=host --gpus all --rm \
   -v ${PWD}:/workspace \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
@@ -94,7 +95,7 @@ print(completion.choices[0].message.content)
 ```
 
 7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
-```
+```bash
 cd openai/tests/
 pytest -v
 ```
@@ -118,7 +119,8 @@ at the model repository accordingly when following the examples. This should be 
     access gated models, make sure this is set in your local environment if needed.
 
 ```bash
-docker build -t tritonserver-openai-vllm -f docker/Dockerfile.tensorttllm .
+docker build -t tritonserver-openai-vllm -f docker/Dockerfile.tensorrtllm .
+
 docker run -it --net=host --gpus all --rm \
   -v ${PWD}:/workspace \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
