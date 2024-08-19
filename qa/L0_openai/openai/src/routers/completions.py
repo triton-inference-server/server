@@ -97,7 +97,10 @@ def create_completion(
     )
     if request.stream:
         return StreamingResponse(
-            streaming_completion_response(request_id, created, metadata.name, responses)
+            streaming_completion_response(
+                request_id, created, metadata.name, responses
+            ),
+            media_type="text/event-stream",
         )
 
     # Response validation with decoupled models in mind

@@ -149,7 +149,8 @@ def create_chat_completion(
         return StreamingResponse(
             streaming_chat_completion_response(
                 request_id, created, request.model, role, responses
-            )
+            ),
+            media_type="text/event-stream",
         )
 
     # Response validation with decoupled models in mind
