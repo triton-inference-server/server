@@ -524,7 +524,7 @@ function setup_virtualenv() {
 
     if [[ ${TEST_WINDOWS} == 1 ]]; then
       pip3 install "numpy<2" tritonclient[all]
-    else
+    fi
 }
 
 function deactivate_virtualenv() {
