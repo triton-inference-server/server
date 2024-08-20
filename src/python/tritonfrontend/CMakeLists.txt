@@ -60,9 +60,14 @@ set(
   ../../common.cc
   ../../restricted_features.h
   ../../tracer.h
-  ../../tracer.cc
   ../../classification.cc
 )
+
+if(${TRITON_ENABLE_TRACING})
+  list(APPEND PYTHON_FRONTEND_BINDING_DEPS
+      ../../tacer.cc
+    )
+endif()
 
 set(PY_BINDING_DEPENDENCY_LIBS
       triton-common-json
