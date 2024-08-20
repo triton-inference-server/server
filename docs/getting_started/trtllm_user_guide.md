@@ -39,6 +39,7 @@ NVIDIA GPUs.
 
 ## How to run TRT-LLM models with Triton Server via TensorRT-LLM backend
 
+The
 [TensorRT-LLM Backend](https://github.com/triton-inference-server/tensorrtllm_backend)
 lets you serve TensorRT-LLM models with Triton Inference Server. Check out the
 [Getting Started](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#getting-started)
@@ -62,11 +63,19 @@ to modify the optional parameters as needed. To learn more about the
 parameters, model inputs, and outputs, see the
 [model config documentation](ttps://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
 
-## What are the other parameters you can tweak
-Links to scheduling, quantization, optimization docs etc.
+## Advanced Configuration Options and Deployment Strategies
 
-## Placeholder
-Links to other sections if needed.
+Explore advanced configuration options and deployment strategies to optimize
+and run Triton with your TRT-LLM models effectively:
+
+- [Model Deployment](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#model-deployment): Techniques for efficiently deploying and managing your models in various environments.
+- [Multi-Instance GPU (MIG) Support](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#mig-support): Run Triton and TRT-LLM models with MIG to optimize GPU resource management.
+- [Scheduling](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#scheduling): Configure scheduling policies to control how requests are managed and executed.
+- [Key-Value Cache](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#key-value-cache): Utlizte KV cache and KV cache reuse to optimize memory usage and improve performance.
+- [Decoding](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#decoding): Advanced methods for generating text, including top-k, top-p, top-k top-p, beam search, Medusa, and speculative decoding.
+- [Chunked Context](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#chunked-context): Splitting the context into several chunks and batching them during generation phase to increase overall throughput.
+- [Quantization](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#quantization): Apply quantization techniques to reduce model size and enhance inference speed.
+- [LoRa (Low-Rank Adaptation)](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#lora): Use LoRa for efficient model fine-tuning and adaptation.
 
 ## Tutorials
 
@@ -83,9 +92,11 @@ by Triton Inference Server. Check out the
 [Quick Start](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#quick-start)
 to learn how to use GenAI-Perf to benchmark your LLM models.
 
-## How to tweak the config to make it more performant
+## Performance Best Practices
 
-Contents to be added and aligned with https://nvidia.github.io/TensorRT-LLM/performance/perf-best-practices.html.
+Check out the
+[Performance Best Practices guide](https://nvidia.github.io/TensorRT-LLM/performance/perf-best-practices.html)
+to learn how to optimize your TensorRT-LLM models for better performance.
 
 ## Metrics
 
