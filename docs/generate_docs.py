@@ -126,6 +126,7 @@ def run_command(command):
         log_message(f"Error executing command: {e.cmd}")
         log_message(e.output)
         log_message(e.stderr)
+        raise (e)
 
 
 def clone_from_github(repo, tag, org):
@@ -156,6 +157,7 @@ def clone_from_github(repo, tag, org):
         log_message(f"Successfully cloned {repo}")
     except subprocess.CalledProcessError as e:
         log_message(f"Failed to clone {repo}. Error: {e}")
+        raise (e)
 
 
 def parse_repo_tag(repo_tags):
