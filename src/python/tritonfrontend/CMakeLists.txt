@@ -65,7 +65,7 @@ set(
 
 if(${TRITON_ENABLE_TRACING})
   list(APPEND PYTHON_FRONTEND_BINDING_DEPS
-      ../../tacer.cc
+      ../../tracer.cc
     )
 endif()
 

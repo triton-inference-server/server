@@ -108,16 +108,6 @@ class Server {
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<Server>* service);
 
-  static TRITONSERVER_Error* GetSocketOptions(
-      SocketOptions& options, UnorderedMapType& data);
-  static TRITONSERVER_Error* GetSslOptions(
-      SslOptions& options, UnorderedMapType& data);
-  static TRITONSERVER_Error* GetKeepAliveOptions(
-      KeepAliveOptions& options, UnorderedMapType& data);
-
-  static TRITONSERVER_Error* GetOptions(
-      Options& options, UnorderedMapType& data);
-
 
   ~Server();
 
@@ -130,6 +120,16 @@ class Server {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const Options& server_options);
+
+  static TRITONSERVER_Error* GetSocketOptions(
+      SocketOptions& options, UnorderedMapType& data);
+  static TRITONSERVER_Error* GetSslOptions(
+      SslOptions& options, UnorderedMapType& data);
+  static TRITONSERVER_Error* GetKeepAliveOptions(
+      KeepAliveOptions& options, UnorderedMapType& data);
+
+  static TRITONSERVER_Error* GetOptions(
+      Options& options, UnorderedMapType& data);
 
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   TraceManager* trace_manager_;
