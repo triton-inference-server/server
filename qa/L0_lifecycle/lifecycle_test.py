@@ -3493,6 +3493,133 @@ class LifeCycleTest(tu.TestResultCollector):
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_load_new_model_version(self):
+        model_name = "identity_fp32"
+        client = self._get_client(use_grpc=True)
+
+        # version 1 and 2 are already loaded
+        # version 3 is in the model directory but not loaded
+        # version 4 does not exist anywhere
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertTrue(client.is_model_ready(model_name, "2"))
+        self.assertFalse(client.is_model_ready(model_name, "3"))
+        self.assertFalse(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 0)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 0)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 1)
+
+        # update version 2 model file
+        Path(os.path.join("models", model_name, "2", "model.py")).touch()
+        # add version 4 model file
+        src_path = os.path.join("models", model_name, "3")
+        dst_path = os.path.join("models", model_name, "4")
+        shutil.copytree(src_path, dst_path)
+        # update model config to load version 1 to 4
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [1, 2] } }",
+                "version_policy: { specific: { versions: [1, 2, 3, 4] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # reload the model
+        client.load_model(model_name)
+
+        # version 1 is unmodified so it should not be reloaded
+        # version 2 is modified so it should be reloaded
+        # version 3 model file existed but not loaded so it should be loaded
+        # version 4 is a new version so it should be loaded
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertTrue(client.is_model_ready(model_name, "2"))
+        self.assertTrue(client.is_model_ready(model_name, "3"))
+        self.assertTrue(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 1)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 1)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 2)
+
+        # simulate a dependency change to all versions
+        Path(os.path.join("models", model_name, "dummy_dependency.py")).touch()
+        # reload the model
+        client.load_model(model_name)
+
+        # all 4 versions should be reloaded
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertTrue(client.is_model_ready(model_name, "2"))
+        self.assertTrue(client.is_model_ready(model_name, "3"))
+        self.assertTrue(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 3)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 2)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 3)
+
+        # update model config to only load version 4
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [1, 2, 3, 4] } }",
+                "version_policy: { specific: { versions: [4] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # reload the model
+        client.load_model(model_name)
+
+        # only version 4 should be available and no reloads should happen
+        self.assertFalse(client.is_model_ready(model_name, "1"))
+        self.assertFalse(client.is_model_ready(model_name, "2"))
+        self.assertFalse(client.is_model_ready(model_name, "3"))
+        self.assertTrue(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 3)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 2)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 4)
+
+        # update model config to load version 1 and 4
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [4] } }",
+                "version_policy: { specific: { versions: [1, 4] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # reload the model
+        client.load_model(model_name)
+
+        # version 1 should be loaded and version 4 should not be reloaded
+        self.assertTrue(client.is_model_ready(model_name, "1"))
+        self.assertFalse(client.is_model_ready(model_name, "2"))
+        self.assertFalse(client.is_model_ready(model_name, "3"))
+        self.assertTrue(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 3)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 3)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 2)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 5)
+
 
 if __name__ == "__main__":
     unittest.main()
