@@ -3566,6 +3566,33 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertEqual(server_log.count("[PB model] Loading version 4"), 2)
         self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 3)
 
+        # update model config to only load version 4
+        config_path = os.path.join("models", model_name, "config.pbtxt")
+        with open(config_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            config = f.read()
+            config = config.replace(
+                "version_policy: { specific: { versions: [1, 2, 3, 4] } }",
+                "version_policy: { specific: { versions: [4] } }",
+            )
+            f.truncate(0)
+            f.seek(0)
+            f.write(config)
+        # reload the model
+        client.load_model(model_name)
+
+        # only version 4 should be available and no reloads should happen
+        self.assertFalse(client.is_model_ready(model_name, "1"))
+        self.assertFalse(client.is_model_ready(model_name, "2"))
+        self.assertFalse(client.is_model_ready(model_name, "3"))
+        self.assertTrue(client.is_model_ready(model_name, "4"))
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertEqual(server_log.count("[PB model] Loading version 1"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 2"), 3)
+        self.assertEqual(server_log.count("[PB model] Loading version 3"), 2)
+        self.assertEqual(server_log.count("[PB model] Loading version 4"), 2)
+        self.assertEqual(server_log.count("successfully loaded 'identity_fp32'"), 4)
+
 
 if __name__ == "__main__":
     unittest.main()
