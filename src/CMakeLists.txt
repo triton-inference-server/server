@@ -774,7 +774,7 @@ if (NOT WIN32)
 endif() # NOT WIN32
 
 # tritonfrontend python package
-add_subdirectory(python python)
+add_subdirectory(python)
 
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)
