@@ -1,0 +1,3 @@
+transformers==4.43.1
+# Llama3.1 vllm requirements
+vllm==0.5.3.post1

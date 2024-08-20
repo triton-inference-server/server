@@ -1,0 +1,7 @@
+# FastAPI Application
+fastapi==0.111.1
+openai==1.40.6
+
+# Testing
+pytest==8.1.1
+pytest-asyncio==0.23.8
