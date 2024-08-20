@@ -666,7 +666,11 @@ class InferHandlerState {
 
     bool IsCancelled()
     {
-      return received_notification_ ? ctx_->IsCancelled() : false;
+      std::lock_guard<std::recursive_mutex> lock(mu_);
+      return received_notification_
+                 ? (ctx_->IsCancelled() ||
+                    gRPCErrorTracker_->CheckAndUpdateGRPCError())
+                 : false;
     }
 
     // Increments the ongoing request counter
