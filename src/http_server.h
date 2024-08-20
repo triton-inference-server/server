@@ -35,6 +35,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include "common.h"
 #include "data_compressor.h"

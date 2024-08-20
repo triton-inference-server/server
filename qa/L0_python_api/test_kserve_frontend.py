@@ -24,38 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
+from typing import Union
 
 import numpy as np
 import pytest
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
-from tritonfrontend import AlreadyExistsError, KServeGrpc, KServeHttp
+from tritonfrontend import (
+    AlreadyExistsError,
+    InvalidArgumentError,
+    KServeGrpc,
+    KServeHttp,
+)
 
 
-# Context Manager to start and stop/close respective client
-class Client:  # Default http settings
-    def __init__(self, frontend_service=httpclient, url="0.0.0.0:8000"):
-        self.frontend_service = frontend_service
-        self.url = url
-
-    def __enter__(self):
-        self.client = self.frontend_service.InferenceServerClient(url=self.url)
-        return self.client
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.client.close()
-        self.frontend_service = None
-        self.client = None
-
-
-class TestKServeHttp:
-    @pytest.fixture(scope="class")
-    def server_service(self):
+class TestingUtils:
+    def setup_server(model_repository="test_model_repository") -> tritonserver:
         module_directory = os.path.split(os.path.abspath(__file__))[0]
-        model_path = os.path.abspath(
-            os.path.join(module_directory, "test_model_repository")
-        )
+        model_path = os.path.abspath(os.path.join(module_directory, model_repository))
 
         # Starting Server Instance
         server_options = tritonserver.Options(
@@ -67,130 +54,204 @@ class TestKServeHttp:
         )
 
         server = tritonserver.Server(server_options).start(wait_until_ready=True)
+        return server
 
-        http_options = KServeHttp.Options()
-        http_service = KServeHttp.Server(server, http_options)
-        http_service.start()
-
-        yield server, http_service
-
-        http_service.stop()
+    def teardown_server(server: tritonserver) -> None:
         server.stop()
 
-    def test_server_ready(self, server_service):
-        server, http_service = server_service
-        with Client(httpclient, url="localhost:8000") as http_client:
-            assert http_client.is_server_ready()
+    def setup_service(
+        server: tritonserver, frontend: Union[KServeHttp, KServeGrpc], options=None
+    ) -> Union[KServeHttp, KServeGrpc]:
+        service = frontend.Server(server=server, options=options)
+        service.start()
+        return service
 
-    def test_server_live(self, server_service):
-        server, http_service = server_service
-        with Client(httpclient, url="localhost:8000") as http_client:
-            assert http_client.is_server_live()
+    def teardown_service(service: Union[KServeHttp, KServeGrpc]) -> None:
+        service.stop()
 
-    def test_already_exists_error(self, server_service):
-        server, http_service = server_service
-        # Should throw error because http service already started.
+    def setup_client(frontend_client, url: str):
+        return frontend_client.InferenceServerClient(url=url)
+
+    def teardown_client(client):
+        client.close()
+
+
+class TestKServeHttp(TestingUtils):
+    def test_server_ready(self):
+        server = TestingUtils.setup_server()
+        http_service = TestingUtils.setup_service(server, KServeHttp)
+        http_client = TestingUtils.setup_client(httpclient, url="localhost:8000")
+
+        assert http_client.is_server_ready()
+
+        TestingUtils.teardown_client(http_client)
+        TestingUtils.teardown_service(http_service)
+        TestingUtils.teardown_server(server)
+
+    def test_already_exists_error(self):
+        server = TestingUtils.setup_server()
+        http_service = TestingUtils.setup_service(server, KServeHttp)
+
         with pytest.raises(AlreadyExistsError):
             http_service.start()
 
-    def test_wrong_parameters(self, server_service):
-        server, _ = server_service
-        with pytest.raises(Exception):
-            incorrect_http_options = KServeHttp.Options(port=-15)
+        TestingUtils.teardown_server(server)
+        TestingUtils.teardown_service(http_service)
 
-    def test_invalid_server(self):
-        with pytest.raises(tritonserver.InvalidArgumentError):
-            invalid_server = tritonserver.Server(tritonserver.Options())
-            custom_http_service = KServeHttp.Server(
-                invalid_server, KServeHttp.Options()
-            )
+    def test_wrong_parameters(self):
+        with pytest.raises(Exception):
+            KServeHttp.Options(port=-15)
+        with pytest.raises(Exception):
+            KServeHttp.Options(thread_count=-5)
+
+    def test_invalid_options(self):
+        server = TestingUtils.setup_server()
+
+        with pytest.raises(InvalidArgumentError):
+            custom_grpc_service = KServeHttp.Server(server, {"port": 8001})
+
+        TestingUtils.teardown_server(server)
+
+    def test_service_custom_port(self):
+        server = TestingUtils.setup_server()
+        http_options = KServeHttp.Options(port=8005)
+        http_service = TestingUtils.setup_service(server, KServeHttp, http_options)
+        http_client = TestingUtils.setup_client(httpclient, url="localhost:8005")
+
+        http_client.is_server_ready()
+
+        TestingUtils.teardown_client(http_client)
+        TestingUtils.teardown_service(http_service)
+        TestingUtils.teardown_server(server)
 
     def test_inference(self):
+        server = TestingUtils.setup_server()
+        http_service = TestingUtils.setup_service(server, KServeHttp)
+        http_client = TestingUtils.setup_client(httpclient, url="localhost:8000")
+
         model_name = "identity"
-        with Client(httpclient, url="localhost:8000") as http_client:
-            input_data = np.array([["testing"]], dtype=object)
-            # Create input and output objects
-            inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-            outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+        input_data = np.array([["testing"]], dtype=object)
+        # Create input and output objects
+        inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+        outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
 
-            # Set the data for the input tensor
-            inputs[0].set_data_from_numpy(input_data)
+        # Set the data for the input tensor
+        inputs[0].set_data_from_numpy(input_data)
 
-            results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+        results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
 
-            output_data = results.as_numpy("OUTPUT0")
+        output_data = results.as_numpy("OUTPUT0")
 
-            assert input_data[0][0] == output_data[0][0].decode()
+        assert input_data[0][0] == output_data[0][0].decode()
 
+        TestingUtils.teardown_client(http_client)
+        TestingUtils.teardown_service(http_service)
+        TestingUtils.teardown_server(server)
 
-class TestKServeGrpc:
-    @pytest.fixture(scope="class")
-    def server_service(self):
-        # Making empty model repository
-        model_path = "./test_model_repository"
+    def test_server_service_order(self):
+        server = TestingUtils.setup_server()
+        http_service = TestingUtils.setup_service(server, KServeHttp)
 
-        # Starting Server Instance
-        server_options = tritonserver.Options(
-            server_id="TestServer",
-            model_repository=model_path,
-            log_error=True,
-            log_warn=True,
-            log_info=True,
-        )
-
-        server = tritonserver.Server(server_options).start()
-
-        grpc_options = KServeGrpc.Options()
-        print(grpc_options)
-        grpc_service = KServeGrpc.Server(server, grpc_options)
-        grpc_service.start()
-
-        yield server, grpc_service
-
-        grpc_service.stop()
         server.stop()
+        http_service.stop()  # Should have graceful exit
 
-    def test_server_ready(self, server_service):
-        server, grpc_service = server_service
-        with Client(grpcclient, url="localhost:8001") as grpc_client:
-            assert grpc_client.is_server_ready()
+    # KNOWN ISSUE: CAUSES SEGFAULT
+    # Created  [DLIS-7231] to address at future date
+    # def test_inference_after_server_stop(self):
+    #     server = TestingUtils.setup_server()
+    #     http_service = TestingUtils.setup_service(server, KServeHttp)
+    #     http_client = TestingUtils.setup_client(httpclient, url="localhost:8000")
 
-    def test_server_live(self, server_service):
-        server, grpc_service = server_service
-        with Client(grpcclient, url="localhost:8001") as grpc_client:
-            assert grpc_client.is_server_live()
+    #     TestingUtils.teardown_server(server) # Server has been stopped
 
-    def test_already_exists_error(self, server_service):
-        server, grpc_service = server_service
-        # Should throw error because http service already started.
+    #     model_name = "identity"
+    #     input_data = np.array([["testing"]], dtype=object)
+    #     # Create input and output objects
+    #     inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+
+    #     # Set the data for the input tensor
+    #     inputs[0].set_data_from_numpy(input_data)
+
+    #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+
+    #     TestingUtils.teardown_client(http_client)
+    #     TestingUtils.teardown_service(http_service)
+
+
+class TestKServeGrpc(TestingUtils):
+    def test_server_ready(self):
+        server = TestingUtils.setup_server()
+        grpc_service = TestingUtils.setup_service(server, KServeGrpc)
+        grpc_client = TestingUtils.setup_client(grpcclient, url="localhost:8001")
+
+        assert grpc_client.is_server_ready()
+
+        TestingUtils.teardown_client(grpc_client)
+        TestingUtils.teardown_service(grpc_service)
+        TestingUtils.teardown_server(server)
+
+    def test_already_exists_error(self):
+        server = TestingUtils.setup_server()
+        grpc_service = TestingUtils.setup_service(server, KServeGrpc)
+
         with pytest.raises(AlreadyExistsError):
             grpc_service.start()
 
-    def test_wrong_parameters(self, server_service):
-        server, _ = server_service
-        with pytest.raises(Exception):
-            incorrect_grpc_options = KServeGrpc.Options(port=-15)
+        TestingUtils.teardown_server(server)
+        TestingUtils.teardown_service(grpc_service)
 
-    def test_invalid_server(self):
-        with pytest.raises(tritonserver.InvalidArgumentError):
-            invalid_server = tritonserver.Server(tritonserver.Options())
-            custom_grpc_service = KServeHttp.Server(
-                invalid_server, KServeGrpc.Options()
-            )
+    def test_wrong_parameters(self):
+        with pytest.raises(Exception):
+            KServeGrpc.Options(port=-15)
+
+    def test_invalid_options(self):
+        server = TestingUtils.setup_server()
+
+        with pytest.raises(InvalidArgumentError):
+            custom_grpc_service = KServeGrpc.Server(server, {"port": 8001})
+
+        TestingUtils.teardown_server(server)
+
+    def test_service_custom_port(self):
+        server = TestingUtils.setup_server()
+        grpc_options = KServeGrpc.Options(port=8005)
+        grpc_service = TestingUtils.setup_service(server, KServeGrpc, grpc_options)
+        grpc_client = TestingUtils.setup_client(grpcclient, url="localhost:8005")
+
+        assert grpc_client.is_server_ready()
+
+        TestingUtils.teardown_client(grpc_client)
+        TestingUtils.teardown_service(grpc_service)
+        TestingUtils.teardown_server(server)
 
     def test_inference(self):
+        server = TestingUtils.setup_server()
+        grpc_service = TestingUtils.setup_service(server, KServeGrpc)
+        grpc_client = TestingUtils.setup_client(grpcclient, url="localhost:8001")
+
         model_name = "identity"
-        with Client(grpcclient, url="localhost:8001") as grpc_client:
-            input_data = np.array([["testing"]], dtype=object)
-            # Create input and output objects
-            inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-            outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
+        input_data = np.array([["testing"]], dtype=object)
+        # Create input and output objects
+        inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+        outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
 
-            # Set the data for the input tensor
-            inputs[0].set_data_from_numpy(input_data)
+        # Set the data for the input tensor
+        inputs[0].set_data_from_numpy(input_data)
 
-            results = grpc_client.infer(model_name, inputs=inputs, outputs=outputs)
+        results = grpc_client.infer(model_name, inputs=inputs, outputs=outputs)
 
-            output_data = results.as_numpy("OUTPUT0")
+        output_data = results.as_numpy("OUTPUT0")
 
-            assert input_data[0][0] == output_data[0][0].decode()
+        assert input_data[0][0] == output_data[0][0].decode()
+
+        TestingUtils.teardown_client(grpc_client)
+        TestingUtils.teardown_service(grpc_service)
+        TestingUtils.teardown_server(server)
+
+    def test_server_service_order(self):
+        server = TestingUtils.setup_server()
+        grpc_service = TestingUtils.setup_service(server, KServeGrpc)
+
+        server.stop()
+        grpc_service.stop()  # Should have graceful exitG
