@@ -76,7 +76,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
-        "0.5.4",  # vLLM version
+        "0.5.3.post1",  # vLLM version
     )
 }
 
@@ -1804,6 +1804,10 @@ def backend_clone(
 
     clone_script.cp(
         os.path.join(build_dir, be, "src", "model.py"),
+        backend_dir,
+    )
+    clone_script.cpdir(
+        os.path.join(build_dir, be, "src", "utils"),
         backend_dir,
     )
 
