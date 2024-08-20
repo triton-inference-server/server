@@ -55,7 +55,8 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -fr models && mkdir models
-cp -r $DATADIR/trt_dla_model_store/resnet50_plan models/.
+#cp -r $DATADIR/trt_dla_model_store/resnet50_plan models/.
+cp -r $DATADIR/caffe_models/trt_model_store/resnet50_plan models/.
 rm -f *.log
 
 run_server
