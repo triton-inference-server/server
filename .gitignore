@@ -8,3 +8,4 @@ tmp
 *.xml
 test_results.txt
 artifacts
+qa/L0_openai/openai
