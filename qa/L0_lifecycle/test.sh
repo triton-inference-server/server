@@ -2196,6 +2196,41 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_load_new_model_version
+rm -rf models
+mkdir models
+cp -r ../python_models/identity_fp32 models/ && (cd models/identity_fp32 && \
+    echo "version_policy: { specific: { versions: [1, 2] } }" >> config.pbtxt && \
+    echo "    def initialize(self, args):" >> model.py && \
+    echo "        pb_utils.Logger.log_info(f'[PB model] Loading version {args[\"model_version\"]}')" >> model.py && \
+    mkdir 1 && cp model.py 1 && \
+    mkdir 2 && cp model.py 2 && \
+    mkdir 3 && mv model.py 3)
+
+export PYTHONDONTWRITEBYTECODE="True"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model=*"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_LOG=$SERVER_LOG python $LC_TEST LifeCycleTest.test_load_new_model_version >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+unset PYTHONDONTWRITEBYTECODE
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
