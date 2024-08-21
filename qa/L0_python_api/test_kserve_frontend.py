@@ -260,4 +260,4 @@ class TestKServeGrpc:
         grpc_service = TestingUtils.setup_service(server, KServeGrpc)
 
         server.stop()
-        grpc_service.stop()  # Should have graceful exitG
+        grpc_service.stop()
