@@ -26,8 +26,12 @@
 
 cmake_minimum_required(VERSION 3.18)
 
-# [DLIS-XXXX] TODO
+# [DLIS-7232] tritonfrontend package expects all supported packages to be
+# built, without any check/verification for respective frontend enable flags.
+# Support for partial builds(ex: HTTP but not gRPC) will be addressed later.
 if(NOT (${TRITON_ENABLE_HTTP} AND ${TRITON_ENABLE_GRPC}))
+  message("tritonfrontend python package build skipped when relevant frontends are disabled.")
+  message("In order to build tritonfrontend, set -DTRITON_ENABLE_HTTP=ON -DTRITON_ENABLE_GRPC=ON")
   return()
 endif()
 
