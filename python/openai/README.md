@@ -107,10 +107,9 @@ pytest -v
 **NOTE**: The workflow for preparing TRT-LLM engines, model repository, etc. in order to
 load and test is not fleshed out in the README here yet. You can try using the Triton CLI
 or follow existing TRT-LLM backend examples to prepare a model repository, and point
-at the model repository accordingly when following the examples. This should be fleshed out
- or cleaned up in the future.
+at the model repository accordingly when following the examples.
 
-0. `[TODO]` Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
+0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
 
 1. Build and launch the container:
   - Mounts the openai source files to `/workspace` for simplicity, later on these will be shipped in the container.

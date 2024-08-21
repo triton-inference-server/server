@@ -48,7 +48,7 @@ class TestCompletions:
         )
         print("Response:", response.json())
 
-        # TODO: Add support and remove this check
+        # FIXME: Add support and remove this check
         unsupported_parameters = ["logprobs", "logit_bias"]
         if sampling_parameter in unsupported_parameters:
             assert response.status_code == 400
@@ -315,7 +315,6 @@ class TestCompletions:
     def test_multi_lora(self):
         pass
 
-    # TODO: Do we want to support "usage" field for token counts in response?
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_usage_response(self):
         pass

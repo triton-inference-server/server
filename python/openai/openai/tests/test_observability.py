@@ -49,19 +49,18 @@ class TestObservability:
         assert "nv_cpu_utilization" in response.json()
 
     ### Models ###
-    def test_models_list(self, client, model):
-        # TODO: Load multiple models and make sure exactly ALL are returned
+    def test_models_list(self, client):
         response = client.get("/v1/models")
         assert response.status_code == 200
         models = response.json()["data"]
-        assert len(models) == 1
-        assert models[0]["id"] == model
-        assert models[0]["object"] == "model"
-        assert models[0]["created"] > 0
-        assert models[0]["owned_by"] == "Triton Inference Server"
+        assert len(models) == 2
+        for model in models:
+            assert model["id"]
+            assert model["object"] == "model"
+            assert model["created"] > 0
+            assert model["owned_by"] == "Triton Inference Server"
 
     def test_models_get(self, client, model):
-        # TODO: Load multiple models and make sure exactly 1 is returned
         response = client.get(f"/v1/models/{model}")
         assert response.status_code == 200
         model_resp = response.json()
