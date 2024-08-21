@@ -12,14 +12,12 @@ function install_deps() {
 }
 
 function pre_test() {
-
+    # Cleanup
     rm -rf openai/
     rm -f *.xml *.log
 
-    # TODO: Use this instead when moving to devel container
-    # cp -r ../../python/openai .
-    cp -r /mnt/server/python/openai .
-
+    # Prep test environment
+    cp -r ../../python/openai .
     install_deps
 }
 
