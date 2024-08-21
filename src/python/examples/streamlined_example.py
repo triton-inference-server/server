@@ -19,8 +19,8 @@ def main():
     http_service = KServeHttp.Server(server, http_options)
     http_service.start()
 
-    grpc_options = KServeGrpc.Options()
-    grpc_service = KServeGrpc.Server(server, grpc_options)
+    # Default options selected if none provided
+    grpc_service = KServeGrpc.Server(server)
     grpc_service.start()
 
     # Client Logic (tritonclient)

@@ -1,15 +1,14 @@
 ### Triton Server (tritonfrontend) Bindings
 
-The `tritonfrontend` python package is a set of bindings to Triton's existing frontends implemented in C++. Currently, `tritonfrontend` supports starting up `KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination with Triton's Python In-Process API (`tritonserver`) and `tritonclient` extend the ability to use Triton's full feature set with a couple of lines of Python.
+The `tritonfrontend` python package is a set of bindings to Triton's existing frontends implemented in C++. Currently, `tritonfrontend` supports starting up `KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination with Triton's Python In-Process API ([`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver)) and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library) extend the ability to use Triton's full feature set with a couple of lines of Python.
 
 Let us walk through a simple example:
 1. First we need to load the desired models and start the server with `tritonserver`.
 ```python
 import tritonserver
-import pathlib
 
 # Constructing path to Model Repository
-model_path = f"{pathlib.Path(__file__).parent.resolve()}/examples/example_model_repository"
+model_path = f"server/src/python/examples/example_model_repository"
 
 server_options = tritonserver.Options(
     server_id="ExampleServer",
@@ -20,6 +19,8 @@ server_options = tritonserver.Options(
 )
 server = tritonserver.Server(server_options).start(wait_until_ready=True)
 ```
+Note: `model_path` may need to be edited depending on your setup.
+
 
 2. Now, to start up the respective services with `tritonfrontend`
 ```python
@@ -36,8 +37,10 @@ grpc_service.start()
 3. Finally, with running services, we can use `tritonclient` or simple `curl` commands to send requests and receive responses from the frontends.
 
 ```python
+import tritonclient.http as httpclient
+import numpy as np # Use version numpy < 2
 model_name = "identity"
-url = "localhost:8001"
+url = "localhost:8000"
 
 # Create a Triton client
 client = httpclient.InferenceServerClient(url=url)
@@ -56,6 +59,11 @@ results = client.infer(model_name, inputs=inputs)
 # Get the output data
 output_data = results.as_numpy("OUTPUT0")
 
+# Print results
+print("[INFERENCE RESULTS]")
+print("Input data:", input_data)
+print("Output data:", output_data)
+
 # Stop respective services and server.
 http_service.stop()
 grpc_service.stop()
@@ -66,31 +74,30 @@ server.stop()
 
 Additionally, `tritonfrontend` provides context manager support as well. So steps 2-3, could also be achieved through:
 ```python
+from tritonfrontend import KServeHttp
+import tritonclient.http as httpclient
+import numpy as np  # Use version numpy < 2
+
 with KServeHttp.Server(server) as http_service:
     # The identity model returns an exact duplicate of the input data as output
     model_name = "identity"
-    url = "localhost:8005"
-
+    url = "localhost:8000"
     # Create a Triton client
-    client = httpclient.InferenceServerClient(url=url)
-
-    # Prepare input data
-    input_data = np.array([["Roger Roger"]], dtype=object)
-
-    # Create input and output objects
-    inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-
-    # Set the data for the input tensor
-    inputs[0].set_data_from_numpy(input_data)
-
-    results = client.infer(model_name, inputs=inputs)
-
-    # Get the output data
-    output_data = results.as_numpy("OUTPUT0")
-
-    print("[INFERENCE RESULTS]")
-    print("Input data:", input_data)
-    print("Output data:", output_data)
+    with httpclient.InferenceServerClient(url=url) as client:
+        # Prepare input data
+        input_data = np.array([["Roger Roger"]], dtype=object)
+        # Create input and output objects
+        inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+        # Set the data for the input tensor
+        inputs[0].set_data_from_numpy(input_data)
+        # Perform inference
+        results = client.infer(model_name, inputs=inputs)
+        # Get the output data
+        output_data = results.as_numpy("OUTPUT0")
+        # Print results
+        print("[INFERENCE RESULTS]")
+        print("Input data:", input_data)
+        print("Output data:", output_data)
 
 server.stop()
 ```
