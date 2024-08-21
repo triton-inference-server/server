@@ -1,1 +1,1 @@
-# TODO: NEED TO ADD FUNCTION STUBS
+from tritonfrontend._c.tritonfrontend_bindings import *

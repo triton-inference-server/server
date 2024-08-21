@@ -27,11 +27,14 @@
 cmake_minimum_required(VERSION 3.18)
 
 # ================= Ensures Package is Structured Properly ==================
+# Top level module entry point and typed marker
 file(COPY __init__.py DESTINATION .)
 file(COPY py.typed DESTINATION .)
+# Copy the '__init__.py' for the '_c' module
 file(COPY _c/__init__.py DESTINATION ./_c/.)
 file(COPY _c/__init__.pyi DESTINATION ./_c/.)
-
+file(COPY _c/tritonfrontend_bindings.pyi DESTINATION ./_c/.)
+# Find and copy _api modules
 file(GLOB PYTHON_MODULE_FILES ./_api/*.py)
 file(COPY ${PYTHON_MODULE_FILES} DESTINATION ./_api/.)
 # ================================= END =====================================
@@ -63,12 +66,6 @@ set(
   $<$<BOOL:${TRITON_ENABLE_TRACING}>:../../tracer.cc>
   ../../classification.cc
 )
-
-# if(${TRITON_ENABLE_TRACING})
-#   list(APPEND PYTHON_FRONTEND_BINDING_DEPS
-#       ../../tracer.cc
-#     )
-# endif()
 
 set(PY_BINDING_DEPENDENCY_LIBS
       triton-common-json
