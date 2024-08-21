@@ -43,15 +43,15 @@ function prepare_tensorrtllm() {
     pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
     # Use ENGINE_DEST_PATH to re-use NFS mount when possible and skip engine build
     ENGINE_DEST_PATH="${NFS_ENGINE_DEST_PATH}" triton import \
-        --model {$MODEL}  \
+        --model ${MODEL}  \
         --backend tensorrtllm \
         --model-repository "${MODEL_REPO}"
     rm -rf "${MODEL_REPO}"
 
     # To avoid too much I/O with NFS mount at test time, copy it out to a local dir first.
-    cp -r ${NFS_ENGINE_DEST_PATH} ${LOCAL_ENGINE_DEST_PATH}
+    time cp -r ${NFS_ENGINE_DEST_PATH} ${LOCAL_ENGINE_DEST_PATH}
     ENGINE_DEST_PATH="${LOCAL_ENGINE_DEST_PATH}" triton import \
-        --model {$MODEL}  \
+        --model ${MODEL}  \
         --backend tensorrtllm \
         --model-repository "${MODEL_REPO}"
 
@@ -71,9 +71,7 @@ function pre_test() {
 
 function run_test() {
     pushd openai/openai/tests
-    set +e
     pytest -s -v --junitxml=test_openai.xml 2>&1 | tee test_openai.log
-    set -e
     cp *.xml *.log ../../../
     popd
 }
@@ -86,6 +84,8 @@ function post_test() {
 
 ### Test ###
 
+set +e
 pre_test
 run_test
 post_test
+set -e
