@@ -22,14 +22,15 @@ function pre_test() {
 }
 
 function run_test() {
-    pushd openai/tests
+    pushd openai/openai/tests
     pytest -s -v --junitxml=test_openai.xml 2>&1 | tee test_openai.log
-    cp *.xml *.log ../../
+    cp *.xml *.log ../../../
     popd
 }
 
 function post_test() {
-    # no-op
+    # Placeholder
+    echo "post_test"
 }
 
 
