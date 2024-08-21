@@ -6,6 +6,7 @@
 # TODO: Detect vllm vs trtllm
 function install_deps() {
     pushd openai/docker
+    pip install /opt/tritonserver/python/triton*.whl
     pip install -r requirements.txt
     pip install -r requirements_vllm.txt
     popd
