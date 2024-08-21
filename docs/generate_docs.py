@@ -123,9 +123,6 @@ def run_command(command):
             stderr=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as e:
-        log_message(f"Error executing command: {e.cmd}")
-        log_message(e.output)
-        log_message(e.stderr)
         raise (e)
 
 
@@ -156,7 +153,6 @@ def clone_from_github(repo, tag, org):
         subprocess.run(clone_command, check=True)
         log_message(f"Successfully cloned {repo}")
     except subprocess.CalledProcessError as e:
-        log_message(f"Failed to clone {repo}. Error: {e}")
         raise (e)
 
 
