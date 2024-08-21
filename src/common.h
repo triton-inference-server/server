@@ -221,12 +221,16 @@ get_value(const UnorderedMapType& options, const std::string& key, T* arg)
       expected = "string";
     }
 
-    if (std::holds_alternative<int>(curr->second)) {
-      found = "int";
-    } else if (std::holds_alternative<bool>(curr->second)) {
-      found = "bool";
-    } else if (std::holds_alternative<std::string>(curr->second)) {
-      found = "string";
+    switch (curr->second.index()) {
+      case 0:
+        found = "bool";
+        break;
+      case 1:
+        found = "int";
+        break;
+      case 2:
+        found = "string";
+        break;
     }
 
     msg = "Key: " + key + " found, but incorrect type. Expected " + expected +
