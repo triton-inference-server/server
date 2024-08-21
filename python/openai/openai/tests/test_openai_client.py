@@ -13,9 +13,9 @@ class TestOpenAIClient:
         models = list(client.models.list())
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            # ensemble or tensorrt_llm_bls
+            # tensorrt_llm_bls +
             # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 5
+            assert len(models) == 4
         elif backend == "vllm":
             assert len(models) == 1
         else:
@@ -79,9 +79,9 @@ class TestAsyncOpenAIClient:
         models = [model async for model in async_models]
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            # ensemble or tensorrt_llm_bls
+            # tensorrt_llm_bls +
             # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 5
+            assert len(models) == 4
         elif backend == "vllm":
             assert len(models) == 1
         else:
