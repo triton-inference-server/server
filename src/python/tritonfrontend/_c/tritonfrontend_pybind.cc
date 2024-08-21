@@ -27,8 +27,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <memory>
-
 #include "../../../grpc/grpc_server.h"
 #include "../../../http_server.h"
 #include "triton/core/tritonserver.h"
