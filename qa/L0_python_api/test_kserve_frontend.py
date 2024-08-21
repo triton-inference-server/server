@@ -40,6 +40,7 @@ from tritonfrontend import (
 
 
 class TestingUtils:
+    @staticmethod
     def setup_server(model_repository="test_model_repository") -> tritonserver:
         module_directory = os.path.split(os.path.abspath(__file__))[0]
         model_path = os.path.abspath(os.path.join(module_directory, model_repository))
@@ -56,9 +57,11 @@ class TestingUtils:
         server = tritonserver.Server(server_options).start(wait_until_ready=True)
         return server
 
+    @staticmethod
     def teardown_server(server: tritonserver) -> None:
         server.stop()
 
+    @staticmethod
     def setup_service(
         server: tritonserver, frontend: Union[KServeHttp, KServeGrpc], options=None
     ) -> Union[KServeHttp, KServeGrpc]:
@@ -66,17 +69,20 @@ class TestingUtils:
         service.start()
         return service
 
+    @staticmethod
     def teardown_service(service: Union[KServeHttp, KServeGrpc]) -> None:
         service.stop()
 
+    @staticmethod
     def setup_client(frontend_client, url: str):
         return frontend_client.InferenceServerClient(url=url)
 
+    @staticmethod
     def teardown_client(client):
         client.close()
 
 
-class TestKServeHttp(TestingUtils):
+class TestKServeHttp:
     def test_server_ready(self):
         server = TestingUtils.setup_server()
         http_service = TestingUtils.setup_service(server, KServeHttp)
@@ -153,7 +159,7 @@ class TestKServeHttp(TestingUtils):
         http_service = TestingUtils.setup_service(server, KServeHttp)
 
         server.stop()
-        http_service.stop()  # Should have graceful exit
+        http_service.stop()
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date
@@ -179,7 +185,7 @@ class TestKServeHttp(TestingUtils):
     #     TestingUtils.teardown_service(http_service)
 
 
-class TestKServeGrpc(TestingUtils):
+class TestKServeGrpc:
     def test_server_ready(self):
         server = TestingUtils.setup_server()
         grpc_service = TestingUtils.setup_service(server, KServeGrpc)

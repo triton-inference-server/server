@@ -26,6 +26,11 @@
 
 cmake_minimum_required(VERSION 3.18)
 
+# [DLIS-XXXX] TODO
+if(NOT (${TRITON_ENABLE_HTTP} AND ${TRITON_ENABLE_GRPC}))
+  return()
+endif()
+
 add_subdirectory(tritonfrontend)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION ${TRITON_VERSION})
