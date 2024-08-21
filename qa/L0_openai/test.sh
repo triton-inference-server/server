@@ -56,7 +56,7 @@ function prepare_tensorrtllm() {
         --model-repository "${MODEL_REPO}"
 
     # WAR for tests expecting default name of "tensorrt_llm_bls"
-    mv "${MODEL_REPO}/llama-3-8b-instruct" "${MODEL_REPO}/tensorrt_llm_bls"
+    mv "${MODEL_REPO}/${MODEL}" "${MODEL_REPO}/tensorrt_llm_bls"
 }
 
 function pre_test() {
