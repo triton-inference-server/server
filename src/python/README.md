@@ -105,3 +105,4 @@ With this workflow, you can avoid having to stop each service after client reque
     - VertexAI
     - Sagemaker
     - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
+    - After a running server has been stopped, if the client sends an inference request, it will result in a Segmentation Fault.

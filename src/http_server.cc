@@ -3628,7 +3628,7 @@ HTTPAPIServer::HandleInfer(
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req, irequest_shared);
-  if (this->trace_manager_) {
+  if (this->trace_manager_) {  // Checks if trace_manager_ is nullptr
     infer_request->trace_ = trace;
   }
   const char* request_id = "<id_unknown>";
