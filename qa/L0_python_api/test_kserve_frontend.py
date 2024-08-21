@@ -54,8 +54,7 @@ class TestingUtils:
             log_info=True,
         )
 
-        server = tritonserver.Server(server_options).start(wait_until_ready=True)
-        return server
+        return tritonserver.Server(server_options).start(wait_until_ready=True)
 
     @staticmethod
     def teardown_server(server: tritonserver) -> None:
