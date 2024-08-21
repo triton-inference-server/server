@@ -48,20 +48,28 @@ function pre_test() {
 
 function run_test() {
     pushd openai/openai/tests
-    pytest -s -v --junitxml=test_openai.xml 2>&1 | tee test_openai.log
+    TEST_LOG="test_openai.log"
+
+    # Capture error code without exiting to allow log collection
+    set +e
+    pytest -s -v --junitxml=test_openai.xml 2>&1 > ${TEST_LOG}
+    if [ $? -ne 0 ]; then
+        cat ${TEST_LOG}
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    # Collect logs for error analysis when needed
     cp *.xml *.log ../../../
     popd
 }
 
-function post_test() {
-    # Placeholder
-    echo "post_test"
-}
-
 ### Test ###
 
-set +e
+RET=0
+
 pre_test
 run_test
-post_test
-set -e
+
+exit ${RET}
