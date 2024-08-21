@@ -3592,7 +3592,7 @@ HTTPAPIServer::HandleInfer(
 
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
   std::shared_ptr<TraceManager::Trace> trace;
-  if (this->trace_manager_) {  // Checks if trace_manager_ != nullptr
+  if (this->trace_manager_) {
     // If tracing is enabled see if this request should be traced.
     trace = StartTrace(req, model_name, &triton_trace);
   }
@@ -3628,7 +3628,7 @@ HTTPAPIServer::HandleInfer(
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req, irequest_shared);
-  if (this->trace_manager_) {  // Checks if trace_manager_ is nullptr
+  if (this->trace_manager_) {
     infer_request->trace_ = trace;
   }
   const char* request_id = "<id_unknown>";
