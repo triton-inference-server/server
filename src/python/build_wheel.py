@@ -111,7 +111,7 @@ def main():
         os.path.join(FLAGS.whl_dir, "tritonfrontend", "_c", PYBIND_LIB),
     )
 
-    # shutil.copyfile("LICENSE.txt", os.path.join(FLAGS.whl_dir, "LICENSE.txt"))
+    shutil.copyfile("LICENSE.txt", os.path.join(FLAGS.whl_dir, "LICENSE.txt"))
     shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
 
     os.chdir(FLAGS.whl_dir)

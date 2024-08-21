@@ -57,9 +57,9 @@ except ImportError:
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
-# data_files = [
-#     ("", ["LICENSE.txt"]),
-# ]
+data_files = [
+    ("", ["LICENSE.txt"]),
+]
 
 # Type checking marker file indicating support for type checkers.
 # https://peps.python.org/pep-0561/
@@ -106,7 +106,7 @@ setup(
     },
     zip_safe=False,
     cmdclass={"bdist_wheel": bdist_wheel},
-    # data_files=data_files,
+    data_files=data_files,
     install_requires=["tritonserver", "pydantic"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
 )

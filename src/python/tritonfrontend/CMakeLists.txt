@@ -60,14 +60,15 @@ set(
   ../../common.cc
   ../../restricted_features.h
   ../../tracer.h
+  $<$<BOOL:${TRITON_ENABLE_TRACING}>:../../tracer.cc>
   ../../classification.cc
 )
 
-if(${TRITON_ENABLE_TRACING})
-  list(APPEND PYTHON_FRONTEND_BINDING_DEPS
-      ../../tracer.cc
-    )
-endif()
+# if(${TRITON_ENABLE_TRACING})
+#   list(APPEND PYTHON_FRONTEND_BINDING_DEPS
+#       ../../tracer.cc
+#     )
+# endif()
 
 set(PY_BINDING_DEPENDENCY_LIBS
       triton-common-json
