@@ -49,7 +49,7 @@ function prepare_tensorrtllm() {
     rm -rf "${MODEL_REPO}"
 
     # To avoid too much I/O with NFS mount at test time, copy it out to a local dir first.
-    time cp -r ${NFS_ENGINE_DEST_PATH} ${LOCAL_ENGINE_DEST_PATH}
+    time rsync -ah ${NFS_ENGINE_DEST_PATH} ${LOCAL_ENGINE_DEST_PATH}
     ENGINE_DEST_PATH="${LOCAL_ENGINE_DEST_PATH}" triton import \
         --model ${MODEL}  \
         --backend tensorrtllm \
