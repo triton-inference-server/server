@@ -57,7 +57,9 @@ function pre_test() {
 
 function run_test() {
     pushd openai/openai/tests
+    set +e
     pytest -s -v --junitxml=test_openai.xml 2>&1 | tee test_openai.log
+    set -e
     cp *.xml *.log ../../../
     popd
 }
