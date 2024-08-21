@@ -11,9 +11,6 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-# NOTE: This default path doesn't make sense if run on non-A100 GPU
-ENGINE_DEST_PATH=${ENGINE_DEST_PATH:="${DATADIR}/trtllm_engines_A100"}
 
 function install_deps() {
     pushd openai/docker
@@ -32,15 +29,32 @@ function prepare_vllm() {
 }
 
 function prepare_tensorrtllm() {
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    # NOTE: This default path doesn't make sense if run on non-A100 GPU
+    NFS_ENGINE_DEST_PATH=${ENGINE_DEST_PATH:="${DATADIR}/trtllm_engines_A100"}
+    LOCAL_ENGINE_DEST_PATH="./trtllm_engines_A100"
+
+    MODEL="llama-3-8b-instruct"
+    MODEL_REPO="../openai/tests/tensorrtllm_models"
+    rm -rf ${MODEL_REPO} ${LOCAL_ENGINE_DEST_PATH}
+
+    # FIXME: This will require an upgrade each release to match the TRT-LLM version
     # Use Triton CLI to prepare model repository for testing
     pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
-    MODEL_REPO="../openai/tests/tensorrtllm_models"
-    rm -rf ${MODEL_REPO}
-    # Use ENGINE_DEST_PATH to re-use NFS mount when possible
-    ENGINE_DEST_PATH="${ENGINE_DEST_PATH}" triton import \
-        --model llama-3-8b-instruct \
+    # Use ENGINE_DEST_PATH to re-use NFS mount when possible and skip engine build
+    ENGINE_DEST_PATH="${NFS_ENGINE_DEST_PATH}" triton import \
+        --model {$MODEL}  \
         --backend tensorrtllm \
         --model-repository "${MODEL_REPO}"
+    rm -rf "${MODEL_REPO}"
+
+    # To avoid too much I/O with NFS mount at test time, copy it out to a local dir first.
+    cp -r ${NFS_ENGINE_DEST_PATH} ${LOCAL_ENGINE_DEST_PATH}
+    ENGINE_DEST_PATH="${LOCAL_ENGINE_DEST_PATH}" triton import \
+        --model {$MODEL}  \
+        --backend tensorrtllm \
+        --model-repository "${MODEL_REPO}"
+
     # WAR for tests expecting default name of "tensorrt_llm_bls"
     mv "${MODEL_REPO}/llama-3-8b-instruct" "${MODEL_REPO}/tensorrt_llm_bls"
 }
