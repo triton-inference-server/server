@@ -113,17 +113,48 @@ class TestAsyncOpenAIClient:
         assert chat_completion.choices[0].finish_reason == "stop"
         print(f"Chat completion results: {chat_completion}")
 
-    # TODO: Add this test
-    @pytest.mark.skip(reason="Not Implemented Yet")
     @pytest.mark.asyncio
-    async def test_completion_streaming(self):
-        pass
+    async def test_completion_streaming(
+        self, client: openai.AsyncOpenAI, model: str, prompt: str
+    ):
+        # Test single completion for comparison
+        chat_completion = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            temperature=0.0,
+            stream=False,
+        )
+        output = chat_completion.choices[0].text
+        stop_reason = chat_completion.choices[0].finish_reason
+
+        # Test streaming
+        stream = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            temperature=0.0,
+            stream=True,
+        )
+        chunks = []
+        finish_reason_count = 0
+        async for chunk in stream:
+            delta = chunk.choices[0]
+            if delta.text:
+                chunks.append(delta.text)
+            if delta.finish_reason is not None:
+                finish_reason_count += 1
+
+        # finish reason should only return in last block
+        assert finish_reason_count == 1
+        assert chunk.choices[0].finish_reason == stop_reason
+        assert "".join(chunks) == output
 
     @pytest.mark.asyncio
     async def test_chat_streaming(
         self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
     ):
-        # test single completion
+        # Test single chat completion for comparison
         chat_completion = await client.chat.completions.create(
             model=model,
             messages=messages,
@@ -134,7 +165,7 @@ class TestAsyncOpenAIClient:
         output = chat_completion.choices[0].message.content
         stop_reason = chat_completion.choices[0].finish_reason
 
-        # test streaming
+        # Test streaming
         stream = await client.chat.completions.create(
             model=model,
             messages=messages,
@@ -152,6 +183,7 @@ class TestAsyncOpenAIClient:
                 chunks.append(delta.content)
             if chunk.choices[0].finish_reason is not None:
                 finish_reason_count += 1
+
         # finish reason should only return in last block
         assert finish_reason_count == 1
         assert chunk.choices[0].finish_reason == stop_reason

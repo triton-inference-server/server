@@ -83,7 +83,7 @@ class TestChatCompletions:
             },
         )
 
-        # TODO: Add support and remove this check
+        # FIXME: Add support and remove this check
         unsupported_parameters = ["logprobs", "logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
@@ -421,7 +421,6 @@ class TestChatCompletions:
     def test_request_logit_bias(self):
         pass
 
-    # TODO: Do we want to support "usage" field for token counts in response?
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_usage_response(self):
         pass

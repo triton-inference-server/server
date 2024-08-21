@@ -8,4 +8,7 @@ tmp
 *.xml
 test_results.txt
 artifacts
+
+# Test exclusions
 qa/L0_openai/openai
+qa/L0_openai/tensorrtllm_models
