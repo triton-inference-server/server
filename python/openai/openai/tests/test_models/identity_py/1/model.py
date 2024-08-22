@@ -24,11 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.07-vllm-python-py3
-FROM ${BASE_IMAGE}
+import triton_python_backend_utils as pb_utils
 
-RUN pip install /opt/tritonserver/python/*.whl
 
-COPY requirements.txt requirements_vllm.txt /tmp
-RUN pip install -r /tmp/requirements.txt && \
-    pip install -r /tmp/requirements_vllm.txt
+class TritonPythonModel:
+    def execute(self, requests):
+        """
+        Identity model in Python backend.
+        """
+        responses = []
+        for request in requests:
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses
