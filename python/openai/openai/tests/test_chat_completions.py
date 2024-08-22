@@ -49,7 +49,7 @@ class TestChatCompletions:
         assert message["content"].strip()
         assert message["role"] == "assistant"
         # "usage" currently not supported
-        assert response.json()["usage"] == None
+        assert not response.json()["usage"]
 
     def test_chat_completions_system_prompt(self, client, model: str):
         # NOTE: Currently just sanity check that there are no issues when a

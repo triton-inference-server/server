@@ -46,7 +46,7 @@ class TestCompletions:
         #       or tested with dummy identity model.
         assert response.json()["choices"][0]["text"].strip()
         # "usage" currently not supported
-        assert response.json()["usage"] == None
+        assert not response.json()["usage"]
 
     @pytest.mark.parametrize(
         "sampling_parameter, value",

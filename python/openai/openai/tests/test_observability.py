@@ -57,15 +57,6 @@ class TestObservability:
         response = client.get("/health")
         assert response.status_code == 200
 
-    def test_startup_fail(self):
-        os.environ["TRITON_MODEL_REPOSITORY"] = "/does/not/exist"
-        with pytest.raises(Exception):
-            # Test that FastAPI lifespan startup fails when initializing Triton
-            # with unknown model repository.
-            app = init_app()
-            with TestClient(app):
-                pass
-
     ### Metrics ###
     def test_startup_metrics(self, client):
         response = client.get("/metrics")
@@ -96,3 +87,16 @@ class TestObservability:
         assert model_resp["object"] == "model"
         assert model_resp["created"] > 0
         assert model_resp["owned_by"] == "Triton Inference Server"
+
+
+# For tests that won't use the same pytest fixture for server startup across
+# the whole class test suite.
+class TestObservabilityCustomFixture:
+    def test_startup_fail(self):
+        os.environ["TRITON_MODEL_REPOSITORY"] = "/does/not/exist"
+        with pytest.raises(Exception):
+            # Test that FastAPI lifespan startup fails when initializing Triton
+            # with unknown model repository.
+            app = init_app()
+            with TestClient(app):
+                pass

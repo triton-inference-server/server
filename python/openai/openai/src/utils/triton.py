@@ -139,7 +139,7 @@ def get_output(response):
     if "text_output" in response.outputs:
         try:
             return response.outputs["text_output"].to_string_array()[0]
-        except:
+        except Exception:
             return str(response.outputs["text_output"].to_bytes_array()[0])
     return ""
 

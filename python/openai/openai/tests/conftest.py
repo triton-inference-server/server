@@ -36,13 +36,15 @@ TEST_MODEL = ""
 TEST_PROMPT = "What is machine learning?"
 TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
 TEST_TOKENIZER = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+# Infer the test environment for simplicity in local dev/testing.
 try:
     import vllm as _
 
     TEST_BACKEND = "vllm"
     TEST_MODEL = "llama-3.1-8b-instruct"
 except ImportError:
-    pass
+    print("No vllm installation found.")
 
 try:
     import tensorrt_llm as _
@@ -50,7 +52,7 @@ try:
     TEST_BACKEND = "tensorrtllm"
     TEST_MODEL = "tensorrt_llm_bls"
 except ImportError:
-    pass
+    print("No tensorrt_llm installation found.")
 
 if not TEST_BACKEND or not TEST_MODEL:
     raise Exception("Unknown test environment")
