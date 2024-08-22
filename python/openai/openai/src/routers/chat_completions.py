@@ -83,10 +83,6 @@ def create_chat_completion(
     Creates a model response for the given chat conversation.
     """
 
-    # TODO: Cleanup
-    print(f"[DEBUG] Available model metadata: {raw_request.app.models.keys()=}")
-    print(f"[DEBUG] Fetching model metadata for {request.model=}")
-
     model_metadatas = raw_request.app.models
     if not model_metadatas:
         raise HTTPException(status_code=400, detail="No known models")

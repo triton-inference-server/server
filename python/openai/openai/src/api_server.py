@@ -15,6 +15,7 @@ def add_cors_middleware(app: FastAPI):
         "http://localhost",
     ]
 
+    # TODO: Move towards logger instead of printing
     print(f"[WARNING] Adding CORS for the following origins: {origins}")
     app.add_middleware(
         CORSMiddleware,
@@ -67,8 +68,5 @@ def init_app():
 
     # NOTE: For debugging purposes, should generally be restricted or removed
     add_cors_middleware(app)
-
-    # TODO: Add common logger and use logger.debug in place of current print
-    # statements for debugging purposes.
 
     return app

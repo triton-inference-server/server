@@ -9,13 +9,8 @@ from fastapi import HTTPException
 from src.schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 from src.utils.tokenizer import get_tokenizer
 
-# TODO: Refactor
-# NOTE: Allow python backend for testing purposes
-SUPPORTED_BACKENDS: set = {"vllm", "tensorrtllm", "python"}
-LLM_BACKENDS: set = {"vllm", "tensorrtllm"}
 
-
-# TODO: pydantic validation?
+# TODO: Stricter pydantic validation would be better in future
 @dataclass
 class TritonModelMetadata:
     # Name used in Triton model repository
@@ -24,14 +19,15 @@ class TritonModelMetadata:
     backend: str
     # Triton model object handle
     model: tritonserver.Model
-    # TODO: Address typing
+    # Tokenizers used for chat templates
     tokenizer: typing.Optional[typing.Any]
     # Time that model was loaded by Triton
     create_time: int
-    # TODO: Address typing
+    # Conversion format between OpenAI and Triton requests
     request_convert_fn: typing.Optional[typing.Any]
 
 
+# TODO: Expose explicit flag to catch edge cases
 def determine_request_format(backend):
     # Request conversion from OpenAI format to backend-specific format
     if backend == "vllm":
@@ -45,35 +41,11 @@ def determine_request_format(backend):
     return request_convert_fn
 
 
-# TODO: Refactor:
-# NOTE: We need to figure out a few things while looking at the models in the
-# triton model repository.
-#   1. Which model should we interact with when sending requests to Triton core?
-#       a. For a single model, this is trivial, and would support any backend.
-#       b. For TRT-LLM, this should be 'ensemble' or 'tensorrt_llm_bls' following
-#          TRT-LLM defaults/examples. However, this could also be renamed by the user
-#          to have a more intuitive front-facing name, such as "llama3-8b". Note that
-#          TRT-LLM pipelines produced by the Triton CLI will generally be renamed like
-#          this. FIXME: This is a relatively fragile flow and should be improved.
-#   2. Which tokenizer to use for things like applying a chat template or making
-#      a tool/function call. These are primarily relevant for the /chat/completions
-#      endpoint, but not the /completions endpoint.
-#     - For now, require user-defined TOKENIZER for simplicity.
-#   3. Which inputs/outputs/parameters should be set when creating the underlying
-#      triton inference request? The inference request fields required will differ
-#      for vLLM, TRT-LLM, and user-defined models like a custom python model. So we
-#      need to know how to correctly translate the OpenAI schema parameters to
-#      a triton inference request.
-#     - For now, we will look for either vllm or trtllm in list of loaded backends,
-#       and we consider python==trtllm for now due to possibility of python runtime.
-#       We may want to consider using Triton's "runtime" config field for this for
-#       easier detection instead.
 def load_models(server):
     model_metadatas = []
     backends = []
 
-    # TODO: Support tokenizers more generically or custom tokenizers, possibly
-    # by looking for tokenizer.json in a pre-specified location?
+    # TODO: Consider support for custom tokenizers
     tokenizer = None
     tokenizer_model = os.environ.get("TOKENIZER")
     if tokenizer_model:
@@ -85,7 +57,7 @@ def load_models(server):
     names = []
     # Load all triton models and gather the respective backends of each
     for name, version in server.models().keys():
-        # TODO: Why skip known version? Already loaded?
+        # Skip models that are already loaded, if any
         if version != -1:
             continue
 
@@ -122,7 +94,7 @@ def init_tritonserver():
     )
     log_verbose_level = int(os.environ.get("TRITON_LOG_VERBOSE_LEVEL", "0"))
 
-    print("Starting Triton Server Core...")
+    print("Starting Triton Server...")
     server = tritonserver.Server(
         model_repository=model_repository,
         log_verbose=log_verbose_level,
@@ -177,8 +149,6 @@ def create_vllm_inference_request(
         exclude=excludes,
         exclude_none=True,
     )
-    print(f"[DEBUG] {sampling_parameters=}")
-
     inputs["text_input"] = [prompt]
     inputs["stream"] = [request.stream]
     exclude_input_in_output = True
@@ -186,8 +156,6 @@ def create_vllm_inference_request(
     if echo:
         exclude_input_in_output = not echo
     inputs["exclude_input_in_output"] = [exclude_input_in_output]
-
-    print(f"[DEBUG] Triton Inference Request {inputs=}")
     return model.create_request(inputs=inputs, parameters=sampling_parameters)
 
 
@@ -214,6 +182,4 @@ def create_trtllm_inference_request(
         inputs["random_seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
-
-    print(f"[DEBUG] Triton Inference Request {inputs=}")
     return model.create_request(inputs=inputs)

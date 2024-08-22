@@ -252,10 +252,6 @@ class ChatCompletionRequestFunctionMessage(BaseModel):
 
 class FunctionParameters(BaseModel):
     model_config = ConfigDict(extra="allow")
-    # class Config:
-    #    # TODO: Remove
-    #    #extra = Extra.allow
-    #    extra = "allow"
 
 
 class ChatCompletionFunctions(BaseModel):
