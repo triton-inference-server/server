@@ -54,9 +54,14 @@ def add_cors_middleware(app: FastAPI):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting FastAPI app lifespan...")
     # Start the tritonserver on FastAPI app startup
+    print("Starting FastAPI app lifespan...")
     server, model_metadatas = init_tritonserver()
+
+    # NOTE: These are meant for read-only access by routes handling requests
+    # with a single process, and should generally not be modified for the
+    # lifetime of the application. If multiple uvicorn workers are instantiated,
+    # then multiple triton servers would be started, one per worker process.
     app.server = server
     app.models = {metadata.name: metadata for metadata in model_metadatas}
 
