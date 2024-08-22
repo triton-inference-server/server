@@ -135,7 +135,6 @@ def clone_from_github(repo, tag, org):
     """
     # Construct the full GitHub repository URL
     repo_url = f"https://github.com/{org}/{repo}.git"
-    print(repo_url)
     # Construct the git clone command
     if tag:
         clone_command = [
@@ -187,8 +186,8 @@ def get_git_repo_name(file_path):
             .decode()
             .strip()
         )
-    except subprocess.CalledProcessError:
-        return None
+    except subprocess.CalledProcessError as e:
+        raise (e)
 
     # Extract repository name from the remote URL.
     if remote_url.endswith(".git"):
