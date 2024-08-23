@@ -1,5 +1,5 @@
 ####
-Triton Performance Analyzer
+Performance Analyzer
 ####
 .. mdinclude:: perf_analyzer/README.md
 
