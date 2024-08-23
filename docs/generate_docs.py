@@ -393,6 +393,12 @@ def main():
     if "python_backend" in repo_tags:
         clone_from_github("python_backend", repo_tags["python_backend"], github_org)
 
+    # Usage generate_docs.py --repo-tag=tensorrtllm_backend:main
+    if "tensorrtllm_backend" in repo_tags:
+        clone_from_github(
+            "tensorrtllm_backend", repo_tags["tensorrtllm_backend"], github_org
+        )
+
     # Usage generate_docs.py --backend-tag=custom_backend:main
     # Custom backend can be anything currently empty
     if "custom_backend" in backend_tags:
@@ -409,6 +415,10 @@ def main():
         run_command("rm -rf python_backend")
     if "custom_backend" in backend_tags:
         run_command("rm -rf custom_backend")
+    if "tensorrtllm_backend" in repo_tags:
+        run_command("rm -rf tensorrtllm_backend")
+    if "perf_analyzer" in repo_tags:
+        run_command("rm -rf perf_analyzer")
 
     # Return to previous working directory server/.
     os.chdir(server_abspath)
