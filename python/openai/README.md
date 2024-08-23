@@ -11,7 +11,6 @@
 ## VLLM
 
 1. Build and launch the container:
-  - Mounts the openai source files to `/workspace` for simplicity, later on these will be shipped in the container.
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
