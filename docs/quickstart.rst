@@ -3,9 +3,8 @@ QuickStart
 ########
 
 .. toctree::
-    :caption: QuickStart
-    :maxdepth: 2
-    :titlesonly:
+    :maxdepth: 1
+    :hidden:
 
-    Install <QuickStart/install>
-    Inference <QuickStart/inference>
+    Install <quickstart/install>
+    Inference <quickstart/inference>

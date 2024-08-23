@@ -295,6 +295,9 @@ def replace_relpath_with_url(relpath, src_doc_path):
         src_repo_abspath = os.path.join(server_docs_abspath, src_git_repo_name)
 
     # Assert target path is under the current repo directory.
+    print("SUMAN2:src_repo " + src_repo_abspath)
+    print("SUMAN2:target " + target_path)
+    print(os.path.commonpath([src_repo_abspath, target_path]))
     assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
@@ -333,9 +336,11 @@ def replace_hyperlink(m, src_doc_path):
     match = http_reg.match(hyperlink_str)
 
     if match:
+        print("SUMAN: URL")
         # Hyperlink is a URL.
         res = replace_url_with_relpath(hyperlink_str, src_doc_path)
     else:
+        print("SUMAN: Relpath")
         # Hyperlink is a relative path.
         res = replace_relpath_with_url(hyperlink_str, src_doc_path)
 
@@ -362,6 +367,7 @@ def preprocess_docs(exclude_paths=[]):
             continue
 
         content = None
+        print("suman" + doc_abspath)
         with open(doc_abspath, "r") as f:
             content = f.read()
 
@@ -369,10 +375,46 @@ def preprocess_docs(exclude_paths=[]):
             partial(replace_hyperlink, src_doc_path=doc_abspath),
             content,
         )
-
+        #print(content)
         with open(doc_abspath, "w") as f:
             f.write(content)
 
+
+def main2():
+    args = parser.parse_args()
+    repo_tags = parse_repo_tag(args.repo_tag) if args.repo_tag else {}
+    backend_tags = parse_repo_tag(args.backend) if args.backend else {}
+    github_org = args.github_organization
+
+    os.chdir(server_docs_abspath)
+    run_command("make clean")
+
+    for tag in repo_tags:
+        print(tag)
+        #run_command("rm -rf " + tag)
+        #clone_from_github(tag, repo_tags[tag], github_org)
+
+    for tag in backend_tags:
+        print(tag)
+        #run_command("rm -rf " + tag)
+        #clone_from_github(tag, backend_tags[tag], github_org)
+    
+     # Preprocess documents in server_docs_abspath after all repos are cloned.
+    #preprocess_docs()
+    run_command("make html")
+
+    for tag in repo_tags:
+        print(tag)
+        #run_command("rm -rf " + tag)
+        #clone_from_github(tag, repo_tags[tag], github_org)
+
+    for tag in backend_tags:
+        print(tag)
+        #run_command("rm -rf " + tag)
+        #clone_from_github(tag, backend_tags[tag], github_org)
+    
+    # Return to previous working directory server/.
+    os.chdir(server_abspath)
 
 def main():
     args = parser.parse_args()
@@ -414,4 +456,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main2()

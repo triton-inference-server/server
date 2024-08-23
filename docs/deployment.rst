@@ -3,9 +3,9 @@ Deployment Types
 ########
 
 .. toctree::
+    :hidden:
     :caption: Deployment Types
     :maxdepth: 2
-    :titlesonly:
 
     standalone
     k8
