@@ -26,27 +26,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-::::{grid}
-:reverse:
-:gutter: 2 1 1 1
-:margin: 4 4 1 1
 
-:::{grid-item}
-:columns: 4
 
 ```{image} ./_static/nvidia-logo-vert-rgb-blk-for-screen.png
 :width: 300px
 ```
-:::
-:::{grid-item}
-:columns: 8
-:class: sd-fs-3
 
-NVIDIA Triton Inference Server
-
-:::
-::::
-
+# NVIDIA Triton Inference Server
 Triton Inference Server is an open source inference serving software that streamlines AI inferencing.
 
   <!-- :::
@@ -57,8 +43,6 @@ Triton Inference Server is an open source inference serving software that stream
 <div>
 <iframe width="560" height="315" src="https://www.youtube.com/embed/NQDtfSi5QF4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </div>
-
-# Triton Inference Server
 
 Triton Inference Server enables teams to deploy any AI model from multiple deep
 learning and machine learning frameworks, including TensorRT, TensorFlow,
