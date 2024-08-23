@@ -105,7 +105,7 @@
    :hidden:
    :caption: Perf benchmarking and tuning
 
-   perfanalyzer
+   Performance Analyzer <perf_benchmark/perf_analyzer>
    Model Analyzer <model_analyzer/README>
    Model Navigator <model_navigator/README>
    GenAI Perf Analyzer <perf_analyzer/genai-perf/README>
