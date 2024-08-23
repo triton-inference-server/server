@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from fastapi import APIRouter, HTTPException, Request
-from src.schemas.openai import ListModelsResponse, Model, ObjectType
+from schemas.openai import ListModelsResponse, Model, ObjectType
 
 router = APIRouter()
 

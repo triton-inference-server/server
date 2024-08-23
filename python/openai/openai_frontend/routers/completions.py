@@ -29,14 +29,14 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from src.schemas.openai import (
+from schemas.openai import (
     Choice,
     CreateCompletionRequest,
     CreateCompletionResponse,
     FinishReason,
     ObjectType,
 )
-from src.utils.triton import get_output, validate_triton_responses
+from utils.triton import get_output, validate_triton_responses
 
 router = APIRouter()
 

@@ -30,7 +30,7 @@ import argparse
 import os
 
 import uvicorn
-from src.api_server import init_app
+from app import init_app
 
 
 def parse_args():
@@ -60,7 +60,7 @@ def parse_args():
     triton_group.add_argument(
         "--model-repository",
         type=str,
-        default=None,
+        required=True,
         help="Path to the Triton model repository holding the models to be served",
     )
     triton_group.add_argument(
@@ -77,8 +77,7 @@ if __name__ == "__main__":
     args = parse_args()
     # NOTE: configurations can be passed to FastAPI app through a builder
     # function like init_app in future, but using env vars for simplicity.
-    if args.model_repository:
-        os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
+    os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
     if args.tokenizer:
         os.environ["TOKENIZER"] = args.tokenizer
 

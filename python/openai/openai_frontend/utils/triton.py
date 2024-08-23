@@ -32,8 +32,8 @@ from dataclasses import dataclass
 import numpy as np
 import tritonserver
 from fastapi import HTTPException
-from src.schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
-from src.utils.tokenizer import get_tokenizer
+from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
+from utils.tokenizer import get_tokenizer
 
 
 # TODO: Stricter pydantic validation would be better in future
@@ -68,7 +68,7 @@ def determine_request_format(backend):
 
 
 def load_models(server):
-    model_metadatas = []
+    model_metadata = []
     backends = []
 
     # TODO: Consider support for custom tokenizers
@@ -109,9 +109,9 @@ def load_models(server):
             create_time=create_time,
             request_convert_fn=determine_request_format(backend),
         )
-        model_metadatas.append(metadata)
+        model_metadata.append(metadata)
 
-    return model_metadatas
+    return model_metadata
 
 
 def init_tritonserver():

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from src.api_server import init_app
+from tests.utils import setup_fastapi_app
 
 
 # Override conftest.py default model
@@ -42,8 +42,7 @@ class TestObservability:
     @pytest.fixture(scope="class")
     def client(self):
         model_repository = Path(__file__).parent / "test_models"
-        os.environ["TRITON_MODEL_REPOSITORY"] = str(model_repository)
-        app = init_app()
+        app = setup_fastapi_app(tokenizer="", model_repository=str(model_repository))
         with TestClient(app) as test_client:
             yield test_client
 

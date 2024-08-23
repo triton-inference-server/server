@@ -34,7 +34,7 @@ WORKDIR /workspace
 RUN git clone --single-branch -b rmccormick-openai https://github.com/triton-inference-server/server.git && \
     pip install -r server/python/openai/docker/requirements.txt && \
     pip install -r server/python/openai/docker/requirements_vllm.txt && \
-    mv server/python/openai/openai ./openai && \
+    mv server/python/openai/openai_frontend ./openai && \
     mv server/python/openai/examples ./openai && \
     mv server/python/openai/README.md ./openai && \
     rm -r server

@@ -24,10 +24,10 @@ docker run -it --net=host --gpus all --rm \
   tritonserver-openai-vllm
 ```
 
-2. Launch the OpenAI server:
+2. Launch the OpenAI-compatible Triton Inference Server:
 ```bash
 # NOTE: Adjust the --tokenizer based on the model being used
-python3 openai/main.py --model-repository openai/tests/vllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
+python3 openai_frontend/main.py --model-repository tests/vllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 3. Send a `/v1/chat/completions` request:
@@ -93,7 +93,7 @@ print(completion.choices[0].message.content)
 
 7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
-cd openai/tests/
+cd tests/
 pytest -v
 ```
 
@@ -115,7 +115,7 @@ at the model repository accordingly when following the examples.
     access gated models, make sure this is set in your local environment if needed.
 
 ```bash
-docker build -t tritonserver-openai-vllm -f docker/Dockerfile.tensorrtllm .
+docker build -t tritonserver-openai-tensorrtllm -f docker/Dockerfile.tensorrtllm ./docker
 
 docker run -it --net=host --gpus all --rm \
   -v ${PWD}:/workspace \
@@ -128,7 +128,7 @@ docker run -it --net=host --gpus all --rm \
 2. Launch the OpenAI server:
 ```bash
 # NOTE: Adjust the --tokenizer based on the model being used
-python3 openai/main.py --model-repository openai/tests/tensorrtllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
+python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 3. Send a `/v1/chat/completions` request:

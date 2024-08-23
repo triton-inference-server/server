@@ -29,7 +29,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from src.schemas.openai import (
+from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
     ChatCompletionResponseMessage,
@@ -40,7 +40,7 @@ from src.schemas.openai import (
     CreateChatCompletionStreamResponse,
     ObjectType,
 )
-from src.utils.triton import get_output, validate_triton_responses
+from utils.triton import get_output, validate_triton_responses
 
 router = APIRouter()
 
@@ -128,13 +128,8 @@ def create_chat_completion(
     if not metadata.backend:
         raise HTTPException(status_code=400, detail="Unknown backend")
 
-    triton_model = raw_request.app.server.model(request.model)
-    if request.model != triton_model.name:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Mismatched model name: {request.model} != {triton_model.name}",
-        )
-
+    # TODO: Cleanup
+    triton_model = metadata.model
     if request.n and request.n > 1:
         raise HTTPException(status_code=400, detail="Only single choice is supported")
 

@@ -33,7 +33,9 @@ from typing import Dict, List, Optional
 
 import openai
 import requests
-from src.api_server import init_app
+
+sys.path.append(os.path.join("..", "openai_frontend"))
+from openai_frontend.app import init_app
 
 
 def setup_fastapi_app(tokenizer: str, model_repository: str):
@@ -62,7 +64,7 @@ class OpenAIServer:
             env.update(env_dict)
 
         this_dir = Path(__file__).resolve().parent
-        script_path = this_dir / ".." / "main.py"
+        script_path = this_dir / ".." / "openai_frontend" / "main.py"
         self.proc = subprocess.Popen(
             ["python3", script_path] + cli_args,
             env=env,

@@ -31,8 +31,8 @@ from contextlib import asynccontextmanager
 import tritonserver
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.routers import chat_completions, completions, models, observability
-from src.utils.triton import init_tritonserver
+from routers import chat_completions, completions, models, observability
+from utils.triton import init_tritonserver
 
 
 def add_cors_middleware(app: FastAPI):
