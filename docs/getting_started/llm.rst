@@ -1,10 +1,10 @@
 ########
-LLM Inference
+Large language model
 ########
 
 .. toctree::
     :hidden:
-    :caption: LLM Inference
+    :caption: Large Language model
     :maxdepth: 2
 
     TRT-LLM <tutorials/Popular_Models_Guide/Llama2/README>
