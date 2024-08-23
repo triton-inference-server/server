@@ -20,10 +20,8 @@
 docker build -t tritonserver-openai-vllm -f docker/Dockerfile.vllm .
 
 docker run -it --net=host --gpus all --rm \
-  -v ${PWD}:/workspace \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  -w /workspace \
   tritonserver-openai-vllm
 ```
 
