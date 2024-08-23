@@ -105,6 +105,6 @@ simplying adding the `(?-i)` prefix which turns off case-insensitive mode, e.g.
 Python HTTP client may be automatically lower-cased by internal client libraries.
 
 The forwarded headers can be accessed using the
-[Python](https://github.com/triton-inference-server/python_backend#inference-request-parameters)
+[Python](../python_backend/README.md#inference-request-parameters)
 or C Backend APIs as inference request parameters.
 

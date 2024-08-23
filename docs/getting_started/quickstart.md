@@ -30,7 +30,7 @@
 
 **New to Triton Inference Server and want do just deploy your model quickly?**
 Make use of
-[these tutorials](https://github.com/triton-inference-server/tutorials#quick-deploy)
+[these tutorials](../tutorials/README.md#quick-deploy)
  to begin your Triton journey!
 
 The Triton Inference Server is available as [buildable source
@@ -49,7 +49,7 @@ Launching and maintaining Triton Inference Server revolves around the use of bui
 The [model repository](../user_guide/model_repository.md) is the directory where you
 place the models that you want Triton to serve. An example model
 repository is included in the
-[docs/examples/model_repository](../examples/model_repository).
+[docs/examples/model_repository](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository).
 Before using the repository, you must fetch any missing model definition
 files from their public model zoos via the provided script.
 
