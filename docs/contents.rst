@@ -107,7 +107,7 @@
 
    GenAI Perf Analyzer <perf_benchmark/genai_perf>
    Performance Analyzer <perf_benchmark/perf_analyzer>
-   Model Analyzer <model_analyzer/README>
+   Model Analyzer <perf_benchmark/model_analyzer>
    Model Navigator <model_navigator/README>
 
 .. toctree::
