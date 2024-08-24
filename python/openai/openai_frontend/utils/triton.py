@@ -26,9 +26,8 @@
 
 import os
 import time
-import typing
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import tritonserver
@@ -47,7 +46,7 @@ class TritonModelMetadata:
     # Triton model object handle
     model: tritonserver.Model
     # Tokenizers used for chat templates
-    tokenizer: Optional[typing.Any]
+    tokenizer: Optional[Any]
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
