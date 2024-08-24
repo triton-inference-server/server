@@ -34,7 +34,7 @@ from typing import Dict, List, Optional
 import openai
 import requests
 
-sys.path.append(os.path.join("..", "openai_frontend"))
+sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
 from openai_frontend.app import init_app
 
 

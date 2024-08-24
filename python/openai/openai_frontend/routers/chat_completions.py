@@ -26,6 +26,7 @@
 
 import time
 import uuid
+from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -40,19 +41,24 @@ from schemas.openai import (
     CreateChatCompletionStreamResponse,
     ObjectType,
 )
-from utils.triton import get_output, validate_triton_responses
+from utils.triton import TritonModelMetadata, get_output, validate_triton_responses
 
 router = APIRouter()
 
 
-def get_first_response_role(conversation, add_generation_prompt, default_role):
+# TODO: This behavior should be tested further
+def _get_first_response_role(
+    conversation: List[Dict], add_generation_prompt: bool, default_role: str
+) -> str:
     if add_generation_prompt:
         return default_role
 
     return conversation[-1]["role"]
 
 
-def streaming_chat_completion_response(request_id, created, model, role, responses):
+def _streaming_chat_completion_response(
+    request_id: str, created: int, model: str, role: str, responses: List
+) -> str:
     # first chunk
     choice = ChatCompletionStreamingResponseChoice(
         index=0,
@@ -98,6 +104,36 @@ def streaming_chat_completion_response(request_id, created, model, role, respons
     yield "data: [DONE]\n\n"
 
 
+def _validate_chat_request(
+    request: CreateChatCompletionRequest, metadata: TritonModelMetadata
+):
+    """
+    Validates a chat completions request to align with currently supported features.
+    """
+
+    if not metadata:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+
+    if not metadata.request_converter:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown request format for model: {request.model}"
+        )
+
+    if not metadata.tokenizer:
+        raise HTTPException(status_code=400, detail="Unknown tokenizer")
+
+    if not metadata.backend:
+        raise HTTPException(status_code=400, detail="Unknown backend")
+
+    if request.n and request.n > 1:
+        raise HTTPException(status_code=400, detail="Only single choice is supported")
+
+    if request.logit_bias is not None or request.logprobs:
+        raise HTTPException(
+            status_code=400, detail="logit bias and log probs not supported"
+        )
+
+
 @router.post(
     "/v1/chat/completions", response_model=CreateChatCompletionResponse, tags=["Chat"]
 )
@@ -109,45 +145,18 @@ def create_chat_completion(
     Creates a model response for the given chat conversation.
     """
 
-    model_metadatas = raw_request.app.models
-    if not model_metadatas:
-        raise HTTPException(status_code=400, detail="No known models")
+    metadata = raw_request.app.models.get(request.model)
+    _validate_chat_request(request, metadata)
 
-    metadata = model_metadatas.get(request.model)
-    if not metadata:
-        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+    # TODO: Move conversation/role bits into helper
 
-    if not metadata.request_convert_fn:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown request format for model: {request.model}"
-        )
-
-    if not metadata.tokenizer:
-        raise HTTPException(status_code=400, detail="Unknown tokenizer")
-
-    if not metadata.backend:
-        raise HTTPException(status_code=400, detail="Unknown backend")
-
-    # TODO: Cleanup
-    triton_model = metadata.model
-    if request.n and request.n > 1:
-        raise HTTPException(status_code=400, detail="Only single choice is supported")
-
-    if request.logit_bias is not None or request.logprobs:
-        raise HTTPException(
-            status_code=400, detail="logit bias and log probs not supported"
-        )
-
+    # Prepare prompt with chat template
+    # TODO: Does this need to be exposed to the user?
+    add_generation_prompt = True
     conversation = [
         {"role": str(message.role), "content": str(message.content)}
         for message in request.messages
     ]
-
-    # NOTE: This behavior should be tested further
-    # TODO: Do these need to be exposed to the user?
-    add_generation_prompt = True
-    default_role = "assistant"
-    role = get_first_response_role(conversation, add_generation_prompt, default_role)
 
     prompt = metadata.tokenizer.apply_chat_template(
         conversation=conversation,
@@ -155,16 +164,21 @@ def create_chat_completion(
         add_generation_prompt=add_generation_prompt,
     )
 
+    # Convert to Triton request format and perform inference
+    triton_model = metadata.model
+    responses = triton_model.infer(
+        metadata.request_converter(triton_model, prompt, request)
+    )
+
+    # Prepare and send responses back to client in OpenAI format
     request_id = f"cmpl-{uuid.uuid1()}"
     created = int(time.time())
-
-    responses = triton_model.infer(
-        metadata.request_convert_fn(triton_model, prompt, request)
-    )
+    default_role = "assistant"
+    role = _get_first_response_role(conversation, add_generation_prompt, default_role)
 
     if request.stream:
         return StreamingResponse(
-            streaming_chat_completion_response(
+            _streaming_chat_completion_response(
                 request_id, created, request.model, role, responses
             ),
             media_type="text/event-stream",

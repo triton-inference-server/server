@@ -28,6 +28,7 @@ import os
 import time
 import typing
 from dataclasses import dataclass
+from typing import Callable, Optional
 
 import numpy as np
 import tritonserver
@@ -36,7 +37,7 @@ from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 from utils.tokenizer import get_tokenizer
 
 
-# TODO: Stricter pydantic validation would be better in future
+# TODO: Improve type hints
 @dataclass
 class TritonModelMetadata:
     # Name used in Triton model repository
@@ -46,25 +47,22 @@ class TritonModelMetadata:
     # Triton model object handle
     model: tritonserver.Model
     # Tokenizers used for chat templates
-    tokenizer: typing.Optional[typing.Any]
+    tokenizer: Optional[typing.Any]
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
-    request_convert_fn: typing.Optional[typing.Any]
+    request_converter: Callable
 
 
 # TODO: Expose explicit flag to catch edge cases
-def determine_request_format(backend):
+def determine_request_converter(backend):
     # Request conversion from OpenAI format to backend-specific format
     if backend == "vllm":
-        request_convert_fn = create_vllm_inference_request
-    # Python included to support TRT-LLM BLS model and TRT-LLM python runtime
-    elif backend in ["tensorrtllm", "python"]:
-        request_convert_fn = create_trtllm_inference_request
-    else:
-        request_convert_fn = None
+        return create_vllm_inference_request
 
-    return request_convert_fn
+    # Use TRT-LLM format as default for everything else. This could be
+    # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
+    return create_trtllm_inference_request
 
 
 def load_models(server):
@@ -107,7 +105,7 @@ def load_models(server):
             model=model,
             tokenizer=tokenizer,
             create_time=create_time,
-            request_convert_fn=determine_request_format(backend),
+            request_converter=determine_request_converter(backend),
         )
         model_metadata.append(metadata)
 

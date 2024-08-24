@@ -26,6 +26,7 @@
 
 import time
 import uuid
+from typing import List
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -36,12 +37,14 @@ from schemas.openai import (
     FinishReason,
     ObjectType,
 )
-from utils.triton import get_output, validate_triton_responses
+from utils.triton import TritonModelMetadata, get_output, validate_triton_responses
 
 router = APIRouter()
 
 
-def streaming_completion_response(request_id, created, model, responses):
+def _streaming_completion_response(
+    request_id: str, created: int, model: str, responses: List
+) -> str:
     for response in responses:
         text = get_output(response)
 
@@ -64,29 +67,18 @@ def streaming_completion_response(request_id, created, model, responses):
     yield "data: [DONE]\n\n"
 
 
-@router.post(
-    "/v1/completions", response_model=CreateCompletionResponse, tags=["Completions"]
-)
-def create_completion(
-    request: CreateCompletionRequest, raw_request: Request
-) -> CreateCompletionResponse | StreamingResponse:
+def _validate_completions_request(
+    request: CreateCompletionRequest, metadata: TritonModelMetadata
+):
     """
-    Creates a completion for the provided prompt and parameters.
+    Validates a completions request to align with currently supported features.
     """
-
-    if not request.model:
-        raise Exception("Request must provide a valid 'model'")
-
-    print(f"[DEBUG] Available model metadata: {raw_request.app.models.keys()=}")
-    print(f"[DEBUG] Fetching model metadata for {request.model=}")
-    metadata = raw_request.app.models.get(request.model)
-
     if not metadata:
         raise HTTPException(
             status_code=400, detail=f"Unknown model metadata for model: {request.model}"
         )
 
-    if not metadata.request_convert_fn:
+    if not metadata.request_converter:
         raise HTTPException(
             status_code=400, detail=f"Unknown request format for model: {request.model}"
         )
@@ -114,16 +106,33 @@ def create_completion(
             status_code=400, detail="logit bias and log probs not supported"
         )
 
-    request_id = f"cmpl-{uuid.uuid1()}"
-    created = int(time.time())
 
+@router.post(
+    "/v1/completions", response_model=CreateCompletionResponse, tags=["Completions"]
+)
+def create_completion(
+    request: CreateCompletionRequest, raw_request: Request
+) -> CreateCompletionResponse | StreamingResponse:
+    """
+    Creates a completion for the provided prompt and parameters.
+    """
+
+    # Validate request and convert to Triton format
+    metadata = raw_request.app.models.get(request.model)
+    _validate_completions_request(request, metadata)
+
+    # Convert to Triton request format and perform inference
     triton_model = raw_request.app.server.model(request.model)
     responses = triton_model.infer(
-        metadata.request_convert_fn(triton_model, request.prompt, request)
+        metadata.request_converter(triton_model, request.prompt, request)
     )
+
+    # Prepare and send responses back to client in OpenAI format
+    request_id = f"cmpl-{uuid.uuid1()}"
+    created = int(time.time())
     if request.stream:
         return StreamingResponse(
-            streaming_completion_response(
+            _streaming_completion_response(
                 request_id, created, metadata.name, responses
             ),
             media_type="text/event-stream",

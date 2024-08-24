@@ -37,13 +37,13 @@ def list_models(request: Request) -> ListModelsResponse:
     """
     Lists the currently available models, and provides basic information about each one such as the owner and availability.
     """
-    model_metadatas = request.app.models
-    if not model_metadatas:
+    model_metadata = request.app.models
+    if not model_metadata:
         raise HTTPException(status_code=400, detail="No known models")
 
     model_list = []
-    for model in model_metadatas:
-        metadata = model_metadatas[model]
+    for model in model_metadata:
+        metadata = model_metadata[model]
         if not metadata:
             raise HTTPException(
                 status_code=400, detail=f"No metadata for model: {model}"
@@ -66,11 +66,11 @@ def retrieve_model(request: Request, model_name: str) -> Model:
     """
     Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     """
-    model_metadatas = request.app.models
-    if not model_metadatas:
+    model_metadata = request.app.models
+    if not model_metadata:
         raise HTTPException(status_code=400, detail="No known models")
 
-    model = model_metadatas.get(model_name)
+    model = model_metadata.get(model_name)
     if not model:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
 
