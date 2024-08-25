@@ -104,6 +104,9 @@ class TritonFrontend {
   std::shared_ptr<TRITONSERVER_Server> server_;
   std::unique_ptr<Base> service;
   triton::server::RestrictedFeatures restricted_features;
+  // TODO: [DLIS-7194] Add support for TraceManager & SharedMemoryManager
+  // triton::server::TraceManager trace_manager_;
+  // triton::server::SharedMemoryManager shm_manager_;
 
  public:
   TritonFrontend(uintptr_t server_mem_addr, UnorderedMapType data)
@@ -117,6 +120,11 @@ class TritonFrontend {
         server_, data, nullptr /* TraceManager */,
         nullptr /* SharedMemoryManager */, restricted_features, &service));
   };
+
+  // TODO: [DLIS-7194] Add support for TraceManager & SharedMemoryManager
+  // TritonFrontend(
+  //     uintptr_t server_mem_addr, UnorderedMapType data,
+  //     TraceManager trace_manager, SharedMemoryManager shm_manager)
 
   void StartService() { ThrowIfError(service->Start()); };
   void StopService() { ThrowIfError(service->Stop()); };

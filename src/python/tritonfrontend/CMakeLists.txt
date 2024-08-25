@@ -94,7 +94,7 @@ if(${TRITON_ENABLE_GPU})
   )
 endif()
 
-if(${TRITON_ENABLE_TRACING} OR ${TRITON_ENABLE_STATS})
+if(${TRITON_ENABLE_TRACING})
   message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
   find_package(absl CONFIG REQUIRED)
   find_package(CURL CONFIG REQUIRED)
@@ -164,10 +164,6 @@ if(${TRITON_ENABLE_TRACING})
 endif()
 
 if(${TRITON_ENABLE_STATS})
-  target_include_directories(
-      py-bindings
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
-    )
   target_compile_definitions(
     py-bindings
     PRIVATE TRITON_ENABLE_STATS=1

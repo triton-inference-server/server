@@ -8,7 +8,7 @@ Let us walk through a simple example:
 import tritonserver
 
 # Constructing path to Model Repository
-model_path = f"server/src/python/examples/example_model_repository"
+model_path = f"/server/src/python/examples/example_model_repository"
 
 server_options = tritonserver.Options(
     server_id="ExampleServer",
@@ -85,7 +85,7 @@ with KServeHttp.Server(server) as http_service:
     # Create a Triton client
     with httpclient.InferenceServerClient(url=url) as client:
         # Prepare input data
-        input_data = np.array([["Roger Roger"]], dtype=object)
+        input_data = np.array(["Roger Roger"], dtype=object)
         # Create input and output objects
         inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
         # Set the data for the input tensor

@@ -24,39 +24,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# triton/server/src/python/tritonfrontend/__init__.py
+import time
 
-from importlib.metadata import PackageNotFoundError, version
-
-from tritonfrontend._api._kservegrpc import KServeGrpc
-from tritonfrontend._api._kservehttp import KServeHttp
-from tritonserver import (
-    AlreadyExistsError,
-    InternalError,
-    InvalidArgumentError,
-    NotFoundError,
-    TritonError,
-    UnavailableError,
-    UnknownError,
-    UnsupportedError,
-)
-
-_exceptions = (
-    TritonError,
-    NotFoundError,
-    UnknownError,
-    InternalError,
-    InvalidArgumentError,
-    UnavailableError,
-    AlreadyExistsError,
-    UnsupportedError,
-)
+import triton_python_backend_utils as pb_utils
 
 
-# Rename module for exceptions to simplify stack trace
-for exception in _exceptions:
-    exception.__module__ = "tritonfrontend"
-    globals()[exception.__name__] = exception
+class TritonPythonModel:
+    def execute(self, requests):
+        """
+        Mock Model that uses the input data to determine how long to wait
+        before returning identity data
+        """
+        print(
+            "====================================MODEL EXECUTION START===================================="
+        )
+        assert len(requests) == 1
+        delay = 0
+        request = requests[0]
+        responses = []
 
+        delay_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+        delay_as_numpy = delay_tensor.as_numpy()
+        delay = float(delay_as_numpy[0][0])
 
-del _exceptions
+        out_tensor = pb_utils.Tensor("OUTPUT0", delay_as_numpy)
+        responses.append(pb_utils.InferenceResponse([out_tensor]))
+
+        time.sleep(delay)
+        print(
+            "====================================MODEL EXECUTION DONE===================================="
+        )
+
+        return responses

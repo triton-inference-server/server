@@ -24,39 +24,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# triton/server/src/python/tritonfrontend/__init__.py
-
-from importlib.metadata import PackageNotFoundError, version
-
-from tritonfrontend._api._kservegrpc import KServeGrpc
-from tritonfrontend._api._kservehttp import KServeHttp
-from tritonserver import (
-    AlreadyExistsError,
-    InternalError,
-    InvalidArgumentError,
-    NotFoundError,
-    TritonError,
-    UnavailableError,
-    UnknownError,
-    UnsupportedError,
-)
-
-_exceptions = (
-    TritonError,
-    NotFoundError,
-    UnknownError,
-    InternalError,
-    InvalidArgumentError,
-    UnavailableError,
-    AlreadyExistsError,
-    UnsupportedError,
-)
+import numpy as np
+import triton_python_backend_utils as pb_utils
 
 
-# Rename module for exceptions to simplify stack trace
-for exception in _exceptions:
-    exception.__module__ = "tritonfrontend"
-    globals()[exception.__name__] = exception
+class TritonPythonModel:
+    """This model loops through different dtypes to make sure that
+    serialize_byte_tensor works correctly in the Python backend.
+    """
 
+    def initialize(self, args):
+        self._index = 0
+        self._dtypes = [np.bytes_, np.object_]
 
-del _exceptions
+    def execute(self, requests):
+        responses = []
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor_0 = pb_utils.Tensor(
+                "OUTPUT0", in_0.as_numpy().astype(self._dtypes[self._index])
+            )
+            self._index += 1
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+        return responses

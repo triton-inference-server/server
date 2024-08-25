@@ -228,9 +228,6 @@ HTTPServer::Start()
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
 
-    const std::string addr = address_ + ":" + std::to_string(port_);
-    LOG_INFO << "Started HTTPService at " << addr;
-
     return nullptr;
   }
 
@@ -267,6 +264,8 @@ HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     event_base_free(evbase_);
     return nullptr;
   }
+
+  std::cout << "HTTPServer has been killed!" << std::endl;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
@@ -3628,9 +3627,7 @@ HTTPAPIServer::HandleInfer(
   // this function returns early due to error. Otherwise resumed in callback.
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req, irequest_shared);
-  if (this->trace_manager_) {
-    infer_request->trace_ = trace;
-  }
+  infer_request->trace_ = trace;
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
   // by reference to capture local updates, except for shared pointers which
@@ -4697,6 +4694,8 @@ HTTPAPIServer::Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_cnt, restricted_features));
 
+  const std::string addr = address + ":" + std::to_string(port);
+  LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
 }
