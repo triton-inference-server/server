@@ -91,7 +91,7 @@
    :caption: Backends
 
 
-   TRT-LLM <getting_started/trtllm_user_guide>
+   trt_llm
    vllm
    Python <python_backend/README>
    Pytorch <pytorch_backend/README>
