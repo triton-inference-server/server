@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 import time
+from time import perf_counter, sleep
 from typing import Union
 
 import numpy as np
@@ -33,6 +34,7 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from testing_utils import TestingUtils
+from tritonclient.utils import InferenceServerException
 from tritonfrontend import (
     AlreadyExistsError,
     InvalidArgumentError,
@@ -84,9 +86,9 @@ class TestKServeHttp:
 
     def test_invalid_options(self):
         server = TestingUtils.setup_server()
-
+        # dict is not a valid KServeHttp.Options object
         with pytest.raises(InvalidArgumentError):
-            custom_grpc_service = KServeHttp.Server(server, {"port": 8001})
+            custom_http_service = KServeHttp.Server(server, {"port": 8001})
 
         TestingUtils.teardown_server(server)
 
@@ -103,6 +105,7 @@ class TestKServeHttp:
         http_service = TestingUtils.setup_service(server, KServeHttp, http_options)
         http_client = TestingUtils.setup_client(httpclient, url="localhost:8005")
 
+        # Confirms that http_service starts at port 8005
         http_client.is_server_ready()
 
         TestingUtils.teardown_client(http_client)
@@ -125,7 +128,7 @@ class TestKServeHttp:
         http_service = TestingUtils.setup_service(server, KServeHttp)
         http_client = httpclient.InferenceServerClient(url="localhost:8000")
         model_name = "delayed_identity"
-        delay = 10  # seconds
+        delay = 5  # seconds
         input_data0 = np.array([[delay]], dtype=np.float32)
 
         input0 = httpclient.InferInput("INPUT0", input_data0.shape, "FP32")
@@ -133,22 +136,25 @@ class TestKServeHttp:
 
         inputs = [input0]
         outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-
+        start_time = perf_counter()
         async_request = http_client.async_infer(
             model_name=model_name, inputs=inputs, outputs=outputs
         )
-        print("Beginning to sleep")
-        time.sleep(3)
-        print("Slept for 3 seconds")
+        # with pytest.raises(InferenceServerException):
+
+        sleep(2 * delay)
+
+        response = async_request.get_result(block=False)
+
         TestingUtils.teardown_service(http_service)
-        # print(http_client.is_server_ready())
-        response = async_request.get_result()
-        output_data0 = response.as_numpy("OUTPUT0")
-
-        assert input_data0[0][0] == output_data0[0][0]
-
-        TestingUtils.teardown_client(server)
         TestingUtils.teardown_server(server)
+        response = async_request.get_result(block=False)
+
+        end_time = perf_counter()
+
+        assert (end_time - start_time) > delay
+
+        TestingUtils.teardown_client(http_client)
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date

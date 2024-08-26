@@ -35,9 +35,6 @@ class TritonPythonModel:
         Mock Model that uses the input data to determine how long to wait
         before returning identity data
         """
-        print(
-            "====================================MODEL EXECUTION START===================================="
-        )
         assert len(requests) == 1
         delay = 0
         request = requests[0]
@@ -51,8 +48,5 @@ class TritonPythonModel:
         responses.append(pb_utils.InferenceResponse([out_tensor]))
 
         time.sleep(delay)
-        print(
-            "====================================MODEL EXECUTION DONE===================================="
-        )
 
         return responses

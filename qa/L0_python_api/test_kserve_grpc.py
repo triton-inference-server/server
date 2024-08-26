@@ -101,7 +101,7 @@ class TestKServeGrpc:
         grpc_options = KServeGrpc.Options(port=8005)
         grpc_service = TestingUtils.setup_service(server, KServeGrpc, grpc_options)
         grpc_client = TestingUtils.setup_client(grpcclient, url="localhost:8005")
-
+        # Confirms that grpc_service starts at port 8005
         assert grpc_client.is_server_ready()
 
         TestingUtils.teardown_client(grpc_client)
