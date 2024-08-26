@@ -1002,6 +1002,7 @@ ENTRYPOINT []
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
+
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
 ARG TRITON_VERSION={}
@@ -1098,6 +1099,7 @@ ENTRYPOINT []
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
+
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
