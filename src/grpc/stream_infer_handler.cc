@@ -289,7 +289,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (err == nullptr) {
       err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue_, &state->alloc_payload_);
+          response_queue_, &state->alloc_payload_, irequest);
     }
 
     auto request_release_payload =

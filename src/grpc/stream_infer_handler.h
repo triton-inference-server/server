@@ -76,9 +76,8 @@ class ModelStreamInferHandler
       const std::string& header_forward_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            restricted_kv, header_forward_pattern),
-        trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level)
+            restricted_kv, header_forward_pattern, shm_manager),
+        trace_manager_(trace_manager), compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -116,7 +115,6 @@ class ModelStreamInferHandler
   bool Finish(State* state);
 
   TraceManager* trace_manager_;
-  std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;

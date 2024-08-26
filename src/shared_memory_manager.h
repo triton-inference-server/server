@@ -90,11 +90,13 @@ class SharedMemoryManager {
   /// \param memory_type Returns the type of the memory
   /// \param device_id Returns the device id associated with the
   /// memory block
+  /// \param ref_count Returns the number of inference requests currently using
+  /// this shared memory block
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
-      int64_t* device_id);
+      int64_t* device_id, int* ref_count);
 
 #ifdef TRITON_ENABLE_GPU
   /// Get the CUDA memory handle associated with the block name.
@@ -130,14 +132,28 @@ class SharedMemoryManager {
 
   /// Unregister all shared memory blocks of specified type from the manager.
   /// \param memory_type The type of memory to unregister.
+  /// \param ignore_ref_count If true, the shared memory region will be
+  /// unregistered even if ref_count_ is greater than 0.
   /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
+  TRITONSERVER_Error* UnregisterAll(
+      TRITONSERVER_MemoryType memory_type, const bool ignore_ref_count = false);
+
+  /// Increments the reference count for the specified shared memory block.
+  /// \param name The name of the shared memory block.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* IncrementRefCount(const std::string& name);
+
+  /// Decrements the reference count for the specified shared memory block.
+  /// \param name The name of the shared memory block.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* DecrementRefCount(const std::string& name);
 
  private:
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
-      const std::string& name, TRITONSERVER_MemoryType memory_type);
+      const std::string& name, TRITONSERVER_MemoryType memory_type,
+      const bool ignore_ref_count = false);
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
@@ -146,10 +162,10 @@ class SharedMemoryManager {
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id)
+        const int64_t device_id, int ref_count)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          kind_(kind), device_id_(device_id)
+          kind_(kind), device_id_(device_id), ref_count_(ref_count)
     {
     }
 
@@ -161,6 +177,7 @@ class SharedMemoryManager {
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
+    int ref_count_;
   };
 
 #ifdef TRITON_ENABLE_GPU
@@ -169,10 +186,11 @@ class SharedMemoryManager {
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
+        const int64_t device_id, int ref_count,
+        const cudaIpcMemHandle_t* cuda_ipc_handle)
         : SharedMemoryInfo(
               name, shm_key, offset, byte_size, shm_fd, mapped_addr, kind,
-              device_id),
+              device_id, ref_count),
           cuda_ipc_handle_(*cuda_ipc_handle)
     {
     }

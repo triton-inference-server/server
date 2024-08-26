@@ -432,9 +432,19 @@ InferGRPCToInput(
                 .c_str());
       }
       void* tmp;
+      int ref_count;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          region_name, offset, byte_size, &tmp, &memory_type, &memory_type_id));
+          region_name, offset, byte_size, &tmp, &memory_type, &memory_type_id,
+          &ref_count));
       base = tmp;
+
+      bool is_added = false;
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRefShmRegion(
+          inference_request, region_name.c_str(), &is_added));
+      if (is_added) {
+        RETURN_IF_ERR(shm_manager->IncrementRefCount(region_name));
+      }
+
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
         RETURN_IF_ERR(shm_manager->GetCUDAHandle(
@@ -918,7 +928,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, request, std::move(serialized_data),
-        response_queue, &state->alloc_payload_);
+        response_queue, &state->alloc_payload_, irequest);
   }
 
   auto request_release_payload =
