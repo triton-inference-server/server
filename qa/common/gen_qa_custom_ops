@@ -44,7 +44,7 @@ PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-p
 
 CUDA_DEVICE=${NV_GPU:=0}
 
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
