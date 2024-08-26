@@ -116,7 +116,8 @@ def fail_if(p, msg):
 
 
 def target_platform():
-    if FLAGS.target_platform is not None:
+    # When called by compose.py, FLAGS will be None
+    if FLAGS and FLAGS.target_platform is not None:
         return FLAGS.target_platform
     platform_string = platform.system().lower()
     if platform_string == "linux":
@@ -132,7 +133,8 @@ def target_platform():
 
 
 def target_machine():
-    if FLAGS.target_machine is not None:
+    # When called by compose.py, FLAGS will be None
+    if FLAGS and FLAGS.target_machine is not None:
         return FLAGS.target_machine
     return platform.machine().lower()
 
@@ -639,13 +641,16 @@ def pytorch_cmake_args(images):
         cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
     ]
 
-    if FLAGS.enable_gpu:
+    # TODO: TPRD-372 TorchTRT extension is not currently supported by our manylinux build
+    # TODO: TPRD-373 NVTX extension is not currently supported by our manylinux build
+    if target_platform() != "rhel":
+        if FLAGS.enable_gpu:
+            cargs.append(
+                cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
+            )
         cargs.append(
-            cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
+            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
         )
-    cargs.append(
-        cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
-    )
     return cargs
 
 
@@ -1301,7 +1306,6 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
         gpu_enabled=gpu_enabled
     )
 
-    # This
     if target_platform() == "rhel":
         df += """
 # Common dpeendencies.
