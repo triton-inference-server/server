@@ -1,7 +1,7 @@
 ####
 GenAI Performance Analyzer
 ####
-.. mdinclude:: ../perf_analyzer/genai-perf/README.md
+.. include:: ../genai-perf-README.rst
 
 
 .. toctree::
