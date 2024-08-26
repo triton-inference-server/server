@@ -29,8 +29,9 @@
 import argparse
 import os
 
-import uvicorn
-from app import init_app
+from engine.triton_engine import TritonOpenAIEngine
+from frontend.triton_frontend import TritonOpenAIFrontend
+from utils.triton import init_tritonserver
 
 
 def parse_args():
@@ -83,11 +84,14 @@ if __name__ == "__main__":
 
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
-    app = init_app()
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level=args.uvicorn_log_level,
-        timeout_keep_alive=5,
+    server, _ = init_tritonserver()
+    engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
+    frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
+        host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine
     )
+
+    try:
+        frontend.start()
+    except KeyboardInterrupt:
+        frontend.stop()
+        server.stop()

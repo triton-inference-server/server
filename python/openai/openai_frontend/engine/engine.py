@@ -24,27 +24,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse, Response
 
-router = APIRouter()
+from __future__ import annotations
 
+from typing import List, Protocol
 
-@router.get("/metrics", response_class=PlainTextResponse, tags=["Utilities"])
-def metrics(request: Request) -> PlainTextResponse:
-    return request.app.engine.metrics()
+from schemas.openai import Model
 
 
-@router.get("/health", tags=["Utilities"])
-def health(request: Request) -> Response:
-    if not request.app.engine:
-        raise HTTPException(
-            status_code=400, detail="No inference engine attached to frontend."
-        )
+class OpenAIEngine(Protocol):
+    """
+    Interface for an OpenAI-aware inference engine to be attached to an
+    OpenAI-compatible frontend.
+    """
 
-    if not request.app.engine.live():
-        raise HTTPException(
-            status_code=400, detail="Attached inference engine is not live."
-        )
+    def live(self) -> bool:
+        """
+        Returns True if the engine is live and healthy, or False otherwise.
+        """
+        ...
 
-    return Response(status_code=200)
+    def metrics(self) -> str:
+        """
+        Returns the engine's metrics in a Prometheus-compatible string format.
+        """
+        ...
+
+    def models(self) -> List[Model]:
+        """
+        Returns a List of OpenAI Model objects.
+        """
+        ...

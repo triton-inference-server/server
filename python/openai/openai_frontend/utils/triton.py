@@ -64,6 +64,50 @@ def determine_request_converter(backend):
     return create_trtllm_inference_request
 
 
+def read_models(server):
+    model_metadata = []
+    backends = []
+
+    # TODO: Consider support for custom tokenizers
+    tokenizer = None
+    tokenizer_model = os.environ.get("TOKENIZER")
+    if tokenizer_model:
+        print(f"Using env var TOKENIZER={tokenizer_model} to determine the tokenizer")
+        tokenizer = get_tokenizer(tokenizer_model)
+
+    models = []
+    backends = []
+    names = []
+    # Load all triton models and gather the respective backends of each
+    for name, _ in server.models().keys():
+        model = server.model(name)
+        backend = model.config()["backend"]
+
+        names.append(name)
+        models.append(model)
+        backends.append(backend)
+        print(f"Loaded: {name=}, {backend=}, tokenizer={tokenizer_model}")
+
+    create_time = int(time.time())
+
+    # One tokenizer, convert function, and creation time for all loaded models.
+    # NOTE: This doesn't currently support having both a vLLM and TRT-LLM
+    # model loaded at the same time.
+    for name, model, backend in zip(names, models, backends):
+        metadata = TritonModelMetadata(
+            name=name,
+            backend=backend,
+            model=model,
+            tokenizer=tokenizer,
+            create_time=create_time,
+            request_converter=determine_request_converter(backend),
+        )
+        model_metadata.append(metadata)
+
+    return model_metadata
+
+
+# TODO: Remove?
 def load_models(server):
     model_metadata = []
     backends = []
@@ -124,7 +168,8 @@ def init_tritonserver():
         log_info=True,
         log_warn=True,
         log_error=True,
-        model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        # TODO: explicit control mode necessary?
+        # model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
     ).start(wait_until_ready=True)
 
     print("Loading Models...")

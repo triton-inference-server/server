@@ -24,27 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse, Response
+from __future__ import annotations
 
-router = APIRouter()
-
-
-@router.get("/metrics", response_class=PlainTextResponse, tags=["Utilities"])
-def metrics(request: Request) -> PlainTextResponse:
-    return request.app.engine.metrics()
+from typing import Protocol
 
 
-@router.get("/health", tags=["Utilities"])
-def health(request: Request) -> Response:
-    if not request.app.engine:
-        raise HTTPException(
-            status_code=400, detail="No inference engine attached to frontend."
-        )
+class OpenAIFrontend(Protocol):
+    def start(self) -> None:
+        ...
 
-    if not request.app.engine.live():
-        raise HTTPException(
-            status_code=400, detail="Attached inference engine is not live."
-        )
-
-    return Response(status_code=200)
+    def stop(self) -> None:
+        ...

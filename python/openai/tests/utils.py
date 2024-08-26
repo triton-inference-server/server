@@ -35,14 +35,21 @@ import openai
 import requests
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
-from openai_frontend.app import init_app
+from engine.triton_engine import TritonOpenAIEngine
+from frontend.triton_frontend import TritonOpenAIFrontend
+from utils.triton import init_tritonserver
 
 
+# TODO: Cleanup, refactor, mock, etc.
 def setup_fastapi_app(tokenizer: str, model_repository: str):
     os.environ["TOKENIZER"] = tokenizer
     os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
-    app = init_app()
-    return app
+
+    server, _ = init_tritonserver()
+    engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
+
+    frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)
+    return frontend.app
 
 
 # Heavily inspired by vLLM's test infrastructure
