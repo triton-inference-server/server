@@ -84,7 +84,10 @@ class TestKServeGrpc:
     def test_invalid_options(self):
         server = TestingUtils.setup_server()
 
-        with pytest.raises(InvalidArgumentError):
+        with pytest.raises(
+            InvalidArgumentError,
+            match="Incorrect type for options. options argument must be of type KServeGrpc.Options",
+        ):
             custom_grpc_service = KServeGrpc.Server(server, {"port": 8001})
 
         TestingUtils.teardown_server(server)

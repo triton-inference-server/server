@@ -87,7 +87,10 @@ class TestKServeHttp:
     def test_invalid_options(self):
         server = TestingUtils.setup_server()
         # dict is not a valid KServeHttp.Options object
-        with pytest.raises(InvalidArgumentError):
+        with pytest.raises(
+            InvalidArgumentError,
+            match="Incorrect type for options. options argument must be of type KServeHttp.Options",
+        ):
             custom_http_service = KServeHttp.Server(server, {"port": 8001})
 
         TestingUtils.teardown_server(server)
