@@ -2,7 +2,7 @@
 Model Analyzer
 ####
 
-.. mdinclude:: ../model_analyzer/docs/README.md
+.. include:: ../model-analyzer-README.rst
 
 .. toctree::
    :maxdepth: 1

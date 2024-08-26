@@ -69,8 +69,8 @@ master_doc = "contents"
 # ones.
 extensions = [
     "ablog",
-    "sphinx_mdinclude", # include md files in rst
-    # "myst_parser", use sphinx parser for rendering rst files
+    #"sphinx_mdinclude", # include md files in rst
+    "myst_parser", #use sphinx parser for rendering rst files
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx-prompt",
@@ -138,6 +138,7 @@ exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
+#html_theme = "sphinx_book_theme"
 html_theme = "nvidia_sphinx_theme"
 #html_logo = "_static/nvidia-logo-horiz-rgb-blk-for-screen.png"
 #html_title = "NVIDIA Triton Inference Server"
@@ -156,7 +157,7 @@ html_css_files = ["custom.css"]
 
 html_theme_options = {
     # set the start date for copyright
-#    "path_to_docs": "docs",
+    # "path_to_docs": "docs",
     # "launch_buttons": {
     #     "binderhub_url": "https://mybinder.org",
     #     "colab_url": "https://colab.research.google.com/",
@@ -165,16 +166,28 @@ html_theme_options = {
     #     "thebe": True,
     #     # "jupyterhub_url": "https://datahub.berkeley.edu",  # For testing
     # },
-#    "use_edit_page_button": False,
-#    "use_issues_button": True,
-#    "use_repository_button": True,
-#    "use_download_button": False,
-#    "logo_only": False,
-#    "show_toc_level": 2,
-#    "extra_navbar": "",
+    #"use_edit_page_button": False,
+    #"use_issues_button": True,
+    #"use_repository_button": True,
+    #"use_download_button": False,
+    #"logo_only": False,
+    #"show_toc_level": 2,
+    #"extra_navbar": "",
+    #"extra_footer": """
+    #  <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-policy/" target="_blank">Privacy Policy</a> |
+    #  <a href="https://www.nvidia.com/en-us/privacy-center/" target="_blank">Manage My Privacy</a> |
+    #  <a href="https://www.nvidia.com/en-us/preferences/email-preferences/" target="_blank">Do Not Sell or Share My
+    #    Data</a> |
+    #  <a href="https://www.nvidia.com/en-us/about-nvidia/terms-of-service/" target="_blank">Terms of Service</a> |
+    #  <a href="https://www.nvidia.com/en-us/about-nvidia/accessibility/" target="_blank">Accessibility</a> |
+    #  <a href="https://www.nvidia.com/en-us/about-nvidia/company-policies/" target="_blank">Corporate Policies</a> |
+    #  <a href="https://www.nvidia.com/en-us/product-security/" target="_blank">Product Security</a> |
+    #  <a href="https://www.nvidia.com/en-us/contact/" target="_blank">Contact</a>""",
+    #"repository_url": "https://github.com/triton-inference-server/server",
+    #"use_repository_button": True,
     "github_url": "https://github.com/triton-inference-server/server",
     "navbar_start": ["navbar-logo", "version-switcher"],
-#    "use_repository_button": True,
+    #"use_repository_button": True,
 }
 
 # Theme options are theme-specific and customize the look and feel of a theme

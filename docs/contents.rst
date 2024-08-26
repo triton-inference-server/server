@@ -71,8 +71,8 @@
    :hidden:
    :caption: Server
 
-   serverfeatures
-   distributedserve
+   server/features
+   server/distributedserve
 
 .. toctree::
    :hidden:

@@ -27,11 +27,6 @@
 -->
 
 
-
-```{image} ./_static/nvidia-logo-vert-rgb-blk-for-screen.png
-:width: 300px
-```
-
 # NVIDIA Triton Inference Server
 Triton Inference Server is an open source inference serving software that streamlines AI inferencing.
 
