@@ -93,7 +93,7 @@ class Barrier {
 struct RequestReleasePayload final {
   explicit RequestReleasePayload(
       const std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request)
-      : inference_request_(inference_request) {};
+      : inference_request_(inference_request){};
 
  private:
   std::shared_ptr<TRITONSERVER_InferenceRequest> inference_request_ = nullptr;
