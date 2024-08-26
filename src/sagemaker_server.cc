@@ -429,7 +429,7 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   auto error = infer_request->DecrementShmRefCounts();
   if (error != nullptr) {
     LOG_VERBOSE(1) << "DecrementShmRefCounts failed: "
-                   << TRITONSERVER_ErrorMessage(err);
+                   << TRITONSERVER_ErrorMessage(error);
   }
 
   evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
@@ -597,16 +597,18 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
         request_release_payload.release();
       }
     }
+
+    if (err != nullptr) {
+      auto error = infer_request->DecrementShmRefCounts();
+      if (error != nullptr) {
+        LOG_VERBOSE(1) << "DecrementShmRefCounts failed: "
+                       << TRITONSERVER_ErrorMessage(error);
+      }
+    }
   }
 
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-    auto error = infer_request->DecrementShmRefCounts();
-    if (error != nullptr) {
-      LOG_VERBOSE(1) << "DecrementShmRefCounts failed: "
-                     << TRITONSERVER_ErrorMessage(err);
-    }
 
     evhtp_headers_add_header(
         req->headers_out,
