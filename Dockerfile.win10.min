@@ -37,7 +37,7 @@ RUN choco install unzip -y
 #
 # Installing TensorRT
 #
-ARG TENSORRT_VERSION=10.2.0.19
+ARG TENSORRT_VERSION=10.3.0.26
 ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-12.5.zip"
 ARG TENSORRT_SOURCE=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.2.0/zip/TensorRT-10.2.0.19.Windows10.x86_64.cuda-12.5.zip
 # COPY ${TENSORRT_ZIP} /tmp/${TENSORRT_ZIP}
@@ -51,7 +51,7 @@ LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
 #
 # Installing cuDNN
 #
-ARG CUDNN_VERSION=9.2.1.18
+ARG CUDNN_VERSION=9.3.0.75
 ARG CUDNN_ZIP=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda12-archive.zip
 ARG CUDNN_SOURCE=https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.2.1.18_cuda12-archive.zip
 ADD ${CUDNN_SOURCE} /tmp/${CUDNN_ZIP}
@@ -101,14 +101,14 @@ LABEL CMAKE_VERSION=${CMAKE_VERSION}
 #
 # Installing Visual Studio BuildTools: VS17 2022
 #
-ARG BUILDTOOLS_VERSION=17.9.34622.214
+ARG BUILDTOOLS_VERSION=17.10.35201.131
 # Download collect.exe in case of an install failure.
 ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
 # Use the latest release channel. For more control, specify the location of an internal layout.
 # Download the Build Tools bootstrapper.
 # ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
-ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/5e7b923b-7d89-4e14-95b8-a84ab168e243/96b21d216c7954aaf606c6d7ba59a3de991884a8a86c578c767ba349c23188a9/vs_BuildTools.exe
+ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/28626b4b-f88f-4b55-a0cf-f3eaa2c643fb/e6c43d4dfb36338d954cdb3ad9010ab2a479e712088f4f6b016eadcc721bab28/vs_BuildTools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
@@ -175,7 +175,7 @@ RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensi
 
 RUN setx PATH "%CUDA_INSTALL_ROOT_WP%\bin;%PATH%"
 
-ARG CUDNN_VERSION=9.2.1.18
+ARG CUDNN_VERSION=9.3.0.75
 ENV CUDNN_VERSION ${CUDNN_VERSION}
 COPY --from=dependency_base /cudnn /cudnn
 RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
@@ -183,7 +183,7 @@ RUN copy cudnn\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
 RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
 LABEL CUDNN_VERSION="${CUDNN_VERSION}"
 
-ARG TENSORRT_VERSION=10.2.0.19
+ARG TENSORRT_VERSION=10.3.0.26
 ENV TRT_VERSION ${TENSORRT_VERSION}
 COPY --from=dependency_base /TensorRT /TensorRT
 RUN setx PATH "c:\TensorRT\lib;%PATH%"
