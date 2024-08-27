@@ -70,9 +70,9 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.49.0dev": (
-        "24.08dev",  # triton container
-        "24.07",  # upstream container
+    "2.50.0dev": (
+        "24.09dev",  # triton container
+        "24.08",  # upstream container
         "1.18.1",  # ORT
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
@@ -216,6 +216,8 @@ class BuildScript:
 
         self.comment("Exit script immediately if any command fails")
         if target_platform() == "windows":
+            self._file.write("$UseStructuredOutput = $false\n")
+            self.blankln()
             self._file.write("function ExitWithCode($exitcode) {\n")
             self._file.write("    $host.SetShouldExit($exitcode)\n")
             self._file.write("    exit $exitcode\n")
@@ -660,7 +662,9 @@ def onnxruntime_cmake_args(images, library_paths):
             "onnxruntime",
             "TRITON_BUILD_ONNXRUNTIME_VERSION",
             None,
-            TRITON_VERSION_MAP[FLAGS.version][2],
+            os.getenv("TRITON_BUILD_ONNXRUNTIME_VERSION")
+            if os.getenv("TRITON_BUILD_ONNXRUNTIME_VERSION")
+            else TRITON_VERSION_MAP[FLAGS.version][2],
         )
     ]
 
