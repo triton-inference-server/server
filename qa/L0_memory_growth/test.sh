@@ -47,7 +47,8 @@ IMAGE=../images/vulture.jpeg
 
 # Models
 TRTEXEC=/usr/src/tensorrt/bin/trtexec
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 # Server
 SERVER=/opt/tritonserver/bin/tritonserver

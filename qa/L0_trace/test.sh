@@ -49,7 +49,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_model_repository"}
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 BLSDIR=../python_models/bls_simple
 CANCELDIR=models/

@@ -44,7 +44,8 @@ TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 TEST=tf_tag_sigdef_test.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_tf_tag_sigdef_repository"}
 MODELDIR=`pwd`/models
 
 rm -rf $SERVER_LOG $CLIENT_LOG $MODELDIR

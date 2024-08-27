@@ -52,7 +52,8 @@ NGINX_CONF="./nginx.conf"
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/mnt/c/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
@@ -83,7 +84,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+    DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends

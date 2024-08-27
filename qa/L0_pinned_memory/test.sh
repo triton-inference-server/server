@@ -42,7 +42,8 @@ CLIENT=../clients/perf_client
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh

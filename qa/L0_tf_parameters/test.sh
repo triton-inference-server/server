@@ -41,7 +41,8 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_parameters_repository
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/qa_tf_parameters_repository"}
 TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 TEST=tf_parameter_test.py

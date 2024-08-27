@@ -42,7 +42,8 @@ RET=0
 TEST_RESULT_FILE='test_results.txt'
 BACKENDS="onnx"
 export CUDA_VISIBLE_DEVICES=0
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 
 rm -rf models
 mkdir models

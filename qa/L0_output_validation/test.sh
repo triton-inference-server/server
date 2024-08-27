@@ -43,7 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store2
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}/libtorch_model_store2"}
 EXPECTED_NUM_TESTS="3"
 
 SERVER=/opt/tritonserver/bin/tritonserver

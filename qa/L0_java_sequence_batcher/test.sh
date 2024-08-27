@@ -39,7 +39,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 # Models
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+DATADIR_ROOT=${DATADIR_ROOT:="/data/inferenceserver"}
+DATADIR=${DATADIR:="${DATADIR_ROOT}/${REPO_VERSION}"}
 JAVACPP_BRANCH=${JAVACPP_BRANCH:="https://github.com/bytedeco/javacpp-presets.git"}
 JAVACPP_BRANCH_TAG=${JAVACPP_BRANCH_TAG:="master"}
 
