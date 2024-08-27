@@ -41,97 +41,8 @@ from schemas.openai import (
     CreateChatCompletionStreamResponse,
     ObjectType,
 )
-from utils.triton import TritonModelMetadata, get_output, validate_triton_responses
 
 router = APIRouter()
-
-
-# TODO: This behavior should be tested further
-def _get_first_response_role(
-    conversation: List[Dict], add_generation_prompt: bool, default_role: str
-) -> str:
-    if add_generation_prompt:
-        return default_role
-
-    return conversation[-1]["role"]
-
-
-def _streaming_chat_completion_response(
-    request_id: str, created: int, model: str, role: str, responses: List
-) -> str:
-    # first chunk
-    choice = ChatCompletionStreamingResponseChoice(
-        index=0,
-        delta=ChatCompletionStreamResponseDelta(
-            role=role, content="", function_call=None
-        ),
-        logprobs=None,
-        finish_reason=None,
-    )
-    chunk = CreateChatCompletionStreamResponse(
-        id=request_id,
-        choices=[choice],
-        created=created,
-        model=model,
-        system_fingerprint=None,
-        object=ObjectType.chat_completion_chunk,
-    )
-    yield f"data: {chunk.json(exclude_unset=True)}\n\n"
-
-    for response in responses:
-        text = get_output(response)
-
-        choice = ChatCompletionStreamingResponseChoice(
-            index=0,
-            delta=ChatCompletionStreamResponseDelta(
-                role=None, content=text, function_call=None
-            ),
-            logprobs=None,
-            finish_reason=ChatCompletionFinishReason.stop if response.final else None,
-        )
-
-        chunk = CreateChatCompletionStreamResponse(
-            id=request_id,
-            choices=[choice],
-            created=created,
-            model=model,
-            system_fingerprint=None,
-            object=ObjectType.chat_completion_chunk,
-        )
-
-        yield f"data: {chunk.json(exclude_unset=True)}\n\n"
-
-    yield "data: [DONE]\n\n"
-
-
-def _validate_chat_request(
-    request: CreateChatCompletionRequest, metadata: TritonModelMetadata
-):
-    """
-    Validates a chat completions request to align with currently supported features.
-    """
-
-    if not metadata:
-        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
-
-    if not metadata.request_converter:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown request format for model: {request.model}"
-        )
-
-    if not metadata.tokenizer:
-        raise HTTPException(status_code=400, detail="Unknown tokenizer")
-
-    if not metadata.backend:
-        raise HTTPException(status_code=400, detail="Unknown backend")
-
-    if request.n and request.n > 1:
-        raise HTTPException(status_code=400, detail="Only single choice is supported")
-
-    if request.logit_bias is not None or request.logprobs:
-        raise HTTPException(
-            status_code=400, detail="logit bias and log probs not supported"
-        )
 
 
 @router.post(
@@ -144,7 +55,16 @@ def create_chat_completion(
     """
     Creates a model response for the given chat conversation.
     """
+    try:
+        response = raw_request.app.engine.chat(request)
+        if request.stream:
+            return StreamingResponse(response, media_type="text/event-stream")
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Chat Completion failed: {e}")
 
+
+def placeholder():
     metadata = raw_request.app.models.get(request.model)
     _validate_chat_request(request, metadata)
 
@@ -186,7 +106,7 @@ def create_chat_completion(
 
     # Response validation with decoupled models in mind
     responses = list(responses)
-    validate_triton_responses(responses)
+    validate_triton_responses_non_streaming(responses)
     response = responses[0]
     text = get_output(response)
 

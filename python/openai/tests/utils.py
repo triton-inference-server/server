@@ -49,7 +49,7 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
     engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
 
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)
-    return frontend.app
+    return frontend.app, server
 
 
 # Heavily inspired by vLLM's test infrastructure
@@ -79,7 +79,9 @@ class OpenAIServer:
             stderr=sys.stderr,
         )
         # Wait until health endpoint is responsive
-        self._wait_for_server(url=self.url_for("health"), timeout=self.START_TIMEOUT)
+        self._wait_for_server(
+            url=self.url_for("health", "ready"), timeout=self.START_TIMEOUT
+        )
 
     def __enter__(self):
         return self

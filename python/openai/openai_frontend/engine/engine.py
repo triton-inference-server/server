@@ -27,9 +27,13 @@
 
 from __future__ import annotations
 
-from typing import List, Protocol
+from typing import Iterator, List, Protocol
 
-from schemas.openai import Model
+from schemas.openai import (
+    CreateChatCompletionRequest,
+    CreateChatCompletionResponse,
+    Model,
+)
 
 
 class OpenAIEngine(Protocol):
@@ -38,9 +42,9 @@ class OpenAIEngine(Protocol):
     OpenAI-compatible frontend.
     """
 
-    def live(self) -> bool:
+    def ready(self) -> bool:
         """
-        Returns True if the engine is live and healthy, or False otherwise.
+        Returns True if the engine is ready to accept inference requests, or False otherwise.
         """
         ...
 
@@ -53,5 +57,19 @@ class OpenAIEngine(Protocol):
     def models(self) -> List[Model]:
         """
         Returns a List of OpenAI Model objects.
+        """
+        ...
+
+    def chat(
+        self, request: CreateChatCompletionRequest
+    ) -> CreateChatCompletionResponse | Iterator[str]:
+        """
+        If request.stream is True, this returns an Iterator (or Generator) that
+        produces server-sent-event (SSE) strings in the following form:
+            'data: {CreateChatCompletionStreamResponse}\n\n'
+            ...
+            'data: [DONE]\n\n'
+
+        If request.stream is False, this returns a CreateChatCompletionResponse.
         """
         ...

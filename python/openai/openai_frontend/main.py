@@ -28,10 +28,23 @@
 
 import argparse
 import os
+import signal
+from functools import partial
 
+import tritonserver
 from engine.triton_engine import TritonOpenAIEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
 from utils.triton import init_tritonserver
+
+
+def signal_handler(server, frontend, signal, frame):
+    print(f"Received {signal=}, {frame=}")
+
+    # Graceful Shutdown
+    print("Shutting down OpenAI Frontend...")
+    frontend.stop()
+    print("Shutting down Triton Inference Server...")
+    server.stop()
 
 
 def parse_args():
@@ -84,14 +97,15 @@ if __name__ == "__main__":
 
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
-    server, _ = init_tritonserver()
+    server: tritonserver.Server = init_tritonserver()
     engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
         host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine
     )
 
-    try:
-        frontend.start()
-    except KeyboardInterrupt:
-        frontend.stop()
-        server.stop()
+    # Gracefully shutdown when receiving signals for testing and interactive use
+    signal.signal(signal.SIGINT, partial(signal_handler, server, frontend))
+    signal.signal(signal.SIGTERM, partial(signal_handler, server, frontend))
+
+    # Blocking call until killed or interrupted with SIGINT
+    frontend.start()

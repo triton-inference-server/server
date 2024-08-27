@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 from pathlib import Path
 
 import pytest
@@ -43,9 +42,13 @@ class TestObservability:
     def client(self):
         # TODO: Cleanup, mock server/engine, etc.
         model_repository = Path(__file__).parent / "test_models"
-        app = setup_fastapi_app(tokenizer="", model_repository=str(model_repository))
+        app, server = setup_fastapi_app(
+            tokenizer="", model_repository=str(model_repository)
+        )
         with TestClient(app) as test_client:
             yield test_client
+
+        server.stop()
 
     ### General Error Handling ###
     def test_not_found(self, client):
@@ -54,7 +57,7 @@ class TestObservability:
 
     ### Startup / Health ###
     def test_startup_success(self, client):
-        response = client.get("/health")
+        response = client.get("/health/ready")
         assert response.status_code == 200
 
     ### Metrics ###

@@ -36,125 +36,6 @@ from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 from utils.tokenizer import get_tokenizer
 
 
-# TODO: Improve type hints
-@dataclass
-class TritonModelMetadata:
-    # Name used in Triton model repository
-    name: str
-    # Name of backend used by Triton
-    backend: str
-    # Triton model object handle
-    model: tritonserver.Model
-    # Tokenizers used for chat templates
-    tokenizer: Optional[Any]
-    # Time that model was loaded by Triton
-    create_time: int
-    # Conversion format between OpenAI and Triton requests
-    request_converter: Callable
-
-
-# TODO: Expose explicit flag to catch edge cases
-def determine_request_converter(backend):
-    # Request conversion from OpenAI format to backend-specific format
-    if backend == "vllm":
-        return create_vllm_inference_request
-
-    # Use TRT-LLM format as default for everything else. This could be
-    # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
-    return create_trtllm_inference_request
-
-
-def read_models(server):
-    model_metadata = []
-    backends = []
-
-    # TODO: Consider support for custom tokenizers
-    tokenizer = None
-    tokenizer_model = os.environ.get("TOKENIZER")
-    if tokenizer_model:
-        print(f"Using env var TOKENIZER={tokenizer_model} to determine the tokenizer")
-        tokenizer = get_tokenizer(tokenizer_model)
-
-    models = []
-    backends = []
-    names = []
-    # Load all triton models and gather the respective backends of each
-    for name, _ in server.models().keys():
-        model = server.model(name)
-        backend = model.config()["backend"]
-
-        names.append(name)
-        models.append(model)
-        backends.append(backend)
-        print(f"Loaded: {name=}, {backend=}, tokenizer={tokenizer_model}")
-
-    create_time = int(time.time())
-
-    # One tokenizer, convert function, and creation time for all loaded models.
-    # NOTE: This doesn't currently support having both a vLLM and TRT-LLM
-    # model loaded at the same time.
-    for name, model, backend in zip(names, models, backends):
-        metadata = TritonModelMetadata(
-            name=name,
-            backend=backend,
-            model=model,
-            tokenizer=tokenizer,
-            create_time=create_time,
-            request_converter=determine_request_converter(backend),
-        )
-        model_metadata.append(metadata)
-
-    return model_metadata
-
-
-# TODO: Remove?
-def load_models(server):
-    model_metadata = []
-    backends = []
-
-    # TODO: Consider support for custom tokenizers
-    tokenizer = None
-    tokenizer_model = os.environ.get("TOKENIZER")
-    if tokenizer_model:
-        print(f"Using env var TOKENIZER={tokenizer_model} to determine the tokenizer")
-        tokenizer = get_tokenizer(tokenizer_model)
-
-    models = []
-    backends = []
-    names = []
-    # Load all triton models and gather the respective backends of each
-    for name, version in server.models().keys():
-        # Skip models that are already loaded, if any
-        if version != -1:
-            continue
-
-        model = server.load(name)
-        backend = model.config()["backend"]
-
-        names.append(name)
-        models.append(model)
-        backends.append(backend)
-        print(f"Loaded: {name=}, {backend=}, tokenizer={tokenizer_model}")
-
-    create_time = int(time.time())
-
-    # One tokenizer, convert function, and creation time for all loaded models.
-    # NOTE: This doesn't currently support having both a vLLM and TRT-LLM
-    # model loaded at the same time.
-    for name, model, backend in zip(names, models, backends):
-        metadata = TritonModelMetadata(
-            name=name,
-            backend=backend,
-            model=model,
-            tokenizer=tokenizer,
-            create_time=create_time,
-            request_converter=determine_request_converter(backend),
-        )
-        model_metadata.append(metadata)
-
-    return model_metadata
-
-
 def init_tritonserver():
     model_repository = os.environ.get(
         "TRITON_MODEL_REPOSITORY", "/opt/tritonserver/models"
@@ -168,41 +49,9 @@ def init_tritonserver():
         log_info=True,
         log_warn=True,
         log_error=True,
-        # TODO: explicit control mode necessary?
-        # model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
     ).start(wait_until_ready=True)
 
-    print("Loading Models...")
-    metadatas = load_models(server)
-    return server, metadatas
-
-
-def get_output(response):
-    if "text_output" in response.outputs:
-        try:
-            return response.outputs["text_output"].to_string_array()[0]
-        except Exception:
-            return str(response.outputs["text_output"].to_bytes_array()[0])
-    return ""
-
-
-def validate_triton_responses(responses):
-    num_responses = len(responses)
-    if num_responses == 1 and responses[0].final != True:
-        raise HTTPException(
-            status_code=400,
-            detail="Unexpected internal error with incorrect response flags",
-        )
-    if num_responses == 2 and responses[-1].final != True:
-        raise HTTPException(
-            status_code=400,
-            detail="Unexpected internal error with incorrect response flags",
-        )
-    if num_responses > 2:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unexpected number of responses: {num_responses}, expected 1.",
-        )
+    return server
 
 
 def create_vllm_inference_request(

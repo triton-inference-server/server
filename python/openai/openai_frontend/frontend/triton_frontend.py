@@ -33,7 +33,7 @@ from engine.triton_engine import TritonOpenAIEngine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from frontend.frontend import OpenAIFrontend
-from routers import chat_completions, completions, models, observability
+from routers import chat, completions, models, observability
 
 
 class TritonOpenAIFrontend(OpenAIFrontend):
@@ -83,7 +83,7 @@ class TritonOpenAIFrontend(OpenAIFrontend):
         app.include_router(observability.router)
         app.include_router(models.router)
         app.include_router(completions.router)
-        app.include_router(chat_completions.router)
+        app.include_router(chat.router)
 
         # NOTE: For debugging purposes, should generally be restricted or removed
         self._add_cors_middleware(app)

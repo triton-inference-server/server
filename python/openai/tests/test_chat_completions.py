@@ -462,7 +462,7 @@ class TestChatCompletionsCustomFixture:
         self, backend: str, model: str, messages: List[dict]
     ):
         model_repository = str(Path(__file__).parent / f"{backend}_models")
-        app = setup_fastapi_app(model_repository=model_repository, tokenizer="")
+        app, server = setup_fastapi_app(model_repository=model_repository, tokenizer="")
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
@@ -470,3 +470,5 @@ class TestChatCompletionsCustomFixture:
             )
             assert response.status_code == 400
             assert response.json()["detail"] == "Unknown tokenizer"
+
+        server.stop()

@@ -35,16 +35,17 @@ def metrics(request: Request) -> PlainTextResponse:
     return request.app.engine.metrics()
 
 
-@router.get("/health", tags=["Utilities"])
-def health(request: Request) -> Response:
+@router.get("/health/ready", tags=["Utilities"])
+def ready(request: Request) -> Response:
     if not request.app.engine:
         raise HTTPException(
             status_code=400, detail="No inference engine attached to frontend."
         )
 
-    if not request.app.engine.live():
+    if not request.app.engine.ready():
         raise HTTPException(
-            status_code=400, detail="Attached inference engine is not live."
+            status_code=400,
+            detail="Attached inference engine is not ready for inference requests.",
         )
 
     return Response(status_code=200)

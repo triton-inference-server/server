@@ -28,6 +28,9 @@ import time
 import uuid
 from typing import List
 
+# TODO: Remove
+# from utils.triton import TritonModelMetadata, get_output, validate_triton_responses_non_streaming
+from engine.triton_engine import TritonModelMetadata
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from schemas.openai import (
@@ -37,7 +40,6 @@ from schemas.openai import (
     FinishReason,
     ObjectType,
 )
-from utils.triton import TritonModelMetadata, get_output, validate_triton_responses
 
 router = APIRouter()
 
@@ -140,7 +142,7 @@ def create_completion(
 
     # Response validation with decoupled models in mind
     responses = list(responses)
-    validate_triton_responses(responses)
+    validate_triton_responses_non_streaming(responses)
     response = responses[0]
     text = get_output(response)
 
