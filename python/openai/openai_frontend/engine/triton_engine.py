@@ -78,9 +78,10 @@ class TritonModelMetadata:
 
 
 class TritonLLMEngine(LLMEngine):
-    def __init__(self, server: tritonserver.Server):
+    def __init__(self, server: tritonserver.Server, tokenizer: str):
         # Assume an already configured and started server
         self.server = server
+        self.tokenizer = self._get_tokenizer(tokenizer)
 
         # NOTE: Creation time and model metadata will be static at startup for
         # now, and won't account for dynamically loading/unloading models.
@@ -227,22 +228,16 @@ class TritonLLMEngine(LLMEngine):
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
         return _create_trtllm_inference_request
 
-    def _get_tokenizer(self):
+    def _get_tokenizer(self, tokenizer_name: str):
         # TODO: Consider support for custom tokenizers
         tokenizer = None
-        tokenizer_name = os.environ.get("TOKENIZER")
         if tokenizer_name:
-            print(
-                f"Using env var TOKENIZER={tokenizer_name} to determine the tokenizer"
-            )
             tokenizer = get_tokenizer(tokenizer_name)
 
         return tokenizer
 
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
-        tokenizer = self._get_tokenizer()
-
-        # One tokenizer, convert function, and creation time for all loaded models.
+        # One tokenizer and creation time shared for all loaded models for now.
         model_metadata = {}
 
         # Read all triton models and store the necessary metadata for each
@@ -255,7 +250,7 @@ class TritonLLMEngine(LLMEngine):
                 name=name,
                 backend=backend,
                 model=model,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer,
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
             )

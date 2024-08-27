@@ -41,12 +41,12 @@ class TritonOpenAIFrontend(OpenAIFrontend):
         self,
         host: str = "localhost",
         port: int = 8000,
-        log_level: int = 0,
+        log_level: str = "info",
         engine: Optional[TritonLLMEngine] = None,
     ):
         self.host: str = host
         self.port: int = port
-        self.log_level: int = log_level
+        self.log_level: str = log_level
         self.stopped: bool = False
 
         self.app = self._create_app()

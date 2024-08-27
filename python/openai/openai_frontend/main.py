@@ -34,7 +34,6 @@ from functools import partial
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
-from utils.triton import create_tritonserver
 
 
 def signal_handler(server, frontend, signal, frame):
@@ -66,7 +65,7 @@ def parse_args():
     # Triton
     triton_group = parser.add_argument_group("Triton Inference Server")
     triton_group.add_argument(
-        "--tritonserver-log-level",
+        "--tritonserver-log-verbose-level",
         type=int,
         default=0,
         help="The tritonserver log verbosity level",
@@ -87,16 +86,22 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
-    os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
-    if args.tokenizer:
-        os.environ["TOKENIZER"] = args.tokenizer
 
-    os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
+    # Initialize a Triton Inference Server pointing at LLM models
+    server: tritonserver.Server = tritonserver.Server(
+        model_repository=args.model_repository,
+        log_verbose=args.tritonserver_log_verbose_level,
+        log_info=True,
+        log_warn=True,
+        log_error=True,
+    ).start(wait_until_ready=True)
 
-    server: tritonserver.Server = create_tritonserver()
-    engine: TritonLLMEngine = TritonLLMEngine(server)
+    # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
+    engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=args.tokenizer)
+
+    # Attach TritonLLMEngine as the backbone for inference and model management
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
         host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine
     )
@@ -107,3 +112,7 @@ if __name__ == "__main__":
 
     # Blocking call until killed or interrupted with SIGINT
     frontend.start()
+
+
+if __name__ == "__main__":
+    main()

@@ -24,30 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 from typing import List
 
 import numpy as np
 import tritonserver
 from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
-
-
-def create_tritonserver():
-    model_repository = os.environ.get(
-        "TRITON_MODEL_REPOSITORY", "/opt/tritonserver/models"
-    )
-    log_verbose_level = int(os.environ.get("TRITON_LOG_VERBOSE_LEVEL", "0"))
-
-    print("Starting Triton Server...")
-    server = tritonserver.Server(
-        model_repository=model_repository,
-        log_verbose=log_verbose_level,
-        log_info=True,
-        log_warn=True,
-        log_error=True,
-    ).start(wait_until_ready=True)
-
-    return server
 
 
 def _create_vllm_inference_request(
