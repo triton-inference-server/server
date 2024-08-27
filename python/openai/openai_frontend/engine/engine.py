@@ -48,19 +48,19 @@ class OpenAIEngine(Protocol):
         """
         Returns True if the engine is ready to accept inference requests, or False otherwise.
         """
-        ...
+        pass
 
     def metrics(self) -> str:
         """
         Returns the engine's metrics in a Prometheus-compatible string format.
         """
-        ...
+        pass
 
     def models(self) -> List[Model]:
         """
         Returns a List of OpenAI Model objects.
         """
-        ...
+        pass
 
     def chat(
         self, request: CreateChatCompletionRequest
@@ -74,7 +74,7 @@ class OpenAIEngine(Protocol):
 
         If request.stream is False, this returns a CreateChatCompletionResponse.
         """
-        ...
+        pass
 
     def completion(
         self, request: CreateCompletionRequest
@@ -82,10 +82,10 @@ class OpenAIEngine(Protocol):
         """
         If request.stream is True, this returns an Iterator (or Generator) that
         produces server-sent-event (SSE) strings in the following form:
-            'data: {CreateChatCompletionStreamResponse}\n\n'
+            'data: {CreateCompletionResponse}\n\n'
             ...
             'data: [DONE]\n\n'
 
-        If request.stream is False, this returns a CreateChatCompletionResponse.
+        If request.stream is False, this returns a CreateCompletionResponse.
         """
-        ...
+        pass

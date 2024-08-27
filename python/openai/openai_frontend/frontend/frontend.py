@@ -31,7 +31,13 @@ from typing import Protocol
 
 class OpenAIFrontend(Protocol):
     def start(self) -> None:
-        ...
+        """
+        Starts the OpenAI-compatible service.
+        """
+        pass
 
     def stop(self) -> None:
-        ...
+        """
+        Stops the OpenAI-compatible service.
+        """
+        pass
