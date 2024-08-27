@@ -48,9 +48,7 @@ HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
 HOST_SOURCE_DIR=$HOST_BUILD_DIR/gen_srcdir
 
 # Set CI specific parameters
-DOCKER_GPU_ARGS="${DOCKER_GPU_ARGS:="--gpus device=$CUDA_DEVICE"}"
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS)
-
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
 # Set model output directories
 
