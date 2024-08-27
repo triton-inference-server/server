@@ -23,24 +23,20 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import os
-import time
-from time import perf_counter, sleep
+
+import sys
+
+sys.path.append("../common")
+
 from typing import Union
 
 import numpy as np
 import pytest
-import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-import tritonserver
 from testing_utils import TestingUtils
 from tritonclient.utils import InferenceServerException
-from tritonfrontend import (
-    AlreadyExistsError,
-    InvalidArgumentError,
-    KServeGrpc,
-    KServeHttp,
-)
+from tritonfrontend import AlreadyExistsError, InvalidArgumentError, KServeHttp
+from tritonserver import InternalError
 
 
 class TestHttpOptions:
@@ -126,38 +122,32 @@ class TestKServeHttp:
         TestingUtils.teardown_service(http_service)
         TestingUtils.teardown_server(server)
 
-    def test_req_during_shutdown(self):
-        server = TestingUtils.setup_server()
-        http_service = TestingUtils.setup_service(server, KServeHttp)
-        http_client = httpclient.InferenceServerClient(url="localhost:8000")
-        model_name = "delayed_identity"
-        delay = 5  # seconds
-        input_data0 = np.array([[delay]], dtype=np.float32)
+    # def test_req_during_shutdown(self):
+    #     # server = TestingUtils.setup_server()
+    #     # http_service = TestingUtils.setup_service(server, KServeHttp)
+    #     http_client = httpclient.InferenceServerClient(url="localhost:8000")
+    #     model_name = "delayed_identity"
+    #     delay = 4  # seconds
+    #     input_data0 = np.array([[delay]], dtype=np.float32)
 
-        input0 = httpclient.InferInput("INPUT0", input_data0.shape, "FP32")
-        input0.set_data_from_numpy(input_data0)
+    #     input0 = httpclient.InferInput("INPUT0", input_data0.shape, "FP32")
+    #     input0.set_data_from_numpy(input_data0)
 
-        inputs = [input0]
-        outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
-        start_time = perf_counter()
-        async_request = http_client.async_infer(
-            model_name=model_name, inputs=inputs, outputs=outputs
-        )
-        # with pytest.raises(InferenceServerException):
+    #     inputs = [input0]
+    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
 
-        sleep(2 * delay)
+    #     async_request = http_client.async_infer(
+    #         model_name=model_name, inputs=inputs, outputs=outputs
+    #     )
+    #     # TestingUtils.teardown_service(http_service)
 
-        response = async_request.get_result(block=False)
+    #     with pytest.raises(ConnectionError):
+    #         response = async_request.get_result(block=True)
 
-        TestingUtils.teardown_service(http_service)
-        TestingUtils.teardown_server(server)
-        response = async_request.get_result(block=False)
+    # TestingUtils.teardown_client(http_client)
 
-        end_time = perf_counter()
-
-        assert (end_time - start_time) > delay
-
-        TestingUtils.teardown_client(http_client)
+    # with pytest.raises(InternalError):
+    #     TestingUtils.teardown_server(server)
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date

@@ -265,7 +265,6 @@ HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     return nullptr;
   }
 
-  std::cout << "HTTPServer has been killed!" << std::endl;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }

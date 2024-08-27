@@ -24,6 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
+import sys
+import time
+from functools import partial
 from typing import Union
 
 import numpy as np
@@ -32,12 +35,14 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from testing_utils import TestingUtils
+from tritonclient.utils import InferenceServerException
 from tritonfrontend import (
     AlreadyExistsError,
     InvalidArgumentError,
     KServeGrpc,
     KServeHttp,
 )
+from tritonserver import InternalError
 
 
 class TestGrpcOptions:
@@ -121,3 +126,44 @@ class TestKServeGrpc:
 
         TestingUtils.teardown_service(grpc_service)
         TestingUtils.teardown_server(server)
+
+    def test_req_during_shutdown(self):
+        # server = TestingUtils.setup_server()
+        # grpc_service = TestingUtils.setup_service(server, KServeGrpc)
+        grpc_client = grpcclient.InferenceServerClient(url="localhost:8001")
+        user_data = []
+
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        model_name = "delayed_identity"
+        delay = 4  # seconds
+
+        input_data0 = np.array([[delay]], dtype=np.float32)
+        input0 = grpcclient.InferInput("INPUT0", input_data0.shape, "FP32")
+        input0.set_data_from_numpy(input_data0)
+
+        inputs = [input0]
+        outputs = [grpcclient.InferRequestedOutput("OUTPUT0")]
+
+        async_request = grpc_client.async_infer(
+            model_name=model_name,
+            inputs=inputs,
+            outputs=outputs,
+            callback=partial(callback, user_data),
+        )
+
+        # TestingUtils.teardown_service(grpc_service)
+        time_out = delay + 1
+        while (len(user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+
+        assert len(user_data) == 1 and user_data[0] == InferenceServerException
+
+        TestingUtils.teardown_client(grpc_client)
+        # with pytest.raises(InternalError):
+        #     TestingUtils.teardown_server(server)
