@@ -113,7 +113,10 @@ class TestChatCompletions:
         unsupported_parameters = ["logprobs", "logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
-            assert response.json()["detail"] == "logit bias and log probs not supported"
+            assert (
+                response.json()["detail"]
+                == "logit bias and log probs not currently supported"
+            )
             return
 
         assert response.status_code == 200

@@ -45,7 +45,7 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
     os.environ["TOKENIZER"] = tokenizer
     os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
 
-    server, _ = init_tritonserver()
+    server = init_tritonserver()
     engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
 
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)
