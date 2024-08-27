@@ -32,6 +32,8 @@ from typing import Iterator, List, Protocol
 from schemas.openai import (
     CreateChatCompletionRequest,
     CreateChatCompletionResponse,
+    CreateCompletionRequest,
+    CreateCompletionResponse,
     Model,
 )
 
@@ -63,6 +65,20 @@ class OpenAIEngine(Protocol):
     def chat(
         self, request: CreateChatCompletionRequest
     ) -> CreateChatCompletionResponse | Iterator[str]:
+        """
+        If request.stream is True, this returns an Iterator (or Generator) that
+        produces server-sent-event (SSE) strings in the following form:
+            'data: {CreateChatCompletionStreamResponse}\n\n'
+            ...
+            'data: [DONE]\n\n'
+
+        If request.stream is False, this returns a CreateChatCompletionResponse.
+        """
+        ...
+
+    def completion(
+        self, request: CreateCompletionRequest
+    ) -> CreateCompletionResponse | Iterator[str]:
         """
         If request.stream is True, this returns an Iterator (or Generator) that
         produces server-sent-event (SSE) strings in the following form:

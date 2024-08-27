@@ -34,7 +34,7 @@ from functools import partial
 import tritonserver
 from engine.triton_engine import TritonOpenAIEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
-from utils.triton import init_tritonserver
+from utils.triton import create_tritonserver
 
 
 def signal_handler(server, frontend, signal, frame):
@@ -89,15 +89,13 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    # NOTE: configurations can be passed to FastAPI app through a builder
-    # function like init_app in future, but using env vars for simplicity.
     os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
     if args.tokenizer:
         os.environ["TOKENIZER"] = args.tokenizer
 
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
-    server: tritonserver.Server = init_tritonserver()
+    server: tritonserver.Server = create_tritonserver()
     engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
         host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine

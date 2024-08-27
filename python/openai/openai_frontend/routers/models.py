@@ -39,6 +39,9 @@ def list_models(request: Request) -> ListModelsResponse:
     """
     Lists the currently available models, and provides basic information about each one such as the owner and availability.
     """
+    if not request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
     models: List[Model] = request.app.engine.models()
     return ListModelsResponse(object=ObjectType.list, data=models)
 
@@ -48,7 +51,10 @@ def retrieve_model(request: Request, model_name: str) -> Model:
     """
     Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     """
-    # TODO: Return model directly from engine instead of searching
+    if not request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
+    # TODO: Return model directly from engine instead of searching models
     models: List[Model] = request.app.engine.models()
     for model in models:
         if model.id == model_name:

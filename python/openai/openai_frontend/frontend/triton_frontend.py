@@ -49,8 +49,9 @@ class TritonOpenAIFrontend(OpenAIFrontend):
         self.log_level: int = log_level
         self.stopped: bool = False
 
-        self.app = self._init_app()
-        self.engine = self._init_engine(engine)
+        self.app = self._create_app()
+        # Attach the inference engine to the FastAPI app
+        self.app.engine = engine
 
     def __del__(self):
         self.stop()
@@ -65,9 +66,10 @@ class TritonOpenAIFrontend(OpenAIFrontend):
         )
 
     def stop(self):
+        # NOTE: If the frontend owned the engine, it could do cleanup here.
         pass
 
-    def _init_app(self):
+    def _create_app(self):
         app = FastAPI(
             title="OpenAI API",
             description="The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.",
@@ -105,12 +107,3 @@ class TritonOpenAIFrontend(OpenAIFrontend):
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
-    def _init_engine(self, engine: Optional[TritonOpenAIEngine]):
-        # TODO: Use engine to access models too
-        if not engine:
-            self.app.engine = None
-            self.app.models = {}
-
-        self.app.engine = engine
-        self.app.models = engine.models()

@@ -38,6 +38,12 @@ def create_chat_completion(
     request: CreateChatCompletionRequest,
     raw_request: Request,
 ) -> CreateChatCompletionResponse | StreamingResponse:
+    """
+    Creates a chat completion for the provided messages and parameters.
+    """
+    if not raw_request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
     try:
         response = raw_request.app.engine.chat(request)
         if request.stream:

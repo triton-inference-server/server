@@ -24,89 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
-import uuid
-from typing import List
-
-# TODO: Remove
-# from utils.triton import TritonModelMetadata, get_output, validate_triton_responses_non_streaming
-from engine.triton_engine import TritonModelMetadata
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from schemas.openai import (
-    Choice,
-    CreateCompletionRequest,
-    CreateCompletionResponse,
-    FinishReason,
-    ObjectType,
-)
+from schemas.openai import CreateCompletionRequest, CreateCompletionResponse
 
 router = APIRouter()
-
-
-def _streaming_completion_response(
-    request_id: str, created: int, model: str, responses: List
-) -> str:
-    for response in responses:
-        text = get_output(response)
-
-        choice = Choice(
-            finish_reason=FinishReason.stop if response.final else None,
-            index=0,
-            logprobs=None,
-            text=text,
-        )
-        response = CreateCompletionResponse(
-            id=request_id,
-            choices=[choice],
-            system_fingerprint=None,
-            object=ObjectType.text_completion,
-            created=created,
-            model=model,
-        )
-
-        yield f"data: {response.json(exclude_unset=True)}\n\n"
-    yield "data: [DONE]\n\n"
-
-
-def _validate_completions_request(
-    request: CreateCompletionRequest, metadata: TritonModelMetadata
-):
-    """
-    Validates a completions request to align with currently supported features.
-    """
-    if not metadata:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown model metadata for model: {request.model}"
-        )
-
-    if not metadata.request_converter:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown request format for model: {request.model}"
-        )
-
-    if request.suffix is not None:
-        raise HTTPException(status_code=400, detail="suffix is not currently supported")
-
-    if request.model != metadata.name:
-        raise HTTPException(status_code=404, detail=f"Unknown model: {request.model}")
-
-    if not request.prompt:
-        raise HTTPException(status_code=400, detail="prompt must be non-empty")
-
-    # Currently only support single string as input
-    if not isinstance(request.prompt, str):
-        raise HTTPException(
-            status_code=400, detail="only single string input is supported"
-        )
-
-    if request.n and request.n > 1:
-        raise HTTPException(status_code=400, detail="Only single choice is supported")
-
-    if request.logit_bias is not None or request.logprobs is not None:
-        raise HTTPException(
-            status_code=400, detail="logit bias and log probs not supported"
-        )
 
 
 @router.post(
@@ -118,45 +40,13 @@ def create_completion(
     """
     Creates a completion for the provided prompt and parameters.
     """
+    if not raw_request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
-    # Validate request and convert to Triton format
-    metadata = raw_request.app.models.get(request.model)
-    _validate_completions_request(request, metadata)
-
-    # Convert to Triton request format and perform inference
-    triton_model = raw_request.app.server.model(request.model)
-    responses = triton_model.infer(
-        metadata.request_converter(triton_model, request.prompt, request)
-    )
-
-    # Prepare and send responses back to client in OpenAI format
-    request_id = f"cmpl-{uuid.uuid1()}"
-    created = int(time.time())
-    if request.stream:
-        return StreamingResponse(
-            _streaming_completion_response(
-                request_id, created, metadata.name, responses
-            ),
-            media_type="text/event-stream",
-        )
-
-    # Response validation with decoupled models in mind
-    responses = list(responses)
-    validate_triton_responses_non_streaming(responses)
-    response = responses[0]
-    text = get_output(response)
-
-    choice = Choice(
-        finish_reason=FinishReason.stop,
-        index=0,
-        logprobs=None,
-        text=text,
-    )
-    return CreateCompletionResponse(
-        id=request_id,
-        choices=[choice],
-        system_fingerprint=None,
-        object=ObjectType.text_completion,
-        created=created,
-        model=metadata.name,
-    )
+    try:
+        response = raw_request.app.engine.completion(request)
+        if request.stream:
+            return StreamingResponse(response, media_type="text/event-stream")
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"{e}")

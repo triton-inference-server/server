@@ -33,7 +33,6 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
-import numpy as np
 import tritonserver
 from engine.engine import OpenAIEngine
 from schemas.openai import (
@@ -42,14 +41,23 @@ from schemas.openai import (
     ChatCompletionResponseMessage,
     ChatCompletionStreamingResponseChoice,
     ChatCompletionStreamResponseDelta,
+    Choice,
     CreateChatCompletionRequest,
     CreateChatCompletionResponse,
     CreateChatCompletionStreamResponse,
+    CreateCompletionRequest,
+    CreateCompletionResponse,
+    FinishReason,
     Model,
     ObjectType,
 )
 from utils.tokenizer import get_tokenizer
-from utils.triton import create_trtllm_inference_request, create_vllm_inference_request
+from utils.triton import (
+    _create_trtllm_inference_request,
+    _create_vllm_inference_request,
+    _get_output,
+    _validate_triton_responses_non_streaming,
+)
 
 
 # TODO: Improve type hints
@@ -137,9 +145,9 @@ class TritonOpenAIEngine(OpenAIEngine):
 
         # Response validation with decoupled models in mind
         responses = list(responses)
-        self._validate_triton_responses_non_streaming(responses)
+        _validate_triton_responses_non_streaming(responses)
         response = responses[0]
-        text = self._get_output(response)
+        text = _get_output(response)
 
         return CreateChatCompletionResponse(
             id=request_id,
@@ -159,6 +167,47 @@ class TritonOpenAIEngine(OpenAIEngine):
             object=ObjectType.chat_completion,
         )
 
+    def completion(
+        self, request: CreateCompletionRequest
+    ) -> CreateCompletionResponse | Iterator[str]:
+        # Validate request and convert to Triton format
+        metadata = self.model_metadata.get(request.model)
+        self._validate_completion_request(request, metadata)
+
+        # Convert to Triton request format and perform inference
+        responses = metadata.model.infer(
+            metadata.request_converter(metadata.model, request.prompt, request)
+        )
+
+        # Prepare and send responses back to client in OpenAI format
+        request_id = f"cmpl-{uuid.uuid1()}"
+        created = int(time.time())
+        if request.stream:
+            return self._streaming_completion_iterator(
+                request_id, created, metadata.name, responses
+            )
+
+        # Response validation with decoupled models in mind
+        responses = list(responses)
+        _validate_triton_responses_non_streaming(responses)
+        response = responses[0]
+        text = _get_output(response)
+
+        choice = Choice(
+            finish_reason=FinishReason.stop,
+            index=0,
+            logprobs=None,
+            text=text,
+        )
+        return CreateCompletionResponse(
+            id=request_id,
+            choices=[choice],
+            system_fingerprint=None,
+            object=ObjectType.text_completion,
+            created=created,
+            model=metadata.name,
+        )
+
     # TODO: This behavior should be tested further
     def _get_first_response_role(
         self, conversation: List[Dict], add_generation_prompt: bool, default_role: str
@@ -172,30 +221,11 @@ class TritonOpenAIEngine(OpenAIEngine):
     def _determine_request_converter(self, backend):
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
-            return create_vllm_inference_request
+            return _create_vllm_inference_request
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
-        return create_trtllm_inference_request
-
-    def _get_output(self, response):
-        if "text_output" in response.outputs:
-            try:
-                return response.outputs["text_output"].to_string_array()[0]
-            except Exception:
-                return str(response.outputs["text_output"].to_bytes_array()[0])
-        return ""
-
-    def _validate_triton_responses_non_streaming(self, responses):
-        num_responses = len(responses)
-        if num_responses == 1 and responses[0].final != True:
-            raise Exception("Unexpected internal error with incorrect response flags")
-        if num_responses == 2 and responses[-1].final != True:
-            raise Exception("Unexpected internal error with incorrect response flags")
-        if num_responses > 2:
-            raise Exception(
-                f"Unexpected number of responses: {num_responses}, expected 1."
-            )
+        return _create_trtllm_inference_request
 
     def _get_tokenizer(self):
         # TODO: Consider support for custom tokenizers
@@ -213,11 +243,9 @@ class TritonOpenAIEngine(OpenAIEngine):
         tokenizer = self._get_tokenizer()
 
         # One tokenizer, convert function, and creation time for all loaded models.
-        # NOTE: This doesn't currently support having both a vLLM and TRT-LLM
-        # model loaded at the same time.
         model_metadata = {}
 
-        # Read all triton models and gather the respective backends of each
+        # Read all triton models and store the necessary metadata for each
         for name, _ in self.server.models().keys():
             model = self.server.model(name)
             backend = model.config()["backend"]
@@ -235,7 +263,7 @@ class TritonOpenAIEngine(OpenAIEngine):
 
         return model_metadata
 
-    def _get_streaming_response_chunk(
+    def _get_streaming_chat_response_chunk(
         self,
         choice: ChatCompletionStreamingResponseChoice,
         request_id: str,
@@ -251,7 +279,7 @@ class TritonOpenAIEngine(OpenAIEngine):
             object=ObjectType.chat_completion_chunk,
         )
 
-    def _get_first_streaming_response(
+    def _get_first_streaming_chat_response(
         self, request_id: str, created: int, model: str, role: str
     ) -> CreateChatCompletionStreamResponse:
         # First chunk has no content and sets the role
@@ -263,17 +291,19 @@ class TritonOpenAIEngine(OpenAIEngine):
             logprobs=None,
             finish_reason=None,
         )
-        chunk = self._get_streaming_response_chunk(choice, request_id, created, model)
+        chunk = self._get_streaming_chat_response_chunk(
+            choice, request_id, created, model
+        )
         return chunk
 
-    def _get_nth_streaming_response(
+    def _get_nth_streaming_chat_response(
         self,
         request_id: str,
         created: int,
         model: str,
         response: tritonserver.InferenceResponse,
     ) -> CreateChatCompletionStreamResponse:
-        text = self._get_output(response)
+        text = _get_output(response)
         choice = ChatCompletionStreamingResponseChoice(
             index=0,
             delta=ChatCompletionStreamResponseDelta(
@@ -283,17 +313,21 @@ class TritonOpenAIEngine(OpenAIEngine):
             finish_reason=ChatCompletionFinishReason.stop if response.final else None,
         )
 
-        chunk = self._get_streaming_response_chunk(choice, request_id, created, model)
+        chunk = self._get_streaming_chat_response_chunk(
+            choice, request_id, created, model
+        )
         return chunk
 
     def _streaming_chat_iterator(
         self, request_id: str, created: int, model: str, role: str, responses: List
     ) -> Iterator[str]:
-        chunk = self._get_first_streaming_response(request_id, created, model, role)
+        chunk = self._get_first_streaming_chat_response(
+            request_id, created, model, role
+        )
         yield f"data: {chunk.json(exclude_unset=True)}\n\n"
 
         for response in responses:
-            chunk = self._get_nth_streaming_response(
+            chunk = self._get_nth_streaming_chat_response(
                 request_id, created, model, response
             )
             yield f"data: {chunk.json(exclude_unset=True)}\n\n"
@@ -307,7 +341,7 @@ class TritonOpenAIEngine(OpenAIEngine):
         Validates a chat request to align with currently supported features.
         """
 
-        # Missing internal information needed to do inference
+        # Reject missing internal information needed to do inference
         if not metadata:
             raise Exception(f"Unknown model: {request.model}")
 
@@ -320,9 +354,66 @@ class TritonOpenAIEngine(OpenAIEngine):
         if not metadata.request_converter:
             raise Exception(f"Unknown request format for model: {request.model}")
 
-        # Currently unsupported features being requested
+        # Reject unsupported features if requested
         if request.n and request.n > 1:
             raise Exception("Only single choice is supported")
 
         if request.logit_bias is not None or request.logprobs:
             raise Exception("logit bias and log probs not currently supported")
+
+    def _streaming_completion_iterator(
+        self, request_id: str, created: int, model: str, responses: List
+    ) -> Iterator[str]:
+        for response in responses:
+            text = _get_output(response)
+            choice = Choice(
+                finish_reason=FinishReason.stop if response.final else None,
+                index=0,
+                logprobs=None,
+                text=text,
+            )
+            response = CreateCompletionResponse(
+                id=request_id,
+                choices=[choice],
+                system_fingerprint=None,
+                object=ObjectType.text_completion,
+                created=created,
+                model=model,
+            )
+
+            yield f"data: {response.json(exclude_unset=True)}\n\n"
+
+        yield "data: [DONE]\n\n"
+
+    def _validate_completion_request(
+        self, request: CreateCompletionRequest, metadata: TritonModelMetadata
+    ):
+        """
+        Validates a completions request to align with currently supported features.
+        """
+        # Reject missing internal information needed to do inference
+        if not metadata:
+            raise Exception(f"Unknown model: {request.model}")
+
+        if not metadata.backend:
+            raise Exception("Unknown backend")
+
+        if not metadata.request_converter:
+            raise Exception(f"Unknown request format for model: {request.model}")
+
+        # Reject unsupported features if requested
+        if request.suffix is not None:
+            raise Exception("suffix is not currently supported")
+
+        if not request.prompt:
+            raise Exception("prompt must be non-empty")
+
+        # Currently only support single string as input
+        if not isinstance(request.prompt, str):
+            raise Exception("only single string input is supported")
+
+        if request.n and request.n > 1:
+            raise Exception("Only single choice is supported")
+
+        if request.logit_bias is not None or request.logprobs is not None:
+            raise Exception("logit bias and log probs not supported")

@@ -33,11 +33,12 @@ from typing import Dict, List, Optional
 
 import openai
 import requests
+import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
 from engine.triton_engine import TritonOpenAIEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
-from utils.triton import init_tritonserver
+from utils.triton import create_tritonserver
 
 
 # TODO: Cleanup, refactor, mock, etc.
@@ -45,7 +46,7 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
     os.environ["TOKENIZER"] = tokenizer
     os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
 
-    server = init_tritonserver()
+    server: tritonserver.Server = create_tritonserver()
     engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
 
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)

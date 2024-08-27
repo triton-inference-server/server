@@ -25,18 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import time
-from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import List
 
 import numpy as np
 import tritonserver
-from fastapi import HTTPException
 from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
-from utils.tokenizer import get_tokenizer
 
 
-def init_tritonserver():
+def create_tritonserver():
     model_repository = os.environ.get(
         "TRITON_MODEL_REPOSITORY", "/opt/tritonserver/models"
     )
@@ -54,7 +50,7 @@ def init_tritonserver():
     return server
 
 
-def create_vllm_inference_request(
+def _create_vllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
     inputs = {}
@@ -76,7 +72,7 @@ def create_vllm_inference_request(
     return model.create_request(inputs=inputs, parameters=sampling_parameters)
 
 
-def create_trtllm_inference_request(
+def _create_trtllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
     inputs = {}
@@ -100,3 +96,25 @@ def create_trtllm_inference_request(
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
     return model.create_request(inputs=inputs)
+
+
+# TODO: Use tritonserver.InferenceResponse when support is published
+def _get_output(response: tritonserver._api._response.InferenceResponse):
+    if "text_output" in response.outputs:
+        try:
+            return response.outputs["text_output"].to_string_array()[0]
+        except Exception:
+            return str(response.outputs["text_output"].to_bytes_array()[0])
+    return ""
+
+
+def _validate_triton_responses_non_streaming(
+    responses: List[tritonserver._api._response.InferenceResponse],
+):
+    num_responses = len(responses)
+    if num_responses == 1 and responses[0].final != True:
+        raise Exception("Unexpected internal error with incorrect response flags")
+    if num_responses == 2 and responses[-1].final != True:
+        raise Exception("Unexpected internal error with incorrect response flags")
+    if num_responses > 2:
+        raise Exception(f"Unexpected number of responses: {num_responses}, expected 1.")
