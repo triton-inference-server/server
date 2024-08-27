@@ -29,7 +29,7 @@ from __future__ import annotations
 from typing import Optional
 
 import uvicorn
-from engine.triton_engine import TritonOpenAIEngine
+from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from frontend.frontend import OpenAIFrontend
@@ -42,7 +42,7 @@ class TritonOpenAIFrontend(OpenAIFrontend):
         host: str = "localhost",
         port: int = 8000,
         log_level: int = 0,
-        engine: Optional[TritonOpenAIEngine] = None,
+        engine: Optional[TritonLLMEngine] = None,
     ):
         self.host: str = host
         self.port: int = port

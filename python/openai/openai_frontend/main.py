@@ -32,7 +32,7 @@ import signal
 from functools import partial
 
 import tritonserver
-from engine.triton_engine import TritonOpenAIEngine
+from engine.triton_engine import TritonLLMEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
 from utils.triton import create_tritonserver
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
 
     server: tritonserver.Server = create_tritonserver()
-    engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
+    engine: TritonLLMEngine = TritonLLMEngine(server)
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
         host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine
     )

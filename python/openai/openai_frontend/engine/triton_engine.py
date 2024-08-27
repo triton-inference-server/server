@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import tritonserver
-from engine.engine import OpenAIEngine
+from engine.engine import LLMEngine
 from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
@@ -77,7 +77,7 @@ class TritonModelMetadata:
     request_converter: Callable
 
 
-class TritonOpenAIEngine(OpenAIEngine):
+class TritonLLMEngine(LLMEngine):
     def __init__(self, server: tritonserver.Server):
         # Assume an already configured and started server
         self.server = server

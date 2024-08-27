@@ -36,7 +36,7 @@ import requests
 import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
-from engine.triton_engine import TritonOpenAIEngine
+from engine.triton_engine import TritonLLMEngine
 from frontend.triton_frontend import TritonOpenAIFrontend
 from utils.triton import create_tritonserver
 
@@ -47,7 +47,7 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
     os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
 
     server: tritonserver.Server = create_tritonserver()
-    engine: TritonOpenAIEngine = TritonOpenAIEngine(server)
+    engine: TritonLLMEngine = TritonLLMEngine(server)
 
     frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)
     return frontend.app, server

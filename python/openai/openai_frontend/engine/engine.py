@@ -38,10 +38,13 @@ from schemas.openai import (
 )
 
 
-class OpenAIEngine(Protocol):
+class LLMEngine(Protocol):
     """
     Interface for an OpenAI-aware inference engine to be attached to an
     OpenAI-compatible frontend.
+
+    NOTE: This interface is subject to change, and may land on something more
+          generic rather than the current 1:1 with OpenAI endpoints over time.
     """
 
     def ready(self) -> bool:
