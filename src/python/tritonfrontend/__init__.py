@@ -26,37 +26,8 @@
 
 # triton/server/src/python/tritonfrontend/__init__.py
 
+import builtins
 from importlib.metadata import PackageNotFoundError, version
 
 from tritonfrontend._api._kservegrpc import KServeGrpc
 from tritonfrontend._api._kservehttp import KServeHttp
-from tritonserver import (
-    AlreadyExistsError,
-    InternalError,
-    InvalidArgumentError,
-    NotFoundError,
-    TritonError,
-    UnavailableError,
-    UnknownError,
-    UnsupportedError,
-)
-
-_exceptions = (
-    TritonError,
-    NotFoundError,
-    UnknownError,
-    InternalError,
-    InvalidArgumentError,
-    UnavailableError,
-    AlreadyExistsError,
-    UnsupportedError,
-)
-
-
-# Rename module for exceptions to simplify stack trace
-for exception in _exceptions:
-    exception.__module__ = "tritonfrontend"
-    globals()[exception.__name__] = exception
-
-
-del _exceptions

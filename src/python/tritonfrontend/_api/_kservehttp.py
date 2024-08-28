@@ -25,15 +25,34 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+import sys
 from typing import Union
 
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 from tritonfrontend._c.tritonfrontend_bindings import (
+    AlreadyExistsError,
+    InternalError,
     InvalidArgumentError,
+    NotFoundError,
+    TritonError,
     TritonFrontendHttp,
+    UnavailableError,
+    UnknownError,
+    UnsupportedError,
 )
+
+error_mapping = {
+    TritonError: tritonserver.TritonError,
+    NotFoundError: tritonserver.NotFoundError,
+    UnknownError: tritonserver.UnknownError,
+    InternalError: tritonserver.InternalError,
+    InvalidArgumentError: tritonserver.InvalidArgumentError,
+    UnavailableError: tritonserver.UnavailableError,
+    AlreadyExistsError: tritonserver.AlreadyExistsError,
+    UnsupportedError: tritonserver.UnsupportedError,
+}
 
 
 class KServeHttp:
@@ -44,24 +63,30 @@ class KServeHttp:
         reuse_port: bool = False
         thread_count: int = Field(8, ge=0)
         header_forward_pattern: str = ""
+        # DLIS-7215: Add restricted protocol support
         # restricted_protocols: list
 
     class Server:
         def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
-            server_ptr = server._ptr()
+            try:
+                server_ptr = server._ptr()  # TRITONSERVER_Server pointer
 
-            # If no options provided, default options are selected
-            if options is None:
-                options = KServeHttp.Options()
+                # If no options provided, default options are selected
+                if options is None:
+                    options = KServeHttp.Options()
 
-            if not isinstance(options, KServeHttp.Options):
-                raise InvalidArgumentError(
-                    "Incorrect type for options. options argument must be of type KServeHttp.Options"
-                )
+                if not isinstance(options, KServeHttp.Options):
+                    raise InvalidArgumentError(
+                        "Incorrect type for options. options argument must be of type KServeHttp.Options"
+                    )
 
-            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
-            # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
-            self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
+                options_dict: dict[str, Union[int, bool, str]] = options.__dict__
+                # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
+
+                self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
+            except TritonError:
+                exc_type, exc_value, _ = sys.exc_info()
+                raise error_mapping[exc_type](exc_value) from None
 
         def __enter__(self):
             self.triton_frontend.start()
@@ -69,9 +94,19 @@ class KServeHttp:
 
         def __exit__(self, exc_type, exc_value, traceback):
             self.triton_frontend.stop()
+            if exc_type:
+                raise error_mapping[exc_type](exc_value) from None
 
         def start(self):
-            self.triton_frontend.start()
+            try:
+                self.triton_frontend.start()
+            except TritonError:
+                exc_type, exc_value, _ = sys.exc_info()
+                raise error_mapping[exc_type](exc_value) from None
 
         def stop(self):
-            self.triton_frontend.stop()
+            try:
+                self.triton_frontend.stop()
+            except TritonError:
+                exc_type, exc_value, _ = sys.exc_info()
+                raise error_mapping[exc_type](exc_value) from None
