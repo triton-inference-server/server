@@ -8,7 +8,7 @@ Let us walk through a simple example:
 import tritonserver
 
 # Constructing path to Model Repository
-model_path = f"/server/src/python/examples/example_model_repository"
+model_path = f"server/src/python/examples/example_model_repository"
 
 server_options = tritonserver.Options(
     server_id="ExampleServer",
@@ -39,7 +39,7 @@ grpc_service.start()
 ```python
 import tritonclient.http as httpclient
 import numpy as np # Use version numpy < 2
-model_name = "identity"
+model_name = "identity" # output == input
 url = "localhost:8000"
 
 # Create a Triton client
@@ -61,7 +61,6 @@ output_data = results.as_numpy("OUTPUT0")
 
 # Print results
 print("[INFERENCE RESULTS]")
-print("Input data:", input_data)
 print("Output data:", output_data)
 
 # Stop respective services and server.
@@ -96,12 +95,11 @@ with KServeHttp.Server(server) as http_service:
         output_data = results.as_numpy("OUTPUT0")
         # Print results
         print("[INFERENCE RESULTS]")
-        print("Input data:", input_data)
         print("Output data:", output_data)
 
 server.stop()
 ```
-With this workflow, you can avoid having to stop each service after client requests has terminated.
+With this workflow, you can avoid having to stop each service after client requests have terminated.
 
 
 ## Known Issues
@@ -109,7 +107,7 @@ With this workflow, you can avoid having to stop each service after client reque
     - [Tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md)
     - [Shared Memory](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md)
     - [Metrics](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/metrics.md)
+    - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
     - VertexAI
     - Sagemaker
-    - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
-- After a running server has been stopped, if the client sends an inference request, it will result in a Segmentation Fault.
+- After a running server has been stopped, if the client sends an inference request, a Segmentation Fault will occur.
