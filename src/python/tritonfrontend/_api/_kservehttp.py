@@ -70,6 +70,7 @@ class KServeHttp:
                 self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
             except TritonError:
                 exc_type, exc_value, _ = sys.exc_info()
+                # raise ... from None masks the tritonfrontend Error from being added in traceback
                 raise ERROR_MAPPING[exc_type](exc_value) from None
 
         def __enter__(self):
