@@ -108,7 +108,6 @@ class Server {
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<Server>* service);
 
-
   ~Server();
 
   TRITONSERVER_Error* Start();

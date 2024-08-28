@@ -264,7 +264,6 @@ HTTPServer::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     event_base_free(evbase_);
     return nullptr;
   }
-
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
@@ -3627,6 +3626,7 @@ HTTPAPIServer::HandleInfer(
   bool connection_paused = true;
   auto infer_request = CreateInferRequest(req, irequest_shared);
   infer_request->trace_ = trace;
+
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
   // by reference to capture local updates, except for shared pointers which
@@ -4714,7 +4714,6 @@ HTTPAPIServer::Create(
   std::string header_forward_pattern;
   int thread_count;
 
-
   RETURN_IF_ERR(get_value(data, "port", &port));
   RETURN_IF_ERR(get_value(data, "reuse_port", &reuse_port));
   RETURN_IF_ERR(get_value(data, "address", &address));
@@ -4745,6 +4744,5 @@ HTTPAPIServer::RespondIfRestricted(
   }
   return false;
 }
-
 
 }}  // namespace triton::server

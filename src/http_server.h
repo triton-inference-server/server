@@ -196,7 +196,6 @@ class HTTPAPIServer : public HTTPServer {
       const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* http_server);
 
-
   static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
       const UnorderedMapType& data, triton::server::TraceManager* trace_manager,
