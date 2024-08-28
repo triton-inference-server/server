@@ -75,6 +75,7 @@ class TestingUtils:
         client.close()
 
     # Sends an inference to an identity model and verifies input == output.
+    @staticmethod
     def send_and_test_inference_identity(frontend_client, url: str) -> bool:
         model_name = "identity"
         client = TestingUtils.setup_client(frontend_client, url)
