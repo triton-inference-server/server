@@ -60,7 +60,7 @@ Major features include:
   execution](user_guide/architecture.md#concurrent-model-execution)
 - [Dynamic batching](user_guide/batcher.md#dynamic-batcher)
 - [Sequence batching](user_guide/batcher.md#sequence-batcher) and
-  [implicit state management](user_guide/architecture.md#implicit-state-management)
+  [implicit state management](user_guide/implicit_state_management.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
