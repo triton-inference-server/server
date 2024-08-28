@@ -2437,7 +2437,7 @@ Server::Create(
 
 TRITONSERVER_Error*
 Server::Create(
-    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& data,
+    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& options,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const RestrictedFeatures& restricted_features,
