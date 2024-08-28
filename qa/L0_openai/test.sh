@@ -15,12 +15,12 @@ function install_deps() {
 }
 
 function prepare_vllm() {
-    pip install -r requirements_vllm.txt
+    echo "No prep needed for vllm currently"
 }
 
 function prepare_tensorrtllm() {
     MODEL="llama-3-8b-instruct"
-    MODEL_REPO="../openai/tests/tensorrtllm_models"
+    MODEL_REPO="../tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
     # FIXME: This will require an upgrade each release to match the TRT-LLM version
@@ -47,12 +47,12 @@ function pre_test() {
 }
 
 function run_test() {
-    pushd openai/openai/tests
+    pushd openai/
     TEST_LOG="test_openai.log"
 
     # Capture error code without exiting to allow log collection
     set +e
-    pytest -s -v --junitxml=test_openai.xml 2>&1 > ${TEST_LOG}
+    pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
     if [ $? -ne 0 ]; then
         cat ${TEST_LOG}
         echo -e "\n***\n*** Test Failed\n***"
