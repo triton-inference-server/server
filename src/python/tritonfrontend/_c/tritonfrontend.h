@@ -129,15 +129,11 @@ class TritonFrontend {
   void StartService() { ThrowIfError(service->Start()); };
   void StopService() { ThrowIfError(service->Stop()); };
 
-
-  static TRITONSERVER_Error* EmptyDeleter(TRITONSERVER_Server* obj)
-  {
-    // The frontend does not own the TRITONSERVER_Server* object.
-    // Hence, deleting the underlying server instance,
-    // will cause a double-free when the core bindings attempt to
-    // delete the TRITONSERVER_Server instance.
-    return nullptr;
-  };
+  // The frontend does not own the TRITONSERVER_Server* object.
+  // Hence, deleting the underlying server instance,
+  // will cause a double-free when the core bindings attempt to
+  // delete the TRITONSERVER_Server instance.
+  static void EmptyDeleter(TRITONSERVER_Server* obj){};
 };
 
 }}}  // namespace triton::server::python
