@@ -385,7 +385,7 @@ RUN find qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
 
 # Install Triton Frontend Python API
-RUN find qa/pkgs/  -name "tritonfrontend-*.whl" -exec pip3 install --upgrade {}[all]
+RUN find qa/pkgs/ -type f -name "tritonfrontend-*.whl" -exec pip3 install --upgrade {}[all]
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
