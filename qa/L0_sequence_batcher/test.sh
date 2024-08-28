@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -182,6 +182,17 @@ export USE_SINGLE_BUFFER
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
 rm -fr *.log  models{0,1,2,4} queue_delay_models && mkdir models{0,1,2,4} queue_delay_models
+
+# Search BACKENDS to determine if a backend should be tested
+function should_test_backend() {
+  local target_backend=$1
+  for BACKEND in $BACKENDS; do
+    if [[ "${target_backend}" == "${BACKEND}" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
 
 # Get the datatype to use based on the backend
 function get_datatype () {
@@ -827,8 +838,14 @@ fi
 
 ### Start Preserve Ordering Tests ###
 
-# Test only supported on windows currently due to use of python backend models
-if [ ${WINDOWS} -ne 1 ]; then
+# FIXME: Test only supported on windows currently due to use of python backend models.
+# Now that Windows supports the PYBE, we should check that this tests works once Windows
+# CI is stable.
+
+# These subtests use python models. They should not be executed if 'python' is not one
+# of the backends under test.
+should_test_backend "python"
+if [ $? -eq 1 ] && [ ${WINDOWS} -ne 1 ]; then
     # Test preserve ordering true/false and decoupled/non-decoupled
     TEST_CASE=SequenceBatcherPreserveOrderingTest
     MODEL_PATH=preserve_ordering_models
