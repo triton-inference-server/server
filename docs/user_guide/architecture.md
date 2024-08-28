@@ -117,8 +117,8 @@ model.
 
 Examples of stateless models are CNNs such as image classification and
 object detection. The [default
-scheduler](model_configuration.md#default-scheduler) or [dynamic
-batcher](model_configuration.md#dynamic-batcher) can be used as the
+scheduler](scheduler.md#default-scheduler) or [dynamic
+batcher](batcher.md#dynamic-batcher) can be used as the
 scheduler for these stateless models.
 
 RNNs and similar models which do have internal memory can be stateless
@@ -126,9 +126,9 @@ as long as the state they maintain does not span inference
 requests. For example, an RNN that iterates over all elements in a
 batch is considered stateless by Triton if the internal state is not
 carried between batches of inference requests. The [default
-scheduler](model_configuration.md#default-scheduler) can be used for
+scheduler](scheduler.md#default-scheduler) can be used for
 these stateless models. The [dynamic
-batcher](model_configuration.md#dynamic-batcher) cannot be used since
+batcher](batcher.md#dynamic-batcher) cannot be used since
 the model is typically not expecting the batch to represent multiple
 inference requests.
 
@@ -142,7 +142,7 @@ maintained by the model is correctly updated. Moreover, the model may
 require that Triton provide *control* signals indicating, for example,
 the start and end of the sequence.
 
-The [sequence batcher](model_configuration.md#sequence-batcher) must
+The [sequence batcher](batcher.md#sequence-batcher) must
 be used for these stateful models. As explained below, the sequence
 batcher ensures that all inference requests in a sequence get routed
 to the same model instance so that the model can maintain state
@@ -648,173 +648,3 @@ sequence in a batch (for example, the last two inferences in sequence
 D are not batched together).
 
 ![Sequence Batcher Example](images/dyna_sequence_example1.png)
-
-### Ensemble Models
-
-An ensemble model represents a *pipeline* of one or more models and
-the connection of input and output tensors between those
-models. Ensemble models are intended to be used to encapsulate a
-procedure that involves multiple models, such as "data preprocessing
--> inference -> data postprocessing".  Using ensemble models for this
-purpose can avoid the overhead of transferring intermediate tensors
-and minimize the number of requests that must be sent to Triton.
-
-The ensemble scheduler must be used for ensemble models, regardless of
-the scheduler used by the models within the ensemble. With respect to
-the ensemble scheduler, an *ensemble* model is not an actual
-model. Instead, it specifies the dataflow between models within the
-ensemble as *ModelEnsembling::Step* entries in the model
-configuration. The scheduler collects the output tensors in each step,
-provides them as input tensors for other steps according to the
-specification. In spite of that, the ensemble model is still viewed as
-a single model from an external view.
-
-Note that the ensemble models will inherit the characteristics of the
-models involved, so the meta-data in the request header must comply
-with the models within the ensemble. For instance, if one of the
-models is stateful model, then the inference request for the ensemble
-model should contain the information mentioned in [Stateful
-Models](#stateful-models), which will be provided to the stateful
-model by the scheduler.
-
-As an example consider an ensemble model for image classification and
-segmentation that has the following model configuration:
-
-```
-name: "ensemble_model"
-platform: "ensemble"
-max_batch_size: 1
-input [
-  {
-    name: "IMAGE"
-    data_type: TYPE_STRING
-    dims: [ 1 ]
-  }
-]
-output [
-  {
-    name: "CLASSIFICATION"
-    data_type: TYPE_FP32
-    dims: [ 1000 ]
-  },
-  {
-    name: "SEGMENTATION"
-    data_type: TYPE_FP32
-    dims: [ 3, 224, 224 ]
-  }
-]
-ensemble_scheduling {
-  step [
-    {
-      model_name: "image_preprocess_model"
-      model_version: -1
-      input_map {
-        key: "RAW_IMAGE"
-        value: "IMAGE"
-      }
-      output_map {
-        key: "PREPROCESSED_OUTPUT"
-        value: "preprocessed_image"
-      }
-    },
-    {
-      model_name: "classification_model"
-      model_version: -1
-      input_map {
-        key: "FORMATTED_IMAGE"
-        value: "preprocessed_image"
-      }
-      output_map {
-        key: "CLASSIFICATION_OUTPUT"
-        value: "CLASSIFICATION"
-      }
-    },
-    {
-      model_name: "segmentation_model"
-      model_version: -1
-      input_map {
-        key: "FORMATTED_IMAGE"
-        value: "preprocessed_image"
-      }
-      output_map {
-        key: "SEGMENTATION_OUTPUT"
-        value: "SEGMENTATION"
-      }
-    }
-  ]
-}
-```
-
-The ensemble\_scheduling section indicates that the ensemble scheduler will be
-used and that the ensemble model consists of three different models. Each
-element in step section specifies the model to be used and how the inputs and
-outputs of the model are mapped to tensor names recognized by the scheduler. For
-example, the first element in step specifies that the latest version of
-image\_preprocess\_model should be used, the content of its input "RAW\_IMAGE"
-is provided by "IMAGE" tensor, and the content of its output
-"PREPROCESSED\_OUTPUT" will be mapped to "preprocessed\_image" tensor for later
-use. The tensor names recognized by the scheduler are the ensemble inputs, the
-ensemble outputs and all values in the input\_map and the output\_map.
-
-The models composing the ensemble may also have dynamic batching
-enabled.  Since ensemble models are just routing the data between
-composing models, Triton can take requests into an ensemble model
-without modifying the ensemble's configuration to exploit the dynamic
-batching of the composing models.
-
-Assuming that only the ensemble model, the preprocess model, the classification
-model and the segmentation model are being served, the client applications will
-see them as four different models which can process requests independently.
-However, the ensemble scheduler will view the ensemble model as the following.
-
-![Ensemble Example](images/ensemble_example0.png)
-
-When an inference request for the ensemble model is received, the ensemble
-scheduler will:
-
-1. Recognize that the "IMAGE" tensor in the request is mapped to input
-   "RAW\_IMAGE" in the preprocess model.
-
-2. Check models within the ensemble and send an internal request to the
-   preprocess model because all the input tensors required are ready.
-
-3. Recognize the completion of the internal request, collect the output
-   tensor and map the content to "preprocessed\_image" which is an unique name
-   known within the ensemble.
-
-4. Map the newly collected tensor to inputs of the models within the ensemble.
-   In this case, the inputs of "classification\_model" and "segmentation\_model"
-   will be mapped and marked as ready.
-
-5. Check models that require the newly collected tensor and send internal
-   requests to models whose inputs are ready, the classification
-   model and the segmentation model in this case. Note that the responses will
-   be in arbitrary order depending on the load and computation time of
-   individual models.
-
-6. Repeat step 3-5 until no more internal requests should be sent, and then
-   response to the inference request with the tensors mapped to the ensemble
-   output names.
-
-Unlike other models, ensemble models do not support "instance_group" field in
-the model configuration. The reason is that the ensemble scheduler itself
-is mainly an event-driven scheduler with very minimal overhead so its
-almost never the bottleneck of the pipeline. The composing models
-within the ensemble can be individually scaled up or down with their
-respective `instance_group` settings. To optimize your model pipeline
-performance, you can use
-[Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
-to find the optimal model configurations.
-
-#### Additional Resources
-
-You can find additional end-to-end ensemble examples in the links below:
-* [This guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles)
-explores the concept of ensembles with a running example.
-* [Preprocessing in Python Backend Using
-  Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)
-* [Accelerating Inference with NVIDIA Triton Inference Server and NVIDIA
-  DALI](https://developer.nvidia.com/blog/accelerating-inference-with-triton-inference-server-and-dali/)
-* [Using RAPIDS AI with NVIDIA Triton Inference
-  Server](https://github.com/rapidsai/rapids-examples/tree/main/rapids_triton_example)
-
