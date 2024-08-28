@@ -1,8 +1,5 @@
-import os
-import sys
 import time
 from functools import partial
-from typing import Union
 
 import numpy as np
 import pytest
@@ -34,7 +31,7 @@ class TestHttpOptions:
 
 class TestGrpcOptions:
     def test_correct_grpc_parameters(self):
-        grpc_options = KServeGrpc.Options(
+        KServeGrpc.Options(
             infer_compression_level=KServeGrpc.Grpc_compression_level.HIGH,
             reuse_port=True,
             infer_allocation_pool_size=12,
@@ -152,7 +149,7 @@ class TestKServe:
 
         # So, inference request will fail as http endpoints have been stopped.
         with pytest.raises(InferenceServerException):
-            response = async_request.get_result(block=True, timeout=2)
+            async_request.get_result(block=True, timeout=2)
 
         # http_client.close() calls join() to terminate pool of greenlets
         # However, due to an unsuccessful get_result(), async_request is still
@@ -186,7 +183,7 @@ class TestKServe:
         inputs = [input0]
         outputs = [client_type.InferRequestedOutput("OUTPUT0")]
 
-        async_request = grpc_client.async_infer(
+        grpc_client.async_infer(
             model_name=model_name,
             inputs=inputs,
             outputs=outputs,

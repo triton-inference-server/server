@@ -30,28 +30,12 @@ from typing import Union
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
+from tritonfrontend._api._error_mapping import ERROR_MAPPING
 from tritonfrontend._c.tritonfrontend_bindings import (
-    AlreadyExistsError,
-    InternalError,
     InvalidArgumentError,
-    NotFoundError,
     TritonError,
     TritonFrontendGrpc,
-    UnavailableError,
-    UnknownError,
-    UnsupportedError,
 )
-
-error_mapping = {
-    TritonError: tritonserver.TritonError,
-    NotFoundError: tritonserver.NotFoundError,
-    UnknownError: tritonserver.UnknownError,
-    InternalError: tritonserver.InternalError,
-    InvalidArgumentError: tritonserver.InvalidArgumentError,
-    UnavailableError: tritonserver.UnavailableError,
-    AlreadyExistsError: tritonserver.AlreadyExistsError,
-    UnsupportedError: tritonserver.UnsupportedError,
-}
 
 
 # Enum (mirroring C++ format)
@@ -125,7 +109,7 @@ class KServeGrpc:
                 self.triton_frontend = TritonFrontendGrpc(server_ptr, options_dict)
             except TritonError:
                 exc_type, exc_value, _ = sys.exc_info()
-                raise error_mapping[exc_type](exc_value) from None
+                raise ERROR_MAPPING[exc_type](exc_value) from None
 
         def __enter__(self):
             self.triton_frontend.start()
@@ -134,18 +118,18 @@ class KServeGrpc:
         def __exit__(self, exc_type, exc_value, traceback):
             self.triton_frontend.stop()
             if exc_type:
-                raise error_mapping[exc_type](exc_value) from None
+                raise ERROR_MAPPING[exc_type](exc_value) from None
 
         def start(self):
             try:
                 self.triton_frontend.start()
             except TritonError:
                 exc_type, exc_value, _ = sys.exc_info()
-                raise error_mapping[exc_type](exc_value) from None
+                raise ERROR_MAPPING[exc_type](exc_value) from None
 
         def stop(self):
             try:
                 self.triton_frontend.stop()
             except TritonError:
                 exc_type, exc_value, _ = sys.exc_info()
-                raise error_mapping[exc_type](exc_value) from None
+                raise ERROR_MAPPING[exc_type](exc_value) from None
