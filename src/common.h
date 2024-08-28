@@ -197,7 +197,7 @@ using UnorderedMapType = std::unordered_map<std::string, VariantType>;
 
 template <typename T>
 TRITONSERVER_Error*
-get_value(const UnorderedMapType& options, const std::string& key, T* arg)
+GetValue(const UnorderedMapType& options, const std::string& key, T* arg)
 {
   auto curr = options.find(key);
   bool is_present = (curr != options.end());
