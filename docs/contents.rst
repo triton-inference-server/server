@@ -72,7 +72,7 @@
    :caption: Server
 
    server/features
-   server/distributedserve
+   server/distributed_serve
 
 .. toctree::
    :hidden:

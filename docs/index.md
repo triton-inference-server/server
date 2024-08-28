@@ -58,16 +58,16 @@ Major features include:
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
   execution](user_guide/architecture.md#concurrent-model-execution)
-- [Dynamic batching](user_guide/model_configuration.md#dynamic-batcher)
-- [Sequence batching](user_guide/model_configuration.md#sequence-batcher) and
+- [Dynamic batching](user_guide/batcher.md#dynamic-batcher)
+- [Sequence batching](user_guide/batcher.md#sequence-batcher) and
   [implicit state management](user_guide/architecture.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
 - Model pipelines using
-  [Ensembling](user_guide/architecture.md#ensemble-models) or [Business
+  [Ensembling](user_guide/ensemble_models.md#ensemble-models) or [Business
   Logic Scripting
-  (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
+  (BLS)](user_guide/bls.md#business-logic-scripting)
 - [HTTP/REST and GRPC inference
   protocols](customization_guide/inference_protocols.md) based on the community
   developed [KServe
