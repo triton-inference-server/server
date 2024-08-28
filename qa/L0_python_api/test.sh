@@ -50,7 +50,7 @@ if [ $? -ne 0 ]; then
 fi
 
 
-FRONTEND_TEST_LOG="./python_tritonfrontend_api.log"
+FRONTEND_TEST_LOG="./python_kserve.log"
 python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $FRONTEND_TEST_LOG
