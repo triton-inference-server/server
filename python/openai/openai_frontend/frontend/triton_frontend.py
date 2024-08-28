@@ -26,8 +26,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import uvicorn
 from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
@@ -39,10 +37,10 @@ from routers import chat, completions, models, observability
 class TritonOpenAIFrontend(OpenAIFrontend):
     def __init__(
         self,
+        engine: TritonLLMEngine,
         host: str = "localhost",
         port: int = 8000,
         log_level: str = "info",
-        engine: Optional[TritonLLMEngine] = None,
     ):
         self.host: str = host
         self.port: int = port
