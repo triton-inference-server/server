@@ -126,7 +126,7 @@ Triton supports batching individual inference requests to improve compute resour
 - [Sequence Batcher](user_guide/model_configuration.md#sequence-batcher)
   - [Stateful Models](user_guide/architecture.md#stateful-models)
   - [Control Inputs](user_guide/architecture.md#control-inputs)
-  - [Implicit State - Stateful Inference Using a Stateless Model](user_guide/architecture.md#implicit-state-management)
+  - [Implicit State - Stateful Inference Using a Stateless Model](implicit_state_management.md#implicit-state-management)
   - [Sequence Scheduling Strategies](user_guide/architecture.md#scheduling-strategies)
     - [Direct](user_guide/architecture.md#direct)
     - [Oldest](user_guide/architecture.md#oldest)
