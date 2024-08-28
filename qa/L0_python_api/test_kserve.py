@@ -52,8 +52,8 @@ class TestGrpcOptions:
             KServeGrpc.Options(server_key=10)
 
 
-HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")
-GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")
+HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
+GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 
 
 class TestKServe:
@@ -84,7 +84,8 @@ class TestKServe:
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_invalid_options(self, frontend):
         server = TestingUtils.setup_server()
-
+        # Current flow is KServeHttp.Options or KServeGrpc.Options have to be
+        # provided to ensure type and range validation occurs.
         with pytest.raises(
             tritonserver.InvalidArgumentError,
             match="Incorrect type for options. options argument must be of type",
@@ -144,7 +145,7 @@ class TestKServe:
         async_request = http_client.async_infer(
             model_name=model_name, inputs=inputs, outputs=outputs
         )
-        # http_service.stop() Does not use Graceful Shutdown
+        # http_service.stop() does not use graceful shutdown
         TestingUtils.teardown_service(http_service)
 
         # So, inference request will fail as http endpoints have been stopped.
@@ -153,10 +154,12 @@ class TestKServe:
 
         # http_client.close() calls join() to terminate pool of greenlets
         # However, due to an unsuccessful get_result(), async_request is still
-        # an active thread. Hence, join
+        # an active thread. Hence, join stalls until greenlet timeouts.
+        # Does not throw an exception, but displays error in logs.
         TestingUtils.teardown_client(http_client)
 
         # delayed_identity will still be an active model
+        # Hence, server.stop() causes InternalError: Timeout.
         with pytest.raises(tritonserver.InternalError):
             TestingUtils.teardown_server(server)
 

@@ -92,7 +92,7 @@ class KServeGrpc:
     class Server:
         def __init__(self, server: tritonserver, options: "KServeGrpc.Options" = None):
             try:
-                server_ptr = server._ptr()
+                server_ptr = server._ptr()  # TRITONSERVER_Server pointer
 
                 # If no options provided, default options are selected
                 if options is None:
@@ -109,6 +109,7 @@ class KServeGrpc:
                 self.triton_frontend = TritonFrontendGrpc(server_ptr, options_dict)
             except TritonError:
                 exc_type, exc_value, _ = sys.exc_info()
+                # raise ... from None masks the tritonfrontend Error from being added in traceback
                 raise ERROR_MAPPING[exc_type](exc_value) from None
 
         def __enter__(self):

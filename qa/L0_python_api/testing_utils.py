@@ -74,7 +74,7 @@ class TestingUtils:
     def teardown_client(client) -> None:
         client.close()
 
-    # Sends an inference to an identity model and verifies input == output.
+    # Sends an inference to test_model_repository/identity model and verifies input == output.
     @staticmethod
     def send_and_test_inference_identity(frontend_client, url: str) -> bool:
         model_name = "identity"
