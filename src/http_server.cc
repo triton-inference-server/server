@@ -3589,7 +3589,7 @@ HTTPAPIServer::HandleInfer(
 
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
   std::shared_ptr<TraceManager::Trace> trace;
-  if (this->trace_manager_) {
+  if (trace_manager_) {
     // If tracing is enabled see if this request should be traced.
     trace = StartTrace(req, model_name, &triton_trace);
   }

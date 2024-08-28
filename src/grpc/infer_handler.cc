@@ -948,7 +948,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
   if (err == nullptr) {
     TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-    if (this->trace_manager_) {
+    if (trace_manager_) {
       GrpcServerCarrier carrier(state->context_->ctx_.get());
       auto start_options =
           trace_manager_->GetTraceStartOptions(carrier, request.model_name());
@@ -984,7 +984,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     inference::ModelInferResponse error_response;
 
 #ifdef TRITON_ENABLE_TRACING
-    if (this->trace_manager_) {
+    if (trace_manager_) {
       state->trace_timestamps_.emplace_back(
           std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
     }
