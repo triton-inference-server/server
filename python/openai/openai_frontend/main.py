@@ -33,7 +33,7 @@ from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
-from frontend.triton_frontend import TritonOpenAIFrontend
+from frontend.fastapi_frontend import FastApiFrontend
 
 
 def signal_handler(server, frontend, signal, frame):
@@ -102,8 +102,8 @@ def main():
     engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=args.tokenizer)
 
     # Attach TritonLLMEngine as the backbone for inference and model management
-    frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(
-        host=args.host, port=args.port, log_level=args.uvicorn_log_level, engine=engine
+    frontend: FastApiFrontend = FastApiFrontend(
+        engine=engine, host=args.host, port=args.port, log_level=args.uvicorn_log_level
     )
 
     # Gracefully shutdown when receiving signals for testing and interactive use

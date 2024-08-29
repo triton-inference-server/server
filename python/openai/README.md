@@ -26,6 +26,8 @@ docker run -it --net=host --gpus all --rm \
 
 2. Launch the OpenAI-compatible Triton Inference Server:
 ```bash
+cd openai/
+
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
@@ -126,6 +128,8 @@ docker run -it --net=host --gpus all --rm \
 
 2. Launch the OpenAI server:
 ```bash
+cd openai/
+
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```

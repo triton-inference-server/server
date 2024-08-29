@@ -30,11 +30,11 @@ import uvicorn
 from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from frontend.fastapi.routers import chat, completions, models, observability
 from frontend.frontend import OpenAIFrontend
-from routers import chat, completions, models, observability
 
 
-class TritonOpenAIFrontend(OpenAIFrontend):
+class FastApiFrontend(OpenAIFrontend):
     def __init__(
         self,
         engine: TritonLLMEngine,
