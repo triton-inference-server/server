@@ -25,26 +25,28 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
+from schemas.openai import CreateCompletionRequest, CreateCompletionResponse
 
 router = APIRouter()
 
 
-@router.get("/metrics", tags=["Utilities"])
-def metrics(request: Request) -> str:
-    if not request.app.server or not request.app.server.live():
-        raise HTTPException(
-            status_code=400, detail="Triton Inference Server is not live."
-        )
+@router.post(
+    "/v1/completions", response_model=CreateCompletionResponse, tags=["Completions"]
+)
+def create_completion(
+    request: CreateCompletionRequest, raw_request: Request
+) -> CreateCompletionResponse | StreamingResponse:
+    """
+    Creates a completion for the provided prompt and parameters.
+    """
+    if not raw_request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
-    return request.app.server.metrics()
-
-
-@router.get("/health", tags=["Utilities"])
-def health(request: Request) -> Response:
-    if not request.app.server or not request.app.server.live():
-        raise HTTPException(
-            status_code=400, detail="Triton Inference Server is not live."
-        )
-
-    return Response(status_code=200)
+    try:
+        response = raw_request.app.engine.completion(request)
+        if request.stream:
+            return StreamingResponse(response, media_type="text/event-stream")
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"{e}")

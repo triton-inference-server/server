@@ -24,14 +24,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
-FROM ${BASE_IMAGE}
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import PlainTextResponse, Response
 
-RUN pip install /opt/tritonserver/python/*.whl
+router = APIRouter()
 
-# TODO: Update along with other folder/structure changes in review comments
-WORKDIR /workspace
-RUN git clone --single-branch -b rmccormick-openai-interface https://github.com/triton-inference-server/server.git && \
-    pip install -r server/python/openai/docker/requirements.txt && \
-    mv server/python/openai/ . && \
-    rm -r server
+
+@router.get("/metrics", response_class=PlainTextResponse, tags=["Utilities"])
+def metrics(request: Request) -> PlainTextResponse:
+    return request.app.engine.metrics()
+
+
+@router.get("/health/ready", tags=["Utilities"])
+def ready(request: Request) -> Response:
+    if not request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
+    if not request.app.engine.ready():
+        raise HTTPException(
+            status_code=400,
+            detail="Attached inference engine is not ready for inference requests.",
+        )
+
+    return Response(status_code=200)

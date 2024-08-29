@@ -33,16 +33,27 @@ from typing import Dict, List, Optional
 
 import openai
 import requests
+import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
-from openai_frontend.app import init_app
+from engine.triton_engine import TritonLLMEngine
+from frontend.fastapi_frontend import FastApiFrontend
 
 
+# TODO: Cleanup, refactor, mock, etc.
 def setup_fastapi_app(tokenizer: str, model_repository: str):
-    os.environ["TOKENIZER"] = tokenizer
-    os.environ["TRITON_MODEL_REPOSITORY"] = model_repository
-    app = init_app()
-    return app
+    server: tritonserver.Server = tritonserver.Server(
+        model_repository=model_repository,
+        log_verbose=0,
+        log_info=True,
+        log_warn=True,
+        log_error=True,
+    ).start(wait_until_ready=True)
+
+    engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=tokenizer)
+
+    frontend: FastApiFrontend = FastApiFrontend(engine=engine)
+    return frontend.app, server
 
 
 # Heavily inspired by vLLM's test infrastructure
@@ -72,7 +83,9 @@ class OpenAIServer:
             stderr=sys.stderr,
         )
         # Wait until health endpoint is responsive
-        self._wait_for_server(url=self.url_for("health"), timeout=self.START_TIMEOUT)
+        self._wait_for_server(
+            url=self.url_for("health", "ready"), timeout=self.START_TIMEOUT
+        )
 
     def __enter__(self):
         return self

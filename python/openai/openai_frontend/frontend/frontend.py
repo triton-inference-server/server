@@ -24,14 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
-FROM ${BASE_IMAGE}
+from __future__ import annotations
 
-RUN pip install /opt/tritonserver/python/*.whl
+from typing import Protocol
 
-# TODO: Update along with other folder/structure changes in review comments
-WORKDIR /workspace
-RUN git clone --single-branch -b rmccormick-openai-interface https://github.com/triton-inference-server/server.git && \
-    pip install -r server/python/openai/docker/requirements.txt && \
-    mv server/python/openai/ . && \
-    rm -r server
+
+class OpenAIFrontend(Protocol):
+    def start(self) -> None:
+        """
+        Starts the OpenAI-compatible service.
+        """
+        pass
+
+    def stop(self) -> None:
+        """
+        Stops the OpenAI-compatible service.
+        """
+        pass

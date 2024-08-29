@@ -28,9 +28,22 @@
 
 import argparse
 import os
+import signal
+from functools import partial
 
-import uvicorn
-from app import init_app
+import tritonserver
+from engine.triton_engine import TritonLLMEngine
+from frontend.fastapi_frontend import FastApiFrontend
+
+
+def signal_handler(server, frontend, signal, frame):
+    print(f"Received {signal=}, {frame=}")
+
+    # Graceful Shutdown
+    print("Shutting down OpenAI Frontend...")
+    frontend.stop()
+    print("Shutting down Triton Inference Server...")
+    server.stop()
 
 
 def parse_args():
@@ -52,7 +65,7 @@ def parse_args():
     # Triton
     triton_group = parser.add_argument_group("Triton Inference Server")
     triton_group.add_argument(
-        "--tritonserver-log-level",
+        "--tritonserver-log-verbose-level",
         type=int,
         default=0,
         help="The tritonserver log verbosity level",
@@ -73,21 +86,33 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
-    # NOTE: configurations can be passed to FastAPI app through a builder
-    # function like init_app in future, but using env vars for simplicity.
-    os.environ["TRITON_MODEL_REPOSITORY"] = args.model_repository
-    if args.tokenizer:
-        os.environ["TOKENIZER"] = args.tokenizer
 
-    os.environ["TRITON_LOG_VERBOSE_LEVEL"] = str(args.tritonserver_log_level)
+    # Initialize a Triton Inference Server pointing at LLM models
+    server: tritonserver.Server = tritonserver.Server(
+        model_repository=args.model_repository,
+        log_verbose=args.tritonserver_log_verbose_level,
+        log_info=True,
+        log_warn=True,
+        log_error=True,
+    ).start(wait_until_ready=True)
 
-    app = init_app()
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level=args.uvicorn_log_level,
-        timeout_keep_alive=5,
+    # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
+    engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=args.tokenizer)
+
+    # Attach TritonLLMEngine as the backbone for inference and model management
+    frontend: FastApiFrontend = FastApiFrontend(
+        engine=engine, host=args.host, port=args.port, log_level=args.uvicorn_log_level
     )
+
+    # Gracefully shutdown when receiving signals for testing and interactive use
+    signal.signal(signal.SIGINT, partial(signal_handler, server, frontend))
+    signal.signal(signal.SIGTERM, partial(signal_handler, server, frontend))
+
+    # Blocking call until killed or interrupted with SIGINT
+    frontend.start()
+
+
+if __name__ == "__main__":
+    main()

@@ -24,14 +24,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
-FROM ${BASE_IMAGE}
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from schemas.openai import CreateChatCompletionRequest, CreateChatCompletionResponse
 
-RUN pip install /opt/tritonserver/python/*.whl
+router = APIRouter()
 
-# TODO: Update along with other folder/structure changes in review comments
-WORKDIR /workspace
-RUN git clone --single-branch -b rmccormick-openai-interface https://github.com/triton-inference-server/server.git && \
-    pip install -r server/python/openai/docker/requirements.txt && \
-    mv server/python/openai/ . && \
-    rm -r server
+
+@router.post(
+    "/v1/chat/completions", response_model=CreateChatCompletionResponse, tags=["Chat"]
+)
+def create_chat_completion(
+    request: CreateChatCompletionRequest,
+    raw_request: Request,
+) -> CreateChatCompletionResponse | StreamingResponse:
+    """
+    Creates a chat completion for the provided messages and parameters.
+    """
+    if not raw_request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
+    try:
+        response = raw_request.app.engine.chat(request)
+        if request.stream:
+            return StreamingResponse(response, media_type="text/event-stream")
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"{e}")

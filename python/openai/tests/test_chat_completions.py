@@ -95,6 +95,9 @@ class TestChatCompletions:
             # logprobs is a boolean for chat completions
             ("logprobs", True),
             ("logit_bias", {"0": 0}),
+            # NOTE: Extensions to the spec
+            ("min_tokens", 16),
+            ("ignore_eos", True),
         ],
     )
     def test_chat_completions_sampling_parameters(
@@ -113,7 +116,10 @@ class TestChatCompletions:
         unsupported_parameters = ["logprobs", "logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
-            assert response.json()["detail"] == "logit bias and log probs not supported"
+            assert (
+                response.json()["detail"]
+                == "logit bias and log probs not currently supported"
+            )
             return
 
         assert response.status_code == 200
@@ -131,6 +137,9 @@ class TestChatCompletions:
             ("frequency_penalty", -3),
             ("presence_penalty", 2.1),
             ("presence_penalty", -2.1),
+            # NOTE: Extensions to the spec
+            ("min_tokens", -1),
+            ("ignore_eos", 123),
         ],
     )
     def test_chat_completions_invalid_sampling_parameters(
@@ -462,7 +471,7 @@ class TestChatCompletionsCustomFixture:
         self, backend: str, model: str, messages: List[dict]
     ):
         model_repository = str(Path(__file__).parent / f"{backend}_models")
-        app = setup_fastapi_app(model_repository=model_repository, tokenizer="")
+        app, server = setup_fastapi_app(model_repository=model_repository, tokenizer="")
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
@@ -470,3 +479,5 @@ class TestChatCompletionsCustomFixture:
             )
             assert response.status_code == 400
             assert response.json()["detail"] == "Unknown tokenizer"
+
+        server.stop()

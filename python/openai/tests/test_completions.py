@@ -59,6 +59,9 @@ class TestCompletions:
             # logprobs is an integer for completions
             ("logprobs", 5),
             ("logit_bias", {"0": 0}),
+            # NOTE: Extensions to the spec
+            ("min_tokens", 16),
+            ("ignore_eos", True),
         ],
     )
     def test_completions_sampling_parameters(
@@ -283,6 +286,9 @@ class TestCompletions:
             ("frequency_penalty", -3),
             ("presence_penalty", 2.1),
             ("presence_penalty", -2.1),
+            # NOTE: Extensions to the spec
+            ("min_tokens", -1),
+            ("ignore_eos", 123),
         ],
     )
     def test_completions_invalid_sampling_parameters(

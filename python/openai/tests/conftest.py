@@ -78,9 +78,13 @@ def server():
 @pytest.fixture(scope="class")
 def fastapi_client_class_scope():
     model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-    app = setup_fastapi_app(tokenizer=TEST_TOKENIZER, model_repository=model_repository)
+    app, server = setup_fastapi_app(
+        tokenizer=TEST_TOKENIZER, model_repository=model_repository
+    )
     with TestClient(app) as test_client:
         yield test_client
+
+    server.stop()
 
 
 @pytest.fixture

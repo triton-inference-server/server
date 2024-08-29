@@ -24,6 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from typing import List
+
 from fastapi import APIRouter, HTTPException, Request
 from schemas.openai import ListModelsResponse, Model, ObjectType
 
@@ -37,28 +39,11 @@ def list_models(request: Request) -> ListModelsResponse:
     """
     Lists the currently available models, and provides basic information about each one such as the owner and availability.
     """
-    model_metadata = request.app.models
-    if not model_metadata:
-        raise HTTPException(status_code=400, detail="No known models")
+    if not request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
-    model_list = []
-    for model in model_metadata:
-        metadata = model_metadata[model]
-        if not metadata:
-            raise HTTPException(
-                status_code=400, detail=f"No metadata for model: {model}"
-            )
-
-        model_list.append(
-            Model(
-                id=metadata.name,
-                created=metadata.create_time,
-                object=ObjectType.model,
-                owned_by=OWNED_BY,
-            ),
-        )
-
-    return ListModelsResponse(object=ObjectType.list, data=model_list)
+    models: List[Model] = request.app.engine.models()
+    return ListModelsResponse(object=ObjectType.list, data=models)
 
 
 @router.get("/v1/models/{model_name}", response_model=Model, tags=["Models"])
@@ -66,20 +51,13 @@ def retrieve_model(request: Request, model_name: str) -> Model:
     """
     Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     """
-    model_metadata = request.app.models
-    if not model_metadata:
-        raise HTTPException(status_code=400, detail="No known models")
+    if not request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
-    model = model_metadata.get(model_name)
-    if not model:
-        raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
-
-    if model_name == model.name:
-        return Model(
-            id=model.name,
-            created=model.create_time,
-            object=ObjectType.model,
-            owned_by=OWNED_BY,
-        )
+    # TODO: Return model directly from engine instead of searching models
+    models: List[Model] = request.app.engine.models()
+    for model in models:
+        if model.id == model_name:
+            return model
 
     raise HTTPException(status_code=404, detail=f"Unknown model: {model_name}")

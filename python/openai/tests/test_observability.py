@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 from pathlib import Path
 
 import pytest
@@ -41,10 +40,15 @@ def model():
 class TestObservability:
     @pytest.fixture(scope="class")
     def client(self):
+        # TODO: Cleanup, mock server/engine, etc.
         model_repository = Path(__file__).parent / "test_models"
-        app = setup_fastapi_app(tokenizer="", model_repository=str(model_repository))
+        app, server = setup_fastapi_app(
+            tokenizer="", model_repository=str(model_repository)
+        )
         with TestClient(app) as test_client:
             yield test_client
+
+        server.stop()
 
     ### General Error Handling ###
     def test_not_found(self, client):
@@ -53,7 +57,7 @@ class TestObservability:
 
     ### Startup / Health ###
     def test_startup_success(self, client):
-        response = client.get("/health")
+        response = client.get("/health/ready")
         assert response.status_code == 200
 
     ### Metrics ###
@@ -61,8 +65,7 @@ class TestObservability:
         response = client.get("/metrics")
         assert response.status_code == 200
         # TODO: Flesh out metrics tests further
-        # NOTE: response.json() works even on non-json prometheus data
-        assert "nv_cpu_utilization" in response.json()
+        assert "nv_cpu_utilization" in response.text
 
     ### Models ###
     def test_models_list(self, client):
@@ -86,16 +89,3 @@ class TestObservability:
         assert model_resp["object"] == "model"
         assert model_resp["created"] > 0
         assert model_resp["owned_by"] == "Triton Inference Server"
-
-
-# For tests that won't use the same pytest fixture for server startup across
-# the whole class test suite.
-class TestObservabilityCustomFixture:
-    def test_startup_fail(self):
-        os.environ["TRITON_MODEL_REPOSITORY"] = "/does/not/exist"
-        with pytest.raises(Exception):
-            # Test that FastAPI lifespan startup fails when initializing Triton
-            # with unknown model repository.
-            app = init_app()
-            with TestClient(app):
-                pass

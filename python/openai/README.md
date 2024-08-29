@@ -5,7 +5,7 @@
 1. Docker + NVIDIA Container Runtime
 2. A correctly configured `HF_TOKEN` for access to HuggingFace models.
     - The current examples and testing primarily use the
-      [`meta-llama/Meta-Llama-3-8B-Instruct`](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct)
+      [`meta-llama/Meta-Llama-3.1-8B-Instruct`](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)
       model, but you can manually bring your own models and adjust accordingly.
 
 ## VLLM
@@ -26,6 +26,8 @@ docker run -it --net=host --gpus all --rm \
 
 2. Launch the OpenAI-compatible Triton Inference Server:
 ```bash
+cd openai/
+
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
@@ -53,7 +55,7 @@ curl -s http://localhost:8000/v1/completions -H 'Content-Type: application/json'
 5. Benchmark with `genai-perf`:
 ```bash
 MODEL="llama-3.1-8b-instruct"
-TOKENIZER="meta-llama/Meta-Llama-3-8B-Instruct"
+TOKENIZER="meta-llama/Meta-Llama-3.1-8B-Instruct"
 genai-perf \
   --model ${MODEL} \
   --tokenizer ${TOKENIZER} \
@@ -93,8 +95,7 @@ print(completion.choices[0].message.content)
 
 7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
-cd tests/
-pytest -v
+pytest -v tests/
 ```
 
 8. For a list of examples, see the `examples/` folder.
@@ -127,6 +128,8 @@ docker run -it --net=host --gpus all --rm \
 
 2. Launch the OpenAI server:
 ```bash
+cd openai/
+
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
