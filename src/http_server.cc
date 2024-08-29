@@ -4702,7 +4702,8 @@ HTTPAPIServer::Create(
 
 TRITONSERVER_Error*
 HTTPAPIServer::Create(
-    std::shared_ptr<TRITONSERVER_Server>& server, const UnorderedMapType& data,
+    std::shared_ptr<TRITONSERVER_Server>& server,
+    const UnorderedMapType& options,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const RestrictedFeatures& restricted_features,
@@ -4714,12 +4715,12 @@ HTTPAPIServer::Create(
   std::string header_forward_pattern;
   int thread_count;
 
-  RETURN_IF_ERR(get_value(data, "port", &port));
-  RETURN_IF_ERR(get_value(data, "reuse_port", &reuse_port));
-  RETURN_IF_ERR(get_value(data, "address", &address));
+  RETURN_IF_ERR(GetValue(options, "port", &port));
+  RETURN_IF_ERR(GetValue(options, "reuse_port", &reuse_port));
+  RETURN_IF_ERR(GetValue(options, "address", &address));
   RETURN_IF_ERR(
-      get_value(data, "header_forward_pattern", &header_forward_pattern));
-  RETURN_IF_ERR(get_value(data, "thread_count", &thread_count));
+      GetValue(options, "header_forward_pattern", &header_forward_pattern));
+  RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
 
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
