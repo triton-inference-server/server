@@ -168,7 +168,9 @@ TRITONSERVER_Error* InferGRPCToInput(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const inference::ModelInferRequest& request,
     std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request);
+    TRITONSERVER_InferenceRequest* inference_request,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        ref_shm_regions);
 
 TRITONSERVER_Error*
 InferGRPCToInputHelper(
@@ -391,7 +393,9 @@ InferGRPCToInput(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const inference::ModelInferRequest& request,
     std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request)
+    TRITONSERVER_InferenceRequest* inference_request,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        ref_shm_regions)
 {
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
@@ -432,17 +436,15 @@ InferGRPCToInput(
                 .c_str());
       }
       void* tmp;
-      int ref_count;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
+          shm_info_ref = nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, byte_size, &tmp, &memory_type, &memory_type_id,
-          &ref_count));
+          &shm_info_ref));
       base = tmp;
 
-      bool is_added = false;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRefShmRegion(
-          inference_request, region_name.c_str(), &is_added));
-      if (is_added) {
-        RETURN_IF_ERR(shm_manager->IncrementRefCount(region_name));
+      if (shm_info_ref != nullptr) {
+        ref_shm_regions->emplace_back(shm_info_ref);
       }
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
@@ -920,19 +922,25 @@ ModelInferHandler::Execute(InferHandler::State* state)
   // Will be used to hold the serialized data in case explicit string
   // tensors are present in the request.
   std::list<std::string> serialized_data;
+  std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+      ref_shm_regions;
 
   if (err == nullptr) {
     err = InferGRPCToInput(
-        tritonserver_, shm_manager_, request, &serialized_data, irequest);
+        tritonserver_, shm_manager_, request, &serialized_data, irequest,
+        &ref_shm_regions);
   }
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, request, std::move(serialized_data),
-        response_queue, &state->alloc_payload_, irequest);
+        response_queue, &state->alloc_payload_, &ref_shm_regions);
   }
 
   auto request_release_payload =
       std::make_unique<RequestReleasePayload>(state->inference_request_);
+  auto response_release_payload = std::make_unique<ResponseReleasePayload>(
+      state, std::move(ref_shm_regions));
+
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetReleaseCallback(
         irequest, InferRequestComplete,
@@ -942,7 +950,8 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = TRITONSERVER_InferenceRequestSetResponseCallback(
         irequest, allocator_,
         &state->alloc_payload_ /* response_allocator_userp */,
-        InferResponseComplete, reinterpret_cast<void*>(state));
+        InferResponseComplete,
+        response_release_payload.get() /* response_userp */);
   }
   // Get request ID for logging in case of error.
   const char* request_id = "";
@@ -978,8 +987,9 @@ ModelInferHandler::Execute(InferHandler::State* state)
   // to handle gRPC stream cancellation.
   if (err == nullptr) {
     state->context_->InsertInflightState(state);
-    // The payload will be cleaned in request release callback.
+    // The payload will be cleaned in release callback.
     request_release_payload.release();
+    response_release_payload.release();
   } else {
     // If error go immediately to COMPLETE.
     LOG_VERBOSE(1) << "[request id: " << request_id << "] "
@@ -1006,7 +1016,9 @@ ModelInferHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  State* state = reinterpret_cast<State*>(userp);
+  std::unique_ptr<ResponseReleasePayload> response_release_payload(
+      static_cast<ResponseReleasePayload*>(userp));
+  auto state = response_release_payload->state_;
 
   // There are multiple handlers registered in the gRPC service
   // Hence, we would need to properly synchronize this thread

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -118,8 +118,7 @@ $system_shared_memory_status_response =
     "name" : $string,
     "key" : $string,
     "offset" : $number,
-    "byte_size" : $number,
-    "ref_count" : $number
+    "byte_size" : $number
   },
   …
 ]
@@ -134,8 +133,6 @@ $system_shared_memory_status_response =
   to the start of the shared memory region.
 
 - “byte_size” : The size of the shared memory region, in bytes.
-
-- “ref_count” : The number of inference requests referencing the shared memory region.
 
 A failed status request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -249,8 +246,7 @@ $cuda_shared_memory_status_response =
   {
     "name" : $string,
     "device_id" : $number,
-    "byte_size" : $number,
-    "ref_count" : $number
+    "byte_size" : $number
   },
   …
 ]
@@ -262,8 +258,6 @@ $cuda_shared_memory_status_response =
   created.
 
 - “byte_size” : The size of the shared memory region, in bytes.
-
-- “ref_count” : The number of inference requests referencing the shared memory region.
 
 A failed status request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the

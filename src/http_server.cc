@@ -2678,12 +2678,18 @@ HTTPAPIServer::ParseJsonTritonIO(
           reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
-        int ref_count;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
+            shm_info_ref = nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, shm_offset, byte_size, &base, &memory_type,
-            &memory_type_id, &ref_count));
+            &memory_type_id, &shm_info_ref));
+
+        if (shm_info_ref != nullptr) {
+          infer_req->AddShmInfoReference(shm_info_ref);
+        }
+
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
           cudaIpcMemHandle_t* cuda_handle;
@@ -2714,13 +2720,6 @@ HTTPAPIServer::ParseJsonTritonIO(
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, base, byte_size, memory_type,
               memory_type_id));
-        }
-
-        bool is_added = false;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRefShmRegion(
-            irequest, shm_region, &is_added));
-        if (is_added) {
-          RETURN_IF_ERR(shm_manager_->IncrementRefCount(shm_region));
         }
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
@@ -2801,12 +2800,17 @@ HTTPAPIServer::ParseJsonTritonIO(
       // classification cannot be true.
       if (use_shm) {
         void* base;
-        int ref_count;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
+            shm_info_ref = nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, offset, byte_size, &base, &memory_type, &memory_type_id,
-            &ref_count));
+            &shm_info_ref));
+
+        if (shm_info_ref != nullptr) {
+          infer_req->AddShmInfoReference(shm_info_ref);
+        }
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -2824,13 +2828,6 @@ HTTPAPIServer::ParseJsonTritonIO(
               std::forward_as_tuple(new AllocPayload::OutputInfo(
                   base, byte_size, memory_type, memory_type_id,
                   nullptr /* cuda ipc handle */)));
-        }
-
-        bool is_added = false;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRefShmRegion(
-            irequest, shm_region, &is_added));
-        if (is_added) {
-          RETURN_IF_ERR(shm_manager_->IncrementRefCount(shm_region));
         }
       } else {
         bool use_binary;
@@ -3284,13 +3281,12 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(), streaming, irequest_shared,
-        shm_manager_));
+        generate_stream_response_schema_.get(), streaming, irequest_shared));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared, shm_manager_));
+        streaming, irequest_shared));
   }
   generate_request->trace_ = trace;
 
@@ -3646,14 +3642,6 @@ HTTPAPIServer::HandleInfer(
   // by reference to capture local updates, except for shared pointers which
   // should be captured by value in case of ref count issues.
   auto error_callback = [&, trace](TRITONSERVER_Error* error) {
-    if (infer_request) {
-      auto err = infer_request->DecrementShmRefCounts();
-      if (err != nullptr) {
-        LOG_VERBOSE(1) << "[request id: " << request_id
-                       << "] DecrementShmRefCounts failed: "
-                       << TRITONSERVER_ErrorMessage(err);
-      }
-    }
     if (error != nullptr) {
       LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(error);
@@ -3768,11 +3756,10 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
-    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-    const std::shared_ptr<SharedMemoryManager>& shm_manager)
+    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
-      triton_request_(triton_request), shm_manager_(shm_manager)
+      triton_request_(triton_request)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
@@ -3850,31 +3837,8 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
-
-  auto error = infer_request->DecrementShmRefCounts();
-  if (error != nullptr) {
-    LOG_VERBOSE(1) << "DecrementShmRefCounts failed: "
-                   << TRITONSERVER_ErrorMessage(error);
-  }
-
   evthr_defer(
       infer_request->thread_, InferRequestClass::ReplyCallback, infer_request);
-}
-
-TRITONSERVER_Error*
-HTTPAPIServer::InferRequestClass::DecrementShmRefCounts()
-{
-  const std::set<std::string>* ref_shm_regions = nullptr;
-  RETURN_IF_ERR(TRITONSERVER_InferenceRequestGetRefShmRegions(
-      triton_request_.get(), &ref_shm_regions));
-
-  if (ref_shm_regions != nullptr) {
-    for (const auto& region_name : *ref_shm_regions) {
-      shm_manager_->DecrementRefCount(region_name);
-    }
-  }
-
-  return nullptr;
 }
 
 TRITONSERVER_Error*

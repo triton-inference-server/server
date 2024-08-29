@@ -300,7 +300,8 @@ InferAllocatorPayload(
     std::list<std::string>&& serialized_data,
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
     AllocPayload<ResponseType>* alloc_payload,
-    TRITONSERVER_InferenceRequest* inference_request)
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        ref_shm_regions)
 {
   alloc_payload->response_queue_ = response_queue;
   alloc_payload->shm_map_.clear();
@@ -334,18 +335,16 @@ InferAllocatorPayload(
 
     if (has_shared_memory) {
       void* base;
-      int ref_count;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
+          shm_info_ref = nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, byte_size, &base, &memory_type, &memory_type_id,
-          &ref_count));
+          &shm_info_ref));
 
-      bool is_added = false;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRefShmRegion(
-          inference_request, region_name.c_str(), &is_added));
-      if (is_added) {
-        RETURN_IF_ERR(shm_manager->IncrementRefCount(region_name));
+      if (shm_info_ref != nullptr) {
+        ref_shm_regions->emplace_back(shm_info_ref);
       }
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
@@ -382,7 +381,9 @@ TRITONSERVER_Error* InferGRPCToInput(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const inference::ModelInferRequest& request,
     std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request);
+    TRITONSERVER_InferenceRequest* inference_request,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        ref_shm_regions);
 
 TRITONSERVER_Error* ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -1204,8 +1205,7 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern,
-      const std::shared_ptr<SharedMemoryManager>& shm_manager);
+      const std::string& header_forward_pattern);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -1260,15 +1260,6 @@ class InferHandler : public HandlerBase {
   {
     LOG_VERBOSE(2) << "StateRelease, " << state->unique_id_ << " Step "
                    << state->step_;
-
-    if (state->inference_request_) {
-      auto err = DecrementShmRefCounts(state);
-      if (err != nullptr) {
-        LOG_VERBOSE(1) << "DecrementShmRefCounts failed: "
-                       << TRITONSERVER_ErrorMessage(err);
-      }
-    }
-
     if (max_state_bucket_count_ > 0) {
       std::lock_guard<std::mutex> lock(alloc_mu_);
 
@@ -1285,8 +1276,6 @@ class InferHandler : public HandlerBase {
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
-
-  TRITONSERVER_Error* DecrementShmRefCounts(InferHandler::State* state);
 
   TRITONSERVER_Error* ForwardHeadersAsParameters(
       TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state);
@@ -1309,8 +1298,6 @@ class InferHandler : public HandlerBase {
   std::pair<std::string, std::string> restricted_kv_;
   std::string header_forward_pattern_;
   re2::RE2 header_forward_regex_;
-
-  std::shared_ptr<SharedMemoryManager> shm_manager_;
 };
 
 template <
@@ -1323,13 +1310,12 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_pattern,
-        const std::shared_ptr<SharedMemoryManager>& shm_manager)
+        const std::string& header_forward_pattern)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       restricted_kv_(restricted_kv),
       header_forward_pattern_(header_forward_pattern),
-      header_forward_regex_(header_forward_pattern_), shm_manager_(shm_manager)
+      header_forward_regex_(header_forward_pattern_)
 {
 }
 
@@ -1449,26 +1435,6 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
   return err;
 }
 
-template <
-    typename ServiceType, typename ServerResponderType, typename RequestType,
-    typename ResponseType>
-TRITONSERVER_Error*
-InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
-    DecrementShmRefCounts(InferHandler::State* state)
-{
-  const std::set<std::string>* ref_shm_regions = nullptr;
-  RETURN_IF_ERR(TRITONSERVER_InferenceRequestGetRefShmRegions(
-      state->inference_request_.get(), &ref_shm_regions));
-
-  if (ref_shm_regions != nullptr) {
-    for (const auto& region_name : *ref_shm_regions) {
-      shm_manager_->DecrementRefCount(region_name);
-    }
-  }
-
-  return nullptr;
-}
-
 //
 // ModelInferHandler
 //
@@ -1490,8 +1456,9 @@ class ModelInferHandler
       const std::string& forward_header_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            restricted_kv, forward_header_pattern, shm_manager),
-        trace_manager_(trace_manager), compression_level_(compression_level)
+            restricted_kv, forward_header_pattern),
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
+        compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -1527,7 +1494,25 @@ class ModelInferHandler
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
 
+  // Simple structure that carries the payload needed for
+  // response release callback.
+  struct ResponseReleasePayload {
+    State* state_;
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        ref_shm_regions_;
+
+    ResponseReleasePayload(
+        State* state,
+        std::vector<
+            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
+            ref_shm_regions)
+        : state_(state), ref_shm_regions_(ref_shm_regions)
+    {
+    }
+  };
+
   TraceManager* trace_manager_;
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;

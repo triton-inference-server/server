@@ -69,7 +69,8 @@ TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, size_t byte_size,
     void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
-    int64_t* device_id, int* ref_count)
+    int64_t* device_id,
+    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info_ref)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
@@ -99,26 +100,7 @@ SharedMemoryManager::Unregister(
 }
 
 TRITONSERVER_Error*
-SharedMemoryManager::UnregisterAll(
-    TRITONSERVER_MemoryType memory_type, const bool ignore_ref_count)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::IncrementRefCount(const std::string& name)
-{
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED,
-      std::string("Shared memory feature is currently not supported on Windows")
-          .c_str());
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::DecrementRefCount(const std::string& name)
+SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
@@ -128,8 +110,7 @@ SharedMemoryManager::DecrementRefCount(const std::string& name)
 
 TRITONSERVER_Error*
 SharedMemoryManager::UnregisterHelper(
-    const std::string& name, TRITONSERVER_MemoryType memory_type,
-    const bool ignore_ref_count)
+    const std::string& name, TRITONSERVER_MemoryType memory_type)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
@@ -364,8 +345,8 @@ CheckCudaSharedMemoryRegionSize(
 
 SharedMemoryManager::~SharedMemoryManager()
 {
-  UnregisterAll(TRITONSERVER_MEMORY_CPU, true /* ignore_ref_count */);
-  UnregisterAll(TRITONSERVER_MEMORY_GPU, true /* ignore_ref_count */);
+  UnregisterAll(TRITONSERVER_MEMORY_CPU);
+  UnregisterAll(TRITONSERVER_MEMORY_GPU);
 }
 
 TRITONSERVER_Error*
@@ -428,9 +409,9 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   }
 
   shared_memory_map_.insert(std::make_pair(
-      name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
+      name, std::make_shared<SharedMemoryManager::SharedMemoryInfo>(
                 name, shm_key, offset, byte_size, shm_fd, mapped_addr,
-                TRITONSERVER_MEMORY_CPU, 0, 0))));
+                TRITONSERVER_MEMORY_CPU, 0)));
 
   return nullptr;  // success
 }
@@ -464,9 +445,9 @@ SharedMemoryManager::RegisterCUDASharedMemory(
       name, reinterpret_cast<CUdeviceptr>(mapped_addr), byte_size));
 
   shared_memory_map_.insert(std::make_pair(
-      name, std::unique_ptr<CUDASharedMemoryInfo>(new CUDASharedMemoryInfo(
+      name, std::make_shared<SharedMemoryManager::CUDASharedMemoryInfo>(
                 name, "", 0, byte_size, 0, mapped_addr, TRITONSERVER_MEMORY_GPU,
-                device_id, 0, cuda_shm_handle))));
+                device_id, cuda_shm_handle)));
 
   return nullptr;  // success
 }
@@ -476,7 +457,8 @@ TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, size_t byte_size,
     void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
-    int64_t* device_id, int* ref_count)
+    int64_t* device_id,
+    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info_ref)
 {
   // protect shared_memory_map_ from concurrent access
   std::lock_guard<std::mutex> lock(mu_);
@@ -514,6 +496,11 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
 
+  if (shm_info_ref != nullptr) {
+    *shm_info_ref =
+        std::static_pointer_cast<const SharedMemoryInfo>(it->second);
+  }
+
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
                                it->second->offset_ + offset);
@@ -523,7 +510,6 @@ SharedMemoryManager::GetMemoryInfo(
 
   *memory_type = it->second->kind_;
   *device_id = it->second->device_id_;
-  *ref_count = it->second->ref_count_;
 
   return nullptr;
 }
@@ -576,8 +562,6 @@ SharedMemoryManager::GetStatus(
         }
         RETURN_IF_ERR(
             shm_region.AddUInt("byte_size", shm_info.second->byte_size_));
-        RETURN_IF_ERR(
-            shm_region.AddUInt("ref_count", shm_info.second->ref_count_));
         RETURN_IF_ERR(shm_status->Append(std::move(shm_region)));
       }
     }
@@ -623,7 +607,6 @@ SharedMemoryManager::GetStatus(
       RETURN_IF_ERR(shm_region.AddUInt("device_id", it->second->device_id_));
     }
     RETURN_IF_ERR(shm_region.AddUInt("byte_size", it->second->byte_size_));
-    RETURN_IF_ERR(shm_region.AddUInt("ref_count", it->second->ref_count_));
     RETURN_IF_ERR(shm_status->Append(std::move(shm_region)));
   }
 
@@ -641,8 +624,7 @@ SharedMemoryManager::Unregister(
 }
 
 TRITONSERVER_Error*
-SharedMemoryManager::UnregisterAll(
-    TRITONSERVER_MemoryType memory_type, const bool ignore_ref_count)
+SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
 {
   std::lock_guard<std::mutex> lock(mu_);
   std::string error_message = "Failed to unregister the following ";
@@ -654,8 +636,7 @@ SharedMemoryManager::UnregisterAll(
          it != shared_memory_map_.cend(); it = next_it) {
       ++next_it;
       if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-        TRITONSERVER_Error* err =
-            UnregisterHelper(it->first, memory_type, ignore_ref_count);
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
         if (err != nullptr) {
           unregister_fails.push_back(it->first);
           LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
@@ -668,8 +649,8 @@ SharedMemoryManager::UnregisterAll(
          it != shared_memory_map_.cend(); it = next_it) {
       ++next_it;
       if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
-        TRITONSERVER_Error* err =
-            UnregisterHelper(it->first, memory_type, ignore_ref_count);
+        TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
+        ;
         if (err != nullptr) {
           unregister_fails.push_back(it->first);
           LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
@@ -691,54 +672,18 @@ SharedMemoryManager::UnregisterAll(
 }
 
 TRITONSERVER_Error*
-SharedMemoryManager::IncrementRefCount(const std::string& name)
-{
-  // protect shared_memory_map_ from concurrent access
-  std::lock_guard<std::mutex> lock(mu_);
-
-  auto it = shared_memory_map_.find(name);
-  if (it == shared_memory_map_.end()) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_NOT_FOUND,
-        std::string("Unable to find shared memory region: '" + name + "'")
-            .c_str());
-  }
-  ++(it->second->ref_count_);
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-SharedMemoryManager::DecrementRefCount(const std::string& name)
-{
-  // protect shared_memory_map_ from concurrent access
-  std::lock_guard<std::mutex> lock(mu_);
-
-  auto it = shared_memory_map_.find(name);
-  if (it == shared_memory_map_.end()) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_NOT_FOUND,
-        std::string("Unable to find shared memory region: '" + name + "'")
-            .c_str());
-  }
-  --(it->second->ref_count_);
-  return nullptr;
-}
-
-TRITONSERVER_Error*
 SharedMemoryManager::UnregisterHelper(
-    const std::string& name, TRITONSERVER_MemoryType memory_type,
-    const bool ignore_ref_count)
+    const std::string& name, TRITONSERVER_MemoryType memory_type)
 {
   // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end() && it->second->kind_ == memory_type) {
-    if (!ignore_ref_count && it->second->ref_count_ > 0) {
+    if (it->second.use_count() > 1) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           std::string(
               "Cannot unregister shared memory region '" + name +
-              "', it is currently in use by " +
-              std::to_string(it->second->ref_count_) + " requests.")
+              "', it is currently in use.")
               .c_str());
     }
 
