@@ -95,6 +95,9 @@ class TestChatCompletions:
             # logprobs is a boolean for chat completions
             ("logprobs", True),
             ("logit_bias", {"0": 0}),
+            # NOTE: Extensions to the spec
+            ("min_tokens", 16),
+            ("ignore_eos", True),
         ],
     )
     def test_chat_completions_sampling_parameters(
@@ -134,6 +137,9 @@ class TestChatCompletions:
             ("frequency_penalty", -3),
             ("presence_penalty", 2.1),
             ("presence_penalty", -2.1),
+            # NOTE: Extensions to the spec
+            ("min_tokens", -1),
+            ("ignore_eos", 123),
         ],
     )
     def test_chat_completions_invalid_sampling_parameters(

@@ -37,7 +37,7 @@ import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
 from engine.triton_engine import TritonLLMEngine
-from frontend.triton_frontend import TritonOpenAIFrontend
+from frontend.fastapi_frontend import FastApiFrontend
 
 
 # TODO: Cleanup, refactor, mock, etc.
@@ -52,7 +52,7 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
 
     engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=tokenizer)
 
-    frontend: TritonOpenAIFrontend = TritonOpenAIFrontend(engine=engine)
+    frontend: FastApiFrontend = FastApiFrontend(engine=engine)
     return frontend.app, server
 
 
