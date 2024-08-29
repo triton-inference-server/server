@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.utils import OpenAIServer, setup_fastapi_app
+from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 ### TEST ENVIRONMENT SETUP ###
 TEST_BACKEND = ""
@@ -78,30 +78,34 @@ def server():
 @pytest.fixture(scope="class")
 def fastapi_client_class_scope():
     model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-    app, server = setup_fastapi_app(
-        tokenizer=TEST_TOKENIZER, model_repository=model_repository
-    )
+    server = setup_server(model_repository=model_repository)
+    app = setup_fastapi_app(tokenizer=TEST_TOKENIZER, server=server)
     with TestClient(app) as test_client:
         yield test_client
 
     server.stop()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def model():
     return TEST_MODEL
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def backend():
     return TEST_BACKEND
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
+def tokenizer_model():
+    return TEST_TOKENIZER
+
+
+@pytest.fixture(scope="module")
 def prompt():
     return TEST_PROMPT
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def messages():
     return TEST_MESSAGES

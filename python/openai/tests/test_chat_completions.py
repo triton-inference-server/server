@@ -25,12 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import copy
+import subprocess
 from pathlib import Path
 from typing import List
 
 import pytest
+import tritonserver
 from fastapi.testclient import TestClient
-from tests.utils import setup_fastapi_app
+from tests.utils import setup_fastapi_app, setup_server
 
 
 class TestChatCompletions:
@@ -463,21 +465,83 @@ class TestChatCompletions:
 
 # For tests that won't use the same pytest fixture for server startup across
 # the whole class test suite.
-class TestChatCompletionsCustomFixture:
-    # A TOKENIZER must be known for /chat/completions endpoint in order to
-    # apply chat templates, and for simplicity in determination, users should
-    # define the TOKENIZER. So, explicitly raise an error if none is provided.
-    def test_chat_completions_no_tokenizer(
-        self, backend: str, model: str, messages: List[dict]
-    ):
+class TestChatCompletionsTokenizers:
+    # Re-use a single Triton server for different frontend configurations
+    @pytest.fixture(scope="class")
+    def server(self, backend: str):
         model_repository = str(Path(__file__).parent / f"{backend}_models")
-        app, server = setup_fastapi_app(model_repository=model_repository, tokenizer="")
+        server = setup_server(str(model_repository))
+        yield server
+        server.stop()
+
+    # A tokenizer must be known for /chat/completions endpoint in order to
+    # apply chat templates, and for simplicity in determination, users should
+    # define the tokenizer. So, explicitly raise an error if none is provided.
+    def test_chat_completions_no_tokenizer(
+        self, server: tritonserver.Server, model: str, messages: List[dict]
+    ):
+        app = setup_fastapi_app(tokenizer="", server=server)
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
                 json={"model": model, "messages": messages},
             )
-            assert response.status_code == 400
-            assert response.json()["detail"] == "Unknown tokenizer"
 
-        server.stop()
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Unknown tokenizer"
+
+    def test_chat_completions_custom_tokenizer(
+        self,
+        server: tritonserver.Server,
+        tokenizer_model: str,
+        model: str,
+        messages: List[dict],
+    ):
+        # Tokenizers can be provided by a local file path to a directory containing
+        # the relevant files such as tokenizer.json and tokenizer_config.json.
+        custom_tokenizer_path = str(Path(__file__).parent / "custom_tokenizer")
+        download_cmd = f"huggingface-cli download --local-dir {custom_tokenizer_path} {tokenizer_model} --include *.json"
+        print(f"Running download command: {download_cmd}")
+        subprocess.run(download_cmd.split(), check=True)
+
+        # Compare the downloaded tokenizer response against remote HF equivalent
+        # to assert equivalent functionality in responses and chat template.
+        app_local = setup_fastapi_app(tokenizer=custom_tokenizer_path, server=server)
+        app_hf = setup_fastapi_app(tokenizer=tokenizer_model, server=server)
+
+        responses = []
+        with TestClient(app_local) as client_local, TestClient(app_hf) as client_hf:
+            payload = {"model": model, "messages": messages, "temperature": 0}
+            responses.append(client_local.post("/v1/chat/completions", json=payload))
+            responses.append(client_hf.post("/v1/chat/completions", json=payload))
+
+        for response in responses:
+            assert response.status_code == 200
+            message = response.json()["choices"][0]["message"]
+            assert message["content"].strip()
+            assert message["role"] == "assistant"
+
+        def equal_dicts(d1, d2, ignore_keys):
+            d1_filtered = {k: v for k, v in d1.items() if k not in ignore_keys}
+            d2_filtered = {k: v for k, v in d2.items() if k not in ignore_keys}
+            return d1_filtered == d2_filtered
+
+        ignore_keys = ["id", "created"]
+        assert equal_dicts(
+            responses[0].json(), responses[1].json(), ignore_keys=ignore_keys
+        )
+
+    def test_chat_completions_invalid_chat_tokenizer(
+        self, server: tritonserver.Server, model: str, messages: List[dict]
+    ):
+        # Pick a tokenizer with no chat template defined
+        invalid_chat_tokenizer = "gpt2"
+        app = setup_fastapi_app(tokenizer=invalid_chat_tokenizer, server=server)
+        with TestClient(app) as client:
+            response = client.post(
+                "/v1/chat/completions",
+                json={"model": model, "messages": messages},
+            )
+
+        assert response.status_code == 400
+        assert "cannot use apply_chat_template()" in response.json()["detail"].lower()

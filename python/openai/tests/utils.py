@@ -41,7 +41,7 @@ from frontend.fastapi_frontend import FastApiFrontend
 
 
 # TODO: Cleanup, refactor, mock, etc.
-def setup_fastapi_app(tokenizer: str, model_repository: str):
+def setup_server(model_repository: str):
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
         log_verbose=0,
@@ -49,11 +49,13 @@ def setup_fastapi_app(tokenizer: str, model_repository: str):
         log_warn=True,
         log_error=True,
     ).start(wait_until_ready=True)
+    return server
 
+
+def setup_fastapi_app(tokenizer: str, server: tritonserver.Server):
     engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=tokenizer)
-
     frontend: FastApiFrontend = FastApiFrontend(engine=engine)
-    return frontend.app, server
+    return frontend.app
 
 
 # Heavily inspired by vLLM's test infrastructure

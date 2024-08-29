@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.utils import setup_fastapi_app
+from tests.utils import setup_fastapi_app, setup_server
 
 
 # Override conftest.py default model
@@ -42,9 +42,8 @@ class TestObservability:
     def client(self):
         # TODO: Cleanup, mock server/engine, etc.
         model_repository = Path(__file__).parent / "test_models"
-        app, server = setup_fastapi_app(
-            tokenizer="", model_repository=str(model_repository)
-        )
+        server = setup_server(str(model_repository))
+        app = setup_fastapi_app(tokenizer="", server=server)
         with TestClient(app) as test_client:
             yield test_client
 
