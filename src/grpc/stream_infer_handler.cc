@@ -189,7 +189,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->responder_->Finish(status, state);
       return !finished;
     }
-
+    state->context_->ExtractStateFromHeaders(state);
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
     const inference::ModelInferRequest& request = state->request_;
@@ -355,7 +355,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
       response->set_error_message(status.error_message());
-
       response->mutable_infer_response()->Clear();
       // repopulate the id so that client knows which request failed.
       response->mutable_infer_response()->set_id(request.id());
@@ -596,7 +595,13 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
-
+  // Ignore Response from CORE in case GRPC Strict as we dont care about
+  if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    if (state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
+      return;
+    }
+  }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
 
@@ -671,14 +676,27 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     } else {
       LOG_ERROR << "expected the response allocator to have added the response";
     }
-
     if (err != nullptr) {
       failed = true;
       ::grpc::Status status;
+      // Converts CORE errors to GRPC error codes
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
+      if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
+        state->status_ = status;
+        // Finish only once, if backend ignores cancellation
+        LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
+                       << status.error_code() << "Closing stream connection."
+                       << std::endl;
+        state->context_->WriteGRPCErrorResponse(state);
+        TRITONSERVER_ErrorDelete(err);
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceResponseDelete(iresponse),
+            "deleting GRPC inference response");
+        return;
+      }
     }
 
     TRITONSERVER_ErrorDelete(err);
@@ -800,6 +818,44 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
     state->complete_ = is_complete;
   }
+}
+
+// Changes the state of grpc_stream_error_state_ to ERROR_HANDLING_COMPLETE,
+// indicating we have closed the stream and initiated the cancel flow
+void
+gRPCErrorTracker::MarkGRPCErrorHandlingComplete()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_HANDLING_COMPLETE;
+}
+
+// Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+bool
+gRPCErrorTracker::CheckAndUpdateGRPCError()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::ERROR_ENCOUNTERED) {
+    // Change the state to ERROR_HANDLING_COMPLETE as we have called
+    // HandleCancellation
+    MarkGRPCErrorHandlingComplete();
+    return true;
+  }
+  return false;
+}
+
+// Marks error after it has been responded to
+void
+gRPCErrorTracker::MarkGRPCErrorEncountered()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_ENCOUNTERED;
+}
+
+// Checks if error already responded to in triton_grpc_error mode
+bool
+gRPCErrorTracker::GRPCErrorEncountered()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::NONE) {
+    return false;
+  }
+  return true;
 }
 
 }}}  // namespace triton::server::grpc
