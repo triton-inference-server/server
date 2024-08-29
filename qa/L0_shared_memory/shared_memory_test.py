@@ -446,6 +446,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             "client memory usage is increasing",
         )
 
+
 class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
     def _test_unregister_shm_fail(self):
         second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
@@ -608,6 +609,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
 
         finally:
             self._cleanup_server(shm_handles)
+
 
 if __name__ == "__main__":
     unittest.main()

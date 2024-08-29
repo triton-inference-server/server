@@ -1,6 +1,8 @@
 import json
 import time
+
 import triton_python_backend_utils as pb_utils
+
 
 class TritonPythonModel:
     def initialize(self, args):
