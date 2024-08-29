@@ -546,7 +546,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
             self._test_unregister_shm_fail()
 
             # Blocking call
-            result = async_request.get_result()
+            async_request.get_result()
 
             # Try unregister shm regions after inference
             self.triton_client.unregister_system_shared_memory()
