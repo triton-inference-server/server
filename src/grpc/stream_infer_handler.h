@@ -124,7 +124,8 @@ class ModelStreamInferHandler
 
     StreamResponseReleasePayload(
         State* state,
-        std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
+        std::vector<
+            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
             ref_shm_regions)
         : state_(state), ref_shm_regions_(ref_shm_regions)
     {

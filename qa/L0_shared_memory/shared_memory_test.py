@@ -31,7 +31,9 @@ import sys
 sys.path.append("../common")
 
 import os
+import time
 import unittest
+from functools import partial
 
 import infer_util as iu
 import numpy as np
@@ -41,9 +43,6 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonclient.utils.shared_memory as shm
 from tritonclient import utils
-
-import time
-from functools import partial
 
 
 class SystemSharedMemoryTestBase(tu.TestResultCollector):
