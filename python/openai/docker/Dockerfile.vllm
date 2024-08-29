@@ -31,7 +31,7 @@ RUN pip install /opt/tritonserver/python/*.whl
 
 # TODO: Update along with other folder/structure changes in review comments
 WORKDIR /workspace
-RUN git clone --single-branch -b rmccormick-openai-interface https://github.com/triton-inference-server/server.git && \
+RUN git clone --single-branch -b rmccormick-openai https://github.com/triton-inference-server/server.git && \
     pip install -r server/python/openai/docker/requirements.txt && \
     mv server/python/openai/ . && \
     rm -r server
