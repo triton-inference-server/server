@@ -247,7 +247,7 @@ class HTTPAPIServer : public HTTPServer {
       }
     }
 
-    AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON) {};
+    AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON){};
     std::unordered_map<std::string, OutputInfo*> output_map_;
     AllocPayload::OutputInfo::Kind default_output_kind_;
   };
@@ -433,7 +433,7 @@ class HTTPAPIServer : public HTTPServer {
     RequestReleasePayload(
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request,
         evbuffer* buffer)
-        : inference_request_(inference_request), buffer_(buffer) {};
+        : inference_request_(inference_request), buffer_(buffer){};
 
     ~RequestReleasePayload()
     {
