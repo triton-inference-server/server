@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,45 +24,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-BINDING_TEST_LOG="./python_binding.log"
+from tritonfrontend import AlreadyExistsError as AlreadyExistsError
+from tritonfrontend import InternalError as InternalError
+from tritonfrontend import InvalidArgumentError as InvalidArgumentError
+from tritonfrontend import NotFoundError as NotFoundError
+from tritonfrontend import TritonError as TritonError
+from tritonfrontend import UnavailableError as UnavailableError
+from tritonfrontend import UnknownError as UnknownError
+from tritonfrontend import UnsupportedError as UnsupportedError
 
-RET=0
+class TritonFrontendGrpc:
+    def __init__(self, arg0: int, arg1: dict[str, bool | int | str]) -> None: ...
+    def start(self) -> None: ...
+    def stop(self) -> None: ...
 
-rm -f $BINDING_TEST_LOG
-
-set +e
-
-python -m pytest --junitxml=test_binding_report.xml test_binding.py > $BINDING_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $BINDING_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-API_TEST_LOG="./python_api.log"
-
-python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $API_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-
-FRONTEND_TEST_LOG="./python_kserve.log"
-python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $FRONTEND_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-set -e
-
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-
-exit $RET
+class TritonFrontendHttp:
+    def __init__(self, arg0: int, arg1: dict[str, bool | int | str]) -> None: ...
+    def start(self) -> None: ...
+    def stop(self) -> None: ...
