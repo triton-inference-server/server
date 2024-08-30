@@ -281,6 +281,14 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // Will be used to hold the serialized data in case explicit string
     // tensors are present in the request.
     std::list<std::string> serialized_data;
+
+    // Maintain shared pointers(read-only reference) to the shared memory
+    // block's information for the shared memory regions used by the request.
+    // These pointers will automatically increase the usage count, preventing
+    // unregistration of the shared memory. This vector must be cleared in the
+    // `StreamInferResponseComplete` callback (after inference) to decrease the
+    // count and permit unregistration. The vector will be included in
+    // `response_release_payload` for the callback.
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         ref_shm_regions;
 
