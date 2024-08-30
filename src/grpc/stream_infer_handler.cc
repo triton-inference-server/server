@@ -603,7 +603,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  std::unique_ptr<StreamResponseReleasePayload> response_release_payload(
+  StreamResponseReleasePayload* response_release_payload(
       static_cast<StreamResponseReleasePayload*>(userp));
   auto state = response_release_payload->state_;
 
@@ -663,6 +663,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     state->complete_ = is_complete;
+    delete response_release_payload;
     return;
   }
 
@@ -707,6 +708,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),
             "deleting GRPC inference response");
+        delete response_release_payload;
         return;
       }
     }
@@ -789,6 +791,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     state->complete_ = is_complete;
+    delete response_release_payload;
     return;
   }
 
@@ -829,6 +832,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       state->context_->WriteResponseIfReady(state);
     }
     state->complete_ = is_complete;
+  }
+
+  if (is_complete) {
+    delete response_release_payload;
   }
 }
 

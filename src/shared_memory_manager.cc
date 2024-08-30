@@ -568,11 +568,19 @@ SharedMemoryManager::GetStatus(
   } else {
     auto it = shared_memory_map_.find(name);
     if (it == shared_memory_map_.end()) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_NOT_FOUND,
-          std::string(
-              "Unable to find system shared memory region: '" + name + "'")
-              .c_str());
+      if (memory_type == TRITONSERVER_MEMORY_GPU) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_NOT_FOUND,
+            std::string(
+                "Unable to find cuda shared memory region: '" + name + "'")
+                .c_str());
+      } else {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_NOT_FOUND,
+            std::string(
+                "Unable to find system shared memory region: '" + name + "'")
+                .c_str());
+      }
     }
 
     if (it->second->kind_ != memory_type) {

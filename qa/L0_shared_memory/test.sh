@@ -96,8 +96,8 @@ for i in \
 done
 
 mkdir -p python_models/simple/1/
-cp ../execute_delayed_model/model.py ./python_models/simple/1/
-cp ../execute_delayed_model/config.pbtxt ./python_models/simple/
+cp ../python_models/execute_delayed_model/model.py ./python_models/simple/1/
+cp ../python_models/execute_delayed_model/config.pbtxt ./python_models/simple/
 
 for client_type in http grpc; do
     SERVER_ARGS="--model-repository=`pwd`/python_models --log-verbose=1 ${SERVER_ARGS_EXTRA}"

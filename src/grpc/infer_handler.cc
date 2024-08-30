@@ -1016,7 +1016,7 @@ ModelInferHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  std::unique_ptr<ResponseReleasePayload> response_release_payload(
+  ResponseReleasePayload* response_release_payload(
       static_cast<ResponseReleasePayload*>(userp));
   auto state = response_release_payload->state_;
 
@@ -1060,6 +1060,7 @@ ModelInferHandler::InferResponseComplete(
     // in the next cycle.
     state->context_->PutTaskBackToQueue(state);
 
+    delete response_release_payload;
     return;
   }
 
@@ -1122,6 +1123,8 @@ ModelInferHandler::InferResponseComplete(
   if (response_created) {
     delete response;
   }
+
+  delete response_release_payload;
 }
 
 }}}  // namespace triton::server::grpc

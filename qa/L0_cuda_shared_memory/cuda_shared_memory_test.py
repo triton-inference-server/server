@@ -31,18 +31,20 @@ import sys
 sys.path.append("../common")
 
 import os
+import time
 import unittest
+from functools import partial
 
 import infer_util as iu
 import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-import tritonshmutils.cuda_shared_memory as cshm
+import tritonclient.utils.cuda_shared_memory as cshm
 from tritonclient.utils import *
 
 
-class CudaSharedMemoryTest(tu.TestResultCollector):
+class CudaSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
 
     def setUp(self):
@@ -60,76 +62,6 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             self.triton_client = grpcclient.InferenceServerClient(
                 self.url, verbose=True
             )
-
-    def test_invalid_create_shm(self):
-        # Raises error since tried to create invalid cuda shared memory region
-        try:
-            shm_op0_handle = cshm.create_shared_memory_region("dummy_data", -1, 0)
-            cshm.destroy_shared_memory_region(shm_op0_handle)
-        except Exception as ex:
-            self.assertEqual(str(ex), "unable to create cuda shared memory handle")
-
-    def test_valid_create_set_register(self):
-        # Create a valid cuda shared memory region, fill data in it and register
-        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
-        cshm.set_shared_memory_region(
-            shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
-        )
-        self.triton_client.register_cuda_shared_memory(
-            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
-        )
-        shm_status = self.triton_client.get_cuda_shared_memory_status()
-        if self.protocol == "http":
-            self.assertEqual(len(shm_status), 1)
-        else:
-            self.assertEqual(len(shm_status.regions), 1)
-        cshm.destroy_shared_memory_region(shm_op0_handle)
-
-    def test_unregister_before_register(self):
-        # Create a valid cuda shared memory region and unregister before register
-        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
-        self.triton_client.unregister_cuda_shared_memory("dummy_data")
-        shm_status = self.triton_client.get_cuda_shared_memory_status()
-        if self.protocol == "http":
-            self.assertEqual(len(shm_status), 0)
-        else:
-            self.assertEqual(len(shm_status.regions), 0)
-        cshm.destroy_shared_memory_region(shm_op0_handle)
-
-    def test_unregister_after_register(self):
-        # Create a valid cuda shared memory region and unregister after register
-        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
-        self.triton_client.register_cuda_shared_memory(
-            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
-        )
-        self.triton_client.unregister_cuda_shared_memory("dummy_data")
-        shm_status = self.triton_client.get_cuda_shared_memory_status()
-        if self.protocol == "http":
-            self.assertEqual(len(shm_status), 0)
-        else:
-            self.assertEqual(len(shm_status.regions), 0)
-        cshm.destroy_shared_memory_region(shm_op0_handle)
-
-    def test_reregister_after_register(self):
-        # Create a valid cuda shared memory region and unregister after register
-        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
-        self.triton_client.register_cuda_shared_memory(
-            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
-        )
-        try:
-            self.triton_client.register_cuda_shared_memory(
-                "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
-            )
-        except Exception as ex:
-            self.assertIn(
-                "shared memory region 'dummy_data' already in manager", str(ex)
-            )
-        shm_status = self.triton_client.get_cuda_shared_memory_status()
-        if self.protocol == "http":
-            self.assertEqual(len(shm_status), 1)
-        else:
-            self.assertEqual(len(shm_status.regions), 1)
-        cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def _configure_server(
         self,
@@ -204,6 +136,78 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
     def _cleanup_server(self, shm_handles):
         for shm_handle in shm_handles:
             cshm.destroy_shared_memory_region(shm_handle)
+
+
+class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
+    def test_invalid_create_shm(self):
+        # Raises error since tried to create invalid cuda shared memory region
+        try:
+            shm_op0_handle = cshm.create_shared_memory_region("dummy_data", -1, 0)
+            cshm.destroy_shared_memory_region(shm_op0_handle)
+        except Exception as ex:
+            self.assertEqual(str(ex), "unable to create cuda shared memory handle")
+
+    def test_valid_create_set_register(self):
+        # Create a valid cuda shared memory region, fill data in it and register
+        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+        cshm.set_shared_memory_region(
+            shm_op0_handle, [np.array([1, 2], dtype=np.float32)]
+        )
+        self.triton_client.register_cuda_shared_memory(
+            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
+        )
+        shm_status = self.triton_client.get_cuda_shared_memory_status()
+        if self.protocol == "http":
+            self.assertEqual(len(shm_status), 1)
+        else:
+            self.assertEqual(len(shm_status.regions), 1)
+        cshm.destroy_shared_memory_region(shm_op0_handle)
+
+    def test_unregister_before_register(self):
+        # Create a valid cuda shared memory region and unregister before register
+        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+        self.triton_client.unregister_cuda_shared_memory("dummy_data")
+        shm_status = self.triton_client.get_cuda_shared_memory_status()
+        if self.protocol == "http":
+            self.assertEqual(len(shm_status), 0)
+        else:
+            self.assertEqual(len(shm_status.regions), 0)
+        cshm.destroy_shared_memory_region(shm_op0_handle)
+
+    def test_unregister_after_register(self):
+        # Create a valid cuda shared memory region and unregister after register
+        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+        self.triton_client.register_cuda_shared_memory(
+            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
+        )
+        self.triton_client.unregister_cuda_shared_memory("dummy_data")
+        shm_status = self.triton_client.get_cuda_shared_memory_status()
+        if self.protocol == "http":
+            self.assertEqual(len(shm_status), 0)
+        else:
+            self.assertEqual(len(shm_status.regions), 0)
+        cshm.destroy_shared_memory_region(shm_op0_handle)
+
+    def test_reregister_after_register(self):
+        # Create a valid cuda shared memory region and unregister after register
+        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+        self.triton_client.register_cuda_shared_memory(
+            "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
+        )
+        try:
+            self.triton_client.register_cuda_shared_memory(
+                "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
+            )
+        except Exception as ex:
+            self.assertIn(
+                "shared memory region 'dummy_data' already in manager", str(ex)
+            )
+        shm_status = self.triton_client.get_cuda_shared_memory_status()
+        if self.protocol == "http":
+            self.assertEqual(len(shm_status), 1)
+        else:
+            self.assertEqual(len(shm_status.regions), 1)
+        cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def test_unregister_after_inference(self):
         # Unregister after inference
@@ -394,6 +398,170 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             "Invalid offset + byte size for shared memory region", error_msg[0]
         )
         self._cleanup_server(shm_handles)
+
+
+class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
+    def _test_unregister_shm_fail(self):
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.unregister_cuda_shared_memory()
+        self.assertIn(
+            "Failed to unregister the following cuda shared memory regions: input0_data ,input1_data ,output0_data ,output1_data",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.unregister_cuda_shared_memory("input0_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'input0_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.unregister_cuda_shared_memory("input1_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'input1_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.unregister_cuda_shared_memory("output0_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'output0_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.unregister_cuda_shared_memory("output1_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'output1_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+    def _test_shm_not_found(self):
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.get_cuda_shared_memory_status("input0_data")
+        self.assertIn(
+            "Unable to find cuda shared memory region: 'input0_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.get_cuda_shared_memory_status("input1_data")
+        self.assertIn(
+            "Unable to find cuda shared memory region: 'input1_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.get_cuda_shared_memory_status("output0_data")
+        self.assertIn(
+            "Unable to find cuda shared memory region: 'output0_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(InferenceServerException) as ex:
+            second_client.get_cuda_shared_memory_status("output1_data")
+        self.assertIn(
+            "Unable to find cuda shared memory region: 'output1_data'",
+            str(ex.exception),
+        )
+
+    def test_unregister_shm_during_inference_http(self):
+        try:
+            self.triton_client.unregister_cuda_shared_memory()
+            shm_handles = self._configure_server()
+
+            inputs = [
+                httpclient.InferInput("INPUT0", [1, 16], "INT32"),
+                httpclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
+                httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+            ]
+
+            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+
+            async_request = self.triton_client.async_infer(
+                model_name="simple", inputs=inputs, outputs=outputs
+            )
+
+            # Ensure inference started
+            time.sleep(2)
+
+            # Try unregister shm regions during inference
+            self._test_unregister_shm_fail()
+
+            # Blocking call
+            async_request.get_result()
+
+            # Try unregister shm regions after inference
+            self.triton_client.unregister_cuda_shared_memory()
+            self._test_shm_not_found()
+
+        finally:
+            self._cleanup_server(shm_handles)
+
+    def test_unregister_shm_during_inference_grpc(self):
+        try:
+            self.triton_client.unregister_cuda_shared_memory()
+            shm_handles = self._configure_server()
+
+            inputs = [
+                grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+                grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                grpcclient.InferRequestedOutput("OUTPUT0"),
+                grpcclient.InferRequestedOutput("OUTPUT1"),
+            ]
+
+            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+
+            def callback(user_data, result, error):
+                if error:
+                    user_data.append(error)
+                else:
+                    user_data.append(result)
+
+            user_data = []
+
+            self.triton_client.async_infer(
+                model_name="simple",
+                inputs=inputs,
+                outputs=outputs,
+                callback=partial(callback, user_data),
+            )
+
+            # Ensure inference started
+            time.sleep(2)
+
+            # Try unregister shm regions during inference
+            self._test_unregister_shm_fail()
+
+            # Wait until the results are available in user_data
+            time_out = 20
+            while (len(user_data) == 0) and time_out > 0:
+                time_out = time_out - 1
+                time.sleep(1)
+            time.sleep(2)
+
+            # Try unregister shm regions after inference
+            self.triton_client.unregister_cuda_shared_memory()
+            self._test_shm_not_found()
+
+        finally:
+            self._cleanup_server(shm_handles)
 
 
 if __name__ == "__main__":
