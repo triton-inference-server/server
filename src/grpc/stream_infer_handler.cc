@@ -668,10 +668,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
-    delete response_release_payload;
     return;
   }
 
@@ -796,10 +796,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
-    delete response_release_payload;
     return;
   }
 
