@@ -136,7 +136,7 @@ class SharedMemoryManager {
   /// shared memory block's information.
   /// This pointer will automatically increase the usage count, preventing
   /// unregistration while the reference is held. The reference must be cleared
-  /// or set to nullptr when no longer needed to decrease the count and allow
+  /// or set to nullptr when no longer needed, to decrease the count and allow
   /// unregistration.
   /// \return a TRITONSERVER_Error indicating success or
   /// failure.

@@ -247,7 +247,7 @@ class HTTPAPIServer : public HTTPServer {
       }
     }
 
-    AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON){};
+    AllocPayload() : default_output_kind_(OutputInfo::Kind::JSON) {};
     std::unordered_map<std::string, OutputInfo*> output_map_;
     AllocPayload::OutputInfo::Kind default_output_kind_;
   };
@@ -328,6 +328,12 @@ class HTTPAPIServer : public HTTPServer {
     // request and must not reference it after a successful
     // TRITONSERVER_ServerInferAsync (except for cancellation).
     std::shared_ptr<TRITONSERVER_InferenceRequest> triton_request_{nullptr};
+
+    // Maintain shared pointers(read-only reference) to the shared memory
+    // block's information for the shared memory regions used by the request.
+    // These pointers will automatically increase the usage count, preventing
+    // unregistration of the shared memory. This vector must be cleared when no
+    // longer needed to decrease the count and permit unregistration.
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         ref_shm_regions_;
 
@@ -427,7 +433,7 @@ class HTTPAPIServer : public HTTPServer {
     RequestReleasePayload(
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& inference_request,
         evbuffer* buffer)
-        : inference_request_(inference_request), buffer_(buffer){};
+        : inference_request_(inference_request), buffer_(buffer) {};
 
     ~RequestReleasePayload()
     {
