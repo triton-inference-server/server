@@ -1,4 +1,4 @@
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -782,7 +782,11 @@ if (NOT WIN32)
   endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
+# tritonfrontend python package
+add_subdirectory(python)
+
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
+

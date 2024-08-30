@@ -27,7 +27,11 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <typeinfo>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "triton/core/tritonserver.h"
@@ -183,5 +187,61 @@ Join(const T& container, const std::string& delim)
   }
   return ss.str();
 }
+
+
+// Used by Python Bindings to accept arguments to initialize Frontends.
+// Known pybind11 issue: bool has to come before int for std::variant
+using VariantType = std::variant<bool, int, std::string>;
+using UnorderedMapType = std::unordered_map<std::string, VariantType>;
+
+
+template <typename T>
+TRITONSERVER_Error*
+GetValue(const UnorderedMapType& options, const std::string& key, T* arg)
+{
+  auto curr = options.find(key);
+  bool is_present = (curr != options.end());
+  std::string msg;
+
+  if (!is_present) {
+    msg = "Key: " + key + " not found in options provided.";
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
+  }
+
+  bool correct_type = std::holds_alternative<T>(curr->second);
+  if (!correct_type) {
+    std::string expected;
+    std::string found;
+    VariantType value = *arg;
+    if (std::holds_alternative<int>(value)) {
+      expected = "int";
+    } else if (std::holds_alternative<bool>(value)) {
+      expected = "bool";
+    } else if (std::holds_alternative<std::string>(value)) {
+      expected = "string";
+    }
+
+    switch (curr->second.index()) {
+      case 0:
+        found = "bool";
+        break;
+      case 1:
+        found = "int";
+        break;
+      case 2:
+        found = "string";
+        break;
+    }
+
+    msg = "Key: " + key + " found, but incorrect type. Expected " + expected +
+          " Found: " + found;
+
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
+  }
+
+  *arg = std::get<T>(curr->second);
+  return nullptr;
+}
+
 
 }}  // namespace triton::server
