@@ -1,3 +1,5 @@
+# Deploying Phi-3 Model with Triton and TRT-LLM
+
 This document captures the steps I took to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. There’s also a section at the end that shows how to use GenAI-Perf to run benchmarks to see how the model is performing in terms of throughput and latency. 
 
 Tested and confirmed to work with the following:
