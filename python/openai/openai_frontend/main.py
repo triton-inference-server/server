@@ -79,7 +79,14 @@ def parse_args():
         "--tokenizer",
         type=str,
         default=None,
-        help="HuggingFace ID of the Tokenizer to use for chat templates",
+        help="HuggingFace ID or local folder path of the Tokenizer to use for chat templates",
+    )
+    triton_group.add_argument(
+        "--backend",
+        type=str,
+        default=None,
+        choices=["vllm", "tensorrtllm"],
+        help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
 
     return parser.parse_args()
@@ -98,7 +105,9 @@ def main():
     ).start(wait_until_ready=True)
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
-    engine: TritonLLMEngine = TritonLLMEngine(server=server, tokenizer=args.tokenizer)
+    engine: TritonLLMEngine = TritonLLMEngine(
+        server=server, tokenizer=args.tokenizer, backend=args.backend
+    )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
     frontend: FastApiFrontend = FastApiFrontend(

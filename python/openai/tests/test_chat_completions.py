@@ -468,9 +468,8 @@ class TestChatCompletions:
 class TestChatCompletionsTokenizers:
     # Re-use a single Triton server for different frontend configurations
     @pytest.fixture(scope="class")
-    def server(self, backend: str):
-        model_repository = str(Path(__file__).parent / f"{backend}_models")
-        server = setup_server(str(model_repository))
+    def server(self, model_repository: str):
+        server = setup_server(model_repository)
         yield server
         server.stop()
 
@@ -478,9 +477,13 @@ class TestChatCompletionsTokenizers:
     # apply chat templates, and for simplicity in determination, users should
     # define the tokenizer. So, explicitly raise an error if none is provided.
     def test_chat_completions_no_tokenizer(
-        self, server: tritonserver.Server, model: str, messages: List[dict]
+        self,
+        server: tritonserver.Server,
+        backend: str,
+        model: str,
+        messages: List[dict],
     ):
-        app = setup_fastapi_app(tokenizer="", server=server)
+        app = setup_fastapi_app(tokenizer="", server=server, backend=backend)
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
@@ -493,6 +496,7 @@ class TestChatCompletionsTokenizers:
     def test_chat_completions_custom_tokenizer(
         self,
         server: tritonserver.Server,
+        backend: str,
         tokenizer_model: str,
         model: str,
         messages: List[dict],
@@ -506,8 +510,12 @@ class TestChatCompletionsTokenizers:
 
         # Compare the downloaded tokenizer response against remote HF equivalent
         # to assert equivalent functionality in responses and chat template.
-        app_local = setup_fastapi_app(tokenizer=custom_tokenizer_path, server=server)
-        app_hf = setup_fastapi_app(tokenizer=tokenizer_model, server=server)
+        app_local = setup_fastapi_app(
+            tokenizer=custom_tokenizer_path, server=server, backend=backend
+        )
+        app_hf = setup_fastapi_app(
+            tokenizer=tokenizer_model, server=server, backend=backend
+        )
 
         responses = []
         with TestClient(app_local) as client_local, TestClient(app_hf) as client_hf:
@@ -534,6 +542,15 @@ class TestChatCompletionsTokenizers:
     def test_chat_completions_invalid_chat_tokenizer(
         self, server: tritonserver.Server, model: str, messages: List[dict]
     ):
+        # NOTE: Use of apply_chat_template on a tokenizer that doesn't support it
+        # is a warning prior to transformers 4.44, and an error afterwards.
+        # NOTE: Can remove after both TRT-LLM and VLLM containers have this version.
+        import transformers
+
+        print(f"{transformers.__version__=}")
+        if transformers.__version__ < "4.44.0":
+            pytest.xfail()
+
         # Pick a tokenizer with no chat template defined
         invalid_chat_tokenizer = "gpt2"
         app = setup_fastapi_app(tokenizer=invalid_chat_tokenizer, server=server)

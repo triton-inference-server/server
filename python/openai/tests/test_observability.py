@@ -43,7 +43,7 @@ class TestObservability:
         # TODO: Cleanup, mock server/engine, etc.
         model_repository = Path(__file__).parent / "test_models"
         server = setup_server(str(model_repository))
-        app = setup_fastapi_app(tokenizer="", server=server)
+        app = setup_fastapi_app(tokenizer="", server=server, backend=None)
         with TestClient(app) as test_client:
             yield test_client
 

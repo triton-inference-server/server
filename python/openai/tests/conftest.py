@@ -24,39 +24,59 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
+
 ### TEST ENVIRONMENT SETUP ###
-TEST_BACKEND = ""
-TEST_MODEL = ""
+def infer_test_environment():
+    # Infer the test environment for simplicity in local dev/testing.
+    try:
+        import vllm as _
+
+        backend = "vllm"
+        model = "llama-3.1-8b-instruct"
+        return backend, model
+    except ImportError:
+        print("No vllm installation found.")
+
+    try:
+        import tensorrt_llm as _
+
+        backend = "tensorrtllm"
+        model = "tensorrt_llm_bls"
+        return backend, model
+    except ImportError:
+        print("No tensorrt_llm installation found.")
+
+    raise Exception("Unknown test environment")
+
+
+def infer_test_model_repository(backend):
+    model_repository = str(Path(__file__).parent / f"{backend}_models")
+    return model_repository
+
+
+# TODO: Refactor away from global variables
+TEST_MODEL = os.environ.get("TEST_MODEL")
+TEST_BACKEND = os.environ.get("TEST_BACKEND")
+TEST_MODEL_REPOSITORY = os.environ.get("TEST_MODEL_REPOSITORY")
+
+TEST_TOKENIZER = os.environ.get(
+    "TEST_TOKENIZER", "meta-llama/Meta-Llama-3.1-8B-Instruct"
+)
 TEST_PROMPT = "What is machine learning?"
 TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
-TEST_TOKENIZER = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-
-# Infer the test environment for simplicity in local dev/testing.
-try:
-    import vllm as _
-
-    TEST_BACKEND = "vllm"
-    TEST_MODEL = "llama-3.1-8b-instruct"
-except ImportError:
-    print("No vllm installation found.")
-
-try:
-    import tensorrt_llm as _
-
-    TEST_BACKEND = "tensorrtllm"
-    TEST_MODEL = "tensorrt_llm_bls"
-except ImportError:
-    print("No tensorrt_llm installation found.")
 
 if not TEST_BACKEND or not TEST_MODEL:
-    raise Exception("Unknown test environment")
-###
+    TEST_BACKEND, TEST_MODEL = infer_test_environment()
+
+if not TEST_MODEL_REPOSITORY:
+    TEST_MODEL_REPOSITORY = infer_test_model_repository(TEST_BACKEND)
 
 
 # NOTE: OpenAI client requires actual server running, and won't work
@@ -64,8 +84,14 @@ if not TEST_BACKEND or not TEST_MODEL:
 # only once for all the tests below.
 @pytest.fixture(scope="module")
 def server():
-    model_repository = Path(__file__).parent / f"{TEST_BACKEND}_models"
-    args = ["--model-repository", model_repository, "--tokenizer", TEST_TOKENIZER]
+    args = [
+        "--model-repository",
+        TEST_MODEL_REPOSITORY,
+        "--tokenizer",
+        TEST_TOKENIZER,
+        "--backend",
+        TEST_BACKEND,
+    ]
 
     with OpenAIServer(args) as openai_server:
         yield openai_server
@@ -77,13 +103,19 @@ def server():
 # the "server" when "starting the server" via TestClient.
 @pytest.fixture(scope="class")
 def fastapi_client_class_scope():
-    model_repository = str(Path(__file__).parent / f"{TEST_BACKEND}_models")
-    server = setup_server(model_repository=model_repository)
-    app = setup_fastapi_app(tokenizer=TEST_TOKENIZER, server=server)
+    server = setup_server(model_repository=TEST_MODEL_REPOSITORY)
+    app = setup_fastapi_app(
+        tokenizer=TEST_TOKENIZER, server=server, backend=TEST_BACKEND
+    )
     with TestClient(app) as test_client:
         yield test_client
 
     server.stop()
+
+
+@pytest.fixture(scope="module")
+def model_repository():
+    return TEST_MODEL_REPOSITORY
 
 
 @pytest.fixture(scope="module")

@@ -77,10 +77,14 @@ class TritonModelMetadata:
 
 
 class TritonLLMEngine(LLMEngine):
-    def __init__(self, server: tritonserver.Server, tokenizer: str):
+    def __init__(
+        self, server: tritonserver.Server, tokenizer: str, backend: Optional[str] = None
+    ):
         # Assume an already configured and started server
         self.server = server
         self.tokenizer = self._get_tokenizer(tokenizer)
+        # TODO: Reconsider name of "backend" vs. something like "request_format"
+        self.backend = backend
 
         # NOTE: Creation time and model metadata will be static at startup for
         # now, and won't account for dynamically loading/unloading models.
@@ -218,7 +222,11 @@ class TritonLLMEngine(LLMEngine):
         return conversation[-1]["role"]
 
     # TODO: Expose explicit flag to catch edge cases
-    def _determine_request_converter(self, backend):
+    def _determine_request_converter(self, backend: str):
+        # Allow manual override of backend request format if provided by user
+        if self.backend:
+            backend = self.backend
+
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
             return _create_vllm_inference_request
