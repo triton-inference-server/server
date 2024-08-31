@@ -10,7 +10,7 @@ Quick Deployment Guide by backend
 
    TRT-LLM <..tutorials/Popular_Models_Guide/Llama2/trtllm_guide.md>
    vLLM <..tutorials/Popular_Models_Guide/Llama2/vllm_guide.md>
-   HuggingFace/Python <tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>
+   Python with HuggingFace <tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>
    PyTorch <../tutorials/Quick_Deploy/PyTorch/README.md>
    ONNX <../tutorials/Quick_Deploy/ONNX/README.md>
    TensorFlow <../tutorials/Quick_Deploy/TensorFlow/README.md>
