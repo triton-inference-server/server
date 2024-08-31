@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,45 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-BINDING_TEST_LOG="./python_binding.log"
+import time
 
-RET=0
-
-rm -f $BINDING_TEST_LOG
-
-set +e
-
-python -m pytest --junitxml=test_binding_report.xml test_binding.py > $BINDING_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $BINDING_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-API_TEST_LOG="./python_api.log"
-
-python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $API_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+import triton_python_backend_utils as pb_utils
 
 
-FRONTEND_TEST_LOG="./python_kserve.log"
-python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $FRONTEND_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+class TritonPythonModel:
+    def execute(self, requests):
+        """
+        Mock Model that uses the input data to determine how long to wait
+        before returning identity data
+        """
+        assert len(requests) == 1
+        delay = 0
+        request = requests[0]
+        responses = []
 
-set -e
+        delay_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+        delay_as_numpy = delay_tensor.as_numpy()
+        delay = float(delay_as_numpy[0][0])
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
+        out_tensor = pb_utils.Tensor("OUTPUT0", delay_as_numpy)
+        responses.append(pb_utils.InferenceResponse([out_tensor]))
 
-exit $RET
+        time.sleep(delay)
+        return responses

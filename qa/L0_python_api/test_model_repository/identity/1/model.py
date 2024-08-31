@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,45 +24,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-BINDING_TEST_LOG="./python_binding.log"
-
-RET=0
-
-rm -f $BINDING_TEST_LOG
-
-set +e
-
-python -m pytest --junitxml=test_binding_report.xml test_binding.py > $BINDING_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $BINDING_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-API_TEST_LOG="./python_api.log"
-
-python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $API_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+import numpy as np
+import triton_python_backend_utils as pb_utils
 
 
-FRONTEND_TEST_LOG="./python_kserve.log"
-python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $FRONTEND_TEST_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+class TritonPythonModel:
+    """This model loops through different dtypes to make sure that
+    serialize_byte_tensor works correctly in the Python backend.
+    """
 
-set -e
+    def initialize(self, args):
+        self._index = 0
+        self._dtypes = [np.bytes_, np.object_]
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-
-exit $RET
+    def execute(self, requests):
+        responses = []
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor_0 = pb_utils.Tensor(
+                "OUTPUT0", in_0.as_numpy().astype(self._dtypes[self._index])
+            )
+            self._index += 1
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+        return responses
