@@ -1273,6 +1273,23 @@ class InferHandler : public HandlerBase {
     delete state;
   }
 
+  // Simple structure that carries the payload needed for
+  // response release callback.
+  struct ResponseReleasePayload {
+    State* state_;
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        ref_shm_regions_;
+
+    ResponseReleasePayload(
+        State* state,
+        std::vector<
+            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
+            ref_shm_regions)
+        : state_(state), ref_shm_regions_(ref_shm_regions)
+    {
+    }
+  };
+
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
@@ -1493,23 +1510,6 @@ class ModelInferHandler
   static void InferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
-
-  // Simple structure that carries the payload needed for
-  // response release callback.
-  struct ResponseReleasePayload {
-    State* state_;
-    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
-        ref_shm_regions_;
-
-    ResponseReleasePayload(
-        State* state,
-        std::vector<
-            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
-            ref_shm_regions)
-        : state_(state), ref_shm_regions_(ref_shm_regions)
-    {
-    }
-  };
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;

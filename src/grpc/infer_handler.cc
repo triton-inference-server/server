@@ -158,20 +158,6 @@ InferResponseFree(
   return nullptr;  // Success
 }
 
-TRITONSERVER_Error* InferGRPCToInputHelper(
-    const std::string& input_name, const std::string& model_name,
-    const TRITONSERVER_DataType tensor_dt, const TRITONSERVER_DataType input_dt,
-    const size_t binary_data_byte_size);
-
-TRITONSERVER_Error* InferGRPCToInput(
-    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-    const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const inference::ModelInferRequest& request,
-    std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request,
-    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
-        ref_shm_regions);
-
 TRITONSERVER_Error*
 InferGRPCToInputHelper(
     const std::string& input_name, const std::string& model_name,

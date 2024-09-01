@@ -306,7 +306,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     auto request_release_payload =
         std::make_unique<RequestReleasePayload>(state->inference_request_);
     auto response_release_payload =
-        std::make_unique<StreamResponseReleasePayload>(
+        std::make_unique<ResponseReleasePayload>(
             state, std::move(ref_shm_regions));
 
     if (err == nullptr) {
@@ -611,8 +611,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  StreamResponseReleasePayload* response_release_payload(
-      static_cast<StreamResponseReleasePayload*>(userp));
+  ResponseReleasePayload* response_release_payload(
+      static_cast<ResponseReleasePayload*>(userp));
   auto state = response_release_payload->state_;
 
   // Ignore Response from CORE in case GRPC Strict as we dont care about
