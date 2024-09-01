@@ -1,89 +1,20 @@
 # Deploying Phi-3 Model with Triton and TRT-LLM
 
-This document captures the steps I took to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. There’s also a section at the end that shows how to use GenAI-Perf to run benchmarks to see how the model is performing in terms of throughput and latency. 
+This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows a shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency. 
 
-Tested and confirmed to work with the following:
+This guide is tested on A100 80GB SXM4 and H100 80GB PCIe. It is confirmed to work with Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi) for full list) using TRT-LLM v0.11 and Triton Inference Server 24.07.
 
-Models: Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi) for full list)
-
-Hardware: A100 80GB SXM4 and H100 80GB PCIe
-
-TRT-LLM v0.11.0
-
-Triton Inference Server 24.07
-
-[Installing on Linux](#installing-on-linux)
-
-[1. Retriever and launch the Docker container (optional)](#retriever-and-launch-the-docker-container-optional)
-
-[2. Install TensorRT-LLM](#install-tensorrt-llm)
-
-[3. Clone the TRT-LLM repo with the Phi-3 conversion script](#clone-the-trt-llm-repo-with-the-phi-3-conversion-script)
-
-[Usage](#build-the-trt-llm-engine)
-
-[4. Download Phi-3-mini-4k-instruct](#download-phi-3-mini-4k-instruct)
-
-[5. Convert weights from HF Transformers to TensorRT-LLM format](#convert-weights-from-hf-transformers-to-tensorrt-llm-format)
-
-[6. Build TensorRT engine(s)](#build-tensorrt-engines)
-
-[7. Run the model](#run-the-model)
-
-[8. Summarization test using the Phi model](#summarization-test-using-the-phi-model)
-
-[Deploy with Triton Inference Server](#deploy-with-triton-inference-server)
-
-[9. Copy engine files from the Docker container to the host](#copy-engine-files-from-the-docker-container-to-the-host)
-
-[10. Copy the compiled model to the skeleton repository with TRT-LLM backend](#copy-the-compiled-model-to-the-skeleton-repository-with-trt-llm-backend)
-
-[11. Modify the configuration files from the model repository](#modify-the-configuration-files-from-the-model-repository)
-
-[Update ensemble/config.pbtxt](#update-ensembleconfigpbtxt)
-
-[Update preprocessing/config.pbtxt](#update-preprocessingconfigpbtxt)
-
-[Update postprocessing/config.pbtxt](#update-postprocessingconfigpbtxt)
-
-[Update tensorrt\_llm/config.pbxt](#update-tensorrt_llmconfigpbxt)
-
-[Remove max\_tokens\_in\_paged\_kv\_cache](#max-tokens-in-paged-kv-cache)
-
-[Update tensorrt\_llm/1/config.json](#update-tensorrt_llm1configjson)
-
-[12. Delete tensorrt\_llm\_bls](#delete-tensorrt_llm_bls)
-
-[13. Download model repository](#download-model-repository)
-
-[14. Launch Triton Inference Server (trtllm-python3-py3)](#launch-triton-inference-server-trtllm-python3-py3)
-
-[15. Send Requests](#send-requests)
-
-[GenAI-Perf](#genai-perf)
-
-[16. Launch Triton Inference Server (py3-sdk)](#launch-triton-inference-server-py3-sdk)
-
-[17. Download the Phi-3 tokenizer](#download-the-phi-3-tokenizer)
-
-[18. Run GenAI-Perf](#run-genai-perf)
-
-[Reference Configurations](#reference-configurations)
-
-[ensemble/config.pbtxt](#ensembleconfigpbtxt)
-
-[postprocessing/config.pbtxt](#postprocessingconfigpbtxt)
-
-[preprocessing/config.pbtxt](#preprocessingconfigpbtxt)
-
-[tensorrt\_llm/config.pbtxt](#tensorrt_llmconfigpbtxt)
+- [Build and test TRT-LLM engine](#build-and-test-trt-llm-engine)
+- [Deploy with Triton Inference Server](#deploy-with-triton-inference-server)
+- [Benchmark with GenAI-Perf](#benchmark-with-genai-perf)
+- [Reference Configurations](#reference-configurations)
 
 
-# Installing on Linux
+# Build and test TRT-LLM engine
 
 Reference: <https://nvidia.github.io/TensorRT-LLM/installation/linux.html>
 
-1. ## Retriever and launch the Docker container (optional)
+1. ## Retrieve and launch the Docker container (optional)
 
 <!---->
 
@@ -163,7 +94,7 @@ Reference: <https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi>
 
 8. ## Summarization test using the Phi model
 
-The following section describes how to run a TensorRT-LLM Phi model to summarize the articles from the [cnn\_dailymail](https://huggingface.co/datasets/cnn_dailymail) dataset. For each summary, the script can compute the [ROUGE](https://en.wikipedia.org/wiki/ROUGE_\(metric\)) scores and use the ROUGE-1 score to validate the implementation. The script can also perform the same summarization using the HF Phi model.
+The TensorRT-LLM Phi model can be tested to summarize the articles from the [cnn\_dailymail](https://huggingface.co/datasets/cnn_dailymail) dataset. For each summary, the script can compute the [ROUGE](https://en.wikipedia.org/wiki/ROUGE_\(metric\)) scores and use the ROUGE-1 score to validate the implementation. The script can also perform the same summarization using the HF Phi model.
 
     # Run the summarization task using a TensorRT-LLM model and a single GPU.
     python3 ../summarize.py --engine_dir ./phi-engine \
@@ -273,9 +204,9 @@ The following configuration files need to be updated:
 
 #### Max Tokens in Paged KV Cache
 
-This is only required for Phi-3-mini-128k-instruct, it is not necessary to modify this parameter for Phi-3-mini-4k-instruct.
+This is only required for Phi-3-mini-128k-instruct, and it is not necessary to modify this parameter for Phi-3-mini-4k-instruct.
 
-To accommodate for the 128k context, remove this part from tensorrt\_llm/config.pbxt - which will allow the max tokens to be determined by the KV cache manager. If you don’t want to remove it, you can also set maxTokensInPagedKvCache such that it is large enough (e.g. 4096) to process at least 1 sequence to completion (i.e. must be larger than beam\_width \* tokensPerBlock \* maxBlocksPerSeq)
+To accommodate for the 128k context, remove the following from tensorrt\_llm/config.pbxt - which will allow the max tokens to be determined by the KV cache manager. If you don’t want to remove it, you can also set maxTokensInPagedKvCache such that it is large enough (e.g. 4096) to process at least 1 sequence to completion (i.e. must be larger than beam\_width \* tokensPerBlock \* maxBlocksPerSeq)
 
     parameters: {
       key: "max_tokens_in_paged_kv_cache"
@@ -343,7 +274,7 @@ The above needs to be done manually with your favorite editor. Once finished, pl
     }' | jq
 
 
-# GenAI-Perf
+# Benchmark with GenAI-Perf
 
 16. ## Launch Triton Inference Server (py3-sdk)
 
@@ -354,7 +285,7 @@ The above needs to be done manually with your favorite editor. Once finished, pl
 
 17. ## Download the Phi-3 tokenizer
 
-Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This isn’t necessary but helps with interpreting token metrics from prompts and responses. If you skip this step, be sure to remove the --tokenizer flag from the GenAI-Perf script in Step 18.
+Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This step is not necessary but helps with interpreting token metrics from prompts and responses. If you skip this step, be sure to remove the --tokenizer flag from the GenAI-Perf script in Step 18.
 
     git lfs install
     git clone https://huggingface.co/microsoft/Phi-3-mini-4k-instruct
@@ -386,10 +317,11 @@ Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This
       --measurement-interval 4000 \
       --url localhost:8001
 
+More details on performance benchmarking with GenAI-Perf can be found [here](https://github.com/triton-inference-server/perf_analyzer/blob/main/genai-perf/docs/tutorial.md).
 
 # Reference Configurations
 
-All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
+All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm are shown below. 
 
 
 ## ensemble/config.pbtxt
