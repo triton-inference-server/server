@@ -50,6 +50,41 @@ streaming. Triton inference Server is part of
 a software platform that accelerates the data science pipeline and streamlines
 the development and deployment of production AI.
 
+# Triton Architecture
+
+The following figure shows the Triton Inference Server high-level
+architecture. The [model repository](model_repository.md) is a
+file-system based repository of the models that Triton will make
+available for inferencing. Inference requests arrive at the server via
+either [HTTP/REST or GRPC](../customization_guide/inference_protocols.md) or by the [C
+API](../customization_guide/inference_protocols.md) and are then routed to the appropriate per-model
+scheduler. Triton implements [multiple scheduling and batching
+algorithms](#models-and-schedulers) that can be configured on a
+model-by-model basis. Each model's scheduler optionally performs
+batching of inference requests and then passes the requests to the
+[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+corresponding to the model type. The backend performs inferencing
+using the inputs provided in the batched requests to produce the
+requested outputs. The outputs are then returned.
+
+Triton supports a [backend C
+API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+that allows Triton to be extended with new functionality such as
+custom pre- and post-processing operations or even a new deep-learning
+framework.
+
+The models being served by Triton can be queried and controlled by a
+dedicated [model management API](model_management.md) that is
+available by HTTP/REST or GRPC protocol, or by the C API.
+
+Readiness and liveness health endpoints and utilization, throughput
+and latency metrics ease the integration of Triton into deployment
+framework such as Kubernetes.
+
+![Triton Architecture Diagram](images/arch.jpg)
+
+# Triton major features
+
 Major features include:
 
 - [Supports multiple deep learning
