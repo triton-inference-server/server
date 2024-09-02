@@ -28,6 +28,8 @@
    :hidden:
 
    Home <index>
+   Release notes <release_note.md>
+   Compatibility matrix <compatibility.md>
 
 .. toctree::
    :hidden:
