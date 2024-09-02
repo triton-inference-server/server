@@ -87,8 +87,7 @@ This Inference Server release includes the following key features and enhancemen
   - Vllm:time\_to\_first\_token\_seconds
 
 To enable the vLLM model's metrics reporting, add these lines to config.pbtxt:\
-```
-bash
+``` bash
     parameters: {
       key: "REPORT_CUSTOM_METRICS"
       value: {
