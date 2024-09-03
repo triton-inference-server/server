@@ -53,7 +53,7 @@
 
    client_doc/api_reference
    client_doc/in_process
-   Libraries <client/README>
+   Client Libraries <client/README>
    _reference/tritonclient_api.rst
 
 .. toctree::
@@ -79,7 +79,7 @@
    :hidden:
    :caption: Backends
 
-   trt_llm
+   TRT-LLM <tensorrtllm_backend/README>
    vllm
    Python <python_backend/README>
    Pytorch <pytorch_backend/README>
