@@ -1,6 +1,6 @@
 # Release Compatibility Matrix
 
-For the complete compatibility matrix,  please refer to this [link](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html). 
+[Please visit Deep Learning Framework (DLFW) website for the complete compatibility matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html). 
 
 ## Container Name: trtllm-python-py3
 
