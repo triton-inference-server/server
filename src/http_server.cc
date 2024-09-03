@@ -1181,6 +1181,7 @@ HTTPAPIServer::HTTPAPIServer(
 
 HTTPAPIServer::~HTTPAPIServer()
 {
+  LOG_VERBOSE(1) << "~HTTPAPIServer()";
   if (server_metadata_err_ != nullptr) {
     TRITONSERVER_ErrorDelete(server_metadata_err_);
   }
@@ -3586,10 +3587,12 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_RESPOND_IF_ERR(
       req, CheckTransactionPolicy(req, model_name, requested_model_version));
 
-  // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (trace_manager_) {
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
@@ -4695,6 +4698,35 @@ HTTPAPIServer::Create(
 
   return nullptr;
 }
+
+
+TRITONSERVER_Error*
+HTTPAPIServer::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server,
+    const UnorderedMapType& options,
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<HTTPServer>* service)
+{
+  int port;
+  bool reuse_port;
+  std::string address;
+  std::string header_forward_pattern;
+  int thread_count;
+
+  RETURN_IF_ERR(GetValue(options, "port", &port));
+  RETURN_IF_ERR(GetValue(options, "reuse_port", &reuse_port));
+  RETURN_IF_ERR(GetValue(options, "address", &address));
+  RETURN_IF_ERR(
+      GetValue(options, "header_forward_pattern", &header_forward_pattern));
+  RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
+
+  return Create(
+      server, trace_manager, shm_manager, port, reuse_port, address,
+      header_forward_pattern, thread_count, restricted_features, service);
+}
+
 
 bool
 HTTPAPIServer::RespondIfRestricted(

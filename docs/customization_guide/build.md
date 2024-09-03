@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r24.07 branch, `<container tag>` will default to r24.07. If you are
+r24.08 branch, `<container tag>` will default to r24.08. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -328,14 +328,14 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```bash
-python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag>
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag> --backend=python:<container tag>
 ```
 
 If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
-are building on the r24.07 branch, `<container tag>` will default to
-r24.07. Therefore, you typically do not need to provide `<container
+are building on the r24.08 branch, `<container tag>` will default to
+r24.08. Therefore, you typically do not need to provide `<container
 tag>` at all (nor the preceding colon). You can use a different
 `<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
