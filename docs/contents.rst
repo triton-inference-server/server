@@ -27,7 +27,7 @@
 .. toctree::
    :hidden:
 
-   Home <index>
+   Home <index.md>
    Release notes <release_note.md>
    Compatibility matrix <compatibility.md>
 
@@ -42,10 +42,9 @@
 
 .. toctree::
    :hidden:
-   :caption: Introduction
+   :caption: Deployment Types
 
-   user_guide/architecture
-   deployment
+   k8
 
 .. toctree::
    :hidden:

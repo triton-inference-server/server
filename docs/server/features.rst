@@ -7,6 +7,7 @@ Features
     :caption: Features
     :maxdepth: 2
 
+    Model_execution <../user_guide/model_execution.md>
     Scheduler <../user_guide/scheduler.md>
     Batcher <../user_guide/batcher.md>
     model_pipelines
