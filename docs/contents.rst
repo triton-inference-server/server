@@ -49,22 +49,12 @@
 
 .. toctree::
    :hidden:
-   :caption: API Reference
-
-   quickstart
-
-
-.. toctree::
-   :hidden:
-   :caption: Protocols
-   
-   quickstart
-
-.. toctree::
-   :hidden:
    :caption: Client
 
-   quickstart
+   client_doc/api_reference
+   client_doc/in_process
+   Libraries <client/README>
+   _reference/tritonclient_api.rst
 
 .. toctree::
    :hidden:
