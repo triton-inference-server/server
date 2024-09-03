@@ -208,7 +208,7 @@ class InputShapeTest(unittest.TestCase):
             triton_client.infer(model_name=model_name, inputs=inputs)
         err_str = str(e.exception)
         self.assertIn(
-            f"expected {input_size} string elements for inference input 'INPUT1' for model '{model_name}', got {input_size+2}",
+            f"unexpected number of string elements {input_size+1} for inference input 'INPUT1' for model '{model_name}', expecting {input_size}",
             err_str,
         )
 
