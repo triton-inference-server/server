@@ -70,7 +70,7 @@ SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, size_t byte_size,
     void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
     int64_t* device_id,
-    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info_ref)
+    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
@@ -458,7 +458,7 @@ SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, size_t byte_size,
     void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
     int64_t* device_id,
-    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info_ref)
+    std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>* shm_info)
 {
   // protect shared_memory_map_ from concurrent access
   std::lock_guard<std::mutex> lock(mu_);
@@ -496,9 +496,8 @@ SharedMemoryManager::GetMemoryInfo(
             .c_str());
   }
 
-  if (shm_info_ref != nullptr) {
-    *shm_info_ref =
-        std::static_pointer_cast<const SharedMemoryInfo>(it->second);
+  if (shm_info != nullptr) {
+    *shm_info = std::static_pointer_cast<const SharedMemoryInfo>(it->second);
   }
 
   if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {

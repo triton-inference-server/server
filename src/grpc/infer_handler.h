@@ -301,7 +301,7 @@ InferAllocatorPayload(
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
     AllocPayload<ResponseType>* alloc_payload,
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
-        ref_shm_regions)
+        shm_regions_info)
 {
   alloc_payload->response_queue_ = response_queue;
   alloc_payload->shm_map_.clear();
@@ -337,14 +337,14 @@ InferAllocatorPayload(
       void* base;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
-      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
-          shm_info_ref = nullptr;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+          nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, byte_size, &base, &memory_type, &memory_type_id,
-          &shm_info_ref));
+          &shm_info));
 
-      if (shm_info_ref != nullptr) {
-        ref_shm_regions->emplace_back(shm_info_ref);
+      if (shm_info != nullptr) {
+        shm_regions_info->emplace_back(shm_info);
       }
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
@@ -383,7 +383,7 @@ TRITONSERVER_Error* InferGRPCToInput(
     std::list<std::string>* serialized_data,
     TRITONSERVER_InferenceRequest* inference_request,
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
-        ref_shm_regions);
+        shm_regions_info);
 
 TRITONSERVER_Error* ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -1275,17 +1275,17 @@ class InferHandler : public HandlerBase {
 
   // Simple structure that carries the payload needed for
   // response release callback.
-  struct ResponseReleasePayload {
+  struct ResponseReleasePayload final {
     State* state_;
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
-        ref_shm_regions_;
+        shm_regions_info_;
 
     ResponseReleasePayload(
         State* state,
         std::vector<
             std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
-            ref_shm_regions)
-        : state_(state), ref_shm_regions_(ref_shm_regions)
+            shm_regions_info)
+        : state_(state), shm_regions_info_(shm_regions_info)
     {
     }
   };

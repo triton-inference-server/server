@@ -381,7 +381,7 @@ InferGRPCToInput(
     std::list<std::string>* serialized_data,
     TRITONSERVER_InferenceRequest* inference_request,
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
-        ref_shm_regions)
+        shm_regions_info)
 {
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
@@ -422,15 +422,15 @@ InferGRPCToInput(
                 .c_str());
       }
       void* tmp;
-      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>
-          shm_info_ref = nullptr;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+          nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, byte_size, &tmp, &memory_type, &memory_type_id,
-          &shm_info_ref));
+          &shm_info));
       base = tmp;
 
-      if (shm_info_ref != nullptr) {
-        ref_shm_regions->emplace_back(shm_info_ref);
+      if (shm_info != nullptr) {
+        shm_regions_info->emplace_back(shm_info);
       }
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
@@ -917,23 +917,23 @@ ModelInferHandler::Execute(InferHandler::State* state)
   // and permit unregistration. The vector will be included in
   // `response_release_payload` for the callback.
   std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
-      ref_shm_regions;
+      shm_regions_info;
 
   if (err == nullptr) {
     err = InferGRPCToInput(
         tritonserver_, shm_manager_, request, &serialized_data, irequest,
-        &ref_shm_regions);
+        &shm_regions_info);
   }
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, request, std::move(serialized_data),
-        response_queue, &state->alloc_payload_, &ref_shm_regions);
+        response_queue, &state->alloc_payload_, &shm_regions_info);
   }
 
   auto request_release_payload =
       std::make_unique<RequestReleasePayload>(state->inference_request_);
   auto response_release_payload = std::make_unique<ResponseReleasePayload>(
-      state, std::move(ref_shm_regions));
+      state, std::move(shm_regions_info));
 
   if (err == nullptr) {
     err = TRITONSERVER_InferenceRequestSetReleaseCallback(

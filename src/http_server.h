@@ -311,11 +311,11 @@ class HTTPAPIServer : public HTTPServer {
 
     static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
-    void AddShmInfoReference(
+    void AddShmRegionInfo(
         const std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>&
-            shm_info_ref)
+            shm_info)
     {
-      ref_shm_regions_.push_back(shm_info_ref);
+      shm_regions_info_.push_back(shm_info);
     }
 
    protected:
@@ -343,7 +343,7 @@ class HTTPAPIServer : public HTTPServer {
     // unregistration of the shared memory. This vector must be cleared when no
     // longer needed to decrease the count and permit unregistration.
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
-        ref_shm_regions_;
+        shm_regions_info_;
 
     evhtp_res response_code_{EVHTP_RES_OK};
   };

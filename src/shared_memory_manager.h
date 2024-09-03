@@ -132,7 +132,7 @@ class SharedMemoryManager {
   /// \param memory_type Returns the type of the memory
   /// \param device_id Returns the device id associated with the
   /// memory block
-  /// \param shm_info_ref Returns a shared pointer reference(read-only) to the
+  /// \param shm_info Returns a shared pointer reference(read-only) to the
   /// shared memory block's information.
   /// This pointer will automatically increase the usage count, preventing
   /// unregistration while the reference is held. The reference must be cleared
@@ -143,8 +143,7 @@ class SharedMemoryManager {
   TRITONSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr, TRITONSERVER_MemoryType* memory_type,
-      int64_t* device_id,
-      std::shared_ptr<const SharedMemoryInfo>* shm_info_ref);
+      int64_t* device_id, std::shared_ptr<const SharedMemoryInfo>* shm_info);
 
 #ifdef TRITON_ENABLE_GPU
   /// Get the CUDA memory handle associated with the block name.

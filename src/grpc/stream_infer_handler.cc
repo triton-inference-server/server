@@ -290,23 +290,23 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // count and permit unregistration. The vector will be included in
     // `response_release_payload` for the callback.
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
-        ref_shm_regions;
+        shm_regions_info;
 
     if (err == nullptr) {
       err = InferGRPCToInput(
           tritonserver_, shm_manager_, request, &serialized_data, irequest,
-          &ref_shm_regions);
+          &shm_regions_info);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue_, &state->alloc_payload_, &ref_shm_regions);
+          response_queue_, &state->alloc_payload_, &shm_regions_info);
     }
 
     auto request_release_payload =
         std::make_unique<RequestReleasePayload>(state->inference_request_);
     auto response_release_payload = std::make_unique<ResponseReleasePayload>(
-        state, std::move(ref_shm_regions));
+        state, std::move(shm_regions_info));
 
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
