@@ -1,4 +1,4 @@
-## [**Triton Inference Server Release 24.08**](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-24-08.html#rel-24-08)
+# [**Triton Inference Server Release 24.08**](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-24-08.html#rel-24-08)
 
 The Triton Inference Server container image, release 24.08, is available on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and is open source on [GitHub](https://github.com/triton-inference-server/server).
 
