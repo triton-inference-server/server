@@ -34,7 +34,7 @@
 # Make all generated files accessible outside of container
 umask 0000
 # Set the version of the models
-TRITON_VERSION=${TRITON_VERSION:=24.07}
+TRITON_VERSION=${TRITON_VERSION:=24.08}
 # Set the CUDA device to use
 CUDA_DEVICE=${RUNNER_ID:=0}
 # Set TensorRT image
@@ -48,9 +48,7 @@ HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
 HOST_SOURCE_DIR=$HOST_BUILD_DIR/gen_srcdir
 
 # Set CI specific parameters
-DOCKER_GPU_ARGS="${DOCKER_GPU_ARGS:="--gpus device=$CUDA_DEVICE"}"
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS)
-
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
 # Set model output directories
 

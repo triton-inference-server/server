@@ -98,6 +98,37 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 #
+# Test response sender to raise exception on response after complete final flag
+#
+rm -rf models && mkdir models
+mkdir -p models/response_sender_complete_final/1 && \
+    cp ../../python_models/response_sender_complete_final/model.py models/response_sender_complete_final/1 && \
+    cp ../../python_models/response_sender_complete_final/config.pbtxt models/response_sender_complete_final
+
+TEST_LOG="response_sender_complete_final_test.log"
+SERVER_LOG="response_sender_complete_final_test.server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/response_sender/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_LOG=$SERVER_LOG python3 -m pytest --junitxml=concurrency_test.report.xml response_sender_complete_final_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** response sender complete final test FAILED\n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+#
 # Test async response sender under decoupled / non-decoupled
 #
 

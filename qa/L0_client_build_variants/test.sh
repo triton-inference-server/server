@@ -58,10 +58,6 @@ TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-i
               -DTRITON_ENABLE_PYTHON_HTTP=ON \
               -DTRITON_ENABLE_PYTHON_GRPC=ON \
               -DTRITON_ENABLE_JAVA_HTTP=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=OFF \
@@ -90,10 +86,6 @@ fi
               -DTRITON_ENABLE_CC_GRPC=ON \
               -DTRITON_ENABLE_PYTHON_HTTP=OFF \
               -DTRITON_ENABLE_PYTHON_GRPC=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
@@ -121,10 +113,6 @@ fi
               -DTRITON_ENABLE_CC_GRPC=OFF \
               -DTRITON_ENABLE_PYTHON_HTTP=ON \
               -DTRITON_ENABLE_PYTHON_GRPC=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
@@ -141,59 +129,27 @@ else
     exit 1
 fi
 
-#
-# Build without Perf Analyzer
-#
-(cd /workspace/build && \
-        rm -fr cc-clients python-clients && \
-        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
-              -DTRITON_ENABLE_CC_HTTP=ON \
-              -DTRITON_ENABLE_CC_GRPC=ON \
-              -DTRITON_ENABLE_PYTHON_HTTP=ON \
-              -DTRITON_ENABLE_PYTHON_GRPC=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_C_API=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
-              -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
-              -DTRITON_ENABLE_EXAMPLES=ON \
-              -DTRITON_ENABLE_TESTS=ON \
-              -DTRITON_ENABLE_GPU=ON \
-              -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
-              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-              /workspace/client && \
-        make -j16 cc-clients python-clients)
-if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** No-Perf-Analyzer Passed\n***"
-else
-    echo -e "\n***\n*** No-Perf-Analyzer FAILED\n***"
-    exit 1
-fi
-
+# TODO: TPRD-342 These tests should be PA CI test
+# cases not Triton test cases
+rm -fr /workspace/build
+mkdir -p /workspace/build
 #
 # Build without C API in Perf Analyzer
 #
 (cd /workspace/build && \
-        rm -fr cc-clients python-clients && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
-              -DTRITON_ENABLE_PYTHON_HTTP=ON \
-              -DTRITON_ENABLE_PYTHON_GRPC=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_C_API=OFF \
               -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
-              -DTRITON_ENABLE_EXAMPLES=ON \
-              -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
               -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
               -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
               -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-              /workspace/client && \
-        make -j16 cc-clients python-clients)
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** No-CAPI Passed\n***"
 else
@@ -205,25 +161,20 @@ fi
 # Build without TensorFlow Serving in Perf Analyzer
 #
 (cd /workspace/build && \
-        rm -fr cc-clients python-clients && \
+        rm -fr cc_clients perf_analyzer && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
-              -DTRITON_ENABLE_PYTHON_HTTP=ON \
-              -DTRITON_ENABLE_PYTHON_GRPC=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
               -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
-              -DTRITON_ENABLE_EXAMPLES=ON \
-              -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
               -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
               -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
               -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-              /workspace/client && \
-        make -j16 cc-clients python-clients)
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** No-TF-Serving Passed\n***"
 else
@@ -235,25 +186,20 @@ fi
 # Build without TorchServe in Perf Analyzer
 #
 (cd /workspace/build && \
-        rm -fr cc-clients python-clients && \
+        rm -fr cc_clients perf_analyzer && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
-              -DTRITON_ENABLE_PYTHON_HTTP=ON \
-              -DTRITON_ENABLE_PYTHON_GRPC=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
               -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
-              -DTRITON_ENABLE_EXAMPLES=ON \
-              -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
               -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
               -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
               -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-              /workspace/client && \
-        make -j16 cc-clients python-clients)
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** No-TorchServe Passed\n***"
 else

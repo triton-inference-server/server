@@ -201,7 +201,7 @@ tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to
 ```
 
 **Note**:
-[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+[perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 is supported on Jetson, while the [model_analyzer](model_analyzer.md) is
 currently not available for Jetson. To execute `perf_analyzer` for C API, use
 the CLI flag `--service-kind=triton_c_api`:

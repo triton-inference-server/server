@@ -1,4 +1,4 @@
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -138,6 +138,15 @@ else()
   )
 endif()
 
+set(LIB_DIR "lib")
+if(LINUX)
+  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
+  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+    set (LIB_DIR "lib64")
+  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
+endif(LINUX)
+set(TRITON_CORE_HEADERS_ONLY OFF)
+
 set_target_properties(
   main
   PROPERTIES
@@ -145,7 +154,7 @@ set_target_properties(
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../lib"
+    INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
 )
 
 target_link_libraries(
@@ -773,7 +782,11 @@ if (NOT WIN32)
   endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
+# tritonfrontend python package
+add_subdirectory(python)
+
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)
   add_subdirectory(test test)
 endif() # NOT WIN32
+
