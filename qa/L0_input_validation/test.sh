@@ -68,7 +68,9 @@ set +e
 python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY::InputValTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** input_validation_test.py::InputValTest FAILED. \n***"
     RET=1
 fi
 set -e
@@ -138,7 +140,9 @@ set +e
 python3 -m pytest --junitxml="input_shape_validation.report.xml" $TEST_PY::InputShapeTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** input_validation_test.py::InputShapeTest FAILED. \n***"
     RET=1
 fi
 set -e
@@ -147,10 +151,13 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # input_byte_size_test
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{savedmodel_zero_1_float32,savedmodel_zero_1_object} ./models
+
 set +e
-LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    cat $TEST_LOG
+    echo -e "\n***\n*** input_byte_size_test FAILED\n***"
     RET=1
 fi
 set -e
@@ -158,8 +165,6 @@ set -e
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
 else
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
     echo -e "\n***\n*** Input Validation Test FAILED\n***"
 fi
 
