@@ -68,6 +68,7 @@ set +e
 python3 -m pytest --junitxml="input_validation.report.xml" $TEST_PY::InputValTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
     echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
     RET=1
 fi
@@ -80,49 +81,6 @@ wait $SERVER_PID
 pip install torch
 pip install pytest-asyncio
 
-mkdir -p models/pt_identity/1
-PYTHON_CODE=$(cat <<END
-import torch
-torch.jit.save(
-    torch.jit.script(torch.nn.Identity()),
-    "`pwd`/models/pt_identity/1/model.pt",
-)
-END
-)
-res="$(python3 -c "$PYTHON_CODE")"
-
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** model "pt_identity" initialization FAILED. \n***"
-    echo $res
-    exit 1
-fi
-
-# Create the config.pbtxt file with the specified configuration
-cat > models/pt_identity/config.pbtxt << EOL
-name: "pt_identity"
-backend: "pytorch"
-max_batch_size: 8
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [8]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [8]
-  }
-]
-# ensure we batch requests together
-dynamic_batching {
-    max_queue_delay_microseconds: 1000000
-}
-EOL
-
-cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_nobatch_zero_1_float32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_zero_1_float32_int32 models/.
 
@@ -138,6 +96,7 @@ set +e
 python3 -m pytest --junitxml="input_shape_validation.report.xml" $TEST_PY::InputShapeTest >> $CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
     echo -e "\n***\n*** input_validation_test.py FAILED. \n***"
     RET=1
 fi
@@ -147,10 +106,13 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # input_byte_size_test
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{savedmodel_zero_1_float32,savedmodel_zero_1_object} ./models
+
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    cat $TEST_LOG
+    echo -e "\n***\n*** input_byte_size_test FAILED\n***"
     RET=1
 fi
 set -e
@@ -158,7 +120,6 @@ set -e
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
 else
-    cat $CLIENT_LOG
     cat $SERVER_LOG
     echo -e "\n***\n*** Input Validation Test FAILED\n***"
 fi

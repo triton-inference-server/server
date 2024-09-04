@@ -34,8 +34,10 @@ import unittest
 import infer_util as iu
 import numpy as np
 import tritonclient.grpc as tritongrpcclient
+import tritonclient.http as tritonhttpclient
+import tritonclient.utils as utils
 import tritonclient.utils.shared_memory as shm
-from tritonclient.utils import InferenceServerException, np_to_triton_dtype
+from tritonclient.utils import InferenceServerException
 
 
 class InputValTest(unittest.TestCase):
@@ -116,101 +118,108 @@ class InputValTest(unittest.TestCase):
 
 
 class InputShapeTest(unittest.TestCase):
-    def test_input_shape_validation(self):
-        input_size = 8
-        model_name = "pt_identity"
-        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+    def test_client_input_shape_validation(self):
+        model_name = "simple"
 
-        # Pass
-        input_data = np.arange(input_size)[None].astype(np.float32)
-        inputs = [
-            tritongrpcclient.InferInput(
-                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
-            )
-        ]
-        inputs[0].set_data_from_numpy(input_data)
-        triton_client.infer(model_name=model_name, inputs=inputs)
+        for client_type in ["http", "grpc"]:
+            if client_type == "http":
+                triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+            else:
+                triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
 
-        # Larger input byte size than expected
-        input_data = np.arange(input_size + 2)[None].astype(np.float32)
-        inputs = [
-            tritongrpcclient.InferInput(
-                "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
-            )
-        ]
-        inputs[0].set_data_from_numpy(input_data)
-        # Compromised input shape
-        inputs[0].set_shape((1, input_size))
-        with self.assertRaises(InferenceServerException) as e:
-            triton_client.infer(
-                model_name=model_name,
-                inputs=inputs,
-            )
-        err_str = str(e.exception)
-        self.assertIn(
-            "input byte size mismatch for input 'INPUT0' for model 'pt_identity'. Expected 32, got 40",
-            err_str,
-        )
-
-    def test_input_string_shape_validation(self):
-        input_size = 16
-        model_name = "graphdef_object_int32_int32"
-        np_dtype_string = np.dtype(object)
-        triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
-
-        def get_input_array(input_size, np_dtype):
-            rinput_dtype = iu._range_repr_dtype(np_dtype)
-            input_array = np.random.randint(
-                low=0, high=127, size=(1, input_size), dtype=rinput_dtype
-            )
-
-            # Convert to string type
-            inn = np.array(
-                [str(x) for x in input_array.reshape(input_array.size)], dtype=object
-            )
-            input_array = inn.reshape(input_array.shape)
-
+            # Infer
             inputs = []
-            inputs.append(
-                tritongrpcclient.InferInput(
-                    "INPUT0", input_array.shape, np_to_triton_dtype(np_dtype)
-                )
+            if client_type == "http":
+                inputs.append(tritonhttpclient.InferInput("INPUT0", [1, 16], "INT32"))
+                inputs.append(tritonhttpclient.InferInput("INPUT1", [1, 16], "INT32"))
+            else:
+                inputs.append(tritongrpcclient.InferInput("INPUT0", [1, 16], "INT32"))
+                inputs.append(tritongrpcclient.InferInput("INPUT1", [1, 16], "INT32"))
+
+            # Create the data for the two input tensors. Initialize the first
+            # to unique integers and the second to all ones.
+            input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+            input0_data = np.expand_dims(input0_data, axis=0)
+            input1_data = np.ones(shape=(1, 16), dtype=np.int32)
+
+            # Initialize the data
+            inputs[0].set_data_from_numpy(input0_data)
+            inputs[1].set_data_from_numpy(input1_data)
+
+            # 1. Test wrong shapes with correct element counts
+            # Compromised input shapes
+            inputs[0].set_shape([2, 8])
+            inputs[1].set_shape([2, 8])
+
+            # If element count is correct but shape is wrong, core will return an error.
+            with self.assertRaises(InferenceServerException) as e:
+                triton_client.infer(model_name=model_name, inputs=inputs)
+            err_str = str(e.exception)
+            self.assertIn(
+                f"unexpected shape for input 'INPUT1' for model 'simple'. Expected [-1,16], got [2,8]",
+                err_str,
             )
-            inputs.append(
-                tritongrpcclient.InferInput(
-                    "INPUT1", input_array.shape, np_to_triton_dtype(np_dtype)
-                )
+
+            # 2. Test wrong shapes with wrong element counts
+            # Compromised input shapes
+            inputs[0].set_shape([1, 8])
+            inputs[1].set_shape([1, 8])
+
+            # If element count is wrong, client returns an error.
+            with self.assertRaises(InferenceServerException) as e:
+                triton_client.infer(model_name=model_name, inputs=inputs)
+            err_str = str(e.exception)
+            self.assertIn(
+                f"input 'INPUT0' got unexpected elements count 16, expected 8",
+                err_str,
             )
 
-            inputs[0].set_data_from_numpy(input_array)
-            inputs[1].set_data_from_numpy(input_array)
-            return inputs
+    def test_client_input_string_shape_validation(self):
+        for client_type in ["http", "grpc"]:
 
-        # Input size is less than expected
-        inputs = get_input_array(input_size - 2, np_dtype_string)
-        # Compromised input shape
-        inputs[0].set_shape((1, input_size))
-        inputs[1].set_shape((1, input_size))
-        with self.assertRaises(InferenceServerException) as e:
-            triton_client.infer(model_name=model_name, inputs=inputs)
-        err_str = str(e.exception)
-        self.assertIn(
-            f"expected {input_size} string elements for inference input 'INPUT1', got {input_size-2}",
-            err_str,
-        )
+            def identity_inference(triton_client, np_array, binary_data):
+                model_name = "simple_identity"
 
-        # Input size is greater than expected
-        inputs = get_input_array(input_size + 2, np_dtype_string)
-        # Compromised input shape
-        inputs[0].set_shape((1, input_size))
-        inputs[1].set_shape((1, input_size))
-        with self.assertRaises(InferenceServerException) as e:
-            triton_client.infer(model_name=model_name, inputs=inputs)
-        err_str = str(e.exception)
-        self.assertIn(
-            f"expected {input_size} string elements for inference input 'INPUT1', got {input_size+2}",
-            err_str,
-        )
+                # Total elements no change
+                inputs = []
+                if client_type == "http":
+                    inputs.append(
+                        tritonhttpclient.InferInput("INPUT0", np_array.shape, "BYTES")
+                    )
+                    inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
+                    inputs[0].set_shape([2, 8])
+                else:
+                    inputs.append(
+                        tritongrpcclient.InferInput("INPUT0", np_array.shape, "BYTES")
+                    )
+                    inputs[0].set_data_from_numpy(np_array)
+                    inputs[0].set_shape([2, 8])
+                triton_client.infer(model_name=model_name, inputs=inputs)
+
+                # Compromised input shape
+                inputs[0].set_shape([1, 8])
+
+                with self.assertRaises(InferenceServerException) as e:
+                    triton_client.infer(model_name=model_name, inputs=inputs)
+                err_str = str(e.exception)
+                self.assertIn(
+                    f"input 'INPUT0' got unexpected elements count 16, expected 8",
+                    err_str,
+                )
+
+            if client_type == "http":
+                triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+            else:
+                triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
+
+            # Example using BYTES input tensor with 16 elements, where each
+            # element is a 4-byte binary blob with value 0x00010203. Can use
+            # dtype=np.bytes_ in this case.
+            bytes_data = [b"\x00\x01\x02\x03" for i in range(16)]
+            np_bytes_data = np.array(bytes_data, dtype=np.bytes_)
+            np_bytes_data = np_bytes_data.reshape([1, 16])
+            identity_inference(triton_client, np_bytes_data, True)  # Using binary data
+            identity_inference(triton_client, np_bytes_data, False)  # Using JSON data
 
     def test_wrong_input_shape_tensor_size(self):
         def inference_helper(model_name, batch_size=1):
@@ -246,12 +255,12 @@ class InputShapeTest(unittest.TestCase):
                 tritongrpcclient.InferInput(
                     "DUMMY_INPUT0",
                     dummy_input_data.shape,
-                    np_to_triton_dtype(np.float32),
+                    utils.np_to_triton_dtype(np.float32),
                 ),
                 tritongrpcclient.InferInput(
                     "INPUT0",
                     shape_tensor_data.shape,
-                    np_to_triton_dtype(np.int32),
+                    utils.np_to_triton_dtype(np.int32),
                 ),
             ]
             inputs[0].set_data_from_numpy(dummy_input_data)
