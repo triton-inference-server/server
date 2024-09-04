@@ -236,7 +236,6 @@ class TritonLLMEngine(LLMEngine):
         return _create_trtllm_inference_request
 
     def _get_tokenizer(self, tokenizer_name: str):
-        # TODO: Consider support for custom tokenizers
         tokenizer = None
         if tokenizer_name:
             tokenizer = get_tokenizer(tokenizer_name)

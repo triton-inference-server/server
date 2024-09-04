@@ -540,7 +540,11 @@ class TestChatCompletionsTokenizers:
         )
 
     def test_chat_completions_invalid_chat_tokenizer(
-        self, server: tritonserver.Server, model: str, messages: List[dict]
+        self,
+        server: tritonserver.Server,
+        backend: str,
+        model: str,
+        messages: List[dict],
     ):
         # NOTE: Use of apply_chat_template on a tokenizer that doesn't support it
         # is a warning prior to transformers 4.44, and an error afterwards.
@@ -553,7 +557,9 @@ class TestChatCompletionsTokenizers:
 
         # Pick a tokenizer with no chat template defined
         invalid_chat_tokenizer = "gpt2"
-        app = setup_fastapi_app(tokenizer=invalid_chat_tokenizer, server=server)
+        app = setup_fastapi_app(
+            tokenizer=invalid_chat_tokenizer, server=server, backend=backend
+        )
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",
