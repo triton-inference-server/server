@@ -42,9 +42,9 @@
 
 .. toctree::
    :hidden:
-   :caption: Deployment Types
+   :caption: Scaling guide
 
-   k8
+   scaling_guide/scaling_guide
 
 .. toctree::
    :hidden:
