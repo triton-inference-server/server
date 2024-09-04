@@ -27,9 +27,9 @@
 .. toctree::
    :hidden:
 
-   Home <index.md>
-   Release notes <release_note.md>
-   Compatibility matrix <compatibility.md>
+   Home <introduction/index.md>
+   Release notes <introduction/release_note.md>
+   Compatibility matrix <introduction/compatibility.md>
 
 .. toctree::
    :hidden:
