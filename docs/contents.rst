@@ -79,7 +79,7 @@
    :caption: Backends
 
    TRT-LLM <tensorrtllm_backend/README>
-   vllm
+   vLLM <../server/docs/backend/vllm>
    Python <python_backend/README>
    Pytorch <pytorch_backend/README>
    ONNX Runtime <onnxruntime_backend/README>
