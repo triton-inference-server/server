@@ -36,7 +36,7 @@
    :caption: Getting Started
 
    getting_started/quick_deployment_by_backend
-   LLM <..server/docs/getting_started/llm.md>
+   LLM with TRT-LLM <..server/docs/getting_started/trtllm_user_guide.md>
    Multimodal model <../tutorials/Popular_Models_Guide/Llava1.5/llava_trtllm_guide.md>
    Stable diffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.md>
 
