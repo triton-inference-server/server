@@ -186,12 +186,11 @@ rm -fr *.log  models{0,1,2,4} queue_delay_models && mkdir models{0,1,2,4} queue_
 # Search BACKENDS to determine if a backend should be tested
 function should_test_backend() {
   local target_backend=$1
-  for BACKEND in $BACKENDS; do
-    if [[ "${target_backend}" == "${BACKEND}" ]]; then
-      return 1
-    fi
-  done
-  return 0
+  if [[ $(echo "${BACKENDS[@]}" | grep -c "${target_backend}") -ne 0 ]]; then
+    echo "true"
+    return
+  fi
+  echo "false"
 }
 
 # Get the datatype to use based on the backend
@@ -844,8 +843,7 @@ fi
 
 # These subtests use python models. They should not be executed if 'python' is not one
 # of the backends under test.
-should_test_backend "python"
-if [ $? -eq 1 ] && [ ${WINDOWS} -ne 1 ]; then
+if [[ $(should_test_backend "python") == "true" &&  !( -v WSL_DISTRO_NAME || -v MSYSTEM )]]; then
     # Test preserve ordering true/false and decoupled/non-decoupled
     TEST_CASE=SequenceBatcherPreserveOrderingTest
     MODEL_PATH=preserve_ordering_models
