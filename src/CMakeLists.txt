@@ -782,8 +782,10 @@ if (NOT WIN32)
   endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
-# tritonfrontend python package
-add_subdirectory(python)
+if (NOT WIN32)
+  # tritonfrontend python package
+  add_subdirectory(python)
+endif (NOT WIN32)
 
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)
