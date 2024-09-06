@@ -1846,11 +1846,18 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
-    # [FIXME] Placing the Triton server wheel file in 'python' for now, should
-    # have been upload to pip registry and be able to install directly
+    # [FIXME] Placing the Triton server wheel and Triton frontend wheel files
+    # in 'python' for now, should have been upload to pip registry and be able
+    # to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
     cmake_script.cp(
         os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+        os.path.join(install_dir, "python"),
+    )
+
+    cmake_script.mkdir(os.path.join(install_dir, "python"))
+    cmake_script.cp(
+        os.path.join(repo_install_dir, "python", "tritonfrontend*.whl"),
         os.path.join(install_dir, "python"),
     )
 
