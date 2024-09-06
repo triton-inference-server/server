@@ -428,10 +428,7 @@ InferGRPCToInput(
           region_name, offset, byte_size, &tmp, &memory_type, &memory_type_id,
           &shm_info));
       base = tmp;
-
-      if (shm_info != nullptr) {
-        shm_regions_info->emplace_back(shm_info);
-      }
+      shm_regions_info->emplace_back(shm_info);
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU

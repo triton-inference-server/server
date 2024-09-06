@@ -2686,10 +2686,7 @@ HTTPAPIServer::ParseJsonTritonIO(
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, shm_offset, byte_size, &base, &memory_type,
             &memory_type_id, &shm_info));
-
-        if (shm_info != nullptr) {
-          infer_req->AddShmRegionInfo(shm_info);
-        }
+        infer_req->AddShmRegionInfo(shm_info);
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -2808,10 +2805,7 @@ HTTPAPIServer::ParseJsonTritonIO(
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, offset, byte_size, &base, &memory_type, &memory_type_id,
             &shm_info));
-
-        if (shm_info != nullptr) {
-          infer_req->AddShmRegionInfo(shm_info);
-        }
+        infer_req->AddShmRegionInfo(shm_info);
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
