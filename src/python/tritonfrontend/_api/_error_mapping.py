@@ -36,6 +36,7 @@ from tritonfrontend._c.tritonfrontend_bindings import (
     UnsupportedError,
 )
 
+# ERROR_MAPPING takes in tritonfrontend Error and maps to respective tritonserver Error
 ERROR_MAPPING = {
     TritonError: tritonserver.TritonError,
     NotFoundError: tritonserver.NotFoundError,
