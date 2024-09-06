@@ -1285,7 +1285,7 @@ class InferHandler : public HandlerBase {
         std::vector<
             std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
             shm_regions_info)
-        : state_(state), shm_regions_info_(shm_regions_info)
+        : state_(state), shm_regions_info_(std::move(shm_regions_info))
     {
     }
   };
