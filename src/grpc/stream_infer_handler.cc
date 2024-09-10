@@ -282,18 +282,32 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // tensors are present in the request.
     std::list<std::string> serialized_data;
 
+    // Maintain shared pointers(read-only reference) to the shared memory
+    // block's information for the shared memory regions used by the request.
+    // These pointers will automatically increase the usage count, preventing
+    // unregistration of the shared memory. This vector must be cleared in the
+    // `StreamInferResponseComplete` callback (after inference) to decrease the
+    // count and permit unregistration. The vector will be included in
+    // `response_release_payload` for the callback.
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info;
+
     if (err == nullptr) {
       err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, &serialized_data, irequest);
+          tritonserver_, shm_manager_, request, &serialized_data, irequest,
+          &shm_regions_info);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue_, &state->alloc_payload_);
+          response_queue_, &state->alloc_payload_, &shm_regions_info);
     }
 
     auto request_release_payload =
         std::make_unique<RequestReleasePayload>(state->inference_request_);
+    auto response_release_payload = std::make_unique<ResponseReleasePayload>(
+        state, std::move(shm_regions_info));
+
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestComplete,
@@ -303,7 +317,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       err = TRITONSERVER_InferenceRequestSetResponseCallback(
           irequest, allocator_,
           &state->alloc_payload_ /* response_allocator_userp */,
-          StreamInferResponseComplete, reinterpret_cast<void*>(state));
+          StreamInferResponseComplete,
+          response_release_payload.get() /* response_userp */);
     }
 
     if (err == nullptr) {
@@ -330,8 +345,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // irequest to handle gRPC stream cancellation.
     if (err == nullptr) {
       state->context_->InsertInflightState(state);
-      // The payload will be cleaned in request release callback.
+      // The payload will be cleaned in release callback.
       request_release_payload.release();
+      response_release_payload.release();
     } else {
       // If there was an error then enqueue the error response and show
       // it to be ready for writing.
@@ -594,7 +610,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  State* state = reinterpret_cast<State*>(userp);
+  ResponseReleasePayload* response_release_payload(
+      static_cast<ResponseReleasePayload*>(userp));
+  auto state = response_release_payload->state_;
+
   // Ignore Response from CORE in case GRPC Strict as we dont care about
   if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
     std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
@@ -648,6 +667,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
@@ -695,6 +715,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),
             "deleting GRPC inference response");
+        delete response_release_payload;
         return;
       }
     }
@@ -774,6 +795,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
@@ -817,6 +839,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       state->context_->WriteResponseIfReady(state);
     }
     state->complete_ = is_complete;
+  }
+
+  if (is_complete) {
+    delete response_release_payload;
   }
 }
 
