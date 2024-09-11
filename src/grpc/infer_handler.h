@@ -299,7 +299,9 @@ InferAllocatorPayload(
     const inference::ModelInferRequest& request,
     std::list<std::string>&& serialized_data,
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
-    AllocPayload<ResponseType>* alloc_payload)
+    AllocPayload<ResponseType>* alloc_payload,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        shm_regions_info)
 {
   alloc_payload->response_queue_ = response_queue;
   alloc_payload->shm_map_.clear();
@@ -335,9 +337,12 @@ InferAllocatorPayload(
       void* base;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+          nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          region_name, offset, byte_size, &base, &memory_type,
-          &memory_type_id));
+          region_name, offset, byte_size, &base, &memory_type, &memory_type_id,
+          &shm_info));
+      shm_regions_info->emplace_back(shm_info);
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -373,7 +378,9 @@ TRITONSERVER_Error* InferGRPCToInput(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const inference::ModelInferRequest& request,
     std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request);
+    TRITONSERVER_InferenceRequest* inference_request,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        shm_regions_info);
 
 TRITONSERVER_Error* ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -1262,6 +1269,23 @@ class InferHandler : public HandlerBase {
 
     delete state;
   }
+
+  // Simple structure that carries the payload needed for
+  // response release callback.
+  struct ResponseReleasePayload final {
+    State* state_;
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info_;
+
+    ResponseReleasePayload(
+        State* state,
+        std::vector<
+            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
+            shm_regions_info)
+        : state_(state), shm_regions_info_(std::move(shm_regions_info))
+    {
+    }
+  };
 
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
