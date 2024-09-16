@@ -26,6 +26,10 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import Iterator
+
+import anyio
 import uvicorn
 from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
@@ -55,19 +59,45 @@ class FastApiFrontend(OpenAIFrontend):
         self.stop()
 
     def start(self):
-        uvicorn.run(
-            self.app,
+        config = uvicorn.Config(
+            app=self.app,
             host=self.host,
             port=self.port,
             log_level=self.log_level,
             timeout_keep_alive=5,
         )
+        server = uvicorn.Server(config)
+
+        # TODO: For synchronous debug only
+        async def monitor_thread_limiter():
+            limiter = anyio.to_thread.current_default_thread_limiter()
+            threads_in_use = limiter.borrowed_tokens
+            while True:
+                print(f"Threads in use: {threads_in_use}")
+                if threads_in_use != limiter.borrowed_tokens:
+                    print(f"Threads in use: {limiter.borrowed_tokens}")
+                    threads_in_use = limiter.borrowed_tokens
+                await anyio.sleep(0)
+
+        async def main():
+            async with anyio.create_task_group() as tg:
+                # TODO: For synchronous debug only
+                tg.start_soon(monitor_thread_limiter)
+                await server.serve()
+
+        anyio.run(main)
 
     def stop(self):
         # NOTE: If the frontend owned the engine, it could do cleanup here.
         pass
 
     def _create_app(self):
+        @asynccontextmanager
+        async def lifespan(app: FastAPI) -> Iterator[None]:
+            limiter = anyio.to_thread.current_default_thread_limiter()
+            limiter.total_tokens = 128  # Can be tuned to max batch size of model or max concurrency to test, but will be overkill
+            yield
+
         app = FastAPI(
             title="OpenAI API",
             description="The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.",
@@ -78,6 +108,7 @@ class FastApiFrontend(OpenAIFrontend):
                 "name": "MIT",
                 "url": "https://github.com/openai/openai-openapi/blob/master/LICENSE",
             },
+            lifespan=lifespan,
         )
 
         app.include_router(observability.router)
