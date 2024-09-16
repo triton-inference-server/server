@@ -217,15 +217,6 @@ class ResponseQueue {
     return ((alloc_count_ == ready_count_) && (alloc_count_ == current_index_));
   }
 
-  // [FIXME] Remove debug info method below, added for testing
-  void PrintAttributes()
-  {
-    std::cout << "\n response_queue_->alloc_count_" << alloc_count_
-              << "\n response_queue_->ready_count_" << ready_count_
-              << "\n response_queue_->current_index_" << current_index_
-              << std::endl;
-  }
-
   // Returns whether the queue has responses
   // ready to be written.
   bool HasReadyResponse()

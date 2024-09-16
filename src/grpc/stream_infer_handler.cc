@@ -545,13 +545,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         } else {
           LOG_ERROR << "Should not print this! Decoupled should NOT write via "
                        "WRITEREADY!";
-
-          // [FIXME] Remove debug info below
-          std::cout << "******************\n"
-                    << " state->complete_: " << state->complete_ << std::endl;
-          state->response_queue_->PrintAttributes();
-          std::cout << "*********************";
-
           // Remove the state from the completion queue
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
           state->step_ = Steps::ISSUED;
