@@ -68,24 +68,10 @@ class FastApiFrontend(OpenAIFrontend):
         )
         server = uvicorn.Server(config)
 
-        # TODO: For synchronous debug only
-        async def monitor_thread_limiter():
-            limiter = anyio.to_thread.current_default_thread_limiter()
-            threads_in_use = limiter.borrowed_tokens
-            while True:
-                print(f"Threads in use: {threads_in_use}")
-                if threads_in_use != limiter.borrowed_tokens:
-                    print(f"Threads in use: {limiter.borrowed_tokens}")
-                    threads_in_use = limiter.borrowed_tokens
-                await anyio.sleep(0)
+        async def serve():
+            await server.serve()
 
-        async def main():
-            async with anyio.create_task_group() as tg:
-                # TODO: For synchronous debug only
-                tg.start_soon(monitor_thread_limiter)
-                await server.serve()
-
-        anyio.run(main)
+        anyio.run(serve)
 
     def stop(self):
         # NOTE: If the frontend owned the engine, it could do cleanup here.

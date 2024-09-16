@@ -34,7 +34,7 @@ router = APIRouter()
 @router.post(
     "/v1/chat/completions", response_model=CreateChatCompletionResponse, tags=["Chat"]
 )
-def create_chat_completion(
+async def create_chat_completion(
     request: CreateChatCompletionRequest,
     raw_request: Request,
 ) -> CreateChatCompletionResponse | StreamingResponse:
@@ -45,7 +45,7 @@ def create_chat_completion(
         raise HTTPException(status_code=500, detail="No attached inference engine")
 
     try:
-        response = raw_request.app.engine.chat(request)
+        response = await raw_request.app.engine.chat(request)
         if request.stream:
             return StreamingResponse(response, media_type="text/event-stream")
         return response

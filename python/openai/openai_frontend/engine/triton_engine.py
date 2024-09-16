@@ -111,7 +111,7 @@ class TritonLLMEngine(LLMEngine):
 
         return models
 
-    def chat(
+    async def chat(
         self, request: CreateChatCompletionRequest
     ) -> CreateChatCompletionResponse | Iterator[str]:
         metadata = self.model_metadata.get(request.model)
@@ -130,7 +130,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         # Convert to Triton request format and perform inference
-        responses = metadata.model.infer(
+        responses = metadata.model.async_infer(
             metadata.request_converter(metadata.model, prompt, request)
         )
 
@@ -148,7 +148,7 @@ class TritonLLMEngine(LLMEngine):
             )
 
         # Response validation with decoupled models in mind
-        responses = list(responses)
+        responses = await list(responses)
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
@@ -319,7 +319,7 @@ class TritonLLMEngine(LLMEngine):
         )
         return chunk
 
-    def _streaming_chat_iterator(
+    async def _streaming_chat_iterator(
         self, request_id: str, created: int, model: str, role: str, responses: List
     ) -> Iterator[str]:
         chunk = self._get_first_streaming_chat_response(
@@ -327,7 +327,7 @@ class TritonLLMEngine(LLMEngine):
         )
         yield f"data: {chunk.json(exclude_unset=True)}\n\n"
 
-        for response in responses:
+        async for response in responses:
             chunk = self._get_nth_streaming_chat_response(
                 request_id, created, model, response
             )
