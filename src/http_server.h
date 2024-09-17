@@ -311,6 +311,13 @@ class HTTPAPIServer : public HTTPServer {
 
     static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
+    void AddShmRegionInfo(
+        const std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>&
+            shm_info)
+    {
+      shm_regions_info_.push_back(shm_info);
+    }
+
    protected:
     TRITONSERVER_Server* server_{nullptr};
     evhtp_request_t* req_{nullptr};
@@ -329,6 +336,14 @@ class HTTPAPIServer : public HTTPServer {
     // request and must not reference it after a successful
     // TRITONSERVER_ServerInferAsync (except for cancellation).
     std::shared_ptr<TRITONSERVER_InferenceRequest> triton_request_{nullptr};
+
+    // Maintain shared pointers(read-only reference) to the shared memory
+    // block's information for the shared memory regions used by the request.
+    // These pointers will automatically increase the usage count, preventing
+    // unregistration of the shared memory. This vector must be cleared when no
+    // longer needed to decrease the count and permit unregistration.
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info_;
 
     evhtp_res response_code_{EVHTP_RES_OK};
   };
