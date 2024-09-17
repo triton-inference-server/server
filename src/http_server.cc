@@ -2681,9 +2681,13 @@ HTTPAPIServer::ParseJsonTritonIO(
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+            nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, shm_offset, byte_size, &base, &memory_type,
-            &memory_type_id));
+            &memory_type_id, &shm_info));
+        infer_req->AddShmRegionInfo(shm_info);
+
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
           cudaIpcMemHandle_t* cuda_handle;
@@ -2796,9 +2800,12 @@ HTTPAPIServer::ParseJsonTritonIO(
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+            nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, offset, byte_size, &base, &memory_type,
-            &memory_type_id));
+            shm_region, offset, byte_size, &base, &memory_type, &memory_type_id,
+            &shm_info));
+        infer_req->AddShmRegionInfo(shm_info);
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU

@@ -31,7 +31,9 @@ import sys
 sys.path.append("../common")
 
 import os
+import time
 import unittest
+from functools import partial
 
 import infer_util as iu
 import numpy as np
@@ -43,7 +45,7 @@ import tritonclient.utils.shared_memory as shm
 from tritonclient import utils
 
 
-class SharedMemoryTest(tu.TestResultCollector):
+class SystemSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
 
     def setUp(self):
@@ -62,6 +64,68 @@ class SharedMemoryTest(tu.TestResultCollector):
                 self.url, verbose=True
             )
 
+    def _configure_server(
+        self,
+        create_byte_size=DEFAULT_SHM_BYTE_SIZE,
+        register_byte_size=DEFAULT_SHM_BYTE_SIZE,
+        register_offset=0,
+    ):
+        """Creates and registers shared memory regions for testing.
+
+        Parameters
+        ----------
+        create_byte_size: int
+            Size of each system shared memory region to create.
+            NOTE: This should be sufficiently large to hold the inputs/outputs
+                  stored in shared memory.
+
+        register_byte_size: int
+            Size of each system shared memory region to register with server.
+            NOTE: The (offset + register_byte_size) should be less than or equal
+            to the create_byte_size. Otherwise an exception will be raised for
+            an invalid set of registration args.
+
+        register_offset: int
+            Offset into the shared memory object to start the registered region.
+
+        """
+        shm_ip0_handle = shm.create_shared_memory_region(
+            "input0_data", "/input0_data", create_byte_size
+        )
+        shm_ip1_handle = shm.create_shared_memory_region(
+            "input1_data", "/input1_data", create_byte_size
+        )
+        shm_op0_handle = shm.create_shared_memory_region(
+            "output0_data", "/output0_data", create_byte_size
+        )
+        shm_op1_handle = shm.create_shared_memory_region(
+            "output1_data", "/output1_data", create_byte_size
+        )
+        # Implicit assumption that input and output byte_sizes are 64 bytes for now
+        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+        input1_data = np.ones(shape=16, dtype=np.int32)
+        shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
+        shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
+        self.triton_client.register_system_shared_memory(
+            "input0_data", "/input0_data", register_byte_size, offset=register_offset
+        )
+        self.triton_client.register_system_shared_memory(
+            "input1_data", "/input1_data", register_byte_size, offset=register_offset
+        )
+        self.triton_client.register_system_shared_memory(
+            "output0_data", "/output0_data", register_byte_size, offset=register_offset
+        )
+        self.triton_client.register_system_shared_memory(
+            "output1_data", "/output1_data", register_byte_size, offset=register_offset
+        )
+        return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
+
+    def _cleanup_server(self, shm_handles):
+        for shm_handle in shm_handles:
+            shm.destroy_shared_memory_region(shm_handle)
+
+
+class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid system shared memory region
         try:
@@ -127,66 +191,6 @@ class SharedMemoryTest(tu.TestResultCollector):
         else:
             self.assertTrue(len(shm_status.regions) == 1)
         shm.destroy_shared_memory_region(shm_op0_handle)
-
-    def _configure_server(
-        self,
-        create_byte_size=DEFAULT_SHM_BYTE_SIZE,
-        register_byte_size=DEFAULT_SHM_BYTE_SIZE,
-        register_offset=0,
-    ):
-        """Creates and registers shared memory regions for testing.
-
-        Parameters
-        ----------
-        create_byte_size: int
-            Size of each system shared memory region to create.
-            NOTE: This should be sufficiently large to hold the inputs/outputs
-                  stored in shared memory.
-
-        register_byte_size: int
-            Size of each system shared memory region to register with server.
-            NOTE: The (offset + register_byte_size) should be less than or equal
-            to the create_byte_size. Otherwise an exception will be raised for
-            an invalid set of registration args.
-
-        register_offset: int
-            Offset into the shared memory object to start the registered region.
-
-        """
-        shm_ip0_handle = shm.create_shared_memory_region(
-            "input0_data", "/input0_data", create_byte_size
-        )
-        shm_ip1_handle = shm.create_shared_memory_region(
-            "input1_data", "/input1_data", create_byte_size
-        )
-        shm_op0_handle = shm.create_shared_memory_region(
-            "output0_data", "/output0_data", create_byte_size
-        )
-        shm_op1_handle = shm.create_shared_memory_region(
-            "output1_data", "/output1_data", create_byte_size
-        )
-        # Implicit assumption that input and output byte_sizes are 64 bytes for now
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-        input1_data = np.ones(shape=16, dtype=np.int32)
-        shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-        shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
-        self.triton_client.register_system_shared_memory(
-            "input0_data", "/input0_data", register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "input1_data", "/input1_data", register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "output0_data", "/output0_data", register_byte_size, offset=register_offset
-        )
-        self.triton_client.register_system_shared_memory(
-            "output1_data", "/output1_data", register_byte_size, offset=register_offset
-        )
-        return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
-
-    def _cleanup_server(self, shm_handles):
-        for shm_handle in shm_handles:
-            shm.destroy_shared_memory_region(shm_handle)
 
     def test_unregister_after_inference(self):
         # Unregister after inference
@@ -441,6 +445,170 @@ class SharedMemoryTest(tu.TestResultCollector):
             (initial_mem_usage <= final_mem_usage <= threshold),
             "client memory usage is increasing",
         )
+
+
+class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
+    def _test_unregister_shm_fail(self):
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.unregister_system_shared_memory()
+        self.assertIn(
+            "Failed to unregister the following system shared memory regions: input0_data ,input1_data ,output0_data ,output1_data",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.unregister_system_shared_memory("input0_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'input0_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.unregister_system_shared_memory("input1_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'input1_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.unregister_system_shared_memory("output0_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'output0_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.unregister_system_shared_memory("output1_data")
+        self.assertIn(
+            "Cannot unregister shared memory region 'output1_data', it is currently in use.",
+            str(ex.exception),
+        )
+
+    def _test_shm_not_found(self):
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.get_system_shared_memory_status("input0_data")
+        self.assertIn(
+            "Unable to find system shared memory region: 'input0_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.get_system_shared_memory_status("input1_data")
+        self.assertIn(
+            "Unable to find system shared memory region: 'input1_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.get_system_shared_memory_status("output0_data")
+        self.assertIn(
+            "Unable to find system shared memory region: 'output0_data'",
+            str(ex.exception),
+        )
+
+        with self.assertRaises(utils.InferenceServerException) as ex:
+            second_client.get_system_shared_memory_status("output1_data")
+        self.assertIn(
+            "Unable to find system shared memory region: 'output1_data'",
+            str(ex.exception),
+        )
+
+    def test_unregister_shm_during_inference_http(self):
+        try:
+            self.triton_client.unregister_system_shared_memory()
+            shm_handles = self._configure_server()
+
+            inputs = [
+                httpclient.InferInput("INPUT0", [1, 16], "INT32"),
+                httpclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
+                httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+            ]
+
+            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+
+            async_request = self.triton_client.async_infer(
+                model_name="simple", inputs=inputs, outputs=outputs
+            )
+
+            # Ensure inference started
+            time.sleep(2)
+
+            # Try unregister shm regions during inference
+            self._test_unregister_shm_fail()
+
+            # Blocking call
+            async_request.get_result()
+
+            # Try unregister shm regions after inference
+            self.triton_client.unregister_system_shared_memory()
+            self._test_shm_not_found()
+
+        finally:
+            self._cleanup_server(shm_handles)
+
+    def test_unregister_shm_during_inference_grpc(self):
+        try:
+            self.triton_client.unregister_system_shared_memory()
+            shm_handles = self._configure_server()
+
+            inputs = [
+                grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+                grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                grpcclient.InferRequestedOutput("OUTPUT0"),
+                grpcclient.InferRequestedOutput("OUTPUT1"),
+            ]
+
+            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+
+            def callback(user_data, result, error):
+                if error:
+                    user_data.append(error)
+                else:
+                    user_data.append(result)
+
+            user_data = []
+
+            self.triton_client.async_infer(
+                model_name="simple",
+                inputs=inputs,
+                outputs=outputs,
+                callback=partial(callback, user_data),
+            )
+
+            # Ensure inference started
+            time.sleep(2)
+
+            # Try unregister shm regions during inference
+            self._test_unregister_shm_fail()
+
+            # Wait until the results are available in user_data
+            time_out = 20
+            while (len(user_data) == 0) and time_out > 0:
+                time_out = time_out - 1
+                time.sleep(1)
+            time.sleep(2)
+
+            # Try unregister shm regions after inference
+            self.triton_client.unregister_system_shared_memory()
+            self._test_shm_not_found()
+
+        finally:
+            self._cleanup_server(shm_handles)
 
 
 if __name__ == "__main__":

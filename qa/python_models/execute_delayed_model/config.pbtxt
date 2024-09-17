@@ -24,4 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Need to automate stubgen process as a part of build: https://github.com/triton-inference-server/server/pull/7501#discussion_r1720135228
+name: "simple"
+backend: "python"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+
+instance_group [ { kind: KIND_CPU }]
