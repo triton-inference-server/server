@@ -537,15 +537,18 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     } else if (state->step_ == Steps::WRITEREADY) {
       // Finish the state if all the transactions associated with
       // the state have completed.
-      if (state->IsComplete()) {
-        state->context_->DecrementRequestCounter();
-        finished = Finish(state);
-      } else {
-        LOG_ERROR << "Should not print this! Decoupled should NOT write via "
-                     "WRITEREADY!";
-        // Remove the state from the completion queue
-        std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-        state->step_ = Steps::ISSUED;
+      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+      {
+        if (state->IsComplete()) {
+          state->context_->DecrementRequestCounter();
+          finished = Finish(state);
+        } else {
+          LOG_ERROR << "Should not print this! Decoupled should NOT write via "
+                       "WRITEREADY!";
+          // Remove the state from the completion queue
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          state->step_ = Steps::ISSUED;
+        }
       }
     }
   }
