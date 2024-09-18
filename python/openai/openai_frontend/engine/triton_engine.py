@@ -34,6 +34,13 @@ from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import tritonserver
 from engine.engine import LLMEngine
+from engine.utils.tokenizer import get_tokenizer
+from engine.utils.triton import (
+    _create_trtllm_inference_request,
+    _create_vllm_inference_request,
+    _get_output,
+    _validate_triton_responses_non_streaming,
+)
 from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
@@ -49,13 +56,6 @@ from schemas.openai import (
     FinishReason,
     Model,
     ObjectType,
-)
-from utils.tokenizer import get_tokenizer
-from utils.triton import (
-    _create_trtllm_inference_request,
-    _create_vllm_inference_request,
-    _get_output,
-    _validate_triton_responses_non_streaming,
 )
 
 
