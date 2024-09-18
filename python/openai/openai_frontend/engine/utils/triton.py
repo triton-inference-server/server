@@ -82,10 +82,9 @@ def _create_trtllm_inference_request(
 # TODO: Use tritonserver.InferenceResponse when support is published
 def _get_output(response: tritonserver._api._response.InferenceResponse):
     if "text_output" in response.outputs:
-        try:
-            return response.outputs["text_output"].to_string_array()[0]
-        except Exception:
-            return str(response.outputs["text_output"].to_bytes_array()[0])
+        # TODO: Consider edge cases here
+        return response.outputs["text_output"].to_bytes_array()[0].decode("utf-8")
+
     return ""
 
 
