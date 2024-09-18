@@ -471,6 +471,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
       // Finish the state if all the transactions associated with
       // the state have completed.
+      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);      
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
@@ -502,6 +503,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 
       // Finish the state if all the transactions associated with
       // the state have completed.
+      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
       if (state->IsComplete()) {
         state->context_->DecrementRequestCounter();
         finished = Finish(state);
