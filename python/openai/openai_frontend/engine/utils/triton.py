@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import ctypes
 from typing import List
 
 import numpy as np
@@ -79,11 +80,30 @@ def _create_trtllm_inference_request(
     return model.create_request(inputs=inputs)
 
 
+def _construct_string_from_pointer(pointer, size):
+    """Constructs a Python string from a C pointer and size."""
+
+    # Create a ctypes string buffer
+    string_buffer = ctypes.create_string_buffer(size + 1)  # +1 for null terminator
+
+    # Copy the data from the pointer to the buffer
+    ctypes.memmove(string_buffer, pointer, size)
+
+    # Convert the buffer to a Python string
+    return string_buffer.value.decode("utf-8")  # Adjust encoding if needed
+
+
 # TODO: Use tritonserver.InferenceResponse when support is published
 def _get_output(response: tritonserver._api._response.InferenceResponse):
     if "text_output" in response.outputs:
-        # TODO: Consider edge cases here
-        return response.outputs["text_output"].to_bytes_array()[0].decode("utf-8")
+        # Previous method, creates the same string, for assumption of single string element
+        # return response.outputs["text_output"].to_bytes_array()[0].decode("utf-8")
+        tensor = response.outputs["text_output"]
+        # NOTE: Account for serialized byte string length in first 4 bytes
+        raw_string = _construct_string_from_pointer(
+            tensor.data_ptr + 4, tensor.size - 4
+        )
+        return raw_string
 
     return ""
 
