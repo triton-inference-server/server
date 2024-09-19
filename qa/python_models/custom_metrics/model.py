@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,6 +74,96 @@ class PBCustomMetricsTest(unittest.TestCase):
             self.assertEqual(metric.value(), value)
             logger.log_info("Set metric to : {}".format(metric.value()))
 
+        # Test observe value
+        observe = 0.05
+        # Counter and gauge do not support observe
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric.observe(observe)
+
+    def _histogram_api_helper(self, metric, name, labels):
+        def histogram_str_builder(name, type, labels, value, le=None):
+            if type == "count" or type == "sum":
+                return f"{name}_{type}{{{labels}}} {value}"
+            elif type == "bucket":
+                return f'{name}_bucket{{{labels},le="{le}"}} {value}'
+            else:
+                raise
+
+        # Adding logger to test if custom metrics and logging work together
+        # as they use the same message queue.
+        logger = pb_utils.Logger
+
+        # All values should be 0.0 before the test
+        metrics = self._get_metrics()
+        self.assertIn(histogram_str_builder(name, "count", labels, "0"), metrics)
+        self.assertIn(histogram_str_builder(name, "sum", labels, "0"), metrics)
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="0.1"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="1"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="2.5"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="5"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="10"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "0", le="+Inf"), metrics
+        )
+
+        # Histogram does not support value
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric.value()
+
+        # Test increment value
+        increment = 2023.0
+        # Histogram does not support increment
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric.increment(increment)
+
+        # Test set value
+        value = 999.9
+        # Histogram does not support set
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric.set(value)
+
+        # Test observe value
+        data = [0.05, 1.5, 6.0]
+        for datum in data:
+            metric.observe(datum)
+            logger.log_info("Observe histogram metric with value : {}".format(datum))
+
+        metrics = self._get_metrics()
+        self.assertIn(
+            histogram_str_builder(name, "count", labels, str(len(data))), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "sum", labels, str(sum(data))), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "1", le="0.1"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "1", le="1"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "2", le="2.5"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "2", le="5"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "3", le="10"), metrics
+        )
+        self.assertIn(
+            histogram_str_builder(name, "bucket", labels, "3", le="+Inf"), metrics
+        )
+
     def _dup_metric_helper(self, labels={}):
         # Adding logger to test if custom metrics and logging work together
         # as they use the same message queue.
@@ -128,13 +218,61 @@ class PBCustomMetricsTest(unittest.TestCase):
             description="test metric gauge kind end to end",
             kind=pb_utils.MetricFamily.GAUGE,
         )
-        labels = {"example1": "counter_label1", "example2": "counter_label2"}
+        labels = {"example1": "gauge_label1", "example2": "gauge_label2"}
         metric = metric_family.Metric(labels=labels)
         self._metric_api_helper(metric, "gauge")
 
-        pattern = 'test_gauge_e2e{example1="counter_label1",example2="counter_label2"}'
+        pattern = 'test_gauge_e2e{example1="gauge_label1",example2="gauge_label2"}'
         metrics = self._get_metrics()
         self.assertIn(pattern, metrics)
+
+    def test_histogram_e2e(self):
+        name = "test_histogram_e2e"
+        metric_family = pb_utils.MetricFamily(
+            name=name,
+            description="test metric histogram kind end to end",
+            kind=pb_utils.MetricFamily.HISTOGRAM,
+        )
+
+        labels = {"example1": "histogram_label1", "example2": "histogram_label2"}
+        buckets = [0.1, 1.0, 2.5, 5.0, 10.0]
+        metric = metric_family.Metric(labels=labels, buckets=buckets)
+
+        labels_str = 'example1="histogram_label1",example2="histogram_label2"'
+        self._histogram_api_helper(metric, name, labels_str)
+
+        metrics = self._get_metrics()
+        count_pattern = f"{name}_count{{{labels_str}}}"
+        sum_pattern = f"{name}_sum{{{labels_str}}}"
+        bucket_pattern = f"{name}_bucket{{{labels_str}"
+        self.assertEqual(metrics.count(count_pattern), 1)
+        self.assertEqual(metrics.count(sum_pattern), 1)
+        self.assertEqual(metrics.count(bucket_pattern), len(buckets) + 1)
+
+    def test_histogram_args(self):
+        name = "test_histogram_args"
+        metric_family = pb_utils.MetricFamily(
+            name=name,
+            description="test metric histogram args",
+            kind=pb_utils.MetricFamily.HISTOGRAM,
+        )
+
+        # Test "None" value buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={})
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=None)
+
+        # Test non-ascending order buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=[2.5, 0.1, 1.0, 10.0, 5.0])
+
+        # Test duplicate value buckets
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family.Metric(labels={}, buckets=[1, 1, 2, 5, 5])
+
+        # Test empty list bucket
+        metric_family.Metric(labels={}, buckets=[])
 
     def test_dup_metric_family_diff_kind(self):
         # Test that a duplicate metric family can't be added with a conflicting type/kind

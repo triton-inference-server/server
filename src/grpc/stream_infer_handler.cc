@@ -189,7 +189,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->responder_->Finish(status, state);
       return !finished;
     }
-
+    state->context_->ExtractStateFromHeaders(state);
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
     const inference::ModelInferRequest& request = state->request_;
@@ -282,18 +282,32 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // tensors are present in the request.
     std::list<std::string> serialized_data;
 
+    // Maintain shared pointers(read-only reference) to the shared memory
+    // block's information for the shared memory regions used by the request.
+    // These pointers will automatically increase the usage count, preventing
+    // unregistration of the shared memory. This vector must be cleared in the
+    // `StreamInferResponseComplete` callback (after inference) to decrease the
+    // count and permit unregistration. The vector will be included in
+    // `response_release_payload` for the callback.
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info;
+
     if (err == nullptr) {
       err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, &serialized_data, irequest);
+          tritonserver_, shm_manager_, request, &serialized_data, irequest,
+          &shm_regions_info);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload<inference::ModelStreamInferResponse>(
           tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue_, &state->alloc_payload_);
+          response_queue_, &state->alloc_payload_, &shm_regions_info);
     }
 
     auto request_release_payload =
         std::make_unique<RequestReleasePayload>(state->inference_request_);
+    auto response_release_payload = std::make_unique<ResponseReleasePayload>(
+        state, std::move(shm_regions_info));
+
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestComplete,
@@ -303,7 +317,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       err = TRITONSERVER_InferenceRequestSetResponseCallback(
           irequest, allocator_,
           &state->alloc_payload_ /* response_allocator_userp */,
-          StreamInferResponseComplete, reinterpret_cast<void*>(state));
+          StreamInferResponseComplete,
+          response_release_payload.get() /* response_userp */);
     }
 
     if (err == nullptr) {
@@ -330,8 +345,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // irequest to handle gRPC stream cancellation.
     if (err == nullptr) {
       state->context_->InsertInflightState(state);
-      // The payload will be cleaned in request release callback.
+      // The payload will be cleaned in release callback.
       request_release_payload.release();
+      response_release_payload.release();
     } else {
       // If there was an error then enqueue the error response and show
       // it to be ready for writing.
@@ -355,7 +371,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRITONSERVER_ErrorDelete(err);
       response->set_error_message(status.error_message());
-
       response->mutable_infer_response()->Clear();
       // repopulate the id so that client knows which request failed.
       response->mutable_infer_response()->set_id(request.id());
@@ -522,15 +537,18 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     } else if (state->step_ == Steps::WRITEREADY) {
       // Finish the state if all the transactions associated with
       // the state have completed.
-      if (state->IsComplete()) {
-        state->context_->DecrementRequestCounter();
-        finished = Finish(state);
-      } else {
-        LOG_ERROR << "Should not print this! Decoupled should NOT write via "
-                     "WRITEREADY!";
-        // Remove the state from the completion queue
-        std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
-        state->step_ = Steps::ISSUED;
+      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+      {
+        if (state->IsComplete()) {
+          state->context_->DecrementRequestCounter();
+          finished = Finish(state);
+        } else {
+          LOG_ERROR << "Should not print this! Decoupled should NOT write via "
+                       "WRITEREADY!";
+          // Remove the state from the completion queue
+          std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+          state->step_ = Steps::ISSUED;
+        }
       }
     }
   }
@@ -595,8 +613,17 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     TRITONSERVER_InferenceResponse* iresponse, const uint32_t flags,
     void* userp)
 {
-  State* state = reinterpret_cast<State*>(userp);
+  ResponseReleasePayload* response_release_payload(
+      static_cast<ResponseReleasePayload*>(userp));
+  auto state = response_release_payload->state_;
 
+  // Ignore Response from CORE in case GRPC Strict as we dont care about
+  if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    if (state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
+      return;
+    }
+  }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
 
@@ -643,6 +670,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
@@ -671,14 +699,28 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     } else {
       LOG_ERROR << "expected the response allocator to have added the response";
     }
-
     if (err != nullptr) {
       failed = true;
       ::grpc::Status status;
+      // Converts CORE errors to GRPC error codes
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
       LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
+      if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
+        state->status_ = status;
+        // Finish only once, if backend ignores cancellation
+        LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
+                       << status.error_code() << "Closing stream connection."
+                       << std::endl;
+        state->context_->WriteGRPCErrorResponse(state);
+        TRITONSERVER_ErrorDelete(err);
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceResponseDelete(iresponse),
+            "deleting GRPC inference response");
+        delete response_release_payload;
+        return;
+      }
     }
 
     TRITONSERVER_ErrorDelete(err);
@@ -756,6 +798,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
       state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
 
     state->complete_ = is_complete;
@@ -800,6 +843,48 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
     state->complete_ = is_complete;
   }
+
+  if (is_complete) {
+    delete response_release_payload;
+  }
+}
+
+// Changes the state of grpc_stream_error_state_ to ERROR_HANDLING_COMPLETE,
+// indicating we have closed the stream and initiated the cancel flow
+void
+gRPCErrorTracker::MarkGRPCErrorHandlingComplete()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_HANDLING_COMPLETE;
+}
+
+// Returns true ONLY when GRPC_ERROR from CORE is waiting to be processed.
+bool
+gRPCErrorTracker::CheckAndUpdateGRPCError()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::ERROR_ENCOUNTERED) {
+    // Change the state to ERROR_HANDLING_COMPLETE as we have called
+    // HandleCancellation
+    MarkGRPCErrorHandlingComplete();
+    return true;
+  }
+  return false;
+}
+
+// Marks error after it has been responded to
+void
+gRPCErrorTracker::MarkGRPCErrorEncountered()
+{
+  grpc_stream_error_state_ = TritonGRPCErrorSteps::ERROR_ENCOUNTERED;
+}
+
+// Checks if error already responded to in triton_grpc_error mode
+bool
+gRPCErrorTracker::GRPCErrorEncountered()
+{
+  if (grpc_stream_error_state_ == TritonGRPCErrorSteps::NONE) {
+    return false;
+  }
+  return true;
 }
 
 }}}  // namespace triton::server::grpc

@@ -267,6 +267,12 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
         qa/L0_decoupled/python_models/square_int32/.
 
+RUN mkdir -p qa/L0_decoupled_grpc_error && \
+    cp -r qa/L0_decoupled/. qa/L0_decoupled_grpc_error
+
+RUN mkdir -p qa/L0_grpc_error_state_cleanup && \
+    cp -r qa/L0_grpc_state_cleanup/. qa/L0_grpc_error_state_cleanup
+
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
         qa/L0_repoagent_checksum/models/identity_int32/1/.
@@ -383,6 +389,10 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
 # Install Triton Python API
 RUN find qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
+
+# Install Triton Frontend Python API
+RUN find qa/pkgs/ -type f -name \
+    "tritonfrontend-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
