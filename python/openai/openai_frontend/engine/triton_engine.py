@@ -325,13 +325,13 @@ class TritonLLMEngine(LLMEngine):
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
         )
-        yield f"data: {chunk.json(exclude_unset=True)}\n\n"
+        yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         async for response in responses:
             chunk = self._get_nth_streaming_chat_response(
                 request_id, created, model, response
             )
-            yield f"data: {chunk.json(exclude_unset=True)}\n\n"
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -382,7 +382,7 @@ class TritonLLMEngine(LLMEngine):
                 model=model,
             )
 
-            yield f"data: {response.json(exclude_unset=True)}\n\n"
+            yield f"data: {response.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
