@@ -1,6 +1,6 @@
 #!/bin/bash
 MODEL=${MODEL:-"llama-3.1-8b-instruct"}
-TOKENIZER=${TOKENIZER:-"meta-llama/Meta-Llama-3-8B-Instruct"}
+TOKENIZER=${TOKENIZER:-"meta-llama/Meta-Llama-3.1-8B-Instruct"}
 CONCURRENCY=${CONCURRENCY:-128}
 REQUESTS_PER_THREAD=${REQUESTS_PER_THREAD:-16}
 genai-perf profile \

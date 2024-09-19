@@ -26,10 +26,6 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import Iterator
-
-import anyio
 import uvicorn
 from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
@@ -67,23 +63,13 @@ class FastApiFrontend(OpenAIFrontend):
             timeout_keep_alive=5,
         )
         server = uvicorn.Server(config)
-
-        async def serve():
-            await server.serve()
-
-        anyio.run(serve)
+        server.run()
 
     def stop(self):
         # NOTE: If the frontend owned the engine, it could do cleanup here.
         pass
 
     def _create_app(self):
-        @asynccontextmanager
-        async def lifespan(app: FastAPI) -> Iterator[None]:
-            limiter = anyio.to_thread.current_default_thread_limiter()
-            limiter.total_tokens = 128  # Can be tuned to max batch size of model or max concurrency to test, but will be overkill
-            yield
-
         app = FastAPI(
             title="OpenAI API",
             description="The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.",
@@ -94,7 +80,6 @@ class FastApiFrontend(OpenAIFrontend):
                 "name": "MIT",
                 "url": "https://github.com/openai/openai-openapi/blob/master/LICENSE",
             },
-            lifespan=lifespan,
         )
 
         app.include_router(observability.router)
