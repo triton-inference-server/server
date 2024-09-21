@@ -47,7 +47,7 @@ image:
     #
     # To set model control mode, uncomment and configure below
     # TODO: Fix the following url, it is invalid
-    # See https://github.com/triton-inference-server/server/blob/r24.08/docs/model_management.md
+    # See https://github.com/triton-inference-server/server/blob/r24.08/docs/user_guide/model_management.md
     #  for more details
     #- --model-control-mode=explicit|poll|none
     #

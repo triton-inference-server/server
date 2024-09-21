@@ -45,7 +45,7 @@ import requests
 #
 
 # By default build.py builds the Triton Docker image, but can also be
-# used to build without Docker.  See docs/build.md and --help for more
+# used to build without Docker.  See docs/customization_guide/build.md and --help for more
 # information.
 #
 # The TRITON_VERSION file indicates the Triton version and

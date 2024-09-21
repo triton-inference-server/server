@@ -74,7 +74,7 @@ If your error message only occurs in one or a few places in the Triton code, you
 
 **Step 3. Build with Debug Flags**
 
-The next step is building with debug flags. We unfortunately don’t provide a debug container, so you’d need to follow the [build guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md) to build the container, which includes a [section on adding debug symbols](https://github.com/triton-inference-server/server/blob/main/docs/build.md#building-with-debug-symbols). Once you do so, you can install GDB (`apt-get install gdb`) in the container and run Triton in GDB (`gdb --args tritonserver…`). If needed, you can open a second terminal to run a script in another container. If the server segfaults, you can enter `backtrace`, which will provide you a call stack that lets you know where the error got generated. You should then be able to trace the source of the error. If the bug still exists after debugging, we’ll need this to expedite our work.
+The next step is building with debug flags. We unfortunately don’t provide a debug container, so you’d need to follow the [build guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md) to build the container, which includes a [section on adding debug symbols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-debug-symbols). Once you do so, you can install GDB (`apt-get install gdb`) in the container and run Triton in GDB (`gdb --args tritonserver…`). If needed, you can open a second terminal to run a script in another container. If the server segfaults, you can enter `backtrace`, which will provide you a call stack that lets you know where the error got generated. You should then be able to trace the source of the error. If the bug still exists after debugging, we’ll need this to expedite our work.
 
 Advanced GDB users can also examine variable values, add breakpoints, and more to find the cause of their issue.
 
@@ -89,7 +89,7 @@ If you built the backend yourself, this could be a linking error. If you are con
 
 ## Server Issues
 
-You generally should not run into errors with the server itself. If the server goes down, it’s usually because something went wrong during model loading or inference and you can use the above section to debug. It’s particularly useful to work through the [Building with Debug Flags](https://github.com/triton-inference-server/server/blob/main/docs/build.md#building-with-debug-symbols) section above to resolve those sorts of issues. However, this section will go through some specific cases that may occur.
+You generally should not run into errors with the server itself. If the server goes down, it’s usually because something went wrong during model loading or inference and you can use the above section to debug. It’s particularly useful to work through the [Building with Debug Flags](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-debug-symbols) section above to resolve those sorts of issues. However, this section will go through some specific cases that may occur.
 
 ### No Connection to Server
 
@@ -121,9 +121,9 @@ We often get performance optimization questions around the clients. Triton clien
 
 ## Performance Issues
 
-This section goes over debugging unexpected performance. If you are looking to optimize performance, please see the [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/optimization.md) and [Performance Tuning](https://github.com/triton-inference-server/server/blob/main/docs/performance_tuning.md) guides.
+This section goes over debugging unexpected performance. If you are looking to optimize performance, please see the [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/optimization.md) and [Performance Tuning](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/performance_tuning.md) guides.
 
-The easiest step to start with is running perf_analyzer to get a breakdown of the request lifecycle, throughput, and latency for each individual model. For a more detailed view, you can [enable tracing](https://github.com/triton-inference-server/server/blob/main/docs/trace.md) when running the server. This will provide exact timestamps to drill down into what is happening. You can also enable tracing with perf_analyzer for the GRPC and HTTP clients by using the tracing flags. Note that enabling tracing can impact Triton’s performance, but it can be helpful to examine the timestamps throughout a request’s lifecycle.
+The easiest step to start with is running perf_analyzer to get a breakdown of the request lifecycle, throughput, and latency for each individual model. For a more detailed view, you can [enable tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md) when running the server. This will provide exact timestamps to drill down into what is happening. You can also enable tracing with perf_analyzer for the GRPC and HTTP clients by using the tracing flags. Note that enabling tracing can impact Triton’s performance, but it can be helpful to examine the timestamps throughout a request’s lifecycle.
 
 ### Performance Profiling
 
