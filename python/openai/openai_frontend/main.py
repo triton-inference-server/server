@@ -28,11 +28,23 @@
 
 import argparse
 import signal
+import sys
 from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
+
+try:
+    from tritonfrontend import KServeGrpc, KServeHttp
+except:
+    print(
+        """
+          tritonfrontend is not present in this environment.
+          Check /opt/tritonserver/python for tritonfrontend*.whl/
+          If present, please pip install.
+          """
+    )
 
 
 def signal_handler(server, frontend, signal, frame):
@@ -52,7 +64,7 @@ def parse_args():
     # Uvicorn
     uvicorn_group = parser.add_argument_group("Uvicorn")
     uvicorn_group.add_argument("--host", type=str, default=None, help="host name")
-    uvicorn_group.add_argument("--port", type=int, default=8000, help="port number")
+    uvicorn_group.add_argument("--port", type=int, default=9000, help="port number")
     uvicorn_group.add_argument(
         "--uvicorn-log-level",
         type=str,
@@ -88,6 +100,19 @@ def parse_args():
         choices=["vllm", "tensorrtllm"],
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
+    # Should this be wrapped in an if block that only enters if import tritonfrontend worked
+    triton_group.add_argument(
+        "--kserve-http-port",
+        type=int,
+        default=8000,
+        help="Triton KServeHTTP port number",
+    )
+    triton_group.add_argument(
+        "--kserve-grpc-port",
+        type=int,
+        default=8001,
+        help="Triton KServeGrpc port number",
+    )
 
     return parser.parse_args()
 
@@ -103,6 +128,17 @@ def main():
         log_warn=True,
         log_error=True,
     ).start(wait_until_ready=True)
+
+    http_options, http_service = None, None
+    grpc_options, grpc_service = None, None
+    if "tritonfrontend" in sys.modules:
+        http_options = KServeHttp.Options(port=args.kserve_http_port)
+        http_service = KServeHttp.Server(server, http_options)
+        http_service.start()
+
+        grpc_options = KServeGrpc.Options(port=args.kserve_grpc_port)
+        grpc_service = KServeGrpc.Server(server, grpc_options)
+        grpc_service.start()
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
@@ -120,6 +156,10 @@ def main():
 
     # Blocking call until killed or interrupted with SIGINT
     frontend.start()
+
+    if "tritonfrontend" in sys.modules:
+        http_service.stop()
+        grpc_service.stop()
 
 
 if __name__ == "__main__":
