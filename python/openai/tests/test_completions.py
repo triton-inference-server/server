@@ -56,6 +56,8 @@ class TestCompletions:
             ("top_p", 0.9),
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
+            ("best_of", 1),
+            ("n", 1),
             # logprobs is an integer for completions
             ("logprobs", 5),
             ("logit_bias", {"0": 0}),
@@ -331,13 +333,30 @@ class TestCompletions:
         # 422 Error returned by schema validation
         assert response.status_code == 422
 
-    def test_completions_multiple_choices(self, client, model: str, prompt: str):
+    @pytest.mark.parametrize(
+        "sampling_parameter_dict",
+        [
+            # Each individual parameter should fail for > 1 for now
+            {"n": 2},
+            {"best_of": 2},
+            {"n": 2, "best_of": 2},
+            # When individual params > 1 are supported, best_of < n should fail
+            {"n": 2, "best_of": 1},
+        ],
+    )
+    def test_completions_multiple_choices(
+        self, client, sampling_parameter_dict: dict, model: str, prompt: str
+    ):
         response = client.post(
-            "/v1/completions", json={"model": model, "prompt": prompt, "n": 2}
+            "/v1/completions",
+            json={"model": model, "prompt": prompt, **sampling_parameter_dict},
         )
+        print("Response:", response.json())
 
+        # FIXME: Add support and test for success
+        # Expected to fail when n or best_of > 1, only single choice supported for now
         assert response.status_code == 400
-        assert response.json()["detail"] == "Only single choice is supported"
+        assert "only single choice" in response.json()["detail"]
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_lora(self):

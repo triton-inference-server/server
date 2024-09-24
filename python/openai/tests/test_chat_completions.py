@@ -94,6 +94,7 @@ class TestChatCompletions:
             ("top_p", 0.9),
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
+            ("n", 1),
             # logprobs is a boolean for chat completions
             ("logprobs", True),
             ("logit_bias", {"0": 0}),
@@ -415,7 +416,7 @@ class TestChatCompletions:
         )
 
         assert response.status_code == 400
-        assert response.json()["detail"] == "Only single choice is supported"
+        assert "only single choice" in response.json()["detail"]
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_chat_completions_streaming(self, client):

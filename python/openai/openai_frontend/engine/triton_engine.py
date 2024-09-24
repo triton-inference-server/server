@@ -362,7 +362,9 @@ class TritonLLMEngine(LLMEngine):
 
         # Reject unsupported features if requested
         if request.n and request.n > 1:
-            raise Exception("Only single choice is supported")
+            raise Exception(
+                f"Received n={request.n}, but only single choice (n=1) is currently supported"
+            )
 
         if request.logit_bias is not None or request.logprobs:
             raise Exception("logit bias and log probs not currently supported")
@@ -419,7 +421,14 @@ class TritonLLMEngine(LLMEngine):
             raise Exception("only single string input is supported")
 
         if request.n and request.n > 1:
-            raise Exception("Only single choice is supported")
+            raise Exception(
+                f"Received n={request.n}, but only single choice (n=1) is currently supported"
+            )
+
+        if request.best_of and request.best_of > 1:
+            raise Exception(
+                f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
+            )
 
         if request.logit_bias is not None or request.logprobs is not None:
             raise Exception("logit bias and log probs not supported")
