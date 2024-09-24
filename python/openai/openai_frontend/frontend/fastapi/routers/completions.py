@@ -34,7 +34,7 @@ router = APIRouter()
 @router.post(
     "/v1/completions", response_model=CreateCompletionResponse, tags=["Completions"]
 )
-def create_completion(
+async def create_completion(
     request: CreateCompletionRequest, raw_request: Request
 ) -> CreateCompletionResponse | StreamingResponse:
     """
@@ -44,7 +44,7 @@ def create_completion(
         raise HTTPException(status_code=500, detail="No attached inference engine")
 
     try:
-        response = raw_request.app.engine.completion(request)
+        response = await raw_request.app.engine.completion(request)
         if request.stream:
             return StreamingResponse(response, media_type="text/event-stream")
         return response

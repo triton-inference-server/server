@@ -30,7 +30,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional
 
 import tritonserver
 from engine.engine import LLMEngine
@@ -113,7 +113,7 @@ class TritonLLMEngine(LLMEngine):
 
     async def chat(
         self, request: CreateChatCompletionRequest
-    ) -> CreateChatCompletionResponse | Iterator[str]:
+    ) -> CreateChatCompletionResponse | AsyncIterator[str]:
         metadata = self.model_metadata.get(request.model)
         self._validate_chat_request(request, metadata)
 
@@ -148,7 +148,7 @@ class TritonLLMEngine(LLMEngine):
             )
 
         # Response validation with decoupled models in mind
-        responses = await list(responses)
+        responses = [response async for response in responses]
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
@@ -171,15 +171,15 @@ class TritonLLMEngine(LLMEngine):
             object=ObjectType.chat_completion,
         )
 
-    def completion(
+    async def completion(
         self, request: CreateCompletionRequest
-    ) -> CreateCompletionResponse | Iterator[str]:
+    ) -> CreateCompletionResponse | AsyncIterator[str]:
         # Validate request and convert to Triton format
         metadata = self.model_metadata.get(request.model)
         self._validate_completion_request(request, metadata)
 
         # Convert to Triton request format and perform inference
-        responses = metadata.model.infer(
+        responses = metadata.model.async_infer(
             metadata.request_converter(metadata.model, request.prompt, request)
         )
 
@@ -192,7 +192,7 @@ class TritonLLMEngine(LLMEngine):
             )
 
         # Response validation with decoupled models in mind
-        responses = list(responses)
+        responses = [response async for response in responses]
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
@@ -320,8 +320,13 @@ class TritonLLMEngine(LLMEngine):
         return chunk
 
     async def _streaming_chat_iterator(
-        self, request_id: str, created: int, model: str, role: str, responses: List
-    ) -> Iterator[str]:
+        self,
+        request_id: str,
+        created: int,
+        model: str,
+        role: str,
+        responses: AsyncIterable,
+    ) -> AsyncIterator[str]:
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
         )
@@ -362,10 +367,10 @@ class TritonLLMEngine(LLMEngine):
         if request.logit_bias is not None or request.logprobs:
             raise Exception("logit bias and log probs not currently supported")
 
-    def _streaming_completion_iterator(
-        self, request_id: str, created: int, model: str, responses: List
-    ) -> Iterator[str]:
-        for response in responses:
+    async def _streaming_completion_iterator(
+        self, request_id: str, created: int, model: str, responses: AsyncIterable
+    ) -> AsyncIterator[str]:
+        async for response in responses:
             text = _get_output(response)
             choice = Choice(
                 finish_reason=FinishReason.stop if response.final else None,
@@ -373,7 +378,7 @@ class TritonLLMEngine(LLMEngine):
                 logprobs=None,
                 text=text,
             )
-            response = CreateCompletionResponse(
+            chunk = CreateCompletionResponse(
                 id=request_id,
                 choices=[choice],
                 system_fingerprint=None,
@@ -382,7 +387,7 @@ class TritonLLMEngine(LLMEngine):
                 model=model,
             )
 
-            yield f"data: {response.model_dump_json(exclude_unset=True)}\n\n"
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
