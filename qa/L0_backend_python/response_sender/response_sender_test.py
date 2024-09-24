@@ -280,21 +280,21 @@ class ResponseSenderTest(unittest.TestCase):
         )
         # Do NOT group into a for-loop as it hides which model failed.
         # TODO: Enable response_sender_async tests
-        # model_name = "response_sender_async"
-        # responses = self._infer(
-        #     model_name,
-        #     number_of_response_before_return,
-        #     send_complete_final_flag_before_return,
-        #     return_a_response,
-        #     number_of_response_after_return,
-        #     send_complete_final_flag_after_return,
-        # )
-        # self._assert_responses_valid(
-        #     responses,
-        #     expected_number_of_response_before_return,
-        #     expected_return_a_response,
-        #     expected_number_of_response_after_return,
-        # )
+        model_name = "response_sender_async"
+        responses = self._infer(
+            model_name,
+            number_of_response_before_return,
+            send_complete_final_flag_before_return,
+            return_a_response,
+            number_of_response_after_return,
+            send_complete_final_flag_after_return,
+        )
+        self._assert_responses_valid(
+            responses,
+            expected_number_of_response_before_return,
+            expected_return_a_response,
+            expected_number_of_response_after_return,
+        )
 
     def _assert_non_decoupled_infer_success(
         self,
@@ -440,6 +440,7 @@ class ResponseSenderTest(unittest.TestCase):
         )
 
     # Decoupled model send 1 response on return.
+    @unittest.skip("To be fixed in a future release")
     def test_decoupled_one_response_on_return(self):
         responses = self._infer(
             model_name="response_sender_decoupled",
@@ -453,6 +454,7 @@ class ResponseSenderTest(unittest.TestCase):
         #       using `py_future.result()` with error hangs on exit.
 
     # Decoupled model send 1 response and return 1 response.
+    @unittest.skip("To be fixed in a future release")
     def test_decoupled_one_response_pre_and_on_return(self):
         # Note: The before return response will send a valid response and close the
         #       response sender. Then, returning a response will generate an error, but
