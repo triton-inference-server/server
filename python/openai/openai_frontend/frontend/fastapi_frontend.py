@@ -55,13 +55,15 @@ class FastApiFrontend(OpenAIFrontend):
         self.stop()
 
     def start(self):
-        uvicorn.run(
-            self.app,
+        config = uvicorn.Config(
+            app=self.app,
             host=self.host,
             port=self.port,
             log_level=self.log_level,
             timeout_keep_alive=5,
         )
+        server = uvicorn.Server(config)
+        server.run()
 
     def stop(self):
         # NOTE: If the frontend owned the engine, it could do cleanup here.

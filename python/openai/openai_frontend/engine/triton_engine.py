@@ -30,10 +30,17 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional
 
 import tritonserver
 from engine.engine import LLMEngine
+from engine.utils.tokenizer import get_tokenizer
+from engine.utils.triton import (
+    _create_trtllm_inference_request,
+    _create_vllm_inference_request,
+    _get_output,
+    _validate_triton_responses_non_streaming,
+)
 from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
@@ -49,13 +56,6 @@ from schemas.openai import (
     FinishReason,
     Model,
     ObjectType,
-)
-from utils.tokenizer import get_tokenizer
-from utils.triton import (
-    _create_trtllm_inference_request,
-    _create_vllm_inference_request,
-    _get_output,
-    _validate_triton_responses_non_streaming,
 )
 
 
@@ -111,9 +111,9 @@ class TritonLLMEngine(LLMEngine):
 
         return models
 
-    def chat(
+    async def chat(
         self, request: CreateChatCompletionRequest
-    ) -> CreateChatCompletionResponse | Iterator[str]:
+    ) -> CreateChatCompletionResponse | AsyncIterator[str]:
         metadata = self.model_metadata.get(request.model)
         self._validate_chat_request(request, metadata)
 
@@ -130,7 +130,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         # Convert to Triton request format and perform inference
-        responses = metadata.model.infer(
+        responses = metadata.model.async_infer(
             metadata.request_converter(metadata.model, prompt, request)
         )
 
@@ -148,7 +148,7 @@ class TritonLLMEngine(LLMEngine):
             )
 
         # Response validation with decoupled models in mind
-        responses = list(responses)
+        responses = [response async for response in responses]
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
@@ -171,15 +171,15 @@ class TritonLLMEngine(LLMEngine):
             object=ObjectType.chat_completion,
         )
 
-    def completion(
+    async def completion(
         self, request: CreateCompletionRequest
-    ) -> CreateCompletionResponse | Iterator[str]:
+    ) -> CreateCompletionResponse | AsyncIterator[str]:
         # Validate request and convert to Triton format
         metadata = self.model_metadata.get(request.model)
         self._validate_completion_request(request, metadata)
 
         # Convert to Triton request format and perform inference
-        responses = metadata.model.infer(
+        responses = metadata.model.async_infer(
             metadata.request_converter(metadata.model, request.prompt, request)
         )
 
@@ -192,7 +192,7 @@ class TritonLLMEngine(LLMEngine):
             )
 
         # Response validation with decoupled models in mind
-        responses = list(responses)
+        responses = [response async for response in responses]
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
@@ -319,19 +319,24 @@ class TritonLLMEngine(LLMEngine):
         )
         return chunk
 
-    def _streaming_chat_iterator(
-        self, request_id: str, created: int, model: str, role: str, responses: List
-    ) -> Iterator[str]:
+    async def _streaming_chat_iterator(
+        self,
+        request_id: str,
+        created: int,
+        model: str,
+        role: str,
+        responses: AsyncIterable,
+    ) -> AsyncIterator[str]:
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
         )
-        yield f"data: {chunk.json(exclude_unset=True)}\n\n"
+        yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
-        for response in responses:
+        async for response in responses:
             chunk = self._get_nth_streaming_chat_response(
                 request_id, created, model, response
             )
-            yield f"data: {chunk.json(exclude_unset=True)}\n\n"
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -357,15 +362,17 @@ class TritonLLMEngine(LLMEngine):
 
         # Reject unsupported features if requested
         if request.n and request.n > 1:
-            raise Exception("Only single choice is supported")
+            raise Exception(
+                f"Received n={request.n}, but only single choice (n=1) is currently supported"
+            )
 
         if request.logit_bias is not None or request.logprobs:
             raise Exception("logit bias and log probs not currently supported")
 
-    def _streaming_completion_iterator(
-        self, request_id: str, created: int, model: str, responses: List
-    ) -> Iterator[str]:
-        for response in responses:
+    async def _streaming_completion_iterator(
+        self, request_id: str, created: int, model: str, responses: AsyncIterable
+    ) -> AsyncIterator[str]:
+        async for response in responses:
             text = _get_output(response)
             choice = Choice(
                 finish_reason=FinishReason.stop if response.final else None,
@@ -373,7 +380,7 @@ class TritonLLMEngine(LLMEngine):
                 logprobs=None,
                 text=text,
             )
-            response = CreateCompletionResponse(
+            chunk = CreateCompletionResponse(
                 id=request_id,
                 choices=[choice],
                 system_fingerprint=None,
@@ -382,7 +389,7 @@ class TritonLLMEngine(LLMEngine):
                 model=model,
             )
 
-            yield f"data: {response.json(exclude_unset=True)}\n\n"
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -414,7 +421,14 @@ class TritonLLMEngine(LLMEngine):
             raise Exception("only single string input is supported")
 
         if request.n and request.n > 1:
-            raise Exception("Only single choice is supported")
+            raise Exception(
+                f"Received n={request.n}, but only single choice (n=1) is currently supported"
+            )
+
+        if request.best_of and request.best_of > 1:
+            raise Exception(
+                f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
+            )
 
         if request.logit_bias is not None or request.logprobs is not None:
             raise Exception("logit bias and log probs not supported")

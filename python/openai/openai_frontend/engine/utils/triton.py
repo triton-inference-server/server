@@ -24,7 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from typing import List
+import ctypes
+from typing import Iterable, List
 
 import numpy as np
 import tritonserver
@@ -79,13 +80,50 @@ def _create_trtllm_inference_request(
     return model.create_request(inputs=inputs)
 
 
+def _construct_string_from_pointer(pointer: int, size: int) -> str:
+    """Constructs a Python string from a C pointer and size."""
+
+    # Create a ctypes string buffer
+    string_buffer = ctypes.create_string_buffer(size + 1)  # +1 for null terminator
+
+    # Copy the data from the pointer to the buffer
+    ctypes.memmove(string_buffer, pointer, size)
+
+    # Convert the buffer to a Python string
+    return string_buffer.value.decode("utf-8")  # Adjust encoding if needed
+
+
+def _get_volume(shape: Iterable[int]) -> int:
+    volume = 1
+    for dim in shape:
+        volume *= dim
+
+    return volume
+
+
 # TODO: Use tritonserver.InferenceResponse when support is published
 def _get_output(response: tritonserver._api._response.InferenceResponse):
     if "text_output" in response.outputs:
-        try:
-            return response.outputs["text_output"].to_string_array()[0]
-        except Exception:
-            return str(response.outputs["text_output"].to_bytes_array()[0])
+        # Alternative method, creates the same string, but goes through
+        # deserialization, numpy, and dlpack overhead:
+        # return response.outputs["text_output"].to_bytes_array()[0].decode("utf-8")
+
+        # The following optimization to read string directly from buffer assumes
+        # there is only a single string, so enforce it to avoid obscure errors.
+        tensor = response.outputs["text_output"]
+        volume = _get_volume(tensor.shape)
+        if volume != 1:
+            raise Exception(
+                f"Expected to find 1 string in the output, found {volume} instead."
+            )
+        if tensor.size < 4:
+            raise Exception(
+                f"Expected string buffer to contain its serialized byte size, but found size of {tensor.size}."
+            )
+
+        # NOTE: Account for serialized byte string length in first 4 bytes of buffer
+        return _construct_string_from_pointer(tensor.data_ptr + 4, tensor.size - 4)
+
     return ""
 
 
