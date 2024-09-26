@@ -40,18 +40,28 @@ def _create_vllm_inference_request(
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.
-    sampling_parameters = request.model_dump(
+    sampling_parameters = request.model_dump_json(
         exclude=excludes,
         exclude_none=True,
     )
     inputs["text_input"] = [prompt]
-    inputs["stream"] = [request.stream]
+    inputs["stream"] = np.bool_([request.stream])
+    # Pass sampling_parameters as serialized JSON string input to support List
+    # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
+    inputs["sampling_parameters"] = [sampling_parameters]
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
     if echo:
         exclude_input_in_output = not echo
+
     inputs["exclude_input_in_output"] = [exclude_input_in_output]
-    return model.create_request(inputs=inputs, parameters=sampling_parameters)
+    # TODO: Remove debug print statements
+    print(f"{request.stop=}")
+    print(f"{request.stream=}")
+    print(f"{sampling_parameters=}")
+    print(f"{type(sampling_parameters)=}")
+    print(f"{inputs=}")
+    return model.create_request(inputs=inputs, parameters={})
 
 
 def _create_trtllm_inference_request(
