@@ -74,7 +74,7 @@ def parse_args():
     # Uvicorn
     uvicorn_group = parser.add_argument_group("Uvicorn")
     uvicorn_group.add_argument("--host", type=str, default=None, help="host name")
-    uvicorn_group.add_argument("--port", type=int, default=9000, help="OpenAI port")
+    uvicorn_group.add_argument("--openai-port", type=int, default=9000, help="OpenAI HTTP port (default: 9000)")
     uvicorn_group.add_argument(
         "--uvicorn-log-level",
         type=str,
