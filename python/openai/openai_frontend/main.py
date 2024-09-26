@@ -28,7 +28,6 @@
 
 import argparse
 import signal
-import sys
 from functools import partial
 
 import tritonserver
@@ -44,6 +43,28 @@ def signal_handler(server, frontend, signal, frame):
     frontend.stop()
     print("Shutting down Triton Inference Server...")
     server.stop()
+
+
+def start_kserve_frontends(server, args):
+    http_service, grpc_service = None, None
+    try:
+        from tritonfrontend import KServeGrpc, KServeHttp
+
+        http_options = KServeHttp.Options(port=args.kserve_http_port)
+        http_service = KServeHttp.Server(server, http_options)
+        http_service.start()
+
+        grpc_options = KServeGrpc.Options(port=args.kserve_grpc_port)
+        grpc_service = KServeGrpc.Server(server, grpc_options)
+        grpc_service.start()
+
+    except ModuleNotFoundError:
+        print(
+            "[WARNING] The 'tritonfrontend' package was not found. "
+            "KServe frontends won't be available through this application without it. "
+            "Check /opt/tritonserver/python for tritonfrontend*.whl and pip install it if present."
+        )
+    return http_service, grpc_service
 
 
 def parse_args():
@@ -118,27 +139,7 @@ def main():
         log_error=True,
     ).start(wait_until_ready=True)
 
-    http_options, http_service = None, None
-    grpc_options, grpc_service = None, None
-    try:
-        from tritonfrontend import KServeGrpc, KServeHttp
-
-        http_options = KServeHttp.Options(port=args.kserve_http_port)
-        http_service = KServeHttp.Server(server, http_options)
-        http_service.start()
-
-        grpc_options = KServeGrpc.Options(port=args.kserve_grpc_port)
-        grpc_service = KServeGrpc.Server(server, grpc_options)
-        grpc_service.start()
-
-    except ModuleNotFoundError:
-        print(
-            """
-          tritonfrontend is not present in this environment.
-          Check /opt/tritonserver/python for tritonfrontend*.whl/
-          If present, please pip install.
-          """
-        )
+    http_service, grpc_service = start_kserve_frontends(server, args)
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
