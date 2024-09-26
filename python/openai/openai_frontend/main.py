@@ -35,17 +35,6 @@ import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
 
-try:
-    from tritonfrontend import KServeGrpc, KServeHttp
-except ModuleNotFoundError:
-    print(
-        """
-          tritonfrontend is not present in this environment.
-          Check /opt/tritonserver/python for tritonfrontend*.whl/
-          If present, please pip install.
-          """
-    )
-
 
 def signal_handler(server, frontend, signal, frame):
     print(f"Received {signal=}, {frame=}")
@@ -131,7 +120,9 @@ def main():
 
     http_options, http_service = None, None
     grpc_options, grpc_service = None, None
-    if "tritonfrontend" in sys.modules:
+    try:
+        from tritonfrontend import KServeGrpc, KServeHttp
+
         http_options = KServeHttp.Options(port=args.kserve_http_port)
         http_service = KServeHttp.Server(server, http_options)
         http_service.start()
@@ -139,6 +130,15 @@ def main():
         grpc_options = KServeGrpc.Options(port=args.kserve_grpc_port)
         grpc_service = KServeGrpc.Server(server, grpc_options)
         grpc_service.start()
+
+    except ModuleNotFoundError:
+        print(
+            """
+          tritonfrontend is not present in this environment.
+          Check /opt/tritonserver/python for tritonfrontend*.whl/
+          If present, please pip install.
+          """
+        )
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
@@ -157,8 +157,9 @@ def main():
     # Blocking call until killed or interrupted with SIGINT
     frontend.start()
 
-    if "tritonfrontend" in sys.modules:
+    if http_service:
         http_service.stop()
+    if grpc_service:
         grpc_service.stop()
 
 
