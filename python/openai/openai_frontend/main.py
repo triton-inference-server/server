@@ -37,7 +37,7 @@ from frontend.fastapi_frontend import FastApiFrontend
 
 try:
     from tritonfrontend import KServeGrpc, KServeHttp
-except:
+except ModuleNotFoundError:
     print(
         """
           tritonfrontend is not present in this environment.
