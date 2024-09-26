@@ -94,7 +94,7 @@ def parse_args():
         "--kserve-http-port",
         type=int,
         default=8000,
-        help="Triton KServeHTTP port number",
+        help="KServe Predict v2 HTTP port (default: 8000)",
     )
     triton_group.add_argument(
         "--kserve-grpc-port",
