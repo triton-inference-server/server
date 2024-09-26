@@ -100,7 +100,7 @@ def parse_args():
         "--kserve-grpc-port",
         type=int,
         default=8001,
-        help="Triton KServeGrpc port number",
+        help="KServe Predict v2 GRPC port (default: 8001)",
     )
 
     return parser.parse_args()
