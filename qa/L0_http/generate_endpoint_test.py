@@ -142,6 +142,21 @@ class GenerateEndpointTest(tu.TestResultCollector):
         self.assertIn("TEXT", data)
         self.assertEqual(text, data["TEXT"])
 
+    def test_generate_with_all_inputs(self):
+        # Setup text-based input
+        text = "hello world"
+        inputs = {"PROMPT": text, "STREAM": False, "input_ids": [100, 200]}
+
+        r = self.generate(self._model_name, inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("TEXT", data)
+        self.assertEqual(text, data["TEXT"])
+
     def test_request_id(self):
         # Setup text based input
         text = "hello world"
@@ -220,18 +235,26 @@ class GenerateEndpointTest(tu.TestResultCollector):
         ]
         for inputs in missing_all_inputs:
             self.generate_expect_failure(
-                self._model_name, inputs, "expected 2 inputs but got 0"
+                self._model_name,
+                inputs,
+                "expected number of inputs between 2 and 3 but got 0",
             )
             self.generate_stream_expect_failure(
-                self._model_name, inputs, "expected 2 inputs but got 0"
+                self._model_name,
+                inputs,
+                "expected number of inputs between 2 and 3 but got 0",
             )
 
         for inputs in missing_one_input:
             self.generate_expect_failure(
-                self._model_name, inputs, "expected 2 inputs but got 1"
+                self._model_name,
+                inputs,
+                "expected number of inputs between 2 and 3 but got 1",
             )
             self.generate_stream_expect_failure(
-                self._model_name, inputs, "expected 2 inputs but got 1"
+                self._model_name,
+                inputs,
+                "expected number of inputs between 2 and 3 but got 1",
             )
 
     def test_invalid_input_types(self):
