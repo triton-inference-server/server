@@ -92,6 +92,10 @@ def server():
         "--backend",
         TEST_BACKEND,
     ]
+    # TODO: Incorporate kserve frontend binding smoke tests to catch any
+    # breakage with default values or slight cli arg variations
+    extra_args = ["--enable-kserve-frontends"]
+    args += extra_args
 
     with OpenAIServer(args) as openai_server:
         yield openai_server
