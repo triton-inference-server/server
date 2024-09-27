@@ -159,7 +159,7 @@ if(${TRITON_ENABLE_TRACING})
     )
   target_compile_definitions(
     py-bindings
-    PRIVATE TRITON_ENABLE_TRACING=1
+    PRIVATE TRITON_ENABLE_TRACING=0
   )
 endif()
 
