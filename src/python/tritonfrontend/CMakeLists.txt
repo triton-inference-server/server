@@ -95,14 +95,14 @@ if(${TRITON_ENABLE_GPU})
 endif()
 
 if(${TRITON_ENABLE_TRACING})
-  message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
-  find_package(absl CONFIG REQUIRED)
-  find_package(CURL CONFIG REQUIRED)
-  find_package(nlohmann_json CONFIG REQUIRED)
+#   message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
+#   find_package(absl CONFIG REQUIRED)
+#   find_package(CURL CONFIG REQUIRED)
+#   find_package(nlohmann_json CONFIG REQUIRED)
   find_package(opentelemetry-cpp CONFIG REQUIRED)
-  list(APPEND PY_BINDING_DEPENDENCY_LIBS
-    tracing-library
-  )
+#   list(APPEND PY_BINDING_DEPENDENCY_LIBS
+#     tracing-library
+#   )
 endif()
 
 # ===================== End of Collection ===================================
