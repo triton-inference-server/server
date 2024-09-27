@@ -34,6 +34,7 @@
 #ifdef TRITON_ENABLE_GRPC
 #include "../../../grpc/grpc_server.h"
 #endif
+
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 
