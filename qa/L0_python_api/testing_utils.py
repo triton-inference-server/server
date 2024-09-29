@@ -25,10 +25,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import queue
 from typing import Union
 
 import numpy as np
 import tritonserver
+from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp
 
 
@@ -81,15 +83,63 @@ def send_and_test_inference_identity(frontend_client, url: str) -> bool:
     input_data = np.array(["testing"], dtype=object)
 
     # Create input and output objects
-    inputs = [frontend_client.InferInput("INPUT0", input_data.shape, "BYTES")]
-    outputs = [frontend_client.InferRequestedOutput("OUTPUT0")]
+    inputs = [frontend_client.InferInput("text_input", input_data.shape, "BYTES")]
+    outputs = [frontend_client.InferRequestedOutput("text_output")]
     # Set the data for the input tensor
     inputs[0].set_data_from_numpy(input_data)
 
     # Perform inference request
     results = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
 
-    output_data = results.as_numpy("OUTPUT0")  # Gather output data
+    output_data = results.as_numpy("text_output")  # Gather output data
 
     teardown_client(client)
     return input_data[0] == output_data[0].decode()
+
+
+# Sends a streaming inference request to test_model_repository/identity model
+# and verifies input == output
+def send_and_test_stream_inference(frontend_client, url: str) -> bool:
+    model_name = "identity"
+
+    # Setting up the gRPC client stream
+    results = queue.Queue()
+    callback = lambda error, result: results.put(error or result)
+    client = frontend_client.InferenceServerClient(url=url)
+
+    client.start_stream(callback=callback)
+
+    # Preparing Input Data
+    text_input = "testing"
+    input_tensor = frontend_client.InferInput(
+        name="text_input", shape=[1], datatype="BYTES"
+    )
+    input_tensor.set_data_from_numpy(np.array([text_input.encode()], dtype=np.object_))
+
+    # Sending Streaming Inference Request
+    client.async_stream_infer(
+        model_name=model_name, inputs=[input_tensor], enable_empty_final_response=True
+    )
+
+    # Looping through until exception thrown or request completed
+    completed_requests, num_requests = 0, 1
+    text_output, is_final = None, None
+    while completed_requests != num_requests:
+        result = results.get()
+        if isinstance(result, InferenceServerException):
+            if result.status() == "StatusCode.CANCELLED":
+                completed_requests += 1
+            raise result
+
+        # Processing Response
+        text_output = result.as_numpy("text_output")[0].decode()
+        is_final = result.get_response().parameters.get("triton_final_response", False)
+
+        # Request Completed
+        if is_final:
+            completed_requests += 1
+
+    # Tearing down gRPC client stream
+    client.stop_stream(cancel_requests=True)
+
+    return is_final and (text_input == text_output)
