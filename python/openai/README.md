@@ -14,6 +14,7 @@
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
+  - An alternative method of authentication is using `huggingface-cli login` command to setup token in your environment.
 
 ```bash
 docker build -t tritonserver-openai-vllm -f docker/Dockerfile.vllm .
@@ -31,6 +32,23 @@ cd openai/
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
+The output should contain the following snippets look along the lines of:
+```
+...
++-----------------------+---------+--------+
+| Model                 | Version | Status |
++-----------------------+---------+--------+
+| llama-3.1-8b-instruct | 1       | READY  | <- Correct Model Loaded in Triton
++-----------------------+---------+--------+
+...
+Found model: name='llama-3.1-8b-instruct', backend='vllm'
+[WARNING] Adding CORS for the following origins: ['http://localhost']
+INFO:     Started server process [126]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
+```
+
 
 3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
@@ -41,6 +59,31 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
 ```
+which should provide output that looks like this:
+```json
+{
+  "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message":
+      {
+        "content": "This is only a test.",
+        "tool_calls": null,
+        "role": "assistant",
+        "function_call": null
+      },
+      "logprobs": null
+    }
+  ],
+  "created": 1727679085,
+  "model": "llama-3.1-8b-instruct",
+  "system_fingerprint": null,
+  "object": "chat.completion",
+  "usage": null
+}
+```
 
 4. Send a `/v1/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
@@ -50,6 +93,25 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
   "model": "'${MODEL}'",
   "prompt": "Machine learning is"
 }' | jq
+```
+which should provide an output that looks like this:
+```json
+{
+  "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "text": " a field of computer science that focuses on developing algorithms that allow computers to learn from"
+    }
+  ],
+  "created": 1727679266,
+  "model": "llama-3.1-8b-instruct",
+  "system_fingerprint": null,
+  "object": "text_completion",
+  "usage": null
+}
 ```
 
 5. Benchmark with `genai-perf`:
