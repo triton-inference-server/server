@@ -165,12 +165,11 @@ pytest -v tests/
 ## TensorRT-LLM
 
 **NOTE**: The workflow for preparing TRT-LLM engines, model repository, etc. in order to
-load and test is not fleshed out in the README here yet. You can try using the Triton CLI
+load and test is not fleshed out in the README here yet. You can try using the [Triton CLI](https://github.com/triton-inference-server/triton_cli/)
 or follow existing TRT-LLM backend examples to prepare a model repository, and point
 at the model repository accordingly when following the examples.
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
-
 1. Build and launch the container:
   - Mounts the openai source files to `/workspace` for simplicity, later on these will be shipped in the container.
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
@@ -186,6 +185,15 @@ docker run -it --net=host --gpus all --rm \
   -e HF_TOKEN \
   -w /workspace \
   tritonserver-openai-tensorrtllm
+```
+
+Setting up the model repository:
+```
+# Install the Triton CLI
+pip install git+https://github.com/triton-inference-server/triton_cli.git
+
+# Setting up the model repository and build the engine
+triton import -m llama-3.1-8b-instruct --backend tensorrtllm --repo openai/tests/tensorrtllm_models
 ```
 
 2. Launch the OpenAI server:
