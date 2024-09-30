@@ -184,7 +184,7 @@ for BACKEND in $BACKENDS; do
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
-    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"10"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
