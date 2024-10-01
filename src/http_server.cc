@@ -1526,7 +1526,7 @@ HTTPAPIServer::HandleRepositoryControl(
                 param_json.MemberAsString(m.c_str(), &param_str, &param_len));
 
             TRITONSERVER_Parameter* param = nullptr;
-            if (m == "config") {
+            if (m == "config" || m == "additional_dependency_dir") {
               param = TRITONSERVER_ParameterNew(
                   m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             } else if (m.rfind("file:", 0) == 0) {
@@ -1541,7 +1541,6 @@ HTTPAPIServer::HandleRepositoryControl(
               param = TRITONSERVER_ParameterBytesNew(
                   m.c_str(), binary_files.back().data(), decoded_size);
             }
-
             if (param != nullptr) {
               params->emplace_back(param);
               const_params.emplace_back(param);
