@@ -133,7 +133,14 @@ def send_and_test_stream_inference(frontend_client, url: str) -> bool:
 
         # Processing Response
         text_output = result.as_numpy("text_output")[0].decode()
-        is_final = result.get_response().parameters.get("triton_final_response", False)
+
+        triton_final_response = result.get_response().parameters.get(
+            "triton_final_response", {}
+        )
+
+        is_final = False
+        if triton_final_response.HasField("bool_param"):
+            is_final = triton_final_response.bool_param
 
         # Request Completed
         if is_final:
