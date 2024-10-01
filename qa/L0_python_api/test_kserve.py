@@ -242,17 +242,18 @@ class TestKServe:
             time.sleep(1)
 
         # Depending on when gRPC frontend shut down StatusCode can vary
-        acceptable_failure_msgs = set(
-            [
-                "[StatusCode.CANCELLED] CANCELLED",
-                "[StatusCode.UNAVAILABLE] failed to connect to all addresses",
-            ]
-        )
+        acceptable_failure_msgs = [
+            "[StatusCode.CANCELLED] CANCELLED",
+            "[StatusCode.UNAVAILABLE] failed to connect to all addresses",
+        ]
 
         assert (
             len(user_data) == 1
             and isinstance(user_data[0], InferenceServerException)
-            and str(user_data[0]) in acceptable_failure_msgs
+            and any(
+                failure_msg in str(user_data[0])
+                for failure_msg in acceptable_failure_msgs
+            )
         )
 
         teardown_client(grpc_client)
