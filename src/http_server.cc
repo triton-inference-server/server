@@ -1809,7 +1809,6 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
-
 #ifdef TRITON_ENABLE_TRACING
   if (trace_manager_ == nullptr) {
     return;
