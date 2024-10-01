@@ -296,3 +296,37 @@ class TestKServe:
 
     #     utils.teardown_client(http_client)
     #     utils.teardown_service(http_service)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
+    def test_grpc_streaming(self, frontend, client_type, url):
+        num_requests = 100
+        requests = []
+        for i in range(num_requests):
+            input0_np = np.array([[float(i) / 1000]], dtype=np.float32)
+            inputs = [client_type.InferInput("INPUT0", input0_np.shape, "FP32")]
+            inputs[0].set_data_from_numpy(input0_np)
+            requests.append(inputs)
+
+        responses = []
+
+        def callback(responses, result, error):
+            responses.append({"result": result, "error": error})
+
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+        client = utils.setup_client(client_type, url=url)
+
+        client.start_stream(partial(callback, responses))
+        for inputs in requests:
+            client.async_stream_infer("delayed_identity", inputs)
+        client.stop_stream()
+
+        utils.teardown_client(client)
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+        assert len(responses) == num_requests
+        for i in range(len(responses)):
+            assert responses[i]["error"] is None
+            output0_np = responses[i]["result"].as_numpy(name="OUTPUT0")
+            assert np.allclose(output0_np, [[float(i) / 1000]])
