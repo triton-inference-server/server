@@ -1809,7 +1809,12 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
+
 #ifdef TRITON_ENABLE_TRACING
+  if (trace_manager_ == nullptr) {
+    return;
+  }
+
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
   int32_t count;
@@ -3124,6 +3129,10 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
+  if (trace_manager_ == nullptr) {
+    return nullptr;
+  }
+
   HttpTextMapCarrier carrier(req->headers_in);
   auto start_options =
       trace_manager_->GetTraceStartOptions(carrier, model_name);
