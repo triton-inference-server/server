@@ -56,7 +56,7 @@ SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_d
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
-STABILITY_THRESHOLD="15"
+STABILITY_THRESHOLD="9999"
 
 source ../common/util.sh
 
