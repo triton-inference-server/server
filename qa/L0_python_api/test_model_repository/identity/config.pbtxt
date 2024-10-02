@@ -30,14 +30,14 @@ max_batch_size: 0
 
 input [
   {
-    name: "text_input"
+    name: "INPUT0"
     data_type: TYPE_STRING
     dims: [ 1 ]
   }
 ]
 output [
   {
-    name: "text_output"
+    name: "OUTPUT0"
     data_type: TYPE_STRING
     dims: [ 1 ]
   }

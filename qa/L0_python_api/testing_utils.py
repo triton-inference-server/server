@@ -83,15 +83,15 @@ def send_and_test_inference_identity(frontend_client, url: str) -> bool:
     input_data = np.array(["testing"], dtype=object)
 
     # Create input and output objects
-    inputs = [frontend_client.InferInput("text_input", input_data.shape, "BYTES")]
-    outputs = [frontend_client.InferRequestedOutput("text_output")]
+    inputs = [frontend_client.InferInput("INPUT0", input_data.shape, "BYTES")]
+    outputs = [frontend_client.InferRequestedOutput("OUTPUT0")]
     # Set the data for the input tensor
     inputs[0].set_data_from_numpy(input_data)
 
     # Perform inference request
     results = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
 
-    output_data = results.as_numpy("text_output")  # Gather output data
+    output_data = results.as_numpy("OUTPUT0")  # Gather output data
 
     teardown_client(client)
     return input_data[0] == output_data[0].decode()
@@ -112,7 +112,7 @@ def send_and_test_stream_inference(frontend_client, url: str) -> bool:
     # Preparing Input Data
     text_input = "testing"
     input_tensor = frontend_client.InferInput(
-        name="text_input", shape=[1], datatype="BYTES"
+        name="INPUT0", shape=[1], datatype="BYTES"
     )
     input_tensor.set_data_from_numpy(np.array([text_input.encode()], dtype=np.object_))
 
@@ -132,7 +132,7 @@ def send_and_test_stream_inference(frontend_client, url: str) -> bool:
             raise result
 
         # Processing Response
-        text_output = result.as_numpy("text_output")[0].decode()
+        text_output = result.as_numpy("OUTPUT0")[0].decode()
 
         triton_final_response = result.get_response().parameters.get(
             "triton_final_response", {}
