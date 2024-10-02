@@ -70,10 +70,10 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.50.0dev": (
-        "24.09dev",  # triton container
-        "24.08",  # upstream container
-        "1.18.1",  # ORT
+    "2.51.0dev": (
+        "24.10dev",  # triton container
+        "24.09",  # upstream container
+        "1.19.2",  # ORT
         "2024.0.0",  # ORT OpenVINO
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
@@ -1374,12 +1374,15 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
-        df += """
+        # This segment will break the RHEL SBSA build. Need to determine whether
+        # this is necessary to incorporate.
+        if target_platform() != "rhel":
+            df += """
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
-      && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
-      && ldconfig \\
-      && rm -f ${_CUDA_COMPAT_PATH}/lib
+    && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
+    && ldconfig \\
+    && rm -f ${_CUDA_COMPAT_PATH}/lib
 """
     else:
         df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
