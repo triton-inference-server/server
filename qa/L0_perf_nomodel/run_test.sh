@@ -35,7 +35,7 @@ CONCURRENCY=${CONCURRENCY:=1}
 
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
-PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=1000}
+PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
@@ -180,7 +180,7 @@ for BACKEND in $BACKENDS; do
             exit 1
         fi
     fi
-
+    start_time=$(date +%s)
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
@@ -200,6 +200,9 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
     echo "Time after perf analyzer trials: $(date)"
+    end_time=$(date +%s)
+    time_diff=$((end_time - start_time))
+    echo "Time taken by $NAME: $time_diff seconds" | tee -a ${RESULTDIR}/test_time.log
     set +o pipefail
     set -e
 
