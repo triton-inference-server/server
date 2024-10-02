@@ -30,7 +30,8 @@
 The `tritonfrontend` python package is a set of bindings to Triton's existing
 frontends implemented in C++. Currently, `tritonfrontend` supports starting up
 `KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination
-with Triton's Python In-Process API ([`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver))
+with Triton's Python In-Process API
+([`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver))
 and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library)
 extend the ability to use Triton's full feature set with a few lines of Python.
 
