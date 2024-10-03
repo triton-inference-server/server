@@ -59,7 +59,7 @@ specification [here](https://github.com/triton-inference-server/common/blob/main
 
 You can configure the Triton endpoints, which implement the protocols, to
 restrict access to some protocols and to control network settings, please refer
-to [protocol customization guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.
+to [protocol customization guide](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.
 
 ## IPv6
 

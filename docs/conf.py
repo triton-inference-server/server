@@ -39,22 +39,25 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+import re
+import nvidia_sphinx_theme
 
 from docutils import nodes
 from sphinx import search
+from datetime import date
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
-
+html_show_sphinx = False
 project = "NVIDIA Triton Inference Server"
-copyright = "2018-2024, NVIDIA Corporation"
-author = "NVIDIA"
+copyright = "2018-{}, NVIDIA Corporation".format(date.today().year)
 
 # The full version, including alpha/beta/rc tags
 # Env only set during riva-release process, otherwise keep as dev for all internal builds
-release = os.getenv("TRITON_VERSION", "dev")
+release = os.getenv("TRITON_VERSION", "dev") # e.g 2.49.0dev
+switcher_version = re.match(r"^[\d]+\.[\d]+", release.strip()).group(0)
 
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
@@ -67,7 +70,8 @@ master_doc = "contents"
 # ones.
 extensions = [
     "ablog",
-    "myst_parser",
+    #"sphinx_mdinclude", # include md files in rst
+    "myst_parser", #use sphinx parser for rendering rst files
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx-prompt",
@@ -123,7 +127,7 @@ myst_enable_extensions = [
 myst_heading_anchors = 5
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+# templates_path = ["_templates"]  #disable it for nvidia-sphinx-theme to show footer
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -135,51 +139,35 @@ exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_book_theme"
-html_logo = "_static/nvidia-logo-horiz-rgb-blk-for-screen.png"
-html_title = "NVIDIA Triton Inference Server"
-html_short_title = "Triton"
-html_copy_source = True
-html_sourcelink_suffix = ""
-html_favicon = "_static/nvidia-logo-vert-rgb-blk-for-screen.png"
-html_last_updated_fmt = ""
-html_additional_files = ["index.html"]
+html_theme = "nvidia_sphinx_theme"
+#html_theme = "sphinx_book_theme"
+#html_logo = "_static/nvidia-logo-horiz-rgb-blk-for-screen.png"
+#html_title = "NVIDIA Triton Inference Server"
+#html_short_title = "Triton"
+#html_copy_source = True
+#html_sourcelink_suffix = ""
+#html_favicon = "_static/nvidia-logo-vert-rgb-blk-for-screen.png"
+#html_last_updated_fmt = ""
+#html_additional_files = ["index.html"]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
-html_css_files = ["custom.css"]
+#html_css_files = ["custom.css"] # Not needed with new theme
 
 html_theme_options = {
-    "path_to_docs": "docs",
-    # "launch_buttons": {
-    #     "binderhub_url": "https://mybinder.org",
-    #     "colab_url": "https://colab.research.google.com/",
-    #     "deepnote_url": "https://deepnote.com/",
-    #     "notebook_interface": "jupyterlab",
-    #     "thebe": True,
-    #     # "jupyterhub_url": "https://datahub.berkeley.edu",  # For testing
-    # },
-    "use_edit_page_button": False,
-    "use_issues_button": True,
-    "use_repository_button": True,
-    "use_download_button": False,
-    "logo_only": False,
-    "show_toc_level": 2,
-    "extra_navbar": "",
-    "extra_footer": """
-      <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-policy/" target="_blank">Privacy Policy</a> |
-      <a href="https://www.nvidia.com/en-us/privacy-center/" target="_blank">Manage My Privacy</a> |
-      <a href="https://www.nvidia.com/en-us/preferences/email-preferences/" target="_blank">Do Not Sell or Share My
-        Data</a> |
-      <a href="https://www.nvidia.com/en-us/about-nvidia/terms-of-service/" target="_blank">Terms of Service</a> |
-      <a href="https://www.nvidia.com/en-us/about-nvidia/accessibility/" target="_blank">Accessibility</a> |
-      <a href="https://www.nvidia.com/en-us/about-nvidia/company-policies/" target="_blank">Corporate Policies</a> |
-      <a href="https://www.nvidia.com/en-us/product-security/" target="_blank">Product Security</a> |
-      <a href="https://www.nvidia.com/en-us/contact/" target="_blank">Contact</a>""",
-    "repository_url": "https://github.com/triton-inference-server/server",
-    "use_repository_button": True,
+    "collapse_navigation": False,
+    "github_url": "https://github.com/triton-inference-server/server",
+    "switcher": {
+        # use for local testing
+        "json_url": "http://localhost:8888/_static/switcher.json",
+        #"json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/"
+        #"docs/_static/switcher.json",
+        "version_match": switcher_version,
+    },
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "primary_sidebar_end": [],
 }
 
 version_short = release
@@ -285,4 +273,4 @@ def sphinxSearchIndexFeed(
             self._mapping.setdefault(stemmed_word, set()).add(docname)
 
 
-search.IndexBuilder.feed = sphinxSearchIndexFeed
+#search.IndexBuilder.feed = sphinxSearchIndexFeed
