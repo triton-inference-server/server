@@ -1,0 +1,7 @@
+##############################################################
+# List of approvers/reviewers for Developer Tools
+##############################################################
+# Learn about CODEOWNERS file format:
+#  https://help.github.com/en/articles/about-code-owners
+# These owners will be the default owners for everything in the github ci workflows
+.github/workflows/* @nvda-mesharma
