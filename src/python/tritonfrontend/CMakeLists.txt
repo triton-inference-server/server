@@ -62,8 +62,6 @@ set(
   ../../common.h
   ../../common.cc
   ../../restricted_features.h
-  ../../tracer.h
-  $<$<BOOL:${TRITON_ENABLE_TRACING}>:../../tracer.cc>
   ../../classification.cc
 )
 
@@ -95,14 +93,15 @@ if(${TRITON_ENABLE_GPU})
 endif()
 
 if(${TRITON_ENABLE_TRACING})
-#   message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
-#   find_package(absl CONFIG REQUIRED)
-#   find_package(CURL CONFIG REQUIRED)
-#   find_package(nlohmann_json CONFIG REQUIRED)
-  find_package(opentelemetry-cpp CONFIG REQUIRED)
-#   list(APPEND PY_BINDING_DEPENDENCY_LIBS
-#     tracing-library
-#   )
+  message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
+  # find_package(absl CONFIG REQUIRED)
+  # find_package(CURL CONFIG REQUIRED)
+  # find_package(nlohmann_json CONFIG REQUIRED)
+  # find_package(opentelemetry-cpp CONFIG REQUIRED)
+  list(
+      APPEND PY_BINDING_DEPENDENCY_LIBS
+      $<TARGET_OBJECTS:tracing-library>
+      )
 endif()
 
 # ===================== End of Collection ===================================
@@ -122,7 +121,7 @@ pybind11_add_module(
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
 
-target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
+# target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
     py-bindings
@@ -157,9 +156,17 @@ if(${TRITON_ENABLE_TRACING})
       py-bindings
       PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
+
+  #   target_link_libraries(
+  #     tracing-library
+  #     PUBLIC
+  #     ${OPENTELEMETRY_CPP_LIBRARIES}
+  #     )
+
+
   target_compile_definitions(
     py-bindings
-    PRIVATE TRITON_ENABLE_TRACING=0
+    PRIVATE TRITON_ENABLE_TRACING=1
   )
 endif()
 
@@ -177,5 +184,6 @@ set_target_properties(
     py-bindings
     PROPERTIES
       BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
+      POSITION_INDEPENDENT_CODE ON
 )
 # ===================== End of Python Bindings ==============================
