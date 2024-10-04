@@ -31,12 +31,12 @@ from importlib.metadata import PackageNotFoundError, version
 
 try:
     from tritonfrontend._api._kservehttp import KServeHttp
-except:
+except ImportError:
     # TRITON_ENABLE_HTTP=OFF
     pass
 
 try:
     from tritonfrontend._api._kservegrpc import KServeGrpc
-except:
+except ImportError:
     # TRITON_ENABLE_GRPC=OFF
     pass
