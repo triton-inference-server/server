@@ -27,9 +27,13 @@
 try:
     from ._kservehttp import KServeHttp
 except ImportError:
+    # TRITON_ENABLE_HTTP=OFF
+    # TritonFrontendHttp Package was not present
     pass
 
 try:
     from ._kservegrpc import KServeGrpc
 except ImportError:
+    # TRITON_ENABLE_GRPC=OFF
+    # TritonFrontendGrpc Package was not present
     pass

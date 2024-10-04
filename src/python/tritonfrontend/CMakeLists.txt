@@ -98,10 +98,10 @@ if(${TRITON_ENABLE_TRACING})
   # find_package(CURL CONFIG REQUIRED)
   # find_package(nlohmann_json CONFIG REQUIRED)
   # find_package(opentelemetry-cpp CONFIG REQUIRED)
-  # list(
-  #     APPEND PY_BINDING_DEPENDENCY_LIBS
-  #     $<TARGET_OBJECTS:tracing-library>
-  #     )
+  list(
+      APPEND PY_BINDING_DEPENDENCY_LIBS
+      $<TARGET_OBJECTS:tracing-library>
+      )
 endif()
 
 # ===================== End of Collection ===================================
@@ -119,7 +119,6 @@ pybind11_add_module(
   MODULE
   ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
-  $<TARGET_OBJECTS:tracing-library>
 )
 
 # target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -153,15 +152,9 @@ if(${TRITON_ENABLE_GPU})
 endif()
 
 if(${TRITON_ENABLE_TRACING})
-  target_include_directories(
+    target_include_directories(
       py-bindings
       PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
-    )
-
-    target_link_libraries(
-      tracing-library
-      PUBLIC
-      ${OPENTELEMETRY_CPP_LIBRARIES}
     )
 
     target_link_libraries(
