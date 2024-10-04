@@ -35,40 +35,59 @@ from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
 
 
-def signal_handler(server, frontend, signal, frame):
+def signal_handler(
+    server, openai_frontend, kserve_http_frontend, kserve_grpc_frontend, signal, frame
+):
     print(f"Received {signal=}, {frame=}")
-
     # Graceful Shutdown
-    print("Shutting down OpenAI Frontend...")
-    frontend.stop()
+    shutdown(server, openai_frontend, kserve_http_frontend, kserve_grpc_frontend)
+
+
+def shutdown(server, openai_frontend, kserve_http, kserve_grpc):
+    print("Shutting down Triton OpenAI-Compatible Frontend...")
+    openai_frontend.stop()
+
+    if kserve_http:
+        print("Shutting down Triton KServe HTTP Frontend...")
+        kserve_http.stop()
+
+    if kserve_grpc:
+        print("Shutting down Triton KServe GRPC Frontend...")
+        kserve_grpc.stop()
+
     print("Shutting down Triton Inference Server...")
     server.stop()
 
 
+def start_kserve_frontends(server, args):
+    http_service, grpc_service = None, None
+    try:
+        from tritonfrontend import KServeGrpc, KServeHttp
+
+        http_options = KServeHttp.Options(address=args.host, port=args.kserve_http_port)
+        http_service = KServeHttp.Server(server, http_options)
+        http_service.start()
+
+        grpc_options = KServeGrpc.Options(address=args.host, port=args.kserve_grpc_port)
+        grpc_service = KServeGrpc.Server(server, grpc_options)
+        grpc_service.start()
+
+    except ModuleNotFoundError:
+        print(
+            "[WARNING] The 'tritonfrontend' package was not found. "
+            "KServe frontends won't be available through this application without it. "
+            "Check /opt/tritonserver/python for tritonfrontend*.whl and pip install it if present."
+        )
+    return http_service, grpc_service
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Triton OpenAI Compatible RESTful API server."
-    )
-    # Uvicorn
-    uvicorn_group = parser.add_argument_group("Uvicorn")
-    uvicorn_group.add_argument("--host", type=str, default=None, help="host name")
-    uvicorn_group.add_argument("--port", type=int, default=8000, help="port number")
-    uvicorn_group.add_argument(
-        "--uvicorn-log-level",
-        type=str,
-        default="info",
-        choices=["debug", "info", "warning", "error", "critical", "trace"],
-        help="log level for uvicorn",
+        description="Triton Inference Server with OpenAI-Compatible RESTful API server."
     )
 
-    # Triton
+    # Triton Inference Server
     triton_group = parser.add_argument_group("Triton Inference Server")
-    triton_group.add_argument(
-        "--tritonserver-log-verbose-level",
-        type=int,
-        default=0,
-        help="The tritonserver log verbosity level",
-    )
     triton_group.add_argument(
         "--model-repository",
         type=str,
@@ -87,6 +106,51 @@ def parse_args():
         default=None,
         choices=["vllm", "tensorrtllm"],
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
+    )
+    triton_group.add_argument(
+        "--tritonserver-log-verbose-level",
+        type=int,
+        default=0,
+        help="The tritonserver log verbosity level",
+    )
+    triton_group.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Address/host of frontends (default: '0.0.0.0')",
+    )
+
+    # OpenAI-Compatible Frontend (FastAPI)
+    openai_group = parser.add_argument_group("Triton OpenAI-Compatible Frontend")
+    openai_group.add_argument(
+        "--openai-port", type=int, default=9000, help="OpenAI HTTP port (default: 9000)"
+    )
+    openai_group.add_argument(
+        "--uvicorn-log-level",
+        type=str,
+        default="info",
+        choices=["debug", "info", "warning", "error", "critical", "trace"],
+        help="log level for uvicorn",
+    )
+
+    # KServe Predict v2 Frontend
+    kserve_group = parser.add_argument_group("Triton KServe Frontend")
+    kserve_group.add_argument(
+        "--enable-kserve-frontends",
+        action="store_true",
+        help="Enable KServe Predict v2 HTTP/GRPC frontends (disabled by default)",
+    )
+    kserve_group.add_argument(
+        "--kserve-http-port",
+        type=int,
+        default=8000,
+        help="KServe Predict v2 HTTP port (default: 8000)",
+    )
+    kserve_group.add_argument(
+        "--kserve-grpc-port",
+        type=int,
+        default=8001,
+        help="KServe Predict v2 GRPC port (default: 8001)",
     )
 
     return parser.parse_args()
@@ -110,16 +174,30 @@ def main():
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
-    frontend: FastApiFrontend = FastApiFrontend(
-        engine=engine, host=args.host, port=args.port, log_level=args.uvicorn_log_level
+    openai_frontend: FastApiFrontend = FastApiFrontend(
+        engine=engine,
+        host=args.host,
+        port=args.openai_port,
+        log_level=args.uvicorn_log_level,
     )
 
+    # Optionally expose Triton KServe HTTP/GRPC Frontends
+    kserve_http, kserve_grpc = None, None
+    if args.enable_kserve_frontends:
+        kserve_http, kserve_grpc = start_kserve_frontends(server, args)
+
     # Gracefully shutdown when receiving signals for testing and interactive use
-    signal.signal(signal.SIGINT, partial(signal_handler, server, frontend))
-    signal.signal(signal.SIGTERM, partial(signal_handler, server, frontend))
+    signal.signal(
+        signal.SIGINT,
+        partial(signal_handler, server, openai_frontend, kserve_http, kserve_grpc),
+    )
+    signal.signal(
+        signal.SIGTERM,
+        partial(signal_handler, server, openai_frontend, kserve_http, kserve_grpc),
+    )
 
     # Blocking call until killed or interrupted with SIGINT
-    frontend.start()
+    openai_frontend.start()
 
 
 if __name__ == "__main__":

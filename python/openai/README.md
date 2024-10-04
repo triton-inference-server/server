@@ -29,14 +29,14 @@ docker run -it --net=host --gpus all --rm \
 cd openai/
 
 # NOTE: Adjust the --tokenizer based on the model being used
-python3 openai_frontend/main.py --model-repository tests/vllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
+python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
-curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
@@ -46,7 +46,7 @@ curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
-curl -s http://localhost:8000/v1/completions -H 'Content-Type: application/json' -d '{
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
   "prompt": "Machine learning is"
 }' | jq
@@ -73,7 +73,7 @@ genai-perf \
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8000/v1",
+    base_url="http://localhost:9000/v1",
     api_key="EMPTY",
 )
 
@@ -131,14 +131,14 @@ docker run -it --net=host --gpus all --rm \
 cd openai/
 
 # NOTE: Adjust the --tokenizer based on the model being used
-python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models/ --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
+python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="tensorrt_llm_bls"
-curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
@@ -146,3 +146,23 @@ curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/
 
 The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"`,
 everywhere applicable as seen in the example request above.
+
+## KServe Frontends
+
+To support serving requests through both the OpenAI-Compatible and
+KServe Predict v2 frontends to the same running Triton Inference Server,
+the `tritonfrontend` python bindings are included for optional use in this
+application as well.
+
+You can opt-in to including these additional frontends, assuming `tritonfrontend`
+is installed, with `--enable-kserve-frontends` like below:
+
+```
+python3 openai_frontend/main.py \
+  --model-repository tests/vllm_models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --enable-kserve-frontends
+```
+
+See `python3 openai_frontend/main.py --help` for more information on the
+available arguments and default values.
