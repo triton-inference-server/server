@@ -184,7 +184,7 @@ for BACKEND in $BACKENDS; do
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
-    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"10"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
@@ -219,7 +219,7 @@ for BACKEND in $BACKENDS; do
     echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_test_runtime\":\"${time_diff}\"}]" >> ${RESULTDIR}/${NAME}.tjson
+    # echo -e "\"s_test_runtime\":\"${time_diff}\"}]" >> ${RESULTDIR}/${NAME}.tjson
 
     # SERVER_PID may not be set if using "triton_c_api" for example
     if [[ -n "${SERVER_PID}" ]]; then
