@@ -166,6 +166,16 @@ class TestKServe:
         utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
+    def test_http_generate_inference(self, frontend, client_type, url):
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+
+        assert utils.send_and_test_generate_inference()
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
     def test_http_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
         http_service = utils.setup_service(server, frontend)

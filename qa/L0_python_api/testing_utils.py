@@ -24,14 +24,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
 import os
 import queue
 from typing import Union
 
 import numpy as np
+import requests
 import tritonserver
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp
+
+# TODO: Re-Format documentation to fit:
+# https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 
 
 def setup_server(model_repository="test_model_repository") -> tritonserver.Server:
@@ -150,3 +155,22 @@ def send_and_test_stream_inference(frontend_client, url: str) -> bool:
     client.stop_stream(cancel_requests=True)
 
     return is_final and (text_input == text_output)
+
+
+def send_and_test_generate_inference() -> bool:
+    model_name = "identity"
+    url = f"http://localhost:8000/v2/models/{model_name}/generate"
+    input_text = "testing"
+    data = {
+        "INPUT0": input_text,
+    }
+
+    response = requests.post(url, json=data, stream=True)
+    if response.status_code == 200:
+        result = response.json()
+        output_text = result.get("OUTPUT0", "")
+
+        if output_text == input_text:
+            return True
+
+    return False
