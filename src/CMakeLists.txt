@@ -530,6 +530,12 @@ if(${TRITON_ENABLE_TRACING})
       ${OPENTELEMETRY_CPP_LIBRARIES})
   endif()
 
+  set_target_properties(
+    tracing-library
+    PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    )
+
   target_link_libraries(
     tracing-library
     PUBLIC
