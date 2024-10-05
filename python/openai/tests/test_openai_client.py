@@ -176,17 +176,39 @@ class TestAsyncOpenAIClient:
         assert chunk.choices[0].finish_reason == stop_reason
         assert "".join(chunks) == output
 
+    @pytest.mark.parametrize(
+        "sampling_parameter_dict",
+        [
+            {},
+            # Verify that stop words work with streaming outputs
+            {"stop": "is"},
+            {"stop": ["is"]},
+            {"stop": ["is", ".", ","]},
+        ],
+    )
     @pytest.mark.asyncio
     async def test_chat_streaming(
-        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+        self,
+        client: openai.AsyncOpenAI,
+        model: str,
+        messages: List[dict],
+        sampling_parameter_dict: dict,
     ):
+        # Fixed seed and temperature for comparing reproducible responses
+        seed = 0
+        temperature = 0.0
+        # Generate enough tokens to easily identify stop words are working.
+        max_tokens = 64
+
         # Test single chat completion for comparison
         chat_completion = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=10,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=False,
+            **sampling_parameter_dict,
         )
         output = chat_completion.choices[0].message.content
         stop_reason = chat_completion.choices[0].finish_reason
@@ -195,9 +217,11 @@ class TestAsyncOpenAIClient:
         stream = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=10,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=True,
+            **sampling_parameter_dict,
         )
         chunks = []
         finish_reason_count = 0
@@ -213,7 +237,12 @@ class TestAsyncOpenAIClient:
         # finish reason should only return in last block
         assert finish_reason_count == 1
         assert chunk.choices[0].finish_reason == stop_reason
-        assert "".join(chunks) == output
+
+        # Assert that streaming actually returned multiple responses
+        # and that it is equivalent to the non-streamed output
+        assert len(chunks) > 1
+        streamed_output = "".join(chunks)
+        assert streamed_output == output
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     @pytest.mark.asyncio
