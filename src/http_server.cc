@@ -3557,6 +3557,8 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       }
     }
 
+    // get original element count back
+    element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
