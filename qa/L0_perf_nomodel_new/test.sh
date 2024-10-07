@@ -168,7 +168,7 @@ TEST_CONCURRENCY+=(
     16
     16
     16)
-TEST_BACKENDS=${BACKENDS:="savedmodel onnx libtorch python"}
+TEST_BACKENDS=${BACKENDS:="plan custom graphdef"}
 
 mkdir -p ${REPO_VERSION}
 
