@@ -46,7 +46,7 @@ def _create_vllm_inference_request(
     )
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
-    if echo:
+    if echo is not None:
         exclude_input_in_output = not echo
 
     inputs["text_input"] = [prompt]
@@ -55,7 +55,7 @@ def _create_vllm_inference_request(
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
-    return model.create_request(inputs=inputs, parameters={})
+    return model.create_request(inputs=inputs)
 
 
 def _create_trtllm_inference_request(
