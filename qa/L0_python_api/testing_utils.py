@@ -25,11 +25,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import queue
 from typing import Union
 
 import numpy as np
+import requests
 import tritonserver
+from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp
+
+# TODO: Re-Format documentation to fit:
+# https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 
 
 def setup_server(model_repository="test_model_repository") -> tritonserver.Server:
@@ -93,3 +99,77 @@ def send_and_test_inference_identity(frontend_client, url: str) -> bool:
 
     teardown_client(client)
     return input_data[0] == output_data[0].decode()
+
+
+# Sends a streaming inference request to test_model_repository/identity model
+# and verifies input == output
+def send_and_test_stream_inference(frontend_client, url: str) -> bool:
+    model_name = "identity"
+
+    # Setting up the gRPC client stream
+    results = queue.Queue()
+    callback = lambda error, result: results.put(error or result)
+    client = frontend_client.InferenceServerClient(url=url)
+
+    client.start_stream(callback=callback)
+
+    # Preparing Input Data
+    text_input = "testing"
+    input_tensor = frontend_client.InferInput(
+        name="INPUT0", shape=[1], datatype="BYTES"
+    )
+    input_tensor.set_data_from_numpy(np.array([text_input.encode()], dtype=np.object_))
+
+    # Sending Streaming Inference Request
+    client.async_stream_infer(
+        model_name=model_name, inputs=[input_tensor], enable_empty_final_response=True
+    )
+
+    # Looping through until exception thrown or request completed
+    completed_requests, num_requests = 0, 1
+    text_output, is_final = None, None
+    while completed_requests != num_requests:
+        result = results.get()
+        if isinstance(result, InferenceServerException):
+            if result.status() == "StatusCode.CANCELLED":
+                completed_requests += 1
+            raise result
+
+        # Processing Response
+        text_output = result.as_numpy("OUTPUT0")[0].decode()
+
+        triton_final_response = result.get_response().parameters.get(
+            "triton_final_response", {}
+        )
+
+        is_final = False
+        if triton_final_response.HasField("bool_param"):
+            is_final = triton_final_response.bool_param
+
+        # Request Completed
+        if is_final:
+            completed_requests += 1
+
+    # Tearing down gRPC client stream
+    client.stop_stream(cancel_requests=True)
+
+    return is_final and (text_input == text_output)
+
+
+def send_and_test_generate_inference() -> bool:
+    model_name = "identity"
+    url = f"http://localhost:8000/v2/models/{model_name}/generate"
+    input_text = "testing"
+    data = {
+        "INPUT0": input_text,
+    }
+
+    response = requests.post(url, json=data, stream=True)
+    if response.status_code == 200:
+        result = response.json()
+        output_text = result.get("OUTPUT0", "")
+
+        if output_text == input_text:
+            return True
+
+    return False

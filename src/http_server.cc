@@ -1810,6 +1810,10 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   }
 
 #ifdef TRITON_ENABLE_TRACING
+  if (trace_manager_ == nullptr) {
+    return;
+  }
+
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
   int32_t count;
@@ -3233,8 +3237,11 @@ HTTPAPIServer::HandleGenerate(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (trace_manager_) {
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
