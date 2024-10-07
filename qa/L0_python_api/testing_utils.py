@@ -63,7 +63,7 @@ def setup_service(
     frontend: Union[KServeHttp, KServeGrpc],
     options=None,
 ) -> Union[KServeHttp, KServeGrpc]:
-    service = frontend.Server(server=server, options=options)
+    service = frontend(server=server, options=options)
     service.start()
     return service
 
