@@ -231,7 +231,7 @@ RUN cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
     mkdir -p qa/L0_perf_nomodel_shm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
-    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
+    cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm && \
     mkdir -p qa/L0_perf_nomodel_new_shm && \
     cp -r qa/L0_perf_nomodel_new/. qa/L0_perf_nomodel_new_shm && \
     mkdir -p qa/L0_perf_nomodel_new_cudashm && \
