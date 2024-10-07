@@ -204,6 +204,7 @@ RUN cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
     cp tritonbuild/python/install/backends/python/triton_shm_monitor*.so \
         qa/common/. && \
     mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
+    mkdir -p qa/L0_perf_nomodel_new/custom_models/custom_zero_1_float32/1 && \
     mkdir -p qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1 && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
@@ -231,6 +232,11 @@ RUN cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_shm && \
     mkdir -p qa/L0_perf_nomodel_cudashm && \
     cp -r qa/L0_perf_nomodel/. qa/L0_perf_nomodel_cudashm
+    mkdir -p qa/L0_perf_nomodel_new_shm && \
+    cp -r qa/L0_perf_nomodel_new/. qa/L0_perf_nomodel_new_shm && \
+    mkdir -p qa/L0_perf_nomodel_new_cudashm && \
+    cp -r qa/L0_perf_nomodel_new/. qa/L0_perf_nomodel_new_cudashm
+
 
 # L0_model_control_stress will not be present if gitlab tests are not available
 RUN if [ -d qa/L0_model_control_stress ]; then \
