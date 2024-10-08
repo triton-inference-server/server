@@ -31,4 +31,4 @@
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 >[!WARNING]
-> You are currently on the `r24.09` branch which tracks under-development progress towards the next release. <br>
+> You are currently on the `r24.10` branch which tracks under-development progress towards the next release. <br>
