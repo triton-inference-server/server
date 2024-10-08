@@ -197,7 +197,7 @@ for BACKEND in $BACKENDS; do
                  --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
-                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured SERVER logs below" && cat $SERVER_LOG)
+                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured GDB BT below" && gdb -p $SERVER_PID -batch -ex "thread apply all bt" > ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log 2>/dev/null && cat ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log)
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
