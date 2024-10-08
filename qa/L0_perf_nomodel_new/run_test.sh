@@ -32,7 +32,8 @@ STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 CONCURRENCY=${CONCURRENCY:=1}
-
+# Define a timeout period (600 seconds = 10 minutes)
+TIMEOUT_PERIOD=300
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=1000}
@@ -185,8 +186,14 @@ for BACKEND in $BACKENDS; do
     set +e
     set -o pipefail
     PA_MAX_TRIALS=${PA_MAX_TRIALS:-"10"}
+    if [ $NAME = "custom_sbatch1_dbatch1_instance2" ]; then
+        EXTRA_VERBOSE="-v"
+    else
+        EXTRA_VERBOSE=""
+    fi
+
     # Update the command to add a subcommand
-    $PERF_CLIENT -v \
+    timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
@@ -195,11 +202,17 @@ for BACKEND in $BACKENDS; do
                  --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
+                 ${EXTRA_VERBOSE} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+
+    if [ $NAME == "custom_sbatch1_dbatch1_instance2" ]; then
+        cat $SERVER_LOG
+    fi
+
     echo "Time after perf analyzer trials: $(date)"
     end_time=$(date +%s)
     time_diff=$((end_time - start_time))
