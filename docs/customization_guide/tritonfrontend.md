@@ -59,11 +59,11 @@ Note: `model_path` may need to be edited depending on your setup.
 ```python
 from tritonfrontend import KServeHttp, KServeGrpc
 http_options = KServeHttp.Options(thread_count=5)
-http_service = KServeHttp.Server(server, http_options)
+http_service = KServeHttp(server, http_options)
 http_service.start()
 
 # Default options (if none provided)
-grpc_service = KServeGrpc.Server(server)
+grpc_service = KServeGrpc(server)
 grpc_service.start()
 ```
 
@@ -110,7 +110,7 @@ from tritonfrontend import KServeHttp
 import tritonclient.http as httpclient
 import numpy as np  # Use version numpy < 2
 
-with KServeHttp.Server(server) as http_service:
+with KServeHttp(server) as http_service:
     # The identity model returns an exact duplicate of the input data as output
     model_name = "identity"
     url = "localhost:8000"
