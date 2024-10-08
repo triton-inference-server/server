@@ -1852,24 +1852,10 @@ def core_build(
     # [FIXME] Placing the tritonserver and tritonfrontend wheel files in 'python' for now,
     # should be uploaded to pip registry to be able to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
-    _from = os.path.join(repo_install_dir, "python", "triton*.whl")
-    _to = os.path.join(install_dir, "python")
-    cmake_script.cmd("echo ===============RYAN================")
-    cmake_script.cmd("find / -name triton*.whl")
-
-    # print(f"[RYAN] Copying {_from=}, {_to=}")
-    cmake_script.cmd(f"echo [RYAN] ==== {_from=} to {_to=} ====")
-    cmake_script.cmd(f"echo ================ BEFORE ================")
-    cmake_script.cmd(f"echo Looking at from:")
-    cmake_script.cmd(f"ls {_from}")
-    cmake_script.cmd(f"echo Looking at to:")
-    cmake_script.cmd(f"ls {_to}")
-    cmake_script.cp(_from, _to)
-    cmake_script.cmd(f"echo ================ AFTER ================")
-    cmake_script.cmd(f"echo Looking at from:")
-    cmake_script.cmd(f"ls {_from}")
-    cmake_script.cmd(f"echo Looking at to:")
-    cmake_script.cmd(f"ls {_to}")
+    cmake_script.cp(
+        os.path.join(repo_install_dir, "python", "triton*.whl"),
+        os.path.join(install_dir, "python"),
+    )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
