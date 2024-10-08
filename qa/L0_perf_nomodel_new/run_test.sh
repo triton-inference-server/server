@@ -185,12 +185,7 @@ for BACKEND in $BACKENDS; do
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
-    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"10"}
-    if [ $NAME = "custom_sbatch1_dbatch1_instance2" ]; then
-        EXTRA_VERBOSE="-v"
-    else
-        EXTRA_VERBOSE=""
-    fi
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"20"}
 
     # Update the command to add a subcommand
     timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
@@ -202,14 +197,10 @@ for BACKEND in $BACKENDS; do
                  --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
-                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log
+                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured SERVER logs below" && cat $SERVER_LOG)
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
-    fi
-
-    if [ $NAME == "custom_sbatch1_dbatch1_instance2" ]; then
-        cat $SERVER_LOG
     fi
 
     echo "Time after perf analyzer trials: $(date)"
