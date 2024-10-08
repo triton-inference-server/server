@@ -202,7 +202,6 @@ for BACKEND in $BACKENDS; do
                  --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
-                 ${EXTRA_VERBOSE} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
