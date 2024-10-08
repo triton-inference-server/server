@@ -118,7 +118,7 @@ class TestKServe:
             tritonserver.InvalidArgumentError,
             match="Incorrect type for options. options argument must be of type",
         ):
-            frontend.Server(server, {"port": 8001})
+            frontend(server, {"port": 8001})
 
         utils.teardown_server(server)
 

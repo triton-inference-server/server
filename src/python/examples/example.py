@@ -51,7 +51,7 @@ def main():
     http_options = KServeHttp.Options(port=8005)
 
     # or http_service = KServeHttp.Server(server, http_options) & http_service.stop()
-    with KServeHttp.Server(server, http_options) as http_service:
+    with KServeHttp(server, http_options) as http_service:
         # The identity model returns an exact duplicate of the input data as output
         model_name = "identity"
         url = "localhost:8005"
@@ -74,7 +74,6 @@ def main():
         output_data = results.as_numpy("OUTPUT0")
 
         print("--------------------- INFERENCE RESULTS ---------------------")
-        print("Input data:", input_data)
         print("Output data:", output_data)
         print("-------------------------------------------------------------")
 
