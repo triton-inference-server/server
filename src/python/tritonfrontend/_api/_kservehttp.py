@@ -31,7 +31,7 @@ from typing import Union
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
-from tritonfrontend._api._error_mapping import ERROR_MAPPING
+from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
     TritonError,
@@ -50,47 +50,38 @@ class KServeHttp:
         # DLIS-7215: Add restricted protocol support
         # restricted_protocols: list
 
+    @handle_triton_error
     def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
-        try:
-            server_ptr = server._ptr()  # TRITONSERVER_Server pointer
+        server_ptr = server._ptr()  # TRITONSERVER_Server pointer
 
-            # If no options provided, default options are selected
-            if options is None:
-                options = KServeHttp.Options()
+        # If no options provided, default options are selected
+        if options is None:
+            options = KServeHttp.Options()
 
-            if not isinstance(options, KServeHttp.Options):
-                raise InvalidArgumentError(
-                    "Incorrect type for options. options argument must be of type KServeHttp.Options"
-                )
+        if not isinstance(options, KServeHttp.Options):
+            raise InvalidArgumentError(
+                "Incorrect type for options. options argument must be of type KServeHttp.Options"
+            )
 
-            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
-            # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
+        options_dict: dict[str, Union[int, bool, str]] = options.__dict__
+        # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
 
-            self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
-        except TritonError:
-            exc_type, exc_value, _ = sys.exc_info()
-            # raise ... from None masks the tritonfrontend Error from being added in traceback
-            raise ERROR_MAPPING[exc_type](exc_value) from None
+        self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
 
     def __enter__(self):
         self.triton_frontend.start()
         return self
 
+    @handle_triton_error
     def __exit__(self, exc_type, exc_value, traceback):
         self.triton_frontend.stop()
         if exc_type:
-            raise ERROR_MAPPING[exc_type](exc_value) from None
-
+            raise exc_type(exc_value)
+    
+    @handle_triton_error
     def start(self):
-        try:
-            self.triton_frontend.start()
-        except TritonError:
-            exc_type, exc_value, _ = sys.exc_info()
-            raise ERROR_MAPPING[exc_type](exc_value) from None
-
+        self.triton_frontend.start()
+    
+    @handle_triton_error    
     def stop(self):
-        try:
-            self.triton_frontend.stop()
-        except TritonError:
-            exc_type, exc_value, _ = sys.exc_info()
-            raise ERROR_MAPPING[exc_type](exc_value) from None
+        self.triton_frontend.stop()

@@ -35,6 +35,7 @@ from tritonfrontend._c.tritonfrontend_bindings import (
     UnknownError,
     UnsupportedError,
 )
+import sys
 
 ERROR_MAPPING = {
     TritonError: tritonserver.TritonError,
@@ -46,3 +47,14 @@ ERROR_MAPPING = {
     AlreadyExistsError: tritonserver.AlreadyExistsError,
     UnsupportedError: tritonserver.UnsupportedError,
 }
+
+def handle_triton_error(func):
+    def error_handling_wrapper(self, *args, **kwargs):
+        try:
+            func(self, *args, **kwargs)
+        except TritonError:
+            exc_type, exc_value, _ = sys.exc_info()
+            # raise ... from None masks the tritonfrontend Error from being added in traceback
+            raise ERROR_MAPPING[exc_type](exc_value) from None
+    
+    return error_handling_wrapper
