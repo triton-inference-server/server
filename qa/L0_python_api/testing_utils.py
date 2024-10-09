@@ -33,7 +33,7 @@ import numpy as np
 import requests
 import tritonserver
 from tritonclient.utils import InferenceServerException
-from tritonfrontend import KServeGrpc, KServeHttp
+from tritonfrontend import KServeGrpc, KServeHttp, Metrics
 
 # TODO: Re-Format documentation to fit:
 # https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
@@ -61,9 +61,9 @@ def teardown_server(server: tritonserver.Server) -> None:
 
 def setup_service(
     server: tritonserver.Server,
-    frontend: Union[KServeHttp, KServeGrpc],
+    frontend: Union[KServeHttp, KServeGrpc, Metrics],
     options=None,
-) -> Union[KServeHttp, KServeGrpc]:
+) -> Union[KServeHttp, KServeGrpc, Metrics]:
     service = frontend(server=server, options=options)
     service.start()
     return service
