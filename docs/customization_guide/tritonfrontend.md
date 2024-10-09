@@ -25,9 +25,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-### Triton Server (tritonfrontend) Bindings
+### Triton Server (tritonfrontend) Bindings (Beta)
 
-The `tritonfrontend` python package is a set of bindings to Triton's existing frontends implemented in C++. Currently, `tritonfrontend` supports starting up `KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination with Triton's Python In-Process API ([`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver)) and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library) extend the ability to use Triton's full feature set with a couple of lines of Python.
+The `tritonfrontend` python package is a set of bindings to Triton's existing
+frontends implemented in C++. Currently, `tritonfrontend` supports starting up
+`KServeHttp` and `KServeGrpc` frontends. These bindings used in-combination
+with Triton's Python In-Process API
+([`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver))
+and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library)
+extend the ability to use Triton's full feature set with a few lines of Python.
 
 Let us walk through a simple example:
 1. First we need to load the desired models and start the server with `tritonserver`.
@@ -53,11 +59,11 @@ Note: `model_path` may need to be edited depending on your setup.
 ```python
 from tritonfrontend import KServeHttp, KServeGrpc
 http_options = KServeHttp.Options(thread_count=5)
-http_service = KServeHttp.Server(server, http_options)
+http_service = KServeHttp(server, http_options)
 http_service.start()
 
 # Default options (if none provided)
-grpc_service = KServeGrpc.Server(server)
+grpc_service = KServeGrpc(server)
 grpc_service.start()
 ```
 
@@ -104,7 +110,7 @@ from tritonfrontend import KServeHttp
 import tritonclient.http as httpclient
 import numpy as np  # Use version numpy < 2
 
-with KServeHttp.Server(server) as http_service:
+with KServeHttp(server) as http_service:
     # The identity model returns an exact duplicate of the input data as output
     model_name = "identity"
     url = "localhost:8000"
