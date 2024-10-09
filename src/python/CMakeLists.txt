@@ -25,9 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required(VERSION 3.18)
-# [DLIS-7232] tritonfrontend package expects all supported packages to be
-# built, without any check/verification for respective frontend enable flags.
-# Support for partial builds(ex: HTTP but not gRPC) will be addressed later.
 
 add_subdirectory(tritonfrontend)
 
