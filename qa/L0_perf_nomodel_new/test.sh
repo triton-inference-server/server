@@ -60,7 +60,7 @@ PERF_CLIENT_STABILIZE_WINDOW=1000
 # Threshold, as a percentage, to use when stabilizing latency and
 # infer/sec results. Values must vary by less than this percent over 3
 # measurement windows to be considered value.
-PERF_CLIENT_STABILIZE_THRESHOLD=25.0
+PERF_CLIENT_STABILIZE_THRESHOLD=15.0
 
 RUNTEST=./run_test.sh
 
