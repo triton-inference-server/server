@@ -16,17 +16,16 @@
     access gated models, make sure this is set in your local environment if needed.
 
 ```bash
-docker build -t tritonserver-openai-vllm -f docker/Dockerfile.vllm .
-
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  tritonserver-openai-vllm
+  nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
 ```bash
-cd openai/
+git clone https://github.com/triton-inference-server/server.git
+cd server/python/openai/
 
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
@@ -95,40 +94,31 @@ print(completion.choices[0].message.content)
 
 7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
+cd server/python/openai/
 pytest -v tests/
 ```
 
-8. For a list of examples, see the `examples/` folder.
-
 ## TensorRT-LLM
 
-**NOTE**: The workflow for preparing TRT-LLM engines, model repository, etc. in order to
-load and test is not fleshed out in the README here yet. You can try using the Triton CLI
-or follow existing TRT-LLM backend examples to prepare a model repository, and point
-at the model repository accordingly when following the examples.
-
-0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
+0. Prepare your model repository for serving a TensorRT-LLM model:
+   https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start
 
 1. Build and launch the container:
-  - Mounts the openai source files to `/workspace` for simplicity, later on these will be shipped in the container.
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
 ```bash
-docker build -t tritonserver-openai-tensorrtllm -f docker/Dockerfile.tensorrtllm ./docker
-
 docker run -it --net=host --gpus all --rm \
-  -v ${PWD}:/workspace \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  -w /workspace \
-  tritonserver-openai-tensorrtllm
+  nvcr.io/nvidia/tritonserver:24.08-trtllm-python-py3
 ```
 
 2. Launch the OpenAI server:
 ```bash
-cd openai/
+git clone https://github.com/triton-inference-server/server.git
+cd server/python/openai/
 
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
@@ -166,3 +156,6 @@ python3 openai_frontend/main.py \
 
 See `python3 openai_frontend/main.py --help` for more information on the
 available arguments and default values.
+
+For more information on the `tritonfrontend` python bindings, see the docs
+[here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
