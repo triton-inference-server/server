@@ -24,7 +24,7 @@ function prepare_vllm() {
 
 function prepare_tensorrtllm() {
     MODEL="llama-3-8b-instruct"
-    MODEL_REPO="../tests/tensorrtllm_models"
+    MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
     # FIXME: This will require an upgrade each release to match the TRT-LLM version
