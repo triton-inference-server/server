@@ -170,14 +170,9 @@ pytest -v tests/
 
 ## TensorRT-LLM
 
-**NOTE**: The workflow for preparing TRT-LLM engines, model repository, etc. in order to
-load and test is not fleshed out in the README here yet. You can try using the 
-[Triton CLI](https://github.com/triton-inference-server/triton_cli/)
-or follow existing TRT-LLM backend 
-[examples](https://github.com/triton-inference-server/tutorials/blob/main/Popular_Models_Guide/Llama2/trtllm_guide.md#infer-with-tensorrt-llm-backend) 
-to prepare a model repository, and point at the model repository accordingly when following the examples.
-
-0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
+0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
+  - [Triton CLI](https://github.com/triton-inference-server/triton_cli/)
+  - [TRT-LLM backend examples](https://github.com/triton-inference-server/tutorials/blob/main/Popular_Models_Guide/Llama2/trtllm_guide.md#infer-with-tensorrt-llm-backend)
 
 1. Launch the container:
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
