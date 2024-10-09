@@ -81,7 +81,7 @@ def _create_trtllm_inference_request(
         inputs["random_seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
-    # NOTE: TRT-LLM doesn't currently support runtime changes of 'echo' and it
+    # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
 

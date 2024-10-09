@@ -73,6 +73,7 @@ def start_kserve_frontends(server, args):
         grpc_service.start()
 
     except ModuleNotFoundError:
+        # FIXME: Raise error instead of warning if kserve frontends are opt-in
         print(
             "[WARNING] The 'tritonfrontend' package was not found. "
             "KServe frontends won't be available through this application without it. "

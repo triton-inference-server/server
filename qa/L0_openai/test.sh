@@ -3,6 +3,9 @@
 ### Helpers ###
 
 function install_deps() {
+    # FIXME: Once the test script and code is in-place, we can clone/copy the
+    # tests rather than expecting them to be baked into the container here, for
+    # better portability and easier test setup.
     pushd openai/docker
     pip install /opt/tritonserver/python/triton*.whl
     pip install -r requirements.txt
