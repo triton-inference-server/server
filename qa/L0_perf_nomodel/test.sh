@@ -55,7 +55,7 @@ PERF_CLIENT_SLOWDOWN_THRESHOLD=5.0
 
 # Length of window, in milliseconds, to use when stabilizing latency
 # and infer/sec results.
-PERF_CLIENT_STABILIZE_WINDOW=1000
+PERF_CLIENT_STABILIZE_WINDOW=10000
 
 # Threshold, as a percentage, to use when stabilizing latency and
 # infer/sec results. Values must vary by less than this percent over 3
