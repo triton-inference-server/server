@@ -169,8 +169,7 @@ load and test is not fleshed out in the README here yet. You can try using the
 [Triton CLI](https://github.com/triton-inference-server/triton_cli/)
 or follow existing TRT-LLM backend 
 [examples](https://github.com/triton-inference-server/tutorials/blob/main/Popular_Models_Guide/Llama2/trtllm_guide.md#infer-with-tensorrt-llm-backend) 
-to prepare a model repository, and point
-at the model repository accordingly when following the examples.
+to prepare a model repository, and point at the model repository accordingly when following the examples.
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc.
 
