@@ -3,9 +3,13 @@
 ### Helpers ###
 
 function install_deps() {
-    pushd openai/docker
+    # Install python bindings for tritonserver and tritonfrontend
     pip install /opt/tritonserver/python/triton*.whl
+
+    # Install application/testing requirements
+    pushd openai/
     pip install -r requirements.txt
+
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         prepare_tensorrtllm
     else
@@ -20,7 +24,7 @@ function prepare_vllm() {
 
 function prepare_tensorrtllm() {
     MODEL="llama-3-8b-instruct"
-    MODEL_REPO="../tests/tensorrtllm_models"
+    MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
     # FIXME: This will require an upgrade each release to match the TRT-LLM version

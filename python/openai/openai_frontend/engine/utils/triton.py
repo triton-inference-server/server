@@ -40,18 +40,22 @@ def _create_vllm_inference_request(
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.
-    sampling_parameters = request.model_dump(
+    sampling_parameters = request.model_dump_json(
         exclude=excludes,
         exclude_none=True,
     )
-    inputs["text_input"] = [prompt]
-    inputs["stream"] = [request.stream]
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
-    if echo:
+    if echo is not None:
         exclude_input_in_output = not echo
-    inputs["exclude_input_in_output"] = [exclude_input_in_output]
-    return model.create_request(inputs=inputs, parameters=sampling_parameters)
+
+    inputs["text_input"] = [prompt]
+    inputs["stream"] = np.bool_([request.stream])
+    inputs["exclude_input_in_output"] = np.bool_([exclude_input_in_output])
+    # Pass sampling_parameters as serialized JSON string input to support List
+    # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
+    inputs["sampling_parameters"] = [sampling_parameters]
+    return model.create_request(inputs=inputs)
 
 
 def _create_trtllm_inference_request(
@@ -59,7 +63,7 @@ def _create_trtllm_inference_request(
 ):
     inputs = {}
     inputs["text_input"] = [[prompt]]
-    inputs["stream"] = [[request.stream]]
+    inputs["stream"] = np.bool_([[request.stream]])
     if request.max_tokens:
         inputs["max_tokens"] = np.int32([[request.max_tokens]])
     if request.stop:
@@ -77,6 +81,8 @@ def _create_trtllm_inference_request(
         inputs["random_seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
+    # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
+    # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
 
 

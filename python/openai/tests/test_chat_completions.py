@@ -95,6 +95,11 @@ class TestChatCompletions:
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
             ("n", 1),
+            # Single stop word as a string
+            ("stop", "."),
+            # List of stop words
+            ("stop", []),
+            ("stop", [".", ","]),
             # logprobs is a boolean for chat completions
             ("logprobs", True),
             ("logit_bias", {"0": 0}),
@@ -156,8 +161,9 @@ class TestChatCompletions:
                 param_key: param_value,
             },
         )
-
         print("Response:", response.json())
+
+        # Assert schema validation error
         assert response.status_code == 422
 
     # Simple tests to verify max_tokens roughly behaves as expected
@@ -568,4 +574,11 @@ class TestChatCompletionsTokenizers:
             )
 
         assert response.status_code == 400
-        assert "cannot use apply_chat_template()" in response.json()["detail"].lower()
+        # Error may vary based on transformers version
+        expected_errors = [
+            "cannot use apply_chat_template()",
+            "cannot use chat template",
+        ]
+        assert any(
+            error in response.json()["detail"].lower() for error in expected_errors
+        )
