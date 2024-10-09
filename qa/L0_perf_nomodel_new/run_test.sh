@@ -37,7 +37,7 @@ TIMEOUT_PERIOD=300
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=1000}
-PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
+PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=25}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
@@ -51,7 +51,7 @@ BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
 PERF_CLIENT=../clients/perf_client
 TF_VERSION=${TF_VERSION:=2}
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -188,6 +188,16 @@ for BACKEND in $BACKENDS; do
     PA_MAX_TRIALS=${PA_MAX_TRIALS:-"20"}
 
     # Update the command to add a subcommand
+    # timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
+    #              -p${PERF_CLIENT_STABILIZE_WINDOW} \
+    #              -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
+    #              ${PERF_CLIENT_EXTRA_ARGS} \
+    #              -m ${MODEL_NAME} \
+    #              -b${STATIC_BATCH} -t${CONCURRENCY} \
+    #              --max-trials "${PA_MAX_TRIALS}" \
+    #              --shape ${INPUT_NAME}:${SHAPE} \
+    #              ${SERVICE_ARGS} \
+    #              -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured GDB BT below" && gdb -p $SERVER_PID -batch -ex "thread apply all bt" > ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log 2>/dev/null && cat ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log)
     timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
@@ -197,7 +207,8 @@ for BACKEND in $BACKENDS; do
                  --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
-                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured GDB BT below" && gdb -p $SERVER_PID -batch -ex "thread apply all bt" > ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log 2>/dev/null && cat ${RESULTDIR}/${NAME}.gdb_backtrace_$SERVER_PID.log)
+                 -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occured SERVER logs below" && cat $SERVER_LOG)
+
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
