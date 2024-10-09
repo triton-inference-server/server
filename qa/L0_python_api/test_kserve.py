@@ -35,7 +35,7 @@ import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
-
+import requests
 
 class TestHttpOptions:
     def test_correct_http_parameters(self):
@@ -53,7 +53,6 @@ class TestHttpOptions:
         # Wrong data type
         with pytest.raises(Exception):
             KServeHttp.Options(header_forward_pattern=10)
-
 
 class TestGrpcOptions:
     def test_correct_grpc_parameters(self):
@@ -286,19 +285,37 @@ class TestKServe:
         utils.teardown_server(server)
 
 
+    @pytest.mark.parametrize("frontend", [Metrics])
+    def test_metrics_custom_port(self, frontend, port=8005):
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend, Metrics.Options(port=port))
+        
+        metrics_url = f"http://localhost:{port}/metrics"
+        response = requests.get(metrics_url)
+        assert response.status_code == 200
+            
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+    
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics(self, frontend, url):
         # For this test
         # Setup Server, KServeGrpc, Metrics
-
+        server = utils.setup_server()
+        grpc_service = utils.setup_service(server, KServeGrpc) # Needed to send inference request
+        metrics_service = utils.setup_service(server, frontend)
+        
         # Get Metrics and verify inference count == 0
         # Parse Metrics as done here: L0_metrics/pinned_memory_metrics_test.py
 
         # Send 1 Inference Request with send_and_test_inference()
 
         # Get Metrics, Parse, and verify inference count == 1
-
+        
         # Teardown Metrics, GrpcService, Server
+        utils.teardown_service(grpc_service)
+        utils.teardown_service(metrics_service)
+        utils.teardown_server(server)
         pass
     
     # KNOWN ISSUE: CAUSES SEGFAULT
