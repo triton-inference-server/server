@@ -31,7 +31,7 @@ from typing import Union
 import tritonserver
 from pydantic import Field
 from pydantic.dataclasses import dataclass
-from tritonfrontend._api._error_mapping import handle_triton_error, ERROR_MAPPING
+from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
     TritonError,
