@@ -94,10 +94,6 @@ endif()
 
 if(${TRITON_ENABLE_TRACING})
   message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
-  # find_package(absl CONFIG REQUIRED)
-  # find_package(CURL CONFIG REQUIRED)
-  # find_package(nlohmann_json CONFIG REQUIRED)
-  # find_package(opentelemetry-cpp CONFIG REQUIRED)
   list(
       APPEND PY_BINDING_DEPENDENCY_LIBS
       $<TARGET_OBJECTS:tracing-library>
@@ -120,8 +116,6 @@ pybind11_add_module(
   ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
-
-# target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
     py-bindings
@@ -154,12 +148,12 @@ endif()
 if(${TRITON_ENABLE_TRACING})
     target_include_directories(
       py-bindings
-      PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(
       py-bindings
-      PUBLIC
+      PRIVATE
       ${OPENTELEMETRY_CPP_LIBRARIES}
     )
 
