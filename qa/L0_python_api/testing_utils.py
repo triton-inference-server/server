@@ -25,11 +25,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import queue
+from functools import partial
 from typing import Union
 
 import numpy as np
+import requests
 import tritonserver
+from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp
+
+# TODO: Re-Format documentation to fit:
+# https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 
 
 def setup_server(model_repository="test_model_repository") -> tritonserver.Server:
@@ -57,7 +64,7 @@ def setup_service(
     frontend: Union[KServeHttp, KServeGrpc],
     options=None,
 ) -> Union[KServeHttp, KServeGrpc]:
-    service = frontend.Server(server=server, options=options)
+    service = frontend(server=server, options=options)
     service.start()
     return service
 
@@ -93,3 +100,54 @@ def send_and_test_inference_identity(frontend_client, url: str) -> bool:
 
     teardown_client(client)
     return input_data[0] == output_data[0].decode()
+
+
+# Sends multiple streaming requests to "delayed_identity" model with negligible delays,
+# and verifies the inputs matches outputs and the ordering is preserved.
+def send_and_test_stream_inference(frontend_client, url: str) -> bool:
+    num_requests = 100
+    requests = []
+    for i in range(num_requests):
+        input0_np = np.array([[float(i) / 1000]], dtype=np.float32)
+        inputs = [frontend_client.InferInput("INPUT0", input0_np.shape, "FP32")]
+        inputs[0].set_data_from_numpy(input0_np)
+        requests.append(inputs)
+
+    responses = []
+
+    def callback(responses, result, error):
+        responses.append({"result": result, "error": error})
+
+    client = frontend_client.InferenceServerClient(url=url)
+    client.start_stream(partial(callback, responses))
+    for inputs in requests:
+        client.async_stream_infer("delayed_identity", inputs)
+    client.stop_stream()
+    teardown_client(client)
+
+    assert len(responses) == num_requests
+    for i in range(len(responses)):
+        assert responses[i]["error"] is None
+        output0_np = responses[i]["result"].as_numpy(name="OUTPUT0")
+        assert np.allclose(output0_np, [[float(i) / 1000]])
+
+    return True  # test passed
+
+
+def send_and_test_generate_inference() -> bool:
+    model_name = "identity"
+    url = f"http://localhost:8000/v2/models/{model_name}/generate"
+    input_text = "testing"
+    data = {
+        "INPUT0": input_text,
+    }
+
+    response = requests.post(url, json=data, stream=True)
+    if response.status_code == 200:
+        result = response.json()
+        output_text = result.get("OUTPUT0", "")
+
+        if output_text == input_text:
+            return True
+
+    return False
