@@ -42,6 +42,9 @@ class PromptItem(RootModel):
 
 
 class CreateCompletionRequest(BaseModel):
+    # Explicitly return errors for unknown fields.
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+
     model: Union[str, Model1] = Field(
         ...,
         description="ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.\n",
@@ -776,6 +779,9 @@ class ChatCompletionRequestMessage(RootModel):
 
 
 class CreateChatCompletionRequest(BaseModel):
+    # Explicitly return errors for unknown fields.
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+
     messages: List[ChatCompletionRequestMessage] = Field(
         ...,
         description="A list of messages comprising the conversation so far. [Example Python code](https://cookbook.openai.com/examples/how_to_format_inputs_to_chatgpt_models).",
