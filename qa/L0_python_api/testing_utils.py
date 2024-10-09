@@ -163,9 +163,14 @@ def get_metrics(metrics_url: str, model_name: str="identity") -> Tuple[int, int]
 
 
 def _extract_inference_count(metrics_data: str, model_name: str):
+    print("-"*80)
+    print(metrics_data)
+    print("-"*80)
     pattern = fr'nv_inference_count\{{.*?model="{re.escape(model_name)}".*?\}}\s+([0-9.]+)'
     match = re.search(pattern, metrics_data)
     if match:
-        return float(match.group(1))
+        return int(float(match.group(1)))
+    
+    
     
     return None
