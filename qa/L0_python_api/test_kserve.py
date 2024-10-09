@@ -285,39 +285,56 @@ class TestKServe:
         utils.teardown_server(server)
 
 
+    @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
+    def test_metrics_default_port(self, frontend, url):
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+        
+        metrics_url = f"http://{url}/metrics"
+        status_code, _ = utils.get_metrics(metrics_url)
+        
+        assert status_code == 200
+        
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+    
     @pytest.mark.parametrize("frontend", [Metrics])
     def test_metrics_custom_port(self, frontend, port=8005):
         server = utils.setup_server()
         service = utils.setup_service(server, frontend, Metrics.Options(port=port))
         
         metrics_url = f"http://localhost:{port}/metrics"
-        response = requests.get(metrics_url)
-        assert response.status_code == 200
+        status_code, _ = utils.get_metrics(metrics_url)
+        
+        assert status_code == 200
             
         utils.teardown_service(service)
         utils.teardown_server(server)
     
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
-    def test_metrics(self, frontend, url):
+    def test_metrics_update(self, frontend, url):
         # For this test
         # Setup Server, KServeGrpc, Metrics
         server = utils.setup_server()
         grpc_service = utils.setup_service(server, KServeGrpc) # Needed to send inference request
         metrics_service = utils.setup_service(server, frontend)
         
-        # Get Metrics and verify inference count == 0
-        # Parse Metrics as done here: L0_metrics/pinned_memory_metrics_test.py
-
+        # Get Metrics and verify inference count == 0 before inference
+        before_status_code, before_inference_count = utils.get_metrics(f"http://{url}/metrics")
+        assert before_status_code == 200 and before_inference_count == 0 
+        
         # Send 1 Inference Request with send_and_test_inference()
-
-        # Get Metrics, Parse, and verify inference count == 1
+        assert utils.send_and_test_inference_identity(GRPC_ARGS[1], GRPC_ARGS[2])
+        
+        # Get Metrics and verify inference count == 1 after inference
+        after_status_code, after_inference_count = utils.get_metrics(f"http://{url}/metrics")
+        assert after_status_code == 200 and after_inference_count == 1 
         
         # Teardown Metrics, GrpcService, Server
         utils.teardown_service(grpc_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
-        pass
-    
+        
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date
     # Once the server has been stopped, the underlying TRITONSERVER_Server instance
