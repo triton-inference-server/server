@@ -3,12 +3,13 @@
 ### Helpers ###
 
 function install_deps() {
-    # FIXME: Once the test script and code is in-place, we can clone/copy the
-    # tests rather than expecting them to be baked into the container here, for
-    # better portability and easier test setup.
-    pushd openai/docker
+    # Install python bindings for tritonserver and tritonfrontend
     pip install /opt/tritonserver/python/triton*.whl
+
+    # Install application/testing requirements
+    pushd openai/
     pip install -r requirements.txt
+
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         prepare_tensorrtllm
     else

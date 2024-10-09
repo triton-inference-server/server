@@ -10,7 +10,7 @@
 
 ## VLLM
 
-1. Build and launch the container:
+1. Launch the container and install dependencies:
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
@@ -22,16 +22,24 @@ docker run -it --net=host --gpus all --rm \
   nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
 ```
 
-2. Launch the OpenAI-compatible Triton Inference Server:
+2. Install dependencies inside the container:
 ```bash
+# Install python bindings for tritonserver and tritonfrontend
+pip install /opt/tritonserver/python/triton*.whl
+
+# Install application/testing requirements
 git clone https://github.com/triton-inference-server/server.git
 cd server/python/openai/
+pip install -r requirements.txt
+```
 
+3. Launch the OpenAI-compatible Triton Inference Server:
+```bash
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
-3. Send a `/v1/chat/completions` request:
+4. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -41,7 +49,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 }' | jq
 ```
 
-4. Send a `/v1/completions` request:
+5. Send a `/v1/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -51,7 +59,7 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 }' | jq
 ```
 
-5. Benchmark with `genai-perf`:
+6. Benchmark with `genai-perf`:
 ```bash
 MODEL="llama-3.1-8b-instruct"
 TOKENIZER="meta-llama/Meta-Llama-3.1-8B-Instruct"
@@ -67,7 +75,7 @@ genai-perf \
   --streaming
 ```
 
-6. Use the OpenAI python client directly:
+7. Use the OpenAI python client directly:
 ```python
 from openai import OpenAI
 
@@ -92,7 +100,7 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
-7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
+8. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
 cd server/python/openai/
 pytest -v tests/
@@ -103,7 +111,7 @@ pytest -v tests/
 0. Prepare your model repository for serving a TensorRT-LLM model:
    https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start
 
-1. Build and launch the container:
+1. Launch the container:
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
@@ -115,11 +123,19 @@ docker run -it --net=host --gpus all --rm \
   nvcr.io/nvidia/tritonserver:24.08-trtllm-python-py3
 ```
 
-2. Launch the OpenAI server:
+2. Install dependencies inside the container:
 ```bash
+# Install python bindings for tritonserver and tritonfrontend
+pip install /opt/tritonserver/python/triton*.whl
+
+# Install application/testing requirements
 git clone https://github.com/triton-inference-server/server.git
 cd server/python/openai/
+pip install -r requirements.txt
+```
 
+2. Launch the OpenAI server:
+```bash
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
