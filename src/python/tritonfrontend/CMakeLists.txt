@@ -148,12 +148,12 @@ endif()
 if(${TRITON_ENABLE_TRACING})
     target_include_directories(
       py-bindings
-      PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(
       py-bindings
-      PUBLIC
+      PRIVATE
       ${OPENTELEMETRY_CPP_LIBRARIES}
     )
 
