@@ -37,3 +37,10 @@ except ImportError:
     # TRITON_ENABLE_GRPC=OFF
     # TritonFrontendGrpc Package was not present
     pass
+
+try:
+    from ._metrics import Metrics
+except ImportError:
+    # TRITON_ENABLE_Metrics=OFF
+    # TritonFrontendMetrics Package was not present
+    pass

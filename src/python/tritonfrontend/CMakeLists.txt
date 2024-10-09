@@ -176,6 +176,12 @@ if(${TRITON_ENABLE_STATS})
   )
 endif()
 
+if(${TRITON_ENABLE_METRICS})
+  target_compile_definitions(
+    py-bindings
+    PRIVATE TRITON_ENABLE_METRICS=1
+  )
+endif()
 
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 
