@@ -26,15 +26,16 @@
 
 import os
 import queue
-from functools import partial
-from typing import Union, Tuple
 import re
+from functools import partial
+from typing import Tuple, Union
 
 import numpy as np
 import requests
 import tritonserver
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
+
 # TODO: Re-Format documentation to fit:
 # https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 
@@ -152,25 +153,23 @@ def send_and_test_generate_inference() -> bool:
 
     return False
 
-def get_metrics(metrics_url: str, model_name: str="identity") -> Tuple[int, int]:
+
+def get_metrics(metrics_url: str, model_name: str = "identity") -> Tuple[int, int]:
     response = requests.get(metrics_url)
     request_status_code = response.status_code
     inference_count = None
-    
-    if response.status_code == 200: 
+
+    if response.status_code == 200:
         inference_count = _extract_inference_count(response.text, model_name)
     return response.status_code, inference_count
 
 
 def _extract_inference_count(metrics_data: str, model_name: str):
-    print("-"*80)
-    print(metrics_data)
-    print("-"*80)
-    pattern = fr'nv_inference_count\{{.*?model="{re.escape(model_name)}".*?\}}\s+([0-9.]+)'
+    pattern = (
+        rf'nv_inference_count\{{.*?model="{re.escape(model_name)}".*?\}}\s+([0-9.]+)'
+    )
     match = re.search(pattern, metrics_data)
     if match:
         return int(float(match.group(1)))
-    
-    
-    
+
     return None
