@@ -36,6 +36,9 @@
 #include "../../../http_server.h"
 #endif
 
+#ifdef TRITON_ENABLE_METRICS
+#include "../../../http_server.h"
+#endif
 
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
@@ -82,6 +85,15 @@ PYBIND11_MODULE(tritonfrontend_bindings, m)
                       triton::server::grpc::Server,
                       triton::server::grpc::Server>::StopService);
 #endif  // TRITON_ENABLE_GRPC
+
+#ifdef TRITON_ENABLE_METRICS
+  py::class_<TritonFrontend<HTTPServer, HTTPMetricsServer>>(
+      m, "TritonFrontendMetrics")
+      .def(py::init<uintptr_t, UnorderedMapType>())
+      .def(
+          "start", &TritonFrontend<HTTPServer, HTTPMetricsServer>::StartService)
+      .def("stop", &TritonFrontend<HTTPServer, HTTPMetricsServer>::StopService);
+#endif  // TRITON_ENABLE_METRICS
 }
 
 }}}  // namespace triton::server::python
