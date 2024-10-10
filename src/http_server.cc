@@ -1181,6 +1181,7 @@ HTTPAPIServer::HTTPAPIServer(
 
 HTTPAPIServer::~HTTPAPIServer()
 {
+  LOG_VERBOSE(1) << "~HTTPAPIServer()";
   if (server_metadata_err_ != nullptr) {
     TRITONSERVER_ErrorDelete(server_metadata_err_);
   }
@@ -1809,6 +1810,10 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   }
 
 #ifdef TRITON_ENABLE_TRACING
+  if (trace_manager_ == nullptr) {
+    return;
+  }
+
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
   int32_t count;
@@ -2680,9 +2685,13 @@ HTTPAPIServer::ParseJsonTritonIO(
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+            nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, shm_offset, byte_size, &base, &memory_type,
-            &memory_type_id));
+            &memory_type_id, &shm_info));
+        infer_req->AddShmRegionInfo(shm_info);
+
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
           cudaIpcMemHandle_t* cuda_handle;
@@ -2795,9 +2804,12 @@ HTTPAPIServer::ParseJsonTritonIO(
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
+        std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+            nullptr;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, offset, byte_size, &base, &memory_type,
-            &memory_type_id));
+            shm_region, offset, byte_size, &base, &memory_type, &memory_type_id,
+            &shm_info));
+        infer_req->AddShmRegionInfo(shm_info);
 
         if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -3225,8 +3237,11 @@ HTTPAPIServer::HandleGenerate(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (trace_manager_) {
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
@@ -3549,6 +3564,8 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       }
     }
 
+    // get original element count back
+    element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
@@ -3586,10 +3603,12 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_RESPOND_IF_ERR(
       req, CheckTransactionPolicy(req, model_name, requested_model_version));
 
-  // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (trace_manager_) {
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
@@ -4695,6 +4714,35 @@ HTTPAPIServer::Create(
 
   return nullptr;
 }
+
+
+TRITONSERVER_Error*
+HTTPAPIServer::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server,
+    const UnorderedMapType& options,
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<HTTPServer>* service)
+{
+  int port;
+  bool reuse_port;
+  std::string address;
+  std::string header_forward_pattern;
+  int thread_count;
+
+  RETURN_IF_ERR(GetValue(options, "port", &port));
+  RETURN_IF_ERR(GetValue(options, "reuse_port", &reuse_port));
+  RETURN_IF_ERR(GetValue(options, "address", &address));
+  RETURN_IF_ERR(
+      GetValue(options, "header_forward_pattern", &header_forward_pattern));
+  RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
+
+  return Create(
+      server, trace_manager, shm_manager, port, reuse_port, address,
+      header_forward_pattern, thread_count, restricted_features, service);
+}
+
 
 bool
 HTTPAPIServer::RespondIfRestricted(

@@ -934,7 +934,7 @@ dynamic batcher configurations.
 ```
 
 * Use the
-  [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+  [Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
   to determine the latency and throughput provided by the default dynamic
   batcher configuration.
 

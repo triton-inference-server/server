@@ -29,10 +29,11 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.07-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.09-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
+ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_CLIENT_REPO_TAG=main
@@ -217,6 +218,7 @@ WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=sdk_build /workspace/client/ client/
+COPY --from=sdk_build /workspace/perf_analyzer/ perf_analyzer/
 COPY --from=sdk_build /workspace/install/ install/
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \

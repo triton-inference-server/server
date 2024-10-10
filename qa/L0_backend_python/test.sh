@@ -39,18 +39,18 @@ fi
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 export TEST_WINDOWS=0
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     export DATADIR=${DATADIR:="/c/data/inferenceserver/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
     # This will run in WSL, but Triton will run in windows, so environment
     # variables meant for loaded models must be exported using WSLENV.
     # The /w flag indicates the value should only be included when invoking
     # Win32 from WSL.
-    export WSLENV=TRITON_DIR/w
+    export WSLENV=TRITON_DIR
     export SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     export BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
     export MODELDIR=${MODELDIR:=c:/}
-    TEST_WINDOWS=1
+    export TEST_WINDOWS=1
 else
     export DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -425,11 +425,20 @@ if [ "$TEST_JETSON" == "0" ]; then
         # between dependencies.
         setup_virtualenv
 
+        set +e
         (cd ${TEST} && bash -ex test.sh)
-        if [ $? -ne 0 ]; then
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -ne 0 ]; then
             echo "Subtest ${TEST} FAILED"
-            RET=1
+            RET=$EXIT_CODE
+
+            # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
+            # Propagate the exit code to make sure it's not overwritten by other tests.
+            if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
+                BLS_RET=$RET
+            fi
         fi
+        set -e
 
         deactivate_virtualenv
     done
@@ -438,11 +447,13 @@ if [ "$TEST_JETSON" == "0" ]; then
     if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
+        set +e
         (cd env && bash -ex test.sh)
         if [ $? -ne 0 ]; then
             echo "Subtest env FAILED"
             RET=1
         fi
+        set -e
     fi
 fi
 
@@ -459,12 +470,14 @@ for TEST in ${SUBTESTS}; do
     # between dependencies.
     setup_virtualenv
 
+    set +e
     (cd ${TEST} && bash -ex test.sh)
 
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
     fi
+    set -e
 
     deactivate_virtualenv
 done
@@ -475,4 +488,14 @@ else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 
-exit $RET
+# Exit with RET if it is 1, meaning that the test failed.
+# Otherwise, exit with BLS_RET if it is set, meaning that the known memory leak is captured.
+if [ $RET -eq 1 ]; then
+    exit $RET
+else
+    if [ -z "$BLS_RET" ]; then
+        exit $RET
+    else
+        exit $BLS_RET
+    fi
+fi

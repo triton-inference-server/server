@@ -378,3 +378,9 @@ Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
 The TRT-LLM backend uses the custom metrics API to track and expose specific metrics about
 LLMs, KV Cache, and Inflight Batching to Triton:
 https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#triton-metrics
+
+### vLLM Backend Metrics
+
+The vLLM backend uses the custom metrics API to track and expose specific metrics about
+LLMs to Triton:
+https://github.com/triton-inference-server/vllm_backend?tab=readme-ov-file#triton-metrics
