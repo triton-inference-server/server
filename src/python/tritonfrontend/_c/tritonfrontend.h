@@ -119,16 +119,15 @@ class TritonFrontend {
     std::string trace_file = "/tmp/prashanth.json";
     TRITONSERVER_InferenceTraceLevel trace_level{
         TRITONSERVER_TRACE_LEVEL_TIMESTAMPS};
-    int32_t trace_rate{1000};
-    int32_t trace_count{-1};
-    int32_t trace_log_frequency{0};
-    InferenceTraceMode trace_mode{TRACE_MODE_TRITON};
-    TraceConfigMap trace_config_map;
+    int32_t trace_rate{1000};  // Sampling Rate 1/trace_rate requests get traced
+    int32_t trace_count{-1};   // Limit of traces collected
+    int32_t trace_log_frequency{1};  // Will write to a log for every n traces
+    InferenceTraceMode trace_mode{TRACE_MODE_TRITON};  // Or trace_mode_triton
+    TraceConfigMap trace_config_map;                   // Can pass trace args
 
     ThrowIfError(TraceManager::Create(
-          &trace_manager_, trace_level, trace_rate, 
-          trace_count, trace_log_frequency,
-          trace_file, trace_mode, trace_config_map));
+        &trace_manager_, trace_level, trace_rate, trace_count,
+        trace_log_frequency, trace_file, trace_mode, trace_config_map));
 
 
     ThrowIfError(FrontendServer::Create(
@@ -150,11 +149,11 @@ class TritonFrontend {
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
 
-  ~TritonFrontend() {
+  ~TritonFrontend()
+  {
     delete trace_manager_;
     trace_manager_ = nullptr;
   }
-  
 };
 
 }}}  // namespace triton::server::python
