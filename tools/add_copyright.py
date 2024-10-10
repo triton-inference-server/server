@@ -257,7 +257,9 @@ def add_copyrights(paths):
                 f"WARNING: No handler registered for file: {path}. Please add a new handler to {__file__}!"
             )
 
-    subprocess.run(["git", "add"] + paths)
+    # Don't automatically 'git add' changes for now, make it more clear which
+    # files were changed and have ability to see 'git diff' on them.
+    # subprocess.run(["git", "add"] + paths)
 
     print(f"Processed copyright headers for {len(paths)} file(s).")
 
