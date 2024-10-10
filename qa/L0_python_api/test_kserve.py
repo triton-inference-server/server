@@ -29,18 +29,10 @@ from functools import partial
 
 import numpy as np
 import pytest
+import testing_utils as utils
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
-from testing_utils import (
-    send_and_test_inference_identity,
-    setup_client,
-    setup_server,
-    setup_service,
-    teardown_client,
-    teardown_server,
-    teardown_service,
-)
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp
 
@@ -93,80 +85,100 @@ GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 class TestKServe:
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
     def test_server_ready(self, frontend, client_type, url):
-        server = setup_server()
-        service = setup_service(server, frontend)
-        client = setup_client(client_type, url=url)
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+        client = utils.setup_client(client_type, url=url)
 
         assert client.is_server_ready()
 
-        teardown_client(client)
-        teardown_service(service)
-        teardown_server(server)
+        utils.teardown_client(client)
+        utils.teardown_service(service)
+        utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_service_double_start(self, frontend):
-        server = setup_server()
+        server = utils.setup_server()
         # setup_service() performs service.start()
-        service = setup_service(server, frontend)
+        service = utils.setup_service(server, frontend)
 
         with pytest.raises(
             tritonserver.AlreadyExistsError, match="server is already running."
         ):
             service.start()
 
-        teardown_server(server)
-        teardown_service(service)
+        utils.teardown_server(server)
+        utils.teardown_service(service)
 
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_invalid_options(self, frontend):
-        server = setup_server()
+        server = utils.setup_server()
         # Current flow is KServeHttp.Options or KServeGrpc.Options have to be
         # provided to ensure type and range validation occurs.
         with pytest.raises(
             tritonserver.InvalidArgumentError,
             match="Incorrect type for options. options argument must be of type",
         ):
-            frontend.Server(server, {"port": 8001})
+            frontend(server, {"port": 8001})
 
-        teardown_server(server)
+        utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_server_service_order(self, frontend):
-        server = setup_server()
-        service = setup_service(server, frontend)
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
 
-        teardown_server(server)
-        teardown_service(service)
+        utils.teardown_server(server)
+        utils.teardown_service(service)
 
     @pytest.mark.parametrize("frontend, client_type", [HTTP_ARGS[:2], GRPC_ARGS[:2]])
     def test_service_custom_port(self, frontend, client_type):
-        server = setup_server()
+        server = utils.setup_server()
         options = frontend.Options(port=8005)
-        service = setup_service(server, frontend, options)
-        client = setup_client(client_type, url="localhost:8005")
+        service = utils.setup_service(server, frontend, options)
+        client = utils.setup_client(client_type, url="localhost:8005")
 
         # Confirms that service starts at port 8005
         client.is_server_ready()
 
-        teardown_client(client)
-        teardown_service(service)
-        teardown_server(server)
+        utils.teardown_client(client)
+        utils.teardown_service(service)
+        utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
     def test_inference(self, frontend, client_type, url):
-        server = setup_server()
-        service = setup_service(server, frontend)
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
 
         # TODO: use common/test_infer
-        assert send_and_test_inference_identity(client_type, url=url)
+        assert utils.send_and_test_inference_identity(client_type, url=url)
 
-        teardown_service(service)
-        teardown_server(server)
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
+    def test_streaming_inference(self, frontend, client_type, url):
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+
+        assert utils.send_and_test_stream_inference(client_type, url)
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
+    def test_http_generate_inference(self, frontend, client_type, url):
+        server = utils.setup_server()
+        service = utils.setup_service(server, frontend)
+
+        assert utils.send_and_test_generate_inference()
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
     def test_http_req_during_shutdown(self, frontend, client_type, url):
-        server = setup_server()
-        http_service = setup_service(server, frontend)
+        server = utils.setup_server()
+        http_service = utils.setup_service(server, frontend)
         http_client = httpclient.InferenceServerClient(url="localhost:8000")
         model_name = "delayed_identity"
         delay = 2  # seconds
@@ -182,7 +194,7 @@ class TestKServe:
             model_name=model_name, inputs=inputs, outputs=outputs
         )
         # http_service.stop() does not use graceful shutdown
-        teardown_service(http_service)
+        utils.teardown_service(http_service)
 
         # So, inference request will fail as http endpoints have been stopped.
         with pytest.raises(
@@ -194,7 +206,7 @@ class TestKServe:
         # However, due to an unsuccessful get_result(), async_request is still
         # an active thread. Hence, join stalls until greenlet timeouts.
         # Does not throw an exception, but displays error in logs.
-        teardown_client(http_client)
+        utils.teardown_client(http_client)
 
         # delayed_identity will still be an active model
         # Hence, server.stop() causes InternalError: Timeout.
@@ -202,12 +214,12 @@ class TestKServe:
             tritonserver.InternalError,
             match="Exit timeout expired. Exiting immediately.",
         ):
-            teardown_server(server)
+            utils.teardown_server(server)
 
     @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
     def test_grpc_req_during_shutdown(self, frontend, client_type, url):
-        server = setup_server()
-        grpc_service = setup_service(server, frontend)
+        server = utils.setup_server()
+        grpc_service = utils.setup_service(server, frontend)
         grpc_client = grpcclient.InferenceServerClient(url=url)
         user_data = []
 
@@ -234,7 +246,7 @@ class TestKServe:
             callback=partial(callback, user_data),
         )
 
-        teardown_service(grpc_service)
+        utils.teardown_service(grpc_service)
 
         time_out = delay + 1
         while (len(user_data) == 0) and time_out > 0:
@@ -256,8 +268,8 @@ class TestKServe:
             )
         )
 
-        teardown_client(grpc_client)
-        teardown_server(server)
+        utils.teardown_client(grpc_client)
+        utils.teardown_server(server)
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date
@@ -265,8 +277,8 @@ class TestKServe:
     # is deleted. However, the frontend does not know the server instance
     # is no longer valid.
     # def test_inference_after_server_stop(self):
-    #     server = setup_server()
-    #     http_service = setup_service(server, KServeHttp)
+    #     server = utils.setup_server()
+    #     http_service = utils.setup_service(server, KServeHttp)
     #     http_client = setup_client(httpclient, url="localhost:8000")
 
     #     teardown_server(server) # Server has been stopped
@@ -282,5 +294,5 @@ class TestKServe:
 
     #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
 
-    #     teardown_client(http_client)
-    #     teardown_service(http_service)
+    #     utils.teardown_client(http_client)
+    #     utils.teardown_service(http_service)
