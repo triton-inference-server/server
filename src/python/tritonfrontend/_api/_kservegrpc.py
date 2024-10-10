@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 from enum import IntEnum
 from typing import Union
 
@@ -34,7 +33,6 @@ from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
-    TritonError,
     TritonFrontendGrpc,
 )
 
@@ -107,7 +105,7 @@ class KServeGrpc:
         options_dict: dict[str, Union[int, bool, str]] = options.__dict__
 
         self.triton_frontend = TritonFrontendGrpc(server_ptr, options_dict)
-    
+
     def __enter__(self):
         self.triton_frontend.start()
         return self
@@ -121,7 +119,7 @@ class KServeGrpc:
     @handle_triton_error
     def start(self):
         self.triton_frontend.start()
-    
+
     @handle_triton_error
     def stop(self):
         self.triton_frontend.stop()

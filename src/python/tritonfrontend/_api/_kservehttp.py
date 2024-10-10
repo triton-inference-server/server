@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import sys
 from typing import Union
 
 import tritonserver
@@ -34,7 +33,6 @@ from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
-    TritonError,
     TritonFrontendHttp,
 )
 
@@ -77,11 +75,11 @@ class KServeHttp:
         self.triton_frontend.stop()
         if exc_type:
             raise exc_type(exc_value)
-    
+
     @handle_triton_error
     def start(self):
         self.triton_frontend.start()
-    
-    @handle_triton_error    
+
+    @handle_triton_error
     def stop(self):
         self.triton_frontend.stop()
