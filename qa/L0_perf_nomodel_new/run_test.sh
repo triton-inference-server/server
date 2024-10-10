@@ -36,8 +36,8 @@ CONCURRENCY=${CONCURRENCY:=1}
 TIMEOUT_PERIOD=600
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
-PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=10000}
-PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=15}
+PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=1000}
+PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=18}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
@@ -51,7 +51,8 @@ BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
 PERF_CLIENT=../clients/perf_client
 TF_VERSION=${TF_VERSION:=2}
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -174,6 +175,11 @@ for BACKEND in $BACKENDS; do
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
         SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
+        if [ $NAME == "custom_sbatch1_dbatch1_instance2"]; then
+            SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
+        else
+            SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+
         run_server
         if [ $SERVER_PID == 0 ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
