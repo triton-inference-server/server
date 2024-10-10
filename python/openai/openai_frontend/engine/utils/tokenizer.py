@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Adapted from
-# https://github.com/triton-inference-server/server/blob/rmccormick-openai/python/openai/openai_frontend/engine/utils/tokenizer.py
+# https://github.com/vllm-project/vllm/blob/main/vllm/transformers_utils/tokenizer.py
 # Copyright 2024 The vLLM team.
 
 from typing import Optional, Union
