@@ -105,7 +105,7 @@ class TritonFrontend {
   std::unique_ptr<Base> service;
   triton::server::RestrictedFeatures restricted_features;
   // TODO: [DLIS-7194] Add support for TraceManager & SharedMemoryManager
-  // triton::server::TraceManager trace_manager_;
+  triton::server::TraceManager* trace_manager_;
   // triton::server::SharedMemoryManager shm_manager_;
 
  public:
@@ -116,8 +116,23 @@ class TritonFrontend {
 
     server_.reset(server_ptr, EmptyDeleter);
 
+    std::string trace_file = "/tmp/prashanth.json";
+    TRITONSERVER_InferenceTraceLevel trace_level{
+        TRITONSERVER_TRACE_LEVEL_TIMESTAMPS};
+    int32_t trace_rate{1000};
+    int32_t trace_count{-1};
+    int32_t trace_log_frequency{0};
+    InferenceTraceMode trace_mode{TRACE_MODE_TRITON};
+    TraceConfigMap trace_config_map;
+
+    ThrowIfError(TraceManager::Create(
+          &trace_manager_, trace_level, trace_rate, 
+          trace_count, trace_log_frequency,
+          trace_file, trace_mode, trace_config_map));
+
+
     ThrowIfError(FrontendServer::Create(
-        server_, data, nullptr /* TraceManager */,
+        server_, data, trace_manager_ /* TraceManager */,
         nullptr /* SharedMemoryManager */, restricted_features, &service));
   };
 
@@ -134,6 +149,12 @@ class TritonFrontend {
   // will cause a double-free when the core bindings attempt to
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
+
+  ~TritonFrontend() {
+    delete trace_manager_;
+    trace_manager_ = nullptr;
+  }
+  
 };
 
 }}}  // namespace triton::server::python
