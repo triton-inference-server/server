@@ -175,7 +175,7 @@ for BACKEND in $BACKENDS; do
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
         SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
-        if [ $NAME == "custom_sbatch1_dbatch1_instance2"]; then
+        if [ $NAME == "custom_sbatch1_dbatch1_instance2" ]; then
             SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
         else
             SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
