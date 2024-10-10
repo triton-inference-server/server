@@ -179,7 +179,7 @@ for BACKEND in $BACKENDS; do
             SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
         else
             SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
-
+        fi
         run_server
         if [ $SERVER_PID == 0 ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
