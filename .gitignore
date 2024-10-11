@@ -5,4 +5,13 @@
 __pycache__
 tmp
 *.log
+*.xml
 test_results.txt
+artifacts
+cprofile
+*.prof
+
+# Test exclusions
+qa/L0_openai/openai
+tensorrtllm_models
+custom_tokenizer
