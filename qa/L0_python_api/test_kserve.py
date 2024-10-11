@@ -35,7 +35,7 @@ import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
-import requests
+
 
 class TestHttpOptions:
     def test_correct_http_parameters(self):
@@ -53,6 +53,7 @@ class TestHttpOptions:
         # Wrong data type
         with pytest.raises(Exception):
             KServeHttp.Options(header_forward_pattern=10)
+
 
 class TestGrpcOptions:
     def test_correct_grpc_parameters(self):
@@ -76,6 +77,7 @@ class TestGrpcOptions:
         with pytest.raises(Exception):
             KServeGrpc.Options(server_key=10)
 
+
 class TestMetricsOptions:
     def test_correct_http_parameters(self):
         Metrics.Options(address="0.0.0.1", port=8080, thread_count=16)
@@ -91,9 +93,11 @@ class TestMetricsOptions:
         with pytest.raises(Exception):
             Metrics.Options(thread_count="ten")
 
+
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
 GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
-METRICS_ARGS = (Metrics, "localhost:8002") # Default Metrics args
+METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
+
 
 class TestKServe:
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
@@ -284,57 +288,62 @@ class TestKServe:
         utils.teardown_client(grpc_client)
         utils.teardown_server(server)
 
-
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_default_port(self, frontend, url):
         server = utils.setup_server()
         service = utils.setup_service(server, frontend)
-        
+
         metrics_url = f"http://{url}/metrics"
         status_code, _ = utils.get_metrics(metrics_url)
-        
+
         assert status_code == 200
-        
+
         utils.teardown_service(service)
         utils.teardown_server(server)
-    
+
     @pytest.mark.parametrize("frontend", [Metrics])
     def test_metrics_custom_port(self, frontend, port=8005):
         server = utils.setup_server()
         service = utils.setup_service(server, frontend, Metrics.Options(port=port))
-        
+
         metrics_url = f"http://localhost:{port}/metrics"
         status_code, _ = utils.get_metrics(metrics_url)
-        
+
         assert status_code == 200
-            
+
         utils.teardown_service(service)
         utils.teardown_server(server)
-    
+
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
         # For this test
         # Setup Server, KServeGrpc, Metrics
         server = utils.setup_server()
-        grpc_service = utils.setup_service(server, KServeGrpc) # Needed to send inference request
+        grpc_service = utils.setup_service(
+            server, KServeGrpc
+        )  # Needed to send inference request
         metrics_service = utils.setup_service(server, frontend)
-        
+
         # Get Metrics and verify inference count == 0 before inference
-        before_status_code, before_inference_count = utils.get_metrics(f"http://{url}/metrics")
-        assert before_status_code == 200 and before_inference_count == 0 
-        
+        before_status_code, before_inference_count = utils.get_metrics(
+            f"http://{url}/metrics"
+        )
+        assert before_status_code == 200 and before_inference_count == 0
+
         # Send 1 Inference Request with send_and_test_inference()
         assert utils.send_and_test_inference_identity(GRPC_ARGS[1], GRPC_ARGS[2])
-        
+
         # Get Metrics and verify inference count == 1 after inference
-        after_status_code, after_inference_count = utils.get_metrics(f"http://{url}/metrics")
-        assert after_status_code == 200 and after_inference_count == 1 
-        
+        after_status_code, after_inference_count = utils.get_metrics(
+            f"http://{url}/metrics"
+        )
+        assert after_status_code == 200 and after_inference_count == 1
+
         # Teardown Metrics, GrpcService, Server
         utils.teardown_service(grpc_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
-        
+
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date
     # Once the server has been stopped, the underlying TRITONSERVER_Server instance

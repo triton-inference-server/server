@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import queue
 import re
 from functools import partial
 from typing import Tuple, Union
@@ -33,7 +32,6 @@ from typing import Tuple, Union
 import numpy as np
 import requests
 import tritonserver
-from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
 
 # TODO: Re-Format documentation to fit:
