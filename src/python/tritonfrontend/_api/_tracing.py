@@ -23,3 +23,53 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+import sys
+from typing import Union
+
+import tritonserver
+from pydantic import Field
+from pydantic.dataclasses import dataclass
+
+#
+
+
+class Tracing:
+    @dataclass
+    class Options:
+        filepath: str = ""
+        # trace_level = TRITONSERVER_TRACE_LEVEL_DISABLED
+        rate: int = Field(1000, ge=0, help="Specifies sampling rate")
+        count: int = -1
+        # trace_log_frequency: int =
+        # trace_mode = TRACE_MODE_TRITON
+
+    #   std::string trace_filepath_{};
+
+
+#   TRITONSERVER_InferenceTraceLevel trace_level_{
+#       TRITONSERVER_TRACE_LEVEL_DISABLED};
+#   int32_t trace_rate_{1000};
+#   int32_t trace_count_{-1};
+#   int32_t trace_log_frequency_{0};
+#   InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
+#   TraceConfigMap trace_config_map_;
+
+
+# using TraceConfig = std::vector<
+#     std::pair<std::string, std::variant<std::string, int, uint32_t>>>;
+# // Key is trace mode,
+# using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
+
+# /// Trace modes.
+# typedef enum tracemode_enum {
+#   /// Default is Triton tracing API
+#   TRACE_MODE_TRITON = 0,
+#   /// OpenTelemetry API for tracing
+#   TRACE_MODE_OPENTELEMETRY = 1
+# } InferenceTraceMode;
+
+
+# Current C++ flow of tracer arguments:
+# TraceConfigMap
