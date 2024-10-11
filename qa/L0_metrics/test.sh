@@ -283,6 +283,41 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee
 check_unit_test
 kill_server
 
+# Enable histograms (decoupled)
+decoupled_model_name="dlpack_io_identity_decoupled"
+mkdir -p "${MODELDIR}/${decoupled_model_name}/1/"
+cp ../python_models/${decoupled_model_name}/model.py ${MODELDIR}/${decoupled_model_name}/1/
+cp ../python_models/${decoupled_model_name}/config.pbtxt ${MODELDIR}/${decoupled_model_name}/
+
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model_name}"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Disable histograms (decoupled)
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model_name} --metrics-config histogram_latencies=false"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
 # Enable summaries, counters still enabled by default
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
 run_and_check_server

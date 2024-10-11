@@ -204,6 +204,42 @@ metrics are used for latencies:
 
 To disable these metrics specifically, you can set `--metrics-config counter_latencies=false`
 
+#### Histograms
+
+> **Note**
+>
+> The following Histogram feature is experimental for the time being and may be
+> subject to change based on user feedback.
+
+By default, the following
+[Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
+metrics are used for latencies:
+
+|Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |Model Type
+|--------------|----------------|------------|---------------------------|-----------|-------------|-------------|
+|Latency       |Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to response time |Per model  |Per request  | Decoupled |
+
+To disable these metrics specifically, you can set `--metrics-config histogram_latencies=false`
+
+Each histogram above may composed of several sub-metrics. For each
+metric, there is a set of `le` metrics tracking the counter for each
+bucket. Additionally, there are `_count` and `_sum` metrics that aggregate
+the count and observed values for each. For example, see the following
+information exposed by the Inference First Response Histogram metrics:
+```
+# HELP nv_first_response_histogram_ms Histogram of end-to-end inference request to response time in milliseconds.
+# TYPE nv_first_response_histogram_ms histogram
+nv_inference_first_response_histogram_ms_count{model="my_model",version="1"} 101
+nv_inference_first_response_histogram_ms_sum{model="my_model",version="1"} 3685
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="10"} 55
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="100"} 97
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="500"} 98
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="1000"} 101
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="+Inf"} 101
+```
+
+Triton has a set of default buckets per metric to track, as shown above. Customization of buckets per metric is  currently not supported.
+
 #### Summaries
 
 > **Note**
