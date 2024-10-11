@@ -34,9 +34,6 @@ import requests
 import tritonserver
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
 
-# TODO: Re-Format documentation to fit:
-# https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
-
 
 def setup_server(model_repository="test_model_repository") -> tritonserver.Server:
     """
