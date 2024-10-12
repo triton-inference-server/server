@@ -521,12 +521,12 @@ if(${TRITON_ENABLE_TRACING})
   if (NOT WIN32)
     target_include_directories(
       tracing-library
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(
       tracing-library
-      PRIVATE
+      PUBLIC
       ${OPENTELEMETRY_CPP_LIBRARIES})
   endif()
 
