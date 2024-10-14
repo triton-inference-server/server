@@ -2436,6 +2436,101 @@ Server::Create(
 }
 
 TRITONSERVER_Error*
+Server::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server, UnorderedMapType& options,
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<Server>* service)
+{
+  Options grpc_options;
+
+  RETURN_IF_ERR(GetOptions(grpc_options, options));
+
+  return Create(server, trace_manager, shm_manager, grpc_options, service);
+}
+
+TRITONSERVER_Error*
+Server::GetOptions(Options& options, UnorderedMapType& options_map)
+{
+  SocketOptions socket_selection;
+  SslOptions ssl_selection;
+  KeepAliveOptions keep_alive_selection;
+
+  RETURN_IF_ERR(GetSocketOptions(options.socket_, options_map));
+  RETURN_IF_ERR(GetSslOptions(options.ssl_, options_map));
+  RETURN_IF_ERR(GetKeepAliveOptions(options.keep_alive_, options_map));
+
+  int infer_compression_level_key;
+
+  RETURN_IF_ERR(GetValue(
+      options_map, "infer_compression_level", &infer_compression_level_key));
+
+  options.infer_compression_level_ =
+      static_cast<grpc_compression_level>(infer_compression_level_key);
+
+  RETURN_IF_ERR(GetValue(
+      options_map, "infer_allocation_pool_size",
+      &options.infer_allocation_pool_size_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "forward_header_pattern", &options.forward_header_pattern_));
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+Server::GetSocketOptions(SocketOptions& options, UnorderedMapType& options_map)
+{
+  RETURN_IF_ERR(GetValue(options_map, "address", &options.address_));
+  RETURN_IF_ERR(GetValue(options_map, "port", &options.port_));
+  RETURN_IF_ERR(GetValue(options_map, "reuse_port", &options.reuse_port_));
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+Server::GetSslOptions(SslOptions& options, UnorderedMapType& options_map)
+{
+  RETURN_IF_ERR(GetValue(options_map, "use_ssl", &options.use_ssl_));
+  RETURN_IF_ERR(GetValue(options_map, "server_cert", &options.server_cert_));
+  RETURN_IF_ERR(GetValue(options_map, "server_key", &options.server_key_));
+  RETURN_IF_ERR(GetValue(options_map, "root_cert", &options.root_cert_));
+  RETURN_IF_ERR(
+      GetValue(options_map, "use_mutual_auth", &options.use_mutual_auth_));
+
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+Server::GetKeepAliveOptions(
+    KeepAliveOptions& options, UnorderedMapType& options_map)
+{
+  RETURN_IF_ERR(
+      GetValue(options_map, "keepalive_time_ms", &options.keepalive_time_ms_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "keepalive_timeout_ms", &options.keepalive_timeout_ms_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "keepalive_permit_without_calls",
+      &options.keepalive_permit_without_calls_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "http2_max_pings_without_data",
+      &options.http2_max_pings_without_data_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "http2_min_recv_ping_interval_without_data_ms",
+      &options.http2_min_recv_ping_interval_without_data_ms_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "http2_max_ping_strikes", &options.http2_max_ping_strikes_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "max_connection_age_ms", &options.max_connection_age_ms_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "max_connection_age_grace_ms",
+      &options.max_connection_age_grace_ms_));
+
+  return nullptr;
+}
+
+
+TRITONSERVER_Error*
 Server::Start()
 {
   if (running_) {

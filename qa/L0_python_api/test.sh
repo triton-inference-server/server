@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,6 +45,15 @@ API_TEST_LOG="./python_api.log"
 python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $API_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+
+FRONTEND_TEST_LOG="./python_kserve.log"
+python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $FRONTEND_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

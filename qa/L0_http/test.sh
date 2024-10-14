@@ -49,7 +49,7 @@ NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
@@ -662,7 +662,7 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=16
+EXPECTED_NUM_TESTS=17
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then

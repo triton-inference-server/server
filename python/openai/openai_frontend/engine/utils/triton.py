@@ -36,7 +36,26 @@ def _create_vllm_inference_request(
     model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
 ):
     inputs = {}
-    excludes = {"model", "stream", "messages", "prompt", "echo"}
+    # Exclude non-sampling parameters so they aren't passed to vLLM
+    excludes = {
+        "model",
+        "stream",
+        "messages",
+        "prompt",
+        "echo",
+        "store",
+        "metadata",
+        "response_format",
+        "service_tier",
+        "stream_options",
+        "tools",
+        "tool_choice",
+        "parallel_tool_calls",
+        "user",
+        "function_call",
+        "functions",
+        "suffix",
+    }
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.

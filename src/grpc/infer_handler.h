@@ -299,7 +299,9 @@ InferAllocatorPayload(
     const inference::ModelInferRequest& request,
     std::list<std::string>&& serialized_data,
     std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
-    AllocPayload<ResponseType>* alloc_payload)
+    AllocPayload<ResponseType>* alloc_payload,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        shm_regions_info)
 {
   alloc_payload->response_queue_ = response_queue;
   alloc_payload->shm_map_.clear();
@@ -335,9 +337,12 @@ InferAllocatorPayload(
       void* base;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
+      std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo> shm_info =
+          nullptr;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          region_name, offset, byte_size, &base, &memory_type,
-          &memory_type_id));
+          region_name, offset, byte_size, &base, &memory_type, &memory_type_id,
+          &shm_info));
+      shm_regions_info->emplace_back(shm_info);
 
       if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU
@@ -373,7 +378,9 @@ TRITONSERVER_Error* InferGRPCToInput(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const inference::ModelInferRequest& request,
     std::list<std::string>* serialized_data,
-    TRITONSERVER_InferenceRequest* inference_request);
+    TRITONSERVER_InferenceRequest* inference_request,
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>*
+        shm_regions_info);
 
 TRITONSERVER_Error* ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -646,6 +653,7 @@ class InferHandlerState {
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
+      gRPCErrorTracker_ = std::make_unique<gRPCErrorTracker>();
     }
 
     void SetCompressionLevel(grpc_compression_level compression_level)
@@ -666,9 +674,12 @@ class InferHandlerState {
 
     bool IsCancelled()
     {
-      return received_notification_ ? ctx_->IsCancelled() : false;
+      std::lock_guard<std::recursive_mutex> lock(mu_);
+      return received_notification_
+                 ? (ctx_->IsCancelled() ||
+                    gRPCErrorTracker_->CheckAndUpdateGRPCError())
+                 : false;
     }
-
     // Increments the ongoing request counter
     void IncrementRequestCounter() { ongoing_requests_++; }
 
@@ -708,6 +719,37 @@ class InferHandlerState {
         return true;
       }
       return false;
+    }
+
+    // Extracts headers from GRPC request and updates state
+    void ExtractStateFromHeaders(InferHandlerStateType* state)
+    {
+      const auto& metadata = state->context_->ctx_->client_metadata();
+      std::string triton_grpc_error_key = "triton_grpc_error";
+
+      auto it = metadata.find(
+          {triton_grpc_error_key.data(), triton_grpc_error_key.size()});
+
+      if (it != metadata.end()) {
+        if (it->second == "true") {
+          LOG_VERBOSE(2)
+              << "GRPC: triton_grpc_error mode detected in new grpc stream";
+          state->context_->gRPCErrorTracker_->triton_grpc_error_ = true;
+        }
+      }
+    }
+
+    void WriteGRPCErrorResponse(InferHandlerStateType* state)
+    {
+      std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+      // Check if Error not responded previously
+      // Avoid closing connection twice on multiple errors from core
+      if (!state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
+        state->step_ = Steps::COMPLETE;
+        state->context_->responder_->Finish(state->status_, state);
+        // Mark error for this stream
+        state->context_->gRPCErrorTracker_->MarkGRPCErrorEncountered();
+      }
     }
 
     const std::string DebugString(InferHandlerStateType* state)
@@ -793,6 +835,7 @@ class InferHandlerState {
     bool HandleCancellation(
         InferHandlerStateType* state, bool rpc_ok, const std::string& name)
     {
+      // Check to avoid early exit in case of triton_grpc_error
       if (!IsCancelled()) {
         LOG_ERROR
             << "[INTERNAL] HandleCancellation called even when the context was "
@@ -816,7 +859,6 @@ class InferHandlerState {
           IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
-
           // The state returns true because the CancelExecution
           // call above would have raised alarm objects on all
           // pending inflight states objects. This state will
@@ -999,6 +1041,8 @@ class InferHandlerState {
     // Tracks whether the async notification has been delivered by
     // completion queue.
     bool received_notification_;
+
+    std::unique_ptr<gRPCErrorTracker> gRPCErrorTracker_;
   };
 
   // This constructor is used to build a wrapper state object
@@ -1090,7 +1134,6 @@ class InferHandlerState {
 
   void MarkAsAsyncNotifyState() { async_notify_state_ = true; }
   bool IsAsyncNotifyState() { return async_notify_state_; }
-
   // Needed in the response handle for classification outputs.
   TRITONSERVER_Server* tritonserver_;
 
@@ -1226,6 +1269,23 @@ class InferHandler : public HandlerBase {
 
     delete state;
   }
+
+  // Simple structure that carries the payload needed for
+  // response release callback.
+  struct ResponseReleasePayload final {
+    State* state_;
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info_;
+
+    ResponseReleasePayload(
+        State* state,
+        std::vector<
+            std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
+            shm_regions_info)
+        : state_(state), shm_regions_info_(std::move(shm_regions_info))
+    {
+    }
+  };
 
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
