@@ -1,4 +1,4 @@
-#!/usr/bin/python
+# /usr/bin/python
 # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,10 +28,12 @@
 import os
 import re
 import unittest
+
 import requests
 
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 MODEL_LOAD_TIME = "nv_model_load_time{model="
+
 
 def get_model_load_times():
     r = requests.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
@@ -44,25 +46,26 @@ def get_model_load_times():
         model_load_times[model_name] = float(load_time)
     return model_load_times
 
+
 class TestGeneralMetrics(tu.TestResultCollector):
     def setUp(self):
         self.model_name = "libtorch_float32_float32_float32"
-    
+
     def test_metrics_load_time(self):
         model_load_times = get_model_load_times()
         load_time = model_load_times.get(self.model_name)
-        
+
         self.assertIsNotNone(load_time, "Model Load time not found")
-        
+
         dict_size = len(model_load_times)
         self.assertEqual(dict_size, 1, "Too many model_load_time entries found")
 
     def test_metrics_load_time_explicit_load(self):
         model_load_times = get_model_load_times()
         load_time = model_load_times.get(self.model_name)
-        
+
         self.assertIsNotNone(load_time, "Model Load time not found")
-        
+
         dict_size = len(model_load_times)
         self.assertEqual(dict_size, 1, "Too many model_load_time entries found")
 
@@ -72,8 +75,9 @@ class TestGeneralMetrics(tu.TestResultCollector):
         print(r.text)
         model_load_times = get_model_load_times()
         load_time = model_load_times.get(self.model_name)
-        
+
         self.assertIsNone(load_time, "Model Load time found even after unload")
+
 
 if __name__ == "__main__":
     unittest.main()
