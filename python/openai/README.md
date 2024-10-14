@@ -70,7 +70,7 @@ pip install -r requirements.txt
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
-The output should contain the following snippets look along the lines of:
+Once the server has successfully started, you should see something like this:
 ```
 ...
 +-----------------------+---------+--------+
