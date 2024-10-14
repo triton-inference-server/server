@@ -168,7 +168,7 @@ TEST_CONCURRENCY+=(
     16
     16
     16)
-TEST_BACKENDS=${BACKENDS:="plan custom graphdef"}
+TEST_BACKENDS=${BACKENDS:="plan graphdef custom"}
 
 mkdir -p ${REPO_VERSION}
 
