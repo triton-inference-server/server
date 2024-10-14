@@ -195,6 +195,8 @@ print(completion.choices[0].message.content)
 8. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
 cd server/python/openai/
+pip install -r requirements-test.txt
+
 pytest -v tests/
 ```
 
