@@ -73,7 +73,7 @@ mkdir ${MODELDIR}/models && \
 
 function simple_inference_check()
 {
-    INFER_SUCCESS=1
+    INFER_SUCCESS=a
     set +e
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' ${TRITONSERVER_IPADDR}:8000/v2/models/plan_int32_int32_int32/infer`
     set -e
@@ -95,7 +95,7 @@ fi
 
 # Test Case 2: Launch server with additional options to point to custom dependency location (expect SUCCESS)
 SERVER_LOG="./custom_dependency_dir_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dir=${CUSTOM_DEPENDENCY_DIR};"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -113,7 +113,7 @@ kill_server
 
 # Test Case 3: Launch server with additional options to point to custom dependency location and load model dynamically (expect SUCCESS)
 SERVER_LOG="./dynamic_loading_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dir=${CUSTOM_DEPENDENCY_DIR}; --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR}; --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -138,7 +138,7 @@ kill_server
 
 # Test Case 4: Run server when when pointing to stale TRT dependencies (expect FAIL)
 SERVER_LOG="./stale_dependencies_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dir=${STALE_DEPENDENCY_DIR};"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${STALE_DEPENDENCY_DIR};"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** FAILED on line ${LINENO}: unexpected success starting $SERVER\n***"
@@ -148,7 +148,7 @@ fi
 
 # Test Case 5: [Test ordering] Run server when when pointing to stale and correct TRT dependencies (stale first - expect FAIL).
 SERVER_LOG="./stale_first_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dir=${STALE_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR};"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${STALE_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR};"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** FAILED on line ${LINENO}: unexpected success starting $SERVER\n***"
@@ -158,7 +158,7 @@ fi
 
 # Test Case 6:  [Test ordering] Run server when when pointing to stale and correct TRT dependencies (correct first - expect SUCCESS).
 SERVER_LOG="./correct_first_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dir=${CUSTOM_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR}; --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR}; --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
