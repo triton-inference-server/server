@@ -250,6 +250,9 @@ class TritonLLMEngine(LLMEngine):
         for name, _ in self.server.models().keys():
             model = self.server.model(name)
             backend = model.config()["backend"]
+            if backend == "":
+                # look for ensemble setting if backend is undefined
+                backend = model.config()["platform"]
             print(f"Found model: {name=}, {backend=}")
 
             metadata = TritonModelMetadata(
