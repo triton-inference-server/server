@@ -63,6 +63,7 @@ def _create_vllm_inference_request(
         exclude=excludes,
         exclude_none=True,
     )
+
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
     if echo is not None:
