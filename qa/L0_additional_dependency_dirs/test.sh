@@ -73,7 +73,7 @@ mkdir ${MODELDIR}/models && \
 
 function simple_inference_check()
 {
-    INFER_SUCCESS=a
+    INFER_SUCCESS=1
     set +e
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' ${TRITONSERVER_IPADDR}:8000/v2/models/plan_int32_int32_int32/infer`
     set -e
