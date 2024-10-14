@@ -71,7 +71,7 @@ pip install -r requirements.txt
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 Once the server has successfully started, you should see something like this:
-```bash
+```
 ...
 +-----------------------+---------+--------+
 | Model                 | Version | Status |
@@ -167,7 +167,7 @@ genai-perf \
   --streaming
 ```
 which should provide an output that looks like:
-```bash
+```
 2024-10-14 22:43 [INFO] genai_perf.parser:82 - Profiling these models: llama-3.1-8b-instruct
 2024-10-14 22:43 [INFO] genai_perf.wrapper:163 - Running Perf Analyzer : 'perf_analyzer -m llama-3.1-8b-instruct --async --input-data artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/inputs.json -i http --concurrency-range 1 --endpoint v1/chat/completions --service-kind openai -u localhost:9000 --measurement-interval 10000 --stability-percentage 999 --profile-export-file artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export.json'
                               NVIDIA GenAI-Perf | LLM Metrics
@@ -289,7 +289,7 @@ which should provide an output that looks like this:
 }
 ```
 
-The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL=ensemble`,
+The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL="ensemble"`,
 everywhere applicable as seen in the example request above.
 
 ## KServe Frontends
