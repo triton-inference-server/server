@@ -216,7 +216,7 @@ for BACKEND in $BACKENDS; do
     echo "Time after perf analyzer trials: $(date)"
     end_time=$(date +%s)
     time_diff=$((end_time - start_time))
-    echo "Time taken by $NAME: $time_diff seconds" | tee -a ${RESULTDIR}/test_time.log
+    echo "Time taken by $NAME: $time_diff seconds"
     set +o pipefail
     set -e
 
@@ -233,7 +233,6 @@ for BACKEND in $BACKENDS; do
     echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
-    # echo -e "\"s_test_runtime\":\"${time_diff}\"}]" >> ${RESULTDIR}/${NAME}.tjson
 
     # SERVER_PID may not be set if using "triton_c_api" for example
     if [[ -n "${SERVER_PID}" ]]; then
