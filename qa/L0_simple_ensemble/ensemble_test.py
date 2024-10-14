@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import random
 import sys
 import time
@@ -176,6 +177,41 @@ class EnsembleTest(tu.TestResultCollector):
         time.sleep(2)
         if expected_flags != response_flags:
             self.assertTrue(False, "unexpeced sequence flags mismatch error")
+
+    def test_ensemble_partial_add_sub(self):
+        # assert OUTPUT1 is not skipped by ensemble at this point
+        output1_skipped_msg = "Composing models did not output tensor OUTPUT1"
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertNotIn(output1_skipped_msg, server_log, "test precondition not met")
+        # inputs
+        input0_np = np.random.randint(0, 100, size=(1, 16), dtype=np.int32)
+        input1_np = np.random.randint(0, 100, size=(1, 16), dtype=np.int32)
+        inputs = [
+            grpcclient.InferInput("INPUT0", input0_np.shape, "INT32"),
+            grpcclient.InferInput("INPUT1", input1_np.shape, "INT32"),
+        ]
+        inputs[0].set_data_from_numpy(input0_np)
+        inputs[1].set_data_from_numpy(input1_np)
+        # request all outputs
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0"),
+            grpcclient.InferRequestedOutput("OUTPUT1"),
+        ]
+        # infer
+        model_name = "ensemble_partial_add_sub"
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            result = client.infer(model_name, inputs=inputs, outputs=outputs)
+        # assert OUTPUT0 is in result
+        intermediate_1_np = input1_np - input1_np
+        expected_output0_np = input0_np + intermediate_1_np
+        self.assertTrue(np.allclose(result.as_numpy("OUTPUT0"), expected_output0_np))
+        # assert OUTPUT1 is not in result
+        self.assertIsNone(result.as_numpy("OUTPUT1"))
+        # assert OUTPUT1 is skipped by ensemble
+        with open(os.environ["SERVER_LOG"]) as f:
+            server_log = f.read()
+        self.assertIn(output1_skipped_msg, server_log)
 
 
 if __name__ == "__main__":
