@@ -147,7 +147,7 @@ cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends
 add-apt-repository ppa:deadsnakes/ppa -y
 apt-get update && apt-get -y install \
                             "python3.${PYTHON_ENV_VERSION}-dev" \
-                            "python3.${PYTHON_ENV_VERSION}-distutils" \
+                            "python3.${PYTHON_ENV_VERSION}-setuptools" \
                             libboost-dev
 rm -f /usr/bin/python3 && \
 ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3
