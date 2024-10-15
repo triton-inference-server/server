@@ -361,7 +361,10 @@ python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VA
 chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
-if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
+if [ -z "$MODEL_TYPE" ] ||  { [ "$MODEL_TYPE" != "igpu" ] && [ "$MODEL_TYPE" != "V100" ]; }; then
+  python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
+  chmod -R 777 $TORCHTRTDESTDIR
+fi
   python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
   chmod -R 777 $TORCHTRTDESTDIR
 fi
