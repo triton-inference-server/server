@@ -161,17 +161,11 @@ fi
 
 # Test Case 6:  [Test ordering] Run server when when pointing to stale and correct TRT dependencies (correct first - expect SUCCESS).
 SERVER_LOG="./correct_first_server.log"
-SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR}; --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};${STALE_DEPENDENCY_DIR};"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    RET=1
-fi
-
-code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/models/plan_int32_int32_int32/load`
-if [ "$code" != "200" ]; then
-    echo -e "\n***\n*** FAILED on line ${LINENO}: Unable to load model: ${model}\n***"
     RET=1
 fi
 
