@@ -36,7 +36,6 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
-    DATADIR=${DATADIR:="/mnt/nvdl/datasets/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:=c:/tritonserver}
     SERVER=${SERVER:=c:/tritonserver/bin/tritonserver.exe}
     BACKEND_DIR=${BACKEND_DIR:=c:/tritonserver/backends}
@@ -54,6 +53,7 @@ STALE_DEPENDENCY_PATH="C:/ci_test_deps/24.05"
 LOCAL_CI_TEST_DEPS_DIR=${MODELDIR}/ci_test_deps
 CUSTOM_DEPENDENCY_DIR=${MODELDIR}/custom_dependency_location
 STALE_DEPENDENCY_DIR=${MODELDIR}/stale_dependency_location
+TRT_MODEL_DIR="C:/tmp/24.07_trt_models"
 
 source ../common/util.sh
 rm -rf ${CUSTOM_DEPENDENCY_DIR} ${LOCAL_CI_TEST_DEPS_DIR} ${STALE_DEPENDENCY_DIR} ${MODELDIR}/models
@@ -69,7 +69,7 @@ cp -r ${DEPENDENCY_PATH}/* ${LOCAL_CI_TEST_DEPS_DIR} && mv ${LOCAL_CI_TEST_DEPS_
 cp -r ${STALE_DEPENDENCY_PATH}/nvinfer* ${STALE_DEPENDENCY_DIR}/
 
 mkdir ${MODELDIR}/models && \
-    cp -r ${DATADIR}/qa_model_repository/plan_int32_int32_int32 ${MODELDIR}/models/plan_int32_int32_int32 
+    cp -r ${TRT_MODEL_DIR}/qa_model_repository/plan_int32_int32_int32 ${MODELDIR}/models/plan_int32_int32_int32 
 
 function simple_inference_check()
 {
