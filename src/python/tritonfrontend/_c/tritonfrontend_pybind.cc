@@ -32,11 +32,7 @@
 #endif
 
 
-#ifdef TRITON_ENABLE_HTTP
-#include "../../../http_server.h"
-#endif
-
-#ifdef TRITON_ENABLE_METRICS
+#if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "../../../http_server.h"
 #endif
 
