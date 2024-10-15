@@ -284,7 +284,7 @@ check_unit_test
 kill_server
 
 # Enable histograms (decoupled)
-decoupled_model_name="dlpack_io_identity_decoupled"
+decoupled_model_name="async_execute_decouple"
 mkdir -p "${MODELDIR}/${decoupled_model_name}/1/"
 cp ../python_models/${decoupled_model_name}/model.py ${MODELDIR}/${decoupled_model_name}/1/
 cp ../python_models/${decoupled_model_name}/config.pbtxt ${MODELDIR}/${decoupled_model_name}/
