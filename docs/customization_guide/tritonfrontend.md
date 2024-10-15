@@ -101,9 +101,9 @@ print("[INFERENCE RESULTS]")
 print("Output data:", output_data)
 
 # Stop respective services and server.
+metrics_service.stop()
 http_service.stop()
 grpc_service.stop()
-metrics_service.stop()
 server.stop()
 ```
 
