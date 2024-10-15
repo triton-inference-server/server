@@ -140,8 +140,8 @@ SERVER_LOG="general_metrics_test_server.log"
 SERVER_ARGS="$BASE_SERVER_ARGS --log-verbose=1"
 PYTHON_TEST="general_metrics_test.py"
 run_and_check_server
-# Test 1 for normal mode
-python3 ${PYTHON_TEST} TestGeneralMetrics.test_metrics_load_time -v 2>&1 | tee ${CLIENT_LOG}
+# Test 1 for default model control mode (all models loaded at startup)
+python3 -m pytest --junitxml="general_metrics_test.test_metrics_load_time.report.xml" $CLIENT_PY::TestGeneralMetrics::test_metrics_load_time >> $CLIENT_LOG 2>&1
 kill_server
 
 set +e
@@ -150,14 +150,14 @@ CLIENT_LOG="general_metrics_test_client.log"
 SERVER_LOG="general_metrics_test_server.log"
 SERVER_ARGS="$BASE_SERVER_ARGS --model-control-mode=explicit --log-verbose=1"
 run_and_check_server
-export MODEL_NAME='libtorch_float32_float32_float32'
+MODEL_NAME='libtorch_float32_float32_float32'
 code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/models/${MODEL_NAME}/load`
 # Test 2 for explicit mode LOAD
-python3 ${PYTHON_TEST} TestGeneralMetrics.test_metrics_load_time_explicit_load -v 2>&1 | tee ${CLIENT_LOG}
+python3 -m pytest --junitxml="general_metrics_test.test_metrics_load_time_explicit_load.report.xml" $CLIENT_PY::TestGeneralMetrics::test_metrics_load_time_explicit_load >> $CLIENT_LOG 2>&1
 
 code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/models/${MODEL_NAME}/unload`
 # Test 3 for explicit mode UNLOAD
-python3 ${PYTHON_TEST} TestGeneralMetrics.test_metrics_load_time_explicit_unload -v 2>&1 | tee ${CLIENT_LOG}
+python3 -m pytest --junitxml="general_metrics_test.test_metrics_load_time_explicit_unload.report.xml" $CLIENT_PY::TestGeneralMetrics::test_metrics_load_time_explicit_unload >> $CLIENT_LOG 2>&1
 kill_server
 
 ### Pinned memory metrics tests
