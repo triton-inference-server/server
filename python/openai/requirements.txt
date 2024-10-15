@@ -1,0 +1,3 @@
+# FastAPI Application
+fastapi==0.111.1
+openai==1.40.6
