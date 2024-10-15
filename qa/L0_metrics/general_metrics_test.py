@@ -47,7 +47,7 @@ def get_model_load_times():
     return model_load_times
 
 
-class TestGeneralMetrics(tu.TestResultCollector):
+class TestGeneralMetrics(unittest.TestCase):
     def setUp(self):
         self.model_name = "libtorch_float32_float32_float32"
 
