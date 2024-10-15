@@ -50,13 +50,16 @@ fi
 # are being regularly generated on Windows.
 DEPENDENCY_PATH="C:/ci_test_deps/24.07"
 STALE_DEPENDENCY_PATH="C:/ci_test_deps/24.05"
-LOCAL_CI_TEST_DEPS_DIR=${MODELDIR}/ci_test_deps
 CUSTOM_DEPENDENCY_DIR=${MODELDIR}/custom_dependency_location
 STALE_DEPENDENCY_DIR=${MODELDIR}/stale_dependency_location
 TRT_MODEL_DIR="C:/tmp/24.07_trt_models"
+# Unlike the other commands, the mv command requires the path to be fully in
+# the UNIX style in order for regex to work properly. We cannot apply this
+# uniformly because the command line requires Windows path style.
+LOCAL_CI_TEST_DEPS_DIR=${MODELDIR_POSIX}/ci_test_deps
 
 source ../common/util.sh
-rm -rf ${CUSTOM_DEPENDENCY_DIR} ${LOCAL_CI_TEST_DEPS_DIR} ${STALE_DEPENDENCY_DIR} ${MODELDIR}/models
+rm -rf ${CUSTOM_DEPENDENCY_DIR} ${LOCAL_CI_TEST_DEPS_DIR} ${STALE_DEPENDENCY_DIR} ${MODELDIR_POSIX}/models
 rm -f ./*.log ./*.out
 RET=0;
 
@@ -68,8 +71,8 @@ cp -r ${DEPENDENCY_PATH}/* ${LOCAL_CI_TEST_DEPS_DIR} && mv ${LOCAL_CI_TEST_DEPS_
 
 cp -r ${STALE_DEPENDENCY_PATH}/nvinfer* ${STALE_DEPENDENCY_DIR}/
 
-mkdir ${MODELDIR}/models && \
-    cp -r ${TRT_MODEL_DIR}/qa_model_repository/plan_int32_int32_int32 ${MODELDIR}/models/plan_int32_int32_int32 
+mkdir ${MODELDIR_POSIX}/models && \
+    cp -r ${TRT_MODEL_DIR}/qa_model_repository/plan_int32_int32_int32 ${MODELDIR_POSIX}/models/plan_int32_int32_int32
 
 function simple_inference_check()
 {
@@ -185,3 +188,5 @@ if [ $RET -eq 0 ]; then
 else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
+
+exit $RET
