@@ -250,9 +250,9 @@ class TritonLLMEngine(LLMEngine):
         for name, _ in self.server.models().keys():
             model = self.server.model(name)
             backend = model.config()["backend"]
-            if not backend:
-                # Check platform field as a backup, this will support 'ensemble' models
-                backend = model.config()["platform"]
+            # Explicitly handle ensembles to avoid any runtime validation errors
+            if not backend and model.config()["platform"] == "ensemble":
+                backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
 
             metadata = TritonModelMetadata(
