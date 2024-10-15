@@ -136,8 +136,8 @@ class HTTPMetricsServer : public HTTPServer {
 
   // Used by tritonfrontend python bindings
   // Unifying Create function called from tritonfrontend.h
-  // TraceManager and SharedMemoryManager objects are not propagated
-  // or used by HTTPMetricsServer
+  // TraceManager, RestrictedFeatures, and SharedMemoryManager objects 
+  // are not propagated or used by HTTPMetricsServer
   static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
       const UnorderedMapType& options,
