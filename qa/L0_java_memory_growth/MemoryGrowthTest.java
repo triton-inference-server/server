@@ -34,7 +34,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.tritonserver.tritonserver.*;
 
 public class MemoryGrowthTest {
-  static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
+  static final double TRITON_MIN_COMPUTE_CAPABILITY = 7.5;
   private static boolean done = false;
   static float max_growth_allowed = .10f;
   static int max_mem_allowed = 30;
