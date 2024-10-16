@@ -257,7 +257,8 @@ python3 openai_frontend/main.py --model-repository path/to/models --tokenizer me
 3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
-# "ensemble" can also be used here instead of "tensorrt_llm_bls" if setup
+# MODEL should be the client-facing model name in your model repository for a pipeline like TRT-LLM.
+# For example, this could also be "ensemble", or something like "gpt2" if generated from Triton CLI
 MODEL="tensorrt_llm_bls"
 curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
