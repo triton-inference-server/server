@@ -524,28 +524,28 @@ if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
     exit 1
 fi
-
-docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
-       --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
-       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
-       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
-       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
-       --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
-       --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
-       --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
-       --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
-       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
-       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
-       --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
-       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
-       --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
-       --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
-       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
-       --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
-       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
-       $TENSORRT_IMAGE
-
+if [ -z "$MODEL_TYPE" ] ||   [ "$MODEL_TYPE" != "V100" ]; then
+    docker pull $TENSORRT_IMAGE
+    docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
+        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+        --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
+        --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
+        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
+        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
+        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
+        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+        --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+        --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
+        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+        --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
+        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
+        $TENSORRT_IMAGE
+fi
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
