@@ -193,9 +193,22 @@ for BACKEND in $BACKENDS; do
     set -o pipefail
     PA_MAX_TRIALS=${PA_MAX_TRIALS:-"20"}
 
+    # timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
+    #              -p${PERF_CLIENT_STABILIZE_WINDOW} \
+    #              -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
+    #              ${PERF_CLIENT_EXTRA_ARGS} \
+    #              -m ${MODEL_NAME} \
+    #              -b${STATIC_BATCH} -t${CONCURRENCY} \
+    #              --max-trials "${PA_MAX_TRIALS}" \
+    #              --shape ${INPUT_NAME}:${SHAPE} \
+    #              ${SERVICE_ARGS} \
+    #              -f ${RESULTDIR}/${NAME}.csv 2>&1 > ${RESULTDIR}/${NAME}.log && cat ${RESULTDIR}/${NAME}.log || (echo "FAILURE TO RUN FULL TEST timeout occurred SERVER logs below" && cat $SERVER_LOG)
+
+    # New PA arg --request-count=3000000 for testing
     timeout $TIMEOUT_PERIOD $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
+                 --request-count=3000000 \
                  ${PERF_CLIENT_EXTRA_ARGS} \
                  -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
