@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -168,7 +167,7 @@ TEST_CONCURRENCY+=(
     16
     16
     16)
-TEST_BACKENDS=${BACKENDS:="savedmodel onnx libtorch python"}
+TEST_BACKENDS=${BACKENDS:="plan graphdef custom"}
 
 mkdir -p ${REPO_VERSION}
 

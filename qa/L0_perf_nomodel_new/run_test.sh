@@ -27,7 +27,7 @@
 
 REPO_VERSION=$1
 
-BACKENDS=${BACKENDS:="savedmodel onnx libtorch python"}
+BACKENDS=${BACKENDS:="plan graphdef custom"}
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
@@ -52,6 +52,7 @@ MODEL_REPO="${PWD}/models"
 PERF_CLIENT=../clients/perf_client
 TF_VERSION=${TF_VERSION:=2}
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -174,6 +175,11 @@ for BACKEND in $BACKENDS; do
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
         SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
+        if [ $NAME == "custom_sbatch1_dbatch1_instance2" ]; then
+            SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=2"
+        else
+            SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+        fi
         run_server
         if [ $SERVER_PID == 0 ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -215,6 +221,7 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+
     echo "Time after perf analyzer trials: $(date)"
     end_time=$(date +%s)
     time_diff=$((end_time - start_time))
