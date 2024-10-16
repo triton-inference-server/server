@@ -158,7 +158,7 @@ which should provide an output that looks like this:
 ```bash
 MODEL="llama-3.1-8b-instruct"
 TOKENIZER="meta-llama/Meta-Llama-3.1-8B-Instruct"
-genai-perf \
+genai-perf profile \
   --model ${MODEL} \
   --tokenizer ${TOKENIZER} \
   --service-kind openai \
