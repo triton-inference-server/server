@@ -293,7 +293,7 @@ SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model_name}"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -304,11 +304,11 @@ check_unit_test
 kill_server
 
 # Disable histograms (decoupled)
-SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model_name} --metrics-config histogram_latencies=false"
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model_name} --metrics-config histogram_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
