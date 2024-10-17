@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -72,14 +72,14 @@ RUNTEST=./run_test.sh
 # by 4.
 TENSOR_SIZE_16MB=$((4*1024*1024))
 
-if [ "$BENCHMARK_TEST_SHARED_MEMORY" == "system" ]; then
+if [ "$TEST_SHARED_MEMORY" == "system" ]; then
     UNDERTEST_NAME="$UNDERTEST_NAME System Shared Memory";
     SUFFIX="_shm"
-elif [ "$BENCHMARK_TEST_SHARED_MEMORY" == "cuda" ]; then
+elif [ "$TEST_SHARED_MEMORY" == "cuda" ]; then
     UNDERTEST_NAME="$UNDERTEST_NAME CUDA Shared Memory";
     SUFFIX="_cudashm"
 else
-    BENCHMARK_TEST_SHARED_MEMORY="none"
+    TEST_SHARED_MEMORY="none"
     TEST_NAMES=(
         "${UNDERTEST_NAME} Minimum Latency GRPC"
         "${UNDERTEST_NAME} Minimum Latency HTTP"
@@ -188,7 +188,7 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
     # FIXME: If PA C API adds SHMEM support, remove this.
-    if [[ "${BENCHMARK_TEST_SHARED_MEMORY}" != "none" ]] && \
+    if [[ "${TEST_SHARED_MEMORY}" != "none" ]] && \
        [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; then
       echo "WARNING: Perf Analyzer does not support shared memory I/O when benchmarking directly with Triton C API, skipping."
       continue
@@ -202,7 +202,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                 TENSOR_SIZE=${TEST_TENSOR_SIZE} \
                 BACKENDS=${TEST_BACKENDS} \
-                SHARED_MEMORY=${BENCHMARK_TEST_SHARED_MEMORY} \
+                SHARED_MEMORY=${TEST_SHARED_MEMORY} \
                 STATIC_BATCH_SIZES=1 \
                 DYNAMIC_BATCH_SIZES=1 \
                 INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
