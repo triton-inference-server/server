@@ -83,9 +83,10 @@ target_include_directories(
 # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
 # JIRA DLIS-4786
 if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
-  target_include_directories(
+  target_link_libraries(
     grpc-endpoint-library
-    PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+    PRIVATE
+    tracing-library
   )
 endif()
 

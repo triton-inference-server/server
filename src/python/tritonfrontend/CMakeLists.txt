@@ -62,8 +62,6 @@ set(
   ../../common.h
   ../../common.cc
   ../../restricted_features.h
-  ../../tracer.h
-  $<$<BOOL:${TRITON_ENABLE_TRACING}>:../../tracer.cc>
   ../../classification.cc
 )
 
@@ -96,17 +94,76 @@ endif()
 
 if(${TRITON_ENABLE_TRACING})
   message("TRACING/STATS IS CURRENTLY NOT SUPPORTED.")
-  find_package(absl CONFIG REQUIRED)
-  find_package(CURL CONFIG REQUIRED)
-  find_package(nlohmann_json CONFIG REQUIRED)
-  find_package(opentelemetry-cpp CONFIG REQUIRED)
-  list(APPEND PY_BINDING_DEPENDENCY_LIBS
-    tracing-library
+  list(
+      APPEND PY_BINDING_DEPENDENCY_LIBS
+      tracing-library
   )
 endif()
 
 # ===================== End of Collection ===================================
 
+# ========== Create support-lib (Static Lib for Dependencies) ================
+add_library(
+  support-lib
+    STATIC
+    ${PYTHON_FRONTEND_BINDING_DEPS}
+)
+
+target_link_libraries(
+  support-lib
+    PUBLIC
+    ${PY_BINDING_DEPENDENCY_LIBS}
+)
+
+if(${TRITON_ENABLE_HTTP})
+  target_compile_definitions(
+    support-lib
+    PRIVATE TRITON_ENABLE_HTTP=1
+  )
+endif()
+
+if(${TRITON_ENABLE_GRPC})
+  target_compile_definitions(
+    support-lib
+    PRIVATE TRITON_ENABLE_GRPC=1
+  )
+endif()
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+    support-lib
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+endif()
+
+if(${TRITON_ENABLE_TRACING})
+    target_compile_definitions(
+      support-lib
+      PRIVATE TRITON_ENABLE_TRACING=1
+    )
+endif()
+
+if(${TRITON_ENABLE_STATS})
+  target_compile_definitions(
+    support-lib
+    PRIVATE TRITON_ENABLE_STATS=1
+  )
+endif()
+
+if(${TRITON_ENABLE_METRICS})
+  target_compile_definitions(
+    support-lib
+    PRIVATE TRITON_ENABLE_METRICS=1
+  )
+endif()
+
+set_target_properties(
+  support-lib
+  PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
+# ===================== End of support-lib ==================================
 
 # ================== Create Python Frontend Bindings ========================
 set(
@@ -118,16 +175,13 @@ set(
 pybind11_add_module(
   py-bindings
   MODULE
-  ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
-
-target_include_directories(py-bindings PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(
     py-bindings
     PRIVATE
-      ${PY_BINDING_DEPENDENCY_LIBS}
+    support-lib
 )
 
 if(${TRITON_ENABLE_HTTP})
@@ -153,14 +207,10 @@ if(${TRITON_ENABLE_GPU})
 endif()
 
 if(${TRITON_ENABLE_TRACING})
-  target_include_directories(
+    target_compile_definitions(
       py-bindings
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PRIVATE TRITON_ENABLE_TRACING=1
     )
-  target_compile_definitions(
-    py-bindings
-    PRIVATE TRITON_ENABLE_TRACING=1
-  )
 endif()
 
 if(${TRITON_ENABLE_STATS})
@@ -170,6 +220,12 @@ if(${TRITON_ENABLE_STATS})
   )
 endif()
 
+if(${TRITON_ENABLE_METRICS})
+  target_compile_definitions(
+    py-bindings
+    PRIVATE TRITON_ENABLE_METRICS=1
+  )
+endif()
 
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 
@@ -177,5 +233,6 @@ set_target_properties(
     py-bindings
     PROPERTIES
       BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
+      POSITION_INDEPENDENT_CODE ON
 )
 # ===================== End of Python Bindings ==============================
