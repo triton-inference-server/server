@@ -1395,7 +1395,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
 RUN yum install -y \\
         libarchive-devel \\
         python3-devel \\
-        python3-pip
+        python3-pip \\
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
             wheel \\
