@@ -950,7 +950,7 @@ RUN yum install -y \\
             libb64-devel \\
             gperftools-devel \\
             patchelf \\
-            python3.11-devel \\
+            python3-devel \\
             python3-pip \\
             python3-setuptools \\
             rapidjson-devel \\
