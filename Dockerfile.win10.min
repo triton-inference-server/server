@@ -32,7 +32,7 @@ FROM ${BASE_IMAGE} as dependency_base
 
 RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
 RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
-RUN choco install unzip -y
+RUN choco install unzip patch -y
 
 #
 # Installing TensorRT
