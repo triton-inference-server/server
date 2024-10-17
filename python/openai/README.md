@@ -315,3 +315,15 @@ available arguments and default values.
 
 For more information on the `tritonfrontend` python bindings, see the docs
 [here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
+
+## Model Parallelism Support
+
+- For multi-GPU models (ex: Tensor Parallelism > 1), here is the current support matrix:
+  - [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
+    - ex: Configure `tensor_parallel_size: 2` in the
+      [model.json](https://github.com/triton-inference-server/vllm_backend/blob/main/samples/model_repository/vllm_model/1/model.json)
+  - [x] TensorRT-LLM ([Orchestrator Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#orchestrator-mode))
+    - `export TRTLLM_ORCHESTRATOR=1`
+    - **NOTE**: Orchestrator mode does not currently support multi-node models
+  - [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
+    - Coming soon
