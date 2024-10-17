@@ -1389,7 +1389,22 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
 
     # Add dependencies needed for python backend
     if "python" in backends:
-        df += """
+        if target_platform() == "rhel":
+            df += """
+# python3, python3-pip and some pip installs required for the python backend
+RUN yum install -y \\
+        libarchive-devel \\
+        python3-devel \\
+        python3-pip
+      && pip3 install --upgrade pip \\
+      && pip3 install --upgrade \\
+            wheel \\
+            setuptools \\
+            \"numpy<2\" \\
+            virtualenv \\
+"""
+        else:
+            df += """
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
