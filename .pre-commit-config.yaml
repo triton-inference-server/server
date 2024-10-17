@@ -73,13 +73,12 @@ repos:
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
-# FIXME: Only run on changed files when triggered by GitHub Actions
-#- repo: local
-#  hooks:
-#  - id: add-license
-#    name: Add License
-#    entry: python tools/add_copyright.py
-#    language: python
-#    stages: [pre-commit]
-#    verbose: true
-#    require_serial: true
+- repo: local
+  hooks:
+  - id: add-license
+    name: Add License
+    entry: python tools/add_copyright.py
+    language: python
+    stages: [pre-commit]
+    verbose: true
+    require_serial: true
