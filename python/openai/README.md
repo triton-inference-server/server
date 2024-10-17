@@ -316,7 +316,7 @@ available arguments and default values.
 For more information on the `tritonfrontend` python bindings, see the docs
 [here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
 
-## Known Limitations
+## Model Parallelism Support
 
 - For multi-GPU models (ex: Tensor Parallelism > 1), here is the current support matrix:
   - [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
