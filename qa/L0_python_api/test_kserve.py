@@ -177,7 +177,7 @@ class TestKServe:
 
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
     def test_http_req_during_shutdown(self, frontend, client_type, url):
-        server = utils.setup_server()
+        server = utils.setup_server(exit_timeout=5)
         http_service = utils.setup_service(server, frontend)
         http_client = httpclient.InferenceServerClient(url="localhost:8000")
         model_name = "delayed_identity"

@@ -39,7 +39,7 @@ from tritonfrontend import KServeGrpc, KServeHttp
 # https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 
 
-def setup_server(model_repository="test_model_repository") -> tritonserver.Server:
+def setup_server(model_repository="test_model_repository", **kwargs) -> tritonserver.Server:
     module_directory = os.path.split(os.path.abspath(__file__))[0]
     model_path = os.path.abspath(os.path.join(module_directory, model_repository))
 
@@ -50,6 +50,7 @@ def setup_server(model_repository="test_model_repository") -> tritonserver.Serve
         log_error=True,
         log_warn=True,
         log_info=True,
+        **kwargs
     )
 
     return tritonserver.Server(server_options).start(wait_until_ready=True)
