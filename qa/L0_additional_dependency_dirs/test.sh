@@ -177,6 +177,22 @@ fi
 
 kill_server
 
+# Test Case 7: Incorrect extension usage. User provided path(s) that are not semi-colon separated (expect FAIL).
+SERVER_LOG="./incorrect_usage_server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=C:/not_semicolon_terminated"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: unexpected success starting $SERVER\n***"
+    kill_server
+    RET=1
+fi
+
+if [ $(cat ${SERVER_LOG} | grep "malformed" | wc -l) -eq 0 ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: expected error statement not found $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
