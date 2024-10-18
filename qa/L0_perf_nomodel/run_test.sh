@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
 PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
 TENSOR_SIZE=${TENSOR_SIZE:=1}
+TENSOR_ELEMENT_BYTES=${TENSOR_ELEMENT_BYTES:=4}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
 
@@ -126,6 +127,16 @@ for BACKEND in $BACKENDS; do
         fi
     fi
 
+    # set shared memory output size
+    OUTPUT_SHARED_MEMORY_SIZE=""
+    if [[ "$SHARED_MEMORY" != "none" ]]; then
+        OUTPUT_SHARED_MEMORY_SIZE=$((TENSOR_ELEMENT_BYTES*TENSOR_SIZE))
+        if [ $MAX_BATCH > 1 ]; then
+            OUTPUT_SHARED_MEMORY_SIZE=$((OUTPUT_SHARED_MEMORY_SIZE*MAX_BATCH))
+        fi
+        OUTPUT_SHARED_MEMORY_SIZE="--output-shared-memory-size $OUTPUT_SHARED_MEMORY_SIZE"
+    fi
+
     if [ $DYNAMIC_BATCH > 1 ]; then
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
     else
@@ -189,6 +200,7 @@ for BACKEND in $BACKENDS; do
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
+                 ${OUTPUT_SHARED_MEMORY_SIZE} \
                  -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --max-trials "${PA_MAX_TRIALS}" \
