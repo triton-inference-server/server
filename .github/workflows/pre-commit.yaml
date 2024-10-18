@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - name: Get modified files
+      id: modified-files
+      run: echo "modified_files=$(git diff --name-only -r HEAD^1 HEAD | xargs)" >> $GITHUB_OUTPUT
     - uses: actions/setup-python@v3
     - uses: pre-commit/action@v3.0.0
-
+      with:
+        extra_args: --files ${{ steps.modified-files.outputs.modified_files }}
