@@ -65,12 +65,7 @@ set(
   ../../classification.cc
 )
 
-set(PY_BINDING_DEPENDENCY_LIBS
-      triton-common-json
-      triton-common-logging
-      triton-core-serverapi
-      triton-core-serverstub
-  )
+set(PY_BINDING_DEPENDENCY_LIBS)
 
 # Conditional Linking Based on Flags
 if(${TRITON_ENABLE_HTTP})
@@ -102,69 +97,6 @@ endif()
 
 # ===================== End of Collection ===================================
 
-# ========== Create support-lib (Static Lib for Dependencies) ================
-add_library(
-  support-lib
-    STATIC
-    ${PYTHON_FRONTEND_BINDING_DEPS}
-)
-
-target_link_libraries(
-  support-lib
-    PUBLIC
-    ${PY_BINDING_DEPENDENCY_LIBS}
-)
-
-if(${TRITON_ENABLE_HTTP})
-  target_compile_definitions(
-    support-lib
-    PRIVATE TRITON_ENABLE_HTTP=1
-  )
-endif()
-
-if(${TRITON_ENABLE_GRPC})
-  target_compile_definitions(
-    support-lib
-    PRIVATE TRITON_ENABLE_GRPC=1
-  )
-endif()
-
-if(${TRITON_ENABLE_GPU})
-  target_compile_definitions(
-    support-lib
-    PRIVATE TRITON_ENABLE_GPU=1
-    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-  )
-endif()
-
-if(${TRITON_ENABLE_TRACING})
-    target_compile_definitions(
-      support-lib
-      PRIVATE TRITON_ENABLE_TRACING=1
-    )
-endif()
-
-if(${TRITON_ENABLE_STATS})
-  target_compile_definitions(
-    support-lib
-    PRIVATE TRITON_ENABLE_STATS=1
-  )
-endif()
-
-if(${TRITON_ENABLE_METRICS})
-  target_compile_definitions(
-    support-lib
-    PRIVATE TRITON_ENABLE_METRICS=1
-  )
-endif()
-
-set_target_properties(
-  support-lib
-  PROPERTIES
-  POSITION_INDEPENDENT_CODE ON
-)
-# ===================== End of support-lib ==================================
-
 # ================== Create Python Frontend Bindings ========================
 set(
   PYTHON_FRONTEND_BINDING_SRCS
@@ -175,13 +107,14 @@ set(
 pybind11_add_module(
   py-bindings
   MODULE
+  ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
 
 target_link_libraries(
     py-bindings
     PRIVATE
-    support-lib
+    ${PY_BINDING_DEPENDENCY_LIBS}
 )
 
 if(${TRITON_ENABLE_HTTP})
@@ -235,4 +168,5 @@ set_target_properties(
       BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
       POSITION_INDEPENDENT_CODE ON
 )
+
 # ===================== End of Python Bindings ==============================
