@@ -71,7 +71,7 @@ grpc_service.start()
 
 ```python
 import tritonclient.http as httpclient
-import numpy as np # Use version numpy < 2
+import numpy as np
 model_name = "identity" # output == input
 url = "localhost:8000"
 
@@ -108,7 +108,7 @@ Additionally, `tritonfrontend` provides context manager support as well. So step
 ```python
 from tritonfrontend import KServeHttp
 import tritonclient.http as httpclient
-import numpy as np  # Use version numpy < 2
+import numpy as np
 
 with KServeHttp(server) as http_service:
     # The identity model returns an exact duplicate of the input data as output
