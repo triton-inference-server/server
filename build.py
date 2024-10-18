@@ -1401,7 +1401,7 @@ RUN yum install -y \\
             wheel \\
             setuptools \\
             \"numpy<2\" \\
-            virtualenv \\
+            virtualenv
 """
         else:
             df += """
