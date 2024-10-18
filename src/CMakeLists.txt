@@ -249,14 +249,6 @@ if(${TRITON_ENABLE_TRACING})
     main
     PRIVATE TRITON_ENABLE_TRACING=1
   )
-# FIXME: remove, when Windows support is added for Opentelemetry
-  if (NOT WIN32)
-    target_include_directories(
-      main
-      PRIVATE
-        ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
-    )
-  endif()
 endif() # TRITON_ENABLE_TRACING
 
 if(${TRITON_ENABLE_NVTX})
@@ -404,9 +396,9 @@ if(${TRITON_ENABLE_HTTP}
   # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
   # JIRA DLIS-4786
   if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
-    target_include_directories(
+    target_link_libraries(
       http-endpoint-library
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PRIVATE tracing-library
     )
   endif()
 
@@ -517,18 +509,24 @@ if(${TRITON_ENABLE_TRACING})
   )
 
   target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-
+  # FIXME: remove, when Windows support is added for Opentelemetry
   if (NOT WIN32)
     target_include_directories(
       tracing-library
-      PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(
       tracing-library
-      PRIVATE
+      PUBLIC
       ${OPENTELEMETRY_CPP_LIBRARIES})
   endif()
+
+  set_target_properties(
+    tracing-library
+    PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    )
 
   target_link_libraries(
     tracing-library

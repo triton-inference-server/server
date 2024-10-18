@@ -40,6 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="https://github.com/triton-inference-server"}
 DATA_DIR=/data/inferenceserver/${REPO_VERSION}
 IMAGE_DIR="/opt/tritonserver/qa/images"
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -50,7 +51,7 @@ source ../common/util.sh
 if [ ! -f "$BACKENDS/pytorch/pb_exec_env_model.py.tar.gz" ]; then
     PYTORCH_BACKEND_REPO_TAG=${PYTORCH_BACKEND_REPO_TAG:="main"}
     rm -rf pytorch_backend
-    git clone --single-branch --depth=1 -b $PYTORCH_BACKEND_REPO_TAG https://github.com/triton-inference-server/pytorch_backend
+    git clone --single-branch --depth=1 -b $PYTORCH_BACKEND_REPO_TAG ${TRITON_REPO_ORGANIZATION}/pytorch_backend
     (cd pytorch_backend/tools && \
         ./gen_pb_exec_env.sh && \
         mv pb_exec_env_model.py.tar.gz $BACKENDS/pytorch)
