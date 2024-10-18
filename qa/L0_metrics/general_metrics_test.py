@@ -32,7 +32,7 @@ import unittest
 import requests
 
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
-MODEL_LOAD_TIME = "nv_model_load_time{model="
+MODEL_LOAD_TIME = "nv_model_load_duration_secs{model="
 
 
 def get_model_load_times():
