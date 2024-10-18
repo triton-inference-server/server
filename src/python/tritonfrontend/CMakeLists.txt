@@ -168,5 +168,4 @@ set_target_properties(
       BUILD_RPATH "$ORIGIN:/opt/tritonserver/lib"
       POSITION_INDEPENDENT_CODE ON
 )
-
 # ===================== End of Python Bindings ==============================
