@@ -39,7 +39,7 @@ fi
 # have numpy<2 in their pyproject.toml or requirements.txt, which forces
 # any existing version of numpy to install and runs the custom
 pip install "numpy>=2"
-python3 -c "import numpy; print(f"NUMPY VERSION = {numpy.__version__}")"
+python3 -c "import numpy; print(numpy.__version__)"
 
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
