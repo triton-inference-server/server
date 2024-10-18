@@ -219,7 +219,7 @@ metrics are used for latencies:
 |--------------|----------------|------------|---------------------------|-----------|-------------|-------------|
 |Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  | Decoupled |
 
-To disable these metrics specifically, you can set `--metrics-config histogram_latencies=false`
+To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
 
 Each histogram above may composed of several sub-metrics. For each
 metric, there is a set of `le` metrics tracking the counter for each
