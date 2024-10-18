@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ public class ResnetTest {
       // TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
       //"resnet50v1.5_fp16_savedmodel",
   };
-  private static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
+  private static final double TRITON_MIN_COMPUTE_CAPABILITY = 7.5;
   private enum Backend {
     NONE,
     ONNX,

@@ -1,4 +1,4 @@
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
 option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
-set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
+set(TRITON_MIN_COMPUTE_CAPABILITY "7.5" CACHE STRING
     "The minimum CUDA compute capability supported by Triton" )
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
