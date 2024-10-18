@@ -30,13 +30,19 @@ import builtins
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    from tritonfrontend._api._kservehttp import KServeHttp
+    from tritonfrontend._api import KServeHttp
 except ImportError:
     # TRITON_ENABLE_HTTP=OFF
     pass
 
 try:
-    from tritonfrontend._api._kservegrpc import KServeGrpc
+    from tritonfrontend._api import KServeGrpc
 except ImportError:
     # TRITON_ENABLE_GRPC=OFF
+    pass
+
+try:
+    from tritonfrontend._api import Metrics
+except ImportError:
+    # TRITON_ENABLE_METRICS=OFF
     pass

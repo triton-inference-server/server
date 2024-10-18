@@ -57,7 +57,7 @@ Note: `model_path` may need to be edited depending on your setup.
 
 2. Now, to start up the respective services with `tritonfrontend`
 ```python
-from tritonfrontend import KServeHttp, KServeGrpc
+from tritonfrontend import KServeHttp, KServeGrpc, Metrics
 http_options = KServeHttp.Options(thread_count=5)
 http_service = KServeHttp(server, http_options)
 http_service.start()
@@ -65,6 +65,10 @@ http_service.start()
 # Default options (if none provided)
 grpc_service = KServeGrpc(server)
 grpc_service.start()
+
+# Can start metrics service as well
+metrics_service = Metrics(server)
+metrics_service.start()
 ```
 
 3. Finally, with running services, we can use `tritonclient` or simple `curl` commands to send requests and receive responses from the frontends.
@@ -97,6 +101,7 @@ print("[INFERENCE RESULTS]")
 print("Output data:", output_data)
 
 # Stop respective services and server.
+metrics_service.stop()
 http_service.stop()
 grpc_service.stop()
 server.stop()
@@ -139,7 +144,6 @@ With this workflow, you can avoid having to stop each service after client reque
 - The following features are not currently supported when launching the Triton frontend services through the python bindings:
     - [Tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md)
     - [Shared Memory](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md)
-    - [Metrics](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/metrics.md)
     - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
     - VertexAI
     - Sagemaker
