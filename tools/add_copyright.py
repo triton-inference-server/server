@@ -1,4 +1,5 @@
 # Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -25,7 +26,6 @@
 import argparse
 import os
 import re
-import subprocess
 import sys
 from datetime import datetime
 from typing import Callable, Dict, Optional, Sequence
@@ -257,7 +257,11 @@ def add_copyrights(paths):
                 f"WARNING: No handler registered for file: {path}. Please add a new handler to {__file__}!"
             )
 
-    subprocess.run(["git", "add"] + paths)
+    # Don't automatically 'git add' changes for now, make it more clear which
+    # files were changed and have ability to see 'git diff' on them.
+    # Note that this means the hook will modify files and then cancel the commit, which you will then
+    # have to manually make again.
+    # subprocess.run(["git", "add"] + paths)
 
     print(f"Processed copyright headers for {len(paths)} file(s).")
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,13 +40,14 @@ fi
 
 # Models
 DATADIR=/data/inferenceserver/${REPO_VERSION}
+TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="https://github.com/triton-inference-server"}
 JAVACPP_BRANCH=${JAVACPP_BRANCH:="https://github.com/bytedeco/javacpp-presets.git"}
 JAVACPP_BRANCH_TAG=${JAVACPP_BRANCH_TAG:="master"}
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set -e
-git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} https://github.com/triton-inference-server/client.git
+git clone --single-branch --depth=1 -b ${TRITON_CLIENT_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/client.git
 source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh -b $PWD --javacpp-branch ${JAVACPP_BRANCH} --javacpp-tag ${JAVACPP_BRANCH_TAG} --keep-build-dependencies
 cd ..
 
