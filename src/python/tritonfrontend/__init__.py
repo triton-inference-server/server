@@ -41,7 +41,6 @@ except ImportError:
     # TRITON_ENABLE_GRPC=OFF
     pass
 
-
 try:
     from tritonfrontend._api import Metrics
 except ImportError:

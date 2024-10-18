@@ -107,6 +107,7 @@ set(
 pybind11_add_module(
   py-bindings
   MODULE
+  ${PYTHON_FRONTEND_BINDING_DEPS}
   ${PYTHON_FRONTEND_BINDING_SRCS}
 )
 
