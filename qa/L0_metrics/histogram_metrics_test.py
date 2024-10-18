@@ -37,6 +37,9 @@ import requests
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
+sys.path.append("../common")
+import test_util as tu
+
 MILLIS_PER_SEC = 1000
 
 
@@ -51,7 +54,7 @@ def get_histogram_metric_key(
         return None
 
 
-class TestHistogramMetrics(unittest.TestCase):
+class TestHistogramMetrics(tu.TestResultCollector):
     def setUp(self):
         self.tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
