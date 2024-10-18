@@ -70,9 +70,6 @@ class TestGeneralMetrics(unittest.TestCase):
         self.assertEqual(dict_size, 1, "Too many model_load_time entries found")
 
     def test_metrics_load_time_explicit_unload(self):
-        r = requests.get(f"http://localhost:8000/v2/repository/models/")
-        r.raise_for_status()
-        print(r.text)
         model_load_times = get_model_load_times()
         load_time = model_load_times.get(self.model_name)
 
