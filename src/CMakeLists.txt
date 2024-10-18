@@ -373,7 +373,7 @@ if(${TRITON_ENABLE_HTTP}
     target_compile_options(
       http-endpoint-library
       PRIVATE
-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
     )
   endif()
 
