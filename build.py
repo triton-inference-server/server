@@ -667,6 +667,16 @@ def onnxruntime_cmake_args(images, library_paths):
             else TRITON_VERSION_MAP[FLAGS.version][2],
         )
     ]
+    # If variable is set, ONNX Runtime package will be downloaded from the specified URL
+    if os.getenv("TRITON_ONNXRUNTIME_PACKAGE_URL"):
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_ONNXRUNTIME_PACKAGE_URL",
+                None,
+                os.getenv("TRITON_ONNXRUNTIME_PACKAGE_URL"),
+            )
+        )
 
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
     # TODO: TPRD-334 TensorRT extension is not currently supported by our manylinux build
