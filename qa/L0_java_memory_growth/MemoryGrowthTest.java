@@ -1,4 +1,4 @@
-// Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.tritonserver.tritonserver.*;
 
 public class MemoryGrowthTest {
-  static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
+  static final double TRITON_MIN_COMPUTE_CAPABILITY = 7.5;
   private static boolean done = false;
   static float max_growth_allowed = .10f;
   static int max_mem_allowed = 30;
