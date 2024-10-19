@@ -27,6 +27,7 @@
 
 import os
 import re
+import time
 import unittest
 
 import requests
@@ -39,21 +40,60 @@ def get_model_load_times():
     r = requests.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
     r.raise_for_status()
     pattern = re.compile(rf'{MODEL_LOAD_TIME}"(.*?)".*?\ (\d+\.\d+)')
-    model_load_times = {}
-    matches = pattern.findall(r.text)
-    for match in matches:
-        model_name, load_time = match
-        model_load_times[model_name] = float(load_time)
-    return model_load_times
+    # Initialize an empty dictionary to store the data
+    model_data = {}
+    lines = r.text.strip().split("\n")
+    for line in lines:
+        # Use regex to extract model name, version, and load time
+        match = re.match(
+            r"nv_model_load_duration_secs\{model=\"(.*?)\",version=\"(.*?)\"\} (.*)",
+            line,
+        )
+        if match:
+            model_name = match.group(1)
+            model_version = match.group(2)
+            load_time = float(match.group(3))
+            # Store in dictionary
+            if model_name not in model_data:
+                model_data[model_name] = {}
+            model_data[model_name][model_version] = load_time
+    return model_data
+
+
+def load_model_explicit(model_name, server_url="http://localhost:8000"):
+    endpoint = f"{server_url}/v2/repository/models/{model_name}/load"
+    response = requests.post(endpoint)
+
+    if response.status_code == 200:
+        print(f"Model '{model_name}' loaded successfully.")
+    else:
+        print(
+            f"Failed to load model '{model_name}'. Status code: {response.status_code}"
+        )
+        print("Response:", response.text)
+
+
+def unload_model_explicit(model_name, server_url="http://localhost:8000"):
+    endpoint = f"{server_url}/v2/repository/models/{model_name}/unload"
+    response = requests.post(endpoint)
+
+    if response.status_code == 200:
+        print(f"Model '{model_name}' unloaded successfully.")
+    else:
+        print(
+            f"Failed to load model '{model_name}'. Status code: {response.status_code}"
+        )
+        print("Response:", response.text)
 
 
 class TestGeneralMetrics(unittest.TestCase):
     def setUp(self):
         self.model_name = "libtorch_float32_float32_float32"
+        self.model_name_multiple_versions = "input_all_optional"
 
     def test_metrics_load_time(self):
         model_load_times = get_model_load_times()
-        load_time = model_load_times.get(self.model_name)
+        load_time = model_load_times.get(self.model_name, {}).get("1")
 
         self.assertIsNotNone(load_time, "Model Load time not found")
 
@@ -62,7 +102,7 @@ class TestGeneralMetrics(unittest.TestCase):
 
     def test_metrics_load_time_explicit_load(self):
         model_load_times = get_model_load_times()
-        load_time = model_load_times.get(self.model_name)
+        load_time = model_load_times.get(self.model_name, {}).get("1")
 
         self.assertIsNotNone(load_time, "Model Load time not found")
 
@@ -71,9 +111,57 @@ class TestGeneralMetrics(unittest.TestCase):
 
     def test_metrics_load_time_explicit_unload(self):
         model_load_times = get_model_load_times()
-        load_time = model_load_times.get(self.model_name)
-
+        load_time = model_load_times.get(self.model_name, {}).get("1")
         self.assertIsNone(load_time, "Model Load time found even after unload")
+
+    def test_metrics_load_time_multiple_version_reload(self):
+        # Part 1 load multiple versions of the same model and check if slow and fast models reflect the metric correctly
+        load_model_explicit(self.model_name_multiple_versions)
+        model_load_times = get_model_load_times()
+        load_time_slow = model_load_times.get(
+            self.model_name_multiple_versions, {}
+        ).get("1")
+        load_time_fast = model_load_times.get(
+            self.model_name_multiple_versions, {}
+        ).get("2")
+        # Fail the test if load_time_slow is less than load_time_fast
+        self.assertGreaterEqual(
+            load_time_slow,
+            load_time_fast,
+            "Slow load time should be greater than or equal to fast load time",
+        )
+        # Fail the test if load_time_slow is less than 10 seconds as manual delay is 10 seconds
+        self.assertGreaterEqual(
+            load_time_slow,
+            10,
+            "Slow load time should be greater than or equal to fast load time",
+        )
+
+        # Part 2 load multiple versions AGAIN and compare with prev values expect to be the same
+        # as triton does not actually load the model again.
+        load_model_explicit(self.model_name_multiple_versions)
+        model_load_times_new = get_model_load_times()
+        load_time_slow_new = model_load_times_new.get(
+            self.model_name_multiple_versions, {}
+        ).get("1")
+        load_time_fast_new = model_load_times_new.get(
+            self.model_name_multiple_versions, {}
+        ).get("2")
+        self.assertEqual(load_time_fast_new, load_time_fast)
+        self.assertEqual(load_time_slow_new, load_time_slow)
+
+        # Part 3 unload the model and expect the metrics to go away as model is not loaded now
+        unload_model_explicit(self.model_name_multiple_versions)
+        time.sleep(1)
+        model_load_times_new = get_model_load_times()
+        load_time_slow_new = model_load_times_new.get(
+            self.model_name_multiple_versions, {}
+        ).get("1")
+        load_time_fast_new = model_load_times_new.get(
+            self.model_name_multiple_versions, {}
+        ).get("2")
+        self.assertIsNone(load_time_slow_new, "Model Load time found even after unload")
+        self.assertIsNone(load_time_fast_new, "Model Load time found even after unload")
 
 
 if __name__ == "__main__":
