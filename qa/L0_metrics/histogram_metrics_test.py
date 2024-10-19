@@ -110,9 +110,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
         # Display and validate the available results
         if len(user_data) == 1:
             # Check for the errors
-            if type(user_data[0]) == InferenceServerException:
-                print(user_data[0])
-                sys.exit(1)
+            self.assertNotIsInstance(user_data[0], InferenceServerException)
 
     def test_ensemble_decoupled(self):
         ensemble_model_name = "ensemble"
@@ -130,7 +128,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
         inputs[0].set_data_from_numpy(input_data)
 
         # Send 3 requests to ensemble decoupled model
-        for request_num in range(3):
+        for request_num in range(1, 4):
             self.async_stream_infer(ensemble_model_name, inputs, outputs)
 
             # Checks metrics output
@@ -145,7 +143,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 first_response_family, ensemble_model_name, "1", "sum"
             )
             self.assertIn(ensemble_model_count, histogram_dict)
-            self.assertGreaterEqual(histogram_dict[ensemble_model_count], request_num)
+            self.assertEqual(histogram_dict[ensemble_model_count], request_num)
             self.assertIn(ensemble_model_sum, histogram_dict)
             self.assertGreaterEqual(
                 histogram_dict[ensemble_model_sum],
@@ -159,7 +157,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 first_response_family, decoupled_model_name, "1", "sum"
             )
             self.assertIn(decoupled_model_count, histogram_dict)
-            self.assertGreaterEqual(histogram_dict[decoupled_model_count], request_num)
+            self.assertEqual(histogram_dict[decoupled_model_count], request_num)
             self.assertIn(decoupled_model_sum, histogram_dict)
             self.assertGreaterEqual(
                 histogram_dict[decoupled_model_sum],
