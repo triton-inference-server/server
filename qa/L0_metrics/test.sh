@@ -160,6 +160,18 @@ code=`curl -s -w %{http_code} -X POST ${TRITONSERVER_IPADDR}:8000/v2/repository/
 python3 -m pytest --junitxml="general_metrics_test.test_metrics_load_time_explicit_unload.report.xml" $CLIENT_PY::TestGeneralMetrics::test_metrics_load_time_explicit_unload >> $CLIENT_LOG 2>&1
 kill_server
 
+# Test 4 for explicit mode LOAD and UNLOAD with multiple versions
+set +e
+CLIENT_PY="./general_metrics_test.py"
+CLIENT_LOG="general_metrics_test_client.log"
+SERVER_LOG="general_metrics_test_server.log"
+VERSION_DIR="${PWD}/version_models"
+SERVER_ARGS="$BASE_SERVER_ARGS --model-repository=${VERSION_DIR} --model-control-mode=explicit --log-verbose=1"
+run_and_check_server
+python3 -m pytest --junitxml="general_metrics_test.test_metrics_load_time_multiple_version_reload.report.xml" $CLIENT_PY::TestGeneralMetrics::test_metrics_load_time_multiple_version_reload >> $CLIENT_LOG 2>&1
+
+kill_server
+
 ### Pinned memory metrics tests
 set +e
 CLIENT_PY="./pinned_memory_metrics_test.py"
