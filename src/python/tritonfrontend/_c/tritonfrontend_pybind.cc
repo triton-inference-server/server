@@ -36,7 +36,6 @@
 #include "../../../http_server.h"
 #endif
 
-
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 

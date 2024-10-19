@@ -84,7 +84,7 @@ class KServeGrpc:
         infer_allocation_pool_size: int = Field(8, ge=0)
         forward_header_pattern: str = ""
         # DLIS-7215: Add restricted protocol support
-        # restricted_protocols: str = ""
+        restricted_protocols: str = "I am restricted GRPC"
 
         def __post_init__(self):
             if isinstance(self.infer_compression_level, Grpc_compression_level):

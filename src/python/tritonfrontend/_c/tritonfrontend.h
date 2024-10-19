@@ -27,10 +27,13 @@
 #pragma once
 
 #include <memory>  // For shared_ptr
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 
 #include "../../../common.h"
+#include "../../../grpc/grpc_server.h"
+#include "../../../http_server.h"
 #include "../../../restricted_features.h"
 #include "../../../shared_memory_manager.h"
 #include "../../../tracer.h"
@@ -116,6 +119,8 @@ class TritonFrontend {
 
     server_.reset(server_ptr, EmptyDeleter);
 
+    _populate_restricted_features(data);
+
     ThrowIfError(FrontendServer::Create(
         server_, data, nullptr /* TraceManager */,
         nullptr /* SharedMemoryManager */, restricted_features, &service));
@@ -134,6 +139,21 @@ class TritonFrontend {
   // will cause a double-free when the core bindings attempt to
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
+
+  void _populate_restricted_features(UnorderedMapType& data)
+  {
+    std::string map_key;
+    if (std::is_same_v<Base, triton::server::HTTPServer>)
+      map_key = "restricted_apis";
+    else if (std::is_same_v<Base, triton::server::grpc::Server>)
+      map_key = "restricted_protocols";
+
+    std::string restricted_info;
+    ThrowIfError(GetValue(data, map_key, &restricted_info));
+
+    std::cout << "Made it to helper function" << std::endl;
+    std::cout << "Restricted Info: " << restricted_info << std::endl;
+  }
 };
 
 }}}  // namespace triton::server::python
