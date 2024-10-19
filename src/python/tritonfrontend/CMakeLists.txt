@@ -63,6 +63,8 @@ set(
   ../../common.cc
   ../../restricted_features.h
   ../../classification.cc
+  ../../command_line_parser.h
+  ../../command_line_parser.cc
 )
 
 set(PY_BINDING_DEPENDENCY_LIBS)

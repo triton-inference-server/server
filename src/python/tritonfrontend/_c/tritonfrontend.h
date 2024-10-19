@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <variant>
 
+#include "../../../command_line_parser.h"
 #include "../../../common.h"
 #include "../../../grpc/grpc_server.h"
 #include "../../../http_server.h"
@@ -39,7 +40,6 @@
 #include "../../../tracer.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
-
 
 struct TRITONSERVER_Server {};
 
@@ -142,17 +142,35 @@ class TritonFrontend {
 
   void _populate_restricted_features(UnorderedMapType& data)
   {
-    std::string map_key;
-    if (std::is_same_v<Base, triton::server::HTTPServer>)
+    std::string map_key;  // Name of option in UnorderedMap
+
+    std::string option_name;
+    std::string key_prefix;
+    std::string feature_type;
+    if (std::is_same_v<Base, triton::server::HTTPServer>) {
       map_key = "restricted_apis";
-    else if (std::is_same_v<Base, triton::server::grpc::Server>)
+
+      option_name = "http-restricted-api";
+      key_prefix = "";
+      feature_type = "api";
+    } else if (std::is_same_v<Base, triton::server::grpc::Server>) {
       map_key = "restricted_protocols";
+
+      option_name = "grpc-restricted-protocol";
+      key_prefix = "triton-grpc-protocol-";
+      feature_type = "protocol";
+    }
 
     std::string restricted_info;
     ThrowIfError(GetValue(data, map_key, &restricted_info));
 
-    std::cout << "Made it to helper function" << std::endl;
-    std::cout << "Restricted Info: " << restricted_info << std::endl;
+    if (restricted_info.length() != 0) {
+      triton::server::TritonParser tp;
+
+      tp.ParseRestrictedFeatureOption(
+          restricted_info, option_name, key_prefix, feature_type,
+          restricted_features);
+    }
   }
 };
 
