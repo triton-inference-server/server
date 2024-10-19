@@ -48,7 +48,7 @@ class KServeHttp:
         thread_count: int = Field(8, ge=0)
         header_forward_pattern: str = ""
         # DLIS-7215: Add restricted protocol support
-        restricted_apis: str = "metadata:one=two"
+        restricted_apis: str = ""  # "metadata:one=two"
 
     def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
         try:
