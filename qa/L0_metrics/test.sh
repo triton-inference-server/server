@@ -462,8 +462,7 @@ check_unit_test "${expected_tests}"
 MODELDIR="${PWD}/ensemble_decoupled"
 SERVER_ARGS="--model-repository=${MODELDIR} --metrics-config histogram_latencies=true --log-verbose=1"
 PYTHON_TEST="histogram_metrics_test.py"
-rm -rf "${MODELDIR}"/ensemble/1
-mkdir "${MODELDIR}"/ensemble/1
+mkdir -p "${MODELDIR}"/ensemble/1
 cp -r "${MODELDIR}"/async_execute_decouple "${MODELDIR}"/async_execute
 sed -i "s/model_transaction_policy { decoupled: True }//" "${MODELDIR}"/async_execute/config.pbtxt
 

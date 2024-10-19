@@ -76,11 +76,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
         return histogram_dict
 
     def async_stream_infer(self, model_name, inputs, outputs):
-        try:
-            triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
-        except Exception as e:
-            print("context creation failed: " + str(e))
-            sys.exit()
+        triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
 
         # Define the callback function. Note the last two parameters should be
         # result and error. InferenceServerClient would povide the results of an
@@ -133,38 +129,42 @@ class TestHistogramMetrics(tu.TestResultCollector):
         # Initialize the data
         inputs[0].set_data_from_numpy(input_data)
 
-        self.async_stream_infer(ensemble_model_name, inputs, outputs)
+        # Send 3 requests to ensemble decoupled model
+        for request_num in range(3):
+            self.async_stream_infer(ensemble_model_name, inputs, outputs)
 
-        # Checks metrics output
-        first_response_family = "nv_inference_first_response_histogram_ms"
-        decoupled_model_name = "async_execute_decouple"
-        histogram_dict = self.get_histogram_metrics(first_response_family)
+            # Checks metrics output
+            first_response_family = "nv_inference_first_response_histogram_ms"
+            decoupled_model_name = "async_execute_decouple"
+            histogram_dict = self.get_histogram_metrics(first_response_family)
 
-        ensemble_model_count = get_histogram_metric_key(
-            first_response_family, ensemble_model_name, "1", "count"
-        )
-        ensemble_model_sum = get_histogram_metric_key(
-            first_response_family, ensemble_model_name, "1", "sum"
-        )
-        self.assertIn(ensemble_model_count, histogram_dict)
-        self.assertGreaterEqual(histogram_dict[ensemble_model_count], 1)
-        self.assertIn(ensemble_model_sum, histogram_dict)
-        self.assertGreaterEqual(
-            histogram_dict[ensemble_model_sum], 2 * wait_secs * MILLIS_PER_SEC
-        )
+            ensemble_model_count = get_histogram_metric_key(
+                first_response_family, ensemble_model_name, "1", "count"
+            )
+            ensemble_model_sum = get_histogram_metric_key(
+                first_response_family, ensemble_model_name, "1", "sum"
+            )
+            self.assertIn(ensemble_model_count, histogram_dict)
+            self.assertGreaterEqual(histogram_dict[ensemble_model_count], request_num)
+            self.assertIn(ensemble_model_sum, histogram_dict)
+            self.assertGreaterEqual(
+                histogram_dict[ensemble_model_sum],
+                2 * wait_secs * MILLIS_PER_SEC * request_num,
+            )
 
-        decoupled_model_count = get_histogram_metric_key(
-            first_response_family, decoupled_model_name, "1", "count"
-        )
-        decoupled_model_sum = get_histogram_metric_key(
-            first_response_family, decoupled_model_name, "1", "sum"
-        )
-        self.assertIn(decoupled_model_count, histogram_dict)
-        self.assertGreaterEqual(histogram_dict[decoupled_model_count], 1)
-        self.assertIn(decoupled_model_sum, histogram_dict)
-        self.assertGreaterEqual(
-            histogram_dict[decoupled_model_sum], wait_secs * MILLIS_PER_SEC
-        )
+            decoupled_model_count = get_histogram_metric_key(
+                first_response_family, decoupled_model_name, "1", "count"
+            )
+            decoupled_model_sum = get_histogram_metric_key(
+                first_response_family, decoupled_model_name, "1", "sum"
+            )
+            self.assertIn(decoupled_model_count, histogram_dict)
+            self.assertGreaterEqual(histogram_dict[decoupled_model_count], request_num)
+            self.assertIn(decoupled_model_sum, histogram_dict)
+            self.assertGreaterEqual(
+                histogram_dict[decoupled_model_sum],
+                wait_secs * MILLIS_PER_SEC * request_num,
+            )
 
 
 if __name__ == "__main__":
