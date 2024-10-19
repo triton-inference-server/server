@@ -24,45 +24,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.18)
-
-add_subdirectory(tritonfrontend)
-
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION ${TRITON_VERSION})
-configure_file(../../LICENSE LICENSE.txt COPYONLY)
-configure_file(setup.py setup.py @ONLY)
-
-set(WHEEL_DEPENDS
-      ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION
-      ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
-      ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-      ${CMAKE_CURRENT_BINARY_DIR}/tritonfrontend
-      py-bindings
-)
-
-set(wheel_stamp_file "stamp.whl")
-
-add_custom_command(
-  OUTPUT "${wheel_stamp_file}"
-  COMMAND python3
-  ARGS
-    "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.py"
-    --dest-dir "${CMAKE_CURRENT_BINARY_DIR}/generic"
-    --binding-path $<TARGET_FILE:py-bindings>
-  DEPENDS ${WHEEL_DEPENDS}
-)
-
-add_custom_target(
-  frontend-server-wheel ALL
-  DEPENDS
-    "${wheel_stamp_file}"
-)
-
-
-# Wheel
-set(WHEEL_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generic/wheel/dist/")
-install(
-  DIRECTORY
-  ${WHEEL_OUT_DIR}
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/python"
-)
+backend: "python"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+instance_group [{ kind: KIND_CPU }]
