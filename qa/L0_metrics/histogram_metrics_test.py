@@ -98,25 +98,25 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 inputs=inputs,
                 outputs=outputs,
             )
-            triton_client.stop_stream()
 
-            # Wait until the results are available in user_data
-            time_out = 10
-            while (len(user_data) == 0) and time_out > 0:
-                time_out = time_out - 1
-                time.sleep(1)
+        # Wait until the results are available in user_data
+        time_out = 10
+        while (len(user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
 
-            # Validate the results
-            for i in range(len(user_data)):
-                # Check for the errors
-                self.assertNotIsInstance(
-                    user_data[i], InferenceServerException, user_data[i]
-                )
+        # Validate the results
+        for i in range(len(user_data)):
+            # Check for the errors
+            self.assertNotIsInstance(
+                user_data[i], InferenceServerException, user_data[i]
+            )
 
     def test_ensemble_decoupled(self):
-        wait_secs = 0.1
+        wait_secs = 1
         responses_per_req = 3
         total_reqs = 3
+        delta = 0.2
 
         # Infer
         inputs = []
@@ -154,9 +154,10 @@ class TestHistogramMetrics(tu.TestResultCollector):
             self.assertIn(ensemble_model_count, histogram_dict)
             self.assertEqual(histogram_dict[ensemble_model_count], request_num)
             self.assertIn(ensemble_model_sum, histogram_dict)
-            self.assertGreaterEqual(
-                histogram_dict[ensemble_model_sum],
-                2 * wait_secs * MILLIS_PER_SEC * request_num,
+            self.assertTrue(
+                2 * wait_secs * MILLIS_PER_SEC * request_num
+                <= histogram_dict[ensemble_model_sum]
+                < 2 * (wait_secs + delta) * MILLIS_PER_SEC * request_num
             )
 
             # Test decoupled model metrics
@@ -169,9 +170,10 @@ class TestHistogramMetrics(tu.TestResultCollector):
             self.assertIn(decoupled_model_count, histogram_dict)
             self.assertEqual(histogram_dict[decoupled_model_count], request_num)
             self.assertIn(decoupled_model_sum, histogram_dict)
-            self.assertGreaterEqual(
-                histogram_dict[decoupled_model_sum],
-                wait_secs * MILLIS_PER_SEC * request_num,
+            self.assertTrue(
+                wait_secs * MILLIS_PER_SEC * request_num
+                <= histogram_dict[decoupled_model_sum]
+                < (wait_secs + delta) * MILLIS_PER_SEC * request_num
             )
 
             # Test non-decoupled model metrics

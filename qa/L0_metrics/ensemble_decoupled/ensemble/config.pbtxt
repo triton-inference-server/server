@@ -61,7 +61,11 @@ ensemble_scheduling {
    }
    output_map {
     key: "WAIT_SECONDS"
-    value: "temp_output"
+    value: "temp_output0"
+   }
+   output_map {
+    key: "RESPONSE_NUM"
+    value: "temp_output1"
    }
   },
   {
@@ -70,10 +74,14 @@ ensemble_scheduling {
    model_version: 1
    input_map {
     key: "WAIT_SECONDS"
-    value: "temp_output"
+    value: "temp_output0"
+   }
+   input_map {
+    key: "RESPONSE_NUM"
+    value: "temp_output1"
    }
    output_map {
-    key: "DUMMY_OUT"
+    key: "WAIT_SECONDS"
     value: "OUTPUT"
    }
   }

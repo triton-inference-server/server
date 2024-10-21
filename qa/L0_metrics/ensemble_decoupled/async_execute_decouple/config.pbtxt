@@ -42,6 +42,11 @@ output [
     name: "WAIT_SECONDS"
     data_type: TYPE_FP32
     dims: [ 1 ]
+  },
+  {
+    name: "RESPONSE_NUM"
+    data_type: TYPE_UINT8
+    dims: [ 1 ]
   }
 ]
 
