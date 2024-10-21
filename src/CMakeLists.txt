@@ -788,8 +788,8 @@ if (NOT WIN32)
   add_subdirectory(python)
 endif (NOT WIN32)
 
-# # Currently unit tests do not build for windows...
-# if ( NOT WIN32)
-#   add_subdirectory(test test)
-# endif() # NOT WIN32
+# Currently unit tests do not build for windows...
+if ( NOT WIN32)
+  add_subdirectory(test test)
+endif() # NOT WIN32
 
