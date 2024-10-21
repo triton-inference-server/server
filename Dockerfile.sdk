@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.08-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:24.09-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
@@ -276,11 +276,11 @@ ARG NVIDIA_BUILD_ID
 ENV NVIDIA_TRITON_SERVER_SDK_VERSION=${NVIDIA_TRITON_SERVER_SDK_VERSION}
 ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
-ENV PATH /workspace/install/bin:${PATH}
-ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+ENV PATH=/workspace/install/bin:${PATH}
+ENV LD_LIBRARY_PATH=/workspace/install/lib:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
-ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
-ENV TCMALLOC_RELEASE_RATE 200
+ENV TCMALLOC_RELEASE_RATE=200

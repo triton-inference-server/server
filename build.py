@@ -70,10 +70,10 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.50.0dev": (
-        "24.09dev",  # triton container
-        "24.08",  # upstream container
-        "1.18.1",  # ORT
+    "2.51.0dev": (
+        "24.10dev",  # triton container
+        "24.09",  # upstream container
+        "1.19.2",  # ORT
         "2024.0.0",  # ORT OpenVINO
         "2024.3.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
@@ -1849,11 +1849,11 @@ def core_build(
             os.path.join(repo_install_dir, "lib", "libtritonserver.so"),
             os.path.join(install_dir, "lib"),
         )
-    # [FIXME] Placing the Triton server wheel file in 'python' for now, should
-    # have been upload to pip registry and be able to install directly
+    # [FIXME] Placing the tritonserver and tritonfrontend wheel files in 'python' for now,
+    # should be uploaded to pip registry to be able to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
     cmake_script.cp(
-        os.path.join(repo_install_dir, "python", "tritonserver*.whl"),
+        os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
     )
 
