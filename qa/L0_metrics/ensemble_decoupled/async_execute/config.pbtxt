@@ -24,58 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "ensemble"
-platform: "ensemble"
+backend: "python"
 input [
- {
-  name: "INPUT0"
-  data_type: TYPE_FP32
-  dims: [ 1 ]
- },
- {
-  name: "INPUT1"
-  data_type: TYPE_UINT8
-  dims: [ 1 ]
- }
+  {
+    name: "WAIT_SECONDS"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
 ]
 output [
- {
-  name: "OUTPUT"
-  data_type: TYPE_FP32
-  dims: [ 1 ]
- }
-]
-ensemble_scheduling {
- step [
   {
-   # decoupled model
-   model_name: "async_execute_decouple"
-   model_version: 1
-   input_map {
-    key: "WAIT_SECONDS"
-    value: "INPUT0"
-   }
-   input_map {
-    key: "RESPONSE_NUM"
-    value: "INPUT1"
-   }
-   output_map {
-    key: "WAIT_SECONDS"
-    value: "temp_output"
-   }
-  },
-  {
-   # non-decoupled model
-   model_name: "async_execute"
-   model_version: 1
-   input_map {
-    key: "WAIT_SECONDS"
-    value: "temp_output"
-   }
-   output_map {
-    key: "DUMMY_OUT"
-    value: "OUTPUT"
-   }
+    name: "DUMMY_OUT"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
   }
- ]
-}
+]
+
+instance_group [{ kind: KIND_CPU }]

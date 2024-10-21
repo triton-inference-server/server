@@ -76,66 +76,75 @@ class TestHistogramMetrics(tu.TestResultCollector):
         return histogram_dict
 
     def async_stream_infer(self, model_name, inputs, outputs):
-        triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
+        with grpcclient.InferenceServerClient(url="localhost:8001") as triton_client:
+            # Define the callback function. Note the last two parameters should be
+            # result and error. InferenceServerClient would povide the results of an
+            # inference as grpcclient.InferResult in result. For successful
+            # inference, error will be None, otherwise it will be an object of
+            # tritonclientutils.InferenceServerException holding the error details
+            def callback(user_data, result, error):
+                if error:
+                    user_data.append(error)
+                else:
+                    user_data.append(result)
 
-        # Define the callback function. Note the last two parameters should be
-        # result and error. InferenceServerClient would povide the results of an
-        # inference as grpcclient.InferResult in result. For successful
-        # inference, error will be None, otherwise it will be an object of
-        # tritonclientutils.InferenceServerException holding the error details
-        def callback(user_data, result, error):
-            if error:
-                user_data.append(error)
-            else:
-                user_data.append(result)
+            # list to hold the results of inference.
+            user_data = []
 
-        # list to hold the results of inference.
-        user_data = []
+            # Inference call
+            triton_client.start_stream(callback=partial(callback, user_data))
+            triton_client.async_stream_infer(
+                model_name=model_name,
+                inputs=inputs,
+                outputs=outputs,
+            )
+            triton_client.stop_stream()
 
-        # Inference call
-        triton_client.start_stream(callback=partial(callback, user_data))
-        triton_client.async_stream_infer(
-            model_name=model_name,
-            inputs=inputs,
-            outputs=outputs,
-        )
-        triton_client.stop_stream()
+            # Wait until the results are available in user_data
+            time_out = 10
+            while (len(user_data) == 0) and time_out > 0:
+                time_out = time_out - 1
+                time.sleep(1)
 
-        # Wait until the results are available in user_data
-        time_out = 10
-        while (len(user_data) == 0) and time_out > 0:
-            time_out = time_out - 1
-            time.sleep(1)
-
-        # Display and validate the available results
-        if len(user_data) == 1:
-            # Check for the errors
-            self.assertNotIsInstance(user_data[0], InferenceServerException)
+            # Validate the results
+            for i in range(len(user_data)):
+                # Check for the errors
+                self.assertNotIsInstance(
+                    user_data[i], InferenceServerException, user_data[i]
+                )
 
     def test_ensemble_decoupled(self):
-        ensemble_model_name = "ensemble"
-        wait_secs = 1
+        wait_secs = 0.1
+        responses_per_req = 3
+        total_reqs = 3
 
         # Infer
         inputs = []
         outputs = []
-        inputs.append(grpcclient.InferInput("INPUT", [1], "FP32"))
+        inputs.append(grpcclient.InferInput("INPUT0", [1], "FP32"))
+        inputs.append(grpcclient.InferInput("INPUT1", [1], "UINT8"))
         outputs.append(grpcclient.InferRequestedOutput("OUTPUT"))
 
-        # Create the data for the input tensor. Initialize to all ones.
-        input_data = np.ones(shape=(1), dtype=np.float32) * wait_secs
-        # Initialize the data
-        inputs[0].set_data_from_numpy(input_data)
+        # Create the data for the input tensor.
+        input_data_0 = np.array([wait_secs], np.float32)
+        input_data_1 = np.array([responses_per_req], np.uint8)
 
-        # Send 3 requests to ensemble decoupled model
-        for request_num in range(1, 4):
+        # Initialize the data
+        inputs[0].set_data_from_numpy(input_data_0)
+        inputs[1].set_data_from_numpy(input_data_1)
+
+        # Send requests to ensemble decoupled model
+        for request_num in range(1, total_reqs + 1):
+            ensemble_model_name = "ensemble"
+            decoupled_model_name = "async_execute_decouple"
+            non_decoupled_model_name = "async_execute"
             self.async_stream_infer(ensemble_model_name, inputs, outputs)
 
             # Checks metrics output
             first_response_family = "nv_inference_first_response_histogram_ms"
-            decoupled_model_name = "async_execute_decouple"
             histogram_dict = self.get_histogram_metrics(first_response_family)
 
+            # Test ensemble model metrics
             ensemble_model_count = get_histogram_metric_key(
                 first_response_family, ensemble_model_name, "1", "count"
             )
@@ -150,6 +159,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 2 * wait_secs * MILLIS_PER_SEC * request_num,
             )
 
+            # Test decoupled model metrics
             decoupled_model_count = get_histogram_metric_key(
                 first_response_family, decoupled_model_name, "1", "count"
             )
@@ -163,6 +173,16 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 histogram_dict[decoupled_model_sum],
                 wait_secs * MILLIS_PER_SEC * request_num,
             )
+
+            # Test non-decoupled model metrics
+            non_decoupled_model_count = get_histogram_metric_key(
+                first_response_family, non_decoupled_model_name, "1", "count"
+            )
+            non_decoupled_model_sum = get_histogram_metric_key(
+                first_response_family, non_decoupled_model_name, "1", "sum"
+            )
+            self.assertNotIn(non_decoupled_model_count, histogram_dict)
+            self.assertNotIn(non_decoupled_model_sum, histogram_dict)
 
 
 if __name__ == "__main__":

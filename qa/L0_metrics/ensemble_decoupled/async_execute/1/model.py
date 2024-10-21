@@ -39,23 +39,14 @@ class TritonPythonModel:
             wait_secs_tensor = pb_utils.get_input_tensor_by_name(
                 request, "WAIT_SECONDS"
             ).as_numpy()
-            response_num_tensor = pb_utils.get_input_tensor_by_name(
-                request, "RESPONSE_NUM"
-            ).as_numpy()
 
             # Validate input data
             wait_secs = wait_secs_tensor[0]
             if wait_secs < 0:
-                self.raise_value_error(requests, "wait_secs cannot be negative")
-            response_num = response_num_tensor[0]
-            if response_num < 1:
-                self.raise_value_error(requests, "response_num cannot be less than one")
+                self.raise_value_error(request, "wait_secs cannot be negative")
             async_tasks.append(asyncio.create_task(asyncio.sleep(wait_secs)))
-
             processed_requests.append(
                 {
-                    "wait_secs": wait_secs,
-                    "response_num": response_num,
                     "response_sender": request.get_response_sender(),
                 }
             )
@@ -66,21 +57,13 @@ class TritonPythonModel:
         await asyncio.gather(*async_tasks)
 
         for p_req in processed_requests:
-            wait_secs = p_req["wait_secs"]
-            response_num = p_req["response_num"]
             response_sender = p_req["response_sender"]
 
-            output_tensors = pb_utils.Tensor(
-                "WAIT_SECONDS", np.array([wait_secs], np.float32)
+            output_tensors = pb_utils.Tensor("DUMMY_OUT", np.array([0], np.float32))
+            response = pb_utils.InferenceResponse(output_tensors=[output_tensors])
+            response_sender.send(
+                response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
             )
-            for i in range(response_num):
-                response = pb_utils.InferenceResponse(output_tensors=[output_tensors])
-                if i != response_num - 1:
-                    response_sender.send(response)
-                else:
-                    response_sender.send(
-                        response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
-                    )
 
         return None
 
