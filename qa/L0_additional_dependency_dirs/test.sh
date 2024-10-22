@@ -139,7 +139,7 @@ fi
 
 kill_server
 
-# Test Case 4: Run server when when pointing to stale TRT dependencies (expect FAIL)
+# Test Case 4: Run server when pointing to stale TRT dependencies (expect FAIL)
 SERVER_LOG="./stale_dependencies_server.log"
 SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${STALE_DEPENDENCY_DIR};"
 run_server
@@ -149,7 +149,7 @@ if [ "$SERVER_PID" != "0" ]; then
     RET=1
 fi
 
-# Test Case 5: [Test ordering] Run server when when pointing to stale and correct TRT dependencies (stale first - expect FAIL).
+# Test Case 5: [Test ordering] Run server when pointing to stale and correct TRT dependencies (stale first - expect FAIL).
 SERVER_LOG="./stale_first_server.log"
 SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${STALE_DEPENDENCY_DIR};${CUSTOM_DEPENDENCY_DIR};"
 run_server
@@ -159,7 +159,7 @@ if [ "$SERVER_PID" != "0" ]; then
     RET=1
 fi
 
-# Test Case 6:  [Test ordering] Run server when when pointing to stale and correct TRT dependencies (correct first - expect SUCCESS).
+# Test Case 6:  [Test ordering] Run server when pointing to stale and correct TRT dependencies (correct first - expect SUCCESS).
 SERVER_LOG="./correct_first_server.log"
 SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};${STALE_DEPENDENCY_DIR};"
 run_server
@@ -177,7 +177,74 @@ fi
 
 kill_server
 
-# Test Case 7: Incorrect extension usage. User provided path(s) that are not semi-colon separated (expect FAIL).
+ORIGINAL_PATH=$PATH
+# Test Case 7: [Test ordering] Run server when correct TRT dependencies exist in environment PATH (expect SUCCESS)
+SERVER_LOG="./correct_in_environment.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2"
+PATH="${ORIGINAL_PATH};${CUSTOM_DEPENDENCY_DIR};"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+simple_inference_check
+if [ "${INFER_SUCCESS}" == "0" ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: simple inference check failed\n***"
+    RET=1
+fi
+
+PATH=$ORIGINAL_PATH
+kill_server
+
+# Test Case 8: [Test ordering] Run server when correct TRT dependencies exist in environment PATH, but user specifies stale additional dependency directory (user input takes priority - expect FAIL)
+SERVER_LOG="./correct_in_environment_but_user_adds_stale.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${STALE_DEPENDENCY_DIR};"
+PATH="${ORIGINAL_PATH};${CUSTOM_DEPENDENCY_DIR};"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: unexpected success starting $SERVER\n***"
+    kill_server
+    RET=1
+fi
+
+PATH=$ORIGINAL_PATH
+
+# Test Case 9: [Test ordering] Run server when stale TRT dependencies exist in environment PATH (expect FAIL)
+SERVER_LOG="./stale_in_environment.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2"
+PATH="${ORIGINAL_PATH};${STALE_DEPENDENCY_DIR};"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: unexpected success starting $SERVER\n***"
+    kill_server
+    RET=1
+fi
+
+PATH=$ORIGINAL_PATH
+
+# Test Case 10: [Test ordering] Run server when stale TRT dependencies exist in environment PATH, but user specifies correct additional dependency directory (user input takes priority - expect SUCCESS)
+SERVER_LOG="./stale_in_environment_but_user_adds_correct.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=${CUSTOM_DEPENDENCY_DIR};"
+PATH="${ORIGINAL_PATH};${STALE_DEPENDENCY_DIR};"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+simple_inference_check
+if [ "${INFER_SUCCESS}" == "0" ]; then
+    echo -e "\n***\n*** FAILED on line ${LINENO}: simple inference check failed\n***"
+    RET=1
+fi
+
+PATH=$ORIGINAL_PATH
+kill_server
+
+# Test Case 11: Incorrect extension usage. User provided path(s) that are not semi-colon separated (expect FAIL).
 SERVER_LOG="./incorrect_usage_server.log"
 SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=2 --backend-config=tensorrt,additional-dependency-dirs=C:/not_semicolon_terminated"
 run_server
