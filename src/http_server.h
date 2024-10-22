@@ -134,10 +134,6 @@ class HTTPMetricsServer : public HTTPServer {
       std::string address, int thread_cnt,
       std::unique_ptr<HTTPServer>* metrics_server);
 
-  // Used by tritonfrontend python bindings
-  // Unifying Create function called from tritonfrontend.h
-  // TraceManager, RestrictedFeatures, and SharedMemoryManager objects
-  // are not propagated or used by HTTPMetricsServer
   static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
       const UnorderedMapType& options, std::unique_ptr<HTTPServer>* service);
