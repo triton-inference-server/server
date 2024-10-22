@@ -35,7 +35,6 @@ input [
     dims: [ 1 ]
   }
 ]
-
 output [
   {
     name: "OUTPUT0"
@@ -43,7 +42,6 @@ output [
     dims: [ 1 ]
   }
 ]
-
 instance_group [
   {
     count: 1
