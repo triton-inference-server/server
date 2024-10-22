@@ -140,14 +140,7 @@ class HTTPMetricsServer : public HTTPServer {
   // are not propagated or used by HTTPMetricsServer
   static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
-      const UnorderedMapType& options,
-      triton::server::TraceManager*
-          trace_manager,  // Not used HTTPMetricsServer
-      const std::shared_ptr<SharedMemoryManager>&
-          shm_manager,  // Not used HTTPMetricsServer
-      const RestrictedFeatures&
-          restricted_features,  // Not used HTTPMetricsServer
-      std::unique_ptr<HTTPServer>* service);
+      const UnorderedMapType& options, std::unique_ptr<HTTPServer>* service);
 
   ~HTTPMetricsServer() = default;
 

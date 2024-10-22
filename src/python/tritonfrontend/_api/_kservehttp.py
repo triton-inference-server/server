@@ -63,8 +63,8 @@ class KServeHttp:
                     "Incorrect type for options. options argument must be of type KServeHttp.Options"
                 )
 
-            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
             # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
+            options_dict: dict[str, Union[int, bool, str]] = options.__dict__
 
             self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
         except TritonError:
