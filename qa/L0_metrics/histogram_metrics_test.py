@@ -48,8 +48,6 @@ def get_histogram_metric_key(
 ):
     if metric_type in ["count", "sum"]:
         return f'{metric_family}_{metric_type}{{model="{model_name}",version="{model_version}"}}'
-    elif metric_type == "bucket":
-        return f'{metric_family}_{metric_type}{{model="{model_name}",version="{model_version}",le="{le}"}}'
     else:
         return None
 
@@ -75,7 +73,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
 
         return histogram_dict
 
-    def async_stream_infer(self, model_name, inputs, outputs):
+    def async_stream_infer(self, model_name, inputs, outputs, responses_per_req):
         with grpcclient.InferenceServerClient(url="localhost:8001") as triton_client:
             # Define the callback function. Note the last two parameters should be
             # result and error. InferenceServerClient would povide the results of an
@@ -99,12 +97,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
                 outputs=outputs,
             )
 
-        # Wait until the results are available in user_data
-        time_out = 10
-        while (len(user_data) == 0) and time_out > 0:
-            time_out = time_out - 1
-            time.sleep(1)
-
+        self.assertEqual(len(user_data), responses_per_req)
         # Validate the results
         for i in range(len(user_data)):
             # Check for the errors
@@ -138,43 +131,38 @@ class TestHistogramMetrics(tu.TestResultCollector):
             ensemble_model_name = "ensemble"
             decoupled_model_name = "async_execute_decouple"
             non_decoupled_model_name = "async_execute"
-            self.async_stream_infer(ensemble_model_name, inputs, outputs)
+            self.async_stream_infer(
+                ensemble_model_name, inputs, outputs, responses_per_req
+            )
 
             # Checks metrics output
             first_response_family = "nv_inference_first_response_histogram_ms"
             histogram_dict = self.get_histogram_metrics(first_response_family)
 
+            def check_existing_metrics(model_name, wait_secs_per_req, delta):
+                metric_count = get_histogram_metric_key(
+                    first_response_family, model_name, "1", "count"
+                )
+                model_sum = get_histogram_metric_key(
+                    first_response_family, model_name, "1", "sum"
+                )
+                # Test histogram count
+                self.assertIn(metric_count, histogram_dict)
+                self.assertEqual(histogram_dict[metric_count], request_num)
+                # Test histogram sum
+                self.assertIn(model_sum, histogram_dict)
+                self.assertTrue(
+                    wait_secs_per_req * MILLIS_PER_SEC * request_num
+                    <= histogram_dict[model_sum]
+                    < (wait_secs_per_req + delta) * MILLIS_PER_SEC * request_num
+                )
+                # Prometheus histogram buckets are tested in metrics_api_test.cc::HistogramAPIHelper
+
             # Test ensemble model metrics
-            ensemble_model_count = get_histogram_metric_key(
-                first_response_family, ensemble_model_name, "1", "count"
-            )
-            ensemble_model_sum = get_histogram_metric_key(
-                first_response_family, ensemble_model_name, "1", "sum"
-            )
-            self.assertIn(ensemble_model_count, histogram_dict)
-            self.assertEqual(histogram_dict[ensemble_model_count], request_num)
-            self.assertIn(ensemble_model_sum, histogram_dict)
-            self.assertTrue(
-                2 * wait_secs * MILLIS_PER_SEC * request_num
-                <= histogram_dict[ensemble_model_sum]
-                < 2 * (wait_secs + delta) * MILLIS_PER_SEC * request_num
-            )
+            check_existing_metrics(ensemble_model_name, 2 * wait_secs, 2 * delta)
 
             # Test decoupled model metrics
-            decoupled_model_count = get_histogram_metric_key(
-                first_response_family, decoupled_model_name, "1", "count"
-            )
-            decoupled_model_sum = get_histogram_metric_key(
-                first_response_family, decoupled_model_name, "1", "sum"
-            )
-            self.assertIn(decoupled_model_count, histogram_dict)
-            self.assertEqual(histogram_dict[decoupled_model_count], request_num)
-            self.assertIn(decoupled_model_sum, histogram_dict)
-            self.assertTrue(
-                wait_secs * MILLIS_PER_SEC * request_num
-                <= histogram_dict[decoupled_model_sum]
-                < (wait_secs + delta) * MILLIS_PER_SEC * request_num
-            )
+            check_existing_metrics(decoupled_model_name, wait_secs, delta)
 
             # Test non-decoupled model metrics
             non_decoupled_model_count = get_histogram_metric_key(

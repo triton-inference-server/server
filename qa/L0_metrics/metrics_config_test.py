@@ -44,7 +44,7 @@ INF_COUNTER_PATTERNS = [
     "nv_inference_compute_infer_duration",
     "nv_inference_compute_output_duration",
 ]
-INF_HISTOGRAM_DECOUPLED_PATTERNS = ["nv_inference_first_response_histogram"]
+INF_HISTOGRAM_DECOUPLED_PATTERNS = ["nv_inference_first_response_histogram_ms"]
 INF_SUMMARY_PATTERNS = [
     "nv_inference_request_summary",
     "nv_inference_queue_summary",
@@ -102,7 +102,8 @@ class MetricsConfigTest(tu.TestResultCollector):
     def test_inf_histograms_decoupled_exist(self):
         metrics = self._get_metrics()
         for metric in INF_HISTOGRAM_DECOUPLED_PATTERNS:
-            self.assertIn(metric, metrics)
+            for suffix in ["_count", "_sum", ""]:
+                self.assertIn(metric + suffix, metrics)
 
     def test_inf_histograms_decoupled_missing(self):
         metrics = self._get_metrics()

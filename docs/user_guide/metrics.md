@@ -229,13 +229,13 @@ information exposed by the Request to First Response Histogram metrics:
 ```
 # HELP nv_first_response_histogram_ms Duration from request to first response in milliseconds
 # TYPE nv_first_response_histogram_ms histogram
-nv_inference_first_response_histogram_ms_count{model="my_model",version="1"} 101
-nv_inference_first_response_histogram_ms_sum{model="my_model",version="1"} 3685
-nv_inference_first_response_histogram_ms{model="my_model",version="1", le="10"} 55
-nv_inference_first_response_histogram_ms{model="my_model",version="1", le="100"} 97
-nv_inference_first_response_histogram_ms{model="my_model",version="1", le="500"} 98
-nv_inference_first_response_histogram_ms{model="my_model",version="1", le="1000"} 101
-nv_inference_first_response_histogram_ms{model="my_model",version="1", le="+Inf"} 101
+nv_inference_first_response_histogram_ms_count{model="my_model",version="1"} 37
+nv_inference_first_response_histogram_ms_sum{model="my_model",version="1"} 10771
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="100"} 8
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="500"} 30
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="2000"} 36
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="5000"} 37
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="+Inf"} 37
 ```
 
 Triton initializes histograms with default buckets for each, as shown above. Customization of buckets per metric is currently unsupported.
