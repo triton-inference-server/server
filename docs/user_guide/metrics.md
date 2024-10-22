@@ -221,11 +221,12 @@ metrics are used for latencies:
 
 To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
 
-Each histogram above may composed of several sub-metrics. For each
-metric, there is a set of `le` metrics tracking the counter for each
-bucket. Additionally, there are `_count` and `_sum` metrics that aggregate
-the count and observed values for each. For example, see the following
-information exposed by the Request to First Response Histogram metrics:
+Each histogram above is composed of several sub-metrics. For each histogram
+metric, there is a set of `le` (less than or equal to) thresholds tracking
+the counter for each bucket. Additionally, there are `_count` and `_sum`
+metrics that aggregate the count and observed values for each. For example,
+see the following information exposed by the "Time to First Response" histogram
+metrics:
 ```
 # HELP nv_first_response_histogram_ms Duration from request to first response in milliseconds
 # TYPE nv_first_response_histogram_ms histogram
