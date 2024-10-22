@@ -39,7 +39,6 @@ MODEL_LOAD_TIME = "nv_model_load_duration_secs{model="
 def get_model_load_times():
     r = requests.get(f"http://{_tritonserver_ipaddr}:8002/metrics")
     r.raise_for_status()
-    pattern = re.compile(rf'{MODEL_LOAD_TIME}"(.*?)".*?\ (\d+\.\d+)')
     # Initialize an empty dictionary to store the data
     model_data = {}
     lines = r.text.strip().split("\n")
@@ -115,6 +114,11 @@ class TestGeneralMetrics(unittest.TestCase):
         self.assertIsNone(load_time, "Model Load time found even after unload")
 
     def test_metrics_load_time_multiple_version_reload(self):
+        # Part 0 check start condistion, metric should not be present
+        model_load_times = get_model_load_times()
+        load_time = model_load_times.get(self.model_name, {}).get("1")
+        self.assertIsNone(load_time, "Model Load time found even before model load")
+
         # Part 1 load multiple versions of the same model and check if slow and fast models reflect the metric correctly
         load_model_explicit(self.model_name_multiple_versions)
         model_load_times = get_model_load_times()
@@ -135,6 +139,12 @@ class TestGeneralMetrics(unittest.TestCase):
             load_time_slow,
             10,
             "Slow load time should be greater than or equal to fast load time",
+        )
+        # Fail the test if load_time_fast is greater than generous 2 seconds
+        self.assertLess(
+            load_time_fast,
+            2,
+            "Model taking too much time to load",
         )
 
         # Part 2 load multiple versions AGAIN and compare with prev values expect to be the same
