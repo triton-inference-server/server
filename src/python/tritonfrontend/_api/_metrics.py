@@ -58,8 +58,8 @@ class Metrics:
                 "Incorrect type for options. options argument must be of type Metrics.Options"
             )
 
-        options_dict: dict[str, Union[int, bool, str]] = options.__dict__
         # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
+        options_dict: dict[str, Union[int, bool, str]] = options.__dict__
 
         self.triton_frontend = TritonFrontendMetrics(server_ptr, options_dict)
 
