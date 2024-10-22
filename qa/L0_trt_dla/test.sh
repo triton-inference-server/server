@@ -50,7 +50,7 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
-SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120 --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=360 --backend-directory=${BACKEND_DIR}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
