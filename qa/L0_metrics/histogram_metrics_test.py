@@ -28,7 +28,6 @@
 import os
 import re
 import sys
-import time
 import unittest
 from functools import partial
 
