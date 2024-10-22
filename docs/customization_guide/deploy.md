@@ -279,12 +279,12 @@ Directory where cache shared libraries are found.
 
 This is an optional Windows feature that enables Triton to search custom
 dependency directories when loading a specific backend. The user can input
-these directories as a string of semicolon-separated paths (including a 
-trailing semicolon). These directories are programmatically prepended to 
-the process's PATH and are removed when the backend is loaded successfully. 
-Windows will search PATH last in its search sequence, so be cautious that 
-no untrusted files of same name exist in a location of higher search priority 
-(e.g., System32). It is still recommended to add backend-specific dependencies 
+these directories as a string of semicolon-separated paths (including a
+trailing semicolon). These directories are programmatically prepended to
+the process's PATH and are removed when the backend is loaded successfully.
+Windows will search PATH last in its search sequence, so be cautious that
+no untrusted files of same name exist in a location of higher search priority
+(e.g., System32). It is still recommended to add backend-specific dependencies
 to their corresponding backend folder when possible.
 
 
