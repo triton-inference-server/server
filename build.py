@@ -78,6 +78,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "0.5.3.post1",  # vLLM version
+        "3.10.13",  # Python version
     )
 }
 
@@ -908,7 +909,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
-def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
+def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap, backends):
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -988,6 +989,19 @@ RUN wget -O /tmp/boost.tar.gz \\
 #       && apt-get update -q=2 \\
 #       && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
+    if "python" in backends:
+        df += """
+# python3.10 is not available through yum for RHEL8. It must instead must be installed via pyenv.
+# Only copy out libpython3.1* so as to not overwrite the general libpython3.so lib.
+RUN curl https://pyenv.run | bash \\
+    && echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
+    && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
+    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
+    && cp /root/.pyenv/versions/{}/lib/libpython3.1* /usr/lib64/""".format(
+            TRITON_VERSION_MAP[FLAGS.version][7], TRITON_VERSION_MAP[FLAGS.version][7]
+        )
+
     if FLAGS.enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
     df += """
@@ -1391,11 +1405,25 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
+# python3.10 is not available through yum for RHEL8. It must instead must be installed via pyenv.
+# Only copy out libpython3.1* so as to not overwrite the general libpython3.so lib.
+RUN curl https://pyenv.run | bash \\
+    && echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
+    && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
+    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
+    && cp /root/.pyenv/versions/{}/lib/libpython3.1* /usr/lib64/""".format(
+                TRITON_VERSION_MAP[FLAGS.version][7],
+                TRITON_VERSION_MAP[FLAGS.version][7],
+            )
+
+            df += """
 # python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
-        python3-devel \\
         python3-pip \\
+        openssl-devel \\
+        readline-devel
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
             wheel \\
@@ -1621,7 +1649,7 @@ def create_build_dockerfiles(
 
     if target_platform() == "rhel":
         create_dockerfile_buildbase_rhel(
-            FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
+            FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap, backends
         )
     else:
         create_dockerfile_buildbase(
