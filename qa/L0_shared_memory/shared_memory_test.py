@@ -132,14 +132,12 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
 
 class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_invalid_create_shm(self):
-        # Raises error since tried to create invalid system shared memory region
-        try:
-            shm_op0_handle = shm.create_shared_memory_region(
-                "dummy_data", "/dummy_data", -1
+        with self.assertRaisesRegex(
+            shm.SharedMemoryException, "unable to create the shared memory region"
+        ):
+            self._shm_handles.append(
+                shm.create_shared_memory_region("dummy_data", "/dummy_data", -1)
             )
-            shm.destroy_shared_memory_region(shm_op0_handle)
-        except Exception as ex:
-            self.assertTrue(str(ex) == "unable to initialize the size")
 
     def test_valid_create_set_register(self):
         # Create a valid system shared memory region, fill data in it and register
