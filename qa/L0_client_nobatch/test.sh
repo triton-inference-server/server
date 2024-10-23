@@ -46,9 +46,10 @@ CLIENT_TEST=client_test.py
 EXPECTED_NUM_TESTS="4"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-
+MODELDIR="${PWD}/qa_model_repository"
+rm -rf ${MODELDIR} && cp -r "${DATADIR}/qa_model_repository" ${MODELDIR}
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository"
+SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
