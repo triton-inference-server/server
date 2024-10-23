@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,9 +46,10 @@ CLIENT_TEST=client_test.py
 EXPECTED_NUM_TESTS="4"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-
+MODELDIR="${PWD}/qa_model_repository"
+rm -rf ${MODELDIR} && cp -r "${DATADIR}/qa_model_repository" ${MODELDIR}
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository"
+SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
