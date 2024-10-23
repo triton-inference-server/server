@@ -1301,8 +1301,8 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
       && if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
           useradd $TRITON_SERVER_USER; \\
         fi \\
-      && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
-      && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
+      && [ `id -u $TRITON_SERVER_USER` -eq 1001 ] \\
+      && [ `id -g $TRITON_SERVER_USER` -eq 1001 ]
 """.format(
         gpu_enabled=gpu_enabled
     )
@@ -1342,7 +1342,6 @@ RUN apt-get update \\
               libgoogle-perftools-dev \\
               libjemalloc-dev \\
               libnuma-dev \\
-              libre2-9 \\
               software-properties-common \\
               wget \\
               {backend_dependencies} \\
@@ -1394,10 +1393,7 @@ RUN apt-get update \\
             libarchive-dev \\
             python3-pip \\
             libpython3-dev \\
-      && pip3 install --upgrade pip \\
-      && pip3 install --upgrade \\
-            wheel \\
-            setuptools \\
+      && pip3 install --upgrade --break-system-packages \\
             \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
