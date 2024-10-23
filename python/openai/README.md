@@ -70,6 +70,22 @@ pip install -r requirements.txt
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
+Once the server has successfully started, you should see something like this:
+```
+...
++-----------------------+---------+--------+
+| Model                 | Version | Status |
++-----------------------+---------+--------+
+| llama-3.1-8b-instruct | 1       | READY  | <- Correct Model Loaded in Triton
++-----------------------+---------+--------+
+...
+Found model: name='llama-3.1-8b-instruct', backend='vllm'
+[WARNING] Adding CORS for the following origins: ['http://localhost']
+INFO:     Started server process [126]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
+```
 
 4. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
@@ -79,6 +95,31 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "model": "'${MODEL}'",
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
+```
+which should provide output that looks like this:
+```json
+{
+  "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message":
+      {
+        "content": "This is only a test.",
+        "tool_calls": null,
+        "role": "assistant",
+        "function_call": null
+      },
+      "logprobs": null
+    }
+  ],
+  "created": 1727679085,
+  "model": "llama-3.1-8b-instruct",
+  "system_fingerprint": null,
+  "object": "chat.completion",
+  "usage": null
+}
 ```
 
 5. Send a `/v1/completions` request:
@@ -90,21 +131,59 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
   "prompt": "Machine learning is"
 }' | jq
 ```
+which should provide an output that looks like this:
+```json
+{
+  "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "text": " a field of computer science that focuses on developing algorithms that allow computers to learn from"
+    }
+  ],
+  "created": 1727679266,
+  "model": "llama-3.1-8b-instruct",
+  "system_fingerprint": null,
+  "object": "text_completion",
+  "usage": null
+}
+```
 
 6. Benchmark with `genai-perf`:
+- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
+- Or try using genai-perf from the [SDK container](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
+
 ```bash
 MODEL="llama-3.1-8b-instruct"
 TOKENIZER="meta-llama/Meta-Llama-3.1-8B-Instruct"
-genai-perf \
+genai-perf profile \
   --model ${MODEL} \
   --tokenizer ${TOKENIZER} \
   --service-kind openai \
   --endpoint-type chat \
-  --synthetic-input-tokens-mean 256 \
-  --synthetic-input-tokens-stddev 0 \
-  --output-tokens-mean 256 \
-  --output-tokens-stddev 0 \
+  --url localhost:9000 \
   --streaming
+```
+which should provide an output that looks like:
+```
+2024-10-14 22:43 [INFO] genai_perf.parser:82 - Profiling these models: llama-3.1-8b-instruct
+2024-10-14 22:43 [INFO] genai_perf.wrapper:163 - Running Perf Analyzer : 'perf_analyzer -m llama-3.1-8b-instruct --async --input-data artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/inputs.json -i http --concurrency-range 1 --endpoint v1/chat/completions --service-kind openai -u localhost:9000 --measurement-interval 10000 --stability-percentage 999 --profile-export-file artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export.json'
+                              NVIDIA GenAI-Perf | LLM Metrics
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
+┃                         Statistic ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p75 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
+│          Time to first token (ms) │  71.66 │  64.32 │  86.52 │  76.13 │  74.92 │  73.26 │
+│          Inter token latency (ms) │  18.47 │  18.25 │  18.72 │  18.67 │  18.61 │  18.53 │
+│              Request latency (ms) │ 348.00 │ 274.60 │ 362.27 │ 355.41 │ 352.29 │ 350.66 │
+│            Output sequence length │  15.96 │  12.00 │  16.00 │  16.00 │  16.00 │  16.00 │
+│             Input sequence length │ 549.66 │ 548.00 │ 551.00 │ 550.00 │ 550.00 │ 550.00 │
+│ Output token throughput (per sec) │  45.84 │    N/A │    N/A │    N/A │    N/A │    N/A │
+│      Request throughput (per sec) │   2.87 │    N/A │    N/A │    N/A │    N/A │    N/A │
+└───────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+2024-10-14 22:44 [INFO] genai_perf.export_data.json_exporter:62 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.json
+2024-10-14 22:44 [INFO] genai_perf.export_data.csv_exporter:71 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.csv
 ```
 
 7. Use the OpenAI python client directly:
@@ -142,8 +221,9 @@ pytest -v tests/
 
 ## TensorRT-LLM
 
-0. Prepare your model repository for serving a TensorRT-LLM model:
-   https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start
+0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
+  - [Triton CLI](https://github.com/triton-inference-server/triton_cli/)
+  - [TRT-LLM Backend Quickstart](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start)
 
 1. Launch the container:
   - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
@@ -171,20 +251,46 @@ pip install -r requirements.txt
 2. Launch the OpenAI server:
 ```bash
 # NOTE: Adjust the --tokenizer based on the model being used
-python3 openai_frontend/main.py --model-repository tests/tensorrtllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
+python3 openai_frontend/main.py --model-repository path/to/models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
+# MODEL should be the client-facing model name in your model repository for a pipeline like TRT-LLM.
+# For example, this could also be "ensemble", or something like "gpt2" if generated from Triton CLI
 MODEL="tensorrt_llm_bls"
 curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
 ```
+which should provide an output that looks like this:
+```json
+{
+  "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "It looks like you're testing the system!",
+        "tool_calls": null,
+        "role": "assistant",
+        "function_call": null
+      },
+      "logprobs": null
+    }
+  ],
+  "created": 1728948689,
+  "model": "llama-3-8b-instruct",
+  "system_fingerprint": null,
+  "object": "chat.completion",
+  "usage": null
+}
+```
 
-The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"`,
+The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL="ensemble"`,
 everywhere applicable as seen in the example request above.
 
 ## KServe Frontends
