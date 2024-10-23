@@ -106,7 +106,12 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         shm_op1_handle = shm.create_shared_memory_region(
             "output1_data", "/output1_data", create_byte_size
         )
-        self._shm_handles = [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
+        self._shm_handles = [
+            shm_ip0_handle,
+            shm_ip1_handle,
+            shm_op0_handle,
+            shm_op1_handle,
+        ]
         # Implicit assumption that input and output byte_sizes are 64 bytes for now
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
         input1_data = np.ones(shape=16, dtype=np.int32)
@@ -129,6 +134,7 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         for shm_handle in self._shm_handles:
             shm.destroy_shared_memory_region(shm_handle)
         self._shm_handles = []
+
 
 class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_invalid_create_shm(self):

@@ -379,14 +379,18 @@ def inferAndCheckResults(
     )
     try:
         for config in configs:
-            model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
+            model_name = tu.get_model_name(
+                pf, input_dtype, output0_dtype, output1_dtype
+            )
 
             if config[1] == "http":
                 triton_client = httpclient.InferenceServerClient(
                     config[0], verbose=True, network_timeout=network_timeout
                 )
             else:
-                triton_client = grpcclient.InferenceServerClient(config[0], verbose=True)
+                triton_client = grpcclient.InferenceServerClient(
+                    config[0], verbose=True
+                )
 
             inputs = []
             if config[1] == "http":
@@ -462,7 +466,9 @@ def inferAndCheckResults(
                 if len(shm_regions) != 0:
                     if config[1] == "http":
                         output_req.append(
-                            httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3])
+                            httpclient.InferRequestedOutput(
+                                OUTPUT0, binary_data=config[3]
+                            )
                         )
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
@@ -484,7 +490,9 @@ def inferAndCheckResults(
                         if config[1] == "http":
                             output_req.append(
                                 httpclient.InferRequestedOutput(
-                                    OUTPUT0, binary_data=config[3], class_count=num_classes
+                                    OUTPUT0,
+                                    binary_data=config[3],
+                                    class_count=num_classes,
                                 )
                             )
                         else:
@@ -498,7 +506,9 @@ def inferAndCheckResults(
                 if len(shm_regions) != 0:
                     if config[1] == "http":
                         output_req.append(
-                            httpclient.InferRequestedOutput(OUTPUT1, binary_data=config[3])
+                            httpclient.InferRequestedOutput(
+                                OUTPUT1, binary_data=config[3]
+                            )
                         )
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
@@ -520,7 +530,9 @@ def inferAndCheckResults(
                         if config[1] == "http":
                             output_req.append(
                                 httpclient.InferRequestedOutput(
-                                    OUTPUT1, binary_data=config[3], class_count=num_classes
+                                    OUTPUT1,
+                                    binary_data=config[3],
+                                    class_count=num_classes,
                                 )
                             )
                         else:
@@ -632,7 +644,8 @@ def inferAndCheckResults(
                                 ).reshape(output_data.shape)
                             elif config[1] == "grpc":
                                 output_data = np.array(
-                                    [x for x in (output_data.flatten())], dtype=np.object_
+                                    [x for x in (output_data.flatten())],
+                                    dtype=np.object_,
                                 ).reshape(output_data.shape)
 
                     if result_name == OUTPUT0:
@@ -698,7 +711,8 @@ def inferAndCheckResults(
                                 )
                             else:
                                 tester.assertTrue(
-                                    False, "unexpected class result {}".format(result_name)
+                                    False,
+                                    "unexpected class result {}".format(result_name),
                                 )
     finally:
         # Unregister system/cuda shared memory regions if they exist
