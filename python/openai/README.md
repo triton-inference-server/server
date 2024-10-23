@@ -73,6 +73,7 @@ python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer
 
 <details>
 <summary>Example output</summary>
+
 ```
 ...
 +-----------------------+---------+--------+
@@ -88,6 +89,7 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
 ```
+
 </details>
 
 4. Send a `/v1/chat/completions` request:
@@ -102,6 +104,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 <details>
 <summary>Example output</summary>
+
 ```json
 {
   "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
@@ -126,6 +129,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "usage": null
 }
 ```
+
 </details>
 
 5. Send a `/v1/completions` request:
@@ -140,6 +144,7 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 
 <details>
 <summary>Example output</summary>
+
 ```json
 {
   "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
@@ -158,6 +163,7 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
   "usage": null
 }
 ```
+
 </details>
 
 6. Benchmark with `genai-perf`:
@@ -178,6 +184,7 @@ genai-perf profile \
 
 <details>
 <summary>Example output</summary>
+
 ```
 2024-10-14 22:43 [INFO] genai_perf.parser:82 - Profiling these models: llama-3.1-8b-instruct
 2024-10-14 22:43 [INFO] genai_perf.wrapper:163 - Running Perf Analyzer : 'perf_analyzer -m llama-3.1-8b-instruct --async --input-data artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/inputs.json -i http --concurrency-range 1 --endpoint v1/chat/completions --service-kind openai -u localhost:9000 --measurement-interval 10000 --stability-percentage 999 --profile-export-file artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export.json'
@@ -196,6 +203,7 @@ genai-perf profile \
 2024-10-14 22:44 [INFO] genai_perf.export_data.json_exporter:62 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.json
 2024-10-14 22:44 [INFO] genai_perf.export_data.csv_exporter:71 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.csv
 ```
+
 </details>
 
 7. Use the OpenAI python client directly:
@@ -281,6 +289,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 <details>
 <summary>Example output</summary>
+
 ```json
 {
   "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
@@ -304,6 +313,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "usage": null
 }
 ```
+
 </details>
 
 The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL="ensemble"`,
