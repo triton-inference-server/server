@@ -559,7 +559,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
             self._test_shm_not_found()
 
         finally:
-            self._cleanup_server()
+            self._cleanup_shm_handles()
 
     def test_unregister_shm_during_inference_grpc(self):
         try:
@@ -613,7 +613,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
             self._test_shm_not_found()
 
         finally:
-            self._cleanup_server()
+            self._cleanup_shm_handles()
 
 
 if __name__ == "__main__":
