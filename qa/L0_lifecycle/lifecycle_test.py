@@ -3531,6 +3531,7 @@ class LifeCycleTest(tu.TestResultCollector):
             f.write(config)
         # reload the model
         client.load_model(model_name)
+        time.sleep(0.2)
 
         # version 1 is unmodified so it should not be reloaded
         # version 2 is modified so it should be reloaded
@@ -3552,6 +3553,7 @@ class LifeCycleTest(tu.TestResultCollector):
         Path(os.path.join("models", model_name, "dummy_dependency.py")).touch()
         # reload the model
         client.load_model(model_name)
+        time.sleep(0.2)
 
         # all 4 versions should be reloaded
         self.assertTrue(client.is_model_ready(model_name, "1"))
@@ -3579,6 +3581,7 @@ class LifeCycleTest(tu.TestResultCollector):
             f.write(config)
         # reload the model
         client.load_model(model_name)
+        time.sleep(0.2)
 
         # only version 4 should be available and no reloads should happen
         self.assertFalse(client.is_model_ready(model_name, "1"))
@@ -3606,6 +3609,7 @@ class LifeCycleTest(tu.TestResultCollector):
             f.write(config)
         # reload the model
         client.load_model(model_name)
+        time.sleep(0.2)
 
         # version 1 should be loaded and version 4 should not be reloaded
         self.assertTrue(client.is_model_ready(model_name, "1"))
