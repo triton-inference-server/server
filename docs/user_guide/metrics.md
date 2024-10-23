@@ -204,6 +204,43 @@ metrics are used for latencies:
 
 To disable these metrics specifically, you can set `--metrics-config counter_latencies=false`
 
+#### Histograms
+
+> **Note**
+>
+> The following Histogram feature is experimental for the time being and may be
+> subject to change based on user feedback.
+
+By default, the following
+[Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
+metrics are used for latencies:
+
+|Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |Model Type
+|--------------|----------------|------------|---------------------------|-----------|-------------|-------------|
+|Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  | Decoupled |
+
+To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
+
+Each histogram above is composed of several sub-metrics. For each histogram
+metric, there is a set of `le` (less than or equal to) thresholds tracking
+the counter for each bucket. Additionally, there are `_count` and `_sum`
+metrics that aggregate the count and observed values for each. For example,
+see the following information exposed by the "Time to First Response" histogram
+metrics:
+```
+# HELP nv_first_response_histogram_ms Duration from request to first response in milliseconds
+# TYPE nv_first_response_histogram_ms histogram
+nv_inference_first_response_histogram_ms_count{model="my_model",version="1"} 37
+nv_inference_first_response_histogram_ms_sum{model="my_model",version="1"} 10771
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="100"} 8
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="500"} 30
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="2000"} 36
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="5000"} 37
+nv_inference_first_response_histogram_ms{model="my_model",version="1", le="+Inf"} 37
+```
+
+Triton initializes histograms with default buckets for each, as shown above. Customization of buckets per metric is currently unsupported.
+
 #### Summaries
 
 > **Note**
