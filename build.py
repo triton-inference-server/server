@@ -885,7 +885,7 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
@@ -898,7 +898,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \\
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
@@ -1568,7 +1568,7 @@ def create_build_dockerfiles(
             FLAGS.upstream_container_version
         )
     else:
-        base_image = "ubuntu:22.04"
+        base_image = "ubuntu:24.04"
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
