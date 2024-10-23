@@ -70,7 +70,9 @@ pip install -r requirements.txt
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
-Once the server has successfully started, you should see something like this:
+
+<details>
+<summary>Example output</summary>
 ```
 ...
 +-----------------------+---------+--------+
@@ -86,6 +88,7 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
 ```
+</details>
 
 4. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
@@ -96,7 +99,9 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
 ```
-which should provide output that looks like this:
+
+<details>
+<summary>Example output</summary>
 ```json
 {
   "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
@@ -121,6 +126,7 @@ which should provide output that looks like this:
   "usage": null
 }
 ```
+</details>
 
 5. Send a `/v1/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
@@ -131,7 +137,9 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
   "prompt": "Machine learning is"
 }' | jq
 ```
-which should provide an output that looks like this:
+
+<details>
+<summary>Example output</summary>
 ```json
 {
   "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
@@ -150,6 +158,7 @@ which should provide an output that looks like this:
   "usage": null
 }
 ```
+</details>
 
 6. Benchmark with `genai-perf`:
 - To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
@@ -166,7 +175,9 @@ genai-perf profile \
   --url localhost:9000 \
   --streaming
 ```
-which should provide an output that looks like:
+
+<details>
+<summary>Example output</summary>
 ```
 2024-10-14 22:43 [INFO] genai_perf.parser:82 - Profiling these models: llama-3.1-8b-instruct
 2024-10-14 22:43 [INFO] genai_perf.wrapper:163 - Running Perf Analyzer : 'perf_analyzer -m llama-3.1-8b-instruct --async --input-data artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/inputs.json -i http --concurrency-range 1 --endpoint v1/chat/completions --service-kind openai -u localhost:9000 --measurement-interval 10000 --stability-percentage 999 --profile-export-file artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export.json'
@@ -185,6 +196,7 @@ which should provide an output that looks like:
 2024-10-14 22:44 [INFO] genai_perf.export_data.json_exporter:62 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.json
 2024-10-14 22:44 [INFO] genai_perf.export_data.csv_exporter:71 - Generating artifacts/llama-3.1-8b-instruct-openai-chat-concurrency1/profile_export_genai_perf.csv
 ```
+</details>
 
 7. Use the OpenAI python client directly:
 ```python
@@ -234,6 +246,7 @@ pytest -v tests/
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
+  -e TRTLLM_ORCHESTRATOR=1 \
   nvcr.io/nvidia/tritonserver:24.08-trtllm-python-py3
 ```
 
@@ -265,7 +278,9 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
   "messages": [{"role": "user", "content": "Say this is a test!"}]
 }' | jq
 ```
-which should provide an output that looks like this:
+
+<details>
+<summary>Example output</summary>
 ```json
 {
   "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
@@ -289,6 +304,7 @@ which should provide an output that looks like this:
   "usage": null
 }
 ```
+</details>
 
 The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL="ensemble"`,
 everywhere applicable as seen in the example request above.
@@ -318,12 +334,10 @@ For more information on the `tritonfrontend` python bindings, see the docs
 
 ## Model Parallelism Support
 
-- For multi-GPU models (ex: Tensor Parallelism > 1), here is the current support matrix:
-  - [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
+- [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
     - ex: Configure `tensor_parallel_size: 2` in the
       [model.json](https://github.com/triton-inference-server/vllm_backend/blob/main/samples/model_repository/vllm_model/1/model.json)
-  - [x] TensorRT-LLM ([Orchestrator Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#orchestrator-mode))
-    - `export TRTLLM_ORCHESTRATOR=1`
-    - **NOTE**: Orchestrator mode does not currently support multi-node models
-  - [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
-    - Coming soon
+- [x] TensorRT-LLM ([Orchestrator Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#orchestrator-mode))
+    - Set the following environment variable: `export TRTLLM_ORCHESTRATOR=1`
+- [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
+    - Not currently supported
