@@ -78,6 +78,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "0.5.3.post1",  # vLLM version
+        "3.12",  # RHEL Python version
     )
 }
 
@@ -925,6 +926,7 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 """
+    df += change_default_python_version_rhel(TRITON_VERSION_MAP[FLAGS.version][7])
     df += """
 # Install docker docker buildx
 RUN yum install -y ca-certificates curl gnupg yum-utils \\
@@ -1390,6 +1392,9 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     # Add dependencies needed for python backend
     if "python" in backends:
         if target_platform() == "rhel":
+            df += change_default_python_version_rhel(
+                TRITON_VERSION_MAP[FLAGS.version][7]
+            )
             df += """
 # python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
@@ -1397,7 +1402,7 @@ RUN yum install -y \\
         libarchive-devel \\
         python3-pip \\
         openssl-devel \\
-        readline-devel
+        readline-devel \\
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
             wheel \\
@@ -1528,6 +1533,23 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
             libs_arch=libs_arch
         )
 
+    return df
+
+
+def change_default_python_version_rhel(version):
+    df = """
+# RHEL image has several python versions. It's important
+# to set the correct version, otherwise, packages that are
+# pip installed will not be found during testing.
+ENV PYVER {}
+ENV PYTHONPATH /opt/python/v
+RUN ln -sf /opt/python/cp${{PYVER/./}}* ${{PYTHONPATH}}
+ENV PYBIN ${{PYTHONPATH}}/bin
+ENV PYTHON_BIN_PATH ${{PYBIN}}/python${{PYVER}}
+ENV PATH ${{PYBIN}}:${{PATH}}
+""".format(
+        version
+    )
     return df
 
 
