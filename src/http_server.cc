@@ -3128,6 +3128,12 @@ HTTPAPIServer::StartTrace(
     TRITONSERVER_InferenceTrace** triton_trace)
 {
 #ifdef TRITON_ENABLE_TRACING
+  // Currently, the tritonfrontend python bindings pass in a
+  // nullptr for the TraceManager object even if Tracing is
+  // enabled at build time.
+  if (!trace_manager_) {
+    return nullptr;
+  }
   HttpTextMapCarrier carrier(req->headers_in);
   auto start_options =
       trace_manager_->GetTraceStartOptions(carrier, model_name);
@@ -3238,10 +3244,8 @@ HTTPAPIServer::HandleGenerate(
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
   std::shared_ptr<TraceManager::Trace> trace;
-  if (trace_manager_) {
-    // If tracing is enabled see if this request should be traced.
-    trace = StartTrace(req, model_name, &triton_trace);
-  }
+  // If tracing is enabled see if this request should be traced.
+  trace = StartTrace(req, model_name, &triton_trace);
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
@@ -3605,10 +3609,8 @@ HTTPAPIServer::HandleInfer(
 
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
   std::shared_ptr<TraceManager::Trace> trace;
-  if (trace_manager_) {
-    // If tracing is enabled see if this request should be traced.
-    trace = StartTrace(req, model_name, &triton_trace);
-  }
+  // If tracing is enabled see if this request should be traced.
+  trace = StartTrace(req, model_name, &triton_trace);
 
   // Decompress request body if it is compressed in supported type
   evbuffer* decompressed_buffer = nullptr;
