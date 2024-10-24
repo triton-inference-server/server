@@ -57,11 +57,21 @@ class SharedMemoryManager {
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
-        const int64_t device_id)
+        const int64_t device_id, bool marked_for_unregistration,
+        SharedMemoryManager* manager)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          kind_(kind), device_id_(device_id)
+          kind_(kind), device_id_(device_id),
+          marked_for_unregistration_(marked_for_unregistration),
+          shm_manager_(manager)
     {
+    }
+
+    ~SharedMemoryInfo()
+    {
+      if (marked_for_unregistration_ && shm_manager_) {
+        shm_manager_->Unregister(name_);
+      }
     }
 
     std::string name_;
@@ -72,6 +82,8 @@ class SharedMemoryManager {
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
+    bool marked_for_unregistration_;
+    SharedMemoryManager* shm_manager_;
   };
 
 #ifdef TRITON_ENABLE_GPU
