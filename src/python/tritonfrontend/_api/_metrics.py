@@ -42,7 +42,7 @@ class Metrics:
     class Options:
         address: str = "0.0.0.0"
         port: int = Field(8002, ge=0, le=65535)
-        thread_count: int = Field(1, ge=0)
+        thread_count: int = Field(1, ge=1)
 
     @handle_triton_error
     def __init__(self, server: tritonserver, options: "Metrics.Options" = None):
