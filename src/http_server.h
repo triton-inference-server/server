@@ -134,6 +134,10 @@ class HTTPMetricsServer : public HTTPServer {
       std::string address, int thread_cnt,
       std::unique_ptr<HTTPServer>* metrics_server);
 
+  static TRITONSERVER_Error* Create(
+      std::shared_ptr<TRITONSERVER_Server>& server,
+      const UnorderedMapType& options, std::unique_ptr<HTTPServer>* service);
+
   ~HTTPMetricsServer() = default;
 
  private:

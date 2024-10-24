@@ -364,6 +364,22 @@ HTTPMetricsServer::Create(
   return nullptr;
 }
 
+TRITONSERVER_Error*
+HTTPMetricsServer::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server,
+    const UnorderedMapType& options, std::unique_ptr<HTTPServer>* service)
+{
+  int port;
+  std::string address;
+  int thread_count;
+
+  RETURN_IF_ERR(GetValue(options, "port", &port));
+  RETURN_IF_ERR(GetValue(options, "address", &address));
+  RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
+
+  return Create(server, port, address, thread_count, service);
+}
+
 #endif  // TRITON_ENABLE_METRICS
 
 namespace {
