@@ -1564,7 +1564,7 @@ ENV PATH ${{PYBIN}}:${{PATH}}
 RUN curl https://pyenv.run | bash \\
     && echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
     && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
-    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc \\
     && source ~/.bashrc
 RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
     && cp /root/.pyenv/versions/{}/lib/libpython3* /usr/lib64/""".format(
