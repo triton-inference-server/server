@@ -78,7 +78,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "0.5.3.post1",  # vLLM version
-        "3.12",  # RHEL Python version
+        "3.12.1",  # RHEL Python version
     )
 }
 
@@ -926,7 +926,6 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 """
-    df += change_default_python_version_rhel(TRITON_VERSION_MAP[FLAGS.version][7])
     df += """
 # Install docker docker buildx
 RUN yum install -y ca-certificates curl gnupg yum-utils \\
@@ -952,7 +951,6 @@ RUN yum install -y \\
             libb64-devel \\
             gperftools-devel \\
             patchelf \\
-            python3.12-devel \\
             python3-pip \\
             python3-setuptools \\
             rapidjson-devel \\
@@ -965,6 +963,10 @@ RUN yum install -y \\
             libxml2-devel \\
             numactl-devel \\
             wget
+"""
+    # Requires openssl-devel to be installed first for pyenv build to be successful
+    df += change_default_python_version_rhel(TRITON_VERSION_MAP[FLAGS.version][7])
+    df += """
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
@@ -1392,23 +1394,25 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     # Add dependencies needed for python backend
     if "python" in backends:
         if target_platform() == "rhel":
+            df += """
+# python3, python3-pip and some pip installs required for the python backend
+RUN yum install -y \\
+        libarchive-devel \\
+        python3-pip \\
+        openssl-devel \\
+        readline-devel
+"""
+            # Requires openssl-devel to be installed first for pyenv build to be successful
             df += change_default_python_version_rhel(
                 TRITON_VERSION_MAP[FLAGS.version][7]
             )
             df += """
-# python3, python3-pip and some pip installs required for the python backend
-RUN yum install -y \\
-        python3.12-devel \\
-        libarchive-devel \\
-        python3-pip \\
-        openssl-devel \\
-        readline-devel \\
-      && pip3 install --upgrade pip \\
-      && pip3 install --upgrade \\
-            wheel \\
-            setuptools \\
-            \"numpy<2\" \\
-            virtualenv
+RUN pip3 install --upgrade pip \\
+    && pip3 install --upgrade \\
+        wheel \\
+        setuptools \\
+        \"numpy<2\" \\
+        virtualenv
 """
         else:
             df += """
@@ -1537,6 +1541,8 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 
 def change_default_python_version_rhel(version):
+    # Example version 3.12.1 --> 3.12
+    major_minor_version = ".".join(version.split(".")[:2])
     df = """
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
@@ -1548,7 +1554,21 @@ ENV PYBIN ${{PYTHONPATH}}/bin
 ENV PYTHON_BIN_PATH ${{PYBIN}}/python${{PYVER}}
 ENV PATH ${{PYBIN}}:${{PATH}}
 """.format(
-        version
+        major_minor_version
+    )
+    df += """
+# The python library version available for install via 'yum install python3.X-devel' does not
+# match the version of python inside the RHEL base container. This means that python packages
+# installed within the container will not be picked up by the python backend stub process pybind
+# bindings. It must instead must be installed via pyenv.
+RUN curl https://pyenv.run | bash \\
+    && echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
+    && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
+    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    && source ~/.bashrc
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
+    && cp /root/.pyenv/versions/{}/lib/libpython3* /usr/lib64/""".format(
+        version, version
     )
     return df
 
