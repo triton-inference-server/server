@@ -1418,6 +1418,8 @@ RUN apt-get update \\
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
+# Upgrade Ray to the latest version.
+pip install --upgrade ray
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][6]
         )
