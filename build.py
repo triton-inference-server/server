@@ -1562,10 +1562,8 @@ ENV PATH ${{PYBIN}}:${{PATH}}
 # installed within the container will not be picked up by the python backend stub process pybind
 # bindings. It must instead must be installed via pyenv.
 RUN curl https://pyenv.run | bash
-RUN echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
-    && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
-    && echo 'eval "$(pyenv init -)"' >> ~/.bashrc \\
-    && source ~/.bashrc
+ENV PATH="/root/.pyenv/bin:$PATH"
+RUN eval "$(pyenv init -)"
 RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
     && cp /root/.pyenv/versions/{}/lib/libpython3* /usr/lib64/""".format(
         version, version
