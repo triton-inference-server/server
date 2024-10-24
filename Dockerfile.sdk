@@ -44,7 +44,7 @@ ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=3..6
+ARG DCGM_VERSION=3.3.6
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -162,7 +162,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           /workspace/perf_analyzer
 RUN make -j16 perf-analyzer python-clients
 
-RUN pip3 install build \
+RUN pip3 install --break-system-packages build \
     && cd /workspace/perf_analyzer/genai-perf \
     && python3 -m build --wheel --outdir /workspace/install/python
 
@@ -237,18 +237,18 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
+RUN pip3 install --upgrade --break-system-packages "numpy<2" pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade
+    xargs pip3 install --upgrade --break-system-packages
 
-RUN pip3 install install/python/genai_perf-*.whl
+RUN pip3 install --break-system-packages install/python/genai_perf-*.whl
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
         curl -o /tmp/cuda-keyring.deb \
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/$arch/cuda-keyring_1.0-1_all.deb \
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$arch/cuda-keyring_1.1-1_all.deb \
         && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
     fi
@@ -260,7 +260,7 @@ RUN rm -f /usr/bin/python && \
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
 ARG TRITON_MODEL_ANALYZER_REPO="${TRITON_REPO_ORGANIZATION}/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
-RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
+RUN pip3 install --break-system-packages "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 # Entrypoint Banner
 ENV NVIDIA_PRODUCT_NAME="Triton Server SDK"
