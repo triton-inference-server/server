@@ -1418,10 +1418,17 @@ RUN apt-get update \\
         df += """
 # vLLM needed for vLLM backend
 RUN pip3 install vllm=={}
+RUN apt-get update && apt-get install -y unzip zip
 # Upgrade commons-io used in Ray to the latest version.
-RUN wget https://repo1.maven.org/maven2/commons-io/commons-io/2.14.0/commons-io-2.14.0.jar -P /tmp/
-RUN jar uf /usr/local/lib/python3.10/dist-packages/ray/jars/ray_dist.jar -C /tmp commons-io-2.14.0.jar && \
-    rm /tmp/commons-io-2.14.0.jar
+RUN wget -O /tmp/commons-io.jar https://repo1.maven.org/maven2/commons-io/commons-io/2.14.0/commons-io-2.14.0.jar
+RUN mkdir /tmp/ray_dist && \
+    cp /usr/local/lib/python3.10/dist-packages/ray/jars/ray_dist.jar /tmp/ray_dist/ && \
+    unzip /tmp/ray_dist/ray_dist.jar -d /tmp/ray_dist && ls /tmp/ray_dist && \
+    mv /tmp/commons-io.jar /tmp/ray_dist/commons-io.jar && \
+    zip -r /tmp/ray_dist/ray_dist.jar /tmp/ray_dist/* && \
+    mv /tmp/ray_dist/ray_dist.jar /usr/local/lib/python3.10/dist-packages/ray/jars/ && \
+    rm -rf /tmp/ray_dist && \
+    rm /tmp/commons-io.jar
 """.format(
             TRITON_VERSION_MAP[FLAGS.version][6]
         )
