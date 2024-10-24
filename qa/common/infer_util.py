@@ -377,100 +377,93 @@ def inferAndCheckResults(
         use_system_shared_memory,
         use_cuda_shared_memory,
     )
-    for config in configs:
-        model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
-
-        if config[1] == "http":
-            triton_client = httpclient.InferenceServerClient(
-                config[0], verbose=True, network_timeout=network_timeout
-            )
-        else:
-            triton_client = grpcclient.InferenceServerClient(config[0], verbose=True)
-
-        inputs = []
-        if config[1] == "http":
-            inputs.append(
-                httpclient.InferInput(
-                    INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)
-                )
-            )
-            inputs.append(
-                httpclient.InferInput(
-                    INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)
-                )
-            )
-        else:
-            inputs.append(
-                grpcclient.InferInput(
-                    INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)
-                )
-            )
-            inputs.append(
-                grpcclient.InferInput(
-                    INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)
-                )
+    try:
+        for config in configs:
+            model_name = tu.get_model_name(
+                pf, input_dtype, output0_dtype, output1_dtype
             )
 
-        if not (use_cuda_shared_memory or use_system_shared_memory):
             if config[1] == "http":
-                inputs[0].set_data_from_numpy(input0_array, binary_data=config[3])
-                inputs[1].set_data_from_numpy(input1_array, binary_data=config[3])
-            else:
-                inputs[0].set_data_from_numpy(input0_array)
-                inputs[1].set_data_from_numpy(input1_array)
-        else:
-            # Register necessary shared memory regions/handles
-            su.register_add_shm_regions(
-                inputs,
-                outputs,
-                shm_regions,
-                precreated_shm_regions,
-                shm_handles,
-                input0_byte_size,
-                input1_byte_size,
-                output0_byte_size,
-                output1_byte_size,
-                use_system_shared_memory,
-                use_cuda_shared_memory,
-                triton_client,
-            )
-
-        if batch_size == 1:
-            expected0_sort_idx = [
-                np.flip(np.argsort(x.flatten()), 0)
-                for x in output0_array.reshape((1,) + tensor_shape)
-            ]
-            expected1_sort_idx = [
-                np.flip(np.argsort(x.flatten()), 0)
-                for x in output1_array.reshape((1,) + tensor_shape)
-            ]
-        else:
-            expected0_sort_idx = [
-                np.flip(np.argsort(x.flatten()), 0)
-                for x in output0_array.reshape(tensor_shape)
-            ]
-            expected1_sort_idx = [
-                np.flip(np.argsort(x.flatten()), 0)
-                for x in output1_array.reshape(tensor_shape)
-            ]
-
-        # Force binary_data = False for shared memory and class
-        output_req = []
-        i = 0
-        if "OUTPUT0" in outputs:
-            if len(shm_regions) != 0:
-                if config[1] == "http":
-                    output_req.append(
-                        httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3])
-                    )
-                else:
-                    output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
-
-                output_req[-1].set_shared_memory(
-                    shm_regions[2] + "_data", output0_byte_size
+                triton_client = httpclient.InferenceServerClient(
+                    config[0], verbose=True, network_timeout=network_timeout
                 )
             else:
-                if output0_raw:
+                triton_client = grpcclient.InferenceServerClient(
+                    config[0], verbose=True
+                )
+
+            inputs = []
+            if config[1] == "http":
+                inputs.append(
+                    httpclient.InferInput(
+                        INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)
+                    )
+                )
+                inputs.append(
+                    httpclient.InferInput(
+                        INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)
+                    )
+                )
+            else:
+                inputs.append(
+                    grpcclient.InferInput(
+                        INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)
+                    )
+                )
+                inputs.append(
+                    grpcclient.InferInput(
+                        INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)
+                    )
+                )
+
+            if not (use_cuda_shared_memory or use_system_shared_memory):
+                if config[1] == "http":
+                    inputs[0].set_data_from_numpy(input0_array, binary_data=config[3])
+                    inputs[1].set_data_from_numpy(input1_array, binary_data=config[3])
+                else:
+                    inputs[0].set_data_from_numpy(input0_array)
+                    inputs[1].set_data_from_numpy(input1_array)
+            else:
+                # Register necessary shared memory regions/handles
+                su.register_add_shm_regions(
+                    inputs,
+                    outputs,
+                    shm_regions,
+                    precreated_shm_regions,
+                    shm_handles,
+                    input0_byte_size,
+                    input1_byte_size,
+                    output0_byte_size,
+                    output1_byte_size,
+                    use_system_shared_memory,
+                    use_cuda_shared_memory,
+                    triton_client,
+                )
+
+            if batch_size == 1:
+                expected0_sort_idx = [
+                    np.flip(np.argsort(x.flatten()), 0)
+                    for x in output0_array.reshape((1,) + tensor_shape)
+                ]
+                expected1_sort_idx = [
+                    np.flip(np.argsort(x.flatten()), 0)
+                    for x in output1_array.reshape((1,) + tensor_shape)
+                ]
+            else:
+                expected0_sort_idx = [
+                    np.flip(np.argsort(x.flatten()), 0)
+                    for x in output0_array.reshape(tensor_shape)
+                ]
+                expected1_sort_idx = [
+                    np.flip(np.argsort(x.flatten()), 0)
+                    for x in output1_array.reshape(tensor_shape)
+                ]
+
+            # Force binary_data = False for shared memory and class
+            output_req = []
+            i = 0
+            if "OUTPUT0" in outputs:
+                if len(shm_regions) != 0:
                     if config[1] == "http":
                         output_req.append(
                             httpclient.InferRequestedOutput(
@@ -479,34 +472,38 @@ def inferAndCheckResults(
                         )
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
-                else:
-                    if config[1] == "http":
-                        output_req.append(
-                            httpclient.InferRequestedOutput(
-                                OUTPUT0, binary_data=config[3], class_count=num_classes
-                            )
-                        )
-                    else:
-                        output_req.append(
-                            grpcclient.InferRequestedOutput(
-                                OUTPUT0, class_count=num_classes
-                            )
-                        )
-            i += 1
-        if "OUTPUT1" in outputs:
-            if len(shm_regions) != 0:
-                if config[1] == "http":
-                    output_req.append(
-                        httpclient.InferRequestedOutput(OUTPUT1, binary_data=config[3])
+
+                    output_req[-1].set_shared_memory(
+                        shm_regions[2] + "_data", output0_byte_size
                     )
                 else:
-                    output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
-
-                output_req[-1].set_shared_memory(
-                    shm_regions[2 + i] + "_data", output1_byte_size
-                )
-            else:
-                if output1_raw:
+                    if output0_raw:
+                        if config[1] == "http":
+                            output_req.append(
+                                httpclient.InferRequestedOutput(
+                                    OUTPUT0, binary_data=config[3]
+                                )
+                            )
+                        else:
+                            output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
+                    else:
+                        if config[1] == "http":
+                            output_req.append(
+                                httpclient.InferRequestedOutput(
+                                    OUTPUT0,
+                                    binary_data=config[3],
+                                    class_count=num_classes,
+                                )
+                            )
+                        else:
+                            output_req.append(
+                                grpcclient.InferRequestedOutput(
+                                    OUTPUT0, class_count=num_classes
+                                )
+                            )
+                i += 1
+            if "OUTPUT1" in outputs:
+                if len(shm_regions) != 0:
                     if config[1] == "http":
                         output_req.append(
                             httpclient.InferRequestedOutput(
@@ -515,200 +512,218 @@ def inferAndCheckResults(
                         )
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
-                else:
-                    if config[1] == "http":
-                        output_req.append(
-                            httpclient.InferRequestedOutput(
-                                OUTPUT1, binary_data=config[3], class_count=num_classes
-                            )
-                        )
-                    else:
-                        output_req.append(
-                            grpcclient.InferRequestedOutput(
-                                OUTPUT1, class_count=num_classes
-                            )
-                        )
 
-        if config[2]:
-            user_data = UserData()
-            triton_client.start_stream(partial(completion_callback, user_data))
-            try:
-                results = triton_client.async_stream_infer(
+                    output_req[-1].set_shared_memory(
+                        shm_regions[2 + i] + "_data", output1_byte_size
+                    )
+                else:
+                    if output1_raw:
+                        if config[1] == "http":
+                            output_req.append(
+                                httpclient.InferRequestedOutput(
+                                    OUTPUT1, binary_data=config[3]
+                                )
+                            )
+                        else:
+                            output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
+                    else:
+                        if config[1] == "http":
+                            output_req.append(
+                                httpclient.InferRequestedOutput(
+                                    OUTPUT1,
+                                    binary_data=config[3],
+                                    class_count=num_classes,
+                                )
+                            )
+                        else:
+                            output_req.append(
+                                grpcclient.InferRequestedOutput(
+                                    OUTPUT1, class_count=num_classes
+                                )
+                            )
+
+            if config[2]:
+                user_data = UserData()
+                triton_client.start_stream(partial(completion_callback, user_data))
+                try:
+                    results = triton_client.async_stream_infer(
+                        model_name,
+                        inputs,
+                        model_version=model_version,
+                        outputs=output_req,
+                        request_id=str(_unique_request_id()),
+                    )
+                except Exception as e:
+                    triton_client.stop_stream()
+                    raise e
+                triton_client.stop_stream()
+                (results, error) = user_data._completed_requests.get()
+                if error is not None:
+                    raise error
+            else:
+                results = triton_client.infer(
                     model_name,
                     inputs,
                     model_version=model_version,
                     outputs=output_req,
                     request_id=str(_unique_request_id()),
                 )
-            except Exception as e:
-                triton_client.stop_stream()
-                raise e
-            triton_client.stop_stream()
-            (results, error) = user_data._completed_requests.get()
-            if error is not None:
-                raise error
-        else:
-            results = triton_client.infer(
-                model_name,
-                inputs,
-                model_version=model_version,
-                outputs=output_req,
-                request_id=str(_unique_request_id()),
-            )
 
-        last_response = results.get_response()
+            last_response = results.get_response()
 
-        if not skip_request_id_check:
-            global _seen_request_ids
-            if config[1] == "http":
-                request_id = int(last_response["id"])
-            else:
-                request_id = int(last_response.id)
-            tester.assertFalse(
-                request_id in _seen_request_ids, "request_id: {}".format(request_id)
-            )
-            _seen_request_ids.add(request_id)
-
-        if config[1] == "http":
-            response_model_name = last_response["model_name"]
-            if model_version != "":
-                response_model_version = last_response["model_version"]
-            response_outputs = last_response["outputs"]
-        else:
-            response_model_name = last_response.model_name
-            if model_version != "":
-                response_model_version = last_response.model_version
-            response_outputs = last_response.outputs
-
-        tester.assertEqual(response_model_name, model_name)
-
-        if model_version != "":
-            tester.assertEqual(str(response_model_version), model_version)
-
-        tester.assertEqual(len(response_outputs), len(outputs))
-
-        for result in response_outputs:
-            if config[1] == "http":
-                result_name = result["name"]
-            else:
-                result_name = result.name
-
-            if (result_name == OUTPUT0 and output0_raw) or (
-                result_name == OUTPUT1 and output1_raw
-            ):
-                if use_system_shared_memory or use_cuda_shared_memory:
-                    if result_name == OUTPUT0:
-                        shm_handle = shm_handles[2]
-                    else:
-                        shm_handle = shm_handles[3]
-
-                    output = results.get_output(result_name)
-                    if config[1] == "http":
-                        output_datatype = output["datatype"]
-                        output_shape = output["shape"]
-                    else:
-                        output_datatype = output.datatype
-                        output_shape = output.shape
-                    output_dtype = triton_to_np_dtype(output_datatype)
-                if use_system_shared_memory:
-                    output_data = shm.get_contents_as_numpy(
-                        shm_handle, output_dtype, output_shape
-                    )
-                elif use_cuda_shared_memory:
-                    output_data = cudashm.get_contents_as_numpy(
-                        shm_handle, output_dtype, output_shape
-                    )
+            if not skip_request_id_check:
+                global _seen_request_ids
+                if config[1] == "http":
+                    request_id = int(last_response["id"])
                 else:
-                    output_data = results.as_numpy(result_name)
-                    if (output_data.dtype == np.object_) and (not config[3]):
-                        if config[1] == "http":
-                            output_data = np.array(
-                                [
-                                    unicode(str(x), encoding="utf-8")
-                                    for x in (output_data.flatten())
-                                ],
-                                dtype=np.object_,
-                            ).reshape(output_data.shape)
-                        elif config[1] == "grpc":
-                            output_data = np.array(
-                                [x for x in (output_data.flatten())], dtype=np.object_
-                            ).reshape(output_data.shape)
+                    request_id = int(last_response.id)
+                tester.assertFalse(
+                    request_id in _seen_request_ids, "request_id: {}".format(request_id)
+                )
+                _seen_request_ids.add(request_id)
 
-                if result_name == OUTPUT0:
-                    tester.assertTrue(
-                        np.array_equal(output_data, output0_array),
-                        "{}, {} expected: {}, got {}".format(
-                            model_name, OUTPUT0, output0_array, output_data
-                        ),
-                    )
-                elif result_name == OUTPUT1:
-                    tester.assertTrue(
-                        np.array_equal(output_data, output1_array),
-                        "{}, {} expected: {}, got {}".format(
-                            model_name, OUTPUT1, output1_array, output_data
-                        ),
-                    )
-                else:
-                    tester.assertTrue(
-                        False, "unexpected raw result {}".format(result_name)
-                    )
+            if config[1] == "http":
+                response_model_name = last_response["model_name"]
+                if model_version != "":
+                    response_model_version = last_response["model_version"]
+                response_outputs = last_response["outputs"]
             else:
-                for b in range(batch_size):
-                    # num_classes values must be returned and must
-                    # match expected top values
-                    if "nobatch" in pf:
-                        class_list = results.as_numpy(result_name)
-                    else:
-                        class_list = results.as_numpy(result_name)[b]
+                response_model_name = last_response.model_name
+                if model_version != "":
+                    response_model_version = last_response.model_version
+                response_outputs = last_response.outputs
 
-                    tester.assertEqual(len(class_list), num_classes)
-                    if batch_size == 1:
-                        expected0_flatten = output0_array.flatten()
-                        expected1_flatten = output1_array.flatten()
-                    else:
-                        expected0_flatten = output0_array[b].flatten()
-                        expected1_flatten = output1_array[b].flatten()
+            tester.assertEqual(response_model_name, model_name)
 
-                    for idx, class_label in enumerate(class_list):
-                        # can't compare indices since could have different
-                        # indices with the same value/prob, so check that
-                        # the value of each index equals the expected value.
-                        # Only compare labels when the indices are equal.
-                        if type(class_label) == str:
-                            ctuple = class_label.split(":")
-                        else:
-                            ctuple = "".join(chr(x) for x in class_label).split(":")
-                        cval = float(ctuple[0])
-                        cidx = int(ctuple[1])
+            if model_version != "":
+                tester.assertEqual(str(response_model_version), model_version)
+
+            tester.assertEqual(len(response_outputs), len(outputs))
+
+            for result in response_outputs:
+                if config[1] == "http":
+                    result_name = result["name"]
+                else:
+                    result_name = result.name
+
+                if (result_name == OUTPUT0 and output0_raw) or (
+                    result_name == OUTPUT1 and output1_raw
+                ):
+                    if use_system_shared_memory or use_cuda_shared_memory:
                         if result_name == OUTPUT0:
-                            tester.assertEqual(cval, expected0_flatten[cidx])
-                            tester.assertEqual(
-                                cval, expected0_flatten[expected0_sort_idx[b][idx]]
-                            )
-                            if cidx == expected0_sort_idx[b][idx]:
-                                tester.assertEqual(
-                                    ctuple[2],
-                                    "label{}".format(expected0_sort_idx[b][idx]),
-                                )
-                        elif result_name == OUTPUT1:
-                            tester.assertEqual(cval, expected1_flatten[cidx])
-                            tester.assertEqual(
-                                cval, expected1_flatten[expected1_sort_idx[b][idx]]
-                            )
+                            shm_handle = shm_handles[2]
                         else:
-                            tester.assertTrue(
-                                False, "unexpected class result {}".format(result_name)
-                            )
+                            shm_handle = shm_handles[3]
 
-    # Unregister system/cuda shared memory regions if they exist
-    su.unregister_cleanup_shm_regions(
-        shm_regions,
-        shm_handles,
-        precreated_shm_regions,
-        outputs,
-        use_system_shared_memory,
-        use_cuda_shared_memory,
-    )
+                        output = results.get_output(result_name)
+                        if config[1] == "http":
+                            output_datatype = output["datatype"]
+                            output_shape = output["shape"]
+                        else:
+                            output_datatype = output.datatype
+                            output_shape = output.shape
+                        output_dtype = triton_to_np_dtype(output_datatype)
+                    if use_system_shared_memory:
+                        output_data = shm.get_contents_as_numpy(
+                            shm_handle, output_dtype, output_shape
+                        )
+                    elif use_cuda_shared_memory:
+                        output_data = cudashm.get_contents_as_numpy(
+                            shm_handle, output_dtype, output_shape
+                        )
+                    else:
+                        output_data = results.as_numpy(result_name)
+                        if (output_data.dtype == np.object_) and (not config[3]):
+                            if config[1] == "http":
+                                output_data = np.array(
+                                    [
+                                        unicode(str(x), encoding="utf-8")
+                                        for x in (output_data.flatten())
+                                    ],
+                                    dtype=np.object_,
+                                ).reshape(output_data.shape)
+                            elif config[1] == "grpc":
+                                output_data = np.array(
+                                    [x for x in (output_data.flatten())],
+                                    dtype=np.object_,
+                                ).reshape(output_data.shape)
+
+                    if result_name == OUTPUT0:
+                        tester.assertTrue(
+                            np.array_equal(output_data, output0_array),
+                            "{}, {} expected: {}, got {}".format(
+                                model_name, OUTPUT0, output0_array, output_data
+                            ),
+                        )
+                    elif result_name == OUTPUT1:
+                        tester.assertTrue(
+                            np.array_equal(output_data, output1_array),
+                            "{}, {} expected: {}, got {}".format(
+                                model_name, OUTPUT1, output1_array, output_data
+                            ),
+                        )
+                    else:
+                        tester.assertTrue(
+                            False, "unexpected raw result {}".format(result_name)
+                        )
+                else:
+                    for b in range(batch_size):
+                        # num_classes values must be returned and must
+                        # match expected top values
+                        if "nobatch" in pf:
+                            class_list = results.as_numpy(result_name)
+                        else:
+                            class_list = results.as_numpy(result_name)[b]
+
+                        tester.assertEqual(len(class_list), num_classes)
+                        if batch_size == 1:
+                            expected0_flatten = output0_array.flatten()
+                            expected1_flatten = output1_array.flatten()
+                        else:
+                            expected0_flatten = output0_array[b].flatten()
+                            expected1_flatten = output1_array[b].flatten()
+
+                        for idx, class_label in enumerate(class_list):
+                            # can't compare indices since could have different
+                            # indices with the same value/prob, so check that
+                            # the value of each index equals the expected value.
+                            # Only compare labels when the indices are equal.
+                            if type(class_label) == str:
+                                ctuple = class_label.split(":")
+                            else:
+                                ctuple = "".join(chr(x) for x in class_label).split(":")
+                            cval = float(ctuple[0])
+                            cidx = int(ctuple[1])
+                            if result_name == OUTPUT0:
+                                tester.assertEqual(cval, expected0_flatten[cidx])
+                                tester.assertEqual(
+                                    cval, expected0_flatten[expected0_sort_idx[b][idx]]
+                                )
+                                if cidx == expected0_sort_idx[b][idx]:
+                                    tester.assertEqual(
+                                        ctuple[2],
+                                        "label{}".format(expected0_sort_idx[b][idx]),
+                                    )
+                            elif result_name == OUTPUT1:
+                                tester.assertEqual(cval, expected1_flatten[cidx])
+                                tester.assertEqual(
+                                    cval, expected1_flatten[expected1_sort_idx[b][idx]]
+                                )
+                            else:
+                                tester.assertTrue(
+                                    False,
+                                    "unexpected class result {}".format(result_name),
+                                )
+    finally:
+        # Unregister system/cuda shared memory regions if they exist
+        su.unregister_cleanup_shm_regions(
+            shm_regions,
+            shm_handles,
+            precreated_shm_regions,
+            outputs,
+            use_system_shared_memory,
+            use_cuda_shared_memory,
+        )
 
     return results
 
