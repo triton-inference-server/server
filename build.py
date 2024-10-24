@@ -1424,7 +1424,7 @@ RUN wget -O /tmp/commons-io.jar https://repo1.maven.org/maven2/commons-io/common
 RUN mkdir /tmp/ray_dist && \
     cp /usr/local/lib/python3.10/dist-packages/ray/jars/ray_dist.jar /tmp && \
     unzip /tmp/ray_dist.jar -d /tmp/ray_dist && ls /tmp/ray_dist && \
-    unzip /tmp/commons-io.jar -d /tmp/ray_dist && \
+    unzip -o /tmp/commons-io.jar -d /tmp/ray_dist && \
     zip -r /tmp/ray_dist/ray_dist.jar /tmp/ray_dist/* && \
     mv /tmp/ray_dist/ray_dist.jar /usr/local/lib/python3.10/dist-packages/ray/jars/ && \
     rm -rf /tmp/ray_dist && rm /tmp/ray_dist.jar && /tmp/commons-io.jar
