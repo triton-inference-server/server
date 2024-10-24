@@ -1561,8 +1561,8 @@ ENV PATH ${{PYBIN}}:${{PATH}}
 # match the version of python inside the RHEL base container. This means that python packages
 # installed within the container will not be picked up by the python backend stub process pybind
 # bindings. It must instead must be installed via pyenv.
-RUN curl https://pyenv.run | bash \\
-    && echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
+RUN curl https://pyenv.run | bash
+RUN echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc \\
     && echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc \\
     && echo 'eval "$(pyenv init -)"' >> ~/.bashrc \\
     && source ~/.bashrc
