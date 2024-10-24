@@ -114,7 +114,7 @@ class KServeGrpc:
     def __exit__(self, exc_type, exc_value, traceback):
         self.triton_frontend.stop()
         if exc_type:
-            raise exc_type(exc_value) from None
+            raise exc_type(exc_value)
 
     @handle_triton_error
     def start(self):
