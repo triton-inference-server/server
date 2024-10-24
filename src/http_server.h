@@ -272,13 +272,34 @@ class HTTPAPIServer : public HTTPServer {
     explicit InferRequestClass(
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
-        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request);
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+        const std::shared_ptr<SharedMemoryManager>& shm_manager);
+
     virtual ~InferRequestClass()
     {
       if (req_ != nullptr) {
         evhtp_request_unset_hook(req_, evhtp_hook_on_request_fini);
       }
       req_ = nullptr;
+
+      // Unregister shm regions that are waiting for the completion of an
+      // inference.
+      while (!shm_regions_info_.empty()) {
+        auto shm_name = shm_regions_info_.back()->name_;
+        auto shm_memory_type = shm_regions_info_.back()->kind_;
+        auto marked_for_unregistration =
+            shm_regions_info_.back()->marked_for_unregistration_;
+
+        // Delete shared_ptr to decrement reference count
+        shm_regions_info_.pop_back();
+
+        if (marked_for_unregistration) {
+          auto err = shm_manager_->Unregister(shm_name, shm_memory_type);
+          if (err != nullptr) {
+            LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
+          }
+        }
+      }
     }
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
@@ -345,6 +366,8 @@ class HTTPAPIServer : public HTTPServer {
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         shm_regions_info_;
 
+    std::shared_ptr<SharedMemoryManager> shm_manager_;
+
     evhtp_res response_code_{EVHTP_RES_OK};
   };
 
@@ -355,9 +378,11 @@ class HTTPAPIServer : public HTTPServer {
         DataCompressor::Type response_compression_type,
         const MappingSchema* request_schema,
         const MappingSchema* response_schema, bool streaming,
-        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+        const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+        const std::shared_ptr<SharedMemoryManager>& shm_manager)
         : InferRequestClass(
-              server, req, response_compression_type, triton_request),
+              server, req, response_compression_type, triton_request,
+              shm_manager),
           request_schema_(request_schema), response_schema_(response_schema),
           streaming_(streaming)
     {
@@ -471,7 +496,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
   {
     return std::unique_ptr<InferRequestClass>(new InferRequestClass(
-        server_.get(), req, GetResponseCompressionType(req), triton_request));
+        server_.get(), req, GetResponseCompressionType(req), triton_request,
+        shm_manager_));
   }
 
   // Helper function to retrieve infer request header in the form specified by
