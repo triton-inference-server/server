@@ -94,7 +94,11 @@ def teardown_client(
 
 
 def send_and_test_inference_identity(
-    frontend_client: Union["tritonclient.http", "tritonclient.grpc"], url: str
+    frontend_client: Union[
+        "tritonclient.http.InferenceServerClient",
+        "tritonclient.grpc.InferenceServerClient",
+    ],
+    url: str,
 ) -> bool:
     """
     Sends an inference request to the model at test_model_repository/identity
@@ -120,7 +124,11 @@ def send_and_test_inference_identity(
 
 
 def send_and_test_stream_inference(
-    frontend_client: Union["tritonclient.http", "tritonclient.grpc"], url: str
+    frontend_client: Union[
+        "tritonclient.http.InferenceServerClient",
+        "tritonclient.grpc.InferenceServerClient",
+    ],
+    url: str,
 ) -> bool:
     """
     Sends multiple streaming requests to "delayed_identity" model with negligible delays
