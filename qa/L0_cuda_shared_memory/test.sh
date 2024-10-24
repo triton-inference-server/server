@@ -100,9 +100,24 @@ for client_type in http grpc; do
     fi
 
     export CLIENT_TYPE=$client_type
-    CLIENT_LOG="./unregister_shm.$client_type.client.log"
+    CLIENT_LOG="./unregister_shm_during_inference_$client_type.client.log"
     set +e
     python3 $SHM_TEST TestCudaSharedMemoryUnregister.test_unregister_shm_during_inference_$client_type >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $TEST_RESULT_FILE
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+
+    CLIENT_LOG="./unregister_shm_after_inference_$client_type.client.log"
+    python3 $SHM_TEST TestCudaSharedMemoryUnregister.test_unregister_shm_after_inference_$client_type >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
