@@ -1298,11 +1298,12 @@ ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
 RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
+      && userdel ubuntu > /dev/null 2>&1 || true \\
       && if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
           useradd $TRITON_SERVER_USER; \\
         fi \\
-      && [ `id -u $TRITON_SERVER_USER` -eq 1001 ] \\
-      && [ `id -g $TRITON_SERVER_USER` -eq 1001 ]
+      && [ `id -u $TRITON_SERVER_USER` -eq 1000 ] \\
+      && [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 """.format(
         gpu_enabled=gpu_enabled
     )
