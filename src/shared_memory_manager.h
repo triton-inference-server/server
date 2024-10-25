@@ -65,12 +65,6 @@ class SharedMemoryManager {
     {
     }
 
-    ~SharedMemoryInfo()
-    {
-      std::cerr << "********* " << name_
-                << ": destructor ~SharedMemoryInfo() called !! **********\n";
-    }
-
     std::string name_;
     std::string shm_key_;
     size_t offset_;
