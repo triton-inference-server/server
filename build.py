@@ -2014,13 +2014,19 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-    
+
     # The python library version available for install via 'yum install python3.X-devel' does not
     # match the version of python inside the RHEL base container. This means that python packages
     # installed within the container will not be picked up by the python backend stub process pybind
     # bindings. It must instead must be installed via pyenv. We package it here for better usability.
     if target_platform() == "rhel" and be == "python":
-            cmake_script.cp("/usr/lib64/libpython3*", os.path.join(repo_install_dir, "backends", be))
+        major_minor_version = ".".join(
+            (TRITON_VERSION_MAP[FLAGS.version][7]).split(".")[:2]
+        )
+        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
+        cmake_script.cp(
+            version_matched_files, os.path.join(repo_install_dir, "backends", be)
+        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
