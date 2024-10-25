@@ -3283,7 +3283,8 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(), streaming, irequest_shared, shm_manager_));
+        generate_stream_response_schema_.get(), streaming, irequest_shared,
+        shm_manager_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
