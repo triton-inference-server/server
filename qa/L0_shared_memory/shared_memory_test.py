@@ -511,7 +511,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
 
         finally:
             self._cleanup_server(shm_handles)
-    
+
     def test_unregister_shm_after_inference_http(self):
         try:
             self.triton_client.unregister_system_shared_memory()
