@@ -30,6 +30,9 @@
 
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
+> [!WARNING]
+> The current release is version [2.51.0](https://github.com/triton-inference-server/server/releases/latest) and corresponds to the 24.10 container release on NVIDIA GPU Cloud (NGC).
+
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
 multiple deep learning and machine learning frameworks, including TensorRT,
