@@ -70,6 +70,20 @@ class TestGrpcOptions:
             KServeGrpc.Options(port=-5)
         with pytest.raises(Exception):
             KServeGrpc.Options(keepalive_timeout_ms=-20_000)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(keepalive_time_ms=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(keepalive_timeout_ms=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(http2_max_pings_without_data=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(http2_min_recv_ping_interval_without_data_ms=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(http2_max_ping_strikes=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(max_connection_age_ms=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(max_connection_age_grace_ms=-1)
 
         # Wrong data type
         with pytest.raises(Exception):
