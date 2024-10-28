@@ -686,7 +686,7 @@ SharedMemoryManager::UnregisterHelper(
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end() && it->second->kind_ == memory_type) {
     if (it->second.use_count() > 1) {
-      it->second->marked_for_unregistration_ = true;
+      it->second->pending_unregister_ = true;
       LOG_VERBOSE(1)
           << "Shared memory region '" << name
           << "' will be unregistered after in-flight requests complete.";
