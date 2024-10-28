@@ -43,7 +43,7 @@ class KServeHttp:
         address: str = "0.0.0.0"
         port: int = Field(8000, ge=0, le=65535)
         reuse_port: bool = False
-        thread_count: int = Field(8, ge=0)
+        thread_count: int = Field(8, gt=0)
         header_forward_pattern: str = ""
         # DLIS-7215: Add restricted protocol support
         # restricted_protocols: list

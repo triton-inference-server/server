@@ -48,7 +48,7 @@ class TestHttpOptions:
         with pytest.raises(Exception):
             KServeHttp.Options(port=-15)
         with pytest.raises(Exception):
-            KServeHttp.Options(thread_count=-5)
+            KServeHttp.Options(thread_count=0)
 
         # Wrong data type
         with pytest.raises(Exception):
@@ -87,7 +87,7 @@ class TestMetricsOptions:
         with pytest.raises(Exception):
             Metrics.Options(port=-15)
         with pytest.raises(Exception):
-            Metrics.Options(thread_count=-5)
+            Metrics.Options(thread_count=0)
 
         # Wrong data type
         with pytest.raises(Exception):
