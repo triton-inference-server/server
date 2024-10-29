@@ -78,7 +78,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "0.5.3.post1",  # vLLM version
-        "3.12.1",  # RHEL Python version
+        "3.12.3",  # RHEL Python version
     )
 }
 
@@ -1541,32 +1541,31 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 
 def change_default_python_version_rhel(version):
-    # Example version 3.12.1 --> 3.12
-    major_minor_version = ".".join(version.split(".")[:2])
     df = """
+# The python library version available for install via 'yum install python3.X-devel' does not
+# match the version of python inside the RHEL base container. This means that python packages
+# installed within the container will not be picked up by the python backend stub process pybind
+# bindings. It must instead must be installed via pyenv.
+ENV PYENV_ROOT=/tmp/pyenv_build
+RUN curl https://pyenv.run | bash
+ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
+RUN eval "$(pyenv init -)"
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
+    && cp ${{PYENV_ROOT}}/versions/{}/lib/libpython3* /usr/lib64/""".format(
+        version, version
+    )
+    df += """
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
 # pip installed will not be found during testing.
 ENV PYVER {}
 ENV PYTHONPATH /opt/python/v
-RUN ln -sf /opt/python/cp${{PYVER/./}}* ${{PYTHONPATH}}
+RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
 ENV PYBIN ${{PYTHONPATH}}/bin
 ENV PYTHON_BIN_PATH ${{PYBIN}}/python${{PYVER}}
 ENV PATH ${{PYBIN}}:${{PATH}}
 """.format(
-        major_minor_version
-    )
-    df += """
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-RUN curl https://pyenv.run | bash
-ENV PATH="/root/.pyenv/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
-    && cp /root/.pyenv/versions/{}/lib/libpython3* /usr/lib64/""".format(
-        version, version
+        version
     )
     return df
 
