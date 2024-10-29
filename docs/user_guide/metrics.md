@@ -239,7 +239,24 @@ nv_inference_first_response_histogram_ms{model="my_model",version="1", le="5000"
 nv_inference_first_response_histogram_ms{model="my_model",version="1", le="+Inf"} 37
 ```
 
-Triton initializes histograms with default buckets for each, as shown above. Customization of buckets per metric is currently unsupported.
+Triton initializes histograms with default buckets for each, as shown above.
+Buckets can be overridden per family by specifying `model_metrics` in the
+model configuration. For example:
+```
+// config.pbtxt
+model_metrics {
+  metric_control: [
+    {
+      metric_identifier: {
+        family: "nv_inference_first_response_histogram_ms"
+      }
+      histogram_options: {
+        buckets: [ 1, 2, 4, 8 ]
+      }
+    }
+  ]
+}
+```
 
 #### Summaries
 
