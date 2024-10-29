@@ -323,8 +323,8 @@ More details on performance benchmarking with GenAI-Perf can be found [here](htt
 
 All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm are shown below. 
 
-
-## ensemble/config.pbtxt
+<details>
+<summary><b> ensemble/config.pbtxt</b></summary>
 
     # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
@@ -831,9 +831,10 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
         }
       ]
     }
+</details>
 
-
-## postprocessing/config.pbtxt
+<details>
+<summary><b>postprocessing/config.pbtxt</b></summary>
 
     # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
@@ -959,9 +960,10 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
             kind: KIND_CPU
         }
     ]
+</details>
 
-
-## preprocessing/config.pbtxt
+<details>
+<summary><b> preprocessing/config.pbtxt</b> </summary>
 
     # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
@@ -1152,10 +1154,10 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
         }
     ]
 
+</details>
 
-## tensorrt\_llm/config.pbtxt
-
-\
+<details>
+<summary> <b> tensorrt_llm/config.pbtxt </b></summary>
 
 
     # Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -1556,6 +1558,8 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
         string_value: "${encoder_engine_dir}"
       }
     }
+
+    </details>
     parameters: {
       key: "max_tokens_in_paged_kv_cache"
       value: {
