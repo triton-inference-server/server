@@ -134,7 +134,7 @@ else()
   target_compile_options(
     main
     PRIVATE
-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
   )
 endif()
 
@@ -373,7 +373,7 @@ if(${TRITON_ENABLE_HTTP}
     target_compile_options(
       http-endpoint-library
       PRIVATE
-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
     )
   endif()
 
