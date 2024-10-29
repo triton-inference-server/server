@@ -2,7 +2,7 @@
 <!-- Describe your pull request here. Please read the text below the line, and make sure you follow the checklist.-->
 
 #### Checklist
-- [ ] PR title reflects the change and is of format `<commit_type>: <Title>`. Check [conventional commit type](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#type).
+- [ ] PR title reflects the change and is of format `<commit_type>: <Title>`. Check the [conventional commit type](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#type).
 - [ ] Changes are described in the pull request.
 - [ ] Populated [github labels](https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels) field.
 - [ ] Added [test plan](#test-plan) and verified test passes.
