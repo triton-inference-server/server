@@ -1558,8 +1558,7 @@ RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
 # pip installed will not be found during testing.
-ENV PYVER {}
-ENV PYTHONPATH /opt/python/v
+ENV PYVER={} PYTHONPATH=/opt/python/v
 RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
 ENV PYBIN ${{PYTHONPATH}}/bin
 ENV PYTHON_BIN_PATH ${{PYBIN}}/python${{PYVER}}
