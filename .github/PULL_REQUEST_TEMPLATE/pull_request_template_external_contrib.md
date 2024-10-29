@@ -34,6 +34,7 @@
 Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-CCLA-v1.pdf).
 - [ ] PR title reflects the change and is of format `<commit_type>: <Title>`. Check the [conventional commit type](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#type).
 - [ ] Changes are described in the pull request.
+- [ ] Related issues are referenced.
 - [ ] Populated [github labels](https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels) field.
 - [ ] Added [test plan](#test-plan) and verified test passes.
 - [ ] Verified that the PR passes existing CI.
@@ -41,7 +42,6 @@ Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-
 - [ ] Verified copyright is correct on all changed files.
 - [ ] Added _succinct_ git squash message before merging [ref](https://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 - [ ] All template sections are filled out.
-- [ ] Optional: Related issues are referenced.
 - [ ] Optional: Additional screenshots for behavior/output changes with before/after.
 
 #### Related PRs:
