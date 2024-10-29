@@ -1032,6 +1032,7 @@ SHELL ["cmd", "/S", "/C"]
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Install docker docker buildx
 RUN apt-get update \\
@@ -1068,6 +1069,7 @@ RUN apt-get update \\
             patchelf \\
             python3-dev \\
             python3-pip \\
+            python3-wheel \\
             python3-setuptools \\
             rapidjson-dev \\
             scons \\
@@ -1082,7 +1084,7 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade --break-system-packages \\
+RUN pip3 install --upgrade \\
           docker \\
           virtualenv
 
@@ -1393,8 +1395,10 @@ RUN apt-get update \\
             python3 \\
             libarchive-dev \\
             python3-pip \\
+            python3-wheel \\
+            python3-setuptools \\
             libpython3-dev \\
-      && pip3 install --upgrade --break-system-packages \\
+      && pip3 install --upgrade \\
             \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
