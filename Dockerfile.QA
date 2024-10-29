@@ -308,6 +308,7 @@ ARG TARGETPLATFORM
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+# ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # install platform specific packages
 RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
@@ -346,8 +347,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade --break-system-packages "numpy<2" pillow attrdict \
-                           future grpcio requests gsutil \
+RUN pip3 install --upgrade "numpy<2" pillow attrdict future grpcio requests gsutil \
                            awscli six grpcio-channelz prettytable virtualenv \
                            check-jsonschema
 
@@ -376,11 +376,11 @@ COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     find qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade --break-system-packages
+    xargs pip3 install --upgrade
 
 # Install Triton Python API
 RUN find qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade --break-system-packages {}[all]
+    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
 
 # Install Triton Frontend Python API
 RUN find qa/pkgs/ -type f -name \
