@@ -155,6 +155,7 @@ ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
                    nvml_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   nvrtc_${CUDA_MAJOR}.${CUDA_MINOR} nvrtc_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cublas_${CUDA_MAJOR}.${CUDA_MINOR} cublas_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cufft_${CUDA_MAJOR}.${CUDA_MINOR} cufft_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
                    curand_${CUDA_MAJOR}.${CUDA_MINOR} curand_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
