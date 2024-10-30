@@ -1546,7 +1546,7 @@ def change_default_python_version_rhel(version):
 # match the version of python inside the RHEL base container. This means that python packages
 # installed within the container will not be picked up by the python backend stub process pybind
 # bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/tmp/pyenv_build
+ENV PYENV_ROOT=/opt/pyenv_build
 RUN curl https://pyenv.run | bash
 ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
 RUN eval "$(pyenv init -)"
