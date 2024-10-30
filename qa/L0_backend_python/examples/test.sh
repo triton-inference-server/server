@@ -29,6 +29,7 @@ source ../common.sh
 source ../../common/util.sh
 
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
+
 SERVER_ARGS="--model-repository=${MODELDIR}/examples/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./examples_server.log"
 
@@ -441,6 +442,6 @@ else
     echo -e "\n***\n*** Example verification test FAILED.\n***"
 fi
 
-pip3 uninstall numpy
+pip3 uninstall -y numpy
 pip3 install "numpy<2"
 exit $RET
