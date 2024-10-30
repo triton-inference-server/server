@@ -29,7 +29,6 @@ source ../common.sh
 source ../../common/util.sh
 
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
-
 SERVER_ARGS="--model-repository=${MODELDIR}/examples/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./examples_server.log"
 
@@ -38,10 +37,12 @@ rm -fr *.log python_backend/
 
 # Install torch
 pip3 uninstall -y torch
+pip3 uninstall -y numpy
+pip3 install "numpy>=2"
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-    pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
+    pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
 else
-    pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
+    pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
 fi
 
 # Install `validators` for Model Instance Kind example
@@ -440,4 +441,6 @@ else
     echo -e "\n***\n*** Example verification test FAILED.\n***"
 fi
 
+pip3 uninstall numpy
+pip3 install "numpy<2"
 exit $RET
