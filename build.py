@@ -1294,7 +1294,6 @@ ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
 ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
@@ -1390,6 +1389,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     # Add dependencies needed for python backend
     if "python" in backends:
         df += """
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
