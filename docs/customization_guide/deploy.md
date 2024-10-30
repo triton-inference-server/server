@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -244,7 +244,9 @@ to `False` if not required to avoid capturing or exposing any sensitive informat
 
 #### `--trace-config level=<string> default "off"`
 
-Tracing mode. Trace mode supports `triton` and `opentelemetry`. Unless required `--trace-config level=off` should be set to avoid capturing or exposing any sensitive information.
+Tracing mode. Trace mode supports `triton` and `opentelemetry`. Unless required
+`--trace-config level=off` should be set to avoid capturing or exposing any
+sensitive information.
 
 
 ##### `backend-directory <string> default /opt/tritonserver/backends`
@@ -273,6 +275,17 @@ Directory where cache shared libraries are found.
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
+##### `backend-config=<backend>,additional-dependency-dirs=<string>`
+
+This is an optional Windows feature that enables Triton to search custom
+dependency directories when loading a specific backend. The user can input
+these directories as a string of semicolon-separated paths (including a
+trailing semicolon). These directories are programmatically prepended to
+the process's PATH and are removed when the backend is loaded successfully.
+Windows will search PATH last in its search sequence, so be cautious that
+no untrusted files of same name exist in a location of higher search priority
+(e.g., System32). It is still recommended to add backend-specific dependencies
+to their corresponding backend folder when possible.
 
 
 

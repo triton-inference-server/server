@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -805,6 +805,13 @@ respective `instance_group` settings. To optimize your model pipeline
 performance, you can use
 [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
 to find the optimal model configurations.
+
+When crafting the ensemble steps, it is useful to note the distinction between
+*key* and *value* on the `input_map`/`output_map`:
+* *key*: An `input`/`output` tensor name on the composing model.
+* *value*: A tensor name on the ensemble model, which acts as an identifier
+connecting ensemble `input`/`output` to those on the composing model and between
+composing models.
 
 #### Additional Resources
 

@@ -27,8 +27,16 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#ifdef TRITON_ENABLE_GRPC
 #include "../../../grpc/grpc_server.h"
+#endif
+
+
+#ifdef TRITON_ENABLE_HTTP
 #include "../../../http_server.h"
+#endif
+
+
 #include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 
@@ -53,12 +61,14 @@ PYBIND11_MODULE(tritonfrontend_bindings, m)
   py::register_exception<AlreadyExistsError>(
       m, "AlreadyExistsError", tfe.ptr());
 
-
+#ifdef TRITON_ENABLE_HTTP
   py::class_<TritonFrontend<HTTPServer, HTTPAPIServer>>(m, "TritonFrontendHttp")
       .def(py::init<uintptr_t, UnorderedMapType>())
       .def("start", &TritonFrontend<HTTPServer, HTTPAPIServer>::StartService)
       .def("stop", &TritonFrontend<HTTPServer, HTTPAPIServer>::StopService);
+#endif  // TRITON_ENABLE_HTTP
 
+#ifdef TRITON_ENABLE_GRPC
   py::class_<TritonFrontend<
       triton::server::grpc::Server, triton::server::grpc::Server>>(
       m, "TritonFrontendGrpc")
@@ -71,6 +81,7 @@ PYBIND11_MODULE(tritonfrontend_bindings, m)
           "stop", &TritonFrontend<
                       triton::server::grpc::Server,
                       triton::server::grpc::Server>::StopService);
+#endif  // TRITON_ENABLE_GRPC
 }
 
 }}}  // namespace triton::server::python
