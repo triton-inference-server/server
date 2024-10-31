@@ -41,7 +41,7 @@ pip3 uninstall -y torch
 pip3 uninstall -y numpy
 pip3 install "numpy>=2"
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-    pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
+    pip3 install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124
 else
     pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
 fi
