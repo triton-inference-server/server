@@ -80,43 +80,21 @@ elif [ "$TEST_SHARED_MEMORY" == "cuda" ]; then
     SUFFIX="_cudashm"
 else
     TEST_SHARED_MEMORY="none"
-    TEST_NAMES=(
-        "${UNDERTEST_NAME} Minimum Latency GRPC"
-        "${UNDERTEST_NAME} Minimum Latency HTTP"
-        "${UNDERTEST_NAME} Minimum Latency C API"
-        "${UNDERTEST_NAME} Maximum Throughput GRPC"
-        "${UNDERTEST_NAME} Maximum Throughput HTTP"
-        "${UNDERTEST_NAME} Maximum Throughput C API")
-    TEST_DIRS=(
-        min_latency_grpc
-        min_latency_http
-        min_latency_triton_c_api
-        max_throughput_grpc
-        max_throughput_http
-        max_throughput_triton_c_api)
     SUFFIX=""
-    TEST_CONCURRENCY=(
-        1
-        1
-        1
-        16
-        16
-        16)
-    TEST_INSTANCE_COUNTS=(
-        1
-        1
-        1
-        2
-        2
-        2)
-    # Small payloads
-    TEST_TENSOR_SIZES=(
-        1
-        1
-        1
-        1
-        1
-        1)
+    TEST_NAMES=(
+        "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
+        "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
+        "${UNDERTEST_NAME} 16MB I/O Latency C API"
+        "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
+        "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
+        "${UNDERTEST_NAME} 16MB I/O Throughput C API")
+    TEST_DIRS=(
+        16mb_latency_grpc${SUFFIX}
+        16mb_latency_http${SUFFIX}
+        16mb_latency_triton_c_api${SUFFIX}
+        16mb_throughput_grpc${SUFFIX}
+        16mb_throughput_http${SUFFIX}
+        16mb_throughput_triton_c_api${SUFFIX})
     TEST_PROTOCOLS=(
         grpc
         http
@@ -124,50 +102,78 @@ else
         grpc
         http
         triton_c_api)
+    # Large payloads
+    TEST_TENSOR_SIZES=(
+        ${TENSOR_SIZE_16MB}
+        ${TENSOR_SIZE_16MB}
+        ${TENSOR_SIZE_16MB}
+        ${TENSOR_SIZE_16MB}
+        ${TENSOR_SIZE_16MB}
+        ${TENSOR_SIZE_16MB})
+    TEST_INSTANCE_COUNTS=(
+        1
+        1
+        1
+        2
+        2
+        2)
+    TEST_CONCURRENCY=(
+        1
+        1
+        1
+        16
+        16
+        16)
 fi
 TEST_NAMES+=(
-    "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
-    "${UNDERTEST_NAME} 16MB I/O Latency C API"
-    "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
-    "${UNDERTEST_NAME} 16MB I/O Throughput C API")
+    "${UNDERTEST_NAME} Minimum Latency C API"
+    "${UNDERTEST_NAME} Maximum Throughput C API"
+    "${UNDERTEST_NAME} Maximum Throughput GRPC"
+    "${UNDERTEST_NAME} Maximum Throughput HTTP"
+    "${UNDERTEST_NAME} Minimum Latency GRPC"
+    "${UNDERTEST_NAME} Minimum Latency HTTP"
+    )
 TEST_DIRS+=(
-    16mb_latency_grpc${SUFFIX}
-    16mb_latency_http${SUFFIX}
-    16mb_latency_triton_c_api${SUFFIX}
-    16mb_throughput_grpc${SUFFIX}
-    16mb_throughput_http${SUFFIX}
-    16mb_throughput_triton_c_api${SUFFIX})
+    min_latency_triton_c_api
+    max_throughput_triton_c_api
+    max_throughput_grpc
+    max_throughput_http
+    min_latency_grpc
+    min_latency_http
+    )
+TEST_CONCURRENCY+=(
+    1
+    16
+    16
+    16
+    1
+    1
+    )
+TEST_INSTANCE_COUNTS+=(
+    1
+    2
+    2
+    2
+    1
+    1
+    )
+# Small payloads
+TEST_TENSOR_SIZES+=(
+    1
+    1
+    1
+    1
+    1
+    1)
 TEST_PROTOCOLS+=(
-    grpc
-    http
+    triton_c_api
     triton_c_api
     grpc
     http
-    triton_c_api)
-# Large payloads
-TEST_TENSOR_SIZES+=(
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB})
-TEST_INSTANCE_COUNTS+=(
-    1
-    1
-    1
-    2
-    2
-    2)
-TEST_CONCURRENCY+=(
-    1
-    1
-    1
-    16
-    16
-    16)
+    grpc
+    http
+    )
+fi
 TEST_BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
 
 mkdir -p ${REPO_VERSION}
