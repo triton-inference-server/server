@@ -78,6 +78,7 @@ TRITON_VERSION_MAP = {
         "2024.0.0",  # Standalone OpenVINO
         "3.2.6",  # DCGM version
         "0.5.3.post1",  # vLLM version
+        "3.12.3",  # RHEL Python version
     )
 }
 
@@ -950,7 +951,6 @@ RUN yum install -y \\
             libb64-devel \\
             gperftools-devel \\
             patchelf \\
-            python3.11-devel \\
             python3-pip \\
             python3-setuptools \\
             rapidjson-devel \\
@@ -963,6 +963,10 @@ RUN yum install -y \\
             libxml2-devel \\
             numactl-devel \\
             wget
+"""
+    # Requires openssl-devel to be installed first for pyenv build to be successful
+    df += change_default_python_version_rhel(TRITON_VERSION_MAP[FLAGS.version][7])
+    df += """
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
@@ -1389,7 +1393,29 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
 
     # Add dependencies needed for python backend
     if "python" in backends:
-        df += """
+        if target_platform() == "rhel":
+            df += """
+# python3, python3-pip and some pip installs required for the python backend
+RUN yum install -y \\
+        libarchive-devel \\
+        python3-pip \\
+        openssl-devel \\
+        readline-devel
+"""
+            # Requires openssl-devel to be installed first for pyenv build to be successful
+            df += change_default_python_version_rhel(
+                TRITON_VERSION_MAP[FLAGS.version][7]
+            )
+            df += """
+RUN pip3 install --upgrade pip \\
+    && pip3 install --upgrade \\
+        wheel \\
+        setuptools \\
+        \"numpy<2\" \\
+        virtualenv
+"""
+        else:
+            df += """
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
@@ -1511,6 +1537,34 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
             libs_arch=libs_arch
         )
 
+    return df
+
+
+def change_default_python_version_rhel(version):
+    df = """
+# The python library version available for install via 'yum install python3.X-devel' does not
+# match the version of python inside the RHEL base container. This means that python packages
+# installed within the container will not be picked up by the python backend stub process pybind
+# bindings. It must instead must be installed via pyenv.
+ENV PYENV_ROOT=/opt/pyenv_build
+RUN curl https://pyenv.run | bash
+ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
+RUN eval "$(pyenv init -)"
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
+    && cp ${{PYENV_ROOT}}/versions/{}/lib/libpython3* /usr/lib64/""".format(
+        version, version
+    )
+    df += """
+# RHEL image has several python versions. It's important
+# to set the correct version, otherwise, packages that are
+# pip installed will not be found during testing.
+ENV PYVER={} PYTHONPATH=/opt/python/v
+RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
+ENV PYBIN=${{PYTHONPATH}}/bin
+ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+""".format(
+        version
+    )
     return df
 
 
@@ -1957,6 +2011,19 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
+
+    # The python library version available for install via 'yum install python3.X-devel' does not
+    # match the version of python inside the RHEL base container. This means that python packages
+    # installed within the container will not be picked up by the python backend stub process pybind
+    # bindings. It must instead must be installed via pyenv. We package it here for better usability.
+    if target_platform() == "rhel" and be == "python":
+        major_minor_version = ".".join(
+            (TRITON_VERSION_MAP[FLAGS.version][7]).split(".")[:2]
+        )
+        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
+        cmake_script.cp(
+            version_matched_files, os.path.join(repo_install_dir, "backends", be)
+        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
