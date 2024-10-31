@@ -330,7 +330,6 @@ class TestKServe:
 
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
-        # For this test
         # Setup Server, KServeGrpc, Metrics
         server = utils.setup_server()
         grpc_service = utils.setup_service(
