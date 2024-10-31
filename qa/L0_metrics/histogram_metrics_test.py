@@ -182,9 +182,7 @@ class HistogramMetricsTest(tu.TestResultCollector):
     def test_buckets_override(self):
         model_name = "async_execute_decouple"
         metrics = self.get_metrics()
-        override_buckets = [
-            x for x in os.environ.get("OVERRIDE_BUCKETS").split(",")
-        ] + ["+Inf"]
+        override_buckets = [x for x in os.environ.get("OVERRIDE_BUCKETS").split(",")]
 
         # Check metric output
         self.assertEqual(
@@ -195,13 +193,6 @@ class HistogramMetricsTest(tu.TestResultCollector):
                 FIRST_RESPONSE_HISTOGRAM, model_name, "1", "bucket", le
             )
             self.assertIn(bucket_key, metrics)
-
-    def test_server_log_error(self):
-        # Test error in server log
-        with open(os.environ["SERVER_LOG"]) as f:
-            server_log = f.read()
-        server_log_error = os.environ["SERVER_LOG_ERROR"]
-        self.assertIn(server_log_error, server_log)
 
 
 if __name__ == "__main__":

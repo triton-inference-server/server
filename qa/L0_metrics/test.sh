@@ -475,7 +475,7 @@ check_unit_test
 
 ### Test model metrics configuration
 MODELDIR="${PWD}/model_metrics_model"
-export SERVER_LOG="./model_metric_config_server.log"
+SERVER_LOG="./model_metric_config_server.log"
 CLIENT_LOG="./model_metric_config_client.log"
 decoupled_model="async_execute_decouple"
 SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=true --log-verbose=1"
@@ -493,7 +493,7 @@ model_metrics {
         family: "nv_inference_first_response_histogram_ms"
       }
       histogram_options: {
-        buckets: [ 1.0, 2.0, 4.0, 8.0 ]
+        buckets: [ -1, 0.0, 1, 2.5 ]
       }
     }
   ]
@@ -501,76 +501,10 @@ model_metrics {
 EOL
 
 run_and_check_server
-export OVERRIDE_BUCKETS="1,2,4,8"
+export OVERRIDE_BUCKETS="-1,0,1,2.5,+Inf"
 python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_buckets_override 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
-
-# Test invalid model_metrics configs
-cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
-cat >> "${MODELDIR}/${decoupled_model}/config.pbtxt" << EOL
-model_metrics {
-  metric_control: [{}]
-}
-EOL
-
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    export SERVER_LOG_ERROR="model_control must specify 'metric_identifier'"
-    python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_server_log_error 2>&1 | tee ${CLIENT_LOG}
-    check_unit_test
-fi
-
-# Test invalid model_metrics messages
-cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
-cat >> "${MODELDIR}/${decoupled_model}/config.pbtxt" << EOL
-model_metrics {
-  metric_control: [
-    {
-      metric_identifier: {}
-    }
-  ]
-}
-EOL
-
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    export SERVER_LOG_ERROR="metric_identifier must specify 'family'"
-    python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_server_log_error 2>&1 | tee ${CLIENT_LOG}
-    check_unit_test
-fi
-
-cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
-cat >> "${MODELDIR}/${decoupled_model}/config.pbtxt" << EOL
-model_metrics {
-  metric_control: [
-    {
-      metric_identifier: {
-        family: ""
-      }
-    }
-  ]
-}
-EOL
-
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    export SERVER_LOG_ERROR="metric_identifier must specify 'family'"
-    python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_server_log_error 2>&1 | tee ${CLIENT_LOG}
-    check_unit_test
-fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

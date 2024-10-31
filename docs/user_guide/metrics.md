@@ -257,6 +257,10 @@ model_metrics {
   ]
 }
 ```
+Currently, the following histogram families support custom buckets.
+```
+nv_inference_first_response_histogram_ms  // Time to First Response
+```
 
 #### Summaries
 
