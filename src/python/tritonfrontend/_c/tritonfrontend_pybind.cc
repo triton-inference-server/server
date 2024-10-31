@@ -27,16 +27,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#ifdef TRITON_ENABLE_GRPC
-#include "../../../grpc/grpc_server.h"
-#endif
-
-
-#if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
-#include "../../../http_server.h"
-#endif
-
-#include "triton/core/tritonserver.h"
 #include "tritonfrontend.h"
 
 
