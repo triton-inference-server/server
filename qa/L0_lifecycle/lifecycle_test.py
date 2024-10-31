@@ -3529,6 +3529,8 @@ class LifeCycleTest(tu.TestResultCollector):
             f.truncate(0)
             f.seek(0)
             f.write(config)
+        # make sure the disk operation is done before reloading
+        time.sleep(0.1)
         # reload the model
         client.load_model(model_name)
 
@@ -3550,6 +3552,8 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # simulate a dependency change to all versions
         Path(os.path.join("models", model_name, "dummy_dependency.py")).touch()
+        # make sure the disk operation is done before reloading
+        time.sleep(0.1)
         # reload the model
         client.load_model(model_name)
 
@@ -3577,6 +3581,8 @@ class LifeCycleTest(tu.TestResultCollector):
             f.truncate(0)
             f.seek(0)
             f.write(config)
+        # make sure the disk operation is done before reloading
+        time.sleep(0.1)
         # reload the model
         client.load_model(model_name)
 
@@ -3604,6 +3610,8 @@ class LifeCycleTest(tu.TestResultCollector):
             f.truncate(0)
             f.seek(0)
             f.write(config)
+        # make sure the disk operation is done before reloading
+        time.sleep(0.1)
         # reload the model
         client.load_model(model_name)
 

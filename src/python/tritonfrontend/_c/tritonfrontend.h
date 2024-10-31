@@ -119,11 +119,28 @@ class TritonFrontend {
 
     server_.reset(server_ptr, EmptyDeleter);
 
-    _populate_restricted_features(data);
+#ifdef TRITON_ENABLE_HTTP
+    if constexpr (std::is_same_v<FrontendServer, HTTPAPIServer>) {
+      ThrowIfError(FrontendServer::Create(
+          server_, data, nullptr /* TraceManager */,
+          nullptr /* SharedMemoryManager */, restricted_features, &service));
+    }
+#endif
 
-    ThrowIfError(FrontendServer::Create(
-        server_, data, nullptr /* TraceManager */,
-        nullptr /* SharedMemoryManager */, restricted_features, &service));
+#ifdef TRITON_ENABLE_GRPC
+    if constexpr (std::is_same_v<
+                      FrontendServer, triton::server::grpc::Server>) {
+      ThrowIfError(FrontendServer::Create(
+          server_, data, nullptr /* TraceManager */,
+          nullptr /* SharedMemoryManager */, restricted_features, &service));
+    }
+#endif
+
+#ifdef TRITON_ENABLE_METRICS
+    if constexpr (std::is_same_v<FrontendServer, HTTPMetricsServer>) {
+      ThrowIfError(FrontendServer::Create(server_, data, &service));
+    }
+#endif
   };
 
   // TODO: [DLIS-7194] Add support for TraceManager & SharedMemoryManager
