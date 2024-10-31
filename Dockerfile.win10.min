@@ -134,6 +134,7 @@ RUN vcpkg.exe install \
       boost-interprocess:x64-windows \
       boost-stacktrace:x64-windows \
       b64:x64-windows \
+      flatbuffers:x64-windows \
       openssl-windows:x64-windows \
       openssl:x64-windows \
       pthread:x64-windows \
