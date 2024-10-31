@@ -103,14 +103,14 @@ LABEL NINJA_VERSION=${NINJA_VERSION}
 #
 # Installing Visual Studio BuildTools: VS17 2022
 #
-ARG BUILDTOOLS_VERSION=17.12.35309.182
+ARG BUILDTOOLS_VERSION=17.12.35424.110
 # Download collect.exe in case of an install failure.
 ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
 # Use the latest release channel. For more control, specify the location of an internal layout.
 # Download the Build Tools bootstrapper.
 # ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
-ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/12725588-4883-4728-a713-66775443edc9/8a24a3b9c100e68ae15faf83a0f783ffb871f50204aa656bddc7b2c37f6f20ec/vs_BuildTools.exe
+ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/ab43505e-6276-4982-9b89-e41a59e22c48/ed4666f857bce883d9dd950ae9bc951443d28a9a515ad2f95a1c25df681f88c3/vs_BuildTools.exe
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
