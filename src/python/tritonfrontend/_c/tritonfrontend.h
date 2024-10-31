@@ -31,15 +31,18 @@
 #include <unordered_map>
 #include <variant>
 
-#include "../../../command_line_parser.h"
 #include "../../../common.h"
-#include "../../../grpc/grpc_server.h"
-#include "../../../http_server.h"
 #include "../../../restricted_features.h"
 #include "../../../shared_memory_manager.h"
 #include "../../../tracer.h"
-#include "triton/common/logging.h"
-#include "triton/core/tritonserver.h"
+
+#ifdef TRITON_ENABLE_GRPC
+#include "../../../grpc/grpc_server.h"
+#endif
+
+#if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
+#include "../../../http_server.h"
+#endif
 
 struct TRITONSERVER_Server {};
 
