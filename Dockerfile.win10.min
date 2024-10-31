@@ -113,7 +113,6 @@ ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN vs_buildtools.exe --quiet --wait --norestart --nocache install \
-      --newChannelUri https://aka.ms/vs/17/release.LTSC.17.0/channel \
       --installPath %VS_INSTALL_PATH_WP% \
       --add Microsoft.VisualStudio.Workload.VCTools \
       --includeRecommended \
