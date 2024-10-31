@@ -1679,7 +1679,9 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             if FLAGS.container_memory:
                 baseargs += ["--memory", FLAGS.container_memory]
 
-        baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
+        if target_platform() != "windows":
+            baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
+
         baseargs += ["."]
 
         docker_script.cwd(THIS_SCRIPT_DIR)

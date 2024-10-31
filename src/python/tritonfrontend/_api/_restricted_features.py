@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,24 +23,3 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-try:
-    from ._kservehttp import KServeHttp
-except ImportError:
-    # TRITON_ENABLE_HTTP=OFF
-    # TritonFrontendHttp Package was not present
-    pass
-
-try:
-    from ._kservegrpc import KServeGrpc
-except ImportError:
-    # TRITON_ENABLE_GRPC=OFF
-    # TritonFrontendGrpc Package was not present
-    pass
-
-try:
-    from ._metrics import Metrics
-except ImportError:
-    # TRITON_ENABLE_Metrics=OFF
-    # TritonFrontendMetrics Package was not present
-    pass
