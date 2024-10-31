@@ -23,3 +23,38 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+from enum import Enum
+from typing import List, Union
+
+from _error_mapping import handle_triton_error
+from pydantic import FieldValidationInfo, field_validator
+from pydantic.dataclasses import dataclass
+
+
+# 1-to-1 copy of RestrictedCategory Enum from https://github.com/triton-inference-server/server/blob/main/src/restricted_features.h
+class Protocols(Enum):
+    HEALTH = "health"
+    METADATA = "metadata"
+    INFERENCE = "inference"
+    SHM_MEMORY = "shared-memory"
+    MODEL_CONFIG = "model-config"
+    MODEL_REPOSITORY = "model-repository"
+    STATISTICS = "statistics"
+    TRACE = "trace"
+    LOGGING = "logging"
+
+
+@dataclass
+class RestrictedFeatureGroup:
+    key: str
+    value: str
+    protocols: List[Protocols]
+
+
+class RestrictedFeatures:
+    Features = Protocols
+    Group = RestrictedFeatureGroup
+
+    def __init__(self):
+        self.FeatureGroups
