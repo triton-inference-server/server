@@ -57,4 +57,10 @@ class RestrictedFeatures:
     Group = RestrictedFeatureGroup
 
     def __init__(self):
-        self.FeatureGroups
+        self.FeatureGroups = []
+
+    def append_group(group: RestrictedFeatureGroup):
+        pass
+
+
+group1 = RestrictedFeatureGroup("some", "value", ["health", "metadata"])
