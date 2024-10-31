@@ -101,14 +101,19 @@ LABEL CMAKE_VERSION=${CMAKE_VERSION}
 #
 # Installing Visual Studio BuildTools: VS17 2022
 #
-ARG BUILDTOOLS_VERSION=17.12.35424.110
 # Download collect.exe in case of an install failure.
 ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 
 # Use the latest release channel. For more control, specify the location of an internal layout.
 # Download the Build Tools bootstrapper.
 # ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
-ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/ab43505e-6276-4982-9b89-e41a59e22c48/ed4666f857bce883d9dd950ae9bc951443d28a9a515ad2f95a1c25df681f88c3/vs_BuildTools.exe
+
+# ARG BUILDTOOLS_VERSION=17.12.35424.110
+# ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/ab43505e-6276-4982-9b89-e41a59e22c48/ed4666f857bce883d9dd950ae9bc951443d28a9a515ad2f95a1c25df681f88c3/vs_BuildTools.exe
+
+ARG BUILDTOOLS_VERSION=17.11.35327.3
+ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/69e24482-3b48-44d3-af65-51f866a08313/471c9a89fa8ba27d356748ae0cf25eb1f362184992dc0bb6e9ccf10178c43c27/vs_BuildTools.exe
+
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
