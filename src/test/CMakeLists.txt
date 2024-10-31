@@ -30,7 +30,6 @@ cmake_minimum_required (VERSION 3.18)
 # Unit tests
 #
 find_package(GTest REQUIRED)
-set(LIBEVENT_STATIC_LINK TRUE)
 
 #
 # Unit test for DataCompressor
