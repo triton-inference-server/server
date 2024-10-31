@@ -1913,6 +1913,10 @@ def core_build(
         os.path.join(install_dir, "python"),
     )
 
+    cmake_script.cmd(
+        ["pip3", "install", os.path.join(install_dir, "python", "triton*.whl")]
+    )
+
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "include", "triton", "core"),
