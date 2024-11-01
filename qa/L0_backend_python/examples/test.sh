@@ -39,6 +39,8 @@ rm -fr *.log python_backend/
 # Install torch
 pip3 uninstall -y torch
 pip3 uninstall -y numpy
+# NOTE: Using this subtest as a test case that involves using a python model with 
+# numpy 2.X without changing the environments used in all the other test cases.
 pip3 install "numpy>=2"
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124
