@@ -1329,6 +1329,7 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
+        python3-pip \\
         numactl-devel
 """
     else:
