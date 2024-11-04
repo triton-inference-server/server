@@ -61,7 +61,8 @@ class FeatureGroup:
         ]
         if invalid_protocols:
             raise InvalidArgumentError(
-                f"Invalid protocols found: {invalid_protocols}. Each item in 'protocols' should be an instance of the tritonfrontend.Protocols. "
+                f"Invalid protocols found: {invalid_protocols}."
+                f"Each item in 'protocols' should be an instance of the tritonfrontend.Protocols."
                 f"Valid options are: {[str(p) for p in Protocols]}"
             )
         return protocols
@@ -85,7 +86,8 @@ class RestrictedFeatures:
         for protocol in group.protocols:
             if protocol in self.protocols_restricted:
                 raise InvalidArgumentError(
-                    "A given protocol can only belong to one group. {str(protocol)} already belongs to a group."
+                    "A given protocol can only belong to one group."
+                    f"{str(protocol)} already belongs to an existing group."
                 )
 
         self.protocols_restricted.update(group.protocols)
