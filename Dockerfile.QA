@@ -386,14 +386,6 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
-# Install Triton Python API
-RUN find qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
-
-# Install Triton Frontend Python API
-RUN find qa/pkgs/ -type f -name \
-    "tritonfrontend-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
-
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
