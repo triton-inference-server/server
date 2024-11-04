@@ -49,8 +49,8 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
 
     def setUp(self):
-        self._setup_client()shm_handles =
-        self._ []
+        self._setup_client()
+        self._shm_handles = []
 
     def tearDown(self):
         self._cleanup_shm_handles()
