@@ -24,6 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
+from copy import deepcopy
 from enum import Enum
 from typing import List, Union
 
@@ -60,13 +62,12 @@ class FeatureGroup:
         if invalid_protocols:
             raise InvalidArgumentError(
                 f"Invalid protocols found: {invalid_protocols}. Each item in 'protocols' should be an instance of the tritonfrontend.Protocols. "
-                f"Valid options are: {[p.name for p in Protocols]}"
+                f"Valid options are: {[str(p) for p in Protocols]}"
             )
         return protocols
 
 
 class RestrictedFeatures:
-    @handle_triton_error
     def __init__(self, groups: List[FeatureGroup] = []):
         self.feature_groups = []
         self.protocols_restricted = set()
@@ -81,14 +82,13 @@ class RestrictedFeatures:
         If collision, raise InvalidArgumentError().
         If no collision, add group to feature_groups
         """
-        for protocols in group.protocols:
-            if protocols in self.protocols_restricted:
+        for protocol in group.protocols:
+            if protocol in self.protocols_restricted:
                 raise InvalidArgumentError(
-                    "A given protocol can only belong to one group."
+                    "A given protocol can only belong to one group. {str(protocol)} already belongs to a group."
                 )
 
         self.protocols_restricted.update(group.protocols)
-
         self.feature_groups.append(group)
 
     @handle_triton_error
@@ -98,5 +98,14 @@ class RestrictedFeatures:
 
     @handle_triton_error
     def __repr__(self) -> str:
-        # Needs to convert data to a json.
-        return ""
+        # Dataclass_Instance.__dict__ provides shallow copy, so need a deep copy IF modifying
+        rfeat_data = [
+            deepcopy(feat_group.__dict__) for feat_group in self.feature_groups
+        ]
+
+        for idx in range(len(rfeat_data)):
+            rfeat_data[idx]["protocols"] = [
+                feat.value for feat in rfeat_data[idx]["protocols"]
+            ]
+
+        return json.dumps(rfeat_data, indent=2)
