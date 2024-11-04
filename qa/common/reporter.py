@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,6 +47,8 @@ ENVS = [
     "CUDNN_VERSION",
     "CUBLAS_VERSION",
     "BENCHMARK_PIPELINE",
+    "BENCHMARK_JOB_ID",
+    "BENCHMARK_NIGHTLY_TAG",
     "BENCHMARK_REPO_BRANCH",
     "BENCHMARK_REPO_COMMIT",
     "BENCHMARK_CLUSTER",
