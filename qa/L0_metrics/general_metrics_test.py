@@ -66,8 +66,11 @@ def load_model_explicit(model_name, server_url="http://localhost:8000"):
         self.assertEqual(response.status_code, 200)
         print(f"Model '{model_name}' loaded successfully.")
     except AssertionError:
-        print(f"Failed to load model '{model_name}'. Status code: {response.status_code}")
+        print(
+            f"Failed to load model '{model_name}'. Status code: {response.status_code}"
+        )
         print("Response:", response.text)
+
 
 def unload_model_explicit(model_name, server_url="http://localhost:8000"):
     endpoint = f"{server_url}/v2/repository/models/{model_name}/unload"
