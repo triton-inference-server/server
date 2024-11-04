@@ -76,7 +76,7 @@ TRITON_VERSION_MAP = {
         "1.19.2",  # ORT
         "2024.4.0",  # ORT OpenVINO
         "2024.4.0",  # Standalone OpenVINO
-        "3.2.6",  # DCGM version
+        "3.3.6",  # DCGM version
         "0.5.5",  # vLLM version
         "3.12.3",  # RHEL Python version
     )
@@ -886,7 +886,7 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
@@ -899,7 +899,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \\
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
@@ -1036,6 +1036,7 @@ SHELL ["cmd", "/S", "/C"]
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Install docker docker buildx
 RUN apt-get update \\
@@ -1072,6 +1073,7 @@ RUN apt-get update \\
             patchelf \\
             python3-dev \\
             python3-pip \\
+            python3-wheel \\
             python3-setuptools \\
             rapidjson-dev \\
             scons \\
@@ -1086,10 +1088,7 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip \\
-      && pip3 install --upgrade \\
-          wheel \\
-          setuptools \\
+RUN pip3 install --upgrade \\
           docker \\
           virtualenv
 
@@ -1107,7 +1106,7 @@ RUN apt update -q=2 \\
       && . /etc/os-release \\
       && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
       && apt-get update -q=2 \\
-      && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
+      && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 """
 
         if FLAGS.enable_gpu:
@@ -1310,6 +1309,7 @@ ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 # artifacts copied below are assign to this user.
 ENV TRITON_SERVER_USER=triton-server
 RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
+      && userdel ubuntu > /dev/null 2>&1 || true \\
       && if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \\
           useradd $TRITON_SERVER_USER; \\
         fi \\
@@ -1356,7 +1356,6 @@ RUN apt-get update \\
               libgoogle-perftools-dev \\
               libjemalloc-dev \\
               libnuma-dev \\
-              libre2-9 \\
               software-properties-common \\
               wget \\
               {backend_dependencies} \\
@@ -1404,7 +1403,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-# python3 and some pip installs required for the python backend
+ENV PIP_BREAK_SYSTEM_PACKAGES=1  
+# python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
         openssl-devel \\
@@ -1424,16 +1424,17 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-# python3 and some pip installs required for the python backend
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+# python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
             libarchive-dev \\
+            python3-pip \\
+            python3-wheel \\
+            python3-setuptools \\
             libpython3-dev \\
-      && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
-            wheel \\
-            setuptools \\
             \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
@@ -1636,7 +1637,7 @@ def create_build_dockerfiles(
             FLAGS.upstream_container_version
         )
     else:
-        base_image = "ubuntu:22.04"
+        base_image = "ubuntu:24.04"
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,

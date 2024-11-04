@@ -43,7 +43,6 @@ else
         curl
 fi
 
-pip3 install --upgrade pip
 # install client libraries
 pip3 install tritonclient[all]
 
