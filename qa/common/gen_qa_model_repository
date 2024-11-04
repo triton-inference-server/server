@@ -57,6 +57,9 @@ ONNX_OPSET=0
 # OPENVINO version
 OPENVINO_VERSION=2023.3.0
 
+#TRT_VERSION
+TRT_VERSION=${TRT_VERSION:-10.5.0.18}
+
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf2-py3}
@@ -361,7 +364,7 @@ python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VA
 chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
-if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
+if [ -z "$MODEL_TYPE" ] ||  { [ "$MODEL_TYPE" != "igpu" ] && [ "$MODEL_TYPE" != "V100" ]; }; then
   python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
   chmod -R 777 $TORCHTRTDESTDIR
 fi
@@ -513,9 +516,7 @@ python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDI
 chmod -R 777 $DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
 
-docker pull ${TENSORRT_IMAGE}
-TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
-(git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git && \
+(git clone -b release/$(echo ${TRT_VERSION} | cut -d '.' -f 1-2) https://github.com/NVIDIA/TensorRT.git && \
 cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
 cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
 LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
@@ -528,26 +529,28 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
-       --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
-       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
-       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
-       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
-       --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
-       --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
-       --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
-       --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
-       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
-       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
-       --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
-       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
-       --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
-       --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
-       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
-       --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
-       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
-       $TENSORRT_IMAGE
+if [ -z "$MODEL_TYPE" ] ||   [ "$MODEL_TYPE" != "V100" ]; then
+    docker pull $TENSORRT_IMAGE
+    docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
+        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+        --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
+        --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
+        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
+        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
+        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
+        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+        --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+        --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
+        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+        --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
+        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
+        $TENSORRT_IMAGE
+fi
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
