@@ -257,6 +257,12 @@ model_metrics {
   ]
 }
 ```
+
+> **Note**
+>
+> To apply changes to metric options dynamically, the model must be completely
+> unloaded and then reloaded for the updates to take effect.
+
 Currently, the following histogram families support custom buckets.
 ```
 nv_inference_first_response_histogram_ms  // Time to First Response

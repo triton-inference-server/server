@@ -1,1 +1,1 @@
-Metric family 'nv_inference_request_success' in 'model_identifier' is not a Triton core metric.
+Metric family 'nv_inference_request_success' in 'metric_identifier' is not a Triton core metric.
