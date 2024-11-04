@@ -469,7 +469,7 @@ cp -r "${MODELDIR}"/async_execute_decouple "${MODELDIR}"/async_execute
 sed -i "s/model_transaction_policy { decoupled: True }//" "${MODELDIR}"/async_execute/config.pbtxt
 
 run_and_check_server
-python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_ensemble_decoupled 2>&1 | tee ${CLIENT_LOG}
+python3 ${HISTOGRAM_PYTEST} TestHistogramMetrics.test_ensemble_decoupled 2>&1 | tee ${CLIENT_LOG}
 kill_server
 check_unit_test
 
@@ -478,7 +478,6 @@ MODELDIR="${PWD}/model_metrics_model"
 SERVER_LOG="./model_metric_config_server.log"
 CLIENT_LOG="./model_metric_config_client.log"
 decoupled_model="async_execute_decouple"
-SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=true --log-verbose=1"
 rm -rf "${MODELDIR}/${decoupled_model}"
 mkdir -p "${MODELDIR}/${decoupled_model}/1/"
 cp ../python_models/${decoupled_model}/model.py ${MODELDIR}/${decoupled_model}/1/
@@ -500,9 +499,17 @@ model_metrics {
 }
 EOL
 
+SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=true --log-verbose=1"
 run_and_check_server
 export OVERRIDE_BUCKETS="-1,0,1,2.5,+Inf"
-python3 ${HISTOGRAM_PYTEST} HistogramMetricsTest.test_buckets_override 2>&1 | tee ${CLIENT_LOG}
+python3 ${HISTOGRAM_PYTEST} TestHistogramMetrics.test_buckets_override 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Test valid model_metrics config with histogram disabled
+SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=false --log-verbose=1"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 

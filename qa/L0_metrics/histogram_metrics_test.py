@@ -54,7 +54,7 @@ def get_histogram_metric_key(
         return None
 
 
-class HistogramMetricsTest(tu.TestResultCollector):
+class TestHistogramMetrics(tu.TestResultCollector):
     def setUp(self):
         self.tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
