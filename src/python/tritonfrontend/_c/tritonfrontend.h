@@ -183,15 +183,6 @@ class TritonFrontend {
 
     std::string restricted_info;
     ThrowIfError(GetValue(data, map_key, &restricted_info));
-
-    if (restricted_info.length() != 0) {
-      triton::server::TritonParser tp;
-
-      tp.ParseRestrictedFeatureOption(
-          restricted_info, option_name, key_prefix, feature_type,
-          restricted_features);
-    }
-  }
+  };
 };
-
 }}}  // namespace triton::server::python
