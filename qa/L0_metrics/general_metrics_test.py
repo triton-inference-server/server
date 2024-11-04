@@ -62,25 +62,22 @@ def get_model_load_times():
 def load_model_explicit(model_name, server_url="http://localhost:8000"):
     endpoint = f"{server_url}/v2/repository/models/{model_name}/load"
     response = requests.post(endpoint)
-
-    if response.status_code == 200:
+    try:
+        self.assertEqual(response.status_code, 200)
         print(f"Model '{model_name}' loaded successfully.")
-    else:
-        print(
-            f"Failed to load model '{model_name}'. Status code: {response.status_code}"
-        )
+    except AssertionError:
+        print(f"Failed to load model '{model_name}'. Status code: {response.status_code}")
         print("Response:", response.text)
-
 
 def unload_model_explicit(model_name, server_url="http://localhost:8000"):
     endpoint = f"{server_url}/v2/repository/models/{model_name}/unload"
     response = requests.post(endpoint)
-
-    if response.status_code == 200:
+    try:
+        self.assertEqual(response.status_code, 200)
         print(f"Model '{model_name}' unloaded successfully.")
-    else:
+    except AssertionError:
         print(
-            f"Failed to load model '{model_name}'. Status code: {response.status_code}"
+            f"Failed to unload model '{model_name}'. Status code: {response.status_code}"
         )
         print("Response:", response.text)
 
