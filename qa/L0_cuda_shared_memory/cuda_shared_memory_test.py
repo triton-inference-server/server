@@ -49,6 +49,10 @@ class CudaSharedMemoryTestBase(tu.TestResultCollector):
 
     def setUp(self):
         self._setup_client()
+        self._shm_handles = []
+
+    def tearDown(self):
+        self._cleanup_shm_handles()
 
     def _setup_client(self):
         self.protocol = os.environ.get("CLIENT_TYPE", "http")
@@ -89,6 +93,7 @@ class CudaSharedMemoryTestBase(tu.TestResultCollector):
 
         """
 
+        self._cleanup_shm_handles()
         shm_ip0_handle = cshm.create_shared_memory_region(
             "input0_data", create_byte_size, device_id
         )
@@ -131,21 +136,28 @@ class CudaSharedMemoryTestBase(tu.TestResultCollector):
             device_id,
             register_byte_size,
         )
-        return [shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle]
+        self._shm_handles = [
+            shm_ip0_handle,
+            shm_ip1_handle,
+            shm_op0_handle,
+            shm_op1_handle,
+        ]
 
-    def _cleanup_server(self, shm_handles):
-        for shm_handle in shm_handles:
+    def _cleanup_shm_handles(self):
+        for shm_handle in self._shm_handles:
             cshm.destroy_shared_memory_region(shm_handle)
+        self._shm_handles = []
 
 
 class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region
-        try:
-            shm_op0_handle = cshm.create_shared_memory_region("dummy_data", -1, 0)
-            cshm.destroy_shared_memory_region(shm_op0_handle)
-        except Exception as ex:
-            self.assertEqual(str(ex), "unable to create cuda shared memory handle")
+        with self.assertRaisesRegex(
+            cshm.SharedMemoryException, "unable to create cuda shared memory handle"
+        ):
+            self._shm_handles.append(
+                cshm.create_shared_memory_region("dummy_data", -1, 0)
+            )
 
     def test_valid_create_set_register(self):
         # Create a valid cuda shared memory region, fill data in it and register
@@ -212,14 +224,14 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
     def test_unregister_after_inference(self):
         # Unregister after inference
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
-            shm_handles[1],
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[0],
+            self._shm_handles[1],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             protocol=self.protocol,
             use_cuda_shared_memory=True,
@@ -233,19 +245,19 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
             self.assertEqual(len(shm_status), 3)
         else:
             self.assertEqual(len(shm_status.regions), 3)
-        self._cleanup_server(shm_handles)
+        self._cleanup_shm_handles()
 
     def test_register_after_inference(self):
         # Register after inference
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
-            shm_handles[1],
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[0],
+            self._shm_handles[1],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             protocol=self.protocol,
             use_cuda_shared_memory=True,
@@ -261,13 +273,13 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
             self.assertEqual(len(shm_status), 5)
         else:
             self.assertEqual(len(shm_status.regions), 5)
-        shm_handles.append(shm_ip2_handle)
-        self._cleanup_server(shm_handles)
+        self._shm_handles.append(shm_ip2_handle)
+        self._cleanup_shm_handles()
 
     def test_too_big_shm(self):
         # Shared memory input region larger than needed - Throws error
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         shm_ip2_handle = cshm.create_shared_memory_region("input2_data", 128, 0)
         self.triton_client.register_cuda_shared_memory(
             "input2_data", cshm.get_raw_handle(shm_ip2_handle), 0, 128
@@ -275,10 +287,10 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
+            self._shm_handles[0],
             shm_ip2_handle,
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             big_shm_name="input2_data",
             big_shm_size=128,
@@ -290,21 +302,21 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
                 "input byte size mismatch for input 'INPUT1' for model 'simple'. Expected 64, got 128",
                 error_msg[-1],
             )
-        shm_handles.append(shm_ip2_handle)
-        self._cleanup_server(shm_handles)
+        self._shm_handles.append(shm_ip2_handle)
+        self._cleanup_shm_handles()
 
     def test_mixed_raw_shm(self):
         # Mix of shared memory and RAW inputs
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         input1_data = np.ones(shape=16, dtype=np.int32)
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
+            self._shm_handles[0],
             [input1_data],
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             protocol=self.protocol,
             use_cuda_shared_memory=True,
@@ -312,11 +324,11 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
 
         if len(error_msg) > 0:
             raise Exception(error_msg[-1])
-        self._cleanup_server(shm_handles)
+        self._cleanup_shm_handles()
 
     def test_unregisterall(self):
         # Unregister all shared memory blocks
-        shm_handles = self._configure_server()
+        self._configure_server()
         status_before = self.triton_client.get_cuda_shared_memory_status()
         if self.protocol == "http":
             self.assertEqual(len(status_before), 4)
@@ -328,7 +340,7 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
             self.assertEqual(len(status_after), 0)
         else:
             self.assertEqual(len(status_after.regions), 0)
-        self._cleanup_server(shm_handles)
+        self._cleanup_shm_handles()
 
     def test_register_out_of_bound(self):
         create_byte_size = self.DEFAULT_SHM_BYTE_SIZE
@@ -345,7 +357,7 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
     def test_infer_offset_out_of_bound(self):
         # CUDA Shared memory offset outside output region - Throws error
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         if self.protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
@@ -357,10 +369,10 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
-            shm_handles[1],
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[0],
+            self._shm_handles[1],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             shm_output_offset=offset,
             protocol=self.protocol,
@@ -370,22 +382,22 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
 
         self.assertEqual(len(error_msg), 1)
         self.assertIn("Invalid offset for shared memory region", error_msg[0])
-        self._cleanup_server(shm_handles)
+        self._cleanup_shm_handles()
 
     def test_infer_byte_size_out_of_bound(self):
         # Shared memory byte_size outside output region - Throws error
         error_msg = []
-        shm_handles = self._configure_server()
+        self._configure_server()
         offset = 60
         byte_size = self.DEFAULT_SHM_BYTE_SIZE
 
         iu.shm_basic_infer(
             self,
             self.triton_client,
-            shm_handles[0],
-            shm_handles[1],
-            shm_handles[2],
-            shm_handles[3],
+            self._shm_handles[0],
+            self._shm_handles[1],
+            self._shm_handles[2],
+            self._shm_handles[3],
             error_msg,
             shm_output_offset=offset,
             shm_output_byte_size=byte_size,
@@ -397,7 +409,7 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
         self.assertIn(
             "Invalid offset + byte size for shared memory region", error_msg[0]
         )
-        self._cleanup_server(shm_handles)
+        self._cleanup_shm_handles()
 
 
 class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
@@ -437,198 +449,182 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             self.assertIn(shm_info["name"], shm_names)
 
     def test_unregister_shm_during_inference_http(self):
-        try:
-            self.triton_client.unregister_cuda_shared_memory()
-            shm_handles = self._configure_server()
-            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
+        self.triton_client.unregister_cuda_shared_memory()
+        self._configure_server()
+        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
-            inputs = [
-                httpclient.InferInput("INPUT0", [1, 16], "INT32"),
-                httpclient.InferInput("INPUT1", [1, 16], "INT32"),
-            ]
-            outputs = [
-                httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
-                httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
-            ]
+        inputs = [
+            httpclient.InferInput("INPUT0", [1, 16], "INT32"),
+            httpclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        outputs = [
+            httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
+            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+        ]
 
-            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
 
-            async_request = self.triton_client.async_infer(
-                model_name="simple", inputs=inputs, outputs=outputs
-            )
+        async_request = self.triton_client.async_infer(
+            model_name="simple", inputs=inputs, outputs=outputs
+        )
 
-            # Ensure inference started
-            time.sleep(2)
+        # Ensure inference started
+        time.sleep(2)
 
-            # Try unregister shm regions during inference
-            self._test_unregister_shm_request_pass(shm_names)
+        # Try unregister shm regions during inference
+        self._test_unregister_shm_request_pass(shm_names)
 
-            # Blocking call
-            async_request.get_result()
+        # Blocking call
+        async_request.get_result()
 
-            # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-            self._test_shm_not_found(shm_names)
-
-        finally:
-            self._cleanup_server(shm_handles)
+        # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
+        self._test_shm_not_found(shm_names)
 
     def test_unregister_shm_after_inference_http(self):
-        try:
-            self.triton_client.unregister_cuda_shared_memory()
-            shm_handles = self._configure_server()
-            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
+        self.triton_client.unregister_cuda_shared_memory()
+        self._configure_server()
+        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
-            inputs = [
-                httpclient.InferInput("INPUT0", [1, 16], "INT32"),
-                httpclient.InferInput("INPUT1", [1, 16], "INT32"),
-            ]
-            outputs = [
-                httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
-                httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
-            ]
+        inputs = [
+            httpclient.InferInput("INPUT0", [1, 16], "INT32"),
+            httpclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        outputs = [
+            httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
+            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+        ]
 
-            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
 
-            async_request = self.triton_client.async_infer(
-                model_name="simple", inputs=inputs, outputs=outputs
-            )
+        async_request = self.triton_client.async_infer(
+            model_name="simple", inputs=inputs, outputs=outputs
+        )
 
-            # Ensure inference started
-            time.sleep(2)
+        # Ensure inference started
+        time.sleep(2)
 
-            # Test all registered shm regions exist during inference.
-            self._test_shm_found(shm_names)
+        # Test all registered shm regions exist during inference.
+        self._test_shm_found(shm_names)
 
-            # Blocking call
-            async_request.get_result()
+        # Blocking call
+        async_request.get_result()
 
-            # Test all registered shm regions exist after inference, as unregister API have not been called.
-            self._test_shm_found(shm_names)
+        # Test all registered shm regions exist after inference, as unregister API have not been called.
+        self._test_shm_found(shm_names)
 
-            # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
-            self.triton_client.unregister_cuda_shared_memory()
-            self._test_shm_not_found(shm_names)
-
-        finally:
-            self._cleanup_server(shm_handles)
+        # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
+        self.triton_client.unregister_cuda_shared_memory()
+        self._test_shm_not_found(shm_names)
 
     def test_unregister_shm_during_inference_grpc(self):
-        try:
-            self.triton_client.unregister_cuda_shared_memory()
-            shm_handles = self._configure_server()
-            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
+        self.triton_client.unregister_cuda_shared_memory()
+        self._configure_server()
+        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
-            inputs = [
-                grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
-                grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
-            ]
-            outputs = [
-                grpcclient.InferRequestedOutput("OUTPUT0"),
-                grpcclient.InferRequestedOutput("OUTPUT1"),
-            ]
+        inputs = [
+            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0"),
+            grpcclient.InferRequestedOutput("OUTPUT1"),
+        ]
 
-            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
 
-            def callback(user_data, result, error):
-                if error:
-                    user_data.append(error)
-                else:
-                    user_data.append(result)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
 
-            user_data = []
+        user_data = []
 
-            self.triton_client.async_infer(
-                model_name="simple",
-                inputs=inputs,
-                outputs=outputs,
-                callback=partial(callback, user_data),
-            )
+        self.triton_client.async_infer(
+            model_name="simple",
+            inputs=inputs,
+            outputs=outputs,
+            callback=partial(callback, user_data),
+        )
 
-            # Ensure inference started
-            time.sleep(2)
+        # Ensure inference started
+        time.sleep(2)
 
-            # Try unregister shm regions during inference
-            self._test_unregister_shm_request_pass(shm_names)
+        # Try unregister shm regions during inference
+        self._test_unregister_shm_request_pass(shm_names)
 
-            # Wait until the results are available in user_data
-            time_out = 20
-            while (len(user_data) == 0) and time_out > 0:
-                time_out = time_out - 1
-                time.sleep(1)
-            time.sleep(2)
+        # Wait until the results are available in user_data
+        time_out = 20
+        while (len(user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+        time.sleep(2)
 
-            # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-            self._test_shm_not_found(shm_names)
-
-        finally:
-            self._cleanup_server(shm_handles)
+        # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
+        self._test_shm_not_found(shm_names)
 
     def test_unregister_shm_after_inference_grpc(self):
-        try:
-            self.triton_client.unregister_cuda_shared_memory()
-            shm_handles = self._configure_server()
-            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
+        self.triton_client.unregister_cuda_shared_memory()
+        self._configure_server()
+        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
-            inputs = [
-                grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
-                grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
-            ]
-            outputs = [
-                grpcclient.InferRequestedOutput("OUTPUT0"),
-                grpcclient.InferRequestedOutput("OUTPUT1"),
-            ]
+        inputs = [
+            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0"),
+            grpcclient.InferRequestedOutput("OUTPUT1"),
+        ]
 
-            inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-            outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
 
-            def callback(user_data, result, error):
-                if error:
-                    user_data.append(error)
-                else:
-                    user_data.append(result)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
 
-            user_data = []
+        user_data = []
 
-            self.triton_client.async_infer(
-                model_name="simple",
-                inputs=inputs,
-                outputs=outputs,
-                callback=partial(callback, user_data),
-            )
+        self.triton_client.async_infer(
+            model_name="simple",
+            inputs=inputs,
+            outputs=outputs,
+            callback=partial(callback, user_data),
+        )
 
-            # Ensure inference started
-            time.sleep(2)
+        # Ensure inference started
+        time.sleep(2)
 
-            # Test all registered shm regions exist during inference.
-            self._test_shm_found(shm_names)
+        # Test all registered shm regions exist during inference.
+        self._test_shm_found(shm_names)
 
-            # Wait until the results are available in user_data
-            time_out = 20
-            while (len(user_data) == 0) and time_out > 0:
-                time_out = time_out - 1
-                time.sleep(1)
-            time.sleep(2)
+        # Wait until the results are available in user_data
+        time_out = 20
+        while (len(user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+        time.sleep(2)
 
-            # Test all registered shm regions exist after inference, as unregister API have not been called.
-            self._test_shm_found(shm_names)
+        # Test all registered shm regions exist after inference, as unregister API have not been called.
+        self._test_shm_found(shm_names)
 
-            # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
-            self.triton_client.unregister_cuda_shared_memory()
-            self._test_shm_not_found(shm_names)
-
-        finally:
-            self._cleanup_server(shm_handles)
+        # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
+        self.triton_client.unregister_cuda_shared_memory()
+        self._test_shm_not_found(shm_names)
 
 
 if __name__ == "__main__":
