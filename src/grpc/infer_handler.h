@@ -1303,9 +1303,13 @@ class InferHandler : public HandlerBase {
         shm_regions_info_.pop_back();
 
         if (awaiting_unregister) {
-          auto err = shm_manager_->Unregister(shm_name, shm_memory_type);
-          if (err != nullptr) {
-            LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
+          if (shm_manager_ != nullptr) {
+            auto err = shm_manager_->Unregister(shm_name, shm_memory_type);
+            if (err != nullptr) {
+              LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
+            }
+          } else {
+            LOG_VERBOSE(1) << "Shared memory manager is not available";
           }
         }
       }

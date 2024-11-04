@@ -401,36 +401,46 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
 
 
 class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
-    def _test_unregister_shm_request_pass(self):
-        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
-
-        status_before_unregister = second_client.get_cuda_shared_memory_status()
-        self.assertEqual(len(status_before_unregister), 4)
+    def _test_unregister_shm_request_pass(self, shm_names):
+        self._test_shm_found(shm_names)
 
         # Unregister all should not result in an error.
         # If shared memory regions are in use, they will be marked and unregistered after the inference is completed.
-        second_client.unregister_cuda_shared_memory()
+        with httpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        ) as second_client:
+            second_client.unregister_cuda_shared_memory()
 
         # Number of shared memory regions should be the same as the inference is not completed yet
-        status_after_unregister = second_client.get_cuda_shared_memory_status()
-        self.assertEqual(len(status_after_unregister), 4)
+        self._test_shm_found(shm_names)
 
-    def _test_shm_not_found(self):
+    def _test_shm_not_found(self, shm_names):
+        self.assertGreater(len(shm_names), 0)
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+
+        for shm_name in shm_names:
+            with self.assertRaises(InferenceServerException) as ex:
+                second_client.get_cuda_shared_memory_status(shm_name)
+                self.assertIn(
+                    f"Unable to find cuda shared memory region: '{shm_name}'",
+                    str(ex.exception),
+                )
+
+    def _test_shm_found(self, shm_names):
+        self.assertGreater(len(shm_names), 0)
         second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
 
         status = second_client.get_cuda_shared_memory_status()
-        self.assertEqual(len(status), 0)
+        self.assertEqual(len(status), len(shm_names))
 
-    def _test_shm_found(self):
-        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
-
-        status = second_client.get_cuda_shared_memory_status()
-        self.assertEqual(len(status), 4)
+        for shm_info in status:
+            self.assertIn(shm_info["name"], shm_names)
 
     def test_unregister_shm_during_inference_http(self):
         try:
             self.triton_client.unregister_cuda_shared_memory()
             shm_handles = self._configure_server()
+            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
             inputs = [
                 httpclient.InferInput("INPUT0", [1, 16], "INT32"),
@@ -454,13 +464,13 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Try unregister shm regions during inference
-            self._test_unregister_shm_request_pass()
+            self._test_unregister_shm_request_pass(shm_names)
 
             # Blocking call
             async_request.get_result()
 
             # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-            self._test_shm_not_found()
+            self._test_shm_not_found(shm_names)
 
         finally:
             self._cleanup_server(shm_handles)
@@ -469,6 +479,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
         try:
             self.triton_client.unregister_cuda_shared_memory()
             shm_handles = self._configure_server()
+            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
             inputs = [
                 httpclient.InferInput("INPUT0", [1, 16], "INT32"),
@@ -492,17 +503,17 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Test all registered shm regions exist during inference.
-            self._test_shm_found()
+            self._test_shm_found(shm_names)
 
             # Blocking call
             async_request.get_result()
 
             # Test all registered shm regions exist after inference, as unregister API have not been called.
-            self._test_shm_found()
+            self._test_shm_found(shm_names)
 
             # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
             self.triton_client.unregister_cuda_shared_memory()
-            self._test_shm_not_found()
+            self._test_shm_not_found(shm_names)
 
         finally:
             self._cleanup_server(shm_handles)
@@ -511,6 +522,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
         try:
             self.triton_client.unregister_cuda_shared_memory()
             shm_handles = self._configure_server()
+            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
             inputs = [
                 grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
@@ -545,7 +557,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Try unregister shm regions during inference
-            self._test_unregister_shm_request_pass()
+            self._test_unregister_shm_request_pass(shm_names)
 
             # Wait until the results are available in user_data
             time_out = 20
@@ -555,7 +567,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-            self._test_shm_not_found()
+            self._test_shm_not_found(shm_names)
 
         finally:
             self._cleanup_server(shm_handles)
@@ -564,6 +576,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
         try:
             self.triton_client.unregister_cuda_shared_memory()
             shm_handles = self._configure_server()
+            shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
             inputs = [
                 grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
@@ -598,7 +611,7 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Test all registered shm regions exist during inference.
-            self._test_shm_found()
+            self._test_shm_found(shm_names)
 
             # Wait until the results are available in user_data
             time_out = 20
@@ -608,11 +621,11 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
             time.sleep(2)
 
             # Test all registered shm regions exist after inference, as unregister API have not been called.
-            self._test_shm_found()
+            self._test_shm_found(shm_names)
 
             # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
             self.triton_client.unregister_cuda_shared_memory()
-            self._test_shm_not_found()
+            self._test_shm_not_found(shm_names)
 
         finally:
             self._cleanup_server(shm_handles)
