@@ -54,7 +54,8 @@ ERROR_MAPPING = {
 def handle_triton_error(func):
     def error_handling_wrapper(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return_val = func(*args, **kwargs)
+            return return_val
         except TritonError:
             exc_type, exc_value, _ = sys.exc_info()
             # raise ... from None masks the tritonfrontend Error from being added in traceback
