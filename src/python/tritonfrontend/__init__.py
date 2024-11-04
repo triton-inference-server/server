@@ -29,6 +29,8 @@
 import builtins
 from importlib.metadata import PackageNotFoundError, version
 
+from tritonfrontend._api import FeatureGroup, Protocols, RestrictedFeatures
+
 try:
     from tritonfrontend._api import KServeHttp
 except ImportError:

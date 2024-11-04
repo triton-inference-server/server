@@ -44,3 +44,6 @@ except ImportError:
     # TRITON_ENABLE_Metrics=OFF
     # TritonFrontendMetrics Package was not present
     pass
+
+
+from ._restricted_features import FeatureGroup, Protocols, RestrictedFeatures

@@ -34,7 +34,14 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
-from tritonfrontend import KServeGrpc, KServeHttp, Metrics
+from tritonfrontend import (
+    FeatureGroup,
+    KServeGrpc,
+    KServeHttp,
+    Metrics,
+    Protocols,
+    RestrictedFeatures,
+)
 
 
 class TestHttpOptions:
@@ -356,6 +363,16 @@ class TestKServe:
         utils.teardown_service(grpc_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
+    def test_restricted_features(self, frontend, client_type, url):
+        server = utils.setup_server()
+
+        # Specifying Restricted Features
+        rest_group = FeatureGroup(key="", value="", protocols=[Protocols.HEALTH])
+        restricted_feat = RestrictedFeatures(FeatureGroup)
+
+        service = utils.setup_service(server, frontend)
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date
