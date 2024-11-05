@@ -1403,9 +1403,10 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-# python3 and some pip installs required for the python backend
+# python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
+        python3-pip \\
         openssl-devel \\
         readline-devel
 """
@@ -1423,11 +1424,12 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-# python3 and some pip installs required for the python backend
+# python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
             libarchive-dev \\
+            python3-pip \\
             libpython3-dev \\
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
