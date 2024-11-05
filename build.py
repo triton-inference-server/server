@@ -1213,6 +1213,10 @@ COPY --chown=1000:1000 build/install tritonserver
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
+RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all] && \
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonfrontend-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
@@ -1328,6 +1332,7 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
+        python3-pip \\
         numactl-devel
 """
     else:
@@ -1352,6 +1357,7 @@ RUN apt-get update \\
               libre2-9 \\
               software-properties-common \\
               wget \\
+              python3-pip \\
               {backend_dependencies} \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
@@ -1395,10 +1401,9 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
-        python3-pip \\
         openssl-devel \\
         readline-devel
 """
@@ -1416,12 +1421,11 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
             libarchive-dev \\
-            python3-pip \\
             libpython3-dev \\
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
