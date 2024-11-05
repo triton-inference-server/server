@@ -1323,7 +1323,7 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
 
     if target_platform() == "rhel":
         df += """
-# Common dpeendencies.
+# Common dependencies.
 RUN yum install -y \\
         git \\
         gperf \\
@@ -1335,7 +1335,6 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
-        python3-pip \\
         numactl-devel
 """
     else:
