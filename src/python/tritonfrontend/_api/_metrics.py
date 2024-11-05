@@ -33,38 +33,34 @@ from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
-    TritonFrontendHttp,
+    TritonFrontendMetrics,
 )
 
 
-class KServeHttp:
+class Metrics:
     @dataclass
     class Options:
         address: str = "0.0.0.0"
-        port: int = Field(8000, ge=0, le=65535)
-        reuse_port: bool = False
-        thread_count: int = Field(8, gt=0)
-        header_forward_pattern: str = ""
-        # DLIS-7215: Add restricted protocol support
-        # restricted_protocols: list
+        port: int = Field(8002, ge=0, le=65535)
+        thread_count: int = Field(1, gt=0)
 
     @handle_triton_error
-    def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
+    def __init__(self, server: tritonserver, options: "Metrics.Options" = None):
         server_ptr = server._ptr()  # TRITONSERVER_Server pointer
 
         # If no options provided, default options are selected
         if options is None:
-            options = KServeHttp.Options()
+            options = Metrics.Options()
 
-        if not isinstance(options, KServeHttp.Options):
+        if not isinstance(options, Metrics.Options):
             raise InvalidArgumentError(
-                "Incorrect type for options. options argument must be of type KServeHttp.Options"
+                "Incorrect type for options. options argument must be of type Metrics.Options"
             )
 
         # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
         options_dict: dict[str, Union[int, bool, str]] = options.__dict__
 
-        self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
+        self.triton_frontend = TritonFrontendMetrics(server_ptr, options_dict)
 
     def __enter__(self):
         self.triton_frontend.start()
