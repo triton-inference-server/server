@@ -29,7 +29,7 @@ from copy import deepcopy
 from enum import Enum
 from typing import List, Union
 
-from pydantic import FieldValidationInfo, field_validator
+from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import InvalidArgumentError
@@ -99,7 +99,7 @@ class RestrictedFeatures:
         self.add_feature_group(group)
 
     @handle_triton_error
-    def __repr__(self) -> str:
+    def _gather_rest_data(self) -> dict:
         # Dataclass_Instance.__dict__ provides shallow copy, so need a deep copy IF modifying
         rfeat_data = [
             deepcopy(feat_group.__dict__) for feat_group in self.feature_groups
@@ -110,4 +110,16 @@ class RestrictedFeatures:
                 feat.value for feat in rfeat_data[idx]["protocols"]
             ]
 
-        return json.dumps(rfeat_data, indent=2)
+        return rfeat_data
+
+    def __str__(self) -> str:
+        """
+        A function to retrieve user-friendly string to view object contents.
+        """
+        return json.dumps(self._gather_rest_data(), indent=2)
+
+    def __repr__(self) -> str:
+        """
+        A function to retrieve representation that has not been formatted.
+        """
+        return json.dumps(self._gather_rest_data())
