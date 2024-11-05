@@ -507,6 +507,7 @@ check_unit_test
 kill_server
 
 # Test valid model_metrics config with histogram disabled
+PYTHON_TEST="metrics_config_test.py"
 SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=false --log-verbose=1"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
