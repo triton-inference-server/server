@@ -1213,10 +1213,13 @@ COPY --chown=1000:1000 build/install tritonserver
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \
-    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all] && \
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \
-    "tritonfrontend-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
+RUN apt-get update && \\
+    apt-get install python3-pip -y && \\
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    apt-get remove python3-pip -y
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
@@ -1357,7 +1360,6 @@ RUN apt-get update \\
               libre2-9 \\
               software-properties-common \\
               wget \\
-              python3-pip \\
               {backend_dependencies} \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
