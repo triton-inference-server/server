@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include <rapidjson/document.h>
+
 #include <memory>  // For shared_ptr
 #include <type_traits>
 #include <unordered_map>
@@ -35,6 +37,7 @@
 #include "../../../restricted_features.h"
 #include "../../../shared_memory_manager.h"
 #include "../../../tracer.h"
+
 
 #ifdef TRITON_ENABLE_GRPC
 #include "../../../grpc/grpc_server.h"
