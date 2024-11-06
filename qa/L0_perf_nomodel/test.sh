@@ -173,7 +173,6 @@ TEST_PROTOCOLS+=(
     grpc
     http
     )
-fi
 TEST_BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
 
 mkdir -p ${REPO_VERSION}
