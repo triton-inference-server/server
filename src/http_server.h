@@ -559,6 +559,11 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str, bool streaming);
 
+  // Helper function to set get the KV-cache utilization metrics for the 
+  // infer response header
+  std::string ExtractKVMetrics(
+      const std::string& prometheus_metrics);
+
   // 'meta_data_root' is the root JSON document for 'input_metadata'.
   // In TritonJson, the Value objects are references to the root document.
   // Therefore the document must stay valid.
