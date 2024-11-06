@@ -161,7 +161,6 @@ set -e
 
 # Test 4 for explicit mode LOAD and UNLOAD with multiple versions
 set +e
-CLIENT_PY="./general_metrics_test.py"
 VERSION_DIR="${PWD}/version_models"
 SERVER_ARGS="$BASE_SERVER_ARGS --model-repository=${VERSION_DIR} --model-control-mode=explicit --log-verbose=1"
 run_and_check_server
