@@ -26,26 +26,31 @@
 
 #pragma once
 
-#include <rapidjson/document.h>
 
 #include <memory>  // For shared_ptr
-#include <type_traits>
 #include <unordered_map>
 #include <variant>
-
-#include "../../../common.h"
-#include "../../../restricted_features.h"
-#include "../../../shared_memory_manager.h"
-#include "../../../tracer.h"
 
 
 #ifdef TRITON_ENABLE_GRPC
 #include "../../../grpc/grpc_server.h"
 #endif
 
+
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "../../../http_server.h"
 #endif
+
+
+#include <rapidjson/document.h>
+
+#include "../../../common.h"
+#include "../../../restricted_features.h"
+#include "../../../shared_memory_manager.h"
+#include "../../../tracer.h"
+#include "triton/common/logging.h"
+#include "triton/core/tritonserver.h"
+
 
 struct TRITONSERVER_Server {};
 
@@ -163,7 +168,7 @@ class TritonFrontend {
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
 
-  void _populate_restricted_features(UnorderedMapType& data)
+  static void _populate_restricted_features(UnorderedMapType& data)
   {
     std::string map_key;  // Name of option in UnorderedMap
 
@@ -186,6 +191,13 @@ class TritonFrontend {
 
     std::string restricted_info;
     ThrowIfError(GetValue(data, map_key, &restricted_info));
+
+    triton::common::TritonJson::Value json_value;
+    TRITONSERVER_Error* err = json_value.Parse(restricted_info);
+    ThrowIfError(err);
+
+    size_t array_size = json_value.ArraySize();
+    std::cout << "ARRAY SIZE " << array_size << std::endl;
   };
 };
 }}}  // namespace triton::server::python

@@ -67,6 +67,10 @@ set(
 
 set(PY_BINDING_DEPENDENCY_LIBS)
 
+list(APPEND PY_BINDING_DEPENDENCY_LIBS
+      triton-common-json
+    )
+
 # Conditional Linking Based on Flags
 if(${TRITON_ENABLE_HTTP})
   list(APPEND PY_BINDING_DEPENDENCY_LIBS
