@@ -1216,7 +1216,8 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all] \\
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
