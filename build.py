@@ -1213,10 +1213,11 @@ COPY --chown=1000:1000 build/install tritonserver
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \
-    "tritonserver-*.whl" | xargs -I {} pip3 install --upgrade {}[all] && \
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \
-    "tritonfrontend-*.whl" | xargs -I {} pip3 install --upgrade {}[all]
+RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
@@ -1320,7 +1321,7 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
 
     if target_platform() == "rhel":
         df += """
-# Common dpeendencies.
+# Common dependencies.
 RUN yum install -y \\
         git \\
         gperf \\
@@ -1334,6 +1335,7 @@ RUN yum install -y \\
         wget \\
         python3-pip \\
         numactl-devel
+
 """
     else:
         df += """
@@ -1357,8 +1359,9 @@ RUN apt-get update \\
               libre2-9 \\
               software-properties-common \\
               wget \\
-              python3-pip \\
               {backend_dependencies} \\
+              python3-pip \\
+      && python3 -m pip install --upgrade pip \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
             backend_dependencies=backend_dependencies
