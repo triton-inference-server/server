@@ -297,6 +297,11 @@ class HTTPAPIServer : public HTTPServer {
     virtual void SetResponseHeader(
         const bool has_binary_data, const size_t header_length);
 
+    // Helper function to set infer response header in the form specified by
+    // the endpoint protocol
+    virtual std::string ExtractKVMetrics(
+        const std::string& prometheus_metrics);
+
     uint32_t IncrementResponseCount();
 
     // Only used if tracing enabled
