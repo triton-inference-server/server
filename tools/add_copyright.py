@@ -215,7 +215,7 @@ def register(match: Callable[[str], bool]):
 
 @register(
     any_of(
-        has_ext([".py", ".sh", ".bash", ".yaml", ".pbtxt"]),
+        has_ext([".py", ".pyi", ".sh", ".bash", ".yaml", ".pbtxt"]),
         basename_is("CMakeLists.txt"),
         path_contains("Dockerfile"),
     )
