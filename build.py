@@ -1333,8 +1333,9 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
-        numactl-devel \\
-        python3-pip
+        python3-pip \\
+        numactl-devel
+
 """
     else:
         df += """
@@ -1403,7 +1404,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
         openssl-devel \\
@@ -1423,7 +1424,7 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
