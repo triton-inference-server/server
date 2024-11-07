@@ -129,6 +129,7 @@ class TritonFrontend {
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
 
     server_.reset(server_ptr, EmptyDeleter);
+    TritonFrontend::_populate_restricted_features(data);
 
 #ifdef TRITON_ENABLE_HTTP
     if constexpr (std::is_same_v<FrontendServer, HTTPAPIServer>) {
@@ -175,22 +176,30 @@ class TritonFrontend {
     std::string option_name;
     std::string key_prefix;
     std::string feature_type;
-    if (std::is_same_v<Base, triton::server::HTTPServer>) {
+    if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
       map_key = "restricted_apis";
 
       option_name = "http-restricted-api";
       key_prefix = "";
       feature_type = "api";
-    } else if (std::is_same_v<Base, triton::server::grpc::Server>) {
+    } else if (std::is_same_v<FrontendServer, triton::server::grpc::Server>) {
       map_key = "restricted_protocols";
 
       option_name = "grpc-restricted-protocol";
       key_prefix = "triton-grpc-protocol-";
       feature_type = "protocol";
+    } else {
+      // Restricted Features is not supported for this class.
+      return;
     }
 
     std::string restricted_info;
     ThrowIfError(GetValue(data, map_key, &restricted_info));
+    std::cout << "[tritonfrontend.h] Done reading restricted_features json: "
+              << std::endl;
+    std::cout << restricted_info << std::endl;
+    std::cout << "=========================================================="
+              << std::endl;
 
     triton::common::TritonJson::Value json_value;
     TRITONSERVER_Error* err = json_value.Parse(restricted_info);
