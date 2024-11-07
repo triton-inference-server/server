@@ -37,7 +37,7 @@ from tritonfrontend._c.tritonfrontend_bindings import InvalidArgumentError
 
 
 # 1-to-1 copy of RestrictedCategory Enum from https://github.com/triton-inference-server/server/blob/main/src/restricted_features.h
-class Protocols(Enum):
+class Feature(Enum):
     HEALTH = "health"
     METADATA = "metadata"
     INFERENCE = "inference"
@@ -53,50 +53,50 @@ class Protocols(Enum):
 class FeatureGroup:
     key: str
     value: str
-    protocols: List[Protocols]
+    features: List[Feature]
 
-    @field_validator("protocols", mode="before")
-    def validate_protocols(protocols: List[Protocols]) -> List[Protocols]:
-        invalid_protocols = [
-            item for item in protocols if not isinstance(item, Protocols)
-        ]
-        if invalid_protocols:
+    @field_validator("features", mode="before")
+    def validate_features(features: List[Feature]) -> List[Feature]:
+        invalid_features = [item for item in features if not isinstance(item, Feature)]
+        if invalid_features:
             raise tritonserver.InvalidArgumentError(
-                f"Invalid protocols found: {invalid_protocols}. "
-                f"Each item in 'protocols' should be an instance of the tritonfrontend.Protocols. "
-                f"Valid options are: {[str(p) for p in Protocols]}"
+                f"Invalid features found: {invalid_features}. "
+                f"Each item in 'features' should be an instance of the tritonfrontend.Feature. "
+                f"Valid options are: {[str(p) for p in features]}"
             )
-        return protocols
+        return features
 
 
 class RestrictedFeatures:
     def __init__(self, groups: List[FeatureGroup] = []):
         self.feature_groups = []
-        self.protocols_restricted = set()
+        self.features_restricted = set()
 
         for feat_group in groups:
             self.add_feature_group(feat_group)
 
     @handle_triton_error
-    def add_feature_group(self, group: FeatureGroup):
+    def add_feature_group(self, group: FeatureGroup) -> None:
         """
-        Need to check for collision with protocols_restricted.
+        Need to check for collision with features_restricted.
         If collision, raise InvalidArgumentError().
         If no collision, add group to feature_groups
         """
-        for protocol in group.protocols:
-            if protocol in self.protocols_restricted:
+        for feat in group.features:
+            if feat in self.features_restricted:
                 raise InvalidArgumentError(
-                    "A given protocol can only belong to one group."
-                    f"{str(protocol)} already belongs to an existing group."
+                    "A given feature can only belong to one group."
+                    f"{str(feat)} already belongs to an existing group."
                 )
 
-        self.protocols_restricted.update(group.protocols)
+        self.features_restricted.update(group.features)
         self.feature_groups.append(group)
 
     @handle_triton_error
-    def create_feature_group(self, key: str, value: str, protocols: List[Protocols]):
-        group = FeatureGroup(key, value, protocols)
+    def create_feature_group(
+        self, key: str, value: str, features: List[Feature]
+    ) -> None:
+        group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
 
     @handle_triton_error
@@ -107,8 +107,8 @@ class RestrictedFeatures:
         ]
 
         for idx in range(len(rfeat_data)):
-            rfeat_data[idx]["protocols"] = [
-                feat.value for feat in rfeat_data[idx]["protocols"]
+            rfeat_data[idx]["features"] = [
+                feat.value for feat in rfeat_data[idx]["features"]
             ]
 
         return rfeat_data

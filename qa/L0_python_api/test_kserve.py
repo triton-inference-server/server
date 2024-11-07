@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import re
 import time
 from functools import partial
 
@@ -35,11 +36,11 @@ import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
 from tritonfrontend import (
+    Feature,
     FeatureGroup,
     KServeGrpc,
     KServeHttp,
     Metrics,
-    Protocols,
     RestrictedFeatures,
 )
 
@@ -119,63 +120,61 @@ class TestRestrictedFeatureOptions:
     def test_correct_rf_parameters(self):
         # Directly test feature groups
         correct_feature_group = FeatureGroup(
-            key="key", value="val", protocols=[Protocols.HEALTH, Protocols.METADATA]
+            key="key", value="val", features=[Feature.HEALTH, Feature.METADATA]
         )
 
         rf = RestrictedFeatures(groups=[correct_feature_group])
         rf.create_feature_group(
-            key="new-key", value="new-val", protocols=[Protocols.INFERENCE]
+            key="new-key", value="new-val", features=[Feature.INFERENCE]
         )
 
     def test_wrong_rf_parameters(self):
         with pytest.raises(AttributeError):
-            Protocols.health  # Needs to be HEALTH
+            Feature.health  # Needs to be HEALTH
         with pytest.raises(AttributeError):
-            Protocols.infer  # Needs to be INFERENCE
+            Feature.infer  # Needs to be INFERENCE
 
         rf = RestrictedFeatures()
-        # Protocols List needs to be an element from tritonfrontend.Protocols
+        # Features List needs to be an element from tritonfrontend.Feature
         with pytest.raises(tritonserver.InvalidArgumentError):
-            rf.create_feature_group(key="", value="", protocols=["health"])
+            rf.create_feature_group(key="", value="", features=["health"])
+
+        # key and value need to be of type string
         with pytest.raises(Exception):
             rf.create_feature_group(
-                key=42, value="Secret to the Universe", protocols=[Protocols.HEALTH]
+                key=42, value="Secret to the Universe", features=[Feature.HEALTH]
             )
         with pytest.raises(Exception):
-            rf.create_feature_group(key="", value=123, protocols=[Protocols.HEALTH])
+            rf.create_feature_group(key="", value=123, features=[Feature.HEALTH])
 
-        # Test collision of Protocols among individual Feature Groups
+        # Test collision of Features among individual Feature Groups
         with pytest.raises(tritonserver.InvalidArgumentError):
             feature_group = FeatureGroup(
-                key="key", value="val", protocols=[Protocols.METADATA, Protocols.HEALTH]
+                key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
             )
 
             rf = RestrictedFeatures(groups=[feature_group])
-            rf.create_feature_group(
-                key="key2", value="val", protocols=[Protocols.HEALTH]
-            )
+            rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
 
         with pytest.raises(tritonserver.InvalidArgumentError):
             rf = RestrictedFeatures(groups=[feature_group])
             rf.create_feature_group(
-                key="key", value="val", protocols=[Protocols.METADATA, Protocols.HEALTH]
+                key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
             )
-            rf.create_feature_group(
-                key="key2", value="val", protocols=[Protocols.HEALTH]
-            )
+            rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
 
 
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
 GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
-restricted_features = RestrictedFeatures()
-restricted_features.create_feature_group(
-    key="admin-key", value="admin-value", protocols=[Protocols.MODEL_REPOSITORY]
+RESTRICTED_FEATURE_ARG = RestrictedFeatures()
+RESTRICTED_FEATURE_ARG.create_feature_group(
+    key="admin-key", value="admin-value", features=[Feature.MODEL_REPOSITORY]
 )
-restricted_features.create_feature_group(
+RESTRICTED_FEATURE_ARG.create_feature_group(
     key="infer-key",
     value="infer-value",
-    protocols=[Protocols.INFERENCE, Protocols.METADATA],
+    features=[Feature.INFERENCE, Feature.METADATA],
 )
 
 
@@ -427,11 +426,22 @@ class TestKServe:
     def test_http_restricted_features(self, frontend, client_type, url):
         server = utils.setup_server()
         # Specifying Restricted Features
-        http_rf_options = KServeHttp.Options(restricted_apis=restricted_features)
+        http_rf_options = KServeHttp.Options(restricted_apis=RESTRICTED_FEATURE_ARG)
         service = utils.setup_service(server, frontend, options=http_rf_options)
 
+        # Valid headers sent with inference request
         headers = {"infer-key": "infer-value"}
         assert utils.send_and_test_inference_identity(client_type, url, headers)
+
+        # Invalid headers sent with inference request
+        headers = {"fake-key": "fake-value"}
+        with pytest.raises(
+            InferenceServerException,
+            match=re.escape(
+                "[403] This API is restricted, expecting header 'infer-key'"
+            ),
+        ):
+            utils.send_and_test_inference_identity(client_type, url, headers)
 
         utils.teardown_service(service)
         utils.teardown_server(server)
@@ -440,8 +450,25 @@ class TestKServe:
     def test_grpc_restricted_features(self, frontend, client_type, url):
         server = utils.setup_server()
         # Specifying Restricted Features
-        grpc_rf_options = KServeGrpc.Options(restricted_protocols=restricted_features)
+        grpc_rf_options = KServeGrpc.Options(
+            restricted_protocols=RESTRICTED_FEATURE_ARG
+        )
         service = utils.setup_service(server, frontend, options=grpc_rf_options)
+
+        # Valid headers sent with inference request
+        grpc_key_prefix = "triton-grpc-protocol-"
+        headers = {grpc_key_prefix + "infer-key": "infer-value"}
+        assert utils.send_and_test_inference_identity(client_type, url, headers)
+
+        # Invalid headers sent with inference request
+        headers = {grpc_key_prefix + "fake-key": "fake-value"}
+        with pytest.raises(
+            InferenceServerException,
+            match=re.escape(
+                "[StatusCode.UNAVAILABLE] This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'"
+            ),
+        ):
+            utils.send_and_test_inference_identity(client_type, url, headers)
 
         utils.teardown_service(service)
         utils.teardown_server(server)
