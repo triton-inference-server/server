@@ -28,7 +28,7 @@ from enum import IntEnum
 from typing import Union
 
 import tritonserver
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._api._restricted_features import RestrictedFeatures
@@ -47,17 +47,13 @@ class Grpc_compression_level(IntEnum):
     COUNT = 4
 
 
-class Config:
-    arbitrary_types_allowed = True
-
-
 class KServeGrpc:
     Grpc_compression_level = (
         Grpc_compression_level  # Include the enum as a class attribute
     )
 
     # triton::server::grpc::Options
-    @dataclass(config=Config)
+    @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
     class Options:
         # triton::server::grpc::SocketOptions
         address: str = "0.0.0.0"
