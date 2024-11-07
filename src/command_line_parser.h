@@ -276,11 +276,6 @@ class TritonParser {
   // Return usage of all recognized options
   std::string Usage();
 
-  void ParseRestrictedFeatureOption(
-      const std::string& arg, const std::string& option_name,
-      const std::string& header_prefix, const std::string& feature_type,
-      RestrictedFeatures& restricted_features);
-
  private:
   std::string FormatUsageMessage(std::string str, int offset);
   // Helper functions for parsing options that require multi-value parsing.
@@ -294,6 +289,10 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
       const std::string& arg);
+  void ParseRestrictedFeatureOption(
+      const std::string& arg, const std::string& option_name,
+      const std::string& header_prefix, const std::string& feature_type,
+      RestrictedFeatures& restricted_features);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
   InferenceTraceMode ParseTraceModeOption(std::string arg);
