@@ -29,6 +29,7 @@ from copy import deepcopy
 from enum import Enum
 from typing import List, Union
 
+import tritonserver
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
@@ -60,9 +61,9 @@ class FeatureGroup:
             item for item in protocols if not isinstance(item, Protocols)
         ]
         if invalid_protocols:
-            raise InvalidArgumentError(
-                f"Invalid protocols found: {invalid_protocols}."
-                f"Each item in 'protocols' should be an instance of the tritonfrontend.Protocols."
+            raise tritonserver.InvalidArgumentError(
+                f"Invalid protocols found: {invalid_protocols}. "
+                f"Each item in 'protocols' should be an instance of the tritonfrontend.Protocols. "
                 f"Valid options are: {[str(p) for p in Protocols]}"
             )
         return protocols

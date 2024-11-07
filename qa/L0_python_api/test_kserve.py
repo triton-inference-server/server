@@ -115,9 +115,68 @@ class TestMetricsOptions:
             Metrics.Options(thread_count="ten")
 
 
+class TestRestrictedFeatureOptions:
+    def test_correct_rf_parameters(self):
+        # Directly test feature groups
+        correct_feature_group = FeatureGroup(
+            key="key", value="val", protocols=[Protocols.HEALTH, Protocols.METADATA]
+        )
+
+        rf = RestrictedFeatures(groups=[correct_feature_group])
+        rf.create_feature_group(
+            key="new-key", value="new-val", protocols=[Protocols.INFERENCE]
+        )
+
+    def test_wrong_rf_parameters(self):
+        with pytest.raises(AttributeError):
+            Protocols.health  # Needs to be HEALTH
+        with pytest.raises(AttributeError):
+            Protocols.infer  # Needs to be INFERENCE
+
+        rf = RestrictedFeatures()
+        # Protocols List needs to be an element from tritonfrontend.Protocols
+        with pytest.raises(tritonserver.InvalidArgumentError):
+            rf.create_feature_group(key="", value="", protocols=["health"])
+        with pytest.raises(Exception):
+            rf.create_feature_group(
+                key=42, value="Secret to the Universe", protocols=[Protocols.HEALTH]
+            )
+        with pytest.raises(Exception):
+            rf.create_feature_group(key="", value=123, protocols=[Protocols.HEALTH])
+
+        # Test collision of Protocols among individual Feature Groups
+        with pytest.raises(tritonserver.InvalidArgumentError):
+            feature_group = FeatureGroup(
+                key="key", value="val", protocols=[Protocols.METADATA, Protocols.HEALTH]
+            )
+
+            rf = RestrictedFeatures(groups=[feature_group])
+            rf.create_feature_group(
+                key="key2", value="val", protocols=[Protocols.HEALTH]
+            )
+
+        with pytest.raises(tritonserver.InvalidArgumentError):
+            rf = RestrictedFeatures(groups=[feature_group])
+            rf.create_feature_group(
+                key="key", value="val", protocols=[Protocols.METADATA, Protocols.HEALTH]
+            )
+            rf.create_feature_group(
+                key="key2", value="val", protocols=[Protocols.HEALTH]
+            )
+
+
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
 GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
+restricted_features = RestrictedFeatures()
+restricted_features.create_feature_group(
+    key="admin-key", value="admin-value", protocols=[Protocols.MODEL_REPOSITORY]
+)
+restricted_features.create_feature_group(
+    key="infer-key",
+    value="infer-value",
+    protocols=[Protocols.INFERENCE, Protocols.METADATA],
+)
 
 
 class TestKServe:
@@ -364,15 +423,28 @@ class TestKServe:
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 
-    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
-    def test_restricted_features(self, frontend, client_type, url):
+    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
+    def test_http_restricted_features(self, frontend, client_type, url):
         server = utils.setup_server()
-
         # Specifying Restricted Features
-        rest_group = FeatureGroup(key="", value="", protocols=[Protocols.HEALTH])
-        restricted_feat = RestrictedFeatures(FeatureGroup)
+        http_rf_options = KServeHttp.Options(restricted_apis=restricted_features)
+        service = utils.setup_service(server, frontend, options=http_rf_options)
 
-        service = utils.setup_service(server, frontend)
+        headers = {"infer-key": "infer-value"}
+        assert utils.send_and_test_inference_identity(client_type, url, headers)
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+    @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
+    def test_grpc_restricted_features(self, frontend, client_type, url):
+        server = utils.setup_server()
+        # Specifying Restricted Features
+        grpc_rf_options = KServeGrpc.Options(restricted_protocols=restricted_features)
+        service = utils.setup_service(server, frontend, options=grpc_rf_options)
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
 
     # KNOWN ISSUE: CAUSES SEGFAULT
     # Created  [DLIS-7231] to address at future date

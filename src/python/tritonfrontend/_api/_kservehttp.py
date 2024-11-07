@@ -28,7 +28,7 @@
 from typing import Optional, Union
 
 import tritonserver
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._api._restricted_features import RestrictedFeatures
@@ -38,12 +38,8 @@ from tritonfrontend._c.tritonfrontend_bindings import (
 )
 
 
-class Config:
-    arbitrary_types_allowed = True
-
-
 class KServeHttp:
-    @dataclass(config=Config)
+    @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
     class Options:
         address: str = "0.0.0.0"
         port: int = Field(8000, ge=0, le=65535)
