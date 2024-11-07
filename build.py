@@ -1244,7 +1244,6 @@ RUN ldconfig && \\
     rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
     rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
     rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
-    python3 -m pip install --upgrade pip && \\
     pip3 install --no-cache-dir transformers && \\
     find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
     find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
@@ -1341,7 +1340,6 @@ RUN yum install -y \\
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
@@ -1361,7 +1359,6 @@ RUN apt-get update \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\
-      && python3 -m pip install --upgrade pip \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
             backend_dependencies=backend_dependencies
