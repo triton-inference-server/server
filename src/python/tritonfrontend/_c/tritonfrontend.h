@@ -129,7 +129,7 @@ class TritonFrontend {
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
 
     server_.reset(server_ptr, EmptyDeleter);
-    TritonFrontend::_populate_restricted_features(data);
+    _populate_restricted_features(data);
 
 #ifdef TRITON_ENABLE_HTTP
     if constexpr (std::is_same_v<FrontendServer, HTTPAPIServer>) {
@@ -169,25 +169,16 @@ class TritonFrontend {
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
 
-  static void _populate_restricted_features(UnorderedMapType& data)
+  void _populate_restricted_features(UnorderedMapType& data)
   {
-    std::string map_key;  // Name of option in UnorderedMap
-
-    std::string option_name;
-    std::string key_prefix;
-    std::string feature_type;
+    std::string map_key;     // Name of option in UnorderedMap
+    std::string key_prefix;  // Name of required header
     if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
       map_key = "restricted_apis";
-
-      option_name = "http-restricted-api";
       key_prefix = "";
-      feature_type = "api";
     } else if (std::is_same_v<FrontendServer, triton::server::grpc::Server>) {
       map_key = "restricted_protocols";
-
-      option_name = "grpc-restricted-protocol";
       key_prefix = "triton-grpc-protocol-";
-      feature_type = "protocol";
     } else {
       // Restricted Features is not supported for this class.
       return;
@@ -195,43 +186,29 @@ class TritonFrontend {
 
     std::string restricted_info;
     ThrowIfError(GetValue(data, map_key, &restricted_info));
-    std::cout << "[tritonfrontend.h] Done reading restricted_features json: "
-              << std::endl;
-    std::cout << restricted_info << std::endl;
-    std::cout << "=========================================================="
-              << std::endl;
 
     triton::common::TritonJson::Value json_array;
-    TRITONSERVER_Error* err = json_array.Parse(restricted_info);
-    ThrowIfError(err);
+    ThrowIfError(json_array.Parse(restricted_info));
 
-    size_t array_size = json_array.ArraySize();
-    std::cout << "ARRAY SIZE " << array_size << std::endl;
-
+    std::string key, value, protocol;
     for (size_t i = 0; i < json_array.ArraySize(); i++) {
       triton::common::TritonJson::Value object;
-
       ThrowIfError(json_array.IndexAsObject(i, &object));
 
       // Extract key and value
-      std::string key, value;
       ThrowIfError(object.MemberAsString("key", &key));
       ThrowIfError(object.MemberAsString("value", &value));
 
-      std::cout << "Key: " << key << ", Value: " << value << std::endl;
-
-      // Extract and iterate through protocols
       triton::common::TritonJson::Value protocols;
       ThrowIfError(object.MemberAsArray("protocols", &protocols));
 
-      std::cout << "Protocols: ";
+      // Extract protocol list
       for (size_t j = 0; j < protocols.ArraySize(); j++) {
-        std::string protocol;
         ThrowIfError(protocols.IndexAsString(j, &protocol));
-        std::cout << protocol << " ";
+        RestrictedCategory category = RestrictedFeatures::ToCategory(protocol);
+        restricted_features.Insert(
+            category, std::make_pair(key_prefix + key, value));
       }
-      std::cout << std::endl;
-      // TODO: Need to add information to the RestrictedFeatures object.
     }
   };
 };

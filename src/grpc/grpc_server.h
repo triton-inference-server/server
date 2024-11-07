@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -54,7 +54,6 @@ struct SocketOptions {
 };
 
 struct SslOptions {
-  // Whether SSL is used for communication
   bool use_ssl_{false};
   // File holding PEM-encoded server certificate
   std::string server_cert_{""};
@@ -128,7 +127,9 @@ class Server {
       KeepAliveOptions& options, UnorderedMapType& options_map);
 
   static TRITONSERVER_Error* GetOptions(
-      Options& options, UnorderedMapType& options_map);
+      Options& options, UnorderedMapType& options_map,
+      const RestrictedFeatures& restricted_features);
+
 
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   TraceManager* trace_manager_;
