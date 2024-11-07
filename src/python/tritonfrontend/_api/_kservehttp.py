@@ -75,9 +75,6 @@ class KServeHttp:
 
         # Converts dataclass instance -> python dictionary -> unordered_map<string, std::variant<...>>
         options_dict: dict[str, Union[int, bool, str]] = options.__dict__
-        print("==========================HTTP Options==========================")
-        print(options_dict)
-        print("================================================================")
 
         self.triton_frontend = TritonFrontendHttp(server_ptr, options_dict)
 
