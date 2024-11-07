@@ -191,9 +191,10 @@ class TritonFrontend {
     ThrowIfError(json_array.Parse(restricted_info));
 
     std::string key, value, protocol;
-    for (size_t i = 0; i < json_array.ArraySize(); i++) {
+    for (size_t group_idx = 0; group_idx < json_array.ArraySize();
+         group_idx++) {
       triton::common::TritonJson::Value object;
-      ThrowIfError(json_array.IndexAsObject(i, &object));
+      ThrowIfError(json_array.IndexAsObject(group_idx, &object));
 
       // Extract key and value
       ThrowIfError(object.MemberAsString("key", &key));
@@ -203,11 +204,12 @@ class TritonFrontend {
       ThrowIfError(object.MemberAsArray("protocols", &protocols));
 
       // Extract protocol list
-      for (size_t j = 0; j < protocols.ArraySize(); j++) {
-        ThrowIfError(protocols.IndexAsString(j, &protocol));
-        RestrictedCategory category = RestrictedFeatures::ToCategory(protocol);
+      for (size_t protocol_idx = 0; protocol_idx < protocols.ArraySize();
+           protocol_idx++) {
+        ThrowIfError(protocols.IndexAsString(protocol_idx, &protocol));
         restricted_features.Insert(
-            category, std::make_pair(key_prefix + key, value));
+            RestrictedFeatures::ToCategory(protocol),
+            std::make_pair(key_prefix + key, value));
       }
     }
   };
