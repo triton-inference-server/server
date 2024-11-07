@@ -201,12 +201,38 @@ class TritonFrontend {
     std::cout << "=========================================================="
               << std::endl;
 
-    triton::common::TritonJson::Value json_value;
-    TRITONSERVER_Error* err = json_value.Parse(restricted_info);
+    triton::common::TritonJson::Value json_array;
+    TRITONSERVER_Error* err = json_array.Parse(restricted_info);
     ThrowIfError(err);
 
-    size_t array_size = json_value.ArraySize();
+    size_t array_size = json_array.ArraySize();
     std::cout << "ARRAY SIZE " << array_size << std::endl;
+
+    for (size_t i = 0; i < json_array.ArraySize(); i++) {
+      triton::common::TritonJson::Value object;
+
+      ThrowIfError(json_array.IndexAsObject(i, &object));
+
+      // Extract key and value
+      std::string key, value;
+      ThrowIfError(object.MemberAsString("key", &key));
+      ThrowIfError(object.MemberAsString("value", &value));
+
+      std::cout << "Key: " << key << ", Value: " << value << std::endl;
+
+      // Extract and iterate through protocols
+      triton::common::TritonJson::Value protocols;
+      ThrowIfError(object.MemberAsArray("protocols", &protocols));
+
+      std::cout << "Protocols: ";
+      for (size_t j = 0; j < protocols.ArraySize(); j++) {
+        std::string protocol;
+        ThrowIfError(protocols.IndexAsString(j, &protocol));
+        std::cout << protocol << " ";
+      }
+      std::cout << std::endl;
+      // TODO: Need to add information to the RestrictedFeatures object.
+    }
   };
 };
 }}}  // namespace triton::server::python
