@@ -42,13 +42,11 @@
 #endif
 
 
-#include <rapidjson/document.h>
-
 #include "../../../common.h"
 #include "../../../restricted_features.h"
 #include "../../../shared_memory_manager.h"
-#include "../../../tracer.h"
 #include "triton/common/logging.h"
+#include "triton/common/triton_json.h"
 #include "triton/core/tritonserver.h"
 
 
