@@ -24,6 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+from ._restricted_features import Feature, FeatureGroup, RestrictedFeatures
+
 try:
     from ._kservehttp import KServeHttp
 except ImportError:
@@ -44,6 +47,3 @@ except ImportError:
     # TRITON_ENABLE_Metrics=OFF
     # TritonFrontendMetrics Package was not present
     pass
-
-
-from ._restricted_features import FeatureGroup, Protocols, RestrictedFeatures
