@@ -26,7 +26,6 @@
 
 #pragma once
 
-
 #include <memory>  // For shared_ptr
 #include <unordered_map>
 #include <variant>
