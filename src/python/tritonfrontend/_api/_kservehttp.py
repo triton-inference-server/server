@@ -25,10 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from typing import Optional, Union
+from typing import Union
 
 import tritonserver
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._api._restricted_features import RestrictedFeatures
