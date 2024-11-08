@@ -38,10 +38,29 @@ rm -fr *.log python_backend/
 
 # Install torch
 pip3 uninstall -y torch
+pip3 uninstall -y numpy
+# NOTE: Using this subtest as a test case that involves using a python model with
+# numpy 2.X without changing the environments used in all the other test cases.
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-    pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
+    if [ ${PYTHON_ENV_VERSION} == "8" ]; then
+        # Python 3.8 does not support numpy 2.x, so installing numpy1.x
+        pip3 install "numpy<2"
+        pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
+    else
+        # Python 3.9 >= supports numpy 2.x.
+        pip3 install "numpy>=2"
+        pip3 install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124
+    fi
 else
-    pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
+    if [ ${PYTHON_ENV_VERSION} == "8" ]; then
+        # Python 3.8 does not support numpy 2.x, so installing numpy1.x
+        pip3 install "numpy<2"
+        pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
+    else
+        # Python 3.9 >= supports numpy 2.x.
+        pip3 install "numpy>=2"
+        pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
+    fi
 fi
 
 # Install `validators` for Model Instance Kind example
