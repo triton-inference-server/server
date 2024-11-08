@@ -69,8 +69,8 @@ class FeatureGroup:
 
 class RestrictedFeatures:
     def __init__(self, groups: List[FeatureGroup] = []):
-        self.feature_groups = []
-        self.features_restricted = set()
+        self.feature_groups = []  # Stores FeatureGroup Instances
+        self.features_restricted = set()  # Used for collision detection between groups
 
         for feat_group in groups:
             self.add_feature_group(feat_group)
@@ -96,11 +96,19 @@ class RestrictedFeatures:
     def create_feature_group(
         self, key: str, value: str, features: List[Feature]
     ) -> None:
+        """
+        Factory Method in Python that can be used to generate FeatureGroup instances
+        and append them to the `RestrictedFeatures` object that called method.
+        """
         group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
 
     @handle_triton_error
     def _gather_rest_data(self) -> dict:
+        """
+        Represents `RestrictedFeatures` Instance as a dictionary.
+        Additionally, converts `Feature` instances to str equivalent.
+        """
         # Dataclass_Instance.__dict__ provides shallow copy, so need a deep copy IF modifying
         rfeat_data = [
             deepcopy(feat_group.__dict__) for feat_group in self.feature_groups
