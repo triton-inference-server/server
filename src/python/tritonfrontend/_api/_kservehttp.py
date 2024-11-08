@@ -46,7 +46,7 @@ class KServeHttp:
         reuse_port: bool = False
         thread_count: int = Field(8, gt=0)
         header_forward_pattern: str = ""
-        restricted_apis: RestrictedFeatures = RestrictedFeatures()  # "metadata:one=two"
+        restricted_apis: RestrictedFeatures = RestrictedFeatures()
 
         @handle_triton_error
         def __post_init__(self):

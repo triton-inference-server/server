@@ -82,7 +82,6 @@ class KServeGrpc:
         ] = Grpc_compression_level.NONE
         infer_allocation_pool_size: int = Field(8, ge=0)
         forward_header_pattern: str = ""
-        # DLIS-7215: Add restricted protocol support
         restricted_protocols: RestrictedFeatures = RestrictedFeatures()
 
         @handle_triton_error
