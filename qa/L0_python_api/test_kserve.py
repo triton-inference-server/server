@@ -169,12 +169,9 @@ GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 RESTRICTED_FEATURE_ARG = RestrictedFeatures()
 RESTRICTED_FEATURE_ARG.create_feature_group(
-    key="admin-key", value="admin-value", features=[Feature.MODEL_REPOSITORY]
-)
-RESTRICTED_FEATURE_ARG.create_feature_group(
     key="infer-key",
     value="infer-value",
-    features=[Feature.INFERENCE, Feature.METADATA],
+    features=[Feature.INFERENCE],
 )
 
 
