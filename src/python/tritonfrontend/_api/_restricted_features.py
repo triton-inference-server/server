@@ -61,7 +61,7 @@ class FeatureGroup:
         if invalid_features:
             raise tritonserver.InvalidArgumentError(
                 f"Invalid features found: {invalid_features}. "
-                f"Each item in 'features' should be an instance of the tritonfrontend.Feature. "
+                "Each item in 'features' should be an instance of the tritonfrontend.Feature. "
                 f"Valid options are: {[str(p) for p in features]}"
             )
         return features
