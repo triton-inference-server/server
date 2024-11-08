@@ -36,6 +36,7 @@ if [[ "$ID_LIKE" =~ "debian" ]]; then
             build-essential \
             curl \
             jq \
+            libnvrtc12 \
             python3 \
             python3-pip
 else
