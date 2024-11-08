@@ -32,7 +32,6 @@ from typing import Tuple, Union
 import numpy as np
 import requests
 import tritonserver
-from tritonclient.utils import InferenceServerException
 from tritonfrontend import KServeGrpc, KServeHttp, Metrics
 
 
