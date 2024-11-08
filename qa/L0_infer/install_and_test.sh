@@ -33,6 +33,7 @@ ID_LIKE=$(grep -Po '(?<=ID_LIKE=).*' /etc/os-release | awk -F= '{print $1}' |  t
 if [[ "$ID_LIKE" =~ "debian" ]]; then
     apt-get update && \
         apt-get install -y --no-install-recommends \
+            build-essential \
             curl \
             jq \
             python3 \
