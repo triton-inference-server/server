@@ -170,7 +170,7 @@ class TritonFrontend {
       UnorderedMapType& data, RestrictedFeatures& rest_features)
   {
     std::string map_key;     // Name of option in UnorderedMap
-    std::string key_prefix;  // Name of required header
+    std::string key_prefix;  // Prefix for header key
     if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
       map_key = "restricted_apis";
       key_prefix = "";
