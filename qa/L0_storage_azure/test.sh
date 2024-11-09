@@ -106,7 +106,7 @@ function setup_model_repo() {
     for FW in $BACKENDS; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
         # Copy models with string inputs and remove nobatch (bs=1) models
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}*_object_object_object models/
         rm -rf models/*nobatch*
     done
 }
