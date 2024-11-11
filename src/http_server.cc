@@ -1550,7 +1550,7 @@ HTTPAPIServer::HandleRepositoryControl(
                 RETURN_AND_RESPOND_IF_ERR(
                     req, TRITONSERVER_ErrorNew(
                              TRITONSERVER_ERROR_INVALID_ARG,
-                             (m.c_str() + " exceeds the allowed size of 2 GB (INT_MAX)")
+                             (m + " exceeds the allowed size of 2 GB (INT_MAX)")
                                  .c_str()));
               }
 
@@ -2457,7 +2457,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
             RETURN_AND_RESPOND_IF_ERR(
                 req, TRITONSERVER_ErrorNew(
                          TRITONSERVER_ERROR_INVALID_ARG,
-                         (std::string(region_name) +
+                         (region_name +
                           " exceeds the allowed size of 2 GB (INT_MAX)")
                              .c_str()));
 
