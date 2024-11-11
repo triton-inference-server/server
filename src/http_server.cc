@@ -1546,6 +1546,14 @@ HTTPAPIServer::HandleRepositoryControl(
               param = TRITONSERVER_ParameterNew(
                   m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             } else if (m.rfind("file:", 0) == 0) {
+              if (param_len > INT_MAX) {
+                RETURN_AND_RESPOND_IF_ERR(
+                    req, TRITONSERVER_ErrorNew(
+                             TRITONSERVER_ERROR_INVALID_ARG,
+                             (m.c_str() + " exceeds the allowed size of 2 GB (INT_MAX)")
+                                 .c_str()));
+              }
+
               // Decode base64
               base64_decodestate s;
               base64_init_decodestate(&s);
@@ -2445,6 +2453,13 @@ HTTPAPIServer::HandleCudaSharedMemory(
           if (err == nullptr) {
             base64_decodestate s;
             base64_init_decodestate(&s);
+
+            RETURN_AND_RESPOND_IF_ERR(
+                req, TRITONSERVER_ErrorNew(
+                         TRITONSERVER_ERROR_INVALID_ARG,
+                         (std::string(region_name) +
+                          " exceeds the allowed size of 2 GB (INT_MAX)")
+                             .c_str()));
 
             // The decoded can not be larger than the input...
             std::vector<char> raw_handle(b64_handle_len + 1);
