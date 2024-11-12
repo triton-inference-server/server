@@ -469,6 +469,8 @@ if [ $? -ne 0 ]; then
 fi
 
 # TensorRT
+docker pull ${TENSORRT_IMAGE}
+TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
 cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
 nvidia-smi -L || true
@@ -512,9 +514,6 @@ chmod -R 777 $FORMATDESTDIR
 python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
 chmod -R 777 $DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
-
-docker pull ${TENSORRT_IMAGE}
-TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
 (git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git && \
 cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
 cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)

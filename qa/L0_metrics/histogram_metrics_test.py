@@ -40,6 +40,7 @@ sys.path.append("../common")
 import test_util as tu
 
 MILLIS_PER_SEC = 1000
+FIRST_RESPONSE_HISTOGRAM = "nv_inference_first_response_histogram_ms"
 
 
 def get_histogram_metric_key(
@@ -47,6 +48,8 @@ def get_histogram_metric_key(
 ):
     if metric_type in ["count", "sum"]:
         return f'{metric_family}_{metric_type}{{model="{model_name}",version="{model_version}"}}'
+    elif metric_type == "bucket":
+        return f'{metric_family}_{metric_type}{{model="{model_name}",version="{model_version}",le="{le}"}}'
     else:
         return None
 
@@ -55,16 +58,20 @@ class TestHistogramMetrics(tu.TestResultCollector):
     def setUp(self):
         self.tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
-    def get_histogram_metrics(self, metric_family: str):
+    def get_metrics(self):
         r = requests.get(f"http://{self.tritonserver_ipaddr}:8002/metrics")
         r.raise_for_status()
+        return r.text
 
+    def get_histogram_metrics(self, metric_family: str):
         # Regular expression to match the pattern
         pattern = f"^{metric_family}.*"
         histogram_dict = {}
 
+        metrics = self.get_metrics()
+
         # Find all matches in the text
-        matches = re.findall(pattern, r.text, re.MULTILINE)
+        matches = re.findall(pattern, metrics, re.MULTILINE)
 
         for match in matches:
             key, value = match.rsplit(" ")
@@ -135,24 +142,23 @@ class TestHistogramMetrics(tu.TestResultCollector):
             )
 
             # Checks metrics output
-            first_response_family = "nv_inference_first_response_histogram_ms"
-            histogram_dict = self.get_histogram_metrics(first_response_family)
+            histogram_dict = self.get_histogram_metrics(FIRST_RESPONSE_HISTOGRAM)
 
             def check_existing_metrics(model_name, wait_secs_per_req, delta):
                 metric_count = get_histogram_metric_key(
-                    first_response_family, model_name, "1", "count"
+                    FIRST_RESPONSE_HISTOGRAM, model_name, "1", "count"
                 )
-                model_sum = get_histogram_metric_key(
-                    first_response_family, model_name, "1", "sum"
+                metric_sum = get_histogram_metric_key(
+                    FIRST_RESPONSE_HISTOGRAM, model_name, "1", "sum"
                 )
                 # Test histogram count
                 self.assertIn(metric_count, histogram_dict)
                 self.assertEqual(histogram_dict[metric_count], request_num)
                 # Test histogram sum
-                self.assertIn(model_sum, histogram_dict)
+                self.assertIn(metric_sum, histogram_dict)
                 self.assertTrue(
                     wait_secs_per_req * MILLIS_PER_SEC * request_num
-                    <= histogram_dict[model_sum]
+                    <= histogram_dict[metric_sum]
                     < (wait_secs_per_req + delta) * MILLIS_PER_SEC * request_num
                 )
                 # Prometheus histogram buckets are tested in metrics_api_test.cc::HistogramAPIHelper
@@ -165,13 +171,28 @@ class TestHistogramMetrics(tu.TestResultCollector):
 
             # Test non-decoupled model metrics
             non_decoupled_model_count = get_histogram_metric_key(
-                first_response_family, non_decoupled_model_name, "1", "count"
+                FIRST_RESPONSE_HISTOGRAM, non_decoupled_model_name, "1", "count"
             )
             non_decoupled_model_sum = get_histogram_metric_key(
-                first_response_family, non_decoupled_model_name, "1", "sum"
+                FIRST_RESPONSE_HISTOGRAM, non_decoupled_model_name, "1", "sum"
             )
             self.assertNotIn(non_decoupled_model_count, histogram_dict)
             self.assertNotIn(non_decoupled_model_sum, histogram_dict)
+
+    def test_buckets_override(self):
+        model_name = "async_execute_decouple"
+        metrics = self.get_metrics()
+        override_buckets = [x for x in os.environ.get("OVERRIDE_BUCKETS").split(",")]
+
+        # Check metric output
+        self.assertEqual(
+            metrics.count(FIRST_RESPONSE_HISTOGRAM + "_bucket"), len(override_buckets)
+        )
+        for le in override_buckets:
+            bucket_key = get_histogram_metric_key(
+                FIRST_RESPONSE_HISTOGRAM, model_name, "1", "bucket", le
+            )
+            self.assertIn(bucket_key, metrics)
 
 
 if __name__ == "__main__":

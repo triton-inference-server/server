@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,6 +73,7 @@ SKIP_PATHS = (
     "qa/L0_model_config/special_cases",
     "qa/L0_model_config/cli_messages/cli_override/expected",
     "qa/L0_model_config/cli_messages/cli_deprecation/expected",
+    "qa/L0_model_config/model_metrics",
     "qa/L0_model_namespacing/test_duplication",
     "qa/L0_model_namespacing/test_dynamic_resolution",
     "qa/L0_model_namespacing/test_ensemble_duplication",

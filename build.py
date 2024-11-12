@@ -70,8 +70,8 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.52.0dev": (
-        "24.11dev",  # triton container
+    "2.53.0dev": (
+        "24.12dev",  # triton container
         "24.10",  # upstream container
         "1.19.2",  # ORT
         "2024.4.0",  # ORT OpenVINO
@@ -1213,6 +1213,11 @@ COPY --chown=1000:1000 build/install tritonserver
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
+RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
@@ -1316,7 +1321,7 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
 
     if target_platform() == "rhel":
         df += """
-# Common dpeendencies.
+# Common dependencies.
 RUN yum install -y \\
         git \\
         gperf \\
@@ -1328,7 +1333,9 @@ RUN yum install -y \\
         gperftools-devel \\
         patchelf \\
         wget \\
+        python3-pip \\
         numactl-devel
+
 """
     else:
         df += """
@@ -1353,6 +1360,8 @@ RUN apt-get update \\
               software-properties-common \\
               wget \\
               {backend_dependencies} \\
+              python3-pip \\
+      && python3 -m pip install --upgrade pip \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
             backend_dependencies=backend_dependencies
@@ -1395,10 +1404,9 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
-        python3-pip \\
         openssl-devel \\
         readline-devel
 """
@@ -1416,12 +1424,11 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-# python3, python3-pip and some pip installs required for the python backend
+# python3 and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
             libarchive-dev \\
-            python3-pip \\
             libpython3-dev \\
       && pip3 install --upgrade pip \\
       && pip3 install --upgrade \\

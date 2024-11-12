@@ -23,27 +23,12 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-import tritonserver
-from _typeshed import Incomplete
-from tritonfrontend._api._error_mapping import (
-    handle_triton_error as handle_triton_error,
-)
-from tritonfrontend._c.tritonfrontend_bindings import (
-    InvalidArgumentError as InvalidArgumentError,
-)
-from tritonfrontend._c.tritonfrontend_bindings import (
-    TritonFrontendMetrics as TritonFrontendMetrics,
-)
-
-class Metrics:
-    class Options:
-        address: str
-        port: int
-        thread_count: int
-    triton_frontend: Incomplete
-    def __init__(self, server: tritonserver, options: Metrics.Options = None) -> None: ...
-    def __enter__(self): ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
-    def start(self) -> None: ...
-    def stop(self) -> None: ...
+model_metrics {
+  metric_control: [
+    {
+      metric_identifier: {
+        family: "nv_inference_first_response_histogram_ms"
+      }
+    }
+  ]
+}
