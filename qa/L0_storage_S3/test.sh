@@ -167,9 +167,11 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
         for FW in ${BACKENDS}; do
             cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
-            # Copy models with string inputs and remove nobatch (bs=1) models
-            cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}*_object_object_object/ models/
-            rm -rf models/*nobatch*
+            # Copy models with string inputs and remove nobatch (bs=1) models. Model does not exist for plan backend.
+            if [[ ${FW} != "plan" ]]; then
+                cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}*_object_object_object/ models/
+                rm -rf models/*nobatch*
+            fi
         done
 
         for FW in ${BACKENDS}; do
