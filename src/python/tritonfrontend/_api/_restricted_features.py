@@ -36,8 +36,12 @@ from tritonfrontend._api._error_mapping import handle_triton_error
 from tritonfrontend._c.tritonfrontend_bindings import InvalidArgumentError
 
 
-# 1-to-1 copy of RestrictedCategory Enum from https://github.com/triton-inference-server/server/blob/main/src/restricted_features.h
 class Feature(Enum):
+    """
+    List of Features that are provided by KServeHttp and KServeGrpc Endpoints for the Server.
+    1-to-1 copy of RestrictedCategory Enum from https://github.com/triton-inference-server/server/blob/main/src/restricted_features.h
+    """
+
     HEALTH = "health"
     METADATA = "metadata"
     INFERENCE = "inference"
@@ -51,6 +55,19 @@ class Feature(Enum):
 
 @dataclass
 class FeatureGroup:
+    """
+    Stores instances of (key, value, features) and performs type validation on instance.
+    Used by the RestrictedFeatures Class.
+
+    Example:
+        >>> from tritonfrontend import Feature, FeatureGroup
+        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> health_group = FeatureGroup("key", "value", ["health"]) # Will Error Out
+        Invalid features found: ['health'] ... Valid options are: ['Feature.HEALTH',
+        'Feature.METADATA', 'Feature.INFERENCE', 'Feature.SHM_MEMORY', 'Feature.MODEL_CONFIG',
+        'Feature.MODEL_REPOSITORY', 'Feature.STATISTICS', 'Feature.TRACE', 'Feature.LOGGING']
+    """
+
     key: str
     value: str
     features: List[Feature]
@@ -62,12 +79,34 @@ class FeatureGroup:
             raise tritonserver.InvalidArgumentError(
                 f"Invalid features found: {invalid_features}. "
                 "Each item in 'features' should be an instance of the tritonfrontend.Feature. "
-                f"Valid options are: {[str(p) for p in features]}"
+                f"Valid options are: {[str(p) for p in Feature]}"
             )
         return features
 
 
 class RestrictedFeatures:
+    """
+    Using `RestrictedFeatures` users can restrict access to certain features provided by the `KServeHttp` and `KServeGrpc` frontends.
+    In order to use a restricted feature, the key-value pair needs to be as {`key`:`value`} a header with the request to the endpoint.
+    Note: For the `KServeGrpc` endpoint, the
+
+    Stores collections of FeatureGroup instances, apply an additional layer of validation to check for collisions
+    (ensuring that each feature belongs to only one group), and serialize the data into a JSON string.
+
+    Example:
+        >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
+        >>> admin_group = FeatureGroup(key="admin-key", value="admin-value", features=[Feature.HEALTH, Feature.METADATA])
+        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> rf = RestrictedFeatures([admin_group, infer_group])
+        >>> rf.create_feature_group("trace-key", "trace-value", [Feature.TRACE])
+        >>> rf
+        [
+            {"key": "admin-key", "value": "admin-value", "features": ["health", "metadata"]},
+            {"key": "infer-key", "value": "infer-value", "features": ["inference"]},
+            {"key": "trace-key", "value": "trace-value", "features": ["trace"]}
+        ]
+    """
+
     def __init__(self, groups: List[FeatureGroup] = []):
         self.feature_groups = []  # Stores FeatureGroup Instances
         self.features_restricted = set()  # Used for collision detection between groups
@@ -81,6 +120,14 @@ class RestrictedFeatures:
         Need to check for collision with features_restricted.
         If collision, raise InvalidArgumentError().
         If no collision, add group to feature_groups
+
+        Example:
+        >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
+        >>> health_group = FeatureGroup("health-key", "health-value", [Feature.HEALTH])
+        >>> rf = RestrictedFeatures()
+        >>> rf.add_feature_group(health_group)
+        >>> rf
+        [{"key": "health-key", "value": "health-value", "features": ["health"]}]
         """
         for feat in group.features:
             if feat in self.features_restricted:
@@ -97,8 +144,15 @@ class RestrictedFeatures:
         self, key: str, value: str, features: List[Feature]
     ) -> None:
         """
-        Factory Method in Python that can be used to generate FeatureGroup instances
-        and append them to the `RestrictedFeatures` object that called method.
+        Factory method used to generate FeatureGroup instances and append them
+        to the `RestrictedFeatures` object that invoked this function.
+
+        Example:
+        >>> from tritonfrontend import RestrictedFeatures, Feature
+        >>> rf = RestrictedFeatures()
+        >>> rf.create_feature_group("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> rf
+        [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
         """
         group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
