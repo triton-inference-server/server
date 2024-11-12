@@ -80,7 +80,7 @@ rm -fr *.log ./models
 
 python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
-    echo -e "Expecting Python default version to be: Python 3.10 but actual version is $(python3 --version)"
+    echo -e "Expecting Python default version to be: Python 3.12 but actual version is $(python3 --version)"
     exit 1
 fi
 
