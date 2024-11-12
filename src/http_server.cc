@@ -1550,7 +1550,7 @@ HTTPAPIServer::HandleRepositoryControl(
                 RETURN_AND_RESPOND_IF_ERR(
                     req, TRITONSERVER_ErrorNew(
                              TRITONSERVER_ERROR_INVALID_ARG,
-                             (m + " exceeds the allowed size of 2 GB (INT_MAX)")
+                             (m + " size exceeds the allowed INT_MAX limit")
                                  .c_str()));
               }
 
@@ -2451,15 +2451,17 @@ HTTPAPIServer::HandleCudaSharedMemory(
           }
 
           if (err == nullptr) {
+            if (b64_handle_len > INT_MAX) {
+              RETURN_AND_RESPOND_IF_ERR(
+                  req,
+                  TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INVALID_ARG,
+                      (region_name + " size exceeds the allowed INT_MAX limit")
+                          .c_str()));
+            }
+
             base64_decodestate s;
             base64_init_decodestate(&s);
-
-            RETURN_AND_RESPOND_IF_ERR(
-                req, TRITONSERVER_ErrorNew(
-                         TRITONSERVER_ERROR_INVALID_ARG,
-                         (region_name +
-                          " exceeds the allowed size of 2 GB (INT_MAX)")
-                             .c_str()));
 
             // The decoded can not be larger than the input...
             std::vector<char> raw_handle(b64_handle_len + 1);
