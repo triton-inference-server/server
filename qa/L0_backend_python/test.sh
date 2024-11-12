@@ -444,7 +444,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     done
 
     # [DLIS-5969]: Incorporate env test for windows
-    if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
+    if [[ ${PYTHON_ENV_VERSION} = "12" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
         set +e

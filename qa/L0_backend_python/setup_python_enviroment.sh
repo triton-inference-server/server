@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 RET=0
 set -e
-if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+if [ ${PYTHON_ENV_VERSION} = "12" ]; then
     echo No need to set up anything for default python3.${PYTHON_ENV_VERSION}
     exit $RET
 fi
@@ -39,7 +39,7 @@ BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --log-verbose=1 --disabl
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
-export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
+export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 RET=0
 EXPECTED_VERSION_STRINGS=""
 
