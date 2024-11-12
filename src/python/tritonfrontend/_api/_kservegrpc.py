@@ -82,18 +82,18 @@ class KServeGrpc:
         ] = Grpc_compression_level.NONE
         infer_allocation_pool_size: int = Field(8, ge=0)
         forward_header_pattern: str = ""
-        restricted_protocols: RestrictedFeatures = RestrictedFeatures()
+        restricted_features: RestrictedFeatures = RestrictedFeatures()
 
         @handle_triton_error
         def __post_init__(self):
             if isinstance(self.infer_compression_level, Grpc_compression_level):
                 self.infer_compression_level = self.infer_compression_level.value
 
-            if not isinstance(self.restricted_protocols, RestrictedFeatures):
+            if not isinstance(self.restricted_features, RestrictedFeatures):
                 raise InvalidArgumentError(
-                    "restricted_protocols needs an instance of RestrictedFeatures."
+                    "restricted_features needs an instance of RestrictedFeatures."
                 )
-            self.restricted_protocols = repr(self.restricted_protocols)
+            self.restricted_features = repr(self.restricted_features)
 
     @handle_triton_error
     def __init__(self, server: tritonserver, options: "KServeGrpc.Options" = None):

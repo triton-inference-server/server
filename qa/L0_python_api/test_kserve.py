@@ -419,51 +419,25 @@ class TestKServe:
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 
-    @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
-    def test_http_restricted_features(self, frontend, client_type, url):
+    @pytest.mark.parametrize(
+        "frontend, client_type, url, key_prefix",
+        [HTTP_ARGS + ("",), GRPC_ARGS + ("triton-grpc-protocol-",)],
+    )
+    def test_restricted_features(self, frontend, client_type, url, key_prefix):
         server = utils.setup_server()
         # Specifying Restricted Features
-        http_rf_options = KServeHttp.Options(restricted_apis=RESTRICTED_FEATURE_ARG)
-        service = utils.setup_service(server, frontend, options=http_rf_options)
+        options = frontend.Options(restricted_features=RESTRICTED_FEATURE_ARG)
+        service = utils.setup_service(server, frontend, options=options)
 
         # Valid headers sent with inference request
-        headers = {"infer-key": "infer-value"}
+        headers = {key_prefix + "infer-key": "infer-value"}
         assert utils.send_and_test_inference_identity(client_type, url, headers)
 
         # Invalid headers sent with inference request
-        headers = {"fake-key": "fake-value"}
+        headers = {key_prefix + "fake-key": "fake-value"}
         with pytest.raises(
             InferenceServerException,
-            match=re.escape(
-                "[403] This API is restricted, expecting header 'infer-key'"
-            ),
-        ):
-            utils.send_and_test_inference_identity(client_type, url, headers)
-
-        utils.teardown_service(service)
-        utils.teardown_server(server)
-
-    @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
-    def test_grpc_restricted_features(self, frontend, client_type, url):
-        server = utils.setup_server()
-        # Specifying Restricted Features
-        grpc_rf_options = KServeGrpc.Options(
-            restricted_protocols=RESTRICTED_FEATURE_ARG
-        )
-        service = utils.setup_service(server, frontend, options=grpc_rf_options)
-
-        # Valid headers sent with inference request
-        grpc_key_prefix = "triton-grpc-protocol-"
-        headers = {grpc_key_prefix + "infer-key": "infer-value"}
-        assert utils.send_and_test_inference_identity(client_type, url, headers)
-
-        # Invalid headers sent with inference request
-        headers = {grpc_key_prefix + "fake-key": "fake-value"}
-        with pytest.raises(
-            InferenceServerException,
-            match=re.escape(
-                "[StatusCode.UNAVAILABLE] This protocol is restricted, expecting header 'triton-grpc-protocol-infer-key'"
-            ),
+            match=f"expecting header '{key_prefix}infer-key'",
         ):
             utils.send_and_test_inference_identity(client_type, url, headers)
 
