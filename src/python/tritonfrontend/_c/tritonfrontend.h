@@ -169,13 +169,12 @@ class TritonFrontend {
   static void _populate_restricted_features(
       UnorderedMapType& data, RestrictedFeatures& rest_features)
   {
-    std::string map_key;     // Name of option in UnorderedMap
-    std::string key_prefix;  // Prefix for header key
+    std::string map_key =
+        "restricted_features";  // Name of option in UnorderedMap
+    std::string key_prefix;     // Prefix for header key
     if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
-      map_key = "restricted_apis";
       key_prefix = "";
     } else if (std::is_same_v<FrontendServer, triton::server::grpc::Server>) {
-      map_key = "restricted_protocols";
       key_prefix = "triton-grpc-protocol-";
     } else {
       // Restricted Features is not supported for this class.

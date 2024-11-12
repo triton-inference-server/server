@@ -46,15 +46,15 @@ class KServeHttp:
         reuse_port: bool = False
         thread_count: int = Field(8, gt=0)
         header_forward_pattern: str = ""
-        restricted_apis: RestrictedFeatures = RestrictedFeatures()
+        restricted_features: RestrictedFeatures = RestrictedFeatures()
 
         @handle_triton_error
         def __post_init__(self):
-            if not isinstance(self.restricted_apis, RestrictedFeatures):
+            if not isinstance(self.restricted_features, RestrictedFeatures):
                 raise InvalidArgumentError(
-                    "restricted_apis needs an instance of RestrictedFeatures."
+                    "restricted_features needs an instance of RestrictedFeatures."
                 )
-            self.restricted_apis = repr(self.restricted_apis)
+            self.restricted_features = repr(self.restricted_features)
 
     @handle_triton_error
     def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):
