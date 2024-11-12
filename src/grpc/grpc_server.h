@@ -54,6 +54,7 @@ struct SocketOptions {
 };
 
 struct SslOptions {
+  // Whether SSL is used for communication
   bool use_ssl_{false};
   // File holding PEM-encoded server certificate
   std::string server_cert_{""};
