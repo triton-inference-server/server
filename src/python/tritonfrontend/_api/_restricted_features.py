@@ -86,12 +86,16 @@ class FeatureGroup:
 
 class RestrictedFeatures:
     """
-    Using `RestrictedFeatures` users can restrict access to certain features provided by the `KServeHttp` and `KServeGrpc` frontends.
-    In order to use a restricted feature, the key-value pair needs to be as {`key`:`value`} a header with the request to the endpoint.
-    Note: For the `KServeGrpc` endpoint, the
+    Using `RestrictedFeatures` users can restrict access to certain features provided by
+    the `KServeHttp` and `KServeGrpc` frontends. In order to use a restricted feature,
+    the key-value pair ({`key`:`value`}) needs to be as a header with the request to the endpoint.
+    Note: For the `KServeGrpc` endpoint, the header key needs a prefix of `triton-grpc-protocol-`
+    when sending a request.
 
-    Stores collections of FeatureGroup instances, apply an additional layer of validation to check for collisions
-    (ensuring that each feature belongs to only one group), and serialize the data into a JSON string.
+    Internally, the `RestrictedFeatures` class:
+    - Stores collections of FeatureGroup instances
+    - Checks for collisions for `Feature` instances among groups.
+    - Serialize the data into a JSON string.
 
     Example:
         >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
@@ -122,12 +126,12 @@ class RestrictedFeatures:
         If no collision, add group to feature_groups
 
         Example:
-        >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
-        >>> health_group = FeatureGroup("health-key", "health-value", [Feature.HEALTH])
-        >>> rf = RestrictedFeatures()
-        >>> rf.add_feature_group(health_group)
-        >>> rf
-        [{"key": "health-key", "value": "health-value", "features": ["health"]}]
+            >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
+            >>> health_group = FeatureGroup("health-key", "health-value", [Feature.HEALTH])
+            >>> rf = RestrictedFeatures()
+            >>> rf.add_feature_group(health_group)
+            >>> rf
+            [{"key": "health-key", "value": "health-value", "features": ["health"]}]
         """
         for feat in group.features:
             if feat in self.features_restricted:
@@ -148,11 +152,11 @@ class RestrictedFeatures:
         to the `RestrictedFeatures` object that invoked this function.
 
         Example:
-        >>> from tritonfrontend import RestrictedFeatures, Feature
-        >>> rf = RestrictedFeatures()
-        >>> rf.create_feature_group("infer-key", "infer-value", [Feature.INFERENCE])
-        >>> rf
-        [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
+            >>> from tritonfrontend import RestrictedFeatures, Feature
+            >>> rf = RestrictedFeatures()
+            >>> rf.create_feature_group("infer-key", "infer-value", [Feature.INFERENCE])
+            >>> rf
+            [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
         """
         group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
