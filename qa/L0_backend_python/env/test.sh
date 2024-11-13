@@ -116,9 +116,9 @@ conda deactivate
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
-conda install numpy=1.23.4 -y
-conda install tensorflow=2.10.0 -y
-PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
+conda install numpy=1.26.4 -y
+conda install tensorflow=2.16.2 -y
+PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is 2.16.2"
 conda pack -o python3.12.tar.gz
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
