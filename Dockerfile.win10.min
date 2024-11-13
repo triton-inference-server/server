@@ -108,15 +108,8 @@ ADD https://aka.ms/vscollect.exe "C:\tmp\collect.exe"
 # Download the Build Tools bootstrapper.
 # ARG BUILD_TOOLS_SOURCE=https://aka.ms/vs/17/release/vs_buildtools.exe
 
-ARG BUILDTOOLS_VERSION=17.12.35424.110
-ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/ab43505e-6276-4982-9b89-e41a59e22c48/ed4666f857bce883d9dd950ae9bc951443d28a9a515ad2f95a1c25df681f88c3/vs_BuildTools.exe
-
-# ARG BUILDTOOLS_VERSION=17.11.35327.3
-# ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/69e24482-3b48-44d3-af65-51f866a08313/471c9a89fa8ba27d356748ae0cf25eb1f362184992dc0bb6e9ccf10178c43c27/vs_BuildTools.exe
-
-# ARG BUILDTOOLS_VERSION=17.12.35323.107
-# ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/5d3883f3-980b-458c-b5a2-9272fef48e22/ddca197fff5448392b2ac6460006d8daf864cfce1debdbc4214d23b56fa2254e/vs_BuildTools.exe
-
+ARG BUILDTOOLS_VERSION=17.12.35506.116
+ARG BUILD_TOOLS_SOURCE=https://download.visualstudio.microsoft.com/download/pr/5536698c-711c-4834-876f-2817d31a2ef2/58894fc272e86d3c3a6d85bf3a1df1e5a0685be8b9ab65d9f3cc5c2a8c6921cc/vs_BuildTools.exe
 
 ADD ${BUILD_TOOLS_SOURCE} vs_buildtools.exe
 # Install Build Tools with the Microsoft.VisualStudio.Workload.VCTools workload, including recommended.
