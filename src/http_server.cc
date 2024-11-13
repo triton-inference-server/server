@@ -1548,12 +1548,12 @@ HTTPAPIServer::HandleRepositoryControl(
             } else if (m.rfind("file:", 0) == 0) {
               if (param_len > INT_MAX) {
                 RETURN_AND_RESPOND_IF_ERR(
-                    req,
-                    TRITONSERVER_ErrorNew(
-                        TRITONSERVER_ERROR_INVALID_ARG,
-                        ("'" + m +
-                         "' size exceeds the maximum allowed limit INT_MAX")
-                            .c_str()));
+                    req, TRITONSERVER_ErrorNew(
+                             TRITONSERVER_ERROR_INVALID_ARG,
+                             ("'" + m +
+                              "' exceeds the maximum allowed data size limit "
+                              "INT_MAX")
+                                 .c_str()));
               }
 
               // Decode base64

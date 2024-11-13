@@ -32,6 +32,8 @@ sys.path.append("../common")
 import threading
 import time
 import unittest
+import json
+import base64
 
 import numpy as np
 import requests
@@ -43,6 +45,9 @@ from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 class HttpTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
         return "http://localhost:8000/v2/models/{}/infer".format(model_name)
+
+    def _get_load_model_url(self, model_name):
+        return "http://localhost:8000/v2/repository/models/{}/load".format(model_name)
 
     def _raw_binary_helper(
         self, model, input_bytes, expected_output_bytes, extra_headers={}
@@ -230,6 +235,43 @@ class HttpTest(tu.TestResultCollector):
             ),
         )
         t.join()
+
+    def test_loading_large_invalid_model(self):
+        # Generate large base64 encoded data
+        data_length = 2147483648
+        original_data_length = data_length * 3 // 4
+        random_data = b"A" * original_data_length
+        encoded_data = base64.b64encode(random_data)
+
+        assert (
+            len(encoded_data) == data_length
+        ), "Encoded data length does not match the required length."
+
+        # Prepare payload with large base64 encoded data
+        payload = {
+            "parameters": {
+                "config": json.dumps({"backend": "onnxruntime"}),
+                "file:1/model.onnx": encoded_data.decode("utf-8"),
+            }
+        }
+        headers = {"Content-Type": "application/json"}
+
+        # Send POST request
+        response = requests.post(
+            self._get_load_model_url("invalid_onnx"), headers=headers, json=payload
+        )
+
+        # Assert the response is not successful
+        self.assertNotEqual(response.status_code, 200)
+        try:
+            error_message = response.json().get("error", "")
+            self.assertIn(
+                "'file:1/model.onnx' exceeds the maximum allowed data size limit "
+                "INT_MAX",
+                error_message,
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
 
 
 if __name__ == "__main__":
