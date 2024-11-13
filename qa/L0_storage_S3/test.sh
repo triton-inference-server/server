@@ -489,7 +489,7 @@ for i in {1..1050}; do
 done
 
 # Provide extended timeout to allow >1000 files to be loaded
-SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=1200 --model-control-mode=none"
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=600 --model-control-mode=none"
 SERVER_LOG=$SERVER_LOG_BASE.many_files.log
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
