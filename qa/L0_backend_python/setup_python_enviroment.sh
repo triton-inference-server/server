@@ -96,6 +96,29 @@ if [ ${PYTHON_ENV_VERSION} = "9" ]; then
     cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
 fi
 
+# Create a model with python 3.10 version
+# Successful execution of the Python model indicates that the environment has
+# been setup correctly.
+if [ ${PYTHON_ENV_VERSION} = "10" ]; then
+    create_conda_env "3.10" "python-3-10"
+    conda install -c conda-forge libstdcxx-ng=14 -y
+    conda install tensorflow=2.10.0 -y
+    conda install numpy=1.23.4 -y
+    EXPECTED_VERSION_STRING="Python version is 3.10, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
+    create_python_backend_stub
+    conda-pack -o python3.10.tar.gz
+    path_to_conda_pack="$PWD/python-3-10"
+    mkdir -p $path_to_conda_pack
+    tar -xzf python3.10.tar.gz -C $path_to_conda_pack
+    mkdir -p models/python_3_10/1/
+    cp ../python_models/python_version/config.pbtxt ./models/python_3_10
+    (cd models/python_3_10 && \
+            sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
+            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
+    cp ../python_models/python_version/model.py ./models/python_3_10/1/
+    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_10
+fi
+
 # Create a model with python 3.11 version
 # Successful execution of the Python model indicates that the environment has
 # been setup correctly.
