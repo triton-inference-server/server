@@ -69,7 +69,7 @@ HOST_VARIMPLICITSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_implicit_model_r
 HOST_VARSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_model_repository
 
 # Clean up host working directory
-rm -fr $HOST_BUILD_DIR
+rm -frv $HOST_BUILD_DIR
 
 # Create the model output directories
 mkdir -p $HOST_SRCDIR
