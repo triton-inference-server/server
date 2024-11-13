@@ -30,6 +30,7 @@ import sys
 
 sys.path.append("../common")
 
+import base64
 import os
 import time
 import unittest
@@ -37,6 +38,7 @@ from functools import partial
 
 import infer_util as iu
 import numpy as np
+import requests
 import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -562,6 +564,100 @@ class TestCudaSharedMemoryUnregister(CudaSharedMemoryTestBase):
 
         finally:
             self._cleanup_server(shm_handles)
+
+
+class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
+    def setUp(self):
+        self.url = "localhost:8000"
+        self.client = httpclient.InferenceServerClient(url=self.url, verbose=True)
+        self.valid_shm_handle = None
+
+    def tearDown(self):
+        self.client.unregister_cuda_shared_memory()
+        if self.valid_shm_handle:
+            cshm.destroy_shared_memory_region(self.valid_shm_handle)
+        self.client.close()
+
+    def _generate_mock_base64_raw_handle(self, data_length):
+        original_data_length = data_length * 3 // 4
+        large_data = b"A" * original_data_length
+        encoded_data = base64.b64encode(large_data)
+
+        assert (
+            len(encoded_data) == data_length
+        ), "Encoded data length does not match the required length."
+        return encoded_data
+
+    def _send_register_cshm_request(self, raw_handle, device_id, byte_size):
+        cuda_shared_memory_register_request = {
+            "raw_handle": {"b64": raw_handle.decode("utf-8")},
+            "device_id": device_id,
+            "byte_size": byte_size,
+        }
+
+        url = "http://{}/v2/cudasharedmemory/region/dummy_large_handle/register".format(
+            self.url
+        )
+        headers = {"Content-Type": "application/json"}
+
+        # Send POST request
+        response = requests.post(
+            url, headers=headers, json=cuda_shared_memory_register_request
+        )
+        return response
+
+    def test_exceeds_cshm_handle_size_limit(self):
+        byte_size = 2147483648
+        device_id = 0
+
+        raw_handle = self._generate_mock_base64_raw_handle(byte_size)
+        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        self.assertNotEqual(response.status_code, 200)
+
+        try:
+            error_message = response.json().get("error", "")
+            self.assertIn(
+                "The length of 'raw_handle' exceeds the maximum allowed limit INT_MAX",
+                error_message,
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
+
+    def test_invalid_small_cshm_handle(self):
+        byte_size = 64
+        device_id = 0
+
+        raw_handle = self._generate_mock_base64_raw_handle(byte_size)
+        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        self.assertNotEqual(response.status_code, 200)
+
+        try:
+            error_message = response.json().get("error", "")
+            self.assertIn(
+                "'raw_handle' must be a valid base64 encoded cudaIpcMemHandle_t",
+                error_message,
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
+
+    def test_valid_cshm_handle(self):
+        byte_size = 64
+        device_id = 0
+        shm_name = "test_shm"
+
+        # Create valid shared memory
+        self.valid_shm_handle = cshm.create_shared_memory_region(
+            shm_name, byte_size, device_id
+        )
+        raw_handle = cshm.get_raw_handle(self.valid_shm_handle)
+
+        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify shared memory status
+        status = self.client.get_cuda_shared_memory_status()
+        self.assertEqual(len(status), 1)
+        self.assertEqual(status[0]["name"], shm_name)
 
 
 if __name__ == "__main__":

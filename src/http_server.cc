@@ -1552,7 +1552,7 @@ HTTPAPIServer::HandleRepositoryControl(
                     TRITONSERVER_ErrorNew(
                         TRITONSERVER_ERROR_INVALID_ARG,
                         ("'" + m +
-                         "' size exceeds the maximum allowed limit of INT_MAX")
+                         "' size exceeds the maximum allowed limit INT_MAX")
                             .c_str()));
               }
 
@@ -2457,9 +2457,8 @@ HTTPAPIServer::HandleCudaSharedMemory(
               RETURN_AND_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
                            TRITONSERVER_ERROR_INVALID_ARG,
-                           ("The length of 'raw_handle' exceeds the maximum "
-                            "allowed limit INT_MAX")
-                               .c_str()));
+                           "The length of 'raw_handle' exceeds the maximum "
+                           "allowed limit INT_MAX"));
             }
 
             base64_decodestate s;
