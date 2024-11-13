@@ -47,7 +47,7 @@ install_conda
 create_conda_env "3.7" "python-3-7"
 conda install numpy=1.20.1 -y
 conda install tensorflow=2.1.0 -y
-conda install -c conda-forge libstdcxx-ng=12 -y
+conda install -c conda-forge libstdcxx-ng=14 -y
 
 PY37_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0"
 create_python_backend_stub
@@ -71,7 +71,7 @@ path_to_conda_pack="$PWD/python-3-7-1"
 create_conda_env_with_specified_path "3.7" $path_to_conda_pack
 conda install numpy=1.20.3 -y
 conda install tensorflow=2.1.0 -y
-conda install -c conda-forge libstdcxx-ng=12 -y
+conda install -c conda-forge libstdcxx-ng=14 -y
 
 PY37_1_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.3, and Tensorflow version is 2.1.0"
 create_python_backend_stub
@@ -90,7 +90,7 @@ conda deactivate
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
 create_conda_env "3.6" "python-3-6"
-conda install -c conda-forge libstdcxx-ng=12 -y
+conda install -c conda-forge libstdcxx-ng=14 -y
 conda install numpy=1.18.1 -y
 conda install tensorflow=2.1.0 -y
 PY36_VERSION_STRING="Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0"
@@ -114,7 +114,7 @@ conda deactivate
 # it is Python 3.10 and for Ubuntu 20.04 is 3.8
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_10_environment.tar.gz'
 create_conda_env "3.10" "python-3-10"
-conda install -c conda-forge libstdcxx-ng=12 -y
+conda install -c conda-forge libstdcxx-ng=14 -y
 conda install numpy=1.23.4 -y
 conda install tensorflow=2.10.0 -y
 PY310_VERSION_STRING="Python version is 3.10, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
