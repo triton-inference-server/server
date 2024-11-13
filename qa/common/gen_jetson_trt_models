@@ -45,7 +45,7 @@ HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp/models_build}
 # Set the path to the host model output directory
 HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
 # Set the source directory to store executable source file to generate models
-HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_SRCDIR=${HOST_SRCDIR:=$HOST_BUILD_DIR/gen_srcdir}
 
 # Set CI specific parameters
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
