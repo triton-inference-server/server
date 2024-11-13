@@ -102,7 +102,7 @@ class MetricsConfigTest(tu.TestResultCollector):
     def test_inf_histograms_decoupled_exist(self):
         metrics = self._get_metrics()
         for metric in INF_HISTOGRAM_DECOUPLED_PATTERNS:
-            for suffix in ["_count", "_sum", ""]:
+            for suffix in ["_count", "_sum", "_bucket"]:
                 self.assertIn(metric + suffix, metrics)
 
     def test_inf_histograms_decoupled_missing(self):
