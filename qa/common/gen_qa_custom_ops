@@ -72,6 +72,8 @@ DESTDIR=/tmp/custom_ops
 
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -127,6 +129,8 @@ fi
 
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e

@@ -205,6 +205,8 @@ if [[ "aarch64" != $(uname -m) ]] ; then
 
 cat >$HOST_SRCDIR/$OPENVINOSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -264,6 +266,8 @@ fi # [[ "aarch64" != $(uname -m) ]]
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -339,6 +343,8 @@ fi
 # PyTorch
 cat >$HOST_SRCDIR/$TORCHSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -402,6 +408,8 @@ fi
 # Tensorflow
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -473,6 +481,8 @@ docker pull ${TENSORRT_IMAGE}
 TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
 cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
