@@ -1546,6 +1546,16 @@ HTTPAPIServer::HandleRepositoryControl(
               param = TRITONSERVER_ParameterNew(
                   m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             } else if (m.rfind("file:", 0) == 0) {
+              if (param_len > INT_MAX) {
+                RETURN_AND_RESPOND_IF_ERR(
+                    req, TRITONSERVER_ErrorNew(
+                             TRITONSERVER_ERROR_INVALID_ARG,
+                             ("'" + m +
+                              "' exceeds the maximum allowed data size limit "
+                              "INT_MAX")
+                                 .c_str()));
+              }
+
               // Decode base64
               base64_decodestate s;
               base64_init_decodestate(&s);
@@ -2443,6 +2453,14 @@ HTTPAPIServer::HandleCudaSharedMemory(
           }
 
           if (err == nullptr) {
+            if (b64_handle_len > INT_MAX) {
+              RETURN_AND_RESPOND_IF_ERR(
+                  req, TRITONSERVER_ErrorNew(
+                           TRITONSERVER_ERROR_INVALID_ARG,
+                           "The length of 'raw_handle' exceeds the maximum "
+                           "allowed limit INT_MAX"));
+            }
+
             base64_decodestate s;
             base64_init_decodestate(&s);
 
