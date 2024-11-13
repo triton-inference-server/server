@@ -61,7 +61,7 @@ fi
 export REPO_VERSION=$REPO_VERSION
 export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
-export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="10"}
+export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
@@ -78,7 +78,7 @@ source ./common.sh
 
 rm -fr *.log ./models
 
-python3 --version | grep "3.10" > /dev/null
+python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
     echo -e "Expecting Python default version to be: Python 3.10 but actual version is $(python3 --version)"
     exit 1
