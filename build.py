@@ -1401,7 +1401,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-ENV PIP_BREAK_SYSTEM_PACKAGES=1  
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
