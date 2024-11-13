@@ -588,15 +588,15 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         ), "Encoded data length does not match the required length."
         return encoded_data
 
-    def _send_register_cshm_request(self, raw_handle, device_id, byte_size):
+    def _send_register_cshm_request(self, raw_handle, device_id, byte_size, shm_name):
         cuda_shared_memory_register_request = {
             "raw_handle": {"b64": raw_handle.decode("utf-8")},
             "device_id": device_id,
             "byte_size": byte_size,
         }
 
-        url = "http://{}/v2/cudasharedmemory/region/dummy_large_handle/register".format(
-            self.url
+        url = "http://{}/v2/cudasharedmemory/region/{}/register".format(
+            self.url, shm_name
         )
         headers = {"Content-Type": "application/json"}
 
@@ -609,9 +609,12 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
     def test_exceeds_cshm_handle_size_limit(self):
         byte_size = 2147483648
         device_id = 0
+        shm_name = "invalid_shm"
 
         raw_handle = self._generate_mock_base64_raw_handle(byte_size)
-        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        response = self._send_register_cshm_request(
+            raw_handle, device_id, byte_size, shm_name
+        )
         self.assertNotEqual(response.status_code, 200)
 
         try:
@@ -626,9 +629,12 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
     def test_invalid_small_cshm_handle(self):
         byte_size = 64
         device_id = 0
+        shm_name = "invalid_shm"
 
         raw_handle = self._generate_mock_base64_raw_handle(byte_size)
-        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        response = self._send_register_cshm_request(
+            raw_handle, device_id, byte_size, shm_name
+        )
         self.assertNotEqual(response.status_code, 200)
 
         try:
@@ -651,7 +657,9 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         )
         raw_handle = cshm.get_raw_handle(self.valid_shm_handle)
 
-        response = self._send_register_cshm_request(raw_handle, device_id, byte_size)
+        response = self._send_register_cshm_request(
+            raw_handle, device_id, byte_size, shm_name
+        )
         self.assertEqual(response.status_code, 200)
 
         # Verify shared memory status
