@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,11 +29,11 @@ import sys
 
 sys.path.append("../common")
 
+import base64
+import json
 import threading
 import time
 import unittest
-import json
-import base64
 
 import numpy as np
 import requests
