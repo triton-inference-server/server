@@ -48,13 +48,13 @@ DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DO
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
-HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_SRCDIR=${HOST_SRCDIR:=$HOST_BUILD_DIR/gen_srcdir}
 HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_custom_ops
 
-rm -fr $HOST_DESTDIR
+rm -frv $HOST_DESTDIR
 mkdir -p $HOST_DESTDIR/tf_custom_ops $HOST_DESTDIR/libtorch_custom_ops
 
-rm -fr $HOST_SRCDIR
+rm -frv $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
 cp ./gen_qa_custom_ops_models.py $HOST_SRCDIR/.
@@ -72,6 +72,8 @@ DESTDIR=/tmp/custom_ops
 
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -127,6 +129,8 @@ fi
 
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
