@@ -45,7 +45,7 @@ HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp/models_build}
 # Set the path to the host model output directory
 HOST_MODEL_DIR=${HOST_MODEL_DIR:="${HOST_BUILD_DIR}/${TRITON_VERSION}"}
 # Set the source directory to store executable source file to generate models
-HOST_SOURCE_DIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_SRCDIR=${HOST_SRCDIR:=$HOST_BUILD_DIR/gen_srcdir}
 
 # Set CI specific parameters
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
@@ -69,10 +69,15 @@ HOST_VARIMPLICITSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_implicit_model_r
 HOST_VARSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_model_repository
 
 # Clean up host working directory
-rm -fr $HOST_BUILD_DIR
+if [ -z "${CI}" ]; then
+  rm -frv $HOST_BUILD_DIR ;
+else
+  rm -frv $HOST_BUILD_DIR/*/plan*
+fi
+
 
 # Create the model output directories
-mkdir -p $HOST_SOURCE_DIR
+mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_DATADEPENDENTDIR
 mkdir -p $HOST_DYNASEQDESTDIR
@@ -90,21 +95,21 @@ mkdir -p $HOST_VARIMPLICITSEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
 
 # Copy the executable source file to the host generate models source directory
-cp ./gen_ensemble_model_utils.py $HOST_SOURCE_DIR/.
-cp ./gen_common.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_dyna_sequence_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_identity_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_implicit_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_noshape_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_ragged_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_reshape_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_sequence_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_trt_data_dependent_shape.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_trt_format_models.py $HOST_SOURCE_DIR/.
-cp ./gen_qa_trt_plugin_models.py $HOST_SOURCE_DIR/.
-cp ./test_util.py $HOST_SOURCE_DIR/.
+cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
+cp ./gen_common.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_identity_models.py $HOST_SRCDIR/.
+cp ./gen_qa_implicit_models.py $HOST_SRCDIR/.
+cp ./gen_qa_models.py $HOST_SRCDIR/.
+cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
+cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
+cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
+cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_data_dependent_shape.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
+cp ./test_util.py $HOST_SRCDIR/.
 
 # Set TensorRT model generation script name
 TRT_MODEL_SCRIPT=trt_gen.cmds
@@ -129,7 +134,7 @@ CONTAINER_VARIMPLICITSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_implic
 CONTAINER_VARSEQDESTDIR=$CONTAINER_MODEL_DIR/qa_variable_sequence_model_repository
 
 # Set script to generate TensorRT models
-cat >$HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT <<EOF
+cat >$HOST_SRCDIR/$TRT_MODEL_SCRIPT <<EOF
 #!/bin/bash -xe
 # Make all generated files accessible outside of container
 umask 0000
@@ -160,14 +165,14 @@ python3 $CONTAINER_SOURCE_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$C
 chmod -R 777 $CONTAINER_MODEL_DIR
 EOF
 # Make the TensorRT model generation script executable
-chmod a+x $HOST_SOURCE_DIR/$TRT_MODEL_SCRIPT
+chmod a+x $HOST_SRCDIR/$TRT_MODEL_SCRIPT
 # Pull the TensorRT image
 docker pull $TENSORRT_IMAGE
 # Run the TensorRT model generation script inside the TensorRT container
 docker run \
   $DOCKER_GPU_ARGS \
   --rm --entrypoint $CONTAINER_SOURCE_DIR/$TRT_MODEL_SCRIPT \
-  --mount type=bind,source=$HOST_SOURCE_DIR,target=$CONTAINER_SOURCE_DIR \
+  --mount type=bind,source=$HOST_SRCDIR,target=$CONTAINER_SOURCE_DIR \
   --mount type=bind,source=$HOST_DESTDIR,target=$CONTAINER_DESTDIR \
   --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$CONTAINER_DATADEPENDENTDIR \
   --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$CONTAINER_DYNASEQDESTDIR \

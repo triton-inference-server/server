@@ -68,7 +68,7 @@ MODEL_TYPE=${MODEL_TYPE:-""}
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
-HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_SRCDIR=${HOST_SRCDIR:=$HOST_BUILD_DIR/gen_srcdir}
 HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_model_repository
 HOST_VARDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
@@ -95,15 +95,15 @@ HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 HOST_SCALARMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 HOST_IMAGEMODELSDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
-rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
-rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
-rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
-rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
-rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
-rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
-rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
-rm -rf $HOST_SCALARMODELSDESTDIR
-rm -rf $HOST_IMAGEMODELSDESTDIR
+rm -frv $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
+rm -frv $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
+rm -frv $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
+rm -frv $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
+rm -frv $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
+rm -frv $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
+rm -frv $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
+rm -frv $HOST_SCALARMODELSDESTDIR
+rm -frv $HOST_IMAGEMODELSDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -141,7 +141,7 @@ mkdir -p $HOST_ENSEMBLEDESTDIR/qa_reshape_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_sequence_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
 
-rm -fr $HOST_SRCDIR
+rm -frv $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
 cp ./gen_qa_models.py $HOST_SRCDIR/.
@@ -205,6 +205,8 @@ if [[ "aarch64" != $(uname -m) ]] ; then
 
 cat >$HOST_SRCDIR/$OPENVINOSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -264,6 +266,8 @@ fi # [[ "aarch64" != $(uname -m) ]]
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -339,6 +343,8 @@ fi
 # PyTorch
 cat >$HOST_SRCDIR/$TORCHSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -402,6 +408,8 @@ fi
 # Tensorflow
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -473,6 +481,8 @@ docker pull ${TENSORRT_IMAGE}
 TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
 cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
+# Make all generated files accessible outside of container
+umask 0000
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
@@ -527,8 +537,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+if [ "$MODEL_TYPE" != "igpu" ] ; then
+  docker pull $TENSORRT_IMAGE
+  docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -548,7 +559,9 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        $TENSORRT_IMAGE
 
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
+  if [ $? -ne 0 ]; then
+      echo -e "Failed"
+      exit 1
+  fi
+
 fi
