@@ -80,7 +80,7 @@ rm -fr *.log ./models
 
 python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
-    echo -e "Expecting Python default version to be: Python 3.10 but actual version is $(python3 --version)"
+    echo -e "Expecting Python default version to be: Python 3.12 but actual version is $(python3 --version)"
     exit 1
 fi
 
@@ -169,7 +169,7 @@ cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
 
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-  pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # GPU tensor tests are disabled on jetson
   pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
@@ -444,7 +444,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     done
 
     # [DLIS-5969]: Incorporate env test for windows
-    if [[ ${PYTHON_ENV_VERSION} = "10" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
+    if [[ ${PYTHON_ENV_VERSION} = "12" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
         # In 'env' test we use miniconda for dependency management. No need to run
         # the test in a virtual environment.
         set +e
