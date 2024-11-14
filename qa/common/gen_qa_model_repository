@@ -537,8 +537,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker pull $TENSORRT_IMAGE
-docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+[ "$MODEL_TYPE" != "igpu" ] && docker pull $TENSORRT_IMAGE
+[ "$MODEL_TYPE" != "igpu" ] && docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
