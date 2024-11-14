@@ -72,7 +72,7 @@ HOST_VARSEQDESTDIR=$HOST_MODEL_DIR/qa_variable_sequence_model_repository
 if [ -z "${CI}" ]; then
   rm -frv $HOST_BUILD_DIR ;
 else
-  find $HOST_BUILD_DIR -type d -name plan_* -exec rm -rfv {} \;
+  rm -frv $HOST_BUILD_DIR/*/plan*
 fi
 
 
