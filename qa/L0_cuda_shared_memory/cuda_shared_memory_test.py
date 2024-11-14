@@ -580,8 +580,8 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
 
     def _generate_mock_base64_raw_handle(self, data_length):
         original_data_length = data_length * 3 // 4
-        large_data = b"A" * original_data_length
-        encoded_data = base64.b64encode(large_data)
+        random_data = b"A" * original_data_length
+        encoded_data = base64.b64encode(random_data)
 
         assert (
             len(encoded_data) == data_length
@@ -607,7 +607,8 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         return response
 
     def test_exceeds_cshm_handle_size_limit(self):
-        byte_size = 2147483648
+        # byte_size greater than INT_MAX
+        byte_size = 1 << 31
         device_id = 0
         shm_name = "invalid_shm"
 
