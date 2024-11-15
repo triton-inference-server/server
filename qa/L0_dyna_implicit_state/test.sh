@@ -34,8 +34,8 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
-if [ ! -z "$TEST_REPO_ARCH" ] && [[ "$REPO_VERSION" == *"$TEST_REPO_ARCH"* ]]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+if [[ -n "$TEST_REPO_ARCH" && "$REPO_VERSION" != *"${TEST_REPO_ARCH}"* ]]; then
+    REPO_VERSION="${REPO_VERSION}_${TEST_REPO_ARCH}"
 fi
 
 export ENSEMBLES=0
