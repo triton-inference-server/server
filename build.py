@@ -73,9 +73,9 @@ TRITON_VERSION_MAP = {
     "2.52.0": (
         "24.11",  # triton container
         "24.11",  # upstream container
-        "1.20.0",  # ORT
-        "2024.0.0",  # ORT OpenVINO
-        "2024.0.0",  # Standalone OpenVINO
+        "1.19.2",  # ORT
+        "2024.4.0",  # ORT OpenVINO
+        "2024.4.0",  # Standalone OpenVINO
         "3.3.6",  # DCGM version
         "0.5.5",  # vLLM version
         "3.12.3",  # RHEL Python version
