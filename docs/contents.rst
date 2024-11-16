@@ -49,8 +49,8 @@
    :hidden:
    :caption: Client
 
-   client_doc/api_reference
-   client_doc/in_process
+   client_guide/api_reference
+   client_guide/in_process
    Client Libraries <client/README>
    _reference/tritonclient_api.rst
 
