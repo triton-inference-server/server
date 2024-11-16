@@ -8,7 +8,7 @@ Quick Deployment Guide by backend
    :maxdepth: 1
    :hidden:
 
-   TRT-LLM <../getting_started/llm.md>
+   TRT-LLM <llm.md>
    vLLM <../tutorials/Popular_Models_Guide/Llama2/vllm_guide.md>
    Python with HuggingFace <../tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>
    PyTorch <../tutorials/Quick_Deploy/PyTorch/README.md>
