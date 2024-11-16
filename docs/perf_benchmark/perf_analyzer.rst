@@ -2,7 +2,7 @@
 Performance Analyzer
 ####
 
-.. include:: ../perf-analyzer-README.rst
+.. include:: perf-analyzer-README.rst
 
 .. toctree::
    :maxdepth: 1
