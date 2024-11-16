@@ -670,8 +670,7 @@ def onnxruntime_cmake_args(images, library_paths):
     ]
 
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
-    # TODO: TPRD-334 TensorRT extension is not currently supported by our manylinux build
-    if FLAGS.enable_gpu and target_platform() != "rhel":
+    if FLAGS.enable_gpu:
         cargs.append(
             cmake_backend_enable(
                 "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
