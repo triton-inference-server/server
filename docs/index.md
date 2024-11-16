@@ -26,41 +26,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-::::{grid}
-:reverse:
-:gutter: 2 1 1 1
-:margin: 4 4 1 1
+# NVIDIA Triton Inference Server
 
-:::{grid-item}
-:columns: 4
-
-```{image} ./_static/nvidia-logo-vert-rgb-blk-for-screen.png
-:width: 300px
-```
-:::
-:::{grid-item}
-:columns: 8
-:class: sd-fs-3
-
-NVIDIA Triton Inference Server
-
-:::
-::::
-
-Triton Inference Server is an open source inference serving software that streamlines AI inferencing.
-
-  <!-- :::
-  :align: center
-  [![Getting Started Video](https://img.youtube.com/vi/NQDtfSi5QF4/1.jpg)](https://www.youtube.com/watch?v=NQDtfSi5QF4)
-  ::: -->
-
-<div>
-<iframe width="560" height="315" src="https://www.youtube.com/embed/NQDtfSi5QF4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</div>
-
-# Triton Inference Server
-
-Triton Inference Server enables teams to deploy any AI model from multiple deep
+Triton Inference Server is an open source inference serving software that streamlines 
+AI inferencing. Triton Inference Server enables teams to deploy any AI model from multiple deep
 learning and machine learning frameworks, including TensorRT, TensorFlow,
 PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference
 across cloud, data center, edge and embedded devices on NVIDIA GPUs, x86 and ARM
@@ -71,6 +40,52 @@ streaming. Triton inference Server is part of
 a software platform that accelerates the data science pipeline and streamlines
 the development and deployment of production AI.
 
+  <!-- :::
+  :align: center
+  [![Getting Started Video](https://img.youtube.com/vi/NQDtfSi5QF4/1.jpg)](https://www.youtube.com/watch?v=NQDtfSi5QF4)
+  ::: -->
+
+<div>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/NQDtfSi5QF4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
+
+
+## Triton Architecture
+
+The following figure shows the Triton Inference Server high-level
+architecture. The [model repository](user_guide/model_repository.md) is a
+file-system based repository of the models that Triton will make
+available for inferencing. Inference requests arrive at the server via
+either [HTTP/REST or GRPC](customization_guide/inference_protocols.md) or by the [C
+API](customization_guide/inference_protocols.md) and are then routed to the appropriate per-model
+scheduler. Triton implements [multiple scheduling and batching
+algorithms](#models-and-schedulers) that can be configured on a
+model-by-model basis. Each model's scheduler optionally performs
+batching of inference requests and then passes the requests to the
+[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+corresponding to the model type. The backend performs inferencing
+using the inputs provided in the batched requests to produce the
+requested outputs. The outputs are then returned.
+
+Triton supports a [backend C
+API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+that allows Triton to be extended with new functionality such as
+custom pre- and post-processing operations or even a new deep-learning
+framework.
+
+The models being served by Triton can be queried and controlled by a
+dedicated [model management API](user_guide/model_management.md) that is
+available by HTTP/REST or GRPC protocol, or by the C API.
+
+Readiness and liveness health endpoints and utilization, throughput
+and latency metrics ease the integration of Triton into deployment
+framework such as Kubernetes.
+
+![Triton Architecture Diagram](user_guide/images/arch.jpg)
+
+## Triton major features
+
 Major features include:
 
 - [Supports multiple deep learning
@@ -78,23 +93,23 @@ Major features include:
 - [Supports multiple machine learning
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
-  execution](user_guide/architecture.md#concurrent-model-execution)
-- [Dynamic batching](user_guide/model_configuration.md#dynamic-batcher)
-- [Sequence batching](user_guide/model_configuration.md#sequence-batcher) and
-  [implicit state management](user_guide/architecture.md#implicit-state-management)
+  execution](user_guide/model_execution.md#concurrent-model-execution)
+- [Dynamic batching](user_guide/batcher.md#dynamic-batcher)
+- [Sequence batching](user_guide/batcher.md#sequence-batcher) and
+  [implicit state management](user_guide/implicit_state_management.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
 - Model pipelines using
-  [Ensembling](user_guide/architecture.md#ensemble-models) or [Business
+  [Ensembling](user_guide/ensemble_models.md#ensemble-models) or [Business
   Logic Scripting
-  (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
+  (BLS)](user_guide/bls.md#business-logic-scripting)
 - [HTTP/REST and GRPC inference
   protocols](customization_guide/inference_protocols.md) based on the community
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
-- A [C API](customization_guide/inference_protocols.md#in-process-triton-server-api) and
-  [Java API](customization_guide/inference_protocols.md#java-bindings-for-in-process-triton-server-api)
+- A [C API](customization_guide/inprocess_c_api.md) and
+  [Java API](customization_guide/inprocess_java_api.md)
   allow Triton to link directly into your application for edge and other in-process use cases
 - [Metrics](user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
@@ -103,4 +118,4 @@ Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learn
 practices, and more. Need enterprise support? NVIDIA global support is available
 for Triton Inference Server with the [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
-See the [Latest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-05.html#rel-23-05) for updates on the newest features and bug fixes.
+See the [Latest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/) for updates on the newest features and bug fixes.
