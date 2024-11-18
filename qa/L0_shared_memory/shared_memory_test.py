@@ -129,6 +129,7 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         self.triton_client.register_system_shared_memory(
             "output1_data", "/output1_data", register_byte_size, offset=register_offset
         )
+        self.shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
     def _cleanup_shm_handles(self):
         for shm_handle in self._shm_handles:
@@ -456,9 +457,46 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         )
 
 
+def callback(user_data, result, error):
+    if error:
+        user_data.append(error)
+    else:
+        user_data.append(result)
+
+
 class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
-    def _test_unregister_shm_request_pass(self, shm_names):
-        self._test_shm_found(shm_names)
+    def _create_request_data(self):
+        self.triton_client.unregister_system_shared_memory()
+        self._configure_server()
+
+        if self.protocol == "http":
+            inputs = [
+                httpclient.InferInput("INPUT0", [1, 16], "INT32"),
+                httpclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
+                httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+            ]
+        else:
+            inputs = [
+                grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+                grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+            ]
+            outputs = [
+                grpcclient.InferRequestedOutput("OUTPUT0"),
+                grpcclient.InferRequestedOutput("OUTPUT1"),
+            ]
+
+        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
+        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+
+        return inputs, outputs
+
+    def _test_unregister_shm_request_pass(self):
+        self._test_shm_found()
 
         # Unregister all should not result in an error.
         # If shared memory regions are in use, they will be marked and unregistered after the inference is completed.
@@ -468,13 +506,12 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
             second_client.unregister_system_shared_memory()
 
         # Number of shared memory regions should be the same as the inference is not completed yet
-        self._test_shm_found(shm_names)
+        self._test_shm_found()
 
-    def _test_shm_not_found(self, shm_names):
-        self.assertGreater(len(shm_names), 0)
+    def _test_shm_not_found(self):
         second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
 
-        for shm_name in shm_names:
+        for shm_name in self.shm_names:
             with self.assertRaises(utils.InferenceServerException) as ex:
                 second_client.get_system_shared_memory_status(shm_name)
                 self.assertIn(
@@ -482,34 +519,17 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
                     str(ex.exception),
                 )
 
-    def _test_shm_found(self, shm_names):
-        self.assertGreater(len(shm_names), 0)
+    def _test_shm_found(self):
         second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
 
         status = second_client.get_system_shared_memory_status()
-        self.assertEqual(len(status), len(shm_names))
+        self.assertEqual(len(status), len(self.shm_names))
 
         for shm_info in status:
-            self.assertIn(shm_info["name"], shm_names)
+            self.assertIn(shm_info["name"], self.shm_names)
 
-    def test_unregister_shm_during_inference_http(self):
-        self.triton_client.unregister_system_shared_memory()
-        self._configure_server()
-        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
-
-        inputs = [
-            httpclient.InferInput("INPUT0", [1, 16], "INT32"),
-            httpclient.InferInput("INPUT1", [1, 16], "INT32"),
-        ]
-        outputs = [
-            httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
-            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
-        ]
-
-        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+    def test_unregister_shm_during_inference_single_req_http(self):
+        inputs, outputs = self._create_request_data()
 
         async_request = self.triton_client.async_infer(
             model_name="simple", inputs=inputs, outputs=outputs
@@ -519,32 +539,49 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Try unregister shm regions during inference
-        self._test_unregister_shm_request_pass(shm_names)
+        self._test_unregister_shm_request_pass()
 
         # Blocking call
         async_request.get_result()
 
         # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-        self._test_shm_not_found(shm_names)
+        self._test_shm_not_found()
+
+    def test_unregister_shm_during_inference_multiple_req_http(self):
+        inputs, outputs = self._create_request_data()
+
+        # Place the first request
+        async_request = self.triton_client.async_infer(
+            model_name="simple", inputs=inputs, outputs=outputs
+        )
+        # Ensure inference started
+        time.sleep(2)
+
+        # Try unregister shm regions during inference
+        self._test_unregister_shm_request_pass()
+        time.sleep(2)
+
+        # Place the second request
+        second_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+        second_async_request = second_client.async_infer(
+            model_name="simple", inputs=inputs, outputs=outputs
+        )
+
+        # Blocking call
+        async_request.get_result()
+
+        # Shm regions will remain available as the second request is still in progress
+        self._test_shm_found()
+
+        # Blocking call
+        second_async_request.get_result()
+
+        # Verify that all shm regions are successfully unregistered once all inference requests have completed,
+        # without needing to manually call unregister again.
+        self._test_shm_not_found()
 
     def test_unregister_shm_after_inference_http(self):
-        self.triton_client.unregister_system_shared_memory()
-        self._configure_server()
-        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
-
-        inputs = [
-            httpclient.InferInput("INPUT0", [1, 16], "INT32"),
-            httpclient.InferInput("INPUT1", [1, 16], "INT32"),
-        ]
-        outputs = [
-            httpclient.InferRequestedOutput("OUTPUT0", binary_data=True),
-            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
-        ]
-
-        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
+        inputs, outputs = self._create_request_data()
 
         async_request = self.triton_client.async_infer(
             model_name="simple", inputs=inputs, outputs=outputs
@@ -554,43 +591,20 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Test all registered shm regions exist during inference.
-        self._test_shm_found(shm_names)
+        self._test_shm_found()
 
         # Blocking call
         async_request.get_result()
 
         # Test all registered shm regions exist after inference, as unregister API have not been called.
-        self._test_shm_found(shm_names)
+        self._test_shm_found()
 
         # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
         self.triton_client.unregister_system_shared_memory()
-        self._test_shm_not_found(shm_names)
+        self._test_shm_not_found()
 
-    def test_unregister_shm_during_inference_grpc(self):
-        self.triton_client.unregister_system_shared_memory()
-        self._configure_server()
-        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
-
-        inputs = [
-            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
-            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
-        ]
-        outputs = [
-            grpcclient.InferRequestedOutput("OUTPUT0"),
-            grpcclient.InferRequestedOutput("OUTPUT1"),
-        ]
-
-        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
-
-        def callback(user_data, result, error):
-            if error:
-                user_data.append(error)
-            else:
-                user_data.append(result)
-
+    def test_unregister_shm_during_inference_single_req_grpc(self):
+        inputs, outputs = self._create_request_data()
         user_data = []
 
         self.triton_client.async_infer(
@@ -604,7 +618,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Try unregister shm regions during inference
-        self._test_unregister_shm_request_pass(shm_names)
+        self._test_unregister_shm_request_pass()
 
         # Wait until the results are available in user_data
         time_out = 20
@@ -614,33 +628,58 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Test that all shm regions are successfully unregistered after inference without needing to call unregister again.
-        self._test_shm_not_found(shm_names)
+        self._test_shm_not_found()
+
+    def test_unregister_shm_during_inference_multiple_req_grpc(self):
+        inputs, outputs = self._create_request_data()
+        user_data = []
+
+        self.triton_client.async_infer(
+            model_name="simple",
+            inputs=inputs,
+            outputs=outputs,
+            callback=partial(callback, user_data),
+        )
+
+        # Ensure inference started
+        time.sleep(2)
+
+        # Try unregister shm regions during inference
+        self._test_unregister_shm_request_pass()
+
+        # Place the second request
+        second_user_data = []
+        second_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+        second_client.async_infer(
+            model_name="simple",
+            inputs=inputs,
+            outputs=outputs,
+            callback=partial(callback, second_user_data),
+        )
+
+        # Wait until the 1st request results are available in user_data
+        time_out = 10
+        while (len(user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+        time.sleep(2)
+
+        # Shm regions will remain available as the second request is still in progress
+        self._test_shm_found()
+
+        # Wait until the 2nd request results are available in user_data
+        time_out = 20
+        while (len(second_user_data) == 0) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+        time.sleep(2)
+
+        # Verify that all shm regions are successfully unregistered once all inference requests have completed,
+        # without needing to manually call unregister again.
+        self._test_shm_not_found()
 
     def test_unregister_shm_after_inference_grpc(self):
-        self.triton_client.unregister_system_shared_memory()
-        self._configure_server()
-        shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
-
-        inputs = [
-            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
-            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
-        ]
-        outputs = [
-            grpcclient.InferRequestedOutput("OUTPUT0"),
-            grpcclient.InferRequestedOutput("OUTPUT1"),
-        ]
-
-        inputs[0].set_shared_memory("input0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        inputs[1].set_shared_memory("input1_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[0].set_shared_memory("output0_data", self.DEFAULT_SHM_BYTE_SIZE)
-        outputs[1].set_shared_memory("output1_data", self.DEFAULT_SHM_BYTE_SIZE)
-
-        def callback(user_data, result, error):
-            if error:
-                user_data.append(error)
-            else:
-                user_data.append(result)
-
+        inputs, outputs = self._create_request_data()
         user_data = []
 
         self.triton_client.async_infer(
@@ -654,7 +693,7 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Test all registered shm regions exist during inference.
-        self._test_shm_found(shm_names)
+        self._test_shm_found()
 
         # Wait until the results are available in user_data
         time_out = 20
@@ -664,11 +703,11 @@ class TestSharedMemoryUnregister(SystemSharedMemoryTestBase):
         time.sleep(2)
 
         # Test all registered shm regions exist after inference, as unregister API have not been called.
-        self._test_shm_found(shm_names)
+        self._test_shm_found()
 
         # Test all shm regions are successfully unregistered after calling the unregister API after inference completed.
         self.triton_client.unregister_system_shared_memory()
-        self._test_shm_not_found(shm_names)
+        self._test_shm_not_found()
 
 
 if __name__ == "__main__":
