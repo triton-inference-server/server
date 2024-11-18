@@ -35,7 +35,7 @@ SERVER_LOG="./decoupled_server.log"
 pip3 uninstall -y torch
 # FIXME: Until Windows supports GPU tensors, only test CPU scenarios
 if [[ ${TEST_WINDOWS} == 1 ]]; then
-  pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+  pip3 install torch==2.3.1 -f https://download.pytorch.org/whl/torch_stable.html
 else
   pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
 fi
