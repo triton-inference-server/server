@@ -673,7 +673,7 @@ def onnxruntime_cmake_args(images, library_paths):
     if FLAGS.enable_gpu:
         # TODO: TPRD-712 TensorRT is not currently supported by our RHEL build for SBSA.
         if target_platform() != "rhel" or (
-            target_platform() == "rhel" and target_machine() != "aarch64"
+            target_platform() == "rhel" and target_machine() == "x86_64"
         ):
             cargs.append(
                 cmake_backend_enable(
