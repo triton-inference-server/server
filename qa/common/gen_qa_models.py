@@ -1809,10 +1809,10 @@ def create_openvino_modelfile(
     )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    in0 = ov.opset8.parameter(
+    in0 = ov.opset1.parameter(
         shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT0"
     )
-    in1 = ov.opset8.parameter(
+    in1 = ov.opset1.parameter(
         shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT1"
     )
 
