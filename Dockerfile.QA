@@ -328,7 +328,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libarchive-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
-                              maven \
                               openjdk-11-jdk \
                               nginx \
                               npm \
