@@ -671,11 +671,15 @@ def onnxruntime_cmake_args(images, library_paths):
 
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
     if FLAGS.enable_gpu:
-        cargs.append(
-            cmake_backend_enable(
-                "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
+        # TODO: TPRD-712 TensorRT is not currently supported by our RHEL build for SBSA.
+        if target_platform() != "rhel" or (
+            target_platform() == "rhel" and target_machine() != "aarch64"
+        ):
+            cargs.append(
+                cmake_backend_enable(
+                    "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
+                )
             )
-        )
 
     if target_platform() == "windows":
         if "base" in images:
