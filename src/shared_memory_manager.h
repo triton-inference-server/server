@@ -72,6 +72,8 @@ class SharedMemoryManager {
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
+
+    // TODO (DLIS-7620): avoid explicit flag and use smart pointers
     bool awaiting_unregister_;
   };
 
