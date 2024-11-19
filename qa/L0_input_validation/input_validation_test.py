@@ -221,19 +221,23 @@ class InputShapeTest(unittest.TestCase):
                 dummy_input_data = np.random.rand(32, 32).astype(np.float32)
             shape_tensor_data = np.asarray([4, 4], dtype=np.int32)
 
-            # Pass incorrect input byte size date for shape tensor
+            # Pass an incorrect input byte size for the shape tensor
             # Use shared memory to bypass the shape check in client library
             input_byte_size = (shape_tensor_data.size - 1) * np.dtype(np.int32).itemsize
 
+            # Create a shared memory region with the incorrect byte size (input_byte_size)
             input_shm_handle = shm.create_shared_memory_region(
                 "INPUT0_SHM",
                 "/INPUT0_SHM",
                 input_byte_size,
             )
+
+            # Write the shape tensor data into the shared memory region
+            # Slice the data to match the incorrect byte size (input_byte_size)
             shm.set_shared_memory_region(
                 input_shm_handle,
                 [
-                    shape_tensor_data,
+                    shape_tensor_data[: input_byte_size // np.dtype(np.int32).itemsize],
                 ],
             )
             triton_client.register_system_shared_memory(
