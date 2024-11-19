@@ -721,6 +721,10 @@ class ModelMetadataTest(tu.TestResultCollector):
                     stats = infer_stats["model_stats"]
                 else:
                     stats = infer_stats.model_stats
+                print("=" * 100)
+                print(f"[DEBUG] stats: {len(stats)}")
+                print(stats)
+                print("=" * 100)
                 self.assertEqual(
                     len(stats),
                     221,
