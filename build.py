@@ -79,7 +79,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "standalone_openvino_version": "2024.4.0",
     "dcgm_version": "3.2.6",
     "vllm_version": "0.5.5",
-    "rhel_py_version": "3.12.3"
+    "rhel_py_version": "3.12.3",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -966,7 +966,9 @@ RUN yum install -y \\
             wget
 """
     # Requires openssl-devel to be installed first for pyenv build to be successful
-    df += change_default_python_version_rhel(DEFAULT_TRITON_VERSION_MAP["rhel_py_version"])
+    df += change_default_python_version_rhel(
+        DEFAULT_TRITON_VERSION_MAP["rhel_py_version"]
+    )
     df += """
 
 RUN pip3 install --upgrade pip \\
