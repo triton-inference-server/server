@@ -472,7 +472,7 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
         cmake_core_enable("TRITON_ENABLE_METRICS_CPU", FLAGS.enable_cpu_metrics)
     )
     cargs.append(cmake_core_enable("TRITON_ENABLE_TRACING", FLAGS.enable_tracing))
-    cargs.append(cmake_core_enable("TRITON_ENABLE_NVTX", FLAGS.enable_nvtx))
+    cargs.append(cmake_core_enable("TRITON_ENABLE_NVTX", True))
 
     cargs.append(cmake_core_enable("TRITON_ENABLE_GPU", FLAGS.enable_gpu))
     cargs.append(
