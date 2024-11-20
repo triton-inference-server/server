@@ -621,7 +621,7 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "The length of 'raw_handle' exceeds the maximum allowed limit INT_MAX",
+                "'raw_handle' exceeds the maximum allowed data size limit INT_MAX",
                 error_message,
             )
         except ValueError:
