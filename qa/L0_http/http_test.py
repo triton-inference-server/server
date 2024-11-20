@@ -238,13 +238,13 @@ class HttpTest(tu.TestResultCollector):
 
     def test_loading_large_invalid_model(self):
         # Generate large base64 encoded data
-        data_length = 2147483648
-        original_data_length = data_length * 3 // 4
-        random_data = b"A" * original_data_length
+        data_length = 1 << 31
+        int_max = (1 << 31) - 1
+        random_data = b"A" * data_length
         encoded_data = base64.b64encode(random_data)
 
         assert (
-            len(encoded_data) == data_length
+            len(encoded_data) > int_max
         ), "Encoded data length does not match the required length."
 
         # Prepare payload with large base64 encoded data
