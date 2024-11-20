@@ -364,6 +364,22 @@ HTTPMetricsServer::Create(
   return nullptr;
 }
 
+TRITONSERVER_Error*
+HTTPMetricsServer::Create(
+    std::shared_ptr<TRITONSERVER_Server>& server,
+    const UnorderedMapType& options, std::unique_ptr<HTTPServer>* service)
+{
+  int port;
+  std::string address;
+  int thread_count;
+
+  RETURN_IF_ERR(GetValue(options, "port", &port));
+  RETURN_IF_ERR(GetValue(options, "address", &address));
+  RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
+
+  return Create(server, port, address, thread_count, service);
+}
+
 #endif  // TRITON_ENABLE_METRICS
 
 namespace {
@@ -1810,6 +1826,10 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   }
 
 #ifdef TRITON_ENABLE_TRACING
+  if (trace_manager_ == nullptr) {
+    return;
+  }
+
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
   int32_t count;
@@ -3233,8 +3253,11 @@ HTTPAPIServer::HandleGenerate(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace =
-      StartTrace(req, model_name, &triton_trace);
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (trace_manager_) {
+    // If tracing is enabled see if this request should be traced.
+    trace = StartTrace(req, model_name, &triton_trace);
+  }
 
   std::map<std::string, triton::common::TritonJson::Value> input_metadata;
   triton::common::TritonJson::Value meta_data_root;
@@ -3557,6 +3580,8 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       }
     }
 
+    // get original element count back
+    element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);

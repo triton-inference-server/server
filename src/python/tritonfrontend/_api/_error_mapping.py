@@ -24,6 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+
 import tritonserver
 from tritonfrontend._c.tritonfrontend_bindings import (
     AlreadyExistsError,
@@ -36,6 +38,7 @@ from tritonfrontend._c.tritonfrontend_bindings import (
     UnsupportedError,
 )
 
+# ERROR_MAPPING takes in tritonfrontend Error and maps to respective tritonserver Error
 ERROR_MAPPING = {
     TritonError: tritonserver.TritonError,
     NotFoundError: tritonserver.NotFoundError,
@@ -46,3 +49,15 @@ ERROR_MAPPING = {
     AlreadyExistsError: tritonserver.AlreadyExistsError,
     UnsupportedError: tritonserver.UnsupportedError,
 }
+
+
+def handle_triton_error(func):
+    def error_handling_wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except TritonError:
+            exc_type, exc_value, _ = sys.exc_info()
+            # raise ... from None masks the tritonfrontend Error from being added in traceback
+            raise ERROR_MAPPING[exc_type](exc_value) from None
+
+    return error_handling_wrapper

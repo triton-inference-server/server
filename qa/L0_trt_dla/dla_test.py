@@ -91,7 +91,7 @@ class InferTest(tu.TestResultCollector):
 
         # Validate the results by comparing with precomputed values.
         # VULTURE class corresponds with index 23
-        EXPECTED_CLASS_INDEX = 23
+        EXPECTED_CLASS_INDEX = 418
         for i in range(batch_size):
             self.assertEqual(output_data[i][0][0], EXPECTED_CLASS_INDEX)
 

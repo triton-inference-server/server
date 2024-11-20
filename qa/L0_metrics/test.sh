@@ -46,6 +46,7 @@ BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_ARGS="${BASE_SERVER_ARGS}"
 SERVER_LOG="./inference_server.log"
 PYTHON_TEST="metrics_config_test.py"
+HISTOGRAM_PYTEST="histogram_metrics_test.py"
 source ../common/util.sh
 
 CLIENT_LOG="client.log"
@@ -270,10 +271,62 @@ mkdir -p "${MODELDIR}/identity_cache_on/1"
 mkdir -p "${MODELDIR}/identity_cache_off/1"
 BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
 
-# Check default settings: Counters should be enabled, summaries should be disabled
+# Check default settings: Counters should be enabled, histograms and summaries should be disabled
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Check default settings: Histograms should be always disabled in non-decoupled model.
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config histogram_latencies=true"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Check default settings: Histograms should be disabled in decoupled model
+decoupled_model="async_execute_decouple"
+mkdir -p "${MODELDIR}/${decoupled_model}/1/"
+cp ../python_models/${decoupled_model}/model.py ${MODELDIR}/${decoupled_model}/1/
+cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
+
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model}"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Enable histograms in decoupled model
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model} --metrics-config histogram_latencies=true"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -406,6 +459,61 @@ kill_server
 expected_tests=6
 check_unit_test "${expected_tests}"
 
+### Test histogram data in ensemble decoupled model ###
+MODELDIR="${PWD}/ensemble_decoupled"
+SERVER_LOG="./histogram_ensemble_decoupled_server.log"
+CLIENT_LOG="./histogram_ensemble_decoupled_client.log"
+SERVER_ARGS="--model-repository=${MODELDIR} --metrics-config histogram_latencies=true --log-verbose=1"
+mkdir -p "${MODELDIR}"/ensemble/1
+cp -r "${MODELDIR}"/async_execute_decouple "${MODELDIR}"/async_execute
+sed -i "s/model_transaction_policy { decoupled: True }//" "${MODELDIR}"/async_execute/config.pbtxt
+
+run_and_check_server
+python3 ${HISTOGRAM_PYTEST} TestHistogramMetrics.test_ensemble_decoupled 2>&1 | tee ${CLIENT_LOG}
+kill_server
+check_unit_test
+
+### Test model metrics configuration
+MODELDIR="${PWD}/model_metrics_model"
+SERVER_LOG="./model_metric_config_server.log"
+CLIENT_LOG="./model_metric_config_client.log"
+decoupled_model="async_execute_decouple"
+rm -rf "${MODELDIR}/${decoupled_model}"
+mkdir -p "${MODELDIR}/${decoupled_model}/1/"
+cp ../python_models/${decoupled_model}/model.py ${MODELDIR}/${decoupled_model}/1/
+
+# Test valid model_metrics config
+cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
+cat >> "${MODELDIR}/${decoupled_model}/config.pbtxt" << EOL
+model_metrics {
+  metric_control: [
+    {
+      metric_identifier: {
+        family: "nv_inference_first_response_histogram_ms"
+      }
+      histogram_options: {
+        buckets: [ -1, 0.0, 1, 2.5 ]
+      }
+    }
+  ]
+}
+EOL
+
+SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=true --log-verbose=1"
+run_and_check_server
+export OVERRIDE_BUCKETS="-1,0,1,2.5,+Inf"
+python3 ${HISTOGRAM_PYTEST} TestHistogramMetrics.test_buckets_override 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Test valid model_metrics config with histogram disabled
+PYTHON_TEST="metrics_config_test.py"
+SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=false --log-verbose=1"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
@@ -413,4 +521,3 @@ else
 fi
 
 exit $RET
-
