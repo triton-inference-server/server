@@ -2626,7 +2626,7 @@ if __name__ == "__main__":
         "--release-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["release_version"],
-        help="Provide any release version.",
+        help="This flag sets the release version for Triton Inference Server to be build. Default: the latest released version.",
     )
     parser.add_argument(
         "--triton-container-version",
