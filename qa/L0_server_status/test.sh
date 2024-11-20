@@ -93,7 +93,7 @@ sleep 3
 # Primarily meant to assist in debugging ModelMetadataTest::test_infer_stats_no_model
 # Diff the output with a previous L0_server_status job to catch any changes to
 # /data/inferenceserver/${REPO_VERSION}/qa_model_repository that were not accounted for.
-curl -X POST http://localhost:8000/v2/repository/index | jq
+curl -X POST http://localhost:8000/v2/repository/index
 
 set +e
 
