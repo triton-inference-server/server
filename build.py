@@ -2630,7 +2630,7 @@ if __name__ == "__main__":
         "--triton-container-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
-        help="Provide any released version of project.",
+        help="Provide any development or released version of project.",
     )
     parser.add_argument(
         "--upstream-container-version",
