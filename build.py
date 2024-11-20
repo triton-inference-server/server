@@ -2626,49 +2626,49 @@ if __name__ == "__main__":
         "--release-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["release_version"],
-        help="This flag sets the release version for Triton Inference Server to be build. Default: the latest released version.",
+        help="This flag sets the release version for Triton Inference Server to be built. Default: the latest released version.",
     )
     parser.add_argument(
         "--triton-container-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
-        help="Provide any development or released version of project.",
+        help="This flag sets the container version for Triton Inference Server to be built. Default: the latest released version.",
     )
     parser.add_argument(
         "--upstream-container-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
-        help="Provide any upstream container version of project.",
+        help="This flag sets the upstream container version for Triton Inference Server to be built. Default: the latest released version.",
     )
     parser.add_argument(
         "--ort-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["ort_version"],
-        help="Provide any ORT version of project.",
+        help="This flag sets the ORT version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--ort-openvino-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
-        help="Provide any openvino version of project.",
+        help="This flag sets the OpenVino version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--standalone-openvino-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["standalone_openvino_version"],
-        help="Provide any standalone openvino version of project.",
+        help="This flag sets the standalon OpenVino version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--dcgm-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
-        help="Provide any DCGM version of project.",
+        help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--vllm-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
-        help="Provide any released version of vllm project.",
+        help="This flag sets the vLLM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
 
     FLAGS = parser.parse_args()
