@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ add_library(
   TritonSequenceBackend::triton-sequence-backend ALIAS triton-sequence-backend
 )
 
-target_compile_features(triton-sequence-backend PRIVATE cxx_std_11)
+target_compile_features(triton-sequence-backend PRIVATE cxx_std_17)
 target_compile_options(
   triton-sequence-backend PRIVATE
   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
