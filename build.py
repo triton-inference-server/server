@@ -663,7 +663,7 @@ def onnxruntime_cmake_args(images, library_paths):
             None,
             os.getenv("TRITON_BUILD_ONNXRUNTIME_VERSION")
             if os.getenv("TRITON_BUILD_ONNXRUNTIME_VERSION")
-            else DEFAULT_TRITON_VERSION_MAP["ort_version"],
+            else FLAGS.ort_version,
         )
     ]
 
