@@ -145,7 +145,6 @@ def container_versions(version, container_version, upstream_container_version):
         container_version = FLAGS.triton_container_version
     if upstream_container_version is None:
         upstream_container_version = FLAGS.upstream_container_version
-        ]
     return container_version, upstream_container_version
 
 
