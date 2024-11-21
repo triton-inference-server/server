@@ -214,7 +214,7 @@ RUN apt-get update && \
             python3-pdfkit \
             maven \
             default-jdk && \
-    pip3 install --upgrade "grpcio-tools<1.68"
+    pip3 install "grpcio<1.68" "grpcio-tools<1.68"
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
