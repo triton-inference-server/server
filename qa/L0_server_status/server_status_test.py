@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -723,8 +723,8 @@ class ModelMetadataTest(tu.TestResultCollector):
                     stats = infer_stats.model_stats
                 self.assertEqual(
                     len(stats),
-                    219,
-                    "expected 219 infer stats for all ready versions of all model",
+                    221,
+                    "expected 221 infer stats for all ready versions of all model",
                 )
 
         except InferenceServerException as ex:

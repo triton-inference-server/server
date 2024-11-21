@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -88,6 +88,12 @@ rm -fr models/graphdef_int32_int32_int32/2 models/graphdef_int32_int32_int32/3
 rm -fr models/onnx_int32_int32_int32/2 models/onnx_int32_int32_int32/3
 cp -r models/graphdef_float16_float32_float32/1 models/graphdef_float16_float32_float32/7
 sleep 3
+
+# Dumping the contents of the models that are currently loaded for debugging purposes
+# Primarily meant to assist in debugging ModelMetadataTest::test_infer_stats_no_model
+# Diff the output with a previous L0_server_status job to catch any changes to
+# /data/inferenceserver/${REPO_VERSION}/qa_model_repository that were not accounted for.
+curl -X POST http://localhost:8000/v2/repository/index
 
 set +e
 
