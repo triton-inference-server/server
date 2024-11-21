@@ -958,6 +958,10 @@ RUN yum install -y \\
             pkg-config \\
             unzip \\
             wget \\
+            ncurses-devel \\
+            readline-devel \\
+            xz-devel \\
+            bzip2-devel \\
             zlib-devel \\
             libarchive-devel \\
             libxml2-devel \\
