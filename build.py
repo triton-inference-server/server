@@ -142,10 +142,9 @@ def target_machine():
 
 def container_versions(version, container_version, upstream_container_version):
     if container_version is None:
-        container_version = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
+        container_version = FLAGS.triton_container_version
     if upstream_container_version is None:
-        upstream_container_version = DEFAULT_TRITON_VERSION_MAP[
-            "upstream_container_version"
+        upstream_container_version = FLAGS.upstream_container_version
         ]
     return container_version, upstream_container_version
 
@@ -699,7 +698,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    DEFAULT_TRITON_VERSION_MAP["triton_container_version"],
+                    FLAGS.triton_container_version,
                 )
             )
 
@@ -707,7 +706,7 @@ def onnxruntime_cmake_args(images, library_paths):
         if (
             (target_machine() != "aarch64")
             and (target_platform() != "rhel")
-            and (DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"] is not None)
+            and (FLAGS.ort_openvino_version is not None)
         ):
             cargs.append(
                 cmake_backend_enable(
@@ -719,7 +718,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
                     None,
-                    DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
+                    FLAGS.ort_openvino_version,
                 )
             )
 
@@ -742,7 +741,7 @@ def openvino_cmake_args():
             "openvino",
             "TRITON_BUILD_OPENVINO_VERSION",
             None,
-            DEFAULT_TRITON_VERSION_MAP["standalone_openvino_version"],
+            FLAGS.standalone_openvino_version,
         )
     ]
     if target_platform() == "windows":
@@ -765,7 +764,7 @@ def openvino_cmake_args():
                     "openvino",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
+                    FLAGS.upstream_container_version,
                 )
             )
     return cargs
@@ -820,7 +819,7 @@ def fil_cmake_args(images):
                 "fil",
                 "TRITON_BUILD_CONTAINER_VERSION",
                 None,
-                DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
+                FLAGS.upstream_container_version,
             )
         )
 
@@ -967,7 +966,7 @@ RUN yum install -y \\
 """
     # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(
-        DEFAULT_TRITON_VERSION_MAP["rhel_py_version"]
+        FLAGS.rhel_py_version
     )
     df += """
 
@@ -1414,7 +1413,7 @@ RUN yum install -y \\
 """
             # Requires openssl-devel to be installed first for pyenv build to be successful
             df += change_default_python_version_rhel(
-                DEFAULT_TRITON_VERSION_MAP["rhel_py_version"]
+                FLAGS.rhel_py_version
             )
             df += """
 RUN pip3 install --upgrade pip \\
@@ -1645,7 +1644,7 @@ def create_build_dockerfiles(
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
-        "DCGM_VERSION": DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
+        "DCGM_VERSION": FLAGS.dcgm_version,
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
@@ -2024,7 +2023,7 @@ def backend_build(
     # bindings. It must instead must be installed via pyenv. We package it here for better usability.
     if target_platform() == "rhel" and be == "python":
         major_minor_version = ".".join(
-            (DEFAULT_TRITON_VERSION_MAP["rhel_py_version"]).split(".")[:2]
+            (FLAGS.rhel_py_version).split(".")[:2]
         )
         version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
         cmake_script.cp(
@@ -2670,7 +2669,12 @@ if __name__ == "__main__":
         default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
         help="This flag sets the vLLM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
-
+    parser.add_argument(
+        "--rhel-py-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
+        help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
@@ -2747,7 +2751,7 @@ if __name__ == "__main__":
     default_repo_tag = "main"
     cver = FLAGS.upstream_container_version
     if cver is None:
-        cver = DEFAULT_TRITON_VERSION_MAP["triton_container_version"]
+        cver = FLAGS.triton_container_version
     if not cver.endswith("dev"):
         default_repo_tag = "r" + cver
     log("default repo-tag: {}".format(default_repo_tag))
