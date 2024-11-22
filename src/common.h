@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -166,6 +166,18 @@ int64_t GetElementCount(const std::vector<int64_t>& dims);
 /// \param str The string to lookup.
 /// \return True if the str is found, false otherwise.
 bool Contains(const std::vector<std::string>& vec, const std::string& str);
+
+/// Decodes a Base64 encoded string and stores the result in a vector.
+///
+/// \param input The Base64 encoded input string to decode.
+/// \param input_len The length of the input string.
+/// \param decoded_data A vector to store the decoded data.
+/// \param decoded_size The size of the decoded data.
+/// \param name The name associated with the decoding process.
+/// \return The error status.
+TRITONSERVER_Error* DecodeBase64(
+    const char* input, size_t input_len, std::vector<char>& decoded_data,
+    size_t& decoded_size, const std::string& name);
 
 /// Joins container of strings into a single string delimited by
 /// 'delim'.
