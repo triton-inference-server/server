@@ -86,7 +86,7 @@ Inference Server with the
 
 ```bash
 # Step 1: Create the example model repository
-git clone -b r24.10 https://github.com/triton-inference-server/server.git
+git clone -b r24.11 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
 
