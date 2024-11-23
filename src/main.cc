@@ -316,6 +316,18 @@ StopEndpoints(uint32_t* exit_timeout_secs)
   }
 #endif  // TRITON_ENABLE_HTTP
 
+#ifdef TRITON_ENABLE_METRICS
+  if (g_metrics_service) {
+    TRITONSERVER_Error* err = g_grpc_service->Stop(exit_timeout_secs);
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop Metrics service");
+      ret = false;
+    }
+
+    g_metrics_service.reset();
+  }
+#endif  // TRITON_ENABLE_METRICS
+
   return ret;
 }
 
@@ -338,18 +350,6 @@ StopEndpoints()
     g_grpc_service.reset();
   }
 #endif  // TRITON_ENABLE_GRPC
-
-#ifdef TRITON_ENABLE_METRICS
-  if (g_metrics_service) {
-    TRITONSERVER_Error* err = g_metrics_service->Stop();
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to stop Metrics service");
-      ret = false;
-    }
-
-    g_metrics_service.reset();
-  }
-#endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_SAGEMAKER
   if (g_sagemaker_service) {

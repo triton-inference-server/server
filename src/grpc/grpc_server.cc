@@ -2560,7 +2560,7 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::Stop()
+Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(
@@ -2574,6 +2574,27 @@ Server::Stop()
   model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
 
+  uint32_t conn_cnt_ = 0;
+  if (exit_timeout_secs != nullptr) {
+    for (auto& model_infer_handler : model_infer_handlers_) {
+      auto& modelInferHandler = dynamic_cast<triton::server::grpc::ModelInferHandler&>(*model_infer_handler);
+      // Each thread keeps an internal counter so we sum over all threads
+      conn_cnt_ += modelInferHandler.connection_count();
+    }
+    while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
+      LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
+               << " " << service_name << " service connections";
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      (*exit_timeout_secs)--;
+      conn_cnt_ = 0;
+      for (auto& model_infer_handler : model_infer_handlers_) {
+        auto& modelInferHandler = dynamic_cast<triton::server::grpc::ModelInferHandler&>(*model_infer_handler);
+        // Each thread keeps an internal counter so we sum over all threads
+        conn_cnt_ += modelInferHandler.connection_count();
+      }
+    }
+  }
+   
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
   common_handler_->Stop();

@@ -111,7 +111,9 @@ class Server {
   ~Server();
 
   TRITONSERVER_Error* Start();
-  TRITONSERVER_Error* Stop();
+  TRITONSERVER_Error* Stop(
+      uint32_t* exit_timeout_secs = nullptr,
+      const std::string& service_name = "gRPC");
 
  private:
   Server(
