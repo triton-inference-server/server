@@ -1213,9 +1213,9 @@ WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] --break-system-packages && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all] --break-system-packages
 
 """
     if not FLAGS.no_core_build:
