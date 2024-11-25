@@ -526,7 +526,7 @@ chmod -R 777 $DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
-else:
+else
     git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
