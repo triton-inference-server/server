@@ -1276,14 +1276,43 @@ class InferHandler : public HandlerBase {
     State* state_;
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         shm_regions_info_;
+    std::shared_ptr<SharedMemoryManager> shm_manager_;
 
     ResponseReleasePayload(
         State* state,
         std::vector<
             std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>&&
-            shm_regions_info)
-        : state_(state), shm_regions_info_(std::move(shm_regions_info))
+            shm_regions_info,
+        const std::shared_ptr<SharedMemoryManager>& shm_manager)
+        : state_(state), shm_regions_info_(std::move(shm_regions_info)),
+          shm_manager_(shm_manager)
     {
+    }
+
+    ~ResponseReleasePayload()
+    {
+      // Unregister shm regions that are waiting for the completion of an
+      // inference.
+      while (!shm_regions_info_.empty()) {
+        auto shm_name = shm_regions_info_.back()->name_;
+        auto shm_memory_type = shm_regions_info_.back()->kind_;
+        auto awaiting_unregister =
+            shm_regions_info_.back()->awaiting_unregister_;
+
+        // Delete shared_ptr to decrement reference count
+        shm_regions_info_.pop_back();
+
+        if (awaiting_unregister) {
+          if (shm_manager_ != nullptr) {
+            auto err = shm_manager_->Unregister(shm_name, shm_memory_type);
+            if (err != nullptr) {
+              LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);
+            }
+          } else {
+            LOG_VERBOSE(1) << "Shared memory manager is not available";
+          }
+        }
+      }
     }
   };
 
