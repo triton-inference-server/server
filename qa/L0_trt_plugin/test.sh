@@ -135,7 +135,7 @@ SERVER_LD_PRELOAD=$CUSTOMPLUGIN
 SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
-if  [[ ! -v WSL_DISTRO_NAME ]] || [[ ! -v MSYSTEM ]]; then
+if  [[ ! -v WSL_DISTRO_NAME ]] && [[ ! -v MSYSTEM ]]; then
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
