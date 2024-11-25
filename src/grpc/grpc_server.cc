@@ -2577,7 +2577,9 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
   uint32_t conn_cnt_ = 0;
   if (exit_timeout_secs != nullptr) {
     for (auto& model_infer_handler : model_infer_handlers_) {
-      auto& modelInferHandler = dynamic_cast<triton::server::grpc::ModelInferHandler&>(*model_infer_handler);
+      auto& modelInferHandler = 
+	  dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+	      *model_infer_handler);
       // Each thread keeps an internal counter so we sum over all threads
       conn_cnt_ += modelInferHandler.connection_count();
     }
@@ -2588,7 +2590,9 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
       (*exit_timeout_secs)--;
       conn_cnt_ = 0;
       for (auto& model_infer_handler : model_infer_handlers_) {
-        auto& modelInferHandler = dynamic_cast<triton::server::grpc::ModelInferHandler&>(*model_infer_handler);
+        auto& modelInferHandler = 
+	    dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+	        *model_infer_handler);
         // Each thread keeps an internal counter so we sum over all threads
         conn_cnt_ += modelInferHandler.connection_count();
       }

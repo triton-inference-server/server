@@ -1472,8 +1472,7 @@ class ModelInferHandler
             name, tritonserver, service, cq, max_state_bucket_count,
             restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level),
-        conn_cnt_(0)
+        compression_level_(compression_level),conn_cnt_(0)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.

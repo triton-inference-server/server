@@ -782,7 +782,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     finished = true;
   }
 
-  if (finished){
+  if (finished) {
     conn_cnt_.fetch_sub(1);
   }
 
