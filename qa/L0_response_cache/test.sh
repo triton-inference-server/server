@@ -286,7 +286,7 @@ check_server_success_and_kill
 # Test triton fails to initialize if it can't connect to redis cache
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=localhost --cache-config=redis,port=nonexistent ${EXTRA_ARGS}"
 run_server
-check_server_expected_failure "Failed to connect to Redis: Connection refused"
+check_server_expected_failure "failed to connect to Redis (localhost:0): Connection refused"
 
 # Test triton fails to initialize if it can't resolve host for redis cache
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=nonexistent --cache-config=redis,port=nonexistent ${EXTRA_ARGS}"
@@ -388,4 +388,3 @@ else
 fi
 
 exit $RET
-

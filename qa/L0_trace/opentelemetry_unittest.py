@@ -221,7 +221,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertFalse(
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
-            self.assertEquals(len(events), len(compute_events))
+            self.assertEqual(len(events), len(compute_events))
 
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
@@ -233,12 +233,12 @@ class OpenTelemetryTest(tu.TestResultCollector):
             if "HTTP" in events:
                 self.assertTrue(all(entry in events for entry in root_events_http))
                 self.assertFalse(all(entry in events for entry in root_events_grpc))
-                self.assertEquals(len(events), len(root_events_http))
+                self.assertEqual(len(events), len(root_events_http))
 
             elif "GRPC" in events:
                 self.assertTrue(all(entry in events for entry in root_events_grpc))
                 self.assertFalse(all(entry in events for entry in root_events_http))
-                self.assertEquals(len(events), len(root_events_grpc))
+                self.assertEqual(len(events), len(root_events_grpc))
 
             if is_cancelled == False:
                 self.assertFalse(all(entry in events for entry in request_events))
@@ -254,7 +254,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 all(entry in events for entry in root_events_http + root_events_grpc)
             )
             self.assertFalse(all(entry in events for entry in compute_events))
-            self.assertEquals(len(events), len(request_events))
+            self.assertEqual(len(events), len(request_events))
 
         elif span_name.startswith("CUSTOM_ACTIVITY"):
             custom_activity_events = []
@@ -276,7 +276,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 all(entry in events for entry in custom_activity_events),
                 "Span " + span_name,
             )
-            self.assertEquals(
+            self.assertEqual(
                 len(events), len(custom_activity_events), "Span " + span_name
             )
 
