@@ -44,7 +44,7 @@ TEST_RESULT_FILE='test_results.txt'
 # can fail when the requests are distributed to multiple devices.
 ldconfig || true
 
-export CUDA_VISIBLE_DEVICES=0
+#export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
