@@ -177,235 +177,53 @@ fi
 
 pip3 install pytest requests virtualenv
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
+# Set up the tests to execute.
+declare -A subtest_properties
+subtest_properties["shared_memory"]=""
+subtest_properties["lifecycle"]=""
+subtest_properties["argument_validation"]=""
+subtest_properties["logging"]=""
+subtest_properties["custom_metrics"]=""
+
+# Add tests depending on which environment is being run. 
+# If not running in igpu mode add these
+if [ "$TEST_JETSON" == "0" ]; then
+    subtest_properties["ensemble"]=""
+    subtest_properties["bls"]=""
+    subtest_properties["decoupled"]=""
+    subtest_properties["response_sender"]=""
+    subtest_properties["env"]=""
 fi
 
-set +e
-python3 -m pytest --junitxml=L0_backend_python.report.xml $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    RET=1
-fi
-set -e
+# If not running on windows add these 
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    subtest_properties["variants"]=""
+    subtest_properties["io"]=""
+    subtest_properties["python_based_backends"]=""
+    subtest_properties["async_execute"]=""
+    subtest_properties["model_control"]=""
+    subtest_properties["examples"]=""
+    subtest_properties["request_rescheduling"]=""
+fi  
 
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    ls /dev/shm
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-prev_num_pages=`get_shm_pages`
-# Triton non-graceful exit
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
+if [[ -n "${SUBTESTS}" ]]; then
+    ALL_SUBTESTS=$(echo "${!subtest_properties[@]}")
+    for subtest in $(echo "${!subtest_properties[@]}"); do 
+        if [[ ! "${SUBTESTS}" =~ "${subtest}" ]]; then
+            unset "subtest_properties[${subtest}]"
+        fi
+    done
 fi
 
-sleep 5
-
-readarray -t triton_procs < <(pgrep --parent ${SERVER_PID})
-
-set +e
-
-# Trigger non-graceful termination of Triton
-kill -9 $SERVER_PID
-
-# Wait 10 seconds so that Python stub can detect non-graceful exit
-sleep 10
-
-for triton_proc in $triton_procs; do
-    kill -0 $triton_proc > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
-        RET=1
-        break
-    fi
-done
-set -e
-
-#
-# Test KIND_GPU
-# Disable env test for Jetson & Windows since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-  rm -rf models/
-  mkdir -p models/add_sub_gpu/1/
-  cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
-  cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
-
-  prev_num_pages=`get_shm_pages`
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      exit 1
-  fi
-
-  if [ $? -ne 0 ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** KIND_GPU model test failed \n***"
-      RET=1
-  fi
-
-  kill_server
-
-  current_num_pages=`get_shm_pages`
-  if [ $current_num_pages -ne $prev_num_pages ]; then
-      cat $CLIENT_LOG
-      ls /dev/shm
-      echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-  Shared memory pages before starting triton equals to $prev_num_pages
-  and shared memory pages after starting triton equals to $current_num_pages \n***"
-      exit 1
-  fi
-fi
-
-# Test Multi file models
-rm -rf models/
-mkdir -p models/multi_file/1/
-cp ../python_models/multi_file/*.py ./models/multi_file/1/
-cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
-(cd models/multi_file && \
-          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** multi-file model test failed \n***"
-    RET=1
-fi
-
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-# Test environment variable propagation
-rm -rf models/
-mkdir -p models/model_env/1/
-cp ../python_models/model_env/model.py ./models/model_env/1/
-cp ../python_models/model_env/config.pbtxt ./models/model_env/
-
-export MY_ENV="MY_ENV"
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    # This will run in WSL, but Triton will run in windows, so environment
-    # variables meant for loaded models must be exported using WSLENV.
-    # The /w flag indicates the value should only be included when invoking
-    # Win32 from WSL.
-    export WSLENV=MY_ENV/w
-fi
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    echo -e "\n***\n*** Environment variable test failed \n***"
-    exit 1
-fi
-
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-rm -fr ./models
-mkdir -p models/identity_fp32/1/
-cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
-
-shm_default_byte_size=$((1024*1024*4))
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-for shm_page in `ls /dev/shm/`; do
-    if [[ $shm_page !=  triton_python_backend_shm* ]]; then
-        continue
-    fi
-    page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
-    if [ $page_size -ne $shm_default_byte_size ]; then
-        echo -e "Shared memory region size is not equal to
-$shm_default_byte_size for page $shm_page. Region size is
-$page_size."
-        RET=1
-    fi
+echo "Executing the following subtests: "
+for subtest in $(echo "${!subtest_properties[@]}"); do
+    echo "  ${subtest}: ${subtest_properties[${subtest}]}"
 done
 
-kill_server
+exit 0
+bash -ex test_shared_memory.sh
 
-# Test model getting killed during initialization
-rm -fr ./models
-mkdir -p models/init_exit/1/
-cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
-cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
 
-ERROR_MESSAGE="Stub process 'init_exit_0_0' is not healthy."
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-    else
-        echo $CLIENT_LOG
-        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-        RET=1
-    fi
-fi
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
 
 # Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
