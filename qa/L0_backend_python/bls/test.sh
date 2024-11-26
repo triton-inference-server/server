@@ -38,7 +38,7 @@ rm -fr *.log ./models *.txt *.xml
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 uninstall -y torch
-    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+    pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
 
     mkdir -p models/bls/1/
     cp ../../python_models/bls/model.py models/bls/1/

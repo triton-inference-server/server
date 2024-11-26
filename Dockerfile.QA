@@ -59,12 +59,11 @@ RUN apt-get update && \
             libboost-dev \
             python3-dev \
             python3-pip \
+            python3-wheel \
+            python3-setuptools \
             rapidjson-dev \
             software-properties-common && \
     rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools
 
 RUN apt update -q=2 \
     && apt install -y gpg wget \
@@ -72,7 +71,7 @@ RUN apt update -q=2 \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -311,20 +310,12 @@ ARG TARGETPLATFORM
 ENV DEBIAN_FRONTEND=noninteractive
 
 # install platform specific packages
-RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-                libpng-dev; \
-    elif [ $(cat /etc/os-release | grep 'VERSION_ID="22.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-                libpng-dev; \
-    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
     else \
-        echo "Ubuntu version must be either 18.04, 20.04 or 22.04" && \
+        echo "Ubuntu version must be either 18.04, 20.04, 22.04 or 24.04" && \
         exit 1; \
     fi
 
@@ -337,7 +328,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libarchive-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
-                              maven \
                               openjdk-11-jdk \
                               nginx \
                               npm \
@@ -345,6 +335,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               python3-dev \
                               python3-pip \
                               python3-protobuf \
+                              python3-wheel \
                               python3-setuptools \
                               swig \
                               valgrind && \
@@ -354,9 +345,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade "numpy<2" pillow attrdict future grpcio requests gsutil \
-                           awscli six grpcio-channelz prettytable virtualenv \
+RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
+                           awscli six "grpcio-channelz<1.68" prettytable virtualenv \
                            check-jsonschema
 
 # go needed for example go client test.

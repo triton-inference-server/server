@@ -32,7 +32,7 @@ get_shm_pages() {
 
 install_conda() {
   rm -rf ./miniconda
-  file_name="Miniconda3-py310_23.11.0-2-Linux-x86_64.sh"
+  file_name="Miniconda3-py312_24.9.2-0-Linux-x86_64.sh"
   wget https://repo.anaconda.com/miniconda/$file_name
 
   # install miniconda in silent mode
@@ -51,7 +51,7 @@ install_build_deps() {
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 }
 
 create_conda_env() {
