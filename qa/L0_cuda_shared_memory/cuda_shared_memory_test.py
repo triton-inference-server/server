@@ -156,7 +156,7 @@ class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region
         with self.assertRaisesRegex(
-            cshm.SharedMemoryException, "unable to create cuda shared memory handle"
+            cshm.CudaSharedMemoryException, "unable to create cuda shared memory handle"
         ):
             self._shm_handles.append(
                 cshm.create_shared_memory_region("dummy_data", -1, 0)
