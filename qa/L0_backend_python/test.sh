@@ -197,7 +197,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     subtest_properties["bls"]=""
     subtest_properties["decoupled"]=""
     subtest_properties["response_sender"]=""
-    subtest_properties["env"]=""
+    subtest_properties["env"]="locale"
 fi
 
 # If not running on windows add these 
@@ -231,8 +231,6 @@ for subtest in $(echo "${!subtest_properties[@]}"); do
     echo "  ${subtest}: ${subtest_properties[${subtest}]}"
 done
 
-exit 0
-
 if [[ "${ALL_SUBTETS}" =~ "shared_memory" ]]; then
     bash -ex test_shared_memory.sh
 fi
@@ -247,7 +245,7 @@ for TEST in ${ALL_SUBTESTS}; do
     setup_virtualenv
 
     set +e
-    (cd ${TEST} && bash -ex test.sh)
+    (cd ${TEST} && PROPERTIES="${subtest_properties["${TEST}"]}" bash -ex test.sh)
     EXIT_CODE=$?
     if [ $EXIT_CODE -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
@@ -264,11 +262,11 @@ for TEST in ${ALL_SUBTESTS}; do
     deactivate_virtualenv
 done
 
-if [[ ${ALL_SUBTESTS} =~ "env" ]]; then
+if [[ "${ALL_SUBTESTS}" =~ "env" ]]; then
     # In 'env' test we use miniconda for dependency management. No need to run
     # the test in a virtual environment.
     set +e
-    (cd env && bash -ex test.sh)
+    (cd env && PROPERTIES="${subtest_properties["env"]}" bash -ex test.sh)
     if [ $? -ne 0 ]; then
         echo "Subtest env FAILED"
         RET=1
