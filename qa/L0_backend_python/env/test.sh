@@ -96,6 +96,7 @@ locale_test() {
     set -e
 }
 
+# This is only run for the default installation of python version, 3.12.
 extraction_test() {
     ## Test re-extraction of environment.
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --model-control-mode=explicit"
@@ -131,6 +132,9 @@ extraction_test() {
 }
 
 aws_test() {
+    local EXPECTED_VERSION_STRING=$1
+    local MODEL_TYPE=$2         # Can be one of: python_3_6, python_3_12
+
     # Test execution environments with S3
     # S3 credentials are necessary for this test. Pass via ENV variables
     aws configure set default.region $AWS_DEFAULT_REGION && \
@@ -151,10 +155,6 @@ aws_test() {
     BUCKET_URL=${BUCKET_URL%/}
     BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-    # Remove Python 3.7 model because it contains absolute paths and cannot be used
-    # with S3.
-    rm -rf models/python_3_7
-
     # Test with the bucket url as model repository
     aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -172,10 +172,10 @@ aws_test() {
     wait $SERVER_PID
 
     set +e
-    grep "$PY36_VERSION_STRING" $SERVER_LOG
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
-        echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
         RET=1
     fi
     set -e
@@ -184,11 +184,14 @@ aws_test() {
     aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
     # Test with EXECUTION_ENV_PATH outside the model directory
-    sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
-    mv models/python_3_6/python_3_6_environment.tar.gz models
-    sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
-    mv models/python_3_12/python_3_12_environment.tar.gz models
-
+    if [[ "$MODEL_TYPE" == "python_3_6" ]]; then
+        sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
+        mv models/python_3_6/python_3_6_environment.tar.gz models
+    elif [[ "$MODEL_TYPE" == "python_3_12" ]]; then
+        sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
+        mv models/python_3_12/python_3_12_environment.tar.gz models
+    fi
+    
     aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
     
     SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
@@ -205,14 +208,12 @@ aws_test() {
     wait $SERVER_PID
 
     set +e
-    for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do
-        grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-        if [ $? -ne 0 ]; then
-            cat $SERVER_LOG
-            echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-            RET=1
-        fi
-    done
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
     set -e
 
     # Clean up bucket contents and delete bucket
@@ -240,6 +241,7 @@ PY37_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.1, and Tensorf
 create_python_backend_stub
 conda-pack -o python3.7.tar.gz
 path_to_conda_pack=`pwd`/python3.7.tar.gz
+rm -r models/ || true
 mkdir -p models/python_3_7/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7
 (cd models/python_3_7 && \
@@ -251,12 +253,6 @@ conda deactivate
 
 if [[ "${PROPERTIES}" =~ "locale" ]]; then 
     locale_test $PY37_VERSION_STRING
-fi
-if [[ "${PROPERTIES}" =~ "extraction" ]]; then 
-    extraction_test
-fi
-if [[ "${PROPERTIES}" =~ "aws" ]]; then 
-    aws_test
 fi
 
 
@@ -273,6 +269,7 @@ conda install -c conda-forge libstdcxx-ng=14 -y
 
 PY37_1_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.3, and Tensorflow version is 2.1.0"
 create_python_backend_stub
+rm -r models/ || true
 mkdir -p models/python_3_7_1/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7_1
 (cd models/python_3_7_1 && \
@@ -285,14 +282,11 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7_1
 conda deactivate
 
 if [[ "${PROPERTIES}" =~ "locale" ]]; then 
-    locale_test $PY37_1_VERSION_STRING
+    locale_test "$PY37_1_VERSION_STRING"
 fi
-if [[ "${PROPERTIES}" =~ "extraction" ]]; then 
-    extraction_test
-fi
-if [[ "${PROPERTIES}" =~ "aws" ]]; then 
-    aws_test
-fi
+# if [[ "${PROPERTIES}" =~ "aws" ]]; then 
+#     aws_test "$PY37_1_VERSION_STRING" "python_3_7_1"
+# fi
 
 # Create a model with python 3.6 version
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
@@ -307,6 +301,7 @@ conda-pack -o python3.6.tar.gz
 # Test relative execution env path
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_6_environment.tar.gz'
 create_python_backend_stub
+rm -r models/ || true
 mkdir -p models/python_3_6/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_6
 cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
@@ -320,11 +315,8 @@ conda deactivate
 if [[ "${PROPERTIES}" =~ "locale" ]]; then 
     locale_test $PY36_VERSION_STRING
 fi
-if [[ "${PROPERTIES}" =~ "extraction" ]]; then 
-    extraction_test
-fi
 if [[ "${PROPERTIES}" =~ "aws" ]]; then 
-    aws_test
+    aws_test "$PY36_VERSION_STRING" "python_3_6"
 fi
 
 # Test conda env without custom Python backend stub This environment should
@@ -338,6 +330,7 @@ conda install numpy=1.26.4 -y
 conda install tensorflow=2.16.2 -y
 PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is 2.16.2"
 conda pack -o python3.12.tar.gz
+rm -r models/ || true
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
 cp python3.12.tar.gz models/python_3_12/python_3_12_environment.tar.gz
@@ -352,10 +345,10 @@ if [[ "${PROPERTIES}" =~ "locale" ]]; then
     locale_test $PY312_VERSION_STRING
 fi
 if [[ "${PROPERTIES}" =~ "extraction" ]]; then 
-    extraction_test
+    extraction_test 
 fi
 if [[ "${PROPERTIES}" =~ "aws" ]]; then 
-    aws_test
+    aws_test "$PY312_VERSION_STRING" "python_3_12"
 fi
 
 if [ $RET -eq 0 ]; then
