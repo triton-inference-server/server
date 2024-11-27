@@ -1446,6 +1446,7 @@ InferHandler<
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
       if (!Process(state, ok, is_notification)) {
+        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         state->context_->EraseState(state);
         StateRelease(state);
       } else {
