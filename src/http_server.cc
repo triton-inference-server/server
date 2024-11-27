@@ -3225,6 +3225,32 @@ HTTPAPIServer::HandleGenerate(
       req, RestrictedCategory::INFERENCE, restricted_apis_);
 
   AddContentTypeHeader(req, "application/json");
+
+  // logic to add kv_cache metrics to reponse header
+  // Get the metrics in Prometheus format
+  TRITONSERVER_Metrics* metrics = nullptr;
+  TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server_.get(), &metrics);
+  if (err == nullptr) {
+    const char* base;
+    size_t byte_size;
+    err = TRITONSERVER_MetricsFormatted(
+        metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
+    if (err == nullptr) {
+      std::string kv_utilization(base, byte_size);
+      // Extract the KV utilization metrics from the Prometheus formatted string.
+      std::string extracted_kv_metrics = ExtractKVMetrics(kv_utilization);
+      evhtp_headers_add_header(
+          req->headers_out,
+          evhtp_header_new("endpoint-load-metrics", extracted_kv_metrics.c_str(), 1, 1));
+    }
+  }
+  TRITONSERVER_MetricsDelete(metrics);
+  // Handle potential errors
+  if (err != nullptr) {
+    LOG_ERROR << "Failed to get KV metrics: " << TRITONSERVER_ErrorMessage(err);
+    TRITONSERVER_ErrorDelete(err);
+  }
+
   if (req->method != htp_method_POST) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
@@ -3379,6 +3405,56 @@ HTTPAPIServer::HandleGenerate(
 #endif  // TRITON_ENABLE_TRACING
   generate_request.release();
   request_release_payload.release();
+}
+
+std::string HTTPAPIServer::ExtractKVMetrics(
+    const std::string& prometheus_metrics) {
+  uint64_t tokens_per_block = 0;
+  uint64_t used_blocks = 0;
+  uint64_t max_blocks = 0;
+
+
+  const RE2 kv_cache_block_regex(
+      R"(nv_trt_llm_kv_cache_block_metrics{kv_cache_block_type=\"(?P<type>\w+)\",model=\"(?P<model>.*?)\",version=\"1\"}\s+(?P<value>\d+))");
+  
+  re2::StringPiece input(prometheus_metrics);
+  std::string type, model, value; 
+
+  while (RE2::FindAndConsume(&input, kv_cache_block_regex, &type, &model, &value)) { 
+
+    uint64_t numeric_value = std::stoull(value); 
+
+    if (type == "tokens_per") {
+      tokens_per_block = numeric_value;
+    } else if (type == "used") {
+      used_blocks = numeric_value;
+    } else if (type == "max") {
+      max_blocks = numeric_value;
+    }
+  }
+
+  // Calculate derived metrics
+  double kv_cache_utilization = 0.0; 
+  if (max_blocks > 0) {
+    kv_cache_utilization = (double)used_blocks / max_blocks;
+  }
+  uint64_t max_token_capacity = max_blocks * tokens_per_block;
+
+  // Format the metrics according to the ORCA protocol
+  triton::common::TritonJson::Value orca_metrics(
+      triton::common::TritonJson::ValueType::OBJECT);
+  triton::common::TritonJson::Value named_metrics(
+      orca_metrics, triton::common::TritonJson::ValueType::OBJECT);
+
+  named_metrics.AddDouble("kv_cache_utilization", kv_cache_utilization);
+  named_metrics.AddUInt("max_token_capacity", max_token_capacity);
+
+  orca_metrics.Add("named_metrics", std::move(named_metrics));
+
+  triton::common::TritonJson::WriteBuffer buffer;
+  orca_metrics.Write(&buffer);
+
+  return std::string("JSON ") + buffer.Contents();
 }
 
 TRITONSERVER_Error*
@@ -4145,80 +4221,6 @@ HTTPAPIServer::InferRequestClass::SetResponseHeader(
     case DataCompressor::Type::UNKNOWN:
       break;
   }
-  // Get the metrics in Prometheus format
-  TRITONSERVER_Metrics* metrics = nullptr;
-  TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server_, &metrics);
-  if (err == nullptr) {
-    const char* base;
-    size_t byte_size;
-    err = TRITONSERVER_MetricsFormatted(
-        metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
-    if (err == nullptr) {
-      std::string kv_utilization(base, byte_size);
-
-      // Extract the KV utilization metrics from the Prometheus formatted string.
-      std::string extracted_kv_metrics = ExtractKVMetrics(kv_utilization);
-
-      evhtp_headers_add_header(
-          req_->headers_out,
-          evhtp_header_new("endpoint-load-metrics", extracted_kv_metrics.c_str(), 1, 1));
-    }
-  }
-  TRITONSERVER_MetricsDelete(metrics);
-  // Handle potential errors (err)
-  if (err != nullptr) {
-    LOG_ERROR << "Failed to get KV metrics: " << TRITONSERVER_ErrorMessage(err);
-    TRITONSERVER_ErrorDelete(err);
-  }
-}
-
-std::string HTTPAPIServer::InferRequestClass::ExtractKVMetrics(
-    const std::string& prometheus_metrics) {
-  uint64_t tokens_per_block = 0;
-  uint64_t used_blocks = 0;
-  uint64_t max_blocks = 0;
-
-  const RE2 kv_cache_block_regex(
-      R"(nv_trt_llm_kv_cache_block_metrics{kv_cache_block_type=\"(\w+)\",.*} (\d+))");
-
-  std::string match;
-  re2::StringPiece input(prometheus_metrics);
-
-  while (RE2::FindAndConsume(&input, kv_cache_block_regex, &match)) {
-    re2::StringPiece kv_type;
-    re2::StringPiece kv_value;
-    RE2::PartialMatch(match, kv_cache_block_regex, &kv_type, &kv_value);
-
-    uint64_t value = std::stoull(kv_value.as_string());
-    if (kv_type == "tokens_per") {
-      tokens_per_block = value;
-    } else if (kv_type == "used") {
-      used_blocks = value;
-    } else if (kv_type == "max") {
-      max_blocks = value;
-    }
-  }
-
-  // Calculate derived metrics
-  double kv_cache_utilization =
-      (max_blocks > 0) ? (double)used_blocks / max_blocks : 0.0;
-  uint64_t max_token_capacity = max_blocks * tokens_per_block;
-
-  // Format the metrics according to the ORCA protocol
-  triton::common::TritonJson::Value orca_metrics(
-      triton::common::TritonJson::ValueType::OBJECT);
-  triton::common::TritonJson::Value named_metrics(
-      orca_metrics, triton::common::TritonJson::ValueType::OBJECT);
-
-  named_metrics.AddDouble("kv_cache_utilization", kv_cache_utilization);
-  named_metrics.AddUInt("max_token_capacity", max_token_capacity);
-
-  orca_metrics.Add("named_metrics", std::move(named_metrics));
-
-  triton::common::TritonJson::WriteBuffer buffer;
-  orca_metrics.Write(&buffer);
-
-  return std::string("JSON ") + buffer.Contents();
 }
 
 uint32_t
@@ -4785,6 +4787,7 @@ HTTPAPIServer::Create(
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
+  LOG_INFO << "### ben is testing header changes ### " << addr;
 
   return nullptr;
 }
