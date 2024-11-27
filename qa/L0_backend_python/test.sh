@@ -178,6 +178,17 @@ fi
 pip3 install pytest requests virtualenv
 
 # Set up the tests to execute.
+# `subtest_properties` is a hash map of the subtests to run 
+# and the associated properties, or configurations, for each 
+# subtest. The list of subtests to run is found by listing the final 
+# set of keys. The subtest properties are variables which the 
+# subtest can consume to narrow or widen the scope of the subtest. 
+# In the same way we can add or remove entries in the hash map 
+# to include/exclude subtests, we can add or remove properties in 
+# the value to increase/decrease the scope of the subtest.
+# 
+# <key>   = subtest name (also the subdirectory for the subtest)
+# <value> = properties which the subtest can consume. 
 declare -A subtest_properties
 subtest_properties["shared_memory"]=""
 subtest_properties["lifecycle"]=""
@@ -197,7 +208,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     subtest_properties["bls"]=""
     subtest_properties["decoupled"]=""
     subtest_properties["response_sender"]=""
-    subtest_properties["env"]="locale"
+    subtest_properties["env"]="locale extraction aws"
 fi
 
 # If not running on windows add these 
