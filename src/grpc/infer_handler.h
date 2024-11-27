@@ -833,7 +833,8 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
+        bool is_notification)
     {
       // Check to avoid early exit in case of triton_grpc_error
       if (!IsCancelled()) {
@@ -845,33 +846,37 @@ class InferHandlerState {
             << " step " << state->step_;
         return true;
       }
-      if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
-          (state->step_ != Steps::CANCELLED)) {
+      if (is_notification) {
         LOG_VERBOSE(1) << "Cancellation notification received for " << name
                        << ", rpc_ok=" << rpc_ok << ", context "
                        << state->context_->unique_id_ << ", "
                        << state->unique_id_ << " step " << state->step_;
-
-        // If the context has not been cancelled then
-        // issue cancellation request to all the inflight
-        // states belonging to the context.
-        if (state->context_->step_ != Steps::CANCELLED) {
-          IssueRequestCancellation();
-          // Mark the context as cancelled
-          state->context_->step_ = Steps::CANCELLED;
-          // The state returns true because the CancelExecution
-          // call above would have raised alarm objects on all
-          // pending inflight states objects. This state will
-          // be taken up along with all the other states in the
-          // next iteration from the completion queue which
-          // would release the state.
-          return true;
-        }
       }
 
-      if (state->step_ != Steps::CANCELLATION_ISSUED) {
-        // The cancellation has not been issued hence the state can
-        // be released.
+      // If the context has not been cancelled then
+      // issue cancellation request to all the inflight
+      // states belonging to the context.
+      // It means this is the first time we are hiting this line for this grpc
+      // transaction.
+      if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
+          (state->step_ != Steps::CANCELLED) &&
+          (state->context_->step_ != Steps::CANCELLED)) {
+        IssueRequestCancellation();
+        // Mark the context as cancelled
+        state->context_->step_ = Steps::CANCELLED;
+        // The state returns true because the CancelExecution
+        // call above would have raised alarm objects on all
+        // pending inflight states objects. This state will
+        // be taken up along with all the other states in the
+        // next iteration from the completion queue which
+        // would release the state.
+        return true;
+      }
+
+      if (state->step_ != Steps::CANCELLATION_ISSUED &&
+          !(is_notification && state->step_ == Steps::CANCELLED)) {
+        // The cancellation has neither been issued nor completed,
+        // hence the state can be released.
         LOG_VERBOSE(1) << "Completing cancellation for " << name
                        << ", rpc_ok=" << rpc_ok << ", context "
                        << state->context_->unique_id_ << ", "
@@ -1076,6 +1081,21 @@ class InferHandlerState {
     if (pstr != nullptr) {
       delay_process_ms_ = atoi(pstr);
     }
+    const char* nstr = getenv("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
+    delay_notification_process_entry_ms_ = 0;
+    if (nstr != nullptr) {
+      delay_notification_process_entry_ms_ = atoi(nstr);
+    }
+    const char* estr = getenv("TRITONSERVER_DELAY_GRPC_ENQUEUE");
+    delay_enqueue_ms_ = 0;
+    if (estr != nullptr) {
+      delay_enqueue_ms_ = atoi(estr);
+    }
+    const char* rstr = getenv("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
+    delay_response_completion_ms_ = 0;
+    if (rstr != nullptr) {
+      delay_response_completion_ms_ = atoi(rstr);
+    }
 
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
@@ -1172,6 +1192,9 @@ class InferHandlerState {
   int delay_response_ms_;
   int delay_complete_ms_;
   int delay_process_ms_;
+  int delay_notification_process_entry_ms_;
+  int delay_enqueue_ms_;
+  int delay_response_completion_ms_;
 
   // For inference requests the allocator payload, unused for other
   // requests.
@@ -1317,7 +1340,7 @@ class InferHandler : public HandlerBase {
   };
 
   virtual void StartNewRequest() = 0;
-  virtual bool Process(State* state, bool rpc_ok) = 0;
+  virtual bool Process(State* state, bool rpc_ok, bool is_notification) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
 
   TRITONSERVER_Error* ForwardHeadersAsParameters(
@@ -1396,17 +1419,33 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
+      bool is_notification = false;
       if (state->step_ == Steps::WAITING_NOTIFICATION) {
         State* state_wrapper = state;
         state = state_wrapper->state_ptr_;
         state->context_->SetReceivedNotification(true);
+        is_notification = true;
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;
+
+        if (state->delay_notification_process_entry_ms_ != 0) {
+          // Will delay the entry to Process by the specified time.
+          // This can be used to test the flow when
+          // 1. cancellation request issued for the request, which invokes
+          // InferResponseComplete callback right before Process.
+          // 2. cancellation request issued for the request during
+          // InferResponseComplete callback right before Process in the
+          // notification thread.
+          LOG_INFO
+              << "Delaying the entry to Process for notification thread by "
+              << state->delay_notification_process_entry_ms_ << " ms...";
+          std::this_thread::sleep_for(std::chrono::milliseconds(
+              state->delay_notification_process_entry_ms_));
+        }
       }
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
-      if (!Process(state, ok)) {
-        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+      if (!Process(state, ok, is_notification)) {
         state->context_->EraseState(state);
         StateRelease(state);
       } else {
@@ -1529,7 +1568,7 @@ class ModelInferHandler
 
  protected:
   void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
+  bool Process(State* state, bool rpc_ok, bool is_notification) override;
 
  private:
   void Execute(State* state);
