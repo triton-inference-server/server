@@ -1772,6 +1772,8 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+            if os.path.exists(os.path.expanduser("~/.docker/config.json")):
+                runargs += ["-v", os.path.expanduser("~/.docker/config.json:/root/.docker/config.json")]
 
         runargs += ["tritonserver_buildbase"]
 
