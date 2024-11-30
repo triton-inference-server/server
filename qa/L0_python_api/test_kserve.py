@@ -494,7 +494,7 @@ class TestRestrictedFeatures:
 
         # Credentials used to restrict/access Triton Features.
         model_repo_key, model_repo_val = "repo-key", "repo-value"
-        infer_key, infer_val = "health-key", "health-value"
+        infer_key, infer_val = "infer-key", "infer-value"
 
         # Specifying restricted feature that restricts multiple groups
         rf = RestrictedFeatures()
@@ -514,15 +514,17 @@ class TestRestrictedFeatures:
         # Testing if Feature.MODEL_REPOSITORY is restricted correctly
         model_config_header = {key_prefix + model_repo_key: model_repo_val}
 
-        assert client.get_model_repository_index(headers=model_config_header) == True
+        model_repo_index = client.get_model_repository_index(
+            headers=model_config_header
+        )
+        model_repo_contents = str(model_repo_index)
+        assert "delayed_identity" in model_repo_contents
 
         with pytest.raises(
             InferenceServerException,
-            match=f"expecting header '{key_prefix}infer-key'",
+            match=f"expecting header '{key_prefix}{model_repo_key}'",
         ):
-            client.get_model_repository_index(
-                client_type, url, {"fake-key": "fake-value"}
-            )
+            client.get_model_repository_index(headers={"fake-key": "fake-value"})
 
         # Testing if Feature.INFERENCE is restricted correctly
         infer_header = {key_prefix + infer_key: infer_val}
@@ -531,7 +533,7 @@ class TestRestrictedFeatures:
 
         with pytest.raises(
             InferenceServerException,
-            match=f"expecting header '{key_prefix}infer-key'",
+            match=f"expecting header '{key_prefix}{infer_key}'",
         ):
             utils.send_and_test_inference_identity(
                 client_type, url, {"fake-key": "fake-value"}
