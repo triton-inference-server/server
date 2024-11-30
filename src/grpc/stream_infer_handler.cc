@@ -306,7 +306,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     auto request_release_payload =
         std::make_unique<RequestReleasePayload>(state->inference_request_);
     auto response_release_payload = std::make_unique<ResponseReleasePayload>(
-        state, std::move(shm_regions_info));
+        state, std::move(shm_regions_info), shm_manager_);
 
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(

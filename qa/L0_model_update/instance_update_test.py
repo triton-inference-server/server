@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,9 +67,7 @@ class TestInstanceUpdate(unittest.TestCase):
 
     def tearDown(self):
         # Check if the test passed for this test case that is tearing down
-        r = self.defaultTestResult()
-        self._feedErrorsToResult(r, self._outcome.errors)
-        # Use `r = self._outcome.result` for the above, if Python >= 3.11
+        r = self._outcome.result
         passed = all(self != test_case for test_case, _ in r.errors + r.failures)
         if passed:
             # Do nothing if passed

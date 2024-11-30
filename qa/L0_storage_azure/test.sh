@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,11 +63,10 @@ CONTAINER_NAME="tritonqatest${timestamp}"
 # container path (Point to the container when testing cloud storage)
 AS_URL="as://${ACCOUNT_NAME}/${CONTAINER_NAME}"
 
-# Must use setuptools version before 58.0.0 due to https://github.com/Azure/azure-cli/issues/19468
-python -m pip install -U setuptools==57.5.0
-
 # Can now install latest azure-cli (instead of 2.0.73)
-python -m pip install azure-cli
+# https://github.com/Azure/azure-cli/issues/30102
+# https://github.com/Azure/azure-cli/issues/30127
+python -m pip install azure-cli setuptools "azure-mgmt-rdbms==10.2.0b17"
 
 # create test container
 az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
@@ -105,11 +104,12 @@ function setup_model_repo() {
     rm -rf models && mkdir -p models
     for FW in $BACKENDS; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
+        # Copy models with string inputs and remove nobatch (bs=1) models. Model does not exist for plan backend.
+        if [[ ${FW} != "plan" ]]; then
+            cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}*_object_object_object/ models/
+            rm -rf models/*nobatch*
+        fi
     done
-
-    # Copy models with string inputs and remove nobatch (bs=1) models
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
-    rm -rf models/*nobatch*
 }
 
 setup_model_repo
