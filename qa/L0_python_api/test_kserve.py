@@ -43,6 +43,8 @@ from tritonfrontend import (
     RestrictedFeatures,
 )
 
+# To test a class individually, user pytest test_kserve.py -k "<ClassName>"
+
 
 class TestHttpOptions:
     def test_correct_http_parameters(self):
@@ -124,8 +126,16 @@ class TestRestrictedFeatureOptions:
 
         rf = RestrictedFeatures(groups=[correct_feature_group])
         rf.create_feature_group(
-            key="new-key", value="new-val", features=[Feature.INFERENCE]
+            key="new-key", value="new-val", features=Feature.INFERENCE
         )
+
+        rf.remove_features(Feature.INFERENCE)
+
+        assert not rf.has_feature(Feature.INFERENCE)
+
+        rf.remove_feature_group(correct_feature_group)
+
+        assert not (rf.has_feature(Feature.HEALTH) and rf.has_feature(Feature.METADATA))
 
     def test_wrong_rf_parameters(self):
         with pytest.raises(AttributeError):
@@ -166,12 +176,6 @@ class TestRestrictedFeatureOptions:
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
 GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
-RESTRICTED_FEATURE_ARG = RestrictedFeatures()
-RESTRICTED_FEATURE_ARG.create_feature_group(
-    key="infer-key",
-    value="infer-value",
-    features=[Feature.INFERENCE],
-)
 
 
 class TestKServe:
@@ -363,6 +367,34 @@ class TestKServe:
         utils.teardown_client(grpc_client)
         utils.teardown_server(server)
 
+    # KNOWN ISSUE: CAUSES SEGFAULT
+    # Created  [DLIS-7231] to address at future date
+    # Once the server has been stopped, the underlying TRITONSERVER_Server instance
+    # is deleted. However, the frontend does not know the server instance
+    # is no longer valid.
+    # def test_inference_after_server_stop(self):
+    #     server = utils.setup_server()
+    #     http_service = utils.setup_service(server, KServeHttp)
+    #     http_client = setup_client(httpclient, url="localhost:8000")
+
+    #     teardown_server(server) # Server has been stopped
+
+    #     model_name = "identity"
+    #     input_data = np.array([["testing"]], dtype=object)
+    #     # Create input and output objects
+    #     inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+
+    #     # Set the data for the input tensor
+    #     inputs[0].set_data_from_numpy(input_data)
+
+    #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+
+    #     utils.teardown_client(http_client)
+    #     utils.teardown_service(http_service)
+
+
+class TestMetrics:
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_default_port(self, frontend, url):
         server = utils.setup_server()
@@ -418,14 +450,24 @@ class TestKServe:
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 
+
+class TestRestrictedFeatures:
     @pytest.mark.parametrize(
         "frontend, client_type, url, key_prefix",
         [HTTP_ARGS + ("",), GRPC_ARGS + ("triton-grpc-protocol-",)],
     )
-    def test_restricted_features(self, frontend, client_type, url, key_prefix):
+    def test_restrict_inference(self, frontend, client_type, url, key_prefix):
         server = utils.setup_server()
-        # Specifying Restricted Features
-        options = frontend.Options(restricted_features=RESTRICTED_FEATURE_ARG)
+
+        # Specifying restricted features that restricts inference.
+        rf = RestrictedFeatures()
+        rf.create_feature_group(
+            key="infer-key",
+            value="infer-value",
+            features=[Feature.INFERENCE],
+        )
+
+        options = frontend.Options(restricted_features=rf)
         service = utils.setup_service(server, frontend, options=options)
 
         # Valid headers sent with inference request
@@ -443,28 +485,58 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
-    # KNOWN ISSUE: CAUSES SEGFAULT
-    # Created  [DLIS-7231] to address at future date
-    # Once the server has been stopped, the underlying TRITONSERVER_Server instance
-    # is deleted. However, the frontend does not know the server instance
-    # is no longer valid.
-    # def test_inference_after_server_stop(self):
-    #     server = utils.setup_server()
-    #     http_service = utils.setup_service(server, KServeHttp)
-    #     http_client = setup_client(httpclient, url="localhost:8000")
+    @pytest.mark.parametrize(
+        "frontend, client_type, url, key_prefix",
+        [HTTP_ARGS + ("",), GRPC_ARGS + ("triton-grpc-protocol-",)],
+    )
+    def test_multiple_groups(self, frontend, client_type, url, key_prefix):
+        server = utils.setup_server()
 
-    #     teardown_server(server) # Server has been stopped
+        # Credentials used to restrict/access Triton Features.
+        model_repo_key, model_repo_val = "repo-key", "repo-value"
+        infer_key, infer_val = "health-key", "health-value"
 
-    #     model_name = "identity"
-    #     input_data = np.array([["testing"]], dtype=object)
-    #     # Create input and output objects
-    #     inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+        # Specifying restricted feature that restricts multiple groups
+        rf = RestrictedFeatures()
+        rf.create_feature_group(
+            key=model_repo_key,
+            value=model_repo_val,
+            features=[Feature.MODEL_REPOSITORY],
+        )
+        rf.create_feature_group(
+            key=infer_key, value=infer_val, features=[Feature.INFERENCE]
+        )
 
-    #     # Set the data for the input tensor
-    #     inputs[0].set_data_from_numpy(input_data)
+        options = frontend.Options(restricted_features=rf)
+        service = utils.setup_service(server, frontend, options=options)
+        client = utils.setup_client(client_type, url=url)
 
-    #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+        # Testing if Feature.MODEL_REPOSITORY is restricted correctly
+        model_config_header = {key_prefix + model_repo_key: model_repo_val}
 
-    #     utils.teardown_client(http_client)
-    #     utils.teardown_service(http_service)
+        assert client.get_model_repository_index(headers=model_config_header) == True
+
+        with pytest.raises(
+            InferenceServerException,
+            match=f"expecting header '{key_prefix}infer-key'",
+        ):
+            client.get_model_repository_index(
+                client_type, url, {"fake-key": "fake-value"}
+            )
+
+        # Testing if Feature.INFERENCE is restricted correctly
+        infer_header = {key_prefix + infer_key: infer_val}
+
+        assert utils.send_and_test_inference_identity(client_type, url, infer_header)
+
+        with pytest.raises(
+            InferenceServerException,
+            match=f"expecting header '{key_prefix}infer-key'",
+        ):
+            utils.send_and_test_inference_identity(
+                client_type, url, {"fake-key": "fake-value"}
+            )
+
+        utils.teardown_client(client)
+        utils.teardown_service(service)
+        utils.teardown_server(server)

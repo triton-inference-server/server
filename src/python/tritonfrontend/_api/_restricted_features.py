@@ -27,7 +27,7 @@
 import json
 from copy import deepcopy
 from enum import Enum
-from typing import List
+from typing import List, Union
 
 import tritonserver
 from pydantic import field_validator
@@ -53,16 +53,17 @@ class Feature(Enum):
     LOGGING = "logging"
 
 
-@dataclass
+@dataclass(frozen=True)
 class FeatureGroup:
     """
     Stores instances of (key, value, features) and performs type validation on instance.
     Used by the RestrictedFeatures Class.
 
     Example:
-        >>> from tritonfrontend import Feature, FeatureGroup
-        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
-        >>> health_group = FeatureGroup("key", "value", ["health"]) # Will Error Out
+    >>> from tritonfrontend import Feature, FeatureGroup
+    >>> infer_group = FeatureGroup("infer-key", "infer-value", Feature.INFERENCE)
+    >>> info_group = FeatureGroup("admin-key", "admin-value", [Feature.HEALTH, Feature.METADATA])
+    >>> health_group = FeatureGroup("key", "value", ["health"]) # Will Error Out
         Invalid features found: ['health'] ... Valid options are: ['Feature.HEALTH',
         'Feature.METADATA', 'Feature.INFERENCE', 'Feature.SHM_MEMORY', 'Feature.MODEL_CONFIG',
         'Feature.MODEL_REPOSITORY', 'Feature.STATISTICS', 'Feature.TRACE', 'Feature.LOGGING']
@@ -70,10 +71,18 @@ class FeatureGroup:
 
     key: str
     value: str
-    features: List[Feature]
+    features: Union[List[Feature], Feature]
 
     @field_validator("features", mode="before")
-    def validate_features(features: List[Feature]) -> List[Feature]:
+    def validate_features(features: List[Feature] | Feature) -> List[Feature]:
+        if isinstance(features, Feature):
+            features = [features]
+
+        if not isinstance(features, list):
+            raise tritonserver.InvalidArgumentError(
+                "FeatureGroup.feature needs to be of type Feature or List[Feature]"
+            )
+
         invalid_features = [item for item in features if not isinstance(item, Feature)]
         if invalid_features:
             raise tritonserver.InvalidArgumentError(
@@ -98,12 +107,12 @@ class RestrictedFeatures:
     - Serialize the data into a JSON string.
 
     Example:
-        >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
-        >>> admin_group = FeatureGroup(key="admin-key", value="admin-value", features=[Feature.HEALTH, Feature.METADATA])
-        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
-        >>> rf = RestrictedFeatures([admin_group, infer_group])
-        >>> rf.create_feature_group("trace-key", "trace-value", [Feature.TRACE])
-        >>> rf
+    >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
+    >>> admin_group = FeatureGroup(key="admin-key", value="admin-value", features=[Feature.HEALTH, Feature.METADATA])
+    >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
+    >>> rf = RestrictedFeatures([admin_group, infer_group])
+    >>> rf.create_feature_group("trace-key", "trace-value", [Feature.TRACE])
+    >>> rf
         [
             {"key": "admin-key", "value": "admin-value", "features": ["health", "metadata"]},
             {"key": "infer-key", "value": "infer-value", "features": ["inference"]},
@@ -126,11 +135,11 @@ class RestrictedFeatures:
         If no collision, add group to feature_groups
 
         Example:
-            >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
-            >>> health_group = FeatureGroup("health-key", "health-value", [Feature.HEALTH])
-            >>> rf = RestrictedFeatures()
-            >>> rf.add_feature_group(health_group)
-            >>> rf
+        >>> from tritonfrontend import Feature, FeatureGroup, RestrictedFeatures
+        >>> health_group = FeatureGroup("health-key", "health-value", [Feature.HEALTH])
+        >>> rf = RestrictedFeatures()
+        >>> rf.add_feature_group(health_group)
+        >>> rf
             [{"key": "health-key", "value": "health-value", "features": ["health"]}]
         """
         for feat in group.features:
@@ -145,24 +154,106 @@ class RestrictedFeatures:
 
     @handle_triton_error
     def create_feature_group(
-        self, key: str, value: str, features: List[Feature]
+        self, key: str, value: str, features: List[Feature] | Feature
     ) -> None:
         """
         Factory method used to generate FeatureGroup instances and append them
         to the `RestrictedFeatures` object that invoked this function.
 
         Example:
-            >>> from tritonfrontend import RestrictedFeatures, Feature
-            >>> rf = RestrictedFeatures()
-            >>> rf.create_feature_group("infer-key", "infer-value", [Feature.INFERENCE])
-            >>> rf
-            [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
+        >>> from tritonfrontend import RestrictedFeatures, Feature
+        >>> rf = RestrictedFeatures()
+        >>> rf.create_feature_group("infer-key", "infer-value", Feature.INFERENCE)
+        >>> rf.create_feature_group("meta-key", "meta-value", [Feature.METADATA, Feature.HEALTH])
+        >>> rf
+            [
+                {"key": "infer-key", "value": "infer-value", "features": ["inference"]},
+                {"key": "meta-key", "value": "meta-value", "features": ["metadata", "health"]},
+            ]
         """
         group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
 
+    def has_feature(self, feature: Feature):
+        """
+        Checks if feature belongs to any of the groups
+        Example:
+        >>> from tritonfrontend import RestrictedFeatures, Feature
+        >>> rf = RestrictedFeatures()
+        >>> rf.create_feature_group("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> rf
+            [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
+        >>> rf.has_feature(Feature.INFERENCE)
+        True
+        >>> rf.has_feature(Feature.TRACE)
+        False
+        """
+        return feature in self.features_restricted
+
     @handle_triton_error
-    def _gather_rest_data(self) -> dict:
+    def remove_features(self, features: List[Feature] | Feature):
+        """
+        Will remove FeatureGroups that contain the features specified.
+        Example:
+        >>> from tritonfrontend import RestrictedFeatures, Feature
+        >>> admin_group = FeatureGroup(key="admin-key", value="admin-value", features=[Feature.HEALTH, Feature.METADATA])
+        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> mem_group = FeatureGroup("mem-key", "mem-value", [Feature.SHM_MEMORY])
+        >>> rf = RestrictedFeatures([admin_group, infer_group])
+        >>> rf.remove_features([Feature.HEALTH, Feature.SHM_MEMORY])
+        >>> rf
+            [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
+        """
+        if isinstance(features, Feature):
+            features = [features]
+
+        not_present = [feat for feat in features if not self.has_feature(feat)]
+        if not_present:
+            raise InvalidArgumentError(
+                f"{not_present} is not present in any of the FeatureGroups for "
+                " the RestrictedFeatures object and therefore cannot be removed."
+            )
+
+        feature_set = set(features)
+        target_groups = [
+            group
+            for group in self.feature_groups
+            if feature_set.intersection(group.features)
+        ]
+        for group in target_groups:
+            self.remove_feature_group(group)
+
+    @handle_triton_error
+    def remove_feature_group(self, group: FeatureGroup) -> None:
+        """
+        Will remove FeatureGroup from RestrictedFeature instance
+
+        Example:
+        >>> from tritonfrontend import RestrictedFeatures, Feature
+        >>> mem_group = FeatureGroup("mem-key", "mem-value", [Feature.SHM_MEMORY])
+        >>> infer_group = FeatureGroup("infer-key", "infer-value", [Feature.INFERENCE])
+        >>> rf = RestrictedFeatures([mem_group, infer_group])
+        >>> rf.remove_feature_group(mem_group)
+        >>> rf
+            [{"key": "infer-key", "value": "infer-value", "features": ["inference"]}]
+        """
+        if not isinstance(group, FeatureGroup):
+            raise InvalidArgumentError(
+                "group has to be of type tritonfrontend.FeatureGroup"
+            )
+
+        try:
+            self.feature_groups.remove(group)
+
+            for feat in group.features:
+                self.features_restricted.discard(feat)
+        except:
+            raise InvalidArgumentError(
+                f"{group} is not present in the RestrictedFeature object"
+            )
+
+    @handle_triton_error
+    def _gather_restricted_data(self) -> dict:
         """
         Represents `RestrictedFeatures` Instance as a dictionary.
         Additionally, converts `Feature` instances to str equivalent.
@@ -183,10 +274,10 @@ class RestrictedFeatures:
         """
         A function to retrieve user-friendly string to view object contents.
         """
-        return json.dumps(self._gather_rest_data(), indent=2)
+        return json.dumps(self._gather_restricted_data(), indent=2)
 
     def __repr__(self) -> str:
         """
         A function to retrieve representation that has not been formatted.
         """
-        return json.dumps(self._gather_rest_data())
+        return json.dumps(self._gather_restricted_data())
