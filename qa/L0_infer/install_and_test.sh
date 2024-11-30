@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,8 +33,10 @@ ID_LIKE=$(grep -Po '(?<=ID_LIKE=).*' /etc/os-release | awk -F= '{print $1}' |  t
 if [[ "$ID_LIKE" =~ "debian" ]]; then
     apt-get update && \
         apt-get install -y --no-install-recommends \
+            build-essential \
             curl \
             jq \
+            libnvrtc12 \
             python3 \
             python3-pip
 else
@@ -43,7 +45,6 @@ else
         curl
 fi
 
-pip3 install --upgrade pip
 # install client libraries
 pip3 install tritonclient[all]
 
