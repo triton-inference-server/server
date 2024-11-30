@@ -74,6 +74,7 @@ class FeatureGroup:
     features: Union[List[Feature], Feature]
 
     @field_validator("features", mode="before")
+    @handle_triton_error
     def validate_features(features: List[Feature] | Feature) -> List[Feature]:
         if isinstance(features, Feature):
             features = [features]

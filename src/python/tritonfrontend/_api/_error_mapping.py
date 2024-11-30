@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+from functools import wraps
 
 import tritonserver
 from tritonfrontend._c.tritonfrontend_bindings import (
@@ -52,6 +53,7 @@ ERROR_MAPPING = {
 
 
 def handle_triton_error(func):
+    @wraps(func)
     def error_handling_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
