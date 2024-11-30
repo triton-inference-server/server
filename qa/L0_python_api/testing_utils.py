@@ -48,7 +48,7 @@ def setup_server(model_repository="test_model_repository") -> tritonserver.Serve
         model_repository=model_path,
         log_error=True,
         log_warn=True,
-        # log_info=True,
+        log_info=True,
     )
 
     return tritonserver.Server(server_options).start(wait_until_ready=True)
