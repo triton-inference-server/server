@@ -686,12 +686,11 @@ SharedMemoryManager::UnregisterHelper(
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end() && it->second->kind_ == memory_type) {
     if (it->second.use_count() > 1) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          std::string(
-              "Cannot unregister shared memory region '" + name +
-              "', it is currently in use.")
-              .c_str());
+      it->second->awaiting_unregister_ = true;
+      LOG_VERBOSE(1)
+          << "Shared memory region '" << name
+          << "' will be unregistered after in-flight requests complete.";
+      return nullptr;
     }
 
     if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {

@@ -44,8 +44,7 @@ RET=0
 # install dependencies
 apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-pip python3-protobuf
-python3 -m pip install --upgrade pip && \
-    pip3 install --upgrade "numpy<2"
+pip3 install --upgrade "numpy<2"
 
 # install client libraries
 pip3 install tritonclient[all]

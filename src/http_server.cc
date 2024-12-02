@@ -3293,12 +3293,13 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(), streaming, irequest_shared));
+        generate_stream_response_schema_.get(), streaming, irequest_shared,
+        shm_manager_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared));
+        streaming, irequest_shared, shm_manager_));
   }
   generate_request->trace_ = trace;
 
@@ -3772,10 +3773,11 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
-    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
-      triton_request_(triton_request)
+      triton_request_(triton_request), shm_manager_(shm_manager)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
