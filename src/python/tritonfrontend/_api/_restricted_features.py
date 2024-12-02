@@ -29,7 +29,6 @@ from copy import deepcopy
 from enum import Enum
 from typing import List, Union
 
-import tritonserver
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
