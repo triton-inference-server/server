@@ -80,13 +80,13 @@ class FeatureGroup:
             features = [features]
 
         if not isinstance(features, list):
-            raise tritonserver.InvalidArgumentError(
+            raise InvalidArgumentError(
                 "FeatureGroup.feature needs to be of type Feature or List[Feature]"
             )
 
         invalid_features = [item for item in features if not isinstance(item, Feature)]
         if invalid_features:
-            raise tritonserver.InvalidArgumentError(
+            raise InvalidArgumentError(
                 f"Invalid features found: {invalid_features}. "
                 "Each item in 'features' should be an instance of the tritonfrontend.Feature. "
                 f"Valid options are: {[str(p) for p in Feature]}"
