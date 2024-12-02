@@ -564,9 +564,15 @@ class TestChatCompletionsTokenizers:
 
         # Pick a tokenizer with no chat template defined
         invalid_chat_tokenizer = "gpt2"
-        app = setup_fastapi_app(
-            tokenizer=invalid_chat_tokenizer, server=server, backend=backend
-        )
+        try:
+            app = setup_fastapi_app(
+                tokenizer=invalid_chat_tokenizer, server=server, backend=backend
+            )
+        except OSError as e:
+            expected_msg = f"We couldn't connect to 'https://huggingface.co' to load this file, couldn't find it in the cached files and it looks like {invalid_chat_tokenizer} is not the path to a directory containing a file named config.json."
+            if expected_msg in str(e):
+                pytest.skip("HuggingFace network issues")
+            raise e
         with TestClient(app) as client:
             response = client.post(
                 "/v1/chat/completions",

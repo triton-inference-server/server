@@ -1,4 +1,4 @@
-// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,10 +27,15 @@
 #include "common.h"
 
 #include <algorithm>
+#include <climits>
 #include <iterator>
 
 #include "restricted_features.h"
 #include "triton/core/tritonserver.h"
+
+extern "C" {
+#include <b64/cdecode.h>
+}
 
 namespace triton { namespace server {
 
@@ -100,6 +105,29 @@ bool
 Contains(const std::vector<std::string>& vec, const std::string& str)
 {
   return std::find(vec.begin(), vec.end(), str) != vec.end();
+}
+
+TRITONSERVER_Error*
+DecodeBase64(
+    const char* input, size_t input_len, std::vector<char>& decoded_data,
+    size_t& decoded_size, const std::string& name)
+{
+  if (input_len > static_cast<size_t>(INT_MAX)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("'" + name + "' exceeds the maximum allowed data size limit INT_MAX")
+            .c_str());
+  }
+
+  // The decoded size cannot be larger than the input
+  decoded_data.resize(input_len + 1);
+  base64_decodestate state;
+  base64_init_decodestate(&state);
+
+  decoded_size =
+      base64_decode_block(input, input_len, decoded_data.data(), &state);
+
+  return nullptr;
 }
 
 }}  // namespace triton::server

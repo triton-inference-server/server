@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,6 +45,7 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST="../common/infer_test.py"
 EXPECTED_NUM_TESTS="3"
 TEST_RESULT_FILE='test_results.txt'
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 # S3 credentials are necessary for this test. Pass via ENV variables
 aws configure set default.region $AWS_DEFAULT_REGION && \
@@ -164,15 +165,16 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
         # Now start model tests
 
-        for FW in graphdef savedmodel onnx libtorch plan; do
+        for FW in ${BACKENDS}; do
             cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
+            # Copy models with string inputs and remove nobatch (bs=1) models. Model does not exist for plan backend.
+            if [[ ${FW} != "plan" ]]; then
+                cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}*_object_object_object/ models/
+                rm -rf models/*nobatch*
+            fi
         done
 
-        # Copy models with string inputs and remove nobatch (bs=1) models
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
-        rm -rf models/*nobatch*
-
-        for FW in graphdef savedmodel onnx libtorch plan; do
+        for FW in ${BACKENDS}; do
             for MC in `ls models/${FW}*/config.pbtxt`; do
                 echo "instance_group [ { kind: ${KIND} }]" >> $MC
             done

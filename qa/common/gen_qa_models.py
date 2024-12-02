@@ -1809,28 +1809,31 @@ def create_openvino_modelfile(
     )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    in0 = ng.parameter(shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT0")
-    in1 = ng.parameter(shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT1")
+    in0 = ov.opset1.parameter(
+        shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT0"
+    )
+    in1 = ov.opset1.parameter(
+        shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT1"
+    )
 
-    r0 = ng.add(in0, in1) if not swap else ng.subtract(in0, in1)
-    r1 = ng.subtract(in0, in1) if not swap else ng.add(in0, in1)
+    r0 = ov.opset1.add(in0, in1) if not swap else ov.opset1.subtract(in0, in1)
+    r1 = ov.opset1.subtract(in0, in1) if not swap else ov.opset1.add(in0, in1)
 
-    result0 = ng.reshape(r0, batch_dim + output0_shape, special_zero=False)
-    result1 = ng.reshape(r1, batch_dim + output1_shape, special_zero=False)
+    result0 = ov.opset1.reshape(r0, batch_dim + output0_shape, special_zero=False)
+    result1 = ov.opset1.reshape(r1, batch_dim + output1_shape, special_zero=False)
 
-    op0 = ng.convert(result0, destination_type=output0_dtype, name="OUTPUT0")
-    op1 = ng.convert(result1, destination_type=output1_dtype, name="OUTPUT1")
+    op0 = ov.opset1.convert(result0, destination_type=output0_dtype, name="OUTPUT0")
+    op1 = ov.opset1.convert(result1, destination_type=output1_dtype, name="OUTPUT1")
 
-    function = ng.impl.Function([op0, op1], [in0, in1], model_name)
-    ie_network = IENetwork(ng.impl.Function.to_capsule(function))
+    model = ov.Model([op0, op1], [in0, in1], model_name)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
         pass  # ignore existing dir
 
-    ie_network.serialize(
-        model_version_dir + "/model.xml", model_version_dir + "/model.bin"
+    ov.serialize(
+        model, model_version_dir + "/model.xml", model_version_dir + "/model.bin"
     )
 
 
@@ -2486,8 +2489,7 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.openvino:
-        from openvino.inference_engine import IENetwork
-        import ngraph as ng
+        import openvino.runtime as ov
 
     import test_util as tu
 

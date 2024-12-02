@@ -46,10 +46,6 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
-extern "C" {
-#include <b64/cdecode.h>
-}
-
 namespace triton { namespace server {
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
@@ -1546,14 +1542,12 @@ HTTPAPIServer::HandleRepositoryControl(
               param = TRITONSERVER_ParameterNew(
                   m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             } else if (m.rfind("file:", 0) == 0) {
-              // Decode base64
-              base64_decodestate s;
-              base64_init_decodestate(&s);
-
-              // The decoded can not be larger than the input...
-              binary_files.emplace_back(std::vector<char>(param_len + 1));
-              size_t decoded_size = base64_decode_block(
-                  param_str, param_len, binary_files.back().data(), &s);
+              size_t decoded_size;
+              binary_files.emplace_back(std::vector<char>());
+              RETURN_AND_RESPOND_IF_ERR(
+                  req, DecodeBase64(
+                           param_str, param_len, binary_files.back(),
+                           decoded_size, m));
               param = TRITONSERVER_ParameterBytesNew(
                   m.c_str(), binary_files.back().data(), decoded_size);
             }
@@ -2443,13 +2437,13 @@ HTTPAPIServer::HandleCudaSharedMemory(
           }
 
           if (err == nullptr) {
-            base64_decodestate s;
-            base64_init_decodestate(&s);
+            size_t decoded_size;
+            std::vector<char> raw_handle;
+            RETURN_AND_RESPOND_IF_ERR(
+                req, DecodeBase64(
+                         b64_handle, b64_handle_len, raw_handle, decoded_size,
+                         "raw_handle"));
 
-            // The decoded can not be larger than the input...
-            std::vector<char> raw_handle(b64_handle_len + 1);
-            size_t decoded_size = base64_decode_block(
-                b64_handle, b64_handle_len, raw_handle.data(), &s);
             if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
               err = TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
@@ -3299,12 +3293,13 @@ HTTPAPIServer::HandleGenerate(
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
-        generate_stream_response_schema_.get(), streaming, irequest_shared));
+        generate_stream_response_schema_.get(), streaming, irequest_shared,
+        shm_manager_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared));
+        streaming, irequest_shared, shm_manager_));
   }
   generate_request->trace_ = trace;
 
@@ -3778,10 +3773,11 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
-    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+    const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
-      triton_request_(triton_request)
+      triton_request_(triton_request), shm_manager_(shm_manager)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;

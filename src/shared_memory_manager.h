@@ -60,7 +60,7 @@ class SharedMemoryManager {
         const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          kind_(kind), device_id_(device_id)
+          kind_(kind), device_id_(device_id), awaiting_unregister_(false)
     {
     }
 
@@ -72,6 +72,9 @@ class SharedMemoryManager {
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
+
+    // TODO (DLIS-7620): avoid explicit flag and use smart pointers
+    bool awaiting_unregister_;
   };
 
 #ifdef TRITON_ENABLE_GPU
