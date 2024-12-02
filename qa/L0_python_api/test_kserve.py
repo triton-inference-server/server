@@ -118,7 +118,7 @@ class TestMetricsOptions:
 
 
 class TestRestrictedFeatureOptions:
-    def test_correct_rf_parameters(self):
+    def test_correct_parameters(self):
         # Directly test feature groups
         correct_feature_group = FeatureGroup(
             key="key", value="val", features=[Feature.HEALTH, Feature.METADATA]
