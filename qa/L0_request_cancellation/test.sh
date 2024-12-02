@@ -130,10 +130,10 @@ for TEST_CASE in "test_grpc_async_infer" \
 
     if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
         unset TRITONSERVER_DELAY_GRPC_PROCESS
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_notification" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_GRPC_ENQUEUE
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_notification_during_response_complete" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
     fi
