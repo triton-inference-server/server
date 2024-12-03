@@ -1066,42 +1066,30 @@ class InferHandlerState {
       : tritonserver_(tritonserver), async_notify_state_(false)
   {
     // For debugging and testing
-    const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
-    delay_response_ms_ = 0;
-    if (dstr != nullptr) {
-      delay_response_ms_ = atoi(dstr);
-    }
-    const char* cstr = getenv("TRITONSERVER_DELAY_GRPC_COMPLETE");
-    delay_complete_ms_ = 0;
-    if (cstr != nullptr) {
-      delay_complete_ms_ = atoi(cstr);
-    }
-    const char* pstr = getenv("TRITONSERVER_DELAY_GRPC_PROCESS");
-    delay_process_ms_ = 0;
-    if (pstr != nullptr) {
-      delay_process_ms_ = atoi(pstr);
-    }
-    const char* nstr = getenv("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
-    delay_notification_process_entry_ms_ = 0;
-    if (nstr != nullptr) {
-      delay_notification_process_entry_ms_ = atoi(nstr);
-    }
-    const char* estr = getenv("TRITONSERVER_DELAY_GRPC_ENQUEUE");
-    delay_enqueue_ms_ = 0;
-    if (estr != nullptr) {
-      delay_enqueue_ms_ = atoi(estr);
-    }
-    const char* rstr = getenv("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
-    delay_response_completion_ms_ = 0;
-    if (rstr != nullptr) {
-      delay_response_completion_ms_ = atoi(rstr);
-    }
+    delay_response_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_RESPONSE");
+    delay_complete_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_COMPLETE");
+    delay_process_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS");
+    delay_notification_process_entry_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
+    delay_enqueue_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_ENQUEUE");
+    delay_response_completion_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
 
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
   }
 
   ~InferHandlerState() { ClearTraceTimestamps(); }
+
+  int ParseDebugVariable(const char* env_str)
+  {
+    const char* str = getenv(env_str);
+    int val = 0;
+    if (str != nullptr) {
+      val = atoi(str);
+    }
+    return val;
+  }
 
   bool IsGrpcContextCancelled() { return context_->IsCancelled(); }
 
