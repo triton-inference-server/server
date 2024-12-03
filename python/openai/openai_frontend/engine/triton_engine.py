@@ -118,7 +118,7 @@ class TritonLLMEngine(LLMEngine):
         self._validate_chat_request(request, metadata)
 
         conversation = [
-            {"role": str(message.role), "content": str(message.content)}
+            message.model_dump(exclude_none=True)
             for message in request.messages
         ]
         add_generation_prompt = True
