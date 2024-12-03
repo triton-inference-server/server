@@ -565,7 +565,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == "tensorflow":
         args = tensorflow_cmake_args(images, library_paths)
     elif be == "python":
-        args = []
+        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -630,6 +630,16 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cargs.append("..")
     return cargs
 
+def python_cmake_args():
+    cargs = []
+    if target_platform() == "rhel":
+        cargs.append(
+            cmake_backend_arg(
+                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
+            )
+        )
+
+    return cargs
 
 def pytorch_cmake_args(images):
     if "pytorch" in images:
