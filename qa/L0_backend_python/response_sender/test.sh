@@ -94,8 +94,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 #
 # Test response sender to raise exception on response after complete final flag
@@ -125,8 +124,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 #
 # Test async response sender under decoupled / non-decoupled

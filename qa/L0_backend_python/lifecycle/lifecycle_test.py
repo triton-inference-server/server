@@ -68,7 +68,7 @@ class LifecycleTest(unittest.TestCase):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
     def _get_metrics(self):
-        metrics_url = "http://localhost:8002/metrics"
+        metrics_url = f"http://{_tritonserver_ipaddr}:8002/metrics"
         r = requests.get(metrics_url)
         r.raise_for_status()
         return r.text
@@ -305,7 +305,9 @@ class LifecycleTest(unittest.TestCase):
         shape = [2, 2]
         number_of_requests = 1
         user_data = UserData()
-        triton_server_url = "localhost:8001"  # Replace with your Triton server address
+        triton_server_url = (
+            f"{_tritonserver_ipaddr}:8001"  # Replace with your Triton server address
+        )
         stream_end = False
         triton_client = grpcclient.InferenceServerClient(triton_server_url)
 
