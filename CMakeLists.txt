@@ -38,7 +38,7 @@ set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared librar
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
-option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
+option(TRITON_ENABLE_NVTX "Include NVTX support in server" ON)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
 option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
@@ -76,7 +76,7 @@ set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE 
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
     "Tag for triton-inference-server/third_party repo")
 set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
+set(TRITON_CORE_REPO_TAG "rmccormick/nvtx" CACHE STRING "Tag for triton-inference-server/core repo")
 set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
 
 # Third-party location
