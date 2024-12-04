@@ -847,22 +847,15 @@ TRITONBACKEND_ModelInstanceExecute(
     if (input_memory_type == TRITONSERVER_MEMORY_GPU) {
       ipbuffer_vec.resize(input_element_cnt);
       ipbuffer_int = ipbuffer_vec.data();
-      auto err = cudaMemcpy(
-          const_cast<int32_t*>(ipbuffer_int), input_buffer, input_byte_size,
-          cudaMemcpyDeviceToHost);
-      if (err != cudaSuccess) {
-        GUARDED_RESPOND_IF_ERROR(
-            responses, r,
-            TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_UNSUPPORTED,
-                "failed to copy buffer from Device to Host"));
-        LOG_MESSAGE(
-            TRITONSERVER_LOG_ERROR,
-            (std::string("request ") + std::to_string(r) +
-             ": copy buffer from Device to Host")
-                .c_str());
-        continue;
-      }
+      LOG_IF_CUDA_ERROR(
+          cudaMemcpyAsync(
+              const_cast<int32_t*>(ipbuffer_int), input_buffer, input_byte_size,
+              cudaMemcpyDeviceToHost, instance_state->CudaStream()),
+          "failed to copy buffer from Device to Host");
+
+      LOG_IF_CUDA_ERROR(
+          cudaStreamSynchronize(instance_state->CudaStream()),
+          "failed to perform synchronization on cuda stream");
     } else {
       ipbuffer_int = reinterpret_cast<const int32_t*>(input_buffer);
     }
@@ -952,22 +945,15 @@ TRITONBACKEND_ModelInstanceExecute(
         }
 
         if (output_memory_type == TRITONSERVER_MEMORY_GPU) {
-          auto err = cudaMemcpy(
-              output_buffer, const_cast<int32_t*>(obuffer_int),
-              buffer_byte_size, cudaMemcpyHostToDevice);
-          if (err != cudaSuccess) {
-            GUARDED_RESPOND_IF_ERROR(
-                responses, r,
-                TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_UNSUPPORTED,
-                    "failed to copy buffer from Device to Host"));
-            LOG_MESSAGE(
-                TRITONSERVER_LOG_ERROR,
-                (std::string("request ") + std::to_string(r) +
-                 ": copy buffer from Device to Host")
-                    .c_str());
-            continue;
-          }
+          LOG_IF_CUDA_ERROR(
+              cudaMemcpyAsync(
+                  output_buffer, const_cast<int32_t*>(obuffer_int),
+                  buffer_byte_size, cudaMemcpyHostToDevice,
+                  instance_state->CudaStream()),
+              "failed to copy buffer from Device to Host");
+          LOG_IF_CUDA_ERROR(
+              cudaStreamSynchronize(instance_state->CudaStream()),
+              "failed to perform synchronization on cuda stream");
         }
       }
     }
