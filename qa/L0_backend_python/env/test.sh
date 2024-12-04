@@ -262,6 +262,8 @@ rm -rf models/python_3_7
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 rm $SERVER_LOG
+# Occasionally needs more time to load
+SERVER_TIMEOUT=420
 
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
