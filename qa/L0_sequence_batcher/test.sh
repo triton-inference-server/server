@@ -44,8 +44,7 @@ TEST_RESULT_FILE='test_results.txt'
 # can fail when the requests are distributed to multiple devices.
 ldconfig || true
 
-export CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=index,name --format=csv,noheader | grep A100 | awk -F',' '{print $1}' | head -n 1)
-echo $CUDA_VISIBLE_DEVICES
+export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
