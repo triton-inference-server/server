@@ -44,6 +44,7 @@
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
+#include "triton/common/nvtx.h"
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
@@ -3599,6 +3600,7 @@ HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  NVTX_RANGE(nvtx_, "HandleInfer");
   RETURN_AND_RESPOND_IF_RESTRICTED(
       req, RestrictedCategory::INFERENCE, restricted_apis_);
 
@@ -3806,6 +3808,7 @@ void
 HTTPAPIServer::InferRequestClass::InferResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
+  NVTX_RANGE(nvtx_, "InferResponseComplete");
   // FIXME can't use InferRequestClass object here since it's lifetime
   // is different than response. For response we need to know how to
   // send each output (as json, shm, or binary) and that information
@@ -4608,6 +4611,7 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
 void
 HTTPAPIServer::Handle(evhtp_request_t* req)
 {
+  NVTX_RANGE(nvtx_, "Handle");
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
