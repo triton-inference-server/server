@@ -1447,7 +1447,18 @@ RUN apt-get update \\
             df += f"""
 # vLLM needed for vLLM backend. This needs to be a certain version based on availability https://gitlab-master.nvidia.com/dl/vllm/vllm/-/packages/89687 (pb3 branch)
 RUN --mount=type=secret,id={secret},target=/run/secrets/{secret} {secret}=$(cat /run/secrets/{secret}) \\
-    && pip3 install --no-cache-dir --index-url https://__token__:${{secret}}@gitlab-master.nvidia.com/api/v4/projects/100660/packages/pypi/simple vllm
+    && pip3 install --no-cache-dir --index-url https://__token__:${{secret}}@gitlab-master.nvidia.com/api/v4/projects/100660/packages/pypi/simple \\
+    vllm==0.5.5+1dbae03.nv24.8.3 \\
+    vllm-flash-attn==2.6.1+cu126 \\
+    flashinfer==0.1.4+nv24.8.3 \\
+    torch==2.5.0a0+872d972e41.nv24.8.3 \\
+    torchvision==0.20.0a0+nv24.8.3 \\
+    xformers==0.0.28+nv24.8.3 \\
+# Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
+    && cd /tmp \\
+    && wget "https://gitlab-master.nvidia.com/api/v4/projects/105799/packages/generic/pytorch_triton/wheel/pytorch_triton-3.0.0+dedb7bdf3-cp310-cp310-linux_$(uname -m).whl" \\
+    && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
+    && rm /tmp/pytorch_triton-*.whl
 """
         else:
             df += f"""
