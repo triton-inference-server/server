@@ -1443,12 +1443,35 @@ RUN apt-get update \\
     """
 
     if "vllm" in backends:
-        df += """
+        if target_machine == "aarch64":
+            df += f"""
+# vLLM needed for vLLM backend. This needs to be a certain version based on availability https://gitlab-master.nvidia.com/dl/vllm/vllm/-/packages/89687 (pb3 branch)
+RUN --mount=type=secret,id={secret},target=/run/secrets/{secret} {secret}=$(cat /run/secrets/{secret}) \\
+    && pip3 install --no-cache-dir \\
+    mkl==2021.1.1 \\
+    mkl-include==2021.1.1 \\
+    mkl-devel==2021.1.1 \\
+    && pip3 install --no-cache-dir --index-url https://__token__:${{secret}}@gitlab-master.nvidia.com/api/v4/projects/100660/packages/pypi/simple \\
+    vllm==0.5.5+1dbae03.nv24.8.3 \\
+    vllm-flash-attn==2.6.1+cu126 \\
+    flashinfer==0.1.4+nv24.8.3 \\
+    torch==2.5.0a0+872d972e41.nv24.8.3 \\
+    torchvision==0.20.0a0+nv24.8.3 \\
+    xformers==0.0.28+nv24.8.3 \\
+# Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
+    && cd /tmp \\
+    && wget "https://gitlab-master.nvidia.com/api/v4/projects/105799/packages/generic/pytorch_triton/wheel/pytorch_triton-3.0.0+dedb7bdf3-cp310-cp310-linux_$(uname -m).whl" \\
+    && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
+    && rm /tmp/pytorch_triton-*.whl
+
+ARG PYVER=3.12
+ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
+"""
+        else:
+            df += f"""
 # vLLM needed for vLLM backend
-RUN pip3 install vllm=={}
-""".format(
-            FLAGS.vllm_version
-        )
+RUN pip3 install vllm=={FLAGS.vllm_version}
+"""
 
     if "dali" in backends:
         df += """
@@ -1826,6 +1849,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             os.path.join(FLAGS.build_dir, "Dockerfile"),
             ".",
         ]
+
+        if secret != "":
+            finalargs += [
+                f"--secret id={secret}",
+            ]
 
         docker_script.cwd(THIS_SCRIPT_DIR)
         docker_script.cmd(finalargs, check_exitcode=True)
@@ -2667,6 +2695,13 @@ if __name__ == "__main__":
         default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
+    parser.add_argument(
+        "--build-secret",
+        type=str,
+        required=False,
+        help="Add build secret in the form of <secret name>. It is assumed that user has <secret name> already as an environment variable (export <secret name>=<secret value> is done). The argument is passed to docker build step of tritonserver as --secret id=<name of secret>",
+    )
+
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
@@ -2785,6 +2820,11 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
+
+    secret = ""
+    if FLAGS.build_secret is not None:
+        secret = FLAGS.build_secret
+        log('Secret environment variable: "{}"'.format(secret))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
