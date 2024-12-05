@@ -1120,6 +1120,8 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
     # case the FROM container has something there already.
     if target_platform() == "windows":
         df += """
+RUN python3 -m pip install "grpcio-tools<1.68"
+
 WORKDIR /workspace
 RUN rmdir /S/Q * || exit 0
 COPY . .
