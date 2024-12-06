@@ -858,39 +858,47 @@ class InferHandlerState {
       // states belonging to the context.
       // It means this is the first time we are hiting this line for this grpc
       // transaction.
-      if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
-          (state->step_ != Steps::CANCELLED) &&
-          (state->context_->step_ != Steps::CANCELLED)) {
-        IssueRequestCancellation();
-        // Mark the context as cancelled
-        state->context_->step_ = Steps::CANCELLED;
-        // The state returns true because the CancelExecution
-        // call above would have raised alarm objects on all
-        // pending inflight states objects. This state will
-        // be taken up along with all the other states in the
-        // next iteration from the completion queue which
-        // would release the state.
-        return true;
-      }
-
-      if (state->step_ != Steps::CANCELLATION_ISSUED &&
-          !(is_notification && state->step_ == Steps::CANCELLED)) {
-        // The cancellation has neither been issued nor completed,
-        // hence the state can be released.
-        LOG_VERBOSE(1) << "Completing cancellation for " << name
-                       << ", rpc_ok=" << rpc_ok << ", context "
-                       << state->context_->unique_id_ << ", "
-                       << state->unique_id_ << " step " << state->step_;
-
-        return false;
-      } else {
-        // Should wait for the ResponseComplete callbacks to be invoked.
+      if (state->step_ != Steps::CANCELLATION_ISSUED) {
+        if ((state->step_ != Steps::CANCELLED) &&
+            (state->context_->step_ != Steps::CANCELLED)) {
+          // Issue the request cancellation as it has not been cancelled yet.
+          IssueRequestCancellation();
+          // Mark the context as cancelled
+          state->context_->step_ = Steps::CANCELLED;
+          // The state returns true because the CancelExecution
+          // call above would have raised alarm objects on all
+          // pending inflight states objects. This state will
+          // be taken up along with all the other states in the
+          // next iteration from the completion queue which
+          // would release the state.
+          return true;
+        } else if (is_notification && state->step_ == Steps::CANCELLED) {
+          // A corner case where InferResponseComplete is called between the
+          // cancellation reception but before the cancellation notification
+          // thread enters Process function. See PR #7840.
+          // Should let the ResponseComplete callback to release the state.
+          LOG_VERBOSE(1) << "Waiting for the state enqueued by callback to "
+                            "complete cancellation for "
+                         << name << ", rpc_ok=" << rpc_ok << ", context "
+                         << state->context_->unique_id_ << ", "
+                         << state->unique_id_ << " step " << state->step_;
+          return true;
+        } else {
+          // The cancellation has neither been issued nor completed,
+          // hence the state can be released.
+          LOG_VERBOSE(1) << "Completing cancellation for " << name
+                         << ", rpc_ok=" << rpc_ok << ", context "
+                         << state->context_->unique_id_ << ", "
+                         << state->unique_id_ << " step " << state->step_;
+          return false;
+        }
+      } else {  // state->step_ == Steps::CANCELLATION_ISSUED
+        // Should wait for the InferResponseComplete callbacks to be invoked.
         LOG_VERBOSE(1)
             << "Waiting for the callback to retrieve cancellation for " << name
             << ", rpc_ok=" << rpc_ok << ", context "
             << state->context_->unique_id_ << ", " << state->unique_id_
             << " step " << state->step_;
-
         return true;
       }
     }
