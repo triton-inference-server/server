@@ -97,12 +97,10 @@ add_executable(
   main
   classification.cc
   command_line_parser.cc
-  common.cc
   main.cc
   shared_memory_manager.cc
   triton_signal.cc
   classification.h
-  common.h
   shared_memory_manager.h
   triton_signal.h
 )
@@ -590,6 +588,42 @@ if(${TRITON_ENABLE_TRACING})
       tracing-library
   )
 endif() # TRITON_ENABLE_TRACING
+
+# Common Library
+add_library(common_obj OBJECT common.cc)
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+      common_obj
+      PRIVATE TRITON_ENABLE_GPU=1
+  )
+endif()
+
+
+if (WIN32)
+  find_library(B64_LIBRARY NAMES b64)
+  target_link_libraries(
+      common_obj
+      PUBLIC
+        ${B64_LIBRARY}
+        triton-core-serverapi  # from repo-core
+  )
+else()
+  target_link_libraries(
+      common_obj
+      PUBLIC
+        b64
+        triton-core-serverapi  # from repo-core
+    )
+endif()
+
+set_target_properties(
+    common_obj
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+)
+
+target_link_libraries(main PRIVATE common_obj)
 
 if (NOT WIN32)
   #
