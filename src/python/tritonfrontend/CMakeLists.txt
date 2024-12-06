@@ -59,13 +59,12 @@ set(
   ../../shared_memory_manager.h
   ../../shared_memory_manager.cc
   ../../data_compressor.h
-  ../../common.h
-  ../../common.cc
   ../../restricted_features.h
   ../../classification.cc
 )
 
-set(PY_BINDING_DEPENDENCY_LIBS)
+set(PY_BINDING_DEPENDENCY_LIBS
+      common_obj)
 
 # Conditional Linking Based on Flags
 if(${TRITON_ENABLE_HTTP})
