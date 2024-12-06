@@ -56,20 +56,13 @@ install_build_deps_apt() {
 
 install_build_deps_yum() {
   yum install rapidjson-devel -y
-  # KMTODO: Figure out how to install a non-standard version of cmake on rhel for the 
-  #         different versions of python we want to test.
-  # yum install -y gpg wget \
-  #   && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
-  #   && . /etc/os-release \
-  #   && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
-  #   && yum install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 }
 
 install_build_deps() {
-  if [[ ${TRITON_RHEL} -eq "1" ]]; then 
+  if [[ ${TRITON_RHEL} -eq "1" ]]; then
     install_build_deps_yum
   else
-    install_build_deps_apt 
+    install_build_deps_apt
   fi
 }
 

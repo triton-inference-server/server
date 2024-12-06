@@ -630,6 +630,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cargs.append("..")
     return cargs
 
+
 def python_cmake_args():
     cargs = []
     if target_platform() == "rhel":
@@ -640,6 +641,7 @@ def python_cmake_args():
         )
 
     return cargs
+
 
 def pytorch_cmake_args(images):
     if "pytorch" in images:
@@ -1566,7 +1568,7 @@ RUN curl https://pyenv.run | bash
 ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
 RUN eval "$(pyenv init -)"
 RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/ 
+    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
 
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
