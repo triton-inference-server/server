@@ -853,12 +853,12 @@ class InferHandlerState {
                        << state->unique_id_ << " step " << state->step_;
       }
 
-      // If the context has not been cancelled then
-      // issue cancellation request to all the inflight
-      // states belonging to the context.
-      // It means this is the first time we are hiting this line for this grpc
-      // transaction.
       if (state->step_ != Steps::CANCELLATION_ISSUED) {
+        // If the context has not been cancelled then
+        // issue cancellation request to all the inflight
+        // states belonging to the context.
+        // It means this is the first time we are hiting this line for this grpc
+        // transaction.
         if ((state->step_ != Steps::CANCELLED) &&
             (state->context_->step_ != Steps::CANCELLED)) {
           // Issue the request cancellation as it has not been cancelled yet.
@@ -875,8 +875,9 @@ class InferHandlerState {
         } else if (is_notification && state->step_ == Steps::CANCELLED) {
           // A corner case where InferResponseComplete is called between the
           // cancellation reception but before the cancellation notification
-          // thread enters Process function. See PR #7840.
-          // Should let the ResponseComplete callback to release the state.
+          // thread enters Process function.
+          // Should let the InferResponseComplete callback trigger the state
+          // release.
           LOG_VERBOSE(1) << "Waiting for the state enqueued by callback to "
                             "complete cancellation for "
                          << name << ", rpc_ok=" << rpc_ok << ", context "
@@ -884,8 +885,8 @@ class InferHandlerState {
                          << state->unique_id_ << " step " << state->step_;
           return true;
         } else {
-          // The cancellation has neither been issued nor completed,
-          // hence the state can be released.
+          // The cancellation request has been handled so the state can be
+          // released.
           LOG_VERBOSE(1) << "Completing cancellation for " << name
                          << ", rpc_ok=" << rpc_ok << ", context "
                          << state->context_->unique_id_ << ", "
