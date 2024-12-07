@@ -1094,7 +1094,24 @@ class InferHandlerState {
     const char* str = getenv(env_str);
     int val = 0;
     if (str != nullptr) {
-      val = atoi(str);
+      try {
+        val = std::stoi(str);
+      }
+      catch (const std::invalid_argument& e) {
+        LOG_ERROR << "Unable to parse the debug variable " << env_str
+                  << ". Value provided: '" << str
+                  << "' is not a valid integer. Error: " << e.what();
+      }
+      catch (const std::out_of_range& e) {
+        LOG_ERROR << "Unable to parse the debug variable " << env_str
+                  << ". Value provided: '" << str
+                  << "' is out of range for an integer. Error: " << e.what();
+      }
+      catch (const std::exception& e) {
+        LOG_ERROR
+            << "An unexpected error occurred while parsing the debug variable "
+            << env_str << " with value '" << str << "'. Error: " << e.what();
+      }
     }
     return val;
   }
