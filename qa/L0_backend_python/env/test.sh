@@ -124,7 +124,6 @@ conda install numpy=1.26.4 -y
 if [ $TRITON_RHEL -eq 1 ]; then
     TF_VERSION="2.17.0"
 fi
-conda search -f tensorflow
 conda install tensorflow=${TF_VERSION} -y
 PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is ${TF_VERSION}"
 conda pack -o python3.12.tar.gz
