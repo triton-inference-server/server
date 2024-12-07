@@ -590,7 +590,22 @@ if(${TRITON_ENABLE_TRACING})
 endif() # TRITON_ENABLE_TRACING
 
 # Common Library
-add_library(common_obj OBJECT common.cc)
+add_library(common_obj OBJECT common.h common.cc)
+
+target_compile_features(common_obj PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  target_compile_options(
+    common_obj
+    PRIVATE
+      /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
+  )
+else()
+  target_compile_options(
+    common_obj
+    PRIVATE
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
+  )
+endif()
 
 if(${TRITON_ENABLE_GPU})
   target_compile_definitions(
