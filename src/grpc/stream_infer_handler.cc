@@ -130,7 +130,8 @@ ModelStreamInferHandler::StartNewRequest()
 }
 
 bool
-ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
+ModelStreamInferHandler::Process(
+    InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
   // Because gRPC doesn't allow concurrent writes on the
   // the stream we only have a single handler thread that
@@ -143,7 +144,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
-      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+      bool resume = state->context_->HandleCancellation(
+          state, rpc_ok, Name(), is_notification);
       return resume;
     } else {
       if (state->context_->HandleCompletion()) {
