@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import concurrent.futures
+import os
 import time
 import unittest
 
@@ -34,11 +35,15 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class TestMaxQueueDelayTimeout(unittest.TestCase):
     def setUp(self):
         # Initialize client
-        self._triton = grpcclient.InferenceServerClient("localhost:8001")
+        self._triton = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
 
     def _get_inputs(self, batch_size):
         self.assertIsInstance(batch_size, int)
