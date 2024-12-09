@@ -56,7 +56,6 @@ function check_state_release() {
   num_state_new=`cat $log_file | grep  "StateNew" | wc -l`
 
   if [ $num_state_release -ne $num_state_new ]; then
-    cat $log_file
     echo -e "\n***\n*** Test Failed: Mismatch detected, $num_state_new state(s) created, $num_state_release state(s) released. \n***" >> $log_file
     return 1
   fi
