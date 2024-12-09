@@ -32,7 +32,195 @@ source ../../common/util.sh
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/env/models --log-verbose=1 --disable-auto-complete-config"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
-SERVER_LOG="./env_server.log"
+
+# Available properties are: locale, extraction, aws
+PROPERTIES=${PROPERTIES:=""}
+echo "properties: ${PROPERTIES}"
+
+locale_test() {
+    local EXPECTED_VERSION_STRING=$1
+
+    SERVER_LOG="inference_server_locale_none.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
+
+    # Test default (non set) locale in python stub processes
+    # NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
+    #       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
+    export LC_ALL=INVALID
+    grep "Locale is (None, None)" $SERVER_LOG
+        if [ $? -ne 0 ]; then
+            cat $SERVER_LOG
+            echo -e "\n***\n*** Default unset Locale was not found in Triton logs. \n***"
+            RET=1
+        fi
+    set -e
+
+    # Test locale set via environment variable in python stub processes
+    # NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
+    #       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
+    export LC_ALL=C.UTF-8
+    SERVER_LOG="inference_server_locale_utf8.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
+        if [ $? -ne 0 ]; then
+            cat $SERVER_LOG
+            echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
+            RET=1
+        fi
+    set -e
+}
+
+# This is only run for the default installation of python version, 3.12.
+extraction_test() {
+    ## Test re-extraction of environment.
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --model-control-mode=explicit"
+    SERVER_LOG="inference_server_extraction.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # The environment should be extracted
+    curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
+    touch -m models/python_3_12/1/model.py
+    # The environment should not be re-extracted
+    curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
+    touch -m models/python_3_12/python_3_12_environment.tar.gz
+    # The environment should be re-extracted
+    curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+
+    PY312_ENV_EXTRACTION="Extracting Python execution env"
+    if [ `grep -c "${PY312_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"
+        RET=1
+    fi
+    set -e
+}
+
+aws_test() {
+    local EXPECTED_VERSION_STRING=$1
+    local MODEL_TYPE=$2         # Can be one of: python_3_6, python_3_12
+
+    # Test execution environments with S3
+    # S3 credentials are necessary for this test. Pass via ENV variables
+    aws configure set default.region $AWS_DEFAULT_REGION && \
+        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
+    # S3 bucket path (Point to bucket when testing cloud storage)
+    BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
+
+    # Cleanup and delete S3 test bucket if it already exists (due to test failure)
+    aws s3 rm $BUCKET_URL --recursive --include "*" && \
+        aws s3 rb $BUCKET_URL || true
+
+    # Make S3 test bucket
+    aws s3 mb "${BUCKET_URL}"
+
+    # Remove Slash in BUCKET_URL
+    BUCKET_URL=${BUCKET_URL%/}
+    BUCKET_URL_SLASH="${BUCKET_URL}/"
+
+    # Test with the bucket url as model repository
+    aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+    SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
+    SERVER_LOG="inference_server_aws_bucket.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        aws s3 rb "${BUCKET_URL}" --force || true
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
+    set -e
+
+    # Clean up bucket contents
+    aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+    # Test with EXECUTION_ENV_PATH outside the model directory
+    if [[ "$MODEL_TYPE" == "python_3_6" ]]; then
+        sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
+        mv models/python_3_6/python_3_6_environment.tar.gz models
+    elif [[ "$MODEL_TYPE" == "python_3_12" ]]; then
+        sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
+        mv models/python_3_12/python_3_12_environment.tar.gz models
+    fi
+    
+    aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+    
+    SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
+    SERVER_LOG="inference_server_aws_extraction.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        aws s3 rb "${BUCKET_URL}" --force || true
+        exit 1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
+    set -e
+
+    # Clean up bucket contents and delete bucket
+    aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+    aws s3 rb "${BUCKET_URL}"
+
+}
 
 RET=0
 
@@ -53,6 +241,7 @@ PY37_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.1, and Tensorf
 create_python_backend_stub
 conda-pack -o python3.7.tar.gz
 path_to_conda_pack=`pwd`/python3.7.tar.gz
+rm -r models/ || true
 mkdir -p models/python_3_7/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7
 (cd models/python_3_7 && \
@@ -61,6 +250,11 @@ cp ../../python_models/python_version/config.pbtxt ./models/python_3_7
 cp ../../python_models/python_version/model.py ./models/python_3_7/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
+
+if [[ "${PROPERTIES}" =~ "locale" ]]; then 
+    locale_test $PY37_VERSION_STRING
+fi
+
 
 # Use python-3-7 without conda pack
 # Create a model with python 3.7 version and numpy 1.20.3 to distinguish from
@@ -75,6 +269,7 @@ conda install -c conda-forge libstdcxx-ng=14 -y
 
 PY37_1_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.3, and Tensorflow version is 2.1.0"
 create_python_backend_stub
+rm -r models/ || true
 mkdir -p models/python_3_7_1/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_7_1
 (cd models/python_3_7_1 && \
@@ -85,6 +280,13 @@ cp ../../python_models/python_version/model.py ./models/python_3_7_1/1/
 cp $path_to_conda_pack/lib/python3.7/site-packages/conda_pack/scripts/posix/activate $path_to_conda_pack/bin/.
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7_1
 conda deactivate
+
+if [[ "${PROPERTIES}" =~ "locale" ]]; then 
+    locale_test "$PY37_1_VERSION_STRING"
+fi
+# if [[ "${PROPERTIES}" =~ "aws" ]]; then 
+#     aws_test "$PY37_1_VERSION_STRING" "python_3_7_1"
+# fi
 
 # Create a model with python 3.6 version
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
@@ -99,6 +301,7 @@ conda-pack -o python3.6.tar.gz
 # Test relative execution env path
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_6_environment.tar.gz'
 create_python_backend_stub
+rm -r models/ || true
 mkdir -p models/python_3_6/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_6
 cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
@@ -108,6 +311,13 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
 conda deactivate
+
+if [[ "${PROPERTIES}" =~ "locale" ]]; then 
+    locale_test $PY36_VERSION_STRING
+fi
+if [[ "${PROPERTIES}" =~ "aws" ]]; then 
+    aws_test "$PY36_VERSION_STRING" "python_3_6"
+fi
 
 # Test conda env without custom Python backend stub This environment should
 # always use the default Python version shipped in the container. For Ubuntu
@@ -120,6 +330,7 @@ conda install numpy=1.26.4 -y
 conda install tensorflow=2.16.2 -y
 PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is 2.16.2"
 conda pack -o python3.12.tar.gz
+rm -r models/ || true
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
 cp python3.12.tar.gz models/python_3_12/python_3_12_environment.tar.gz
@@ -130,185 +341,15 @@ cp ../../python_models/python_version/model.py ./models/python_3_12/1/
 conda deactivate
 rm -rf ./miniconda
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+if [[ "${PROPERTIES}" =~ "locale" ]]; then 
+    locale_test $PY312_VERSION_STRING
 fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY37_1_VERSION_STRING" "$PY312_VERSION_STRING"; do
-    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-        RET=1
-    fi
-done
-
-# Test default (non set) locale in python stub processes
-# NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
-#       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
-export LC_ALL=INVALID
-grep "Locale is (None, None)" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** Default unset Locale was not found in Triton logs. \n***"
-        RET=1
-    fi
-set -e
-
-rm $SERVER_LOG
-
-# Test locale set via environment variable in python stub processes
-# NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
-#       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
-export LC_ALL=C.UTF-8
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+if [[ "${PROPERTIES}" =~ "extraction" ]]; then 
+    extraction_test 
 fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
-        RET=1
-    fi
-set -e
-
-rm $SERVER_LOG
-
-## Test re-extraction of environment.
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --model-control-mode=explicit"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+if [[ "${PROPERTIES}" =~ "aws" ]]; then 
+    aws_test "$PY312_VERSION_STRING" "python_3_12"
 fi
-
-# The environment should be extracted
-curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
-touch -m models/python_3_12/1/model.py
-# The environment should not be re-extracted
-curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
-touch -m models/python_3_12/python_3_12_environment.tar.gz
-# The environment should be re-extracted
-curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-
-PY312_ENV_EXTRACTION="Extracting Python execution env"
-if [ `grep -c "${PY312_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"
-    RET=1
-fi
-set -e
-
-# Test execution environments with S3
-# S3 credentials are necessary for this test. Pass via ENV variables
-aws configure set default.region $AWS_DEFAULT_REGION && \
-    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
-    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-
-# S3 bucket path (Point to bucket when testing cloud storage)
-BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
-
-# Cleanup and delete S3 test bucket if it already exists (due to test failure)
-aws s3 rm $BUCKET_URL --recursive --include "*" && \
-    aws s3 rb $BUCKET_URL || true
-
-# Make S3 test bucket
-aws s3 mb "${BUCKET_URL}"
-
-# Remove Slash in BUCKET_URL
-BUCKET_URL=${BUCKET_URL%/}
-BUCKET_URL_SLASH="${BUCKET_URL}/"
-
-# Remove Python 3.7 model because it contains absolute paths and cannot be used
-# with S3.
-rm -rf models/python_3_7
-
-# Test with the bucket url as model repository
-aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
-
-rm $SERVER_LOG
-
-SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    aws s3 rb "${BUCKET_URL}" --force || true
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-grep "$PY36_VERSION_STRING" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
-    RET=1
-fi
-set -e
-
-# Clean up bucket contents
-aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-
-# Test with EXECUTION_ENV_PATH outside the model directory
-sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
-mv models/python_3_6/python_3_6_environment.tar.gz models
-sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
-mv models/python_3_12/python_3_12_environment.tar.gz models
-
-aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
-
-rm $SERVER_LOG
-
-SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    aws s3 rb "${BUCKET_URL}" --force || true
-    exit 1
-fi
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do
-    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-        RET=1
-    fi
-done
-set -e
-
-# Clean up bucket contents and delete bucket
-aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Env Manager Test PASSED.\n***"

@@ -177,310 +177,113 @@ fi
 
 pip3 install pytest requests virtualenv
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
+# Set up the tests to execute.
+# `subtest_properties` is a hash map of the subtests to run 
+# and the associated properties, or configurations, for each 
+# subtest. The list of subtests to run is found by listing the final 
+# set of keys. The subtest properties are variables which the 
+# subtest can consume to narrow or widen the scope of the subtest. 
+# In the same way we can add or remove entries in the hash map 
+# to include/exclude subtests, we can add or remove properties in 
+# the value to increase/decrease the scope of the subtest.
+# 
+# <key>   = subtest name (also the subdirectory for the subtest)
+# <value> = properties which the subtest can consume. 
+declare -A subtest_properties
+subtest_properties["shared_memory"]=""
+subtest_properties["lifecycle"]=""
+subtest_properties["argument_validation"]=""
+subtest_properties["logging"]=""
+subtest_properties["custom_metrics"]=""
 
-set +e
-python3 -m pytest --junitxml=L0_backend_python.report.xml $CLIENT_PY >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    RET=1
-fi
-set -e
+# Add tests depending on which environment is being run. 
 
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    ls /dev/shm
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    RET=1
-fi
-
-prev_num_pages=`get_shm_pages`
-# Triton non-graceful exit
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-sleep 5
-
-readarray -t triton_procs < <(pgrep --parent ${SERVER_PID})
-
-set +e
-
-# Trigger non-graceful termination of Triton
-kill -9 $SERVER_PID
-
-# Wait 10 seconds so that Python stub can detect non-graceful exit
-sleep 10
-
-for triton_proc in $triton_procs; do
-    kill -0 $triton_proc > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Python backend non-graceful exit test failed \n***"
-        RET=1
-        break
-    fi
-done
-set -e
-
-#
-# Test KIND_GPU
-# Disable env test for Jetson & Windows since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-  rm -rf models/
-  mkdir -p models/add_sub_gpu/1/
-  cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
-  cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
-
-  prev_num_pages=`get_shm_pages`
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      exit 1
-  fi
-
-  if [ $? -ne 0 ]; then
-      cat $SERVER_LOG
-      echo -e "\n***\n*** KIND_GPU model test failed \n***"
-      RET=1
-  fi
-
-  kill_server
-
-  current_num_pages=`get_shm_pages`
-  if [ $current_num_pages -ne $prev_num_pages ]; then
-      cat $CLIENT_LOG
-      ls /dev/shm
-      echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-  Shared memory pages before starting triton equals to $prev_num_pages
-  and shared memory pages after starting triton equals to $current_num_pages \n***"
-      exit 1
-  fi
-fi
-
-# Test Multi file models
-rm -rf models/
-mkdir -p models/multi_file/1/
-cp ../python_models/multi_file/*.py ./models/multi_file/1/
-cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
-(cd models/multi_file && \
-          sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** multi-file model test failed \n***"
-    RET=1
-fi
-
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-# Test environment variable propagation
-rm -rf models/
-mkdir -p models/model_env/1/
-cp ../python_models/model_env/model.py ./models/model_env/1/
-cp ../python_models/model_env/config.pbtxt ./models/model_env/
-
-export MY_ENV="MY_ENV"
-if [[ ${TEST_WINDOWS} == 1 ]]; then
-    # This will run in WSL, but Triton will run in windows, so environment
-    # variables meant for loaded models must be exported using WSLENV.
-    # The /w flag indicates the value should only be included when invoking
-    # Win32 from WSL.
-    export WSLENV=MY_ENV/w
-fi
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    echo -e "\n***\n*** Environment variable test failed \n***"
-    exit 1
-fi
-
-kill_server
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-rm -fr ./models
-mkdir -p models/identity_fp32/1/
-cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
-
-shm_default_byte_size=$((1024*1024*4))
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    exit 1
-fi
-
-for shm_page in `ls /dev/shm/`; do
-    if [[ $shm_page !=  triton_python_backend_shm* ]]; then
-        continue
-    fi
-    page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
-    if [ $page_size -ne $shm_default_byte_size ]; then
-        echo -e "Shared memory region size is not equal to
-$shm_default_byte_size for page $shm_page. Region size is
-$page_size."
-        RET=1
-    fi
-done
-
-kill_server
-
-# Test model getting killed during initialization
-rm -fr ./models
-mkdir -p models/init_exit/1/
-cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
-cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
-
-ERROR_MESSAGE="Stub process 'init_exit_0_0' is not healthy."
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-    else
-        echo $CLIENT_LOG
-        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
-        RET=1
-    fi
-fi
-
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
+# If not running in igpu mode add these
 # Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble bls decoupled response_sender"
-    # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
-    # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
-    # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
-    if [[ ${TEST_WINDOWS} == 0 ]]; then
-        SUBTESTS+=" variants io python_based_backends async_execute"
-    fi
-
-    for TEST in ${SUBTESTS}; do
-        # Run each subtest in a separate virtual environment to avoid conflicts
-        # between dependencies.
-        setup_virtualenv
-
-        set +e
-        (cd ${TEST} && bash -ex test.sh)
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -ne 0 ]; then
-            echo "Subtest ${TEST} FAILED"
-            RET=$EXIT_CODE
-
-            # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
-            # Propagate the exit code to make sure it's not overwritten by other tests.
-            if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
-                BLS_RET=$RET
-            fi
-        fi
-        set -e
-
-        deactivate_virtualenv
-    done
-
-    # [DLIS-5969]: Incorporate env test for windows
-    if [[ ${PYTHON_ENV_VERSION} = "12" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
-        # In 'env' test we use miniconda for dependency management. No need to run
-        # the test in a virtual environment.
-        set +e
-        (cd env && bash -ex test.sh)
-        if [ $? -ne 0 ]; then
-            echo "Subtest env FAILED"
-            RET=1
-        fi
-        set -e
-    fi
+    subtest_properties["ensemble"]=""
+    subtest_properties["bls"]=""
+    subtest_properties["decoupled"]=""
+    subtest_properties["response_sender"]=""
+    subtest_properties["env"]="locale extraction aws"
 fi
 
-SUBTESTS="lifecycle argument_validation logging custom_metrics"
+# If not running on windows add these 
+# [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
+# [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
 # [DLIS-6124] Disable restart test for Windows since it requires more investigation
 # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
 # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
 if [[ ${TEST_WINDOWS} == 0 ]]; then
-    # TODO: Reimplement restart on decoupled data pipeline and enable restart.
-    SUBTESTS+=" model_control examples request_rescheduling"
+    subtest_properties["variants"]=""
+    subtest_properties["io"]=""
+    subtest_properties["python_based_backends"]=""
+    subtest_properties["async_execute"]=""
+    subtest_properties["model_control"]=""
+    subtest_properties["examples"]=""
+    subtest_properties["request_rescheduling"]=""
+fi  
+
+ALL_SUBTESTS=$(echo "${!subtest_properties[@]}")
+if [[ -n "${SUBTESTS}" ]]; then
+    for subtest in $(echo "${!subtest_properties[@]}"); do 
+        if [[ ! "${SUBTESTS}" =~ "${subtest}" ]]; then
+            unset "subtest_properties[${subtest}]"
+        fi
+    done
 fi
-for TEST in ${SUBTESTS}; do
+ALL_SUBTESTS=$(echo "${!subtest_properties[@]}")
+
+echo "Executing the following subtests: "
+for subtest in $(echo "${!subtest_properties[@]}"); do
+    echo "  ${subtest}: ${subtest_properties[${subtest}]}"
+done
+
+if [[ "${ALL_SUBTETS}" =~ "shared_memory" ]]; then
+    bash -ex test_shared_memory.sh
+fi
+
+for TEST in ${ALL_SUBTESTS}; do 
+    if [[ "${TEST}" == "env" ]]; then 
+        continue
+    fi
+
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
     setup_virtualenv
 
     set +e
-    (cd ${TEST} && bash -ex test.sh)
-
-    if [ $? -ne 0 ]; then
+    (cd ${TEST} && PROPERTIES="${subtest_properties["${TEST}"]}" bash -ex test.sh)
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
-        RET=1
+        RET=$EXIT_CODE
+
+        # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
+        # Propagate the exit code to make sure it's not overwritten by other tests.
+        if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
+            BLS_RET=$RET
+        fi
     fi
     set -e
 
     deactivate_virtualenv
 done
+
+if [[ "${ALL_SUBTESTS}" =~ "env" ]]; then
+    # In 'env' test we use miniconda for dependency management. No need to run
+    # the test in a virtual environment.
+    set +e
+    (cd env && PROPERTIES="${subtest_properties["env"]}" bash -ex test.sh)
+    if [ $? -ne 0 ]; then
+        echo "Subtest env FAILED"
+        RET=1
+    fi
+    set -e
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
