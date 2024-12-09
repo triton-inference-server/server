@@ -488,6 +488,14 @@ class HTTPAPIServer : public HTTPServer {
     evbuffer* buffer_ = nullptr;
   };
 
+#ifdef TRITON_ENABLE_METRICS
+ private:
+  struct PromMetric {
+    std::unordered_map<std::string, std::string> labels;
+    double value;
+  };
+#endif  // TRITON_ENABLE_METRICS
+
  protected:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -592,7 +600,17 @@ class HTTPAPIServer : public HTTPServer {
   void HandleGenerate(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str, bool streaming);
+#ifdef TRITON_ENABLE_METRICS
+  // Helper function to set get the KV-cache utilization metrics for the
+  // infer response header
+  std::string ExtractKVMetrics(
+      const std::string& prometheus_metrics, const std::string& orca_type);
 
+  // Generates a metric struct for a given family with a map of labels and a
+  // value
+  std::vector<PromMetric> MetricFamilyExtractor(
+      const std::string& input, const std::string& metricFamily);
+#endif  // TRITON_ENABLE_METRICS
   // 'meta_data_root' is the root JSON document for 'input_metadata'.
   // In TritonJson, the Value objects are references to the root document.
   // Therefore the document must stay valid.
