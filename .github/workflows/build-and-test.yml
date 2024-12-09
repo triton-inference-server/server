@@ -1,0 +1,60 @@
+name: Build And Test
+
+on:
+    pull_request:
+      branches:
+        - main
+      types: [synchronize, opened, reopened, ready_for_review]
+
+
+jobs:
+  free-space:
+    runs-on: ubuntu-latest
+    steps:
+      # Based on https://stackoverflow.com/q/75536771
+      - name: Free disk space
+        run: |
+          sudo docker system prune -a -f
+          sudo rm -rf \
+            /usr/share/dotnet "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/ghc \
+            /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
+            /usr/lib/jvm
+
+          sudo apt-get purge microsoft-edge-stable || true
+          sudo apt-get purge google-cloud-cli || true
+          sudo apt-get purge dotnet-sdk-* || true
+          sudo apt-get purge google-chrome-stable || true
+
+          sudo apt-get autoremove -y
+          sudo apt-get autoclean -y
+
+  test:
+    needs: free-space
+    runs-on: ubuntu-latest
+    container:
+      image: nvcr.io/nvidia/tritonserver:24.10-py3
+      volumes:
+        - ${{ github.workspace }}:/server
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        apt update
+        apt install -y --no-install-recommends clang-format-15 cmake libb64-dev rapidjson-dev libre2-dev libssl-dev
+        wget -O /tmp/boost.tar.gz https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && (cd /tmp && tar xzf boost.tar.gz) && mv /tmp/boost_1_80_0/boost /usr/include/boost
+        pip install pytest requests /opt/tritonserver/python/*.whl pydantic tritonclient[all]
+
+    - name: Build
+      run: |
+        mkdir -p /server/build
+        cd /server/build
+        cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install ..
+        make -j8
+
+    - name: Run tests with pytest
+      run: |
+        cd /server
+        python3 -m pip install --force-reinstall build/triton-server/python/generic/wheel/dist/tritonfrontend-*.whl
+        pytest qa/L0_python_api/ -v
