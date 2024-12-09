@@ -1526,11 +1526,11 @@ class ModelInferHandler
         TRITONSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
   }
+  std::atomic<uint32_t> connection_count() { return conn_cnt_.load(); }
 
  protected:
   void StartNewRequest() override;
   bool Process(State* state, bool rpc_ok) override;
-  std::atomic<uint32_t> connection_count() { return conn_cnt_.load(); }
 
  private:
   void Execute(State* state);
@@ -1543,6 +1543,8 @@ class ModelInferHandler
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+
+  std::atomic<uint32_t> conn_cnt_;
 };
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
@@ -1569,8 +1571,6 @@ class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
   }
 
   ::grpc::ServerContext* context_;
-
-  std::atomic<uint32_t> conn_cnt_;
 };
 #else
 using GrpcServerCarrier = void*;
