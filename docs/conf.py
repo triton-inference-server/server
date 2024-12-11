@@ -66,10 +66,7 @@ with open("../TRITON_VERSION") as f:
     version_long = version_long.strip()
 
 version_short = re.match(r"^[\d]+\.[\d]+", version_long).group(0)
-print(f"version long: {version_long}")
-print(f"version short: {version_short}")
 version_short_split = version_short.split(".")[1]
-print(f"version short split: {version_short_split}")
 
 
 # maintain left-side bar toctrees in `contents` file
@@ -260,9 +257,7 @@ switcher_path = os.path.join(html_static_path[0], "switcher.json")
 versions = []
 # Triton 2 releases
 correction = -1 if "dev" in version_long else 0
-print(f"correction: {correction}")
 upper_bound = version_short.split(".")[1]
-print(f"upper bound: {upper_bound}")
 for i in range (2, int(version_short.split(".")[1]) + correction):
     versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
 
@@ -324,8 +319,7 @@ json_data.append(
 # validate the links 
 for i, d in enumerate(json_data):
     h = httplib2.Http()
-    resp = h.request(d["url"] + "index.html", "HEAD")
-    print(f"{resp}")
+    resp = h.request(d["url"], "HEAD")
     if int(resp[0]["status"]) >= 400:
         print(d["url"], "NOK", resp[0]["status"])
         exit(1)
