@@ -1232,6 +1232,8 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
 
+RUN pip3 install -r python/openai/requirements.txt
+
 """
     if not FLAGS.no_core_build:
         # Add feature labels for SageMaker endpoint
@@ -1922,6 +1924,10 @@ def core_build(
     cmake_script.cp(
         os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
+    )
+    cmake_script.cpdir(
+        os.path.join(repo_install_dir, "python", "openai"),
+        os.path.join(install_dir, "python")
     )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
