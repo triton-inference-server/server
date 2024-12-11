@@ -42,19 +42,14 @@ def get_valid_param_value(param, default_value=""):
 
 class TritonPythonModel:
     def initialize(self, args):
-        # Parse model configs
         model_config = json.loads(args["model_config"])
-
         self.output_config = pb_utils.get_output_config_by_name(
             model_config, "text_output"
         )
-
         self.output_dtype = pb_utils.triton_string_to_numpy(
             self.output_config["data_type"]
         )
-
         self.decoupled = pb_utils.using_decoupled_model_transaction_policy(model_config)
-
         self.logger = pb_utils.Logger
 
     def create_triton_tensors(self, index):
@@ -80,7 +75,6 @@ class TritonPythonModel:
             try:
                 for index in range(0, 1):
                     triton_response = self.create_triton_response(index)
-                    # output_tensors = triton_response.output_tensors()
                     if self.decoupled:
                         response_sender.send(triton_response)
                     else:
@@ -92,9 +86,7 @@ class TritonPythonModel:
                     )
 
             except Exception:
-                # self.logger.log_info(f"error response")
                 self.logger.log_error(traceback.format_exc())
-                # If encountering an error, send a response with err msg
                 error_response = pb_utils.InferenceResponse(
                     output_tensors=[],
                     error=pb_utils.TritonError(traceback.format_exc()),
@@ -115,8 +107,4 @@ class TritonPythonModel:
             return responses
 
     def finalize(self):
-        """`finalize` is called only once when the model is being unloaded.
-        Implementing `finalize` function is optional. This function allows
-        the model to perform any necessary clean ups before exit.
-        """
-        print("Cleaning up...")
+        self.logger.log_info("Cleaning up...")
