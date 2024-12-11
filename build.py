@@ -1925,10 +1925,6 @@ def core_build(
         os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
     )
-    cmake_script.cpdir(
-        os.path.join(repo_install_dir, "python", "openai"),
-        os.path.join(install_dir, "python")
-    )
 
     cmake_script.mkdir(os.path.join(install_dir, "include", "triton"))
     cmake_script.cpdir(
@@ -1936,6 +1932,10 @@ def core_build(
         os.path.join(install_dir, "include", "triton", "core"),
     )
 
+    cmake_script.cpdir(
+        os.path.join(repo_dir, "python", "openai"),
+        os.path.join(install_dir, "python")
+    )
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
     cmake_script.cp(os.path.join(repo_dir, "TRITON_VERSION"), install_dir)
 
