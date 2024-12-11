@@ -574,18 +574,17 @@ def create_openvino_modelfile(
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
         openvino_inputs.append(
-            ov.opset1.parameter(shape=batch_dim + shape, dtype=dtype, name=in_name)
+            ng.parameter(shape=batch_dim + shape, dtype=dtype, name=in_name)
         )
-        openvino_outputs.append(
-            ov.opset1.result(openvino_inputs[io_num], name=out_name)
-        )
+        openvino_outputs.append(ng.result(openvino_inputs[io_num], name=out_name))
 
-    model = ov.Model(openvino_outputs, openvino_inputs, model_name)
+    function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
+    ie_network = IENetwork(ng.impl.Function.to_capsule(function))
 
     os.makedirs(model_version_dir, exist_ok=True)
 
-    ov.serialize(
-        model, model_version_dir + "/model.xml", model_version_dir + "/model.bin"
+    ie_network.serialize(
+        model_version_dir + "/model.xml", model_version_dir + "/model.bin"
     )
 
 
@@ -1318,7 +1317,8 @@ if __name__ == "__main__":
     ):
         import tensorrt as trt
     if FLAGS.openvino:
-        import openvino.runtime as ov
+        from openvino.inference_engine import IENetwork
+        import ngraph as ng
 
     import test_util as tu
 
