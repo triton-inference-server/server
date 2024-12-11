@@ -97,10 +97,12 @@ add_executable(
   main
   classification.cc
   command_line_parser.cc
+  common.cc
   main.cc
   shared_memory_manager.cc
   triton_signal.cc
   classification.h
+  common.h
   shared_memory_manager.h
   triton_signal.h
 )
@@ -116,7 +118,7 @@ if (NOT WIN32)
 endif()
 
 target_compile_features(main PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+if(WIN32)
   message("Using MSVC as compiler, default target on Windows 10. "
     "If the target system is not Windows 10, please update _WIN32_WINNT "
     "to corresponding value.")
@@ -128,13 +130,30 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   target_compile_definitions(main
     PRIVATE
       NOMINMAX)
+
+  # Dependency from common.h
+  find_library(B64_LIBRARY NAMES b64)
+  target_link_libraries(
+    main
+    PRIVATE
+      ${B64_LIBRARY}
+  )
+
 else()
+
   target_compile_options(
     main
     PRIVATE
       -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
   )
-endif()
+
+  # Dependency from common.h
+  target_link_libraries(
+    main
+    PRIVATE
+      b64
+  )
+  endif()
 
 set(LIB_DIR "lib")
 if(LINUX)
@@ -588,57 +607,6 @@ if(${TRITON_ENABLE_TRACING})
       tracing-library
   )
 endif() # TRITON_ENABLE_TRACING
-
-# Common Library
-add_library(common_obj OBJECT common.h common.cc)
-
-target_compile_features(common_obj PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  target_compile_options(
-    common_obj
-    PRIVATE
-      /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
-  )
-else()
-  target_compile_options(
-    common_obj
-    PRIVATE
-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
-  )
-endif()
-
-if(${TRITON_ENABLE_GPU})
-  target_compile_definitions(
-      common_obj
-      PRIVATE TRITON_ENABLE_GPU=1
-  )
-endif()
-
-
-if (WIN32)
-  find_library(B64_LIBRARY NAMES b64)
-  target_link_libraries(
-      common_obj
-      PUBLIC
-        ${B64_LIBRARY}
-        triton-core-serverapi  # from repo-core
-  )
-else()
-  target_link_libraries(
-      common_obj
-      PUBLIC
-        b64
-        triton-core-serverapi  # from repo-core
-    )
-endif()
-
-set_target_properties(
-    common_obj
-    PROPERTIES
-      POSITION_INDEPENDENT_CODE ON
-)
-
-target_link_libraries(main PRIVATE common_obj)
 
 if (NOT WIN32)
   #

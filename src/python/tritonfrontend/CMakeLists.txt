@@ -61,10 +61,12 @@ set(
   ../../data_compressor.h
   ../../restricted_features.h
   ../../classification.cc
+  ../../common.h
+  ../../common.cc
 )
 
 set(PY_BINDING_DEPENDENCY_LIBS
-      common_obj)
+      b64) # Dependency from common.h
 
 # Conditional Linking Based on Flags
 if(${TRITON_ENABLE_HTTP})
