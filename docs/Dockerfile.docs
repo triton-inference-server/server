@@ -59,6 +59,7 @@ RUN pip3 install \
       breathe \
       docutils \
       exhale \
+      httplib2 \
       ipython \
       myst-nb \
       nbclient \
