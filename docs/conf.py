@@ -38,10 +38,14 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import httplib2
+import json
 import os
+import re
 
 from docutils import nodes
 from sphinx import search
+from packaging.version import Version
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
@@ -54,7 +58,19 @@ author = "NVIDIA"
 
 # The full version, including alpha/beta/rc tags
 # Env only set during riva-release process, otherwise keep as dev for all internal builds
-release = os.getenv("TRITON_VERSION", "dev")
+# release = os.getenv("TRITON_VERSION", "dev")
+
+version_long = "0.0.0"
+with open("../TRITON_VERSION") as f:
+    version_long = f.readline()
+    version_long = version_long.strip()
+
+version_short = re.match(r"^[\d]+\.[\d]+", version_long).group(0)
+print(f"version long: {version_long}")
+print(f"version short: {version_short}")
+version_short_split = version_short.split(".")[1]
+print(f"version short split: {version_short_split}")
+
 
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
@@ -180,9 +196,28 @@ html_theme_options = {
       <a href="https://www.nvidia.com/en-us/contact/" target="_blank">Contact</a>""",
     "repository_url": "https://github.com/triton-inference-server/server",
     "use_repository_button": True,
+    "switcher": {
+        # use for local testing
+        # "json_url": "http://localhost:8888/_static/switcher.json",
+        "json_url": "https://docs.nvidia.com/deeplearning/dali/user-guide/"
+        "docs/_static/switcher.json",
+        "version_match": "main" if "dev" in version_long else version_short,
+    },
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "primary_sidebar_end": [],
 }
 
-version_short = release
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+#
+html_theme_options.update(
+    {
+        "collapse_navigation": False,
+    }
+)
+
+
 deploy_ngc_org = "nvidia"
 deploy_ngc_team = "triton"
 myst_substitutions = {
@@ -218,6 +253,86 @@ ultimate_replacements = {
 nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
+###############################
+# SETUP SWITCHER
+###############################
+switcher_path = os.path.join(html_static_path[0], "switcher.json")
+versions = []
+# Triton 2 releases
+correction = -1 if "dev" in version_long else 0
+print(f"correction: {correction}")
+upper_bound = version_short.split(".")[1]
+print(f"upper bound: {upper_bound}")
+for i in range (2, int(version_short.split(".")[1]) + correction):
+    versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
+
+# Triton 1 releases
+for i in range(0, 15):
+    versions.append((f"1.{i}.0", f"tensorrt_inference_server_1{i}0"))
+
+# Triton Beta Releases
+for i in range(1, 11): 
+    versions.append((f"0.{i}.0_beta", f"inference_server_0{i}0_beta"))
+
+# Patch releases
+# Add here.
+
+versions = sorted(versions, key=lambda v: Version(v[0]), reverse=True)
+
+# Build switcher data
+json_data = []
+for v in versions: 
+    json_data.append(
+        {
+            "name": v[0],
+            "version": v[0],
+            "url": f"https://docs.nvidia.com/deeplearning/triton-inference-server/archives/{v[1]}/user-guide/docs",
+        }
+    )
+if "dev" in version_long:
+    version_short_split = version_short.split(".")
+    one_before = f"{version_short_split[0]}.{int(version_short_split[1]) - 1}"
+    json_data.insert(
+        0,
+        {
+            "name": f"{one_before} (current_release)",
+            "version": f"{one_before}", 
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
+        }
+    )
+else:
+    json_data.insert(
+        0,
+        {
+            "name": f"{version_short} (current_release)",
+            "version": f"{version_short}", 
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
+        }
+    )
+
+# Trim to last N releases.
+json_data = json_data[0:12]
+
+json_data.append(
+    {
+        "name": "older releases",
+        "version": "archives",
+        "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/archives/",
+    }
+)
+
+# validate the links 
+for i, d in enumerate(json_data):
+    h = httplib2.Http()
+    resp = h.request(d["url"] + "index.html", "HEAD")
+    print(f"{resp}")
+    if int(resp[0]["status"]) >= 400:
+        print(d["url"], "NOK", resp[0]["status"])
+        exit(1)
+
+# Write switcher data to file
+with open(switcher_path, "w") as f:
+    json.dump(json_data, f, ensure_ascii=False, indent=4)
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
