@@ -59,8 +59,16 @@ html_show_sphinx = False
 
 # The full version, including alpha/beta/rc tags
 # Env only set during riva-release process, otherwise keep as dev for all internal builds
-release = os.getenv("TRITON_VERSION", "dev")
-switcher_version = re.match(r"^[\d]+\.[\d]+", release.strip()).group(0)
+# release = os.getenv("TRITON_VERSION", "dev")
+
+version_long = "0.0.0"
+with open("../TRITON_VERSION") as f:
+    version_long = f.readline()
+    version_long = version_long.strip()
+
+version_short = re.match(r"^[\d]+\.[\d]+", version_long).group(0)
+version_short_split = version_short.split(".")[1]
+
 
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
@@ -199,6 +207,83 @@ ultimate_replacements = {
 nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
+###############################
+# SETUP SWITCHER
+###############################
+switcher_path = os.path.join(html_static_path[0], "switcher.json")
+versions = []
+# Triton 2 releases
+correction = -1 if "dev" in version_long else 0
+upper_bound = version_short.split(".")[1]
+for i in range (2, int(version_short.split(".")[1]) + correction):
+    versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
+
+# Triton 1 releases
+for i in range(0, 15):
+    versions.append((f"1.{i}.0", f"tensorrt_inference_server_1{i}0"))
+
+# Triton Beta Releases
+for i in range(1, 11): 
+    versions.append((f"0.{i}.0_beta", f"inference_server_0{i}0_beta"))
+
+# Patch releases
+# Add here.
+
+versions = sorted(versions, key=lambda v: Version(v[0]), reverse=True)
+
+# Build switcher data
+json_data = []
+for v in versions: 
+    json_data.append(
+        {
+            "name": v[0],
+            "version": v[0],
+            "url": f"https://docs.nvidia.com/deeplearning/triton-inference-server/archives/{v[1]}/user-guide/docs",
+        }
+    )
+if "dev" in version_long:
+    version_short_split = version_short.split(".")
+    one_before = f"{version_short_split[0]}.{int(version_short_split[1]) - 1}"
+    json_data.insert(
+        0,
+        {
+            "name": f"{one_before} (current_release)",
+            "version": f"{one_before}", 
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
+        }
+    )
+else:
+    json_data.insert(
+        0,
+        {
+            "name": f"{version_short} (current_release)",
+            "version": f"{version_short}", 
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
+        }
+    )
+
+# Trim to last N releases.
+json_data = json_data[0:12]
+
+json_data.append(
+    {
+        "name": "older releases",
+        "version": "archives",
+        "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/archives/",
+    }
+)
+
+# validate the links 
+for i, d in enumerate(json_data):
+    h = httplib2.Http()
+    resp = h.request(d["url"], "HEAD")
+    if int(resp[0]["status"]) >= 400:
+        print(d["url"], "NOK", resp[0]["status"])
+        exit(1)
+
+# Write switcher data to file
+with open(switcher_path, "w") as f:
+    json.dump(json_data, f, ensure_ascii=False, indent=4)
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
