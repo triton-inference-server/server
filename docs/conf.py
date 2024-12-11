@@ -65,8 +65,9 @@ with open("../TRITON_VERSION") as f:
     version_long = f.readline()
     version_long = version_long.strip()
 
-version_short = re.match(r"^[\d]+\.[\d]+", version_long).group(0)
-version_short_split = version_short.split(".")[1]
+version_short = re.match(r"^[\d]+\.[\d]+\.[\d]+", version_long).group(0)
+version_short_split = version_short.split(".")
+one_before = f"{version_short_split[0]}.{int(version_short_split[1]) - 1}.{version_short_split[2]}"
 
 
 # maintain left-side bar toctrees in `contents` file
@@ -195,12 +196,11 @@ html_theme_options = {
     "use_repository_button": True,
     "switcher": {
         # use for local testing
-        # "json_url": "http://localhost:8888/_static/switcher.json",
-        "json_url": "https://docs.nvidia.com/deeplearning/dali/user-guide/"
-        "docs/_static/switcher.json",
-        "version_match": "main" if "dev" in version_long else version_short,
+        # "json_url": "http://localhost:8000/_static/switcher.json",
+        "json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/_static/switcher.json",
+        "version_match": one_before if "dev" in version_long else version_short, 
     },
-    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_start": ["version-switcher"],
     "primary_sidebar_end": [],
 }
 
@@ -285,8 +285,6 @@ for v in versions:
         }
     )
 if "dev" in version_long:
-    version_short_split = version_short.split(".")
-    one_before = f"{version_short_split[0]}.{int(version_short_split[1]) - 1}"
     json_data.insert(
         0,
         {
@@ -299,7 +297,7 @@ else:
     json_data.insert(
         0,
         {
-            "name": f"{version_short} (current_release)",
+            "name": f"{version_short} (current release)",
             "version": f"{version_short}", 
             "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
         }
