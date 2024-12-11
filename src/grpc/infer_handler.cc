@@ -645,6 +645,7 @@ InferRequestComplete(
       static_cast<RequestReleasePayload*>(userp);
 
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_VERBOSE(1) << "--------------- delete request_release_payload ---------";
     delete request_release_payload;
   }
 }
