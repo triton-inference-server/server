@@ -44,6 +44,7 @@ install_conda
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
 # Create a model with python 3.7 version
+export PY_VERSION="3.7"
 create_conda_env "3.7" "python-3-7"
 conda install numpy=1.20.1 -y
 conda install tensorflow=2.1.0 -y
@@ -67,6 +68,7 @@ conda deactivate
 # previous test.
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
+export PY_VERSION="3.7.1"
 path_to_conda_pack="$PWD/python-3-7-1"
 create_conda_env_with_specified_path "3.7" $path_to_conda_pack
 conda install numpy=1.20.3 -y
@@ -89,6 +91,7 @@ conda deactivate
 # Create a model with python 3.6 version
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
+export PY_VERSION="3.6"
 create_conda_env "3.6" "python-3-6"
 conda install -c conda-forge libstdcxx-ng=14 -y
 conda install numpy=1.18.1 -y
@@ -116,9 +119,13 @@ conda deactivate
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
+TF_VERSION="2.16.2"
 conda install numpy=1.26.4 -y
-conda install tensorflow=2.16.2 -y
-PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is 2.16.2"
+if [ $TRITON_RHEL -eq 1 ]; then
+    TF_VERSION="2.17.0"
+fi
+conda install tensorflow=${TF_VERSION} -y
+PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and Tensorflow version is ${TF_VERSION}"
 conda pack -o python3.12.tar.gz
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
@@ -137,8 +144,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 set +e
 for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY37_1_VERSION_STRING" "$PY312_VERSION_STRING"; do
@@ -154,6 +160,15 @@ done
 # NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
 #       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
 export LC_ALL=INVALID
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill_server
+
 grep "Locale is (None, None)" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
@@ -175,8 +190,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 set +e
 grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
@@ -207,8 +221,7 @@ touch -m models/python_3_12/python_3_12_environment.tar.gz
 # The environment should be re-extracted
 curl -v -X POST localhost:8000/v2/repository/models/python_3_12/load
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 set +e
 
@@ -248,6 +261,8 @@ rm -rf models/python_3_7
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 rm $SERVER_LOG
+# Occasionally needs more time to load
+SERVER_TIMEOUT=420
 
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
@@ -258,8 +273,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 set +e
 grep "$PY36_VERSION_STRING" $SERVER_LOG
@@ -292,8 +306,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 set +e
 for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do

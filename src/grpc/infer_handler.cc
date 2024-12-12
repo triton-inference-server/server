@@ -677,7 +677,8 @@ ModelInferHandler::StartNewRequest()
 }
 
 bool
-ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
+ModelInferHandler::Process(
+    InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
   // There are multiple handlers registered in the gRPC service.
   // Hence, there we can have a case where a handler thread is
@@ -690,8 +691,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // Will delay the Process execution by the specified time.
     // This can be used to test the flow when cancellation request
     // issued for the request, which is still at START step.
-    LOG_INFO << "Delaying the write of the response by "
-             << state->delay_process_ms_ << " ms...";
+    LOG_INFO << "Delaying the Process execution by " << state->delay_process_ms_
+             << " ms...";
     std::this_thread::sleep_for(
         std::chrono::milliseconds(state->delay_process_ms_));
   }
@@ -711,11 +712,12 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // because we will never leave this if body. Refer to PR 7325.
       // This is a special case for ModelInferHandler, since we have 2 threads,
       // and each of them can process cancellation. ModelStreamInfer has only 1
-      // thread, and  cancellation at step START was not reproducible in a
+      // thread, and cancellation at step START was not reproducible in a
       // single thread scenario.
       StartNewRequest();
     }
-    bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+    bool resume = state->context_->HandleCancellation(
+        state, rpc_ok, Name(), is_notification);
     return resume;
   }
 
@@ -765,7 +767,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
-      state->step_ = COMPLETE;
+      state->step_ = Steps::COMPLETE;
       state->context_->responder_->Finish(
           inference::ModelInferResponse(), status, state);
     }
@@ -1001,7 +1003,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     }
 #endif  // TRITON_ENABLE_TRACING
 
-    state->step_ = COMPLETE;
+    state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(error_response, status, state);
   }
 }
@@ -1050,6 +1052,17 @@ ModelInferHandler::InferResponseComplete(
                    << state->unique_id_
                    << ", skipping response generation as grpc transaction was "
                       "cancelled... ";
+
+    if (state->delay_enqueue_ms_ != 0) {
+      // Will delay PutTaskBackToQueue by the specified time.
+      // This can be used to test the flow when cancellation request
+      // issued for the request during InferResponseComplete
+      // callback right before Process in the notification thread.
+      LOG_INFO << "Delaying PutTaskBackToQueue by " << state->delay_enqueue_ms_
+               << " ms...";
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(state->delay_enqueue_ms_));
+    }
 
     // Send state back to the queue so that state can be released
     // in the next cycle.
@@ -1113,7 +1126,17 @@ ModelInferHandler::InferResponseComplete(
       std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
-  state->step_ = COMPLETE;
+  if (state->delay_response_completion_ms_ != 0) {
+    // Will delay the Process execution of state at step COMPLETE by the
+    // specified time. This can be used to test the flow when cancellation
+    // request issued for the request, which is at InferResponseComplete.
+    LOG_INFO << "Delaying InferResponseComplete by "
+             << state->delay_response_completion_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_response_completion_ms_));
+  }
+
+  state->step_ = Steps::COMPLETE;
   state->context_->responder_->Finish(*response, state->status_, state);
   if (response_created) {
     delete response;

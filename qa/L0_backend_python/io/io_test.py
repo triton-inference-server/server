@@ -259,6 +259,33 @@ class IOTest(unittest.TestCase):
             self.assertTrue(np.allclose(gpu_output_data[1:], next_gpu_output_data))
         self.assertTrue(user_data._completed_requests.empty())
 
+    # Assert a prior crash is fixed regarding requested output on a decoupled model.
+    def test_requested_output_decoupled_prior_crash(self):
+        model_name = "llm"
+        prompt = "test"
+
+        text_input_data = np.array([[prompt]]).astype(object)
+        inputs = [grpcclient.InferInput("text_input", text_input_data.shape, "BYTES")]
+        inputs[-1].set_data_from_numpy(text_input_data)
+
+        requested_outputs = [grpcclient.InferRequestedOutput("text_output")]
+
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
+            client.start_stream(callback=partial(callback, user_data))
+            client.async_stream_infer(
+                model_name=model_name, inputs=inputs, outputs=requested_outputs
+            )
+            client.stop_stream()
+
+        outputs = ""
+        while not user_data._completed_requests.empty():
+            result = user_data._completed_requests.get(block=False)
+            if isinstance(result, InferenceServerException):
+                raise result
+            outputs += str(result.as_numpy("text_output")[0], encoding="utf-8")
+        self.assertGreater(len(outputs), 0, "text_output is empty")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,7 +58,7 @@ mkdir -p models/model/1 && (cd models/model && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt)
 
 SERVER_LOG=server.log
-LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./request_cancellation_test > $SERVER_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Unit Tests Failed\n***"
     cat $SERVER_LOG
@@ -78,12 +78,23 @@ mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
     echo 'instance_group [{ kind: KIND_CPU }]' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "10000" } }]' >> config.pbtxt)
 
-for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc_async_infer" "test_aio_grpc_stream_infer" "test_grpc_async_infer_cancellation_at_step_start"; do
-
+for TEST_CASE in "test_grpc_async_infer" \
+                    "test_grpc_stream_infer" \
+                    "test_aio_grpc_async_infer" \
+                    "test_aio_grpc_stream_infer" \
+                    "test_grpc_async_infer_cancellation_at_step_start" \
+                    "test_grpc_async_infer_response_complete_during_cancellation" \
+                    "test_grpc_async_infer_cancellation_during_response_complete"; do
     TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
     SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
     if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
         export TRITONSERVER_DELAY_GRPC_PROCESS=5000
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
+        export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
+        export TRITONSERVER_DELAY_GRPC_ENQUEUE=5000
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
+        export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
+        export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
     fi
 
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
@@ -101,9 +112,14 @@ for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc
         cat $TEST_LOG
         RET=1
     fi
-    grep "Cancellation notification received for" $SERVER_LOG
-    if [ $? -ne 0 ]; then
+
+    count=$(grep -o "Cancellation notification received for" $SERVER_LOG | wc -l)
+    if [ $count == 0 ]; then
         echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
+        cat $SERVER_LOG
+        RET=1
+    elif [ $count -ne 1 ]; then
+        echo -e "\n***\n*** Unexpected cancellation received by server on $TEST_CASE. Expected 1 but received $count.\n***"
         cat $SERVER_LOG
         RET=1
     fi
@@ -114,6 +130,12 @@ for TEST_CASE in "test_grpc_async_infer" "test_grpc_stream_infer" "test_aio_grpc
 
     if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
         unset TRITONSERVER_DELAY_GRPC_PROCESS
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
+        unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
+        unset TRITONSERVER_DELAY_GRPC_ENQUEUE
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
+        unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
+        unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
     fi
 done
 

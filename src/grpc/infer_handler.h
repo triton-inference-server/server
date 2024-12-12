@@ -833,7 +833,8 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
+        bool is_notification)
     {
       // Check to avoid early exit in case of triton_grpc_error
       if (!IsCancelled()) {
@@ -845,17 +846,22 @@ class InferHandlerState {
             << " step " << state->step_;
         return true;
       }
-      if ((state->step_ != Steps::CANCELLATION_ISSUED) &&
-          (state->step_ != Steps::CANCELLED)) {
+      if (is_notification) {
         LOG_VERBOSE(1) << "Cancellation notification received for " << name
                        << ", rpc_ok=" << rpc_ok << ", context "
                        << state->context_->unique_id_ << ", "
                        << state->unique_id_ << " step " << state->step_;
+      }
 
+      if (state->step_ != Steps::CANCELLATION_ISSUED) {
         // If the context has not been cancelled then
         // issue cancellation request to all the inflight
         // states belonging to the context.
-        if (state->context_->step_ != Steps::CANCELLED) {
+        // It means this is the first time we are hiting this line for this grpc
+        // transaction.
+        if ((state->step_ != Steps::CANCELLED) &&
+            (state->context_->step_ != Steps::CANCELLED)) {
+          // Issue the request cancellation as it has not been cancelled yet.
           IssueRequestCancellation();
           // Mark the context as cancelled
           state->context_->step_ = Steps::CANCELLED;
@@ -866,26 +872,34 @@ class InferHandlerState {
           // next iteration from the completion queue which
           // would release the state.
           return true;
+        } else if (is_notification && state->step_ == Steps::CANCELLED) {
+          // A corner case where InferResponseComplete is called between the
+          // cancellation reception but before the cancellation notification
+          // thread enters Process function.
+          // Should let the InferResponseComplete callback trigger the state
+          // release.
+          LOG_VERBOSE(1) << "Waiting for the state enqueued by callback to "
+                            "complete cancellation for "
+                         << name << ", rpc_ok=" << rpc_ok << ", context "
+                         << state->context_->unique_id_ << ", "
+                         << state->unique_id_ << " step " << state->step_;
+          return true;
+        } else {
+          // The cancellation request has been handled so the state can be
+          // released.
+          LOG_VERBOSE(1) << "Completing cancellation for " << name
+                         << ", rpc_ok=" << rpc_ok << ", context "
+                         << state->context_->unique_id_ << ", "
+                         << state->unique_id_ << " step " << state->step_;
+          return false;
         }
-      }
-
-      if (state->step_ != Steps::CANCELLATION_ISSUED) {
-        // The cancellation has not been issued hence the state can
-        // be released.
-        LOG_VERBOSE(1) << "Completing cancellation for " << name
-                       << ", rpc_ok=" << rpc_ok << ", context "
-                       << state->context_->unique_id_ << ", "
-                       << state->unique_id_ << " step " << state->step_;
-
-        return false;
-      } else {
-        // Should wait for the ResponseComplete callbacks to be invoked.
+      } else {  // state->step_ == Steps::CANCELLATION_ISSUED
+        // Should wait for the InferResponseComplete callbacks to be invoked.
         LOG_VERBOSE(1)
             << "Waiting for the callback to retrieve cancellation for " << name
             << ", rpc_ok=" << rpc_ok << ", context "
             << state->context_->unique_id_ << ", " << state->unique_id_
             << " step " << state->step_;
-
         return true;
       }
     }
@@ -1061,27 +1075,47 @@ class InferHandlerState {
       : tritonserver_(tritonserver), async_notify_state_(false)
   {
     // For debugging and testing
-    const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
-    delay_response_ms_ = 0;
-    if (dstr != nullptr) {
-      delay_response_ms_ = atoi(dstr);
-    }
-    const char* cstr = getenv("TRITONSERVER_DELAY_GRPC_COMPLETE");
-    delay_complete_ms_ = 0;
-    if (cstr != nullptr) {
-      delay_complete_ms_ = atoi(cstr);
-    }
-    const char* pstr = getenv("TRITONSERVER_DELAY_GRPC_PROCESS");
-    delay_process_ms_ = 0;
-    if (pstr != nullptr) {
-      delay_process_ms_ = atoi(pstr);
-    }
+    delay_response_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_RESPONSE");
+    delay_complete_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_COMPLETE");
+    delay_process_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS");
+    delay_notification_process_entry_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
+    delay_enqueue_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_ENQUEUE");
+    delay_response_completion_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
 
     response_queue_.reset(new ResponseQueue<ResponseType>());
     Reset(context, start_step);
   }
 
   ~InferHandlerState() { ClearTraceTimestamps(); }
+
+  int ParseDebugVariable(const char* env_str)
+  {
+    const char* str = getenv(env_str);
+    int val = 0;
+    if (str != nullptr) {
+      try {
+        val = std::stoi(str);
+      }
+      catch (const std::invalid_argument& e) {
+        LOG_ERROR << "Unable to parse the debug variable " << env_str
+                  << ". Value provided: '" << str
+                  << "' is not a valid integer. Error: " << e.what();
+      }
+      catch (const std::out_of_range& e) {
+        LOG_ERROR << "Unable to parse the debug variable " << env_str
+                  << ". Value provided: '" << str
+                  << "' is out of range for an integer. Error: " << e.what();
+      }
+      catch (const std::exception& e) {
+        LOG_ERROR
+            << "An unexpected error occurred while parsing the debug variable "
+            << env_str << " with value '" << str << "'. Error: " << e.what();
+      }
+    }
+    return val;
+  }
 
   bool IsGrpcContextCancelled() { return context_->IsCancelled(); }
 
@@ -1172,6 +1206,9 @@ class InferHandlerState {
   int delay_response_ms_;
   int delay_complete_ms_;
   int delay_process_ms_;
+  int delay_notification_process_entry_ms_;
+  int delay_enqueue_ms_;
+  int delay_response_completion_ms_;
 
   // For inference requests the allocator payload, unused for other
   // requests.
@@ -1317,7 +1354,7 @@ class InferHandler : public HandlerBase {
   };
 
   virtual void StartNewRequest() = 0;
-  virtual bool Process(State* state, bool rpc_ok) = 0;
+  virtual bool Process(State* state, bool rpc_ok, bool is_notification) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
 
   TRITONSERVER_Error* ForwardHeadersAsParameters(
@@ -1396,16 +1433,33 @@ InferHandler<
 
     while (cq_->Next(&tag, &ok)) {
       State* state = static_cast<State*>(tag);
+      bool is_notification = false;
       if (state->step_ == Steps::WAITING_NOTIFICATION) {
         State* state_wrapper = state;
         state = state_wrapper->state_ptr_;
         state->context_->SetReceivedNotification(true);
+        is_notification = true;
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;
+
+        if (state->delay_notification_process_entry_ms_ != 0) {
+          // Will delay the entry to Process by the specified time.
+          // This can be used to test the flow when
+          // 1. cancellation request issued for the request, which invokes
+          // InferResponseComplete callback right before Process.
+          // 2. cancellation request issued for the request during
+          // InferResponseComplete callback right before Process in the
+          // notification thread.
+          LOG_INFO
+              << "Delaying the entry to Process for notification thread by "
+              << state->delay_notification_process_entry_ms_ << " ms...";
+          std::this_thread::sleep_for(std::chrono::milliseconds(
+              state->delay_notification_process_entry_ms_));
+        }
       }
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
-      if (!Process(state, ok)) {
+      if (!Process(state, ok, is_notification)) {
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         state->context_->EraseState(state);
         StateRelease(state);
@@ -1529,7 +1583,7 @@ class ModelInferHandler
 
  protected:
   void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
+  bool Process(State* state, bool rpc_ok, bool is_notification) override;
 
  private:
   void Execute(State* state);

@@ -65,11 +65,11 @@ def start_kserve_frontends(server, args):
         from tritonfrontend import KServeGrpc, KServeHttp
 
         http_options = KServeHttp.Options(address=args.host, port=args.kserve_http_port)
-        http_service = KServeHttp.Server(server, http_options)
+        http_service = KServeHttp(server, http_options)
         http_service.start()
 
         grpc_options = KServeGrpc.Options(address=args.host, port=args.kserve_grpc_port)
-        grpc_service = KServeGrpc.Server(server, grpc_options)
+        grpc_service = KServeGrpc(server, grpc_options)
         grpc_service.start()
 
     except ModuleNotFoundError:

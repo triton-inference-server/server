@@ -565,7 +565,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == "tensorflow":
         args = tensorflow_cmake_args(images, library_paths)
     elif be == "python":
-        args = []
+        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -628,6 +628,18 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     else:
         cargs.append("..")
+    return cargs
+
+
+def python_cmake_args():
+    cargs = []
+    if target_platform() == "rhel":
+        cargs.append(
+            cmake_backend_arg(
+                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
+            )
+        )
+
     return cargs
 
 
@@ -957,6 +969,10 @@ RUN yum install -y \\
             pkg-config \\
             unzip \\
             wget \\
+            ncurses-devel \\
+            readline-devel \\
+            xz-devel \\
+            bzip2-devel \\
             zlib-devel \\
             libarchive-devel \\
             libxml2-devel \\
@@ -1542,7 +1558,7 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 
 def change_default_python_version_rhel(version):
-    df = """
+    df = f"""
 # The python library version available for install via 'yum install python3.X-devel' does not
 # match the version of python inside the RHEL base container. This means that python packages
 # installed within the container will not be picked up by the python backend stub process pybind
@@ -1551,21 +1567,17 @@ ENV PYENV_ROOT=/opt/pyenv_build
 RUN curl https://pyenv.run | bash
 ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
 RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
-    && cp ${{PYENV_ROOT}}/versions/{}/lib/libpython3* /usr/lib64/""".format(
-        version, version
-    )
-    df += """
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
+    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
+
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
 # pip installed will not be found during testing.
-ENV PYVER={} PYTHONPATH=/opt/python/v
+ENV PYVER={version} PYTHONPATH=/opt/python/v
 RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
 ENV PYBIN=${{PYTHONPATH}}/bin
 ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
-""".format(
-        version
-    )
+"""
     return df
 
 
