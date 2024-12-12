@@ -55,12 +55,7 @@ project = "NVIDIA Triton Inference Server"
 copyright = "2018-{}, NVIDIA Corporation".format(date.today().year)
 author = "NVIDIA"
 
-html_show_sphinx = False
-
-# The full version, including alpha/beta/rc tags
-# Env only set during riva-release process, otherwise keep as dev for all internal builds
-# release = os.getenv("TRITON_VERSION", "dev")
-
+# Get the version of Triton this is building.
 version_long = "0.0.0"
 with open("../TRITON_VERSION") as f:
     version_long = f.readline()
