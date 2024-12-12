@@ -28,7 +28,11 @@ FROM nvcr.io/nvidia/tritonserver:24.11-vllm-python-py3
 WORKDIR /opt/tritonserver
 
 # Clone OpenAI-compatible server code and place in container
-RUN git clone --single-branch --depth=1 -b r24.11 https://github.com/triton-inference-server/server.git && \
+# NOTE: Clone commit containing latest tritonfrontend kserve API fix
+RUN git clone -b main https://github.com/triton-inference-server/server.git && \
+    cd server && \
+    git checkout f336fa6bd5416ba2f17e5eb7de5228213562bbc8 && \
+    cd .. && \
     mv server/python/openai openai && \
     chown -R root:root openai && \
     chmod 755 openai && \
@@ -36,7 +40,7 @@ RUN git clone --single-branch --depth=1 -b r24.11 https://github.com/triton-infe
     rm -rf server
 
 # Install OpenAI-compatible server dependencies
-RUN python3 -m pip install "openai==1.40.6" "fastapi==0.111.1"
+RUN python3 -m pip install "openai==1.40.6" "fastapi==0.111.1" "httpx==0.27.2"
 
 # OPTIONAL: Add sample model repository for vLLM model for quickstart.
 # NOTE: Choosing a small model with a chat template and public access, and

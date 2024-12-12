@@ -71,6 +71,5 @@ docker run -ti --gpus all -p 9000:9000 -v ${HOME}/.cache/huggingface:/root/.cach
 python3 -m pip install "pytest==8.1.1" "pytest-asyncio==0.23.8"
 
 # Run tests
-cd openai/
-pytest tests/
+pytest -s -v openai/tests/
 ```
