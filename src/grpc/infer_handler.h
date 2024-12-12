@@ -113,16 +113,13 @@ class ResponseQueue {
 
   ~ResponseQueue()
   {
-    LOG_VERBOSE(2)
-        << " --------------- ResponseQueue::~ResponseQueue() current_index_: "
-        << current_index_ << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_.size(): " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::~ResponseQueue() "
+                   << ", ready_count_: " << ready_count_
+                   << ", alloc_count_: " << alloc_count_
+                   << ", pop_count_: " << pop_count_
+                   << " ------------ response_queue_.size(): "
+                   << response_queue_.size()
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
 
     for (auto response : reusable_pool_) {
       delete response;
@@ -139,16 +136,13 @@ class ResponseQueue {
   void Reset()
   {
     std::lock_guard<std::mutex> lock(mtx_);
-    LOG_VERBOSE(2) << " --------------- ResponseQueue::Reset() current_index_: "
-                   << current_index_ << ", ready_count_: " << ready_count_
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::Reset() "
+                   << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
-                   << " ------------ dup_alloc_count_: " << dup_alloc_count_
-                   << ", dup_ready_count_: " << dup_ready_count_
                    << ", pop_count_: " << pop_count_
                    << " ------------ response_queue_.size(): "
                    << response_queue_.size()
-                   << " reusable_pool_.size(): " << reusable_pool_.size()
-                   << " responses_.size(): " << responses_.size();
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
 
     alloc_count_ = 0;
     ready_count_ = 0;
@@ -160,7 +154,10 @@ class ResponseQueue {
       response_queue_.pop_front();
     }
 
-    LOG_VERBOSE(2) << "----- after responses_.size(): " << responses_.size();
+    LOG_VERBOSE(2) << "----- after response_queue_.size(): "
+                   << response_queue_.size();
+    LOG_VERBOSE(2) << "----- after reusable_pool_.size(): "
+                   << reusable_pool_.size();
     LOG_VERBOSE(2) << " -----------------------------------------";
   }
 
@@ -182,15 +179,10 @@ class ResponseQueue {
 
     LOG_VERBOSE(2)
         << " --------------- ResponseQueue::GetNonDecoupledResponse() "
-           "current_index_: "
-        << current_index_ << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
+        << ", ready_count_: " << ready_count_
+        << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
         << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_.size(): " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+        << " reusable_pool_.size(): " << reusable_pool_.size();
 
     return response_queue_[0];
   }
@@ -208,16 +200,13 @@ class ResponseQueue {
       response_queue_.push_back(new ResponseType());
     }
 
-    LOG_VERBOSE(2)
-        << " --------------- ResponseQueue::AllocateResponse() current_index_: "
-        << current_index_ << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_: " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::AllocateResponse() "
+                   << ", ready_count_: " << ready_count_
+                   << ", alloc_count_: " << alloc_count_
+                   << ", pop_count_: " << pop_count_
+                   << " ------------ response_queue_.size(): "
+                   << response_queue_.size()
+                   << " reusable_pool_: " << reusable_pool_.size();
   }
 
   // Gets the last allocated response
@@ -226,15 +215,10 @@ class ResponseQueue {
     std::lock_guard<std::mutex> lock(mtx_);
     LOG_VERBOSE(2)
         << " --------------- ResponseQueue::GetLastAllocatedResponse() "
-           "current_index_: "
-        << current_index_ << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
+        << ", ready_count_: " << ready_count_
+        << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
         << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_: " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+        << " reusable_pool_: " << reusable_pool_.size();
 
     if ((response_queue_.size() + pop_count_) < alloc_count_) {
       LOG_ERROR
@@ -242,7 +226,7 @@ class ResponseQueue {
       return nullptr;
     }
 
-    // TODO: handle non-decoupled correctly
+    // TODO: check non-decoupled correctly
     return response_queue_.back();
   }
 
@@ -259,35 +243,26 @@ class ResponseQueue {
 
     LOG_VERBOSE(2)
         << " --------------- ResponseQueue::MarkNextResponseComplete() - "
-           "current_index_: "
-        << current_index_ << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
+        << ", ready_count_: " << ready_count_
+        << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
         << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_.size(): " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+        << " reusable_pool_.size(): " << reusable_pool_.size();
 
     return true;
   }
 
-  // Gets the current response from the tail of
+  // Gets the current response from the begining of
   // the queue.
   ResponseType* GetCurrentResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
     LOG_VERBOSE(2) << " --------------- ResponseQueue::GetCurrentResponse() - "
-                      "current_index_: "
-                   << current_index_ << ", ready_count_: " << ready_count_
+                   << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
-                   << " ------------ dup_alloc_count_: " << dup_alloc_count_
-                   << ", dup_ready_count_: " << dup_ready_count_
                    << ", pop_count_: " << pop_count_
                    << " ------------ response_queue_.size(): "
                    << response_queue_.size()
-                   << " reusable_pool_.size(): " << reusable_pool_.size()
-                   << " responses_.size(): " << responses_.size();
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
 
     if (pop_count_ >= ready_count_) {
       LOG_ERROR << "[INTERNAL] Attempting to access current response when it "
@@ -307,15 +282,10 @@ class ResponseQueue {
     std::lock_guard<std::mutex> lock(mtx_);
     LOG_VERBOSE(2)
         << " --------------- ResponseQueue::GetResponseAt()  - index: " << index
-        << " ------------  current_index_: " << current_index_
         << ", ready_count_: " << ready_count_
-        << ", alloc_count_: " << alloc_count_
-        << " ------------ dup_alloc_count_: " << dup_alloc_count_
-        << ", dup_ready_count_: " << dup_ready_count_
-        << ", pop_count_: " << pop_count_
+        << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
         << " ------------ response_queue_.size(): " << response_queue_.size()
-        << " reusable_pool_.size(): " << reusable_pool_.size()
-        << " responses_.size(): " << responses_.size();
+        << " reusable_pool_.size(): " << reusable_pool_.size();
 
     if (index >= alloc_count_) {
       LOG_ERROR << "[INTERNAL] Attempting to access response which is not yet "
@@ -336,7 +306,7 @@ class ResponseQueue {
     std::lock_guard<std::mutex> lock(mtx_);
 
     if (response_queue_.empty()) {
-      LOG_ERROR << "[INTERNAL] No responses to pop.";
+      LOG_ERROR << "[INTERNAL] No responses in the queue to pop.";
       return;
     }
 
@@ -347,16 +317,12 @@ class ResponseQueue {
     pop_count_++;
 
     LOG_VERBOSE(2) << " --------------- ResponseQueue::PopResponse() "
-                      "------------  current_index_: "
-                   << current_index_ << ", ready_count_: " << ready_count_
+                   << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
-                   << " ------------ dup_alloc_count_: " << dup_alloc_count_
-                   << ", dup_ready_count_: " << dup_ready_count_
                    << ", pop_count_: " << pop_count_
                    << " ------------ response_queue_.size(): "
                    << response_queue_.size()
-                   << " reusable_pool_.size(): " << reusable_pool_.size()
-                   << " responses_.size(): " << responses_.size();
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
   }
 
   // Returns whether the queue is empty
@@ -364,16 +330,12 @@ class ResponseQueue {
   {
     std::lock_guard<std::mutex> lock(mtx_);
     LOG_VERBOSE(2) << " --------------- ResponseQueue::IsEmpty() ------------  "
-                      "current_index_: "
-                   << current_index_ << ", ready_count_: " << ready_count_
+                   << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
-                   << " ------------ dup_alloc_count_: " << dup_alloc_count_
-                   << ", dup_ready_count_: " << dup_ready_count_
                    << ", pop_count_: " << pop_count_
                    << " ------------ response_queue_.size(): "
                    << response_queue_.size()
-                   << " reusable_pool_.size(): " << reusable_pool_.size()
-                   << " responses_.size(): " << responses_.size();
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
     return (
         (alloc_count_ == ready_count_) && (alloc_count_ == pop_count_) &&
         response_queue_.empty());
@@ -384,39 +346,28 @@ class ResponseQueue {
   bool HasReadyResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
-    LOG_VERBOSE(2) << " --------------- ResponseQueue::HasReadyResponse() "
-                      "------------  current_index_: "
-                   << current_index_ << ", ready_count_: " << ready_count_
-                   << ", alloc_count_: " << alloc_count_
-                   << " ------------ dup_alloc_count_: " << dup_alloc_count_
-                   << ", dup_ready_count_: " << dup_ready_count_
-                   << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
-                   << " reusable_pool_.size(): " << reusable_pool_.size()
-                   << " responses_.size(): " << responses_.size();
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::HasReadyResponse() " <
+        ", ready_count_: " << ready_count_ << ", alloc_count_: " << alloc_count_
+                           << ", pop_count_: " << pop_count_
+                           << " ------------ response_queue_.size(): "
+                           << response_queue_.size()
+                           << " reusable_pool_.size(): "
+                           << reusable_pool_.size();
     return (ready_count_ > pop_count_);
   }
 
  private:
-  std::vector<ResponseType*> responses_;
-  std::mutex mtx_;
-
-  // There are three indices to track the responses in the queue
-  // Tracks the allocated response
-  uint32_t alloc_count_;
-  // Tracks the response that is ready to be written
-  uint32_t ready_count_;
-  // Tracks the response next in the queue to be written
-  uint32_t current_index_;
-
-  uint32_t dup_alloc_count_ = 0;  // Tracks the allocated response
-  uint32_t dup_ready_count_ =
-      0;                    // Tracks the response that is ready to be writte
-  uint32_t pop_count_ = 0;  // Total popped/written responses.
-
   std::deque<ResponseType*> response_queue_;
   std::deque<ResponseType*> reusable_pool_;
+  std::mutex mtx_;
+
+  // There are three counters to track the responses in the queue
+  // Tracks the number of allocated responses
+  uint32_t alloc_count_;
+  // Tracks the number of responses that are ready to be written
+  uint32_t ready_count_;
+  // Total popped/written responses.
+  uint32_t pop_count_;
 };
 
 
