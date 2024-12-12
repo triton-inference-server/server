@@ -38,6 +38,8 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import httplib2
+import json
 import os
 import re
 import nvidia_sphinx_theme
@@ -45,9 +47,20 @@ import nvidia_sphinx_theme
 from docutils import nodes
 from sphinx import search
 from datetime import date
+from packaging.version import Version
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+
+# -- conf.py setup -----------------------------------------------------------
+
+# conf.py needs to be run in the top level 'docs' 
+# directory but the calling build script needs to 
+# be called from the current working directory. We 
+# change to the 'docs' dir here and then revert back 
+# at the end of the file.
+# current_dir = os.getcwd()
+# os.chdir("docs")
 
 # -- Project information -----------------------------------------------------
 
@@ -158,16 +171,24 @@ html_theme_options = {
     "github_url": "https://github.com/triton-inference-server/server",
     "switcher": {
         # use for local testing
-        "json_url": "http://localhost:8888/_static/switcher.json",
-        #"json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/"
-        #"docs/_static/switcher.json",
-        "version_match": switcher_version,
+        # "json_url": "http://localhost:8000/_static/switcher.json",
+        "json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/_static/switcher.json",
+        "version_match": one_before if "dev" in version_long else version_short,
     },
     "navbar_start": ["version-switcher"],
     "primary_sidebar_end": [],
 }
 
-version_short = release
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+#
+html_theme_options.update(
+    {
+        "collapse_navigation": False,
+    }
+)
+
 deploy_ngc_org = "nvidia"
 deploy_ngc_team = "triton"
 myst_substitutions = {
@@ -211,7 +232,7 @@ versions = []
 # Triton 2 releases
 correction = -1 if "dev" in version_long else 0
 upper_bound = version_short.split(".")[1]
-for i in range (2, int(version_short.split(".")[1]) + correction):
+for i in range(2, int(version_short.split(".")[1]) + correction):
     versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
 
 # Triton 1 releases
@@ -219,7 +240,7 @@ for i in range(0, 15):
     versions.append((f"1.{i}.0", f"tensorrt_inference_server_1{i}0"))
 
 # Triton Beta Releases
-for i in range(1, 11): 
+for i in range(1, 11):
     versions.append((f"0.{i}.0_beta", f"inference_server_0{i}0_beta"))
 
 # Patch releases
@@ -229,7 +250,7 @@ versions = sorted(versions, key=lambda v: Version(v[0]), reverse=True)
 
 # Build switcher data
 json_data = []
-for v in versions: 
+for v in versions:
     json_data.append(
         {
             "name": v[0],
@@ -242,18 +263,18 @@ if "dev" in version_long:
         0,
         {
             "name": f"{one_before} (current_release)",
-            "version": f"{one_before}", 
-            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
-        }
+            "version": f"{one_before}",
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html",
+        },
     )
 else:
     json_data.insert(
         0,
         {
             "name": f"{version_short} (current release)",
-            "version": f"{version_short}", 
-            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
-        }
+            "version": f"{version_short}",
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html",
+        },
     )
 
 # Trim to last N releases.
@@ -267,7 +288,7 @@ json_data.append(
     }
 )
 
-# validate the links 
+# validate the links
 for i, d in enumerate(json_data):
     h = httplib2.Http()
     resp = h.request(d["url"], "HEAD")
@@ -278,6 +299,7 @@ for i, d in enumerate(json_data):
 # Write switcher data to file
 with open(switcher_path, "w") as f:
     json.dump(json_data, f, ensure_ascii=False, indent=4)
+
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
@@ -305,3 +327,5 @@ def setup(app):
     #         priority=501,
     #     )
 
+# cleanup
+# os.chdir(current_dir)
