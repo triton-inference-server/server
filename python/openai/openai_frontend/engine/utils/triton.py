@@ -33,7 +33,10 @@ from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 
 
 def _create_vllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    model_config,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -79,28 +82,42 @@ def _create_vllm_inference_request(
 
 
 def _create_trtllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    model_config,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
 ):
     inputs = {}
-    inputs["text_input"] = [[prompt]]
-    inputs["stream"] = np.bool_([[request.stream]])
+    inputs["text_input"] = [prompt]
+    inputs["stream"] = np.bool_([request.stream])
     if request.max_tokens:
-        inputs["max_tokens"] = np.int32([[request.max_tokens]])
+        inputs["max_tokens"] = np.int32([request.max_tokens])
     if request.stop:
         if isinstance(request.stop, str):
             request.stop = [request.stop]
-        inputs["stop_words"] = [request.stop]
+        inputs["stop_words"] = request.stop
     # Check "is not None" specifically, because values of zero are valid.
     if request.top_p is not None:
-        inputs["top_p"] = np.float32([[request.top_p]])
+        inputs["top_p"] = np.float32([request.top_p])
     if request.frequency_penalty is not None:
-        inputs["frequency_penalty"] = np.float32([[request.frequency_penalty]])
+        inputs["frequency_penalty"] = np.float32([request.frequency_penalty])
     if request.presence_penalty is not None:
-        inputs["presence_penalty"] = np.float32([[request.presence_penalty]])
+        inputs["presence_penalty"] = np.float32([request.presence_penalty])
     if request.seed is not None:
-        inputs["random_seed"] = np.uint64([[request.seed]])
+        inputs["random_seed"] = np.uint64([request.seed])
     if request.temperature is not None:
-        inputs["temperature"] = np.float32([[request.temperature]])
+        inputs["temperature"] = np.float32([request.temperature])
+
+    # Add implicit batch dimension if needed
+    if model_config["max_batch_size"] > 0:
+        for name, value in inputs.items():
+            if isinstance(value, list):
+                value = [value]
+            if isinstance(value, np.ndarray):
+                value = np.expand_dims(value, axis=0)
+
+            inputs[name] = value
+
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)

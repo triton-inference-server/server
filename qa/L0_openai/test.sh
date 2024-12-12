@@ -53,7 +53,9 @@ function prepare_tensorrtllm() {
     MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
-    # FIXME: This will require an upgrade each release to match the TRT-LLM version
+    # FIXME: Test a model with max_batch_size == 0 for proper shape conversion.
+    #        This would be easier to test without using Triton CLI for setup.
+    # FIXME: This may require an upgrade each release to match the TRT-LLM version
     # Use Triton CLI to prepare model repository for testing
     pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
     # NOTE: Could use ENGINE_DEST_PATH set to NFS mount for pre-built engines in future

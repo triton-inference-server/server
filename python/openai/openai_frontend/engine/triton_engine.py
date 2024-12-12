@@ -68,6 +68,8 @@ class TritonModelMetadata:
     backend: str
     # Triton model object handle
     model: tritonserver.Model
+    # Triton model config object
+    config: dict
     # Tokenizers used for chat templates
     tokenizer: Optional[Any]
     # Time that model was loaded by Triton
@@ -131,7 +133,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, prompt, request)
+            metadata.request_converter(metadata.model, metadata.config, prompt, request)
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -249,9 +251,10 @@ class TritonLLMEngine(LLMEngine):
         # Read all triton models and store the necessary metadata for each
         for name, _ in self.server.models().keys():
             model = self.server.model(name)
-            backend = model.config()["backend"]
+            config = model.config()
+            backend = config["backend"]
             # Explicitly handle ensembles to avoid any runtime validation errors
-            if not backend and model.config()["platform"] == "ensemble":
+            if not backend and config["platform"] == "ensemble":
                 backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
 
@@ -259,6 +262,7 @@ class TritonLLMEngine(LLMEngine):
                 name=name,
                 backend=backend,
                 model=model,
+                config=config,
                 tokenizer=self.tokenizer,
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
