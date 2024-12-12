@@ -29,11 +29,11 @@
 
 function install_deps() {
     # Install python bindings for tritonserver and tritonfrontend
-    pip install /opt/tritonserver/python/triton*.whl
+    # pip install /opt/tritonserver/python/triton*.whl
 
     # Install application/testing requirements
     pushd openai/
-    pip install -r requirements.txt
+    # pip install -r requirements.txt
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
