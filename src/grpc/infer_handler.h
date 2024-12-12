@@ -191,22 +191,28 @@ class ResponseQueue {
   void AllocateResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::AllocateResponse() -  "
+                      "before allocation ------------ "
+                      "response_queue_.size(): "
+                   << response_queue_.size()
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
     alloc_count_++;
 
     if (!reusable_pool_.empty()) {
       response_queue_.push_back(reusable_pool_.front());
       reusable_pool_.pop_front();
+      LOG_VERBOSE(2) << " --------------- reusing the response ---------";
     } else {
       response_queue_.push_back(new ResponseType());
+      LOG_VERBOSE(2) << " --------------- allocated new response ---------";
     }
 
-    LOG_VERBOSE(2) << " --------------- ResponseQueue::AllocateResponse() "
-                   << ", ready_count_: " << ready_count_
+    LOG_VERBOSE(2) << "------ ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
                    << " ------------ response_queue_.size(): "
                    << response_queue_.size()
-                   << " reusable_pool_: " << reusable_pool_.size();
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
   }
 
   // Gets the last allocated response
@@ -346,13 +352,13 @@ class ResponseQueue {
   bool HasReadyResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
-    LOG_VERBOSE(2) << " --------------- ResponseQueue::HasReadyResponse() " <
-        ", ready_count_: " << ready_count_ << ", alloc_count_: " << alloc_count_
-                           << ", pop_count_: " << pop_count_
-                           << " ------------ response_queue_.size(): "
-                           << response_queue_.size()
-                           << " reusable_pool_.size(): "
-                           << reusable_pool_.size();
+    LOG_VERBOSE(2) << " --------------- ResponseQueue::HasReadyResponse() "
+                   << ", ready_count_: " << ready_count_
+                   << ", alloc_count_: " << alloc_count_
+                   << ", pop_count_: " << pop_count_
+                   << " ------------ response_queue_.size(): "
+                   << response_queue_.size()
+                   << " reusable_pool_.size(): " << reusable_pool_.size();
     return (ready_count_ > pop_count_);
   }
 
@@ -1280,7 +1286,6 @@ class InferHandlerState {
     context_ = nullptr;
     inference_request_.reset();
     LOG_VERBOSE(2) << "----   inference_request_: " << inference_request_;
-    response_queue_->GetSatus();
     ClearTraceTimestamps();
   }
 
