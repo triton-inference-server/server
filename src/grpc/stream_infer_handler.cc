@@ -408,6 +408,7 @@ ModelStreamInferHandler::Process(
           state->complete_ = true;
         }
         if (writing_state != nullptr) {
+          LOG_VERBOSE(2) << "---- 409 Calling StateWriteResponse(writing_state) ----";
           StateWriteResponse(writing_state);
         }
       }
@@ -535,6 +536,7 @@ ModelStreamInferHandler::Process(
           }
         }
         if (writing_state != nullptr) {
+          LOG_VERBOSE(2) << "---- 537 Calling StateWriteResponse(writing_state) ----";
           StateWriteResponse(writing_state);
         }
       }
@@ -837,6 +839,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       state->complete_ = is_complete;
     }
     if (writing_state != nullptr) {
+      LOG_VERBOSE(2) << "---- 840 Calling StateWriteResponse(writing_state) ----";
       StateWriteResponse(writing_state);
     }
   } else {  // non-decoupled
