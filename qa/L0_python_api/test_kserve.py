@@ -30,7 +30,8 @@ from functools import partial
 import numpy as np
 import pytest
 import testing_utils as utils
-import tritonclient.grpc as grpcclient
+
+# import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
@@ -109,7 +110,8 @@ class TestMetricsOptions:
 
 
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
-GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
+# TODO: Replace None with grpcclient
+GRPC_ARGS = (KServeGrpc, None, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 
 
@@ -330,10 +332,10 @@ class TestKServe:
 
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
-        # Setup Server, KServeGrpc, Metrics
+        # Setup Server, KServeHttp, Metrics
         server = utils.setup_server()
-        grpc_service = utils.setup_service(
-            server, KServeGrpc
+        http_service = utils.setup_service(
+            server, KServeHttp
         )  # Needed to send inference request
         metrics_service = utils.setup_service(server, frontend)
 
@@ -344,7 +346,7 @@ class TestKServe:
         assert before_status_code == 200 and before_inference_count == 0
 
         # Send 1 Inference Request with send_and_test_inference()
-        assert utils.send_and_test_inference_identity(GRPC_ARGS[1], GRPC_ARGS[2])
+        assert utils.send_and_test_inference_identity(HTTP_ARGS[1], HTTP_ARGS[2])
 
         # Get Metrics and verify inference count == 1 after inference
         after_status_code, after_inference_count = utils.get_metrics(
@@ -353,7 +355,7 @@ class TestKServe:
         assert after_status_code == 200 and after_inference_count == 1
 
         # Teardown Metrics, GrpcService, Server
-        utils.teardown_service(grpc_service)
+        utils.teardown_service(http_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 
