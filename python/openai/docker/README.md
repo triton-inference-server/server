@@ -45,7 +45,7 @@ python3 openai/openai_frontend/main.py \
   --tokenizer TinyLlama/TinyLlama-1.1B-Chat-v1.0
 ```
 
-## Test
+## Chat Completions Example
 
 ```bash
 # Send a sample chat completions request
@@ -59,4 +59,18 @@ curl http://localhost:9000/v1/chat/completions \
         ],
         "max_tokens": 256
     }'
+```
+
+## Test
+
+```bash
+# Mount HF cache for re-using model weights
+docker run -ti --gpus all -p 9000:9000 -v ${HOME}/.cache/huggingface:/root/.cache/huggingface tritonserver_openai
+
+# Install test dependencies
+python3 -m pip install "pytest==8.1.1" "pytest-asyncio==0.23.8"
+
+# Run tests
+cd openai/
+pytest tests/
 ```
