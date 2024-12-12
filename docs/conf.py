@@ -34,18 +34,18 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import json
+import os
+import re
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import httplib2
-import json
-import os
-import re
-
 from docutils import nodes
-from sphinx import search
 from packaging.version import Version
+from sphinx import search
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
@@ -195,7 +195,7 @@ html_theme_options = {
         # use for local testing
         # "json_url": "http://localhost:8000/_static/switcher.json",
         "json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/_static/switcher.json",
-        "version_match": one_before if "dev" in version_long else version_short, 
+        "version_match": one_before if "dev" in version_long else version_short,
     },
     "navbar_start": ["version-switcher"],
     "primary_sidebar_end": [],
@@ -255,7 +255,7 @@ versions = []
 # Triton 2 releases
 correction = -1 if "dev" in version_long else 0
 upper_bound = version_short.split(".")[1]
-for i in range (2, int(version_short.split(".")[1]) + correction):
+for i in range(2, int(version_short.split(".")[1]) + correction):
     versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
 
 # Triton 1 releases
@@ -263,7 +263,7 @@ for i in range(0, 15):
     versions.append((f"1.{i}.0", f"tensorrt_inference_server_1{i}0"))
 
 # Triton Beta Releases
-for i in range(1, 11): 
+for i in range(1, 11):
     versions.append((f"0.{i}.0_beta", f"inference_server_0{i}0_beta"))
 
 # Patch releases
@@ -273,7 +273,7 @@ versions = sorted(versions, key=lambda v: Version(v[0]), reverse=True)
 
 # Build switcher data
 json_data = []
-for v in versions: 
+for v in versions:
     json_data.append(
         {
             "name": v[0],
@@ -286,18 +286,18 @@ if "dev" in version_long:
         0,
         {
             "name": f"{one_before} (current_release)",
-            "version": f"{one_before}", 
-            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
-        }
+            "version": f"{one_before}",
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html",
+        },
     )
 else:
     json_data.insert(
         0,
         {
             "name": f"{version_short} (current release)",
-            "version": f"{version_short}", 
-            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html"
-        }
+            "version": f"{version_short}",
+            "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html",
+        },
     )
 
 # Trim to last N releases.
@@ -311,7 +311,7 @@ json_data.append(
     }
 )
 
-# validate the links 
+# validate the links
 for i, d in enumerate(json_data):
     h = httplib2.Http()
     resp = h.request(d["url"], "HEAD")
@@ -322,6 +322,7 @@ for i, d in enumerate(json_data):
 # Write switcher data to file
 with open(switcher_path, "w") as f:
     json.dump(json_data, f, ensure_ascii=False, indent=4)
+
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
