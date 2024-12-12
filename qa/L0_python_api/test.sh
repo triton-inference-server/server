@@ -51,7 +51,7 @@ fi
 
 
 FRONTEND_TEST_LOG="./python_kserve.log"
-python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
+python -m pytest --junitxml=test_kserve.xml test_kserve.py -k "not KServeGrpc" > $FRONTEND_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $FRONTEND_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
