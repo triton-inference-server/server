@@ -42,7 +42,7 @@ install_conda() {
   eval "$(./miniconda/bin/conda shell.bash hook)"
 }
 
-install_build_deps() {
+install_build_deps_apt() {
   apt update && apt install software-properties-common rapidjson-dev -y
   # Using CMAKE installation instruction from:: https://apt.kitware.com/
   apt update -q=2 \
@@ -52,6 +52,18 @@ install_build_deps() {
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
     && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
+}
+
+install_build_deps_yum() {
+  yum install rapidjson-devel -y
+}
+
+install_build_deps() {
+  if [[ ${TRITON_RHEL} -eq "1" ]]; then
+    install_build_deps_yum
+  else
+    install_build_deps_apt
+  fi
 }
 
 create_conda_env() {
@@ -74,6 +86,6 @@ create_python_backend_stub() {
   rm -rf python_backend
   git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
   (cd python_backend/ && mkdir builddir && cd builddir && \
-  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
+  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG -DPYBIND11_PYTHON_VERSION=$PY_VERSION ../ && \
   make -j18 triton-python-backend-stub)
 }

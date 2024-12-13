@@ -59,13 +59,14 @@ set(
   ../../shared_memory_manager.h
   ../../shared_memory_manager.cc
   ../../data_compressor.h
-  ../../common.h
-  ../../common.cc
   ../../restricted_features.h
   ../../classification.cc
+  ../../common.h
+  ../../common.cc
 )
 
-set(PY_BINDING_DEPENDENCY_LIBS)
+set(PY_BINDING_DEPENDENCY_LIBS
+      b64) # Dependency from common.h
 
 list(APPEND PY_BINDING_DEPENDENCY_LIBS
       triton-common-json
