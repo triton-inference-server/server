@@ -34,8 +34,6 @@ import subprocess
 from collections import defaultdict
 from functools import partial
 
-from conf import exclude_patterns
-
 # Global constants
 server_abspath = os.environ.get("SERVER_ABSPATH", os.getcwd())
 server_docs_abspath = os.path.join(server_abspath, "docs")
@@ -64,6 +62,13 @@ triton_github_url_reg = re.compile(
 # relpath_patn = r"]\s*\(\s*([^)]+)\)"
 # Hyperlink in a .md file, excluding embedded images.
 hyperlink_reg = re.compile(r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))")
+
+exclusions = None
+with open(f"{server_docs_abspath}/exclusions.txt", "r") as f:
+    exclusions = f.read()
+    f.close()
+exclude_patterns = exclusions.strip().split("\n")
+print(f"exclude_patterns: {exclude_patterns}")
 
 # Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
@@ -114,9 +119,8 @@ def run_command(command):
     - command: Command to execute
     """
     log_message(f"Running command: {command}")
-    result = None
     try:
-        result = subprocess.run(
+        subprocess.run(
             command,
             shell=True,
             check=True,
@@ -125,7 +129,6 @@ def run_command(command):
             stderr=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as e:
-        print(result.stdout)
         raise (e)
 
 
@@ -370,9 +373,6 @@ def main():
     repo_tag = args.repo_tag
     repository_filename = args.repo_file
     github_org = args.github_organization
-    print(f"repo_tag: {repo_tag}")
-    print(f"repository_filename: {repository_filename}")
-    print(f"github_org: {github_org}")
 
     # Change working directory to server/docs.
     os.chdir(server_docs_abspath)

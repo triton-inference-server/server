@@ -151,7 +151,12 @@ myst_heading_anchors = 5
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["README.md", "examples/README.md", "user_guide/perf_analyzer.md"]
+exclusions = None
+with open("exclusions.txt", "r") as f:
+    exclusions = f.read()
+    f.close()
+exclude_patterns = exclusions.strip().split("\n")
+print(f"exclude_patterns: {exclude_patterns}")
 
 # -- Options for HTML output -------------------------------------------------
 
