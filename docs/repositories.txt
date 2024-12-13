@@ -6,7 +6,6 @@ model_analyzer
 model_navigator
 onnxruntime_backend
 perf_analyzer
-perf_benchmark
 python_backend
 pytorch_backend
 tensorflow_backend
