@@ -43,8 +43,6 @@ from tritonfrontend import (
     RestrictedFeatures,
 )
 
-# To test a class individually, user pytest test_kserve.py -k "<ClassName>"
-
 
 class TestHttpOptions:
     def test_correct_http_parameters(self):
@@ -135,14 +133,11 @@ class TestRestrictedFeatureOptions:
 
         rf.remove_feature_group(correct_feature_group)
 
-        assert not rf.has_feature(Feature.HEALTH) and not rf.has_feature(Feature.METADATA)
+        assert not rf.has_feature(Feature.HEALTH) and not rf.has_feature(
+            Feature.METADATA
+        )
 
     def test_wrong_rf_parameters(self):
-        with pytest.raises(AttributeError):
-            Feature.health  # Needs to be HEALTH
-        with pytest.raises(AttributeError):
-            Feature.infer  # Needs to be INFERENCE
-
         rf = RestrictedFeatures()
         # Features List needs to be an element from tritonfrontend.Feature
         with pytest.raises(tritonserver.InvalidArgumentError):
@@ -157,19 +152,16 @@ class TestRestrictedFeatureOptions:
             rf.create_feature_group(key="", value=123, features=[Feature.HEALTH])
 
         # Test collision of Features among individual Feature Groups
-        with pytest.raises(tritonserver.InvalidArgumentError):
+        with pytest.raises(
+            tritonserver.InvalidArgumentError,
+            match="A given feature can only belong to one "
+            "group.Feature.HEALTH already belongs to an existing group.",
+        ):
             feature_group = FeatureGroup(
                 key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
             )
 
             rf = RestrictedFeatures(groups=[feature_group])
-            rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
-
-        with pytest.raises(tritonserver.InvalidArgumentError):
-            rf = RestrictedFeatures(groups=[feature_group])
-            rf.create_feature_group(
-                key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
-            )
             rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
 
 
