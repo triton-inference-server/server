@@ -397,6 +397,8 @@ class HTTPAPIServer : public HTTPServer {
     }
     virtual ~GenerateRequestClass();
 
+    TRITONSERVER_Server* EvHtpServer() const { return server_; }
+
     // [FIXME] Specialize response complete function for now, should have
     // been a dispatcher and call into object specific response function.
     static void InferResponseComplete(
@@ -426,6 +428,12 @@ class HTTPAPIServer : public HTTPServer {
     const MappingSchema* ResponseSchema() { return response_schema_; }
 
    private:
+#ifdef TRITON_ENABLE_METRICS
+    struct PromMetric {
+      std::unordered_map<std::string, std::string> labels;
+      double value;
+    };
+#endif  // TRITON_ENABLE_METRICS
     struct TritonOutput {
       enum class Type { RESERVED, TENSOR, PARAMETER };
       TritonOutput(Type t, const std::string& val) : type(t), value(val) {}
@@ -436,6 +444,23 @@ class HTTPAPIServer : public HTTPServer {
       // TENSOR, PARAMETER type
       uint32_t index;
     };
+
+#ifdef TRITON_ENABLE_METRICS
+    // Helper function to get the KV-cache utilization metrics for the
+    // inference response header
+    static std::string ExtractKVMetrics(
+        const std::string& prometheus_metrics, const std::string& orca_type);
+    // Generates a metric struct for a given family with a map of labels and a
+    // value
+    static std::vector<PromMetric> MetricFamilyExtractor(
+        const std::string& input, const std::string& metricFamily);
+    // Creates a header string in the the proper reporting format for provided
+    // KV-cache metrics.
+    static std::string OrcaKVMetricHeader(
+        const std::string& reporting_format, const double kv_cache_utilization,
+        const uint64_t max_token_capacity);
+#endif  // TRITON_ENABLE_METRICS
+
     TRITONSERVER_Error* ExactMappingInput(
         const std::string& name, triton::common::TritonJson::Value& value,
         std::map<std::string, triton::common::TritonJson::Value>&
@@ -488,13 +513,6 @@ class HTTPAPIServer : public HTTPServer {
     evbuffer* buffer_ = nullptr;
   };
 
-#ifdef TRITON_ENABLE_METRICS
- private:
-  struct PromMetric {
-    std::unordered_map<std::string, std::string> labels;
-    double value;
-  };
-#endif  // TRITON_ENABLE_METRICS
 
  protected:
   explicit HTTPAPIServer(
@@ -600,17 +618,6 @@ class HTTPAPIServer : public HTTPServer {
   void HandleGenerate(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str, bool streaming);
-#ifdef TRITON_ENABLE_METRICS
-  // Helper function to set get the KV-cache utilization metrics for the
-  // infer response header
-  std::string ExtractKVMetrics(
-      const std::string& prometheus_metrics, const std::string& orca_type);
-
-  // Generates a metric struct for a given family with a map of labels and a
-  // value
-  std::vector<PromMetric> MetricFamilyExtractor(
-      const std::string& input, const std::string& metricFamily);
-#endif  // TRITON_ENABLE_METRICS
   // 'meta_data_root' is the root JSON document for 'input_metadata'.
   // In TritonJson, the Value objects are references to the root document.
   // Therefore the document must stay valid.
