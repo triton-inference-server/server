@@ -135,7 +135,7 @@ class TestRestrictedFeatureOptions:
 
         rf.remove_feature_group(correct_feature_group)
 
-        assert not (rf.has_feature(Feature.HEALTH) and rf.has_feature(Feature.METADATA))
+        assert not rf.has_feature(Feature.HEALTH) and not rf.has_feature(Feature.METADATA)
 
     def test_wrong_rf_parameters(self):
         with pytest.raises(AttributeError):
