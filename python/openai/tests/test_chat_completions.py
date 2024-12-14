@@ -104,7 +104,7 @@ class TestChatCompletions:
         messages = [
             {
                 "role": "user",
-                "content": {"type": "text", "text": "What is machine learning?"},
+                "content": [{"type": "text", "text": "What is machine learning?"}],
             }
         ]
 
