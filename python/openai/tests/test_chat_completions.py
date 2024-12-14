@@ -100,11 +100,11 @@ class TestChatCompletions:
         assert message["role"] == "assistant"
 
     def test_chat_completions_user_prompt_dict(self, client, model: str):
-        # No system prompt provided
+        # Pass a List of Dicts for content to expose the 'type' field
         messages = [
             {
                 "role": "user",
-                "content": {"type": "text", "text": "What is machine learning?"},
+                "content": [{"type": "text", "text": "What is machine learning?"}],
             }
         ]
 
