@@ -34,30 +34,30 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import json
+import os
+import re
+from datetime import date
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import httplib2
-import json
-import os
-import re
 import nvidia_sphinx_theme
-
 from docutils import nodes
-from sphinx import search
-from datetime import date
 from packaging.version import Version
+from sphinx import search
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
 # -- conf.py setup -----------------------------------------------------------
 
-# conf.py needs to be run in the top level 'docs' 
-# directory but the calling build script needs to 
-# be called from the current working directory. We 
-# change to the 'docs' dir here and then revert back 
+# conf.py needs to be run in the top level 'docs'
+# directory but the calling build script needs to
+# be called from the current working directory. We
+# change to the 'docs' dir here and then revert back
 # at the end of the file.
 # current_dir = os.getcwd()
 # os.chdir("docs")
@@ -169,7 +169,7 @@ html_theme = "nvidia_sphinx_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
-#html_css_files = ["custom.css"] # Not needed with new theme
+# html_css_files = ["custom.css"] # Not needed with new theme
 
 html_theme_options = {
     "collapse_navigation": False,
@@ -331,6 +331,7 @@ def setup(app):
     #         "https://assets.readthedocs.org/static/javascript/readthedocs-doc-embed.js",
     #         priority=501,
     #     )
+
 
 # cleanup
 # os.chdir(current_dir)

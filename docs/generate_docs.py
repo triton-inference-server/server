@@ -72,12 +72,12 @@ print(f"exclude_patterns: {exclude_patterns}")
 
 # Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
+parser.add_argument("--repo-tag", type=str, help="Repository tags in format value")
 parser.add_argument(
-    "--repo-tag", type=str, help="Repository tags in format value"
-)
-parser.add_argument(
-    "--repo-file", default="repositories.txt", help="File which lists the repositories to add. File should be"
-    " one repository name per line, newline separated."
+    "--repo-file",
+    default="repositories.txt",
+    help="File which lists the repositories to add. File should be"
+    " one repository name per line, newline separated.",
 )
 parser.add_argument("--github-organization", help="GitHub organization name")
 
@@ -159,6 +159,7 @@ def clone_from_github(repo, tag, org):
         log_message(f"Successfully cloned {repo}")
     except subprocess.CalledProcessError as e:
         raise (e)
+
 
 def is_excluded(file_path):
     for exclude_pattern in exclude_patterns:
@@ -396,7 +397,7 @@ def main():
     # Clean up working directory.
     for repository in repository_list:
         run_command(f"rm -rf {repository}")
-    
+
     # Return to previous working directory server/.
     os.chdir(server_abspath)
 

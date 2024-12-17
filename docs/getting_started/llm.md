@@ -1,6 +1,6 @@
 # Deploying Phi-3 Model with Triton and TRT-LLM
 
-This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows a shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency. 
+This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows a shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency.
 
 This guide is tested on A100 80GB SXM4 and H100 80GB PCIe. It is confirmed to work with Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi) for full list) using TRT-LLM v0.11 and Triton Inference Server 24.07.
 
@@ -25,23 +25,23 @@ Reference: <https://nvidia.github.io/TensorRT-LLM/installation/linux.html>
 
 <!---->
 
-    # Install dependencies, TensorRT-LLM requires Python 3.10 
-    apt-get update && apt-get -y install python3.10 python3-pip openmpi-bin libopenmpi-dev git git-lfs  
+    # Install dependencies, TensorRT-LLM requires Python 3.10
+    apt-get update && apt-get -y install python3.10 python3-pip openmpi-bin libopenmpi-dev git git-lfs
 
     # Install TensorRT-LLM (v0.11.0)
-    pip3 install tensorrt_llm==0.11.0 --extra-index-url https://pypi.nvidia.com  
+    pip3 install tensorrt_llm==0.11.0 --extra-index-url https://pypi.nvidia.com
 
-    # Check installation 
+    # Check installation
     python3 -c "import tensorrt_llm"
 
 3. ## Clone the TRT-LLM repo with the Phi-3 conversion script
 
 <!---->
 
-    git clone -b v0.11.0 https://github.com/NVIDIA/TensorRT-LLM.git 
+    git clone -b v0.11.0 https://github.com/NVIDIA/TensorRT-LLM.git
     cd TensorRT-LLM/examples/phi/
 
-    # only need to install requirements.txt if you want to test the summarize.py example 
+    # only need to install requirements.txt if you want to test the summarize.py example
     # if so, modify requirements.txt such that tensorrt_llm==0.11.0
     # pip install -r requirements.txt
 
@@ -123,12 +123,12 @@ The TensorRT-LLM Phi model can be tested to summarize the articles from the [cnn
 
 <!---->
 
-    # After exiting the TensorRT-LLM Docker container 
-    git clone https://github.com/triton-inference-server/tensorrtllm_backend.git 
-    cd tensorrtllm_backend 
+    # After exiting the TensorRT-LLM Docker container
+    git clone https://github.com/triton-inference-server/tensorrtllm_backend.git
+    cd tensorrtllm_backend
     cp ../phi-engine/*   all_models/inflight_batcher_llm/tensorrt_llm/1/
 
-11. ## Modify the configuration files from the model repository 
+11. ## Modify the configuration files from the model repository
 
 The following configuration files need to be updated:
 
@@ -138,7 +138,7 @@ The following configuration files need to be updated:
 
 - preprocessing/config.pbtxt
 
-- tensorrt\_llm/config.pbxt 
+- tensorrt\_llm/config.pbxt
 
 - tensorrt\_llm/1/config.json
 
@@ -170,7 +170,7 @@ The following configuration files need to be updated:
     preprocessing_instance_count:2
 
 
-### Update tensorrt\_llm/config.pbxt 
+### Update tensorrt\_llm/config.pbxt
 
     python3 tools/fill_template.py --in_place \
         all_models/inflight_batcher_llm/tensorrt_llm/config.pbtxt \
@@ -280,7 +280,7 @@ The above needs to be done manually with your favorite editor. Once finished, pl
 
 <!---->
 
-    export RELEASE="24.07" 
+    export RELEASE="24.07"
     docker run -it --net=host --gpus '"device=0"'  nvcr.io/nvidia/tritonserver:${RELEASE}-py3-sdk
 
 17. ## Download the Phi-3 tokenizer
@@ -321,7 +321,7 @@ More details on performance benchmarking with GenAI-Perf can be found [here](htt
 
 ## Reference Configurations
 
-All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm are shown below. 
+All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm are shown below.
 
 <details>
 <summary><b> ensemble/config.pbtxt</b></summary>

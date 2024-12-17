@@ -22,7 +22,7 @@ All capabilities of Triton server are encapsulated in the shared
 library and are exposed via the Server API. The `tritonserver`
 executable implements HTTP/REST and GRPC endpoints and uses the Server
 API to communicate with core Triton logic. The primary source files
-for the endpoints are `grpc_server.cc <https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc>`__ and 
+for the endpoints are `grpc_server.cc <https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc>`__ and
 `http_server.cc <https://github.com/triton-inference-server/server/blob/main/src/http_server.cc>`__. In these source files you can
 see the Server API being used.
 
