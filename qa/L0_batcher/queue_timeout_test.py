@@ -39,6 +39,7 @@ from tritonclient.utils import InferenceServerException
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+
 class TestMaxQueueDelayTimeout(unittest.TestCase):
     def setUp(self):
         # Initialize client

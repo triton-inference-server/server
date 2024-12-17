@@ -35,6 +35,7 @@ from tritonclient.utils import InferenceServerException
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+
 class ResponseSenderTest(unittest.TestCase):
     _inputs_parameters_zero_response_pre_return = {
         "number_of_response_before_return": 0,

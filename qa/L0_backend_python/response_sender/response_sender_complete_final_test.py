@@ -35,6 +35,7 @@ import tritonclient.grpc as grpcclient
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
+
 class ResponseSenderTest(unittest.TestCase):
     def _generate_streaming_callback_and_responses_pair(self):
         responses = []  # [{"result": result, "error": error}, ...]
