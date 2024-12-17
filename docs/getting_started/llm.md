@@ -299,7 +299,7 @@ Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This
 
     export INPUT_SEQUENCE_LENGTH=128
     export OUTPUT_SEQUENCE_LENGTH=128
-    export CONCURENCY=25
+    export CONCURRENCY=25
 
     genai-perf \
       -m ensemble \
@@ -312,7 +312,7 @@ Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This
       --output-tokens-mean $OUTPUT_SEQUENCE_LENGTH \
       --output-tokens-stddev 0 \
       --output-tokens-mean-deterministic \
-      --concurrency $CONCURENCY \
+      --concurrency $CONCURRENCY \
       --tokenizer microsoft/Phi-3-mini-4k-instruct \
       --measurement-interval 4000 \
       --url localhost:8001
