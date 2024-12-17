@@ -68,7 +68,6 @@ with open(f"{server_docs_abspath}/exclusions.txt", "r") as f:
     exclusions = f.read()
     f.close()
 exclude_patterns = exclusions.strip().split("\n")
-print(f"exclude_patterns: {exclude_patterns}")
 
 # Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
@@ -385,7 +384,6 @@ def main():
         f.close()
 
     repository_list = repositories.strip().split("\n")
-    print(f"{repository_list}")
     for repository in repository_list:
         run_command(f"rm -rf {repository}")
         clone_from_github(repository, repo_tag, github_org)
