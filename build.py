@@ -936,6 +936,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
     df += """
 # Install docker docker buildx
@@ -1041,6 +1042,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
@@ -1051,7 +1053,6 @@ SHELL ["cmd", "/S", "/C"]
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Install docker docker buildx
 RUN apt-get update \\
@@ -1175,6 +1176,7 @@ WORKDIR /workspace
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1214,6 +1216,8 @@ FROM {} AS min_container
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${BASE_IMAGE}
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     df += dockerfile_prepare_container_linux(
@@ -1415,7 +1419,6 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
@@ -1434,7 +1437,6 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
