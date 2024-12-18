@@ -43,7 +43,15 @@
    :hidden:
    :caption: Scaling guide
 
-   scaling_guide/scaling_guide
+   Multi-Node (AWS) <../tutorials/Deployment/Kubernetes/EKS_Multinode_Triton_TRTLLM/README.md>
+   Multi-Instance <../tutorials/Deployment/Kubernetes/TensorRT-LLM_Autoscaling_and_Load_Balancing/README.md>
+
+.. toctree::
+   :hidden:
+   :caption: AI Agents
+
+   Constrained Decoding <../tutorials/AI_Agents_Guide/Constrained_Decoding/README.md>
+   Function Calling <../tutorials/AI_Agents_Guide/Function_Calling/README.md>
 
 .. toctree::
    :hidden:
