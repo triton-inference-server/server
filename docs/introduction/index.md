@@ -82,7 +82,7 @@ Readiness and liveness health endpoints and utilization, throughput
 and latency metrics ease the integration of Triton into deployment
 framework such as Kubernetes.
 
-![Triton Architecture Diagram](user_guide/images/arch.jpg)
+![Triton Architecture Diagram](../user_guide/images/arch.jpg)
 
 ## Triton major features
 
