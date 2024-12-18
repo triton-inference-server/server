@@ -2536,7 +2536,11 @@ if __name__ == "__main__":
         "--enable-tracing", action="store_true", required=False, help="Enable tracing."
     )
     parser.add_argument(
-        "--enable-nvtx", action="store_true", required=False, help="Enable NVTX."
+        "--enable-nvtx",
+        action="store_true",
+        required=False,
+        default=True,
+        help="Enable NVTX (default: True).",
     )
     parser.add_argument(
         "--enable-gpu", action="store_true", required=False, help="Enable GPU support."
