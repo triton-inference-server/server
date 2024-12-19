@@ -28,9 +28,10 @@
 from typing import Union
 
 import tritonserver
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
+from tritonfrontend._api._restricted_features import RestrictedFeatures
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
     TritonFrontendHttp,
@@ -38,15 +39,22 @@ from tritonfrontend._c.tritonfrontend_bindings import (
 
 
 class KServeHttp:
-    @dataclass
+    @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
     class Options:
         address: str = "0.0.0.0"
         port: int = Field(8000, ge=0, le=65535)
         reuse_port: bool = False
         thread_count: int = Field(8, gt=0)
         header_forward_pattern: str = ""
-        # DLIS-7215: Add restricted protocol support
-        # restricted_protocols: list
+        restricted_features: RestrictedFeatures = RestrictedFeatures()
+
+        @handle_triton_error
+        def __post_init__(self):
+            if not isinstance(self.restricted_features, RestrictedFeatures):
+                raise InvalidArgumentError(
+                    "restricted_features needs an instance of RestrictedFeatures."
+                )
+            self.restricted_features = repr(self.restricted_features)
 
     @handle_triton_error
     def __init__(self, server: tritonserver, options: "KServeHttp.Options" = None):

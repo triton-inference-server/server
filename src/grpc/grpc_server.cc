@@ -2445,13 +2445,15 @@ Server::Create(
 {
   Options grpc_options;
 
-  RETURN_IF_ERR(GetOptions(grpc_options, options));
+  RETURN_IF_ERR(GetOptions(grpc_options, options, restricted_features));
 
   return Create(server, trace_manager, shm_manager, grpc_options, service);
 }
 
 TRITONSERVER_Error*
-Server::GetOptions(Options& options, UnorderedMapType& options_map)
+Server::GetOptions(
+    Options& options, UnorderedMapType& options_map,
+    const RestrictedFeatures& restricted_features)
 {
   SocketOptions socket_selection;
   SslOptions ssl_selection;
@@ -2474,6 +2476,8 @@ Server::GetOptions(Options& options, UnorderedMapType& options_map)
       &options.infer_allocation_pool_size_));
   RETURN_IF_ERR(GetValue(
       options_map, "forward_header_pattern", &options.forward_header_pattern_));
+
+  options.restricted_protocols_ = restricted_features;
 
   return nullptr;
 }
