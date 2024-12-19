@@ -24,9 +24,41 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# FastAPI Application
-fastapi==0.111.1
-# Fix httpx version to avoid bug in openai library:
-# https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
-httpx==0.27.2
-openai==1.40.6
+#
+# This test case was added based on a prior crash. DO NOT MODIFY!
+#
+
+name: "llm"
+backend: "python"
+max_batch_size: 128
+
+model_transaction_policy {
+  decoupled: True
+}
+
+input [
+  {
+    name: "text_input"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "text_output"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  },
+  {
+    name: "sequence_index"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind : KIND_CPU
+  }
+]
