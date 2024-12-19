@@ -53,7 +53,9 @@ ERROR_MAPPING = {
 
 
 def handle_triton_error(func):
-    @wraps(func)
+    @wraps(
+        func
+    )  # Preserves the function signature of the underlying function being wrapped.
     def error_handling_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
