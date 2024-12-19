@@ -70,7 +70,7 @@ import requests
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    "2.50.0": (
+    "2.50.0dev": (
         "24.09",  # triton container
         "24.09",  # upstream container
         "1.19.2",  # ORT
