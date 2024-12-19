@@ -33,7 +33,6 @@ function install_deps() {
 
     # Install application/testing requirements
     pushd openai/
-    # pip install -r requirements.txt
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
@@ -49,6 +48,9 @@ function prepare_vllm() {
 }
 
 function prepare_tensorrtllm() {
+    # FIXME: Remove this when pre-installing deps in TRTLLM container
+    pip install -r requirements.txt
+
     MODEL="llama-3-8b-instruct"
     MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
