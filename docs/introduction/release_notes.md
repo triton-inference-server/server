@@ -25,9 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-# [Triton Inference Server Release 24.10](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-24-10.html#rel-24-10)
+# [Triton Inference Server Release 24.12](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-24-12.html#rel-24-12)
 
-The Triton Inference Server container image, release 24.10, is available on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and is open source on [GitHub](https://github.com/triton-inference-server/server).
+The Triton Inference Server container image, release 24.12, is available on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and is open source on [GitHub](https://github.com/triton-inference-server/server).
 
 
 ## **Contents of the Triton Inference Server container**
@@ -38,60 +38,63 @@ For a complete list of what the container includes, refer to [Deep Learning Fram
 
 The container also includes the following:
 
-- [Ubuntu 22.04](http://releases.ubuntu.com/22.04/) including [Python 3.10](https://www.python.org/downloads/release/python-3100/)
+- [Ubuntu 24.04](http://releases.ubuntu.com/24.04/) including [Python 3.12](https://www.python.org/downloads/release/python-3120/)
 
-- [NVIDIA CUDA 12.6.2](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html)
+- [NVIDIA CUDA 12.6.3](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html)
 
-- [NVIDIA cuBLAS 12.6.3.3](https://docs.nvidia.com/cuda/cublas/index.html)
+- [NVIDIA cuBLAS 12.6.4.1](https://docs.nvidia.com/cuda/cublas/index.html)
 
-- [cuDNN 9.5.0.50](https://docs.nvidia.com/deeplearning/cudnn/release-notes/)
+- [cuDNN 9.6.0.74](https://docs.nvidia.com/deeplearning/cudnn/release-notes/)
 
-- [NVIDIA NCCL 2.22.3](https://docs.nvidia.com/deeplearning/nccl/release-notes/) (optimized for [NVIDIA NVLink](http://www.nvidia.com/object/nvlink.html)®)
+- [NVIDIA NCCL 2.23.4](https://docs.nvidia.com/deeplearning/nccl/release-notes/) (optimized for [NVIDIA NVLink](http://www.nvidia.com/object/nvlink.html)®)
 
-- [NVIDIA TensorRT™ 10.5.0.18](https://docs.nvidia.com/deeplearning/tensorrt/release-notes/index.html)
+- [NVIDIA TensorRT™ 10.7.0.23](https://docs.nvidia.com/deeplearning/tensorrt/release-notes/index.html)
 
 - OpenUCX 1.15.0
 
 - GDRCopy 2.3
 
-- NVIDIA HPC-X 2.20
+- NVIDIA HPC-X 2.21
 
 - OpenMPI 4.1.7
 
 - [FIL](https://github.com/triton-inference-server/fil_backend)
 
-- [NVIDIA DALI® 1.42](https://docs.nvidia.com/deeplearning/dali/release-notes/index.html)
+- [NVIDIA DALI® 1.44](https://docs.nvidia.com/deeplearning/dali/release-notes/index.html)
 
 - [nvImageCodec 0.2.0.7](https://docs.nvidia.com/cuda/nvimagecodec/release_notes_v0.2.0.html)
 
 - ONNX Runtime 1.19.2
 
-- Intel[ OpenVINO ](https://github.com/openvinotoolkit/openvino/tree/2022.1.0)2024.0.0
+- Intel[ OpenVINO ](https://github.com/openvinotoolkit/openvino/tree/2022.1.0)2024.40.0
 
 - DCGM 3.2.6
 
-- [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/) version [release/0.13.0](https://github.com/NVIDIA/TensorRT-LLM/tree/v0.13.0)
+- [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM/) version [release/0.15.0](https://github.com/NVIDIA/TensorRT-LLM/tree/v0.15.0)
 
-- [vLLM](https://github.com/vllm-project/vllm) version 0.5.3 post 1
+- [vLLM](https://github.com/vllm-project/vllm) version 0.5.5
 
 
 ## **Driver Requirements**
 
-Release 24.10 is based on [CUDA 12.6.2](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) which requires [NVIDIA Driver](http://www.nvidia.com/Download/index.aspx?lang=en-us) release 560 or later. However, if you are running on a data center GPU (for example, T4 or any other data center GPU), you can use NVIDIA driver release 470.57 (or later R470), 525.85 (or later R525), 535.86 (or later R535), or 545.23 (or later R545).
+Release 24.12 is based on [CUDA 12.6.3](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) which requires [NVIDIA Driver](http://www.nvidia.com/Download/index.aspx?lang=en-us) release 560 or later. However, if you are running on a data center GPU (for example, T4 or any other data center GPU), you can use NVIDIA driver release 470.57 (or later R470), 525.85 (or later R525), 535.86 (or later R535), or 545.23 (or later R545).
 
 The CUDA driver's compatibility package only supports particular drivers. Thus, users should upgrade from all R418, R440, R450, R460, R510, R520, R530, R545 and R555 drivers, which are not forward-compatible with CUDA 12.6. For a complete list of supported drivers, see the [CUDA Application Compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#use-the-right-compat-package) topic. For more information, see [CUDA Compatibility and Upgrades](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#cuda-compatibility-and-upgrades).
 
 
 ## **GPU Requirements**
 
-Release 24.10 supports CUDA compute capability 6.0 and later. This corresponds to GPUs in the NVIDIA Pascal, NVIDIA Volta™, NVIDIA Turing™, NVIDIA Ampere architecture, NVIDIA Hopper™, and NVIDIA Ada Lovelace architecture families. For a list of GPUs to which this compute capability corresponds, see [CUDA GPUs](https://developer.nvidia.com/cuda-gpus). For additional support details, see [Deep Learning Frameworks Support Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html).
+Release 24.12 supports CUDA compute capability 6.0 and later. This corresponds to GPUs in the NVIDIA Pascal, NVIDIA Volta™, NVIDIA Turing™, NVIDIA Ampere architecture, NVIDIA Hopper™, and NVIDIA Ada Lovelace architecture families. For a list of GPUs to which this compute capability corresponds, see [CUDA GPUs](https://developer.nvidia.com/cuda-gpus). For additional support details, see [Deep Learning Frameworks Support Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html).
 
 
 ## **Key Features and Enhancements**
 
 This Inference Server release includes the following key features and enhancements.
 
-- Optimized vLLM performance with custom metrics.
+- [vLLM backend health check](https://github.com/triton-inference-server/vllm_backend/blob/r24.12/docs/health_check.md) may be optionally enabled which unloads the model if the vLLM engine health check failed.
+- vLLM backend supports sending [additional outputs](https://github.com/triton-inference-server/vllm_backend/blob/r24.12/docs/additional_outputs.md) from vLLM if requested.
+- Improved server stability during the gRPC client cancellation.
+
 
 ## **Known Issues**
 - Numpy 2.x is not currently supported for Python Backend models and may cause them to return empty tensors unxpectedly, please use Numpy 1.x until support is added.
@@ -122,3 +125,4 @@ This Inference Server release includes the following key features and enhancemen
   - CPU and GPU-related metrics
   - Custom execution environments
   - The model load/unload APIs
+- The latest GenAI-Perf package on pypi.org is version 0.0.9dev while the latest Triton SDK container (24.12) contains GenAI-Perf version 0.0.8.
