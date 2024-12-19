@@ -471,7 +471,7 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
         cmake_core_enable("TRITON_ENABLE_METRICS_CPU", FLAGS.enable_cpu_metrics)
     )
     cargs.append(cmake_core_enable("TRITON_ENABLE_TRACING", FLAGS.enable_tracing))
-    cargs.append(cmake_core_enable("TRITON_ENABLE_NVTX", FLAGS.enable_nvtx))
+    cargs.append(cmake_core_enable("TRITON_ENABLE_NVTX", True))
 
     cargs.append(cmake_core_enable("TRITON_ENABLE_GPU", FLAGS.enable_gpu))
     cargs.append(
@@ -651,7 +651,7 @@ def pytorch_cmake_args(images):
                 cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
             )
         cargs.append(
-            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
+            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", True)
         )
     return cargs
 
@@ -771,7 +771,7 @@ def openvino_cmake_args():
 
 def tensorrt_cmake_args():
     cargs = [
-        cmake_backend_enable("tensorrt", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx),
+        cmake_backend_enable("tensorrt", "TRITON_ENABLE_NVTX", True),
     ]
     if target_platform() == "windows":
         cargs.append(

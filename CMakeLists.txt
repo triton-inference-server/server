@@ -38,7 +38,7 @@ set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared librar
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
-option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
+option(TRITON_ENABLE_NVTX "Include NVTX support in server" ON)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
 option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
@@ -242,7 +242,7 @@ ExternalProject_Add(triton-server
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
     -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
     -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
-    -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
+    -DTRITON_ENABLE_NVTX:BOOL=ON
     -DTRITON_ENABLE_TRACING:BOOL=${TRITON_ENABLE_TRACING}
     -DTRITON_ENABLE_LOGGING:BOOL=${TRITON_ENABLE_LOGGING}
     -DTRITON_ENABLE_STATS:BOOL=${TRITON_ENABLE_STATS}
