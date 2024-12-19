@@ -1232,7 +1232,6 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
 
-# TODO: Only if vllm or trtllm?
 RUN pip3 install -r python/openai/requirements.txt
 
 """
@@ -1933,7 +1932,6 @@ def core_build(
         os.path.join(install_dir, "include", "triton", "core"),
     )
 
-    # TODO: Only if vllm or trtllm?
     cmake_script.cpdir(
         os.path.join(repo_dir, "python", "openai"), os.path.join(install_dir, "python")
     )
