@@ -986,6 +986,7 @@ RUN yum install -y \\
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          build \\
           wheel \\
           setuptools \\
           docker \\
@@ -1105,6 +1106,7 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          build \\
           docker \\
           virtualenv
 
