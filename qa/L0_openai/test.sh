@@ -53,9 +53,10 @@ function prepare_tensorrtllm() {
     MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
-    # FIXME: This will require an upgrade each release to match the TRT-LLM version
+    # FIXME: This may require an upgrade each release to match the TRT-LLM version,
+    # so it's likely easier to user trtllm-build directly.
     # Use Triton CLI to prepare model repository for testing
-    pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
+    pip install git+https://github.com/triton-inference-server/triton_cli.git@0.1.1
     # NOTE: Could use ENGINE_DEST_PATH set to NFS mount for pre-built engines in future
     triton import \
         --model ${MODEL}  \
