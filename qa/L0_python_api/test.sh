@@ -51,7 +51,7 @@ fi
 
 
 FRONTEND_TEST_LOG="./python_kserve.log"
-# TODO: [DLIS-7215] Run tritonclient.grpc as separate process
+# TODO: [DLIS-7735] Run tritonclient.grpc as separate process
 # Currently, running tritonclient.grpc with tritonserver in the same process,
 # it will non-deterministically abort/crash without being able to be caught by pytest.
 # This is because fork() is called by tritonserver on model load,

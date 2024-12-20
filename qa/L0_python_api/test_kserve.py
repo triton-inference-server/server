@@ -31,7 +31,7 @@ import numpy as np
 import pytest
 import testing_utils as utils
 
-# TODO: [DLIS-7215] Run tritonclient.grpc as a separate process
+# TODO: [DLIS-7735] Run tritonclient.grpc as a separate process
 # import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
@@ -208,7 +208,7 @@ class TestRestrictedFeatureOptions:
 
 
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
-# TODO: [DLIS-7215] Run tritonclient.grpc as separate process
+# TODO: [DLIS-7735] Run tritonclient.grpc as separate process
 GRPC_ARGS = (KServeGrpc, None, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 
@@ -351,7 +351,7 @@ class TestKServe:
     def test_grpc_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
         grpc_service = utils.setup_service(server, frontend)
-        # TODO: [DLIS-7215] Run tritonclient.grpc as a separate process
+        # TODO: [DLIS-7735] Run tritonclient.grpc as a separate process
         grpc_client = grpcclient.InferenceServerClient(url=url)
         user_data = []
 
