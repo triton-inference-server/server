@@ -180,7 +180,7 @@ class RestrictedFeatures:
         group = FeatureGroup(key, value, features)
         self.add_feature_group(group)
 
-    def has_feature(self, feature: Feature):
+    def has_feature(self, feature: Feature) -> bool:
         """
         Checks if feature belongs to any of the groups
         Example:
@@ -197,7 +197,7 @@ class RestrictedFeatures:
         return feature in self.features_restricted
 
     @handle_triton_error
-    def update_feature_group(self, feature: Feature, key: str, value: str):
+    def update_feature_group(self, feature: Feature, key: str, value: str) -> None:
         """
         Updates the key and value used to restrict a Feature
         Example:
@@ -220,7 +220,7 @@ class RestrictedFeatures:
                 break
 
     @handle_triton_error
-    def remove_features(self, features: List[Feature] | Feature):
+    def remove_features(self, features: List[Feature] | Feature) -> None:
         """
         Will remove FeatureGroups that contain the features specified.
         Example:
