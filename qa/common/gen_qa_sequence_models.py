@@ -37,6 +37,7 @@ from gen_common import (
     np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    openvino_save_model,
 )
 
 FLAGS = None
@@ -1145,24 +1146,15 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype, shape
     )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    in0 = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="INPUT")
-    start = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="START")
-    ready = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="READY")
+    in0 = ov.opset1.parameter(shape=batch_dim + shape, dtype=dtype, name="INPUT")
+    start = ov.opset1.parameter(shape=batch_dim + shape, dtype=dtype, name="START")
+    ready = ov.opset1.parameter(shape=batch_dim + shape, dtype=dtype, name="READY")
 
-    tmp = ng.add(in0, start)
-    op0 = ng.multiply(tmp, ready, name="OUTPUT")
+    tmp = ov.opset1.add(in0, start)
+    op0 = ov.opset1.multiply(tmp, ready, name="OUTPUT")
 
-    function = ng.impl.Function([op0], [in0, start, ready], model_name)
-    ie_network = IENetwork(ng.impl.Function.to_capsule(function))
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    ie_network.serialize(
-        model_version_dir + "/model.xml", model_version_dir + "/model.bin"
-    )
+    model = ov.Model([op0], [in0, start, ready], model_name)
+    openvino_save_model(model_version_dir, model)
 
 
 def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype, shape):
@@ -1421,8 +1413,7 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.openvino:
-        from openvino.inference_engine import IENetwork
-        import ngraph as ng
+        import openvino.runtime as ov
 
     import test_util as tu
 

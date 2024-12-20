@@ -38,6 +38,7 @@ from gen_common import (
     np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    openvino_save_model,
 )
 
 FLAGS = None
@@ -934,13 +935,13 @@ def create_openvino_modelfile(
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
         openvino_inputs.append(
-            ng.parameter(
+            ov.opset1.parameter(
                 shape=batch_dim + input_shapes[io_num], dtype=dtype, name=in_name
             )
         )
 
         openvino_outputs.append(
-            ng.reshape(
+            ov.opset1.reshape(
                 openvino_inputs[io_num],
                 batch_dim + output_shapes[io_num],
                 name=out_name,
@@ -948,17 +949,8 @@ def create_openvino_modelfile(
             )
         )
 
-    function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
-    ie_network = IENetwork(ng.impl.Function.to_capsule(function))
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    ie_network.serialize(
-        model_version_dir + "/model.xml", model_version_dir + "/model.bin"
-    )
+    model = ov.Model(openvino_outputs, openvino_inputs, model_name)
+    openvino_save_model(model_version_dir, model)
 
 
 def create_openvino_modelconfig(
@@ -1463,8 +1455,7 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.openvino:
-        from openvino.inference_engine import IENetwork
-        import ngraph as ng
+        import openvino.runtime as ov
 
     import test_util as tu
 
