@@ -119,23 +119,42 @@ class TestRestrictedFeatureOptions:
     def test_correct_parameters(self):
         # Directly test feature groups
         correct_feature_group = FeatureGroup(
-            key="key", value="val", features=[Feature.HEALTH, Feature.METADATA]
+            key="health-key",
+            value="health-val",
+            features=[Feature.HEALTH, Feature.METADATA],
         )
 
         rf = RestrictedFeatures(groups=[correct_feature_group])
-        rf.create_feature_group(
-            key="new-key", value="new-val", features=Feature.INFERENCE
+
+        rf.create_feature_group(key="key", value="val", features=Feature.INFERENCE)
+
+        feature_list = rf.get_feature_groups()
+        expected_list = [
+            FeatureGroup("health-key", "health-val", Feature.HEALTH),
+            FeatureGroup("health-key", "health-val", Feature.METADATA),
+            FeatureGroup("key", "val", Feature.INFERENCE),
+        ]
+
+        # 3 groups: 1 for each Feature.
+        assert len(feature_list) == 3 and sorted(
+            [repr(x) for x in expected_list]
+        ) == sorted([repr(x) for x in expected_list])
+
+        rf.update_feature_group(Feature.METADATA, "metadata-key", "metadata-val")
+        expected_list[1] = FeatureGroup(
+            "metadata-key", "metadata-val", Feature.METADATA
         )
+        assert len(feature_list) == 3 and sorted(
+            [repr(x) for x in expected_list]
+        ) == sorted([repr(x) for x in expected_list])
 
         rf.remove_features(Feature.INFERENCE)
 
         assert not rf.has_feature(Feature.INFERENCE)
 
-        rf.remove_feature_group(correct_feature_group)
+        rf.remove_features(Feature.HEALTH)
 
-        assert not rf.has_feature(Feature.HEALTH) and not rf.has_feature(
-            Feature.METADATA
-        )
+        assert not rf.has_feature(Feature.HEALTH) and rf.has_feature(Feature.METADATA)
 
     def test_wrong_rf_parameters(self):
         rf = RestrictedFeatures()
@@ -155,7 +174,7 @@ class TestRestrictedFeatureOptions:
         with pytest.raises(
             tritonserver.InvalidArgumentError,
             match="A given feature can only belong to one "
-            "group.Feature.HEALTH already belongs to an existing group.",
+            "group. Feature.HEALTH already belongs to an existing group.",
         ):
             feature_group = FeatureGroup(
                 key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
@@ -163,6 +182,14 @@ class TestRestrictedFeatureOptions:
 
             rf = RestrictedFeatures(groups=[feature_group])
             rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
+
+        with pytest.raises(
+            tritonserver.InvalidArgumentError,
+            match="not present in any of the FeatureGroups for "
+            "the RestrictedFeatures object and therefore cannot be removed.",
+        ):
+            rf = RestrictedFeatures()
+            rf.remove_features(Feature.HEALTH)
 
 
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
