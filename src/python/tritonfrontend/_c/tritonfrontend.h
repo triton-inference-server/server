@@ -177,6 +177,12 @@ class TritonFrontend {
     return;  // Frontend does not support RestrictedFeatures
 #endif
 
+#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
+    if constexpr (std::is_same_v<FrontendServer, HTTPMetricsServer>) {
+      return;  // Metrics does not support RestrictedFeatures
+    }
+#endif
+
 #ifdef TRITON_ENABLE_HTTP
     if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
       key_prefix = "";
