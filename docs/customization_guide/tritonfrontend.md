@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-### Triton Server (tritonfrontend) Bindings (Beta)
+## Triton Server (tritonfrontend) Bindings (Beta)
 
 The `tritonfrontend` python package is a set of bindings to Triton's existing
 frontends implemented in C++. Currently, `tritonfrontend` supports starting up
@@ -35,13 +35,20 @@ with Triton's Python In-Process API
 and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library)
 extend the ability to use Triton's full feature set with a few lines of Python.
 
-Let us walk through a simple example:
-1. First we need to load the desired models and start the server with `tritonserver`.
+### Example Workflow:
+
+1. Enter the triton container:
+```bash
+docker run -ti nvcr.io/nvidia/tritonserver:{YY.MM}-python-py3
+```
+Note: The tritonfrontend/tritonserver wheels have been shipped and installed by default in the container since 24.11 release.
+
+2. First we need to load the desired models and start the server with `tritonserver`.
 ```python
 import tritonserver
 
 # Constructing path to Model Repository
-model_path = f"server/src/python/examples/example_model_repository"
+model_path = "server/src/python/examples/example_model_repository"
 
 server_options = tritonserver.Options(
     server_id="ExampleServer",
@@ -83,7 +90,7 @@ url = "localhost:8000"
 client = httpclient.InferenceServerClient(url=url)
 
 # Prepare input data
-input_data = np.array([["Roger Roger"]], dtype=object)
+input_data = np.array(["Roger Roger"], dtype=object)
 
 # Create input and output objects
 inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
@@ -139,12 +146,61 @@ server.stop()
 ```
 With this workflow, you can avoid having to stop each service after client requests have terminated.
 
+### Example with RestrictedFeatures:
+ In order to restrict access to certain endpoints(inference, metadata, model-repo, ...), RestrictedFeatures can be utilized.
+ Let us walk through an example of restricting inference:
+1. Similar to the previous workflow, we start with getting the server up and running.
+ ```python
+import tritonserver
 
-## Known Issues
+model_path = "server/src/python/examples/example_model_repository"
+
+server = tritonserver.Server(model_repostiory=model_path).start(wait_until_ready=True)
+ ```
+
+2. Now, we can restrict inference and start the endpoints.
+```python
+from tritonfrontend import Feature, RestrictedFeatures, KServeHttp
+
+rf = RestrictedFeatures()
+rf.create_feature_group("some-infer-key", "secret-infer-value", [Feature.INFERENCE])
+
+http_options = KServeHttp.Options(restricted_features=rf)
+http_service = KServeHttp(server, http_options)
+http_service.start()
+```
+
+3. Finally, let us try sending a inference request to these endpoints:
+```python
+import tritonclient.http as httpclient
+
+model_name = "identity"
+url = "localhost:8000"
+valid_credentials = {"some-infer-key": "secret-infer-value"}
+with httpclient.InferenceServerClient(url=url) as client:
+    input_data = np.array(["Roger Roger"], dtype=object)
+    inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+    inputs[0].set_data_from_numpy(input_data)
+    results = client.infer(model_name, inputs=inputs, headers=valid_credentials)
+    output_data = results.as_numpy("OUTPUT0")
+    print("[INFERENCE RESULTS]")
+    print("Output data:", output_data)
+```
+Note: If you remove the `header=valid_credentials` argument from `client.infer()`,
+then you can see a failed inference request that looks something like that:
+```
+...
+tritonclient.utils.InferenceServerException: [403] This API is restricted,
+expecting header 'some-infer-key'
+```
+For more information on restrictedfeatures take a look at the following supporting docs:
+- [limit endpoint access docs](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
+- [restricted features implementation](https://github.com/triton-inference-server/server/blob/main/src/python/tritonfrontend/_api/_restricted_features.py)
+### Known Issues
 - The following features are not currently supported when launching the Triton frontend services through the python bindings:
     - [Tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md)
     - [Shared Memory](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md)
-    - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
     - VertexAI
     - Sagemaker
 - After a running server has been stopped, if the client sends an inference request, a Segmentation Fault will occur.
+- Using tritonclient.grpc and tritonserver in the same process may cause crash/abort due to lack of `fork()` support in [`cygrpc`](https://github.com/grpc/grpc/blob/master/doc/fork_support.md)

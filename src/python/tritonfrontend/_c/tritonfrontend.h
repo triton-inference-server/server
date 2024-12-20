@@ -30,11 +30,22 @@
 #include <unordered_map>
 #include <variant>
 
+
+#ifdef TRITON_ENABLE_GRPC
+#include "../../../grpc/grpc_server.h"
+#endif
+
+
+#if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
+#include "../../../http_server.h"
+#endif
+
+
 #include "../../../common.h"
 #include "../../../restricted_features.h"
 #include "../../../shared_memory_manager.h"
-#include "../../../tracer.h"
 #include "triton/common/logging.h"
+#include "triton/common/triton_json.h"
 #include "triton/core/tritonserver.h"
 
 
@@ -115,6 +126,7 @@ class TritonFrontend {
         reinterpret_cast<TRITONSERVER_Server*>(server_mem_addr);
 
     server_.reset(server_ptr, EmptyDeleter);
+    TritonFrontend::_populate_restricted_features(data, restricted_features);
 
 #ifdef TRITON_ENABLE_HTTP
     if constexpr (std::is_same_v<FrontendServer, HTTPAPIServer>) {
@@ -153,6 +165,64 @@ class TritonFrontend {
   // will cause a double-free when the core bindings attempt to
   // delete the TRITONSERVER_Server instance.
   static void EmptyDeleter(TRITONSERVER_Server* obj){};
-};
 
+  static void _populate_restricted_features(
+      UnorderedMapType& data, RestrictedFeatures& rest_features)
+  {
+    std::string map_key =
+        "restricted_features";  // Name of option in UnorderedMap
+    std::string key_prefix;     // Prefix for header key
+
+#if !defined(TRITON_ENABLE_HTTP) && !defined(TRITON_ENABLE_GRPC)
+    return;  // Frontend does not support RestrictedFeatures
+#endif
+
+#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
+    if constexpr (std::is_same_v<FrontendServer, HTTPMetricsServer>) {
+      return;  // Metrics does not support RestrictedFeatures
+    }
+#endif
+
+#ifdef TRITON_ENABLE_HTTP
+    if (std::is_same_v<FrontendServer, triton::server::HTTPAPIServer>) {
+      key_prefix = "";
+    }
+#endif
+
+#ifdef TRITON_ENABLE_GRPC
+    if (std::is_same_v<FrontendServer, triton::server::grpc::Server>) {
+      key_prefix = "triton-grpc-protocol-";
+    }
+#endif
+
+    std::string restricted_info;
+    ThrowIfError(GetValue(data, map_key, &restricted_info));
+
+    triton::common::TritonJson::Value rf_groups;
+    ThrowIfError(rf_groups.Parse(restricted_info));
+
+    std::string key, value, feature;
+    for (size_t group_idx = 0; group_idx < rf_groups.ArraySize(); group_idx++) {
+      triton::common::TritonJson::Value feature_group;
+      ThrowIfError(rf_groups.IndexAsObject(group_idx, &feature_group));
+
+      // Extract key and value
+      ThrowIfError(feature_group.MemberAsString("key", &key));
+      ThrowIfError(feature_group.MemberAsString("value", &value));
+
+      triton::common::TritonJson::Value features;
+      ThrowIfError(feature_group.MemberAsArray("features", &features));
+
+      // Extract feature list
+      for (size_t feature_idx = 0; feature_idx < features.ArraySize();
+           feature_idx++) {
+        ThrowIfError(features.IndexAsString(feature_idx, &feature));
+
+        rest_features.Insert(
+            RestrictedFeatures::ToCategory(feature),
+            std::make_pair(key_prefix + key, value));
+      }
+    }
+  };
+};
 }}}  // namespace triton::server::python

@@ -28,9 +28,10 @@ from enum import IntEnum
 from typing import Union
 
 import tritonserver
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from tritonfrontend._api._error_mapping import handle_triton_error
+from tritonfrontend._api._restricted_features import RestrictedFeatures
 from tritonfrontend._c.tritonfrontend_bindings import (
     InvalidArgumentError,
     TritonFrontendGrpc,
@@ -52,7 +53,7 @@ class KServeGrpc:
     )
 
     # triton::server::grpc::Options
-    @dataclass
+    @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
     class Options:
         # triton::server::grpc::SocketOptions
         address: str = "0.0.0.0"
@@ -81,12 +82,18 @@ class KServeGrpc:
         ] = Grpc_compression_level.NONE
         infer_allocation_pool_size: int = Field(8, ge=0)
         forward_header_pattern: str = ""
-        # DLIS-7215: Add restricted protocol support
-        # restricted_protocols: str = ""
+        restricted_features: RestrictedFeatures = RestrictedFeatures()
 
+        @handle_triton_error
         def __post_init__(self):
             if isinstance(self.infer_compression_level, Grpc_compression_level):
                 self.infer_compression_level = self.infer_compression_level.value
+
+            if not isinstance(self.restricted_features, RestrictedFeatures):
+                raise InvalidArgumentError(
+                    "restricted_features needs an instance of RestrictedFeatures."
+                )
+            self.restricted_features = repr(self.restricted_features)
 
     @handle_triton_error
     def __init__(self, server: tritonserver, options: "KServeGrpc.Options" = None):
