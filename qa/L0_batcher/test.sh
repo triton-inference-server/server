@@ -85,6 +85,10 @@ if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER
+    TEST_WINDOWS=1
+    # DLIS-7683 This test fails performance-related response time parameters
+    # when using HTTP protocol. Use gRPC protocol for now as a WAR.
+    export USE_GRPC=1
 else
     MODELDIR=${MODELDIR:=`pwd`}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -601,7 +605,7 @@ done
 TEST_CASE=test_multi_batch_preserve_ordering
 
 # Skip test for Windows. Trace file concats at 8192 chars on Windows.
-if  [[ ! -v WSL_DISTRO_NAME ]] || [[ ! -v MSYSTEM ]]; then
+if  [ $TEST_WINDOWS -eq 0 ]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1
@@ -754,7 +758,7 @@ mkdir -p models/dynamic_batch/1 && (cd models/dynamic_batch && \
 TEST_LOG="queue_timeout_test.log"
 SERVER_LOG="./queue_timeout_test.server.log"
 
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+SERVER_ARGS="--model-repository=$MODELDIR/models --log-verbose=2 --backend-directory=${BACKEND_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -771,8 +775,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
