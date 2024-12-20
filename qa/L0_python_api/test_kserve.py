@@ -30,7 +30,9 @@ from functools import partial
 import numpy as np
 import pytest
 import testing_utils as utils
-import tritonclient.grpc as grpcclient
+
+# TODO: [DLIS-7215] Run tritonclient.grpc as a separate process
+# import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
@@ -130,10 +132,9 @@ class TestRestrictedFeatureOptions:
             key="infer-key", value="infer-val", features=Feature.INFERENCE
         )
 
-        assert (
-            rf.has_feature(Feature.INFERENCE)
-            and rf.has_feature(Feature.METADATA)
-            and rf.has_feature(Feature.HEALTH)
+        assert all(
+            rf.has_feature(feature)
+            for feature in [Feature.HEALTH, Feature.METADATA, Feature.INFERENCE]
         )
 
         feature_list = rf.get_feature_groups()
@@ -144,24 +145,30 @@ class TestRestrictedFeatureOptions:
         ]
 
         # 3 groups: 1 for each Feature.
-        assert len(feature_list) == 3 and sorted(
-            [repr(x) for x in expected_list]
-        ) == sorted([repr(x) for x in expected_list])
+        assert len(feature_list) == 3
 
+        # Converting FeatureGroup->str and sorting to not have to account for order.
+        feature_str_repr = lambda feature_groups: sorted(
+            repr(group) for group in feature_groups
+        )
+
+        assert feature_str_repr(expected_list) == feature_str_repr(feature_list)
+
+        # Updating Feature.METADATA with new (key, value) pair
         rf.update_feature_group(Feature.METADATA, "metadata-key", "metadata-val")
         expected_list[1] = FeatureGroup(
             "metadata-key", "metadata-val", Feature.METADATA
         )
-        assert len(feature_list) == 3 and sorted(
-            [repr(x) for x in expected_list]
-        ) == sorted([repr(x) for x in expected_list])
+
+        assert len(feature_list) == 3
+        assert feature_str_repr(expected_list) == feature_str_repr(feature_list)
 
         rf.remove_features(Feature.INFERENCE)
-
+        assert len(rf.get_feature_groups()) == 2
         assert not rf.has_feature(Feature.INFERENCE)
 
         rf.remove_features(Feature.HEALTH)
-
+        assert len(rf.get_feature_groups()) == 1
         assert not rf.has_feature(Feature.HEALTH) and rf.has_feature(Feature.METADATA)
 
     def test_wrong_rf_parameters(self):
@@ -201,7 +208,8 @@ class TestRestrictedFeatureOptions:
 
 
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
-GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
+# TODO: [DLIS-7215] Run tritonclient.grpc as separate process
+GRPC_ARGS = (KServeGrpc, None, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 
 
@@ -343,6 +351,7 @@ class TestKServe:
     def test_grpc_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
         grpc_service = utils.setup_service(server, frontend)
+        # TODO: [DLIS-7215] Run tritonclient.grpc as a separate process
         grpc_client = grpcclient.InferenceServerClient(url=url)
         user_data = []
 
@@ -450,10 +459,10 @@ class TestMetrics:
 
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
-        # Setup Server, KServeGrpc, Metrics
+        # Setup Server, KServeHttp, Metrics
         server = utils.setup_server()
-        grpc_service = utils.setup_service(
-            server, KServeGrpc
+        http_service = utils.setup_service(
+            server, KServeHttp
         )  # Needed to send inference request
         metrics_service = utils.setup_service(server, frontend)
 
@@ -464,7 +473,7 @@ class TestMetrics:
         assert before_status_code == 200 and before_inference_count == 0
 
         # Send 1 Inference Request with send_and_test_inference()
-        assert utils.send_and_test_inference_identity(GRPC_ARGS[1], GRPC_ARGS[2])
+        assert utils.send_and_test_inference_identity(HTTP_ARGS[1], HTTP_ARGS[2])
 
         # Get Metrics and verify inference count == 1 after inference
         after_status_code, after_inference_count = utils.get_metrics(
@@ -472,8 +481,8 @@ class TestMetrics:
         )
         assert after_status_code == 200 and after_inference_count == 1
 
-        # Teardown Metrics, GrpcService, Server
-        utils.teardown_service(grpc_service)
+        # Teardown Metrics, HttpService, Server
+        utils.teardown_service(http_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 

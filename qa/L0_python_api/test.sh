@@ -51,7 +51,11 @@ fi
 
 
 FRONTEND_TEST_LOG="./python_kserve.log"
-python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
+# TODO: [DLIS-7215] Run tritonclient.grpc as separate process
+# Currently, when we run tritonclient.grpc with tritonserver in the same process,
+# When a fork() is called by tritonserver on model load, lack of support in cygrpc
+# causes the python process to abort/crash without being able to be caught by pytest.
+python -m pytest --junitxml=test_kserve.xml test_kserve.py -k "not KServeGrpc" > $FRONTEND_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $FRONTEND_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
