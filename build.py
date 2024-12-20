@@ -1640,7 +1640,9 @@ def create_build_dockerfiles(
     if "base" in images:
         base_image = images["base"]
         if target_platform() == "rhel":
-            print("warning: RHEL is not an officially supported target and you will probably experience errors attempting to build this container.")
+            print(
+                "warning: RHEL is not an officially supported target and you will probably experience errors attempting to build this container."
+            )
     elif target_platform() == "windows":
         base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
     elif target_platform() == "rhel":
