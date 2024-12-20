@@ -126,13 +126,21 @@ class TestRestrictedFeatureOptions:
 
         rf = RestrictedFeatures(groups=[correct_feature_group])
 
-        rf.create_feature_group(key="key", value="val", features=Feature.INFERENCE)
+        rf.create_feature_group(
+            key="infer-key", value="infer-val", features=Feature.INFERENCE
+        )
+
+        assert (
+            rf.has_feature(Feature.INFERENCE)
+            and rf.has_feature(Feature.METADATA)
+            and rf.has_feature(Feature.HEALTH)
+        )
 
         feature_list = rf.get_feature_groups()
         expected_list = [
             FeatureGroup("health-key", "health-val", Feature.HEALTH),
             FeatureGroup("health-key", "health-val", Feature.METADATA),
-            FeatureGroup("key", "val", Feature.INFERENCE),
+            FeatureGroup("infer-key", "infer-val", Feature.INFERENCE),
         ]
 
         # 3 groups: 1 for each Feature.
