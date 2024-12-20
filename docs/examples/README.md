@@ -30,6 +30,6 @@
 
 **New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey!
 
-This folder contains the following:
+This folder contains the following and more:
 * jetson: This covers deploying Triton Inference Server on Jetson devices.
 * model_repository: This folder is a basic model repository for deploying models using the Triton Inference Server.
