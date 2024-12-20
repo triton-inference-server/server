@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,28 +23,21 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import sys
 
-name: "identity"
-backend: "python"
-max_batch_size: 0
+import triton_python_backend_utils as pb_utils
 
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_STRING
-    dims: [ 1 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_STRING
-    dims: [ 1 ]
-  }
-]
-instance_group [
-  {
-    count: 1
-    kind : KIND_CPU
-  }
-]
+
+class TritonPythonModel:
+    """An identity model that returns the input tensor as output."""
+
+    def initialize(self, args):
+        pass
+
+    def execute(self, requests):
+        responses = []
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", in_0.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+        return responses
