@@ -55,6 +55,7 @@ FRONTEND_TEST_LOG="./python_kserve.log"
 # Currently, running tritonclient.grpc with tritonserver in the same process,
 # it will non-deterministically abort/crash without being able to be caught by pytest.
 # This is because fork() is called by tritonserver on model load,
+# which attempts to fork the imported libraries and their internal states,
 # and cygrpc (dependency of tritonclient.grpc) does not officially support fork().
 # Reference: https://github.com/grpc/grpc/blob/master/doc/fork_support.md
 python -m pytest --junitxml=test_kserve.xml test_kserve.py -k "not KServeGrpc" > $FRONTEND_TEST_LOG 2>&1
