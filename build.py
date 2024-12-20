@@ -1641,6 +1641,10 @@ def create_build_dockerfiles(
         base_image = images["base"]
     elif target_platform() == "windows":
         base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
+    elif target_platform() == "rhel":
+        # Disallow RHEL target unless base image is specified
+        if not "base" in images:
+            raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
         base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.upstream_container_version
