@@ -51,22 +51,13 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:24.08-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:24.12-vllm-python-py3
 ```
 
-2. Install dependencies inside the container:
+2. Launch the OpenAI-compatible Triton Inference Server:
 ```bash
-# Install python bindings for tritonserver and tritonfrontend
-pip install /opt/tritonserver/python/triton*.whl
+cd /opt/tritonserver/python/openai
 
-# Install application requirements
-git clone https://github.com/triton-inference-server/server.git
-cd server/python/openai/
-pip install -r requirements.txt
-```
-
-3. Launch the OpenAI-compatible Triton Inference Server:
-```bash
 # NOTE: Adjust the --tokenizer based on the model being used
 python3 openai_frontend/main.py --model-repository tests/vllm_models --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
@@ -92,7 +83,7 @@ INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenA
 
 </details>
 
-4. Send a `/v1/chat/completions` request:
+3. Send a `/v1/chat/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -132,7 +123,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 </details>
 
-5. Send a `/v1/completions` request:
+4. Send a `/v1/completions` request:
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -166,7 +157,7 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 
 </details>
 
-6. Benchmark with `genai-perf`:
+5. Benchmark with `genai-perf`:
 - To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
 - Or try using genai-perf from the [SDK container](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
 
@@ -206,7 +197,7 @@ genai-perf profile \
 
 </details>
 
-7. Use the OpenAI python client directly:
+6. Use the OpenAI python client directly:
 ```python
 from openai import OpenAI
 
@@ -231,9 +222,9 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
-8. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
+7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
-cd server/python/openai/
+cd /opt/tritonserver/python/openai/
 pip install -r requirements-test.txt
 
 pytest -v tests/
@@ -255,7 +246,7 @@ docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
   -e TRTLLM_ORCHESTRATOR=1 \
-  nvcr.io/nvidia/tritonserver:24.08-trtllm-python-py3
+  nvcr.io/nvidia/tritonserver:24.11-trtllm-python-py3
 ```
 
 2. Install dependencies inside the container:
