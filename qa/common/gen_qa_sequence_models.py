@@ -37,6 +37,7 @@ from gen_common import (
     np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    openvino_save_model,
 )
 
 FLAGS = None
@@ -1153,15 +1154,7 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype, shape
     op0 = ov.opset1.multiply(tmp, ready, name="OUTPUT")
 
     model = ov.Model([op0], [in0, start, ready], model_name)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    ov.serialize(
-        model, model_version_dir + "/model.xml", model_version_dir + "/model.bin"
-    )
+    openvino_save_model(model_version_dir, model)
 
 
 def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype, shape):
