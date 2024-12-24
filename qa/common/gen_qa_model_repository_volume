@@ -422,8 +422,8 @@ python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$V
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$DYNASEQIMPLICITDESTDIR
-chmod -R 777 $DYNASEQIMPLICITDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
+chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
