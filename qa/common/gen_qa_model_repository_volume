@@ -361,8 +361,8 @@ python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_
 chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
 python3 $VOLUME_SRCDIR/gen_tag_sigdef.py --dir $VOLUME_SIGDEFDESTDIR
 chmod -R 777 $VOLUME_SIGDEFDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDIR
-chmod -R 777 $VOLUME_TFPARAMETERSDIR
+python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDESTDIR
+chmod -R 777 $VOLUME_TFPARAMETERSDESTDIR
 EOF
 
 chmod a+x $TFSCRIPT
