@@ -31,6 +31,10 @@ import unittest
 import numpy as np
 import tritonclient.grpc as grpcclient
 
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+
 
 class ResponseSenderTest(unittest.TestCase):
     def _generate_streaming_callback_and_responses_pair(self):
@@ -53,7 +57,7 @@ class ResponseSenderTest(unittest.TestCase):
         inputs[0].set_data_from_numpy(input0_np)
 
         callback, responses = self._generate_streaming_callback_and_responses_pair()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             client.start_stream(callback)
             client.async_stream_infer(model_name, inputs)
             client.stop_stream()

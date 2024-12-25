@@ -701,7 +701,7 @@ def inferAndCheckResults(
                                 )
                                 if cidx == expected0_sort_idx[b][idx]:
                                     tester.assertEqual(
-                                        ctuple[2],
+                                        ctuple[2].strip("\r"),
                                         "label{}".format(expected0_sort_idx[b][idx]),
                                     )
                             elif result_name == OUTPUT1:

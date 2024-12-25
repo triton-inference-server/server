@@ -78,7 +78,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_openvino_version": "2024.4.0",
     "standalone_openvino_version": "2024.4.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.5.5",
+    "vllm_version": "0.6.3.post1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -986,6 +986,7 @@ RUN yum install -y \\
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          build \\
           wheel \\
           setuptools \\
           docker \\
@@ -1105,6 +1106,7 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          build \\
           docker \\
           virtualenv
 
