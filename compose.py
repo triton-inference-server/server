@@ -88,6 +88,8 @@ FROM {} AS min_container
 
     df += """
 FROM {}
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """.format(
         images["min"]
     )
