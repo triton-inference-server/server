@@ -46,22 +46,38 @@ CUDA_DEVICE=${NV_GPU:=0}
 
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
+############################################################################
+# Check if Docker volume exists
+############################################################################
+CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
+DOCKER_VOLUME=${DOCKER_VOLUME:=volume_gen_qa_model_repositor_${CI_JOB_ID}}
+if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
+    echo "Docker volume $DOCKER_VOLUME does not exist. Creating..."
+    docker volume create $DOCKER_VOLUME
+    docker volume inspect $DOCKER_VOLUME
+fi
+
+docker rm -f $DOCKER_VOLUME
+docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $TENSORFLOW_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}
+docker create --name $DOCKER_VOLUME -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $TENSORFLOW_IMAGE
+docker cp . $DOCKER_VOLUME:/mnt/$CI_JOB_ID/gen_srcdir
+
 ###
-HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
-HOST_SRCDIR=${HOST_SRCDIR:=$HOST_BUILD_DIR/gen_srcdir}
-HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_custom_ops
+VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
+VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
+VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_custom_ops
 
-rm -frv $HOST_DESTDIR
-mkdir -p $HOST_DESTDIR/tf_custom_ops $HOST_DESTDIR/libtorch_custom_ops
 
-rm -frv $HOST_SRCDIR
-mkdir -p $HOST_SRCDIR
+docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE \
+mkdir -p \
+$VOLUME_DESTDIR/tf_custom_ops \
+$VOLUME_DESTDIR/libtorch_custom_ops
 
 cp ./gen_qa_custom_ops_models.py $HOST_SRCDIR/.
 cp ./cuda_op_kernel.cu.cc.patch $HOST_SRCDIR/.
 cp ./busy_op_kernel.* $HOST_SRCDIR/.
-TFSCRIPT=tf_gen.cmds
-PYTSCRIPT=pyt_gen.cmds
+TFSCRIPT=gen.TensorFlow.gen_qa_custom_ops.cmds
+PYTSCRIPT=gen.PyTorch.gen_qa_custom_ops.cmds
 
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops

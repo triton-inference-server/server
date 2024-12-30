@@ -141,11 +141,11 @@ $VOLUME_TORCHTRTDESTDIR \
 $VOLUME_SCALARMODELSDESTDIR \
 $VOLUME_IMAGEMODELSDESTDIR
 
-ONNXSCRIPT=onnx_gen.cmds
-OPENVINOSCRIPT=openvino_gen.cmds
-TORCHSCRIPT=torch_gen.cmds
-TFSCRIPT=tf_gen.cmds
-TRTSCRIPT=trt_gen.cmds
+ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
+OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
+TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
+TFSCRIPT=gen.TensorFlow.gen_qa_model_repository.cmds
+TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 
 # OPENVINO
 #
