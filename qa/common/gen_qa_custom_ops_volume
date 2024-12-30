@@ -99,25 +99,25 @@ TF_LFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get
 # No CUDA
 cd /tmp
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/zero_out_op_kernel_1.cc .
-g++ -std=${STD_FLAG} -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $VOLUME_DESTDIR/libzeroout.so \${TF_CFLAGS[@]} \${TF_LFLAGS[@]}
+g++ -std=${STD_FLAG} -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $DESTDIR/libzeroout.so \${TF_CFLAGS[@]} \${TF_LFLAGS[@]}
 
 # CUDA. Need to patch so that we can build it outside of bazel/TF
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cc .
 cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc .
 patch -i $VOLUME_SRCDIR/cuda_op_kernel.cu.cc.patch cuda_op_kernel.cu.cc
 nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
-g++ -std=${STD_FLAG} -shared -o $VOLUME_DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
+g++ -std=${STD_FLAG} -shared -o $DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 cp $VOLUME_SRCDIR/busy_op_kernel.cc .
 cp $VOLUME_SRCDIR/busy_op_kernel.cu.cc .
 nvcc --expt-relaxed-constexpr -std=${STD_FLAG} -O2 -c -arch=all -o busy_op_kernel.cu.o busy_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
-g++ -std=${STD_FLAG} -shared -o $VOLUME_DESTDIR/libbusyop.so busy_op_kernel.cc busy_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
+g++ -std=${STD_FLAG} -shared -o $DESTDIR/libbusyop.so busy_op_kernel.cc busy_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
 python3 $VOLUME_SRCDIR/gen_qa_custom_ops_models.py --graphdef --savedmodel \
-    --models_dir=$VOLUME_DESTDIR --zero_out_lib_path=$VOLUME_DESTDIR/libzeroout.so \
-    --cuda_op_lib_path=$VOLUME_DESTDIR/libcudaop.so \
-    --busy_op_lib_path=$VOLUME_DESTDIR/libbusyop.so
-chmod -R 777 $VOLUME_DESTDIR
+    --models_dir=$DESTDIR --zero_out_lib_path=$DESTDIR/libzeroout.so \
+    --cuda_op_lib_path=$DESTDIR/libcudaop.so \
+    --busy_op_lib_path=$DESTDIR/libbusyop.so
+chmod -R 777 $DESTDIR
 EOF
 
 chmod a+x $TFSCRIPT
@@ -129,7 +129,7 @@ fi
 docker cp $TFSCRIPT $DOCKER_VOLUME:$VOLUME_SRCDIR/$TFSCRIPT
 
 docker pull $TENSORFLOW_IMAGE
-docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt $TENSORFLOW_IMAGE bash -xe $VOLUME_SRCDIR/$TFSCRIPT
+docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt -e DESTDIR=$VOLUME_DESTDIR/tf_custom_ops $TENSORFLOW_IMAGE bash -xe $VOLUME_SRCDIR/$TFSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -146,9 +146,9 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
-python3 $VOLUME_SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$VOLUME_DESTDIR
-cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $VOLUME_DESTDIR/libtorch_modulo/.
-chmod -R 777 $VOLUME_DESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
+cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+chmod -R 777 $DESTDIR
 EOF
 
 chmod a+x $PYTSCRIPT
@@ -160,7 +160,7 @@ fi
 docker cp $PYTSCRIPT $DOCKER_VOLUME:$VOLUME_SRCDIR/$PYTSCRIPT
 
 docker pull $PYTORCH_IMAGE
-docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt $PYTORCH_IMAGE bash -xe $VOLUME_SRCDIR/$PYTSCRIPT
+docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt -e $VOLUME_DESTDIR/libtorch_custom_ops $PYTORCH_IMAGE bash -xe $VOLUME_SRCDIR/$PYTSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
