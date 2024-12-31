@@ -51,10 +51,14 @@ DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DO
 # Check if Docker volume exists
 ############################################################################
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
-DOCKER_VOLUME=${DOCKER_VOLUME:=volume_gen_qa_model_repositor_${CI_JOB_ID}}
+DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_tftrt_models.${CI_JOB_ID}}
+RUNNER_ID=${RUNNER_ID:=0}
+PROJECT_NAME=${PROJECT_NAME:=tritonserver}
+DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.${CI_JOB_ID}
+
 if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
-    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist.Creating... \033[0m "
-    docker volume create $DOCKER_VOLUME
+    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
+    docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
     docker volume inspect $DOCKER_VOLUME
 else
     echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
@@ -62,9 +66,24 @@ else
 fi
 
 
-docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}
-docker create --name $DOCKER_VOLUME -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE
-docker cp . $DOCKER_VOLUME:/mnt/$CI_JOB_ID/gen_srcdir
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    -v $DOCKER_VOLUME:/mnt \
+    -w /mnt/$CI_JOB_ID \
+    $UBUNTU_IMAGE \
+    mkdir -p gen_srcdir ${TRITON_VERSION}
+
+docker create \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    --name $DOCKER_VOLUME_CONTAINER \
+    -v $DOCKER_VOLUME:/mnt \
+    -w /mnt/$CI_JOB_ID \
+    $UBUNTU_IMAGE
+
+docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
 
 ###
 VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
@@ -129,10 +148,18 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker cp $TFSCRIPT $DOCKER_VOLUME:$VOLUME_SRCDIR/$TFSCRIPT
+docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR/$TFSCRIPT
 
 docker pull $TENSORFLOW_IMAGE
-docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt -e DESTDIR=$VOLUME_DESTDIR/tf_custom_ops $TENSORFLOW_IMAGE bash -xe $VOLUME_SRCDIR/$TFSCRIPT
+docker run \
+    --rm \
+    --label RUNNER_ID=$$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    -e DESTDIR=$VOLUME_DESTDIR/tf_custom_ops \
+    $TENSORFLOW_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$TFSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -160,10 +187,18 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker cp $PYTSCRIPT $DOCKER_VOLUME:$VOLUME_SRCDIR/$PYTSCRIPT
+docker cp $PYTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR/$PYTSCRIPT
 
 docker pull $PYTORCH_IMAGE
-docker run $DOCKER_GPU_ARGS --rm -v $DOCKER_VOLUME:/mnt -e DESTDIR=$VOLUME_DESTDIR/libtorch_custom_ops $PYTORCH_IMAGE bash -xe $VOLUME_SRCDIR/$PYTSCRIPT
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    -e DESTDIR=$VOLUME_DESTDIR/libtorch_custom_ops \
+    $PYTORCH_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$PYTSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -172,9 +207,10 @@ fi
 
 
 if [ -z $CI ] ; then
-    echo "Copying generated models to /tmp/"
-    docker cp $DOCKER_VOLUME:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
-    echo "Removing Docker volume $DOCKER_VOLUME"
-    docker rm -f $DOCKER_VOLUME
+    echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
+    docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
+    echo -e "\033[34m[ INFO ] - "Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
+    docker rm -f $DOCKER_VOLUME_CONTAINER
+    echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
     docker volume rm $DOCKER_VOLUME
 fi
