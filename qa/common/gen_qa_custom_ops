@@ -151,6 +151,9 @@ fi
 docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR/$TFSCRIPT
 
 docker pull $TENSORFLOW_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$$RUNNER_ID \
@@ -190,6 +193,9 @@ fi
 docker cp $PYTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR/$PYTSCRIPT
 
 docker pull $PYTORCH_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $PYTSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \

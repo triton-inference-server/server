@@ -223,6 +223,9 @@ fi
 docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
 docker pull $UBUNTU_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $OPENVINOSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \
@@ -296,6 +299,9 @@ fi
 docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
 docker pull $UBUNTU_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \
@@ -357,6 +363,9 @@ fi
 docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
 docker pull $PYTORCH_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $TORCHSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \
@@ -424,6 +433,9 @@ fi
 docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
 docker pull $TENSORFLOW_IMAGE
+
+echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
+
 docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \
@@ -504,6 +516,9 @@ fi
 if [ "$MODEL_TYPE" != "igpu" ] ; then
   docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
   docker pull $TENSORRT_IMAGE
+
+  echo -e "\033[34m[ INFO ] - Running:  $TRTSCRIPT \033[0m "
+
   docker run \
     --rm \
     --label RUNNER_ID=$RUNNER_ID \
