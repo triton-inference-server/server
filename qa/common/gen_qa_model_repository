@@ -73,7 +73,7 @@ CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 RUNNER_ID=${RUNNER_ID:=0}
 PROJECT_NAME=${CI_PROJECT_NAME:=tritonserver}
-DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.${CI_JOB_ID}
+DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 
 if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
     echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
