@@ -53,12 +53,15 @@ DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DO
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume_gen_qa_model_repositor_${CI_JOB_ID}}
 if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
-    echo "Docker volume $DOCKER_VOLUME does not exist. Creating..."
+    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist.Creating... \033[0m "
     docker volume create $DOCKER_VOLUME
+    docker volume inspect $DOCKER_VOLUME
+else
+    echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
     docker volume inspect $DOCKER_VOLUME
 fi
 
-docker rm -f $DOCKER_VOLUME
+
 docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}
 docker create --name $DOCKER_VOLUME -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE
 docker cp . $DOCKER_VOLUME:/mnt/$CI_JOB_ID/gen_srcdir
