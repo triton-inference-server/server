@@ -209,7 +209,7 @@ fi
 if [ -z $CI ] ; then
     echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
     docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
-    echo -e "\033[34m[ INFO ] - "Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
+    echo -e "\033[34m[ INFO ] - Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
     docker rm -f $DOCKER_VOLUME_CONTAINER
     echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
     docker volume rm $DOCKER_VOLUME
