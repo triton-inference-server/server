@@ -51,7 +51,7 @@ DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DO
 # Check if Docker volume exists
 ############################################################################
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
-DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_tftrt_models.${CI_JOB_ID}}
+DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_custom_ops.${CI_JOB_ID}}
 RUNNER_ID=${RUNNER_ID:=0}
 PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.${CI_JOB_ID}
