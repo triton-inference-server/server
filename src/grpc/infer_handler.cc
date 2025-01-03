@@ -741,6 +741,7 @@ ModelInferHandler::Process(
   }
 
   if (state->step_ == Steps::START) {
+    conn_cnt_.fetch_add(1);
 #ifdef TRITON_ENABLE_TRACING
     // Can't create trace as we don't know the model to be requested,
     // track timestamps in 'state'
@@ -781,6 +782,10 @@ ModelInferHandler::Process(
     state->step_ = Steps::FINISH;
   } else if (state->step_ == Steps::FINISH) {
     finished = true;
+  }
+
+  if (finished) {
+    conn_cnt_.fetch_sub(1);
   }
 
   return !finished;

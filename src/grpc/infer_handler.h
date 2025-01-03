@@ -1555,7 +1555,7 @@ class ModelInferHandler
             name, tritonserver, service, cq, max_state_bucket_count,
             restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level)
+        compression_level_(compression_level), conn_cnt_(0)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -1580,6 +1580,7 @@ class ModelInferHandler
         TRITONSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
   }
+  std::atomic<uint32_t> connection_count() { return conn_cnt_.load(); }
 
  protected:
   void StartNewRequest() override;
@@ -1596,6 +1597,8 @@ class ModelInferHandler
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+
+  std::atomic<uint32_t> conn_cnt_;
 };
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
