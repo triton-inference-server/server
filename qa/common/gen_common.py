@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 from typing import List
 
 # Common utilities for model generation scripts
@@ -168,3 +169,20 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np_dtype_string:
         return List[str]
     return None
+
+
+def openvino_save_model(model_version_dir, model):
+    import openvino as ov
+
+    # W/A for error moving to OpenVINO new APIs "Attempt to get a name for a Tensor without names".
+    # For more details, check https://github.com/triton-inference-server/openvino_backend/issues/89
+    if len(model.outputs) == 0:
+        model.outputs[0].get_tensor().set_names({"OUTPUT"})
+    else:
+        for idx, out in enumerate(model.outputs):
+            out.get_tensor().set_names({f"OUTPUT{idx}"})
+
+    os.makedirs(model_version_dir, exist_ok=True)
+    ov.serialize(
+        model, model_version_dir + "/model.xml", model_version_dir + "/model.bin"
+    )
