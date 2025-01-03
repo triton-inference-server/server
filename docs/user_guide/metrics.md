@@ -183,6 +183,15 @@ There are some places where a request would not be considered pending:
     generally brief, it will not be considered pending from Triton's
     perspective until Triton core has received the request from the frontend.
 
+#### Load Time Per-Model
+The *Model Load Duration* reflects the time to load a model from storage into GPU/CPU in seconds.
+```
+# HELP nv_model_load_duration_secs Model load time in seconds
+# TYPE nv_model_load_duration_secs gauge
+nv_model_load_duration_secs{model="input_all_optional",version="2"} 1.532738387
+nv_model_load_duration_secs{model="input_all_optional",version="1"} 11.68753265
+```
+
 ### Latencies
 
 Starting in 23.04, Triton exposes the ability to choose the types of metrics
