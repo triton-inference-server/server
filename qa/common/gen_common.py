@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,7 +29,6 @@ from typing import List
 
 # Common utilities for model generation scripts
 import numpy as np
-import openvino as ov
 
 np_dtype_string = np.dtype(object)
 
@@ -173,6 +172,8 @@ def np_to_torch_dtype(np_dtype):
 
 
 def openvino_save_model(model_version_dir, model):
+    import openvino as ov
+
     # W/A for error moving to OpenVINO new APIs "Attempt to get a name for a Tensor without names".
     # For more details, check https://github.com/triton-inference-server/openvino_backend/issues/89
     if len(model.outputs) == 0:
