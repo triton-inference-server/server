@@ -214,10 +214,10 @@ documentation](https://helm.sh/docs/using_helm/#customizing-the-chart-before-ins
 You can edit the values.yaml file directly or you can use the *--set*
 option to override a single parameter with the CLI. For example, to
 deploy a cluster with a minimum of two inference servers use *--set* to
-set the autoscaler.minReplicas parameter.
+set the autoscaling.minReplicas parameter.
 
 ```
-$ helm install example --set autoscaler.minReplicas=2 .
+$ helm install example --set autoscaling.minReplicas=2 .
 ```
 
 You can also write your own "config.yaml" file with the values you
