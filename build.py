@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1639,8 +1639,15 @@ def create_build_dockerfiles(
 ):
     if "base" in images:
         base_image = images["base"]
+        if target_platform() == "rhel":
+            print(
+                "warning: RHEL is not an officially supported target and you will probably experience errors attempting to build this container."
+            )
     elif target_platform() == "windows":
         base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
+    elif target_platform() == "rhel":
+        # Disallow RHEL target unless base image is specified
+        raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
         base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.upstream_container_version
