@@ -191,6 +191,8 @@ def visit(path):
             prefix = "# "
         elif line.startswith("// "):
             prefix = "// "
+        elif line.startswith(".. "):
+            prefix = ".. "
         elif not line.startswith(COPYRIGHT_YEAR_RE[0]):
             print(
                 "incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for "
