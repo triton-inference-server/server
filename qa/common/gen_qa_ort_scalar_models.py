@@ -124,6 +124,10 @@ if __name__ == "__main__":
     )
 
     FLAGS = parser.parse_args()
+
+    if not FLAGS.models_dir:
+        raise Exception("--models_dir is required")
+
     create_onnx_modelfile(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelconfig(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelfile(FLAGS.models_dir, shape=[1, 1], dtype=np.float32)
