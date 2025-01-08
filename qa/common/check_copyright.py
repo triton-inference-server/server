@@ -60,6 +60,8 @@ SKIP_PATHS = (
     "docs/_static/.gitattributes",
     "docs/examples/model_repository",
     "docs/examples/jetson",
+    "docs/repositories.txt",
+    "docs/exclusions.txt",
     "docker",
     "qa/common/cuda_op_kernel.cu.cc.patch",
     "qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt",
