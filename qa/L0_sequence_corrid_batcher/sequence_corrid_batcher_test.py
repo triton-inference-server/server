@@ -39,7 +39,7 @@ import numpy as np
 import sequence_util as su
 import test_util as tu
 import tritonclient.http as httpclient
-from tritonclient.utils import *
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 _test_system_shared_memory = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 _test_cuda_shared_memory = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
@@ -83,7 +83,7 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
         if dtype == "TYPE_STRING":
             return "BYTES"
         else:
-            return dtype[len("TYPE_") :]
+            return dtype.replace("TYPE_", "")
 
     def test_skip_batch(self):
         # Test model instances together are configured with
@@ -287,7 +287,7 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                         sequence_start=True,
                         sequence_end=False,
                     )
-                    result = response.get_response()
+                    response.get_response()
                     output0_data = response.as_numpy("OUTPUT0")
                     output1_data = response.as_numpy("OUTPUT1")
 
