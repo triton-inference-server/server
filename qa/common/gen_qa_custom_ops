@@ -156,7 +156,7 @@ echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
 
 docker run \
     --rm \
-    --label RUNNER_ID=$$RUNNER_ID \
+    --label RUNNER_ID=$RUNNER_ID \
     --label PROJECT_NAME=$PROJECT_NAME \
     $DOCKER_GPU_ARGS \
     -v $DOCKER_VOLUME:/mnt \
