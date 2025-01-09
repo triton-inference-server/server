@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -244,6 +244,11 @@ def tpl(path):
 @register(has_ext([".html", ".md"]))
 def html_md(path):
     update_or_add_header(path, "<!--\n" + prefix_lines(LICENSE_TEXT, "# ") + "\n-->")
+
+
+@register(has_ext([".rst"]))
+def rst(path):
+    update_or_add_header(path, prefix_lines(LICENSE_TEXT, ".. "))
 
 
 def add_copyrights(paths):
