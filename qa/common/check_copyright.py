@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -60,6 +60,8 @@ SKIP_PATHS = (
     "docs/_static/.gitattributes",
     "docs/examples/model_repository",
     "docs/examples/jetson",
+    "docs/repositories.txt",
+    "docs/exclusions.txt",
     "docker",
     "qa/common/cuda_op_kernel.cu.cc.patch",
     "qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt",
@@ -191,6 +193,8 @@ def visit(path):
             prefix = "# "
         elif line.startswith("// "):
             prefix = "// "
+        elif line.startswith(".. "):
+            prefix = ".. "
         elif not line.startswith(COPYRIGHT_YEAR_RE[0]):
             print(
                 "incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for "
