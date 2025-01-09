@@ -262,12 +262,10 @@ set +e
 # Add trace setting for 'simple' via trace API, first use the same trace file
 update_trace_setting "simple" '{"trace_file":"global_trace.log"}'
 assert_curl_failure "trace_file updated through network protocol expects an error"
+#TODO: Test Get-Response (trace_mode, ..) when trace_file update is added in the future.
 
 # Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
-if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -591,8 +589,6 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-
-RET=0
 
 set +e
 
