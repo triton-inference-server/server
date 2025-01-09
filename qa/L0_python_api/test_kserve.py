@@ -30,11 +30,20 @@ from functools import partial
 import numpy as np
 import pytest
 import testing_utils as utils
-import tritonclient.grpc as grpcclient
+
+# TODO: [DLIS-7735] Run tritonclient.grpc as a separate process
+# import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import tritonserver
 from tritonclient.utils import InferenceServerException
-from tritonfrontend import KServeGrpc, KServeHttp, Metrics
+from tritonfrontend import (
+    Feature,
+    FeatureGroup,
+    KServeGrpc,
+    KServeHttp,
+    Metrics,
+    RestrictedFeatures,
+)
 
 
 class TestHttpOptions:
@@ -108,8 +117,99 @@ class TestMetricsOptions:
             Metrics.Options(thread_count="ten")
 
 
+class TestRestrictedFeatureOptions:
+    def test_correct_parameters(self):
+        # Directly test feature groups
+        correct_feature_group = FeatureGroup(
+            key="health-key",
+            value="health-val",
+            features=[Feature.HEALTH, Feature.METADATA],
+        )
+
+        rf = RestrictedFeatures(groups=[correct_feature_group])
+
+        rf.create_feature_group(
+            key="infer-key", value="infer-val", features=Feature.INFERENCE
+        )
+
+        assert all(
+            rf.has_feature(feature)
+            for feature in [Feature.HEALTH, Feature.METADATA, Feature.INFERENCE]
+        )
+
+        feature_list = rf.get_feature_groups()
+        expected_list = [
+            FeatureGroup("health-key", "health-val", Feature.HEALTH),
+            FeatureGroup("health-key", "health-val", Feature.METADATA),
+            FeatureGroup("infer-key", "infer-val", Feature.INFERENCE),
+        ]
+
+        # 3 groups: 1 for each Feature.
+        assert len(feature_list) == 3
+
+        # Converting FeatureGroup->str and sorting to not have to account for order.
+        feature_str_repr = lambda feature_groups: sorted(
+            repr(group) for group in feature_groups
+        )
+
+        assert feature_str_repr(expected_list) == feature_str_repr(feature_list)
+
+        # Updating Feature.METADATA with new (key, value) pair
+        rf.update_feature_group(Feature.METADATA, "metadata-key", "metadata-val")
+        expected_list[1] = FeatureGroup(
+            "metadata-key", "metadata-val", Feature.METADATA
+        )
+
+        assert len(feature_list) == 3
+        assert feature_str_repr(expected_list) == feature_str_repr(feature_list)
+
+        rf.remove_features(Feature.INFERENCE)
+        assert len(rf.get_feature_groups()) == 2
+        assert not rf.has_feature(Feature.INFERENCE)
+
+        rf.remove_features(Feature.HEALTH)
+        assert len(rf.get_feature_groups()) == 1
+        assert not rf.has_feature(Feature.HEALTH) and rf.has_feature(Feature.METADATA)
+
+    def test_wrong_rf_parameters(self):
+        rf = RestrictedFeatures()
+        # Features List needs to be an element from tritonfrontend.Feature
+        with pytest.raises(tritonserver.InvalidArgumentError):
+            rf.create_feature_group(key="", value="", features=["health"])
+
+        # key and value need to be of type string
+        with pytest.raises(Exception):
+            rf.create_feature_group(
+                key=42, value="Secret to the Universe", features=[Feature.HEALTH]
+            )
+        with pytest.raises(Exception):
+            rf.create_feature_group(key="", value=123, features=[Feature.HEALTH])
+
+        # Test collision of Features among individual Feature Groups
+        with pytest.raises(
+            tritonserver.InvalidArgumentError,
+            match="A given feature can only belong to one "
+            "group. Feature.HEALTH already belongs to an existing group.",
+        ):
+            feature_group = FeatureGroup(
+                key="key", value="val", features=[Feature.METADATA, Feature.HEALTH]
+            )
+
+            rf = RestrictedFeatures(groups=[feature_group])
+            rf.create_feature_group(key="key2", value="val", features=[Feature.HEALTH])
+
+        with pytest.raises(
+            tritonserver.InvalidArgumentError,
+            match="not present in any of the FeatureGroups for "
+            "the RestrictedFeatures object and therefore cannot be removed.",
+        ):
+            rf = RestrictedFeatures()
+            rf.remove_features(Feature.HEALTH)
+
+
 HTTP_ARGS = (KServeHttp, httpclient, "localhost:8000")  # Default HTTP args
-GRPC_ARGS = (KServeGrpc, grpcclient, "localhost:8001")  # Default GRPC args
+# TODO: [DLIS-7735] Run tritonclient.grpc as separate process
+GRPC_ARGS = (KServeGrpc, None, "localhost:8001")  # Default GRPC args
 METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 
 
@@ -251,6 +351,7 @@ class TestKServe:
     def test_grpc_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
         grpc_service = utils.setup_service(server, frontend)
+        # TODO: [DLIS-7735] Run tritonclient.grpc as a separate process
         grpc_client = grpcclient.InferenceServerClient(url=url)
         user_data = []
 
@@ -302,6 +403,34 @@ class TestKServe:
         utils.teardown_client(grpc_client)
         utils.teardown_server(server)
 
+    # KNOWN ISSUE: CAUSES SEGFAULT
+    # Created  [DLIS-7231] to address at future date
+    # Once the server has been stopped, the underlying TRITONSERVER_Server instance
+    # is deleted. However, the frontend does not know the server instance
+    # is no longer valid.
+    # def test_inference_after_server_stop(self):
+    #     server = utils.setup_server()
+    #     http_service = utils.setup_service(server, KServeHttp)
+    #     http_client = setup_client(httpclient, url="localhost:8000")
+
+    #     teardown_server(server) # Server has been stopped
+
+    #     model_name = "identity"
+    #     input_data = np.array([["testing"]], dtype=object)
+    #     # Create input and output objects
+    #     inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
+    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+
+    #     # Set the data for the input tensor
+    #     inputs[0].set_data_from_numpy(input_data)
+
+    #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+
+    #     utils.teardown_client(http_client)
+    #     utils.teardown_service(http_service)
+
+
+class TestMetrics:
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_default_port(self, frontend, url):
         server = utils.setup_server()
@@ -330,10 +459,10 @@ class TestKServe:
 
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
-        # Setup Server, KServeGrpc, Metrics
+        # Setup Server, KServeHttp, Metrics
         server = utils.setup_server()
-        grpc_service = utils.setup_service(
-            server, KServeGrpc
+        http_service = utils.setup_service(
+            server, KServeHttp
         )  # Needed to send inference request
         metrics_service = utils.setup_service(server, frontend)
 
@@ -344,7 +473,7 @@ class TestKServe:
         assert before_status_code == 200 and before_inference_count == 0
 
         # Send 1 Inference Request with send_and_test_inference()
-        assert utils.send_and_test_inference_identity(GRPC_ARGS[1], GRPC_ARGS[2])
+        assert utils.send_and_test_inference_identity(HTTP_ARGS[1], HTTP_ARGS[2])
 
         # Get Metrics and verify inference count == 1 after inference
         after_status_code, after_inference_count = utils.get_metrics(
@@ -352,33 +481,110 @@ class TestKServe:
         )
         assert after_status_code == 200 and after_inference_count == 1
 
-        # Teardown Metrics, GrpcService, Server
-        utils.teardown_service(grpc_service)
+        # Teardown Metrics, HttpService, Server
+        utils.teardown_service(http_service)
         utils.teardown_service(metrics_service)
         utils.teardown_server(server)
 
-    # KNOWN ISSUE: CAUSES SEGFAULT
-    # Created  [DLIS-7231] to address at future date
-    # Once the server has been stopped, the underlying TRITONSERVER_Server instance
-    # is deleted. However, the frontend does not know the server instance
-    # is no longer valid.
-    # def test_inference_after_server_stop(self):
-    #     server = utils.setup_server()
-    #     http_service = utils.setup_service(server, KServeHttp)
-    #     http_client = setup_client(httpclient, url="localhost:8000")
 
-    #     teardown_server(server) # Server has been stopped
+class TestRestrictedFeatures:
+    @pytest.mark.parametrize(
+        "frontend, client_type, url, key_prefix",
+        [HTTP_ARGS + ("",), GRPC_ARGS + ("triton-grpc-protocol-",)],
+    )
+    def test_restrict_inference(self, frontend, client_type, url, key_prefix):
+        server = utils.setup_server()
 
-    #     model_name = "identity"
-    #     input_data = np.array([["testing"]], dtype=object)
-    #     # Create input and output objects
-    #     inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]
-    #     outputs = [httpclient.InferRequestedOutput("OUTPUT0")]
+        # Specifying restricted features that restricts inference.
+        infer_key, infer_value = "infer-key", "infer-value"
 
-    #     # Set the data for the input tensor
-    #     inputs[0].set_data_from_numpy(input_data)
+        rf = RestrictedFeatures()
+        rf.create_feature_group(
+            key=infer_key,
+            value=infer_value,
+            features=[Feature.INFERENCE],
+        )
 
-    #     results = http_client.infer(model_name, inputs=inputs, outputs=outputs)
+        options = frontend.Options(restricted_features=rf)
+        service = utils.setup_service(server, frontend, options=options)
 
-    #     utils.teardown_client(http_client)
-    #     utils.teardown_service(http_service)
+        # Valid headers sent with inference request
+        headers = {key_prefix + "infer-key": "infer-value"}
+        assert utils.send_and_test_inference_identity(client_type, url, headers)
+
+        # Combinations of Invalid (or no) headers sent with inference request
+        invalid_key_value = {key_prefix + "fake-key": "fake-value"}
+        invalid_value = {key_prefix + infer_key: "fake-value"}
+        error_msg = f"expecting header '{key_prefix}infer-key'"
+
+        for header, err_msg in [
+            (invalid_key_value, error_msg),
+            (invalid_value, error_msg),
+            (None, error_msg),
+        ]:
+            with pytest.raises(
+                InferenceServerException,
+                match=err_msg,
+            ):
+                utils.send_and_test_inference_identity(client_type, url, header)
+
+        utils.teardown_service(service)
+        utils.teardown_server(server)
+
+    @pytest.mark.parametrize(
+        "frontend, client_type, url, key_prefix",
+        [HTTP_ARGS + ("",), GRPC_ARGS + ("triton-grpc-protocol-",)],
+    )
+    def test_multiple_groups(self, frontend, client_type, url, key_prefix):
+        server = utils.setup_server()
+
+        # Credentials used to restrict/access Triton Features.
+        model_repo_key, model_repo_val = "repo-key", "repo-value"
+        infer_key, infer_val = "infer-key", "infer-value"
+
+        # Specifying restricted feature that restricts multiple groups
+        rf = RestrictedFeatures()
+        rf.create_feature_group(
+            key=model_repo_key,
+            value=model_repo_val,
+            features=[Feature.MODEL_REPOSITORY],
+        )
+        rf.create_feature_group(
+            key=infer_key, value=infer_val, features=[Feature.INFERENCE]
+        )
+
+        options = frontend.Options(restricted_features=rf)
+        service = utils.setup_service(server, frontend, options=options)
+        client = utils.setup_client(client_type, url=url)
+
+        # Testing if Feature.MODEL_REPOSITORY is restricted correctly
+        model_config_header = {key_prefix + model_repo_key: model_repo_val}
+
+        model_repo_index = client.get_model_repository_index(
+            headers=model_config_header
+        )
+        model_repo_contents = str(model_repo_index)
+        assert "delayed_identity" in model_repo_contents
+
+        with pytest.raises(
+            InferenceServerException,
+            match=f"expecting header '{key_prefix}{model_repo_key}'",
+        ):
+            client.get_model_repository_index(headers={"fake-key": "fake-value"})
+
+        # Testing if Feature.INFERENCE is restricted correctly
+        infer_header = {key_prefix + infer_key: infer_val}
+
+        assert utils.send_and_test_inference_identity(client_type, url, infer_header)
+
+        with pytest.raises(
+            InferenceServerException,
+            match=f"expecting header '{key_prefix}{infer_key}'",
+        ):
+            utils.send_and_test_inference_identity(
+                client_type, url, {"fake-key": "fake-value"}
+            )
+
+        utils.teardown_client(client)
+        utils.teardown_service(service)
+        utils.teardown_server(server)

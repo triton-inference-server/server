@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+from functools import wraps
 
 import tritonserver
 from tritonfrontend._c.tritonfrontend_bindings import (
@@ -52,9 +53,10 @@ ERROR_MAPPING = {
 
 
 def handle_triton_error(func):
+    @wraps(func)  # Retains the original function's signature.
     def error_handling_wrapper(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         except TritonError:
             exc_type, exc_value, _ = sys.exc_info()
             # raise ... from None masks the tritonfrontend Error from being added in traceback

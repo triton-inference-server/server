@@ -23,28 +23,19 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import triton_python_backend_utils as pb_utils
 
-# triton/server/src/python/tritonfrontend/__init__.py
 
-import builtins
-from importlib.metadata import PackageNotFoundError, version
+class TritonPythonModel:
+    """An identity model that returns the input tensor as output."""
 
-from tritonfrontend._api import Feature, FeatureGroup, RestrictedFeatures
+    def initialize(self, args):
+        pass
 
-try:
-    from tritonfrontend._api import KServeHttp
-except ImportError:
-    # TRITON_ENABLE_HTTP=OFF
-    pass
-
-try:
-    from tritonfrontend._api import KServeGrpc
-except ImportError:
-    # TRITON_ENABLE_GRPC=OFF
-    pass
-
-try:
-    from tritonfrontend._api import Metrics
-except ImportError:
-    # TRITON_ENABLE_METRICS=OFF
-    pass
+    def execute(self, requests):
+        responses = []
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", in_0.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+        return responses

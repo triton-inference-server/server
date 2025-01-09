@@ -60,7 +60,7 @@ def main():
         client = httpclient.InferenceServerClient(url=url)
 
         # Prepare input data
-        input_data = np.array([["Roger Roger"]], dtype=object)
+        input_data = np.array(["Roger Roger"], dtype=object)
 
         # Create input and output objects
         inputs = [httpclient.InferInput("INPUT0", input_data.shape, "BYTES")]

@@ -99,6 +99,7 @@ def send_and_test_inference_identity(
         "tritonclient.grpc.InferenceServerClient",
     ],
     url: str,
+    headers=None,
 ) -> bool:
     """
     Sends an inference request to the model at test_model_repository/identity
@@ -115,7 +116,9 @@ def send_and_test_inference_identity(
     inputs[0].set_data_from_numpy(input_data)
 
     # Perform inference request
-    results = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
+    results = client.infer(
+        model_name=model_name, inputs=inputs, outputs=outputs, headers=headers
+    )
 
     output_data = results.as_numpy("OUTPUT0")  # Gather output data
 
