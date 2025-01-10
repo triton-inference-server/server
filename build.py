@@ -1870,7 +1870,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             os.path.join(FLAGS.build_dir, "Dockerfile"),
             ".",
         ]
-
+        log('Docker build command for vLLM is: "{}"'.format(finalargs))
         docker_script.cwd(THIS_SCRIPT_DIR)
         docker_script.cmd(finalargs, check_exitcode=True)
 
