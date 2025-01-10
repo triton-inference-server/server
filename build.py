@@ -1481,7 +1481,7 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
         && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
         && rm /tmp/pytorch_triton-*.whl; \\
     else \\
-    # public vLLM needed for vLLM backend
+        # public vLLM needed for vLLM backend
         pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP[FLAGS.version][6]}; \\
     fi
 
