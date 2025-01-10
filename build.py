@@ -2750,6 +2750,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
+    if FLAGS.build_secret is None:
+        FLAGS.build_secret = []
 
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
