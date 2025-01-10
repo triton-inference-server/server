@@ -500,9 +500,14 @@ chmod -R 777 $VOLUME_FORMATDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
-(git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git && \
-cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.)
+if [ -d "/usr/src/tensorrt" ]; then
+    cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
+else
+    git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
+    cd /workspace/TensorRT/samples/python/onnx_custom_plugin
+fi
+rm -rf build && mkdir build && \
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
 LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
 chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
