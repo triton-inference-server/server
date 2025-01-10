@@ -53,6 +53,7 @@ def save_model(
     triton_model_path,
     path,
     mlflow_model=None,
+    signature=None,
 ):
     """
     Save an Triton model to a path on the local file system.
@@ -60,6 +61,7 @@ def save_model(
     :param triton_model_path: File path to Triton model to be saved.
     :param path: Local path where the model is to be saved.
     :param mlflow_model: :py:mod:`mlflow.models.Model` this flavor is being added to.
+    :param signature: Schema definition of model input and output.
 
     """
 
@@ -77,6 +79,7 @@ def save_model(
     # Save Triton model
     shutil.copytree(triton_model_path, model_data_path)
 
+    mlflow_model.signature = signature
     mlflow_model.add_flavor(FLAVOR_NAME, data=model_data_subpath)
     mlflow_model.save(os.path.join(path, MLMODEL_FILE_NAME))
 
@@ -87,6 +90,7 @@ def log_model(
     artifact_path,
     registered_model_name=None,
     await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
+    signature=None,
 ):
     """
     Log an Triton model as an MLflow artifact for the current run.
@@ -100,6 +104,7 @@ def log_model(
     :param await_registration_for: Number of seconds to wait for the model version to finish
                             being created and is in ``READY`` status. By default, the function
                             waits for five minutes. Specify 0 or None to skip waiting.
+    :param signature: Schema definition of model input and output.
 
     """
     Model.log(
@@ -108,4 +113,5 @@ def log_model(
         triton_model_path=triton_model_path,
         registered_model_name=registered_model_name,
         await_registration_for=await_registration_for,
+        signature=signature,
     )
