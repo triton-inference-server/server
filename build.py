@@ -1482,7 +1482,7 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
         && rm /tmp/pytorch_triton-*.whl; \\
     else \\
     # public vLLM needed for vLLM backend
-    pip3 install vllm=={TRITON_VERSION_MAP[FLAGS.version][6]}; \\
+        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP[FLAGS.version][6]}; \\
     fi
 
 ARG PYVER=3.12
