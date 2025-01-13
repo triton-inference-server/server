@@ -53,6 +53,7 @@ if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/HardmaxPlugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+    TEST_WINDOWS=1
 else
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=`pwd`/models}
@@ -135,7 +136,8 @@ SERVER_LD_PRELOAD=$CUSTOMPLUGIN
 SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
-if  [[ ! -v WSL_DISTRO_NAME ]] || [[ ! -v MSYSTEM ]]; then
+# Skip test for Windows
+if  [ $TEST_WINDOWS -eq 0 ]; then
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

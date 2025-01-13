@@ -118,7 +118,7 @@ if (NOT WIN32)
 endif()
 
 target_compile_features(main PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+if(WIN32)
   message("Using MSVC as compiler, default target on Windows 10. "
     "If the target system is not Windows 10, please update _WIN32_WINNT "
     "to corresponding value.")
@@ -130,13 +130,30 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   target_compile_definitions(main
     PRIVATE
       NOMINMAX)
+
+  # Dependency from common.h
+  find_library(B64_LIBRARY NAMES b64)
+  target_link_libraries(
+    main
+    PRIVATE
+      ${B64_LIBRARY}
+  )
+
 else()
+
   target_compile_options(
     main
     PRIVATE
       -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
   )
-endif()
+
+  # Dependency from common.h
+  target_link_libraries(
+    main
+    PRIVATE
+      b64
+  )
+  endif()
 
 set(LIB_DIR "lib")
 if(LINUX)

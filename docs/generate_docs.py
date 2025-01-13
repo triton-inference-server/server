@@ -34,8 +34,6 @@ import subprocess
 from collections import defaultdict
 from functools import partial
 
-from conf import exclude_patterns
-
 # Global constants
 server_abspath = os.environ.get("SERVER_ABSPATH", os.getcwd())
 server_docs_abspath = os.path.join(server_abspath, "docs")
@@ -65,13 +63,20 @@ triton_github_url_reg = re.compile(
 # Hyperlink in a .md file, excluding embedded images.
 hyperlink_reg = re.compile(r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))")
 
+exclusions = None
+with open(f"{server_docs_abspath}/exclusions.txt", "r") as f:
+    exclusions = f.read()
+    f.close()
+exclude_patterns = exclusions.strip().split("\n")
+
 # Parser
 parser = argparse.ArgumentParser(description="Process some arguments.")
+parser.add_argument("--repo-tag", type=str, help="Repository tags in format value")
 parser.add_argument(
-    "--repo-tag", action="append", help="Repository tags in format key:value"
-)
-parser.add_argument(
-    "--backend", action="append", help="Repository tags in format key:value"
+    "--repo-file",
+    default="repositories.txt",
+    help="File which lists the repositories to add. File should be"
+    " one repository name per line, newline separated.",
 )
 parser.add_argument("--github-organization", help="GitHub organization name")
 
@@ -141,7 +146,7 @@ def clone_from_github(repo, tag, org):
             "git",
             "clone",
             "--branch",
-            tag[0],
+            tag,
             "--single-branch",
             repo_url,
         ]
@@ -153,14 +158,6 @@ def clone_from_github(repo, tag, org):
         log_message(f"Successfully cloned {repo}")
     except subprocess.CalledProcessError as e:
         raise (e)
-
-
-def parse_repo_tag(repo_tags):
-    repo_dict = defaultdict(list)
-    for tag in repo_tags:
-        key, value = tag.split(":", 1)
-        repo_dict[key].append(value)
-    return dict(repo_dict)
 
 
 def is_excluded(file_path):
@@ -373,52 +370,31 @@ def preprocess_docs(exclude_paths=[]):
 
 def main():
     args = parser.parse_args()
-    repo_tags = parse_repo_tag(args.repo_tag) if args.repo_tag else {}
-    backend_tags = parse_repo_tag(args.backend) if args.backend else {}
+    repo_tag = args.repo_tag
+    repository_filename = args.repo_file
     github_org = args.github_organization
 
     # Change working directory to server/docs.
     os.chdir(server_docs_abspath)
     run_command("make clean")
 
-    # Usage generate_docs.py --repo-tag=client:main
-    if "client" in repo_tags:
-        clone_from_github("client", repo_tags["client"], github_org)
+    repositories = ""
+    with open(repository_filename, "r") as f:
+        repositories = f.read()
+        f.close()
 
-    # Usage generate_docs.py --repo-tag=perf_analyzer:main
-    if "perf_analyzer" in repo_tags:
-        clone_from_github("perf_analyzer", repo_tags["perf_analyzer"], github_org)
-
-    # Usage generate_docs.py --repo-tag=python_backend:main
-    if "python_backend" in repo_tags:
-        clone_from_github("python_backend", repo_tags["python_backend"], github_org)
-
-    # Usage generate_docs.py --repo-tag=tensorrtllm_backend:main
-    if "tensorrtllm_backend" in repo_tags:
-        clone_from_github(
-            "tensorrtllm_backend", repo_tags["tensorrtllm_backend"], github_org
-        )
-
-    # Usage generate_docs.py --backend-tag=custom_backend:main
-    # Custom backend can be anything currently empty
-    if "custom_backend" in backend_tags:
-        clone_from_github("custom_backend", backend_tags["custom_backend"], github_org)
+    repository_list = repositories.strip().split("\n")
+    for repository in repository_list:
+        run_command(f"rm -rf {repository}")
+        clone_from_github(repository, repo_tag, github_org)
 
     # Preprocess documents in server_docs_abspath after all repos are cloned.
     preprocess_docs()
     run_command("make html")
 
     # Clean up working directory.
-    if "client" in repo_tags:
-        run_command("rm -rf client")
-    if "python_backend" in repo_tags:
-        run_command("rm -rf python_backend")
-    if "custom_backend" in backend_tags:
-        run_command("rm -rf custom_backend")
-    if "tensorrtllm_backend" in repo_tags:
-        run_command("rm -rf tensorrtllm_backend")
-    if "perf_analyzer" in repo_tags:
-        run_command("rm -rf perf_analyzer")
+    for repository in repository_list:
+        run_command(f"rm -rf {repository}")
 
     # Return to previous working directory server/.
     os.chdir(server_abspath)

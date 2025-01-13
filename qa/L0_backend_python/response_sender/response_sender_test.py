@@ -24,11 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
+
+# By default, find tritonserver on "localhost", but for windows tests
+# we overwrite the IP address with the TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class ResponseSenderTest(unittest.TestCase):
@@ -148,7 +153,7 @@ class ResponseSenderTest(unittest.TestCase):
 
     def _infer_parallel(self, model_name, parallel_inputs):
         callback, responses = self._generate_streaming_callback_and_responses_pair()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
+        with grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001") as client:
             client.start_stream(callback)
             for inputs in parallel_inputs:
                 client.async_stream_infer(model_name, inputs)
