@@ -44,9 +44,11 @@ PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 def get_trt_plugin(plugin_name):
     plugin = None
     field_collection = None
+    print(PLUGIN_CREATORS)
     for plugin_creator in PLUGIN_CREATORS:
-        if (plugin_creator.name == "CustomHardmax") and (
-            plugin_name == "CustomHardmax"
+        print("Plugin name is ", plugin_creator.name, plugin_name)
+        if (plugin_creator.name == "customHardmaxPlugin") and (
+            plugin_name == "customHardmaxPlugin"
         ):
             axis_attr = trt.PluginField(
                 "axis", np.array([0]), type=trt.PluginFieldType.INT32
@@ -233,7 +235,7 @@ def create_plugin_models(models_dir):
         models_dir,
         8,
         model_version,
-        "CustomHardmax",
+        "customHardmaxPlugin",
         (2, 2),
         (2, 2),
         np.float32,
@@ -243,7 +245,7 @@ def create_plugin_models(models_dir):
         models_dir,
         8,
         model_version,
-        "CustomHardmax",
+        "customHardmaxPlugin",
         (2, 2),
         (2, 2),
         np.float32,
@@ -254,7 +256,7 @@ def create_plugin_models(models_dir):
         models_dir,
         0,
         model_version,
-        "CustomHardmax",
+        "customHardmaxPlugin",
         (16, 1, 1),
         (16, 1, 1),
         np.float32,
@@ -264,7 +266,7 @@ def create_plugin_models(models_dir):
         models_dir,
         0,
         model_version,
-        "CustomHardmax",
+        "customHardmaxPlugin",
         (16, 1, 1),
         (16, 1, 1),
         np.float32,
