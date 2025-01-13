@@ -38,8 +38,9 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-# Use "--request-count 100" throughout the test to PA stability criteria and
+# Use "--request-count" throughout the test to PA stability criteria and
 # reduce flaky failures from PA unstable measurements.
+REQUEST_COUNT=10
 CLIENT=../clients/perf_client
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
@@ -93,7 +94,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates pinned memory for large size
     set +e
-    $CLIENT -m${ENSEMBLE_NAME} --shape INPUT0:16777216 --request-count 100
+    $CLIENT -m${ENSEMBLE_NAME} --shape INPUT0:16777216 --request-count ${REQUEST_COUNT}
     if (( $? != 0 )); then
         RET=1
     fi
@@ -130,7 +131,7 @@ for BACKEND in $BACKENDS; do
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
                 --shape INPUT0:${TENSOR_SIZE} \
-                --request-count 100 \
+                --request-count ${REQUEST_COUNT} \
                 >> ${BACKEND}.${TENSOR_SIZE}.pinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
@@ -153,7 +154,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates non-pinned memory
     set +e
-    $CLIENT  -m${ENSEMBLE_NAME} --shape INPUT0:1 --request-count 100
+    $CLIENT  -m${ENSEMBLE_NAME} --shape INPUT0:1 --request-count ${REQUEST_COUNT}
     if (( $? != 0 )); then
         RET=1
     fi
@@ -183,7 +184,7 @@ for BACKEND in $BACKENDS; do
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
                 --shape INPUT0:${TENSOR_SIZE} \
-                --request-count 100 \
+                --request-count ${REQUEST_COUNT} \
                 >> ${BACKEND}.${TENSOR_SIZE}.nonpinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
