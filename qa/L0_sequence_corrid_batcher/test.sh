@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -116,6 +116,59 @@ for model_trial in 4; do
 
         unset TRITONSERVER_DELAY_SCHEDULER
         unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
+done
+
+# Test correlation ID data type
+mkdir -p corrid_data_type/add_sub/1
+cp ../python_models/add_sub/model.py corrid_data_type/add_sub/1
+
+for corrid_data_type in TYPE_STRING TYPE_UINT32 TYPE_INT32 TYPE_UINT64 TYPE_INT64; do
+    (cd corrid_data_type/add_sub && \
+    cp ../../../python_models/add_sub/config.pbtxt . && \
+    echo "sequence_batching { \
+        control_input [{ \
+            name: \"CORRID\" \
+            control [{ \
+            kind: CONTROL_SEQUENCE_CORRID \
+            data_type: $corrid_data_type \
+            }]
+        }] \
+        }" >> config.pbtxt)
+    MODEL_DIR=corrid_data_type
+
+    for i in test_corrid_data_type ; do
+        export TRITONSERVER_CORRID_DATA_TYPE=$corrid_data_type
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+        SERVER_LOG="./$i.$MODEL_DIR.server.log"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+
+        set +e
+        python $BATCHER_TEST SequenceCorrIDBatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
+            RET=1
+        else
+            check_test_results $TEST_RESULT_FILE 1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+            fi
+        fi
+        set -e
+
+        unset TRITONSERVER_CORRID_DATA_TYPE
         kill $SERVER_PID
         wait $SERVER_PID
     done

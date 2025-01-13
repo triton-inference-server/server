@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,8 @@ import unittest
 import numpy as np
 import sequence_util as su
 import test_util as tu
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException, np_to_triton_dtype
 
 _test_system_shared_memory = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 _test_cuda_shared_memory = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
@@ -76,6 +78,12 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                 if "end" in flag_str:
                     expected_result += corrid
         return expected_result
+
+    def data_type_to_string(self, dtype):
+        if dtype == "TYPE_STRING":
+            return "BYTES"
+        else:
+            return dtype.replace("TYPE_", "")
 
     def test_skip_batch(self):
         # Test model instances together are configured with
@@ -220,6 +228,78 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
                     self.cleanup_shm_regions(precreated_shm3_handles)
+
+    def test_corrid_data_type(self):
+        model_name = "add_sub"
+        expected_corrid_dtype = os.environ["TRITONSERVER_CORRID_DATA_TYPE"]
+
+        for corrid, corrid_dtype in [("corrid", "TYPE_STRING"), (123, "TYPE_UINT64")]:
+            # Check if the corrid data type matches the expected corrid data type specified in the model config
+            dtypes_match = True
+            if (corrid_dtype == "TYPE_STRING") and (
+                expected_corrid_dtype != "TYPE_STRING"
+            ):
+                dtypes_match = False
+            elif (corrid_dtype == "TYPE_UINT64") and (
+                expected_corrid_dtype
+                not in ["TYPE_UINT32", "TYPE_INT32", "TYPE_UINT64", "TYPE_INT64"]
+            ):
+                dtypes_match = False
+
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input0_data = np.random.rand(16).astype(np.float32)
+                input1_data = np.random.rand(16).astype(np.float32)
+                inputs = [
+                    httpclient.InferInput(
+                        "INPUT0",
+                        input0_data.shape,
+                        np_to_triton_dtype(input0_data.dtype),
+                    ),
+                    httpclient.InferInput(
+                        "INPUT1",
+                        input1_data.shape,
+                        np_to_triton_dtype(input1_data.dtype),
+                    ),
+                ]
+
+                inputs[0].set_data_from_numpy(input0_data)
+                inputs[1].set_data_from_numpy(input1_data)
+
+                if not dtypes_match:
+                    with self.assertRaises(InferenceServerException) as e:
+                        client.infer(
+                            model_name,
+                            inputs,
+                            sequence_id=corrid,
+                            sequence_start=True,
+                            sequence_end=False,
+                        )
+                    err_str = str(e.exception)
+                    self.assertIn(
+                        f"sequence batching control 'CORRID' data-type is '{self.data_type_to_string(corrid_dtype)}', but model '{model_name}' expects '{self.data_type_to_string(expected_corrid_dtype)}'",
+                        err_str,
+                    )
+                else:
+                    response = client.infer(
+                        model_name,
+                        inputs,
+                        sequence_id=corrid,
+                        sequence_start=True,
+                        sequence_end=False,
+                    )
+                    response.get_response()
+                    output0_data = response.as_numpy("OUTPUT0")
+                    output1_data = response.as_numpy("OUTPUT1")
+
+                    self.assertTrue(
+                        np.allclose(input0_data + input1_data, output0_data),
+                        "add_sub example error: incorrect sum",
+                    )
+
+                    self.assertTrue(
+                        np.allclose(input0_data - input1_data, output1_data),
+                        "add_sub example error: incorrect difference",
+                    )
 
 
 if __name__ == "__main__":

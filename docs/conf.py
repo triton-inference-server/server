@@ -177,7 +177,7 @@ html_theme_options = {
     "switcher": {
         # use for local testing
         # "json_url": "http://localhost:8000/_static/switcher.json",
-        "json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/_static/switcher.json",
+        "json_url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/_static/switcher.json",
         "version_match": one_before if "dev" in version_long else version_short,
     },
     "navbar_start": ["navbar-logo", "version-switcher"],
