@@ -507,7 +507,7 @@ else
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.
 LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
 chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
