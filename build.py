@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.53.0dev",
-    "triton_container_version": "24.12dev",
-    "upstream_container_version": "24.11",
-    "ort_version": "1.19.2",
+    "release_version": "2.54.0dev",
+    "triton_container_version": "24.01dev",
+    "upstream_container_version": "24.12",
+    "ort_version": "1.20.1",
     "ort_openvino_version": "2024.4.0",
     "standalone_openvino_version": "2024.4.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.5.5",
+    "vllm_version": "0.6.3.post1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -986,6 +986,7 @@ RUN yum install -y \\
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          build \\
           wheel \\
           setuptools \\
           docker \\
@@ -1105,6 +1106,7 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          build \\
           docker \\
           virtualenv
 
@@ -1235,6 +1237,8 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+
+RUN pip3 install -r python/openai/requirements.txt
 
 """
     if not FLAGS.no_core_build:
@@ -1930,6 +1934,10 @@ def core_build(
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "include", "triton", "core"),
         os.path.join(install_dir, "include", "triton", "core"),
+    )
+
+    cmake_script.cpdir(
+        os.path.join(repo_dir, "python", "openai"), os.path.join(install_dir, "python")
     )
 
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
