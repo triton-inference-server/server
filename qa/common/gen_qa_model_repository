@@ -56,7 +56,6 @@ ONNX_OPSET=0
 
 # OPENVINO version
 OPENVINO_VERSION=2024.5.0
-OPENVINO_VERSION=2024.5.0
 
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
@@ -132,114 +131,7 @@ VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_va
 VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
-############################################################################
-# Check if Docker volume exists
-############################################################################
-CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
-DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
-RUNNER_ID=${RUNNER_ID:=0}
-PROJECT_NAME=${CI_PROJECT_NAME:=tritonserver}
-DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 
-if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
-    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
-    docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
-    docker volume inspect $DOCKER_VOLUME
-else
-    echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
-    docker volume inspect $DOCKER_VOLUME
-fi
-
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE \
-    mkdir -p gen_srcdir ${TRITON_VERSION}
-
-docker create \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    --name $DOCKER_VOLUME_CONTAINER \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE
-
-docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
-
-VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
-VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
-VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
-VOLUME_VARDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
-VOLUME_IDENTITYDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_SIGDEFDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
-VOLUME_IDENTITYBIGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_TFPARAMETERSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
-VOLUME_SHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-VOLUME_RESHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-VOLUME_SEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-VOLUME_DYNASEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-VOLUME_DYNASEQIMPLICITDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-VOLUME_VARSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-VOLUME_ENSEMBLEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-VOLUME_NOSHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-VOLUME_PLGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-VOLUME_RAGGEDDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-VOLUME_FORMATDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-VOLUME_DATADEPENDENTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-VOLUME_IMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-VOLUME_VARIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
-VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
-VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
-
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE \
-    mkdir -p \
-        $VOLUME_BUILD_DIR \
-        $VOLUME_SRCDIR \
-        $VOLUME_DESTDIR \
-        $VOLUME_VARDESTDIR \
-        $VOLUME_IDENTITYDESTDIR \
-        $VOLUME_SIGDEFDESTDIR \
-        $VOLUME_IDENTITYBIGDESTDIR \
-        $VOLUME_TFPARAMETERSDESTDIR \
-        $VOLUME_SHAPEDESTDIR \
-        $VOLUME_RESHAPEDESTDIR \
-        $VOLUME_SEQDESTDIR \
-        $VOLUME_DYNASEQDESTDIR \
-        $VOLUME_DYNASEQIMPLICITDESTDIR \
-        $VOLUME_VARSEQDESTDIR \
-        $VOLUME_ENSEMBLEDESTDIR \
-        $VOLUME_NOSHAPEDESTDIR \
-        $VOLUME_PLGDESTDIR \
-        $VOLUME_RAGGEDDESTDIR \
-        $VOLUME_FORMATDESTDIR \
-        $VOLUME_DATADEPENDENTDIR \
-        $VOLUME_IMPLICITSEQDESTDIR \
-        $VOLUME_VARIMPLICITSEQDESTDIR \
-        $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_TORCHTRTDESTDIR \
-        $VOLUME_SCALARMODELSDESTDIR \
-        $VOLUME_IMAGEMODELSDESTDIR
-
-ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
-OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
-TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
-TFSCRIPT=gen.TensorFlow.gen_qa_model_repository.cmds
-TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 
 docker run \
     --rm \
@@ -289,7 +181,6 @@ TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 if [[ "aarch64" != $(uname -m) ]] ; then
 
 cat > $OPENVINOSCRIPT <<EOF
-cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -321,19 +212,8 @@ chmod -R 777 $VOLUME_RESHAPEDESTDIR
 # chmod -R 777 $SVOLUME_EQDESTDIR
 # python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
 # chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --openvino --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --openvino --models_dir=$VOLUME_IDENTITYDESTDIR
-# chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --openvino --models_dir=$VOLUME_SEQDESTDIR
-# chmod -R 777 $SVOLUME_EQDESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
-# chmod -R 777 $VOLUME_DYNASEQDESTDIR
 EOF
 
-chmod a+x $OPENVINOSCRIPT
 chmod a+x $OPENVINOSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
@@ -342,21 +222,7 @@ fi
 
 docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
 docker pull $UBUNTU_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $OPENVINOSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $UBUNTU_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$OPENVINOSCRIPT
-
 
 echo -e "\033[34m[ INFO ] - Running:  $OPENVINOSCRIPT \033[0m "
 
@@ -377,7 +243,6 @@ fi
 fi # [[ "aarch64" != $(uname -m) ]]
 
 # ONNX
-cat > $ONNXSCRIPT <<EOF
 cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -421,11 +286,10 @@ python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_ops
 chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$SCALARMODELSDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
+chmod -R 777 $VOLUME_SCALARMODELSDESTDIR
 EOF
 
-chmod a+x $ONNXSCRIPT
 chmod a+x $ONNXSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
@@ -434,21 +298,7 @@ fi
 
 docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
 docker pull $UBUNTU_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $UBUNTU_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
-
 
 echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
 
@@ -467,7 +317,6 @@ if [ $? -ne 0 ]; then
 fi
 
 # PyTorch
-cat > $TORCHSCRIPT <<EOF
 cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -494,42 +343,17 @@ python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
-  chmod -R 777 $VOLUME_TORCHTRTDESTDIR
   python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
   chmod -R 777 $VOLUME_TORCHTRTDESTDIR
 fi
 python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
 # Export torchvision image models to ONNX
-python3 $VOLUME_SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
-chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
 chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
 EOF
 
-chmod a+x $TORCHSCRIPT
 chmod a+x $TORCHSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
@@ -538,21 +362,7 @@ fi
 
 docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
 docker pull $PYTORCH_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $TORCHSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $PYTORCH_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TORCHSCRIPT
-
 
 echo -e "\033[34m[ INFO ] - Running:  $TORCHSCRIPT \033[0m "
 
@@ -571,7 +381,6 @@ if [ $? -ne 0 ]; then
 fi
 
 # Tensorflow
-cat > $TFSCRIPT <<EOF
 cat > $TFSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -613,38 +422,8 @@ python3 $VOLUME_SRCDIR/gen_tag_sigdef.py --dir $VOLUME_SIGDEFDESTDIR
 chmod -R 777 $VOLUME_SIGDEFDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDESTDIR
 chmod -R 777 $VOLUME_TFPARAMETERSDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$VOLUME_NOSHAPEDESTDIR
-chmod -R 777 $VOLUME_NOSHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --savedmodel --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
-python3 $VOLUME_SRCDIR/gen_tag_sigdef.py --dir $VOLUME_SIGDEFDESTDIR
-chmod -R 777 $VOLUME_SIGDEFDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDESTDIR
-chmod -R 777 $VOLUME_TFPARAMETERSDESTDIR
 EOF
 
-chmod a+x $TFSCRIPT
 chmod a+x $TFSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
@@ -653,21 +432,7 @@ fi
 
 docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
 docker pull $TENSORFLOW_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $TENSORFLOW_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TFSCRIPT
-
 
 echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
 
@@ -687,11 +452,8 @@ fi
 
 # TensorRT
 
-
 docker pull ${TENSORRT_IMAGE}
 TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
-
-cat > $TRTSCRIPT <<EOF
 
 cat > $TRTSCRIPT <<EOF
 #!/bin/bash
@@ -737,51 +499,14 @@ python3 $VOLUME_SRCDIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDE
 chmod -R 777 $VOLUME_FORMATDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-chmod -R 777 $VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
-chmod -R 777 $VOLUME_IDENTITYBIGDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
-chmod -R 777 $VOLUME_FORMATDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
-chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
 (git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git && \
 cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
 cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.)
 LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
 chmod -R 777 $VOLUME_PLGDESTDIR
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.)
-LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
-chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
 
-chmod a+x $TRTSCRIPT
 chmod a+x $TRTSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
@@ -790,19 +515,7 @@ fi
 
 if [ "$MODEL_TYPE" != "igpu" ] ; then
   docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-  docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
   docker pull $TENSORRT_IMAGE
-
-  echo -e "\033[34m[ INFO ] - Running:  $TRTSCRIPT \033[0m "
-
-  docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $TENSORRT_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TRTSCRIPT
 
   echo -e "\033[34m[ INFO ] - Running:  $TRTSCRIPT \033[0m "
 
@@ -822,14 +535,6 @@ if [ "$MODEL_TYPE" != "igpu" ] ; then
 
 fi
 
-if [ -z $CI ] ; then
-    echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
-    docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
-    echo -e "\033[34m[ INFO ] - Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
-    docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
-    echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
-    docker volume rm $DOCKER_VOLUME
-fi
 if [ -z $CI ] ; then
     echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
     docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
