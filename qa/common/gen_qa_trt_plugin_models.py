@@ -44,9 +44,7 @@ PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 def get_trt_plugin(plugin_name):
     plugin = None
     field_collection = None
-    print(PLUGIN_CREATORS)
     for plugin_creator in PLUGIN_CREATORS:
-        print("Plugin name is ", plugin_creator.name, plugin_name)
         if (plugin_creator.name == "CustomHardmax") and (
             plugin_name == "CustomHardmax"
         ):
