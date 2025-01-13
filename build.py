@@ -1477,7 +1477,7 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
         && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
-        && wget $PYTORCH_TRITON_URL\\
+        && wget $PYTORCH_TRITON_URL \\
         && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
         && rm /tmp/pytorch_triton-*.whl; \\
     else \\
