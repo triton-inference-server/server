@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -102,9 +102,9 @@ struct RequestReleasePayload final {
 //
 // ResponseQueue
 //
-// A simple queue holding the responses to be written. Uses a
-// vector of persistent message objects to prevent allocating
-// memory for each response to be written.
+// This class implements a queue to manage responses that need to be written.
+// It internally uses a reusable pool of persistent message objects to avoid
+// allocating memory for each response individually.
 //
 template <typename ResponseType>
 class ResponseQueue {
@@ -113,6 +113,7 @@ class ResponseQueue {
 
   ~ResponseQueue()
   {
+    // Delete all responses in the reusable pool
     LOG_VERBOSE(2) << " --------------- ResponseQueue::~ResponseQueue() "
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
@@ -125,14 +126,15 @@ class ResponseQueue {
       delete response;
     }
 
-    for (auto response : response_queue_) {
+    // Delete all responses currently in the queue
+    for (auto response : responses_) {
       delete response;
     }
 
     LOG_VERBOSE(2) << " -----------------------------------------";
   }
 
-  // Resets the queue
+  // Resets the queue to its initial state
   void Reset()
   {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -148,10 +150,10 @@ class ResponseQueue {
     ready_count_ = 0;
     pop_count_ = 0;
 
-    while (!response_queue_.empty()) {
-      response_queue_.front()->Clear();
-      reusable_pool_.push_back(response_queue_.front());
-      response_queue_.pop_front();
+    while (!responses_.empty()) {
+      responses_.front()->Clear();
+      reusable_pool_.push_back(responses_.front());
+      responses_.pop_front();
     }
 
     LOG_VERBOSE(2) << "----- after response_queue_.size(): "
@@ -168,14 +170,15 @@ class ResponseQueue {
   {
     std::lock_guard<std::mutex> lock(mtx_);
     alloc_count_ = 1;
-    if (response_queue_.size() < 1) {
+    if (responses_.size() < 1) {
       if (!reusable_pool_.empty()) {
-        response_queue_.push_back(reusable_pool_.front());
+        responses_.push_back(reusable_pool_.front());
         reusable_pool_.pop_front();
       } else {
-        response_queue_.push_back(new ResponseType());
+        responses_.push_back(new ResponseType());
       }
     }
+    return responses_[0];
 
     LOG_VERBOSE(2)
         << " --------------- ResponseQueue::GetNonDecoupledResponse() "
@@ -187,7 +190,7 @@ class ResponseQueue {
     return response_queue_[0];
   }
 
-  // Allocates a response on the head of the queue
+  // Allocates a response at the end of the queue
   void AllocateResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -198,12 +201,13 @@ class ResponseQueue {
                    << " reusable_pool_.size(): " << reusable_pool_.size();
     alloc_count_++;
 
+    // Use a response from the reusable pool if available
     if (!reusable_pool_.empty()) {
-      response_queue_.push_back(reusable_pool_.front());
+      responses_.push_back(reusable_pool_.front());
       reusable_pool_.pop_front();
       LOG_VERBOSE(2) << " --------------- reusing the response ---------";
     } else {
-      response_queue_.push_back(new ResponseType());
+      responses_.push_back(new ResponseType());
       LOG_VERBOSE(2) << " --------------- allocated new response ---------";
     }
 
@@ -226,14 +230,14 @@ class ResponseQueue {
         << " ------------ response_queue_.size(): " << response_queue_.size()
         << " reusable_pool_: " << reusable_pool_.size();
 
-    if ((response_queue_.size() + pop_count_) < alloc_count_) {
+    // Ensure that the requested response has been allocated
+    if ((responses_.size() + pop_count_) < alloc_count_) {
       LOG_ERROR
           << "[INTERNAL] Attempting to access the response not yet allocated";
       return nullptr;
     }
 
-    // TODO: check non-decoupled correctly
-    return response_queue_.back();
+    return responses_.back();
   }
 
   // Marks the next non-ready response complete
@@ -257,8 +261,7 @@ class ResponseQueue {
     return true;
   }
 
-  // Gets the current response from the begining of
-  // the queue.
+  // Gets the current response from the front of the queue
   ResponseType* GetCurrentResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -275,11 +278,12 @@ class ResponseQueue {
                    "is not ready";
       return nullptr;
     }
-    if (response_queue_.empty()) {
-      LOG_ERROR << "[INTERNAL] No responses available in the queue.";
+    if (responses_.empty()) {
+      LOG_ERROR << "[INTERNAL] No responses are available in the queue.";
       return nullptr;
     }
-    return response_queue_.front();
+
+    return responses_.front();
   }
 
   // Gets the response at the specified index
@@ -293,33 +297,39 @@ class ResponseQueue {
         << " ------------ response_queue_.size(): " << response_queue_.size()
         << " reusable_pool_.size(): " << reusable_pool_.size();
 
+    // Check if the index is valid for allocated responses
     if (index >= alloc_count_) {
       LOG_ERROR << "[INTERNAL] Attempting to access response which is not yet "
                    "allocated";
       return nullptr;
     }
     if (index < pop_count_) {
-      LOG_ERROR
-          << "[INTERNAL] Attempting to access response which is already popped";
+      LOG_ERROR << "[INTERNAL] Attempting to access a response that has "
+                   "already been removed from the queue.";
       return nullptr;
     }
-    return response_queue_[index - pop_count_];
+
+    // Adjust index based on number of popped responses to get actual index in
+    // 'responses_'
+    return responses_[index - pop_count_];
   }
 
-  // Pops the response from the tail of the queue
+  // Removes the current response from the front of the queue
   void PopResponse()
   {
     std::lock_guard<std::mutex> lock(mtx_);
 
-    if (response_queue_.empty()) {
+    // Ensure there are responses in the queue to pop
+    if (responses_.empty()) {
       LOG_ERROR << "[INTERNAL] No responses in the queue to pop.";
       return;
     }
 
-    auto response = response_queue_.front();
+    // Clear and move the current response to the reusable pool
+    auto response = responses_.front();
     response->Clear();
     reusable_pool_.push_back(response);
-    response_queue_.pop_front();
+    responses_.pop_front();
     pop_count_++;
 
     LOG_VERBOSE(2) << " --------------- ResponseQueue::PopResponse() "
@@ -344,7 +354,7 @@ class ResponseQueue {
                    << " reusable_pool_.size(): " << reusable_pool_.size();
     return (
         (alloc_count_ == ready_count_) && (alloc_count_ == pop_count_) &&
-        response_queue_.empty());
+        responses_.empty());
   }
 
   // Returns whether the queue has responses
@@ -363,17 +373,17 @@ class ResponseQueue {
   }
 
  private:
-  std::deque<ResponseType*> response_queue_;
+  // Stores responses that need to be written. The front of the queue indicates
+  // the current response, while the back indicates the last allocated response.
+  std::deque<ResponseType*> responses_;
+  // Stores completed responses that can be reused
   std::deque<ResponseType*> reusable_pool_;
   std::mutex mtx_;
 
-  // There are three counters to track the responses in the queue
-  // Tracks the number of allocated responses
-  uint32_t alloc_count_;
-  // Tracks the number of responses that are ready to be written
-  uint32_t ready_count_;
-  // Total popped/written responses.
-  uint32_t pop_count_;
+  // Three counters are used to track and manage responses in the queue
+  uint32_t alloc_count_;  // Number of allocated responses
+  uint32_t ready_count_;  // Number of ready-to-write responses
+  uint32_t pop_count_;    // Number of removed responses from the queue
 };
 
 
