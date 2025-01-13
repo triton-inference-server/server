@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import ctypes
 import os
 
 import numpy as np
@@ -38,13 +39,13 @@ np_dtype_string = np.dtype(object)
 TRT_LOGGER = trt.Logger()
 
 trt.init_libnvinfer_plugins(TRT_LOGGER, "")
-PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 
 
 def get_trt_plugin(plugin_name):
     plugin = None
     field_collection = None
-    for plugin_creator in PLUGIN_CREATORS:
+    plugin_creators = trt.get_plugin_registry().plugin_creator_list
+    for plugin_creator in plugin_creators:
         if (plugin_creator.name == "CustomHardmax") and (
             plugin_name == "CustomHardmax"
         ):
@@ -272,13 +273,37 @@ def create_plugin_models(models_dir):
     )
 
 
+def windows_load_plugin_lib(win_plugin_dll):
+    if os.path.isfile(win_plugin_dll):
+        try:
+            ctypes.CDLL(win_plugin_dll, winmode=0)
+        except TypeError:
+            # winmode only introduced in python 3.8
+            ctypes.CDLL(win_plugin_dll)
+        return
+
+    raise IOError('Failed to load library: "{}".'.format(win_plugin_dll))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--models_dir", type=str, required=True, help="Top-level model directory"
     )
+    parser.add_argument(
+        "--win_plugin_dll",
+        type=str,
+        required=False,
+        default="",
+        help="Path to Windows plugin .dll",
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     import test_util as tu
+
+    # Linux can leverage LD_PRELOAD. We must load the Windows plugin manually
+    # in order for it to be discovered in the registry.
+    if os.name == "nt":
+        windows_load_plugin_lib(FLAGS.win_plugin_dll)
 
     create_plugin_models(FLAGS.models_dir)

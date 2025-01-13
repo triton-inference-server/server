@@ -54,11 +54,11 @@ the development and deployment of production AI.
 ## Triton Architecture
 
 The following figure shows the Triton Inference Server high-level
-architecture. The [model repository](user_guide/model_repository.md) is a
+architecture. The [model repository](../user_guide/model_repository.md) is a
 file-system based repository of the models that Triton will make
 available for inferencing. Inference requests arrive at the server via
-either [HTTP/REST or GRPC](customization_guide/inference_protocols.md) or by the [C
-API](customization_guide/inference_protocols.md) and are then routed to the appropriate per-model
+either [HTTP/REST or GRPC](../customization_guide/inference_protocols.md) or by the [C
+API](../customization_guide/inprocess_c_api.md) and are then routed to the appropriate per-model
 scheduler. Triton implements [multiple scheduling and batching
 algorithms](#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
@@ -75,7 +75,7 @@ custom pre- and post-processing operations or even a new deep-learning
 framework.
 
 The models being served by Triton can be queried and controlled by a
-dedicated [model management API](user_guide/model_management.md) that is
+dedicated [model management API](../user_guide/model_management.md) that is
 available by HTTP/REST or GRPC protocol, or by the C API.
 
 Readiness and liveness health endpoints and utilization, throughput
@@ -93,25 +93,25 @@ Major features include:
 - [Supports multiple machine learning
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
-  execution](user_guide/model_execution.md#concurrent-model-execution)
-- [Dynamic batching](user_guide/batcher.md#dynamic-batcher)
-- [Sequence batching](user_guide/batcher.md#sequence-batcher) and
-  [implicit state management](user_guide/implicit_state_management.md#implicit-state-management)
+  execution](../user_guide/model_execution.md#concurrent-model-execution)
+- [Dynamic batching](../user_guide/batcher.md#dynamic-batcher)
+- [Sequence batching](../user_guide/batcher.md#sequence-batcher) and
+  [implicit state management](../user_guide/implicit_state_management.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
 - Model pipelines using
-  [Ensembling](user_guide/ensemble_models.md#ensemble-models) or [Business
+  [Ensembling](../user_guide/ensemble_models.md#ensemble-models) or [Business
   Logic Scripting
-  (BLS)](user_guide/bls.md#business-logic-scripting)
+  (BLS)](../user_guide/bls.md#business-logic-scripting)
 - [HTTP/REST and GRPC inference
-  protocols](customization_guide/inference_protocols.md) based on the community
+  protocols](../customization_guide/inference_protocols.md) based on the community
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
-- A [C API](customization_guide/inprocess_c_api.md) and
-  [Java API](customization_guide/inprocess_java_api.md)
+- A [C API](../customization_guide/inprocess_c_api.md) and
+  [Java API](../customization_guide/inprocess_java_api.md)
   allow Triton to link directly into your application for edge and other in-process use cases
-- [Metrics](user_guide/metrics.md) indicating GPU utilization, server
+- [Metrics](../user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
 Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and stay current on the latest product updates, bug fixes, content, best

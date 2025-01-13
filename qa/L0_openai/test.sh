@@ -29,11 +29,12 @@
 
 function install_deps() {
     # Install python bindings for tritonserver and tritonfrontend
-    pip install /opt/tritonserver/python/triton*.whl
+    # pip install /opt/tritonserver/python/triton*.whl
 
     # Install application/testing requirements
     pushd openai/
-    pip install -r requirements.txt
+    # NOTE: Should be pre-installed in container, but can uncomment if needed
+    # pip install -r requirements.txt
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
@@ -49,13 +50,17 @@ function prepare_vllm() {
 }
 
 function prepare_tensorrtllm() {
+    # FIXME: Remove when testing TRT-LLM containers built from source
+    pip install -r requirements.txt
+
     MODEL="llama-3-8b-instruct"
     MODEL_REPO="tests/tensorrtllm_models"
     rm -rf ${MODEL_REPO}
 
-    # FIXME: This will require an upgrade each release to match the TRT-LLM version
+    # FIXME: This may require an upgrade each release to match the TRT-LLM version,
+    # and would likely be easier to use trtllm-build directly for test purposes.
     # Use Triton CLI to prepare model repository for testing
-    pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
+    pip install git+https://github.com/triton-inference-server/triton_cli.git@0.1.1
     # NOTE: Could use ENGINE_DEST_PATH set to NFS mount for pre-built engines in future
     triton import \
         --model ${MODEL}  \
