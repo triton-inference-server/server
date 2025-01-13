@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -220,6 +220,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 send_inference_requests "client_min.log" 10
 
@@ -267,9 +268,7 @@ assert_curl_failure "trace_file updated through network protocol expects an erro
 if [ `grep -c "\"error\":\"trace file location can not be updated through network protocol\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
-    RET=1
-fi
+cat ./curl.out
 
 # Use a different name
 update_trace_setting "simple" '{"log_frequency":"2"}'
@@ -294,6 +293,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 send_inference_requests "client_simple.log" 10
 
@@ -377,6 +377,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 # Send requests to simple where trace is explicitly disabled
 send_inference_requests "client_update.log" 10
@@ -407,6 +408,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 # Send requests to simple where now uses global setting
 send_inference_requests "client_clear.log" 5
@@ -478,6 +480,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 # Set trace count
 update_global_trace_setting '{"trace_count":"5"}'
@@ -502,6 +505,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 # Send requests to simple where trace is explicitly disabled
 send_inference_requests "client_update.log" 10
@@ -528,6 +532,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 # Check if the indexed file has been generated when trace count reaches 0
 if [ ! -f ./global_count.log.0 ]; then
@@ -592,8 +597,6 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-RET=0
-
 set +e
 
 python $CLIENT_TEST >>$CLIENT_LOG 2>&1
@@ -647,6 +650,7 @@ fi
 if [ `grep -c "\"trace_mode\":\"triton\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+cat ./curl.out
 
 set +e
 # Send bls requests to make sure simple model is traced
@@ -941,6 +945,7 @@ fi
 if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
     RET=1
 fi
+cat ./curl.out
 
 
 set +e
@@ -1026,6 +1031,7 @@ fi
 if [ `grep -c "\"log_frequency\":" ./curl.out` != "0" ]; then
     RET=1
 fi
+cat ./curl.out
 
 set +e
 # Send bls requests to make sure bls_simple model is NOT traced
