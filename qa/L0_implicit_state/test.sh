@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -114,7 +114,6 @@ python3 $IMPLICIT_STATE_CLIENT > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Implicit State FAILED\n***"
     cat ${CLIENT_LOG}
-    cat ${SERVER_LOG}
     exit 1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_TEST_NUM
