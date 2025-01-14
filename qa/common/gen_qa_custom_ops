@@ -37,7 +37,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=24.11}
+TRITON_VERSION=${TRITON_VERSION:=24.12}
 NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$TRITON_VERSION}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$NVIDIA_UPSTREAM_VERSION-tf2-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
@@ -156,7 +156,7 @@ echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
 
 docker run \
     --rm \
-    --label RUNNER_ID=$$RUNNER_ID \
+    --label RUNNER_ID=$RUNNER_ID \
     --label PROJECT_NAME=$PROJECT_NAME \
     $DOCKER_GPU_ARGS \
     -v $DOCKER_VOLUME:/mnt \
