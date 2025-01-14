@@ -114,6 +114,7 @@ python3 $IMPLICIT_STATE_CLIENT > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Implicit State FAILED\n***"
     cat ${CLIENT_LOG}
+    cat ${SERVER_LOG}
     exit 1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_TEST_NUM
