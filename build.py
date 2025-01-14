@@ -1048,6 +1048,8 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
         df += """
+RUN python3 -m pip install build
+
 SHELL ["cmd", "/S", "/C"]
 """
     else:
