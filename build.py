@@ -2729,8 +2729,8 @@ if __name__ == "__main__":
         "  - 'vllm_index_url': The index URL for the pip install.\n"
         "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
         "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
-        "Ensure that the required environment variables for these secrets are set before running the build."
-)
+        "Ensure that the required environment variables for these secrets are set before running the build.",
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
