@@ -28,6 +28,7 @@ name: "growable_memory"
 backend: "implicit_state"
 max_batch_size: 0
 sequence_batching {
+  # Set large idle timeout to avoid inter-request timeouts for test consistency
   max_sequence_idle_microseconds: 10000000
   control_input [
     {
