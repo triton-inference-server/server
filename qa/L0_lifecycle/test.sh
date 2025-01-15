@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1576,7 +1576,7 @@ if [ `grep -c "Model 'custom_zero_1_float32' (version 1) has 1 in-flight inferen
     RET=1
 fi
 
-kill $SERVER_PID
+kill $SERVER_PID || true
 wait $SERVER_PID
 
 rm -f $CLIENT_LOG
@@ -1614,7 +1614,7 @@ if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 1 in-flight inferen
     RET=1
 fi
 
-kill $SERVER_PID
+kill $SERVER_PID || true
 wait $SERVER_PID
 
 rm -f $CLIENT_LOG
@@ -1655,7 +1655,7 @@ if [ `grep -c "Model 'ensemble_zero_1_float32' (version 1) has 1 in-flight infer
     RET=1
 fi
 
-kill $SERVER_PID
+kill $SERVER_PID || true
 wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
@@ -2128,7 +2128,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-kill $SERVER_PID
+kill $SERVER_PID || true
 wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
