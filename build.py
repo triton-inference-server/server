@@ -2725,11 +2725,11 @@ if __name__ == "__main__":
         nargs=2,
         metavar=("key", "value"),
         help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
-         "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-         "  - 'vllm_index_url': The index URL for the pip install.\n"
-         "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
-         "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
-         "Ensure that the required environment variables for these secrets are set before running the build."
+        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
+        "  - 'vllm_index_url': The index URL for the pip install.\n"
+        "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
+        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
+        "Ensure that the required environment variables for these secrets are set before running the build."
 )
     FLAGS = parser.parse_args()
 
