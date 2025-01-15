@@ -118,8 +118,8 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
 
     for (auto response : reusable_pool_) {
@@ -142,8 +142,8 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
 
     alloc_count_ = 0;
@@ -156,8 +156,8 @@ class ResponseQueue {
       responses_.pop_front();
     }
 
-    LOG_VERBOSE(2) << "----- after response_queue_.size(): "
-                   << response_queue_.size();
+    LOG_VERBOSE(2) << "----- after responses_.size(): "
+                   << responses_.size();
     LOG_VERBOSE(2) << "----- after reusable_pool_.size(): "
                    << reusable_pool_.size();
     LOG_VERBOSE(2) << " -----------------------------------------";
@@ -184,21 +184,22 @@ class ResponseQueue {
         << " --------------- ResponseQueue::GetNonDecoupledResponse() "
         << ", ready_count_: " << ready_count_
         << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
+        << " ------------ responses_.size(): " << responses_.size()
         << " reusable_pool_.size(): " << reusable_pool_.size();
 
-    return response_queue_[0];
+    return responses_[0];
   }
 
   // Allocates a response at the end of the queue
   void AllocateResponse()
   {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::unique_lock<std::mutex> lock(mtx_);
     LOG_VERBOSE(2) << " --------------- ResponseQueue::AllocateResponse() -  "
                       "before allocation ------------ "
-                      "response_queue_.size(): "
-                   << response_queue_.size()
+                      "responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
+    cv_.wait(lock, [this] { return responses_.size() < threshold_; });
     alloc_count_++;
 
     // Use a response from the reusable pool if available
@@ -214,8 +215,8 @@ class ResponseQueue {
     LOG_VERBOSE(2) << "------ ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
   }
 
@@ -227,7 +228,7 @@ class ResponseQueue {
         << " --------------- ResponseQueue::GetLastAllocatedResponse() "
         << ", ready_count_: " << ready_count_
         << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
+        << " ------------ responses_.size(): " << responses_.size()
         << " reusable_pool_: " << reusable_pool_.size();
 
     // Ensure that the requested response has been allocated
@@ -255,7 +256,7 @@ class ResponseQueue {
         << " --------------- ResponseQueue::MarkNextResponseComplete() - "
         << ", ready_count_: " << ready_count_
         << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
+        << " ------------ responses_.size(): " << responses_.size()
         << " reusable_pool_.size(): " << reusable_pool_.size();
 
     return true;
@@ -269,8 +270,8 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
 
     if (pop_count_ >= ready_count_) {
@@ -294,7 +295,7 @@ class ResponseQueue {
         << " --------------- ResponseQueue::GetResponseAt()  - index: " << index
         << ", ready_count_: " << ready_count_
         << ", alloc_count_: " << alloc_count_ << ", pop_count_: " << pop_count_
-        << " ------------ response_queue_.size(): " << response_queue_.size()
+        << " ------------ responses_.size(): " << responses_.size()
         << " reusable_pool_.size(): " << reusable_pool_.size();
 
     // Check if the index is valid for allocated responses
@@ -336,9 +337,11 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
+    
+    cv_.notify_one();
   }
 
   // Returns whether the queue is empty
@@ -349,8 +352,8 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
     return (
         (alloc_count_ == ready_count_) && (alloc_count_ == pop_count_) &&
@@ -366,8 +369,8 @@ class ResponseQueue {
                    << ", ready_count_: " << ready_count_
                    << ", alloc_count_: " << alloc_count_
                    << ", pop_count_: " << pop_count_
-                   << " ------------ response_queue_.size(): "
-                   << response_queue_.size()
+                   << " ------------ responses_.size(): "
+                   << responses_.size()
                    << " reusable_pool_.size(): " << reusable_pool_.size();
     return (ready_count_ > pop_count_);
   }
@@ -378,12 +381,14 @@ class ResponseQueue {
   std::deque<ResponseType*> responses_;
   // Stores completed responses that can be reused
   std::deque<ResponseType*> reusable_pool_;
+  std::condition_variable cv_;
   std::mutex mtx_;
 
   // Three counters are used to track and manage responses in the queue
   uint32_t alloc_count_;  // Number of allocated responses
   uint32_t ready_count_;  // Number of ready-to-write responses
   uint32_t pop_count_;    // Number of removed responses from the queue
+  uint32_t threshold_ = 10;
 };
 
 
