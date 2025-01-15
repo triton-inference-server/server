@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -72,11 +72,11 @@ import requests
 
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.54.0dev",
-    "triton_container_version": "24.01dev",
-    "upstream_container_version": "24.12",
+    "triton_container_version": "25.01dev",
+    "upstream_container_version": "25.01",
     "ort_version": "1.20.1",
-    "ort_openvino_version": "2024.4.0",
-    "standalone_openvino_version": "2024.4.0",
+    "ort_openvino_version": "2024.5.0",
+    "standalone_openvino_version": "2024.5.0",
     "dcgm_version": "3.3.6",
     "vllm_version": "0.6.3.post1",
     "rhel_py_version": "3.12.3",
@@ -1048,6 +1048,8 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
         df += """
+RUN python3 -m pip install build
+
 SHELL ["cmd", "/S", "/C"]
 """
     else:
@@ -1465,12 +1467,31 @@ RUN apt-get update \\
     """
 
     if "vllm" in backends:
-        df += """
-# vLLM needed for vLLM backend
-RUN pip3 install vllm=={}
-""".format(
-            FLAGS.vllm_version
-        )
+        df += f"""
+ARG BUILD_PUBLIC_VLLM="true"
+ARG VLLM_INDEX_URL
+ARG PYTORCH_TRITON_URL
+
+RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
+    if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
+        pip3 install --no-cache-dir \\
+        mkl==2021.1.1 \\
+        mkl-include==2021.1.1 \\
+        mkl-devel==2021.1.1 \\
+        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
+        # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
+        && cd /tmp \\
+        && wget $PYTORCH_TRITON_URL \\
+        && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
+        && rm /tmp/pytorch_triton-*.whl; \\
+    else \\
+        # public vLLM needed for vLLM backend
+        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
+    fi
+
+ARG PYVER=3.12
+ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
+"""
 
     if "dali" in backends:
         df += """
@@ -1838,13 +1859,21 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         finalargs = [
             "docker",
             "build",
+        ]
+        if secrets != "":
+            finalargs += [
+                f"--secret id=req,src={requirements}",
+                f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
+                f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
+                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+            ]
+        finalargs += [
             "-t",
             "tritonserver",
             "-f",
             os.path.join(FLAGS.build_dir, "Dockerfile"),
             ".",
         ]
-
         docker_script.cwd(THIS_SCRIPT_DIR)
         docker_script.cmd(finalargs, check_exitcode=True)
 
@@ -2689,6 +2718,19 @@ if __name__ == "__main__":
         default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
+    parser.add_argument(
+        "--build-secret",
+        action="append",
+        required=False,
+        nargs=2,
+        metavar=("key", "value"),
+        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
+        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
+        "  - 'vllm_index_url': The index URL for the pip install.\n"
+        "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
+        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
+        "Ensure that the required environment variables for these secrets are set before running the build.",
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
@@ -2715,6 +2757,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
+    if FLAGS.build_secret is None:
+        FLAGS.build_secret = []
 
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
@@ -2807,6 +2851,14 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
+
+    secrets = dict(getattr(FLAGS, "build_secret", []))
+    if secrets is not None:
+        requirements = secrets.get("req", "")
+        vllm_index_url = secrets.get("vllm_index_url", "")
+        pytorch_triton_url = secrets.get("pytorch_triton_url", "")
+        build_public_vllm = secrets.get("build_public_vllm", "true")
+        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
