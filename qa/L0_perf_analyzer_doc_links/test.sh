@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
 
 #Download perf_analyzer docs
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
-TRITON_PERF_ANALYZER_REPO_TAG="${TRITON_PERF_ANALYZER_REPO_TAG:=main}"
+TRITON_PERF_ANALYZER_REPO_TAG="${TRITON_PERF_ANALYZER_REPO_TAG:=rmccormick/L0_perf_analyzer_doc_links}"
 git clone -b ${TRITON_PERF_ANALYZER_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/perf_analyzer.git
 cp `pwd`/perf_analyzer/README.md .
 cp -rf `pwd`/perf_analyzer/docs .
