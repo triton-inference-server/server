@@ -57,6 +57,8 @@ function prepare_tensorrtllm() {
     MODEL_REPO="tests/tensorrtllm_models"
     mkdir -p ${MODEL_REPO}
     cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
+    # Ensemble model is not needed for the test
+    rm -rf ${MODEL_REPO}/ensemble
 
     # 1. Download model from HF
     huggingface-cli download ${MODEL}
@@ -77,11 +79,11 @@ function prepare_tensorrtllm() {
 
     # 4. Prepare model repository
     FILL_TEMPLATE="/app/tools/fill_template.py"
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,preprocessing_instance_count:1
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,preprocessing_instance_count:1,max_queue_size:0
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,postprocessing_instance_count:1
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:False,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/ensemble/config.pbtxt triton_max_batch_size:64,logits_datatype:TYPE_FP32
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:False,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_delay_microseconds:0,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
+    # python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/ensemble/config.pbtxt triton_max_batch_size:64,logits_datatype:TYPE_FP32
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
 }
 
 function pre_test() {
