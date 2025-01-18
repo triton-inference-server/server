@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 prodname_uc=$(echo "${NVIDIA_PRODUCT_NAME}" | tr [:lower:] [:upper:] | sed 's/ /_/g' | sed 's/^NVIDIA_//')  # Product name
 _prodver="NVIDIA_${prodname_uc}_VERSION" # Container product version variable name
