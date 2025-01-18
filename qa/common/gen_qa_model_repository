@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=24.12}
+TRITON_VERSION=${TRITON_VERSION:=25.01}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.16.1
@@ -107,30 +107,6 @@ docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
 VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
 VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
 VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
-VOLUME_VARDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
-VOLUME_IDENTITYDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_SIGDEFDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
-VOLUME_IDENTITYBIGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_TFPARAMETERSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
-VOLUME_SHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-VOLUME_RESHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-VOLUME_SEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-VOLUME_DYNASEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-VOLUME_DYNASEQIMPLICITDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-VOLUME_VARSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-VOLUME_ENSEMBLEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-VOLUME_NOSHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-VOLUME_PLGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-VOLUME_RAGGEDDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-VOLUME_FORMATDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-VOLUME_DATADEPENDENTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-VOLUME_IMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-VOLUME_VARIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
-VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
-VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 
 docker run \
@@ -143,36 +119,8 @@ docker run \
     mkdir -p \
         $VOLUME_BUILD_DIR \
         $VOLUME_SRCDIR \
-        $VOLUME_DESTDIR \
-        $VOLUME_VARDESTDIR \
-        $VOLUME_IDENTITYDESTDIR \
-        $VOLUME_SIGDEFDESTDIR \
-        $VOLUME_IDENTITYBIGDESTDIR \
-        $VOLUME_TFPARAMETERSDESTDIR \
-        $VOLUME_SHAPEDESTDIR \
-        $VOLUME_RESHAPEDESTDIR \
-        $VOLUME_SEQDESTDIR \
-        $VOLUME_DYNASEQDESTDIR \
-        $VOLUME_DYNASEQIMPLICITDESTDIR \
-        $VOLUME_VARSEQDESTDIR \
-        $VOLUME_ENSEMBLEDESTDIR \
-        $VOLUME_NOSHAPEDESTDIR \
-        $VOLUME_PLGDESTDIR \
-        $VOLUME_RAGGEDDESTDIR \
-        $VOLUME_FORMATDESTDIR \
-        $VOLUME_DATADEPENDENTDIR \
-        $VOLUME_IMPLICITSEQDESTDIR \
-        $VOLUME_VARIMPLICITSEQDESTDIR \
-        $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_TORCHTRTDESTDIR \
-        $VOLUME_SCALARMODELSDESTDIR \
-        $VOLUME_IMAGEMODELSDESTDIR
+        $VOLUME_DESTDIR 
 
-ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
-OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
-TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
-TFSCRIPT=gen.TensorFlow.gen_qa_model_repository.cmds
 TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 
 # TensorRT
@@ -190,51 +138,8 @@ set -e
 set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
-# Models using shape tensor i/o
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-chmod -R 777 $VOLUME_SHAPEDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
-chmod -R 777 $VOLUME_IDENTITYBIGDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
-chmod -R 777 $VOLUME_FORMATDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
-chmod -R 777 $VOLUME_DATADEPENDENTDIR
-# Make shared library for custom Hardmax plugin.
-if [ -d "/usr/src/tensorrt" ]; then
-    cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
-else
-    git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
-    cd /workspace/TensorRT/samples/python/onnx_custom_plugin
-fi
-rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.
-LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
-chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
 
 chmod a+x $TRTSCRIPT
