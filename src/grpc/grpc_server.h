@@ -89,6 +89,7 @@ struct Options {
   // requests doesn't exceed this value there will be no
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
+  int max_response_pool_size_{INT_MAX};
   RestrictedFeatures restricted_protocols_;
   std::string forward_header_pattern_;
 };
