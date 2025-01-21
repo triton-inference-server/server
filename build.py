@@ -962,7 +962,6 @@ RUN yum install -y \\
             libcurl-devel \\
             libb64-devel \\
             gperftools-devel \\
-            patchelf \\
             python3-pip \\
             python3-setuptools \\
             rapidjson-devel \\
@@ -990,7 +989,8 @@ RUN pip3 install --upgrade pip \\
           wheel \\
           setuptools \\
           docker \\
-          virtualenv
+          virtualenv \\
+          patchelf==0.17.2
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1089,7 +1089,6 @@ RUN apt-get update \\
             libcurl4-openssl-dev \\
             libb64-dev \\
             libgoogle-perftools-dev \\
-            patchelf \\
             python3-dev \\
             python3-pip \\
             python3-wheel \\
@@ -1110,7 +1109,8 @@ RUN apt-get update \\
 RUN pip3 install --upgrade \\
           build \\
           docker \\
-          virtualenv
+          virtualenv \\
+          patchelf==0.17.2
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1354,10 +1354,13 @@ RUN yum install -y \\
         libcurl-devel \\
         libb64-devel \\
         gperftools-devel \\
-        patchelf \\
         wget \\
         python3-pip \\
         numactl-devel
+
+RUN pip3 install --upgrade pip \\
+    && pip3 install --upgrade \\
+        patchelf==0.17.2
 
 """
     else:
@@ -1562,7 +1565,10 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends openmpi-bin patchelf
+      && apt-get install -y --no-install-recommends openmpi-bin 
+RUN pip3 install --upgrade pip \\
+    && pip3 install --upgrade \\
+        patchelf==0.17.2
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
