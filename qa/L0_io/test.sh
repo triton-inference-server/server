@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# This test requires at least 2 GPUs to test h2d and d2d transfer combinations
+export CUDA_VISIBLE_DEVICES=0,1
 
 IO_TEST_UTIL=./memory_alloc
 CLIENT_LOG="./client.log"
@@ -147,7 +148,6 @@ cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
 
 # prepare libtorch multi-device and multi-gpu models
 cp -r ../L0_libtorch_instance_group_kind_model/models/libtorch_multi_device $MODELSDIR/.
-cp ../L0_libtorch_instance_group_kind_model/gen_models.py ./gen_libtorch_model.py
 mkdir -p $MODELSDIR/libtorch_multi_device/1
 mkdir -p $MODELSDIR/libtorch_multi_gpu/1
 cp $MODELSDIR/libtorch_multi_device/config.pbtxt $MODELSDIR/libtorch_multi_gpu/.
