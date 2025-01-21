@@ -77,7 +77,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.20.1",
     "ort_openvino_version": "2024.4.0",
     "standalone_openvino_version": "2024.4.0",
-    "dcgm_version": "3.3.6",
+    "dcgm_version": "3.2.6",
     "vllm_version": "0.6.3.post1",
     "rhel_py_version": "3.12.3",
 }
@@ -897,7 +897,7 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
@@ -910,7 +910,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
