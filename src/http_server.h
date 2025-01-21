@@ -618,6 +618,7 @@ class HTTPAPIServer : public HTTPServer {
   void HandleGenerate(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str, bool streaming);
+      
   // 'meta_data_root' is the root JSON document for 'input_metadata'.
   // In TritonJson, the Value objects are references to the root document.
   // Therefore the document must stay valid.

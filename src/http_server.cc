@@ -4244,11 +4244,11 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // logic to add kv_cache metrics to response header
   // Get the metrics in Prometheus format
 
-  // "ORCA_METRIC_FORMAT" is an environment variable that specifies which load
+  // "TRITON_ORCA_METRIC_FORMAT" is an environment variable that specifies which load
   // report format `endpoint-load-metrics` will be in. If left unset the header
   // will not be written and the feature is disabled.
   //
-  // When set, the valid values for "ORCA_METRIC_FORMAT" are:
+  // When set, the valid values for "TRITON_ORCA_METRIC_FORMAT" are:
   //
   // "http"
   // "json"
@@ -4259,8 +4259,8 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // For specifics on the different formats for the load reporting formats, see:
   // https://docs.google.com/document/d/1C1ybMmDKJIVlrbOLbywhu9iRYo4rilR-cT50OTtOFTs/edit?tab=t.0#heading=h.do9yfa1wlpk8
   auto server = infer_request->EvHtpServer();
-  if (std::getenv("ORCA_METRIC_FORMAT") != nullptr && server != nullptr) {
-    const std::string orca_type = std::getenv("ORCA_METRIC_FORMAT");
+  if (std::getenv("TRITON_ORCA_METRIC_FORMAT") != nullptr && server != nullptr) {
+    const std::string orca_type = std::getenv("TRITON_ORCA_METRIC_FORMAT");
     TRITONSERVER_Metrics* metrics = nullptr;
     TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server, &metrics);
     if (err == nullptr) {
@@ -4280,7 +4280,7 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
               evhtp_header_new(
                   "endpoint-load-metrics", extracted_kv_metrics.c_str(), 1, 1));
         } else {
-          LOG_ERROR << "ORCA_METRIC_FORMAT is set but extracted_kv_metrics is "
+          LOG_ERROR << "TRITON_ORCA_METRIC_FORMAT is set but extracted_kv_metrics is "
                        "empty, no header written. orca_type="
                     << orca_type;
         }
