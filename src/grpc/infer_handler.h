@@ -1491,6 +1491,7 @@ InferHandler<
   auto barrier = std::make_shared<Barrier>(2);
 
   thread_.reset(new std::thread([this, barrier] {
+    //INCREMENT COUNT
     StartNewRequest();
     barrier->Wait();
 
@@ -1529,6 +1530,7 @@ InferHandler<
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         state->context_->EraseState(state);
         StateRelease(state);
+        //DECREMENT COUNT
       } else {
         LOG_VERBOSE(2) << "Returning from " << Name() << ", "
                        << state->unique_id_ << ", " << state->step_;
@@ -1621,7 +1623,7 @@ class ModelInferHandler
             name, tritonserver, service, cq, max_state_bucket_count,
             max_response_queue_size, restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level)
+        compression_level_(compression_level), conn_cnt_(0)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -1647,6 +1649,9 @@ class ModelInferHandler
         "deleting response allocator");
   }
 
+ public:
+  std::atomic<uint32_t> connection_count() { return conn_cnt_.load(); }
+
  protected:
   void StartNewRequest() override;
   bool Process(State* state, bool rpc_ok, bool is_notification) override;
@@ -1662,6 +1667,8 @@ class ModelInferHandler
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+  
+  std::atomic<uint32_t> conn_cnt_;
 };
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
