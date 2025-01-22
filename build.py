@@ -901,10 +901,9 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 # FIXME: Add version to DCGM 4 package
 RUN apt-get update \\
-    && CUDA_VERSION=$(nvidia-smi | sed -E -n 's/.*CUDA Version: ([0-9]+)[.].*/\1/p') \\
     && apt-get install --yes \\
                        --install-recommends \\
-                       datacenter-gpu-manager-4-cuda${CUDA_VERSION}
+                       datacenter-gpu-manager-4-cuda12
 """.format(
                     dcgm_version
                 )
@@ -914,10 +913,9 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 # FIXME: Add version to DCGM 4 package
 RUN apt-get update \\
-    && CUDA_VERSION=$(nvidia-smi | sed -E -n 's/.*CUDA Version: ([0-9]+)[.].*/\1/p') \\
     && apt-get install --yes \\
                        --install-recommends \\
-                       datacenter-gpu-manager-4-cuda${CUDA_VERSION}
+                       datacenter-gpu-manager-4-cuda12
 """.format(
                     dcgm_version
                 )
