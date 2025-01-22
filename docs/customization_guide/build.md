@@ -267,10 +267,6 @@ For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
 
-## Building for JetPack 4.x
-
-*Under Construction*
-
 ## Building for Windows 10
 
 For Windows 10, build.py supports both a Docker build and a non-Docker
