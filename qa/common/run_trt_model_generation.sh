@@ -25,6 +25,7 @@ mkdir -p $VOLUME_BUILD_DIR $VOLUME_SRCDIR $VOLUME_DESTDIR $VOLUME_SHAPEDESTDIR \
          $VOLUME_VARDESTDIR $VOLUME_RESHAPEDESTDIR $VOLUME_DYNASEQDESTDIR \
          $VOLUME_DYNASEQIMPLICITDESTDIR
 
+cp *.py $VOLUME_SRCDIR
 # Models using shape tensor i/o
 python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
