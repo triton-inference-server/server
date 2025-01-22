@@ -412,36 +412,36 @@ fi
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    # SUBTESTS="ensemble bls decoupled response_sender"
-    # # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
-    # # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
-    # # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
-    # if [[ ${TEST_WINDOWS} == 0 ]]; then
-    #     SUBTESTS+=" variants io python_based_backends async_execute"
-    # fi
+    SUBTESTS="ensemble bls decoupled response_sender"
+    # [DLIS-6093] Disable variants test for Windows since tests are not executed in docker container (cannot apt update/install)
+    # [DLIS-5970] Disable io tests for Windows since GPU Tensors are not supported
+    # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
+    if [[ ${TEST_WINDOWS} == 0 ]]; then
+        SUBTESTS+=" variants io python_based_backends async_execute"
+    fi
 
-    # for TEST in ${SUBTESTS}; do
-    #     # Run each subtest in a separate virtual environment to avoid conflicts
-    #     # between dependencies.
-    #     setup_virtualenv
+    for TEST in ${SUBTESTS}; do
+        # Run each subtest in a separate virtual environment to avoid conflicts
+        # between dependencies.
+        setup_virtualenv
 
-    #     set +e
-    #     (cd ${TEST} && bash -ex test.sh)
-    #     EXIT_CODE=$?
-    #     if [ $EXIT_CODE -ne 0 ]; then
-    #         echo "Subtest ${TEST} FAILED"
-    #         RET=$EXIT_CODE
+        set +e
+        (cd ${TEST} && bash -ex test.sh)
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -ne 0 ]; then
+            echo "Subtest ${TEST} FAILED"
+            RET=$EXIT_CODE
 
-    #         # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
-    #         # Propagate the exit code to make sure it's not overwritten by other tests.
-    #         if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
-    #             BLS_RET=$RET
-    #         fi
-    #     fi
-    #     set -e
+            # In bls test, it is allowed to fail with a strict memory leak of 480 bytes with exit code '123'.
+            # Propagate the exit code to make sure it's not overwritten by other tests.
+            if [[ ${TEST} == "bls" ]]  && [[ $EXIT_CODE -ne 1 ]] ; then
+                BLS_RET=$RET
+            fi
+        fi
+        set -e
 
-    #     deactivate_virtualenv
-    # done
+        deactivate_virtualenv
+    done
 
     # [DLIS-5969]: Incorporate env test for windows
     if [[ ${PYTHON_ENV_VERSION} = "12" ]] && [[ ${TEST_WINDOWS} == 0 ]]; then
@@ -457,30 +457,30 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-# SUBTESTS="lifecycle argument_validation logging custom_metrics"
-# # [DLIS-6124] Disable restart test for Windows since it requires more investigation
-# # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
-# # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
-# if [[ ${TEST_WINDOWS} == 0 ]]; then
-#     # TODO: Reimplement restart on decoupled data pipeline and enable restart.
-#     SUBTESTS+=" model_control examples request_rescheduling"
-# fi
-# for TEST in ${SUBTESTS}; do
-#     # Run each subtest in a separate virtual environment to avoid conflicts
-#     # between dependencies.
-#     setup_virtualenv
+SUBTESTS="lifecycle argument_validation logging custom_metrics"
+# [DLIS-6124] Disable restart test for Windows since it requires more investigation
+# [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
+# [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    # TODO: Reimplement restart on decoupled data pipeline and enable restart.
+    SUBTESTS+=" model_control examples request_rescheduling"
+fi
+for TEST in ${SUBTESTS}; do
+    # Run each subtest in a separate virtual environment to avoid conflicts
+    # between dependencies.
+    setup_virtualenv
 
-#     set +e
-#     (cd ${TEST} && bash -ex test.sh)
+    set +e
+    (cd ${TEST} && bash -ex test.sh)
 
-#     if [ $? -ne 0 ]; then
-#         echo "Subtest ${TEST} FAILED"
-#         RET=1
-#     fi
-#     set -e
+    if [ $? -ne 0 ]; then
+        echo "Subtest ${TEST} FAILED"
+        RET=1
+    fi
+    set -e
 
-#     deactivate_virtualenv
-# done
+    deactivate_virtualenv
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
