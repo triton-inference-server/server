@@ -2618,15 +2618,7 @@ Server::AggregateConnectionCount()
         dynamic_cast<triton::server::grpc::ModelInferHandler&>(
             *model_infer_handler);
     total_connections += modelInferHandler.connection_count();
-    LOG_INFO << "connection_count: " << modelInferHandler.connection_count();
   }
-
-  // for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
-  //   auto& modelInferHandler =
-  //       dynamic_cast<triton::server::grpc::ModelInferHandler&>(
-  //           *model_stream_infer_handler);
-  //   total_connections += modelInferHandler.connection_count();
-  // }
 
   return total_connections;
 }
