@@ -77,7 +77,7 @@ mkdir -p \
         $VOLUME_SCALARMODELSDESTDIR \
         $VOLUME_IMAGEMODELSDESTDIR
 
-cp . $VOLUME_SRCDIR
+cp -r . $VOLUME_SRCDIR
 # OPENVINO
 #
 # OpenVINO is not available on ARM so skip
