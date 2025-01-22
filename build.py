@@ -1359,8 +1359,7 @@ RUN yum install -y \\
         numactl-devel
 
 RUN pip3 install --upgrade pip \\
-    && pip3 install --upgrade \\
-        patchelf==0.17.2
+    && pip3 install patchelf==0.17.2
 
 """
     else:
