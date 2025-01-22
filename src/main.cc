@@ -1,4 +1,4 @@
-// Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -316,20 +316,9 @@ StopEndpoints(uint32_t* exit_timeout_secs)
   }
 #endif  // TRITON_ENABLE_HTTP
 
-  return ret;
-}
-
-bool
-StopEndpoints()
-{
-  bool ret = true;
-
-  // TODO: Add support for 'exit_timeout_secs' to the endpoints below and move
-  // them to the 'StopEndpoints(uint32_t* exit_timeout_secs)' function above.
-
 #ifdef TRITON_ENABLE_GRPC
   if (g_grpc_service) {
-    TRITONSERVER_Error* err = g_grpc_service->Stop();
+    TRITONSERVER_Error* err = g_grpc_service->Stop(exit_timeout_secs);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC service");
       ret = false;
@@ -338,6 +327,14 @@ StopEndpoints()
     g_grpc_service.reset();
   }
 #endif  // TRITON_ENABLE_GRPC
+
+  return ret;
+}
+
+bool
+StopEndpoints()
+{
+  bool ret = true;
 
 #ifdef TRITON_ENABLE_METRICS
   if (g_metrics_service) {

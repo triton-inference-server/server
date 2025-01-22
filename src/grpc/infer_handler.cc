@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -659,6 +659,8 @@ ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(cq_);
   context->SetCompressionLevel(compression_level_);
+  LOG_VERBOSE(1) << "increment_count";
+  conn_cnt_.fetch_add(1);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -781,6 +783,11 @@ ModelInferHandler::Process(
     state->step_ = Steps::FINISH;
   } else if (state->step_ == Steps::FINISH) {
     finished = true;
+  }
+
+  if (finished) {
+    LOG_VERBOSE(1) << "decrement_count";
+    conn_cnt_.fetch_sub(1);
   }
 
   return !finished;

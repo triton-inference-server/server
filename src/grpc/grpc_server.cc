@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -2560,7 +2560,7 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::Stop()
+Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(
@@ -2574,6 +2574,11 @@ Server::Stop()
   model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
 
+  // Wait for in progress requests to complete
+  if (exit_timeout_secs != nullptr) {
+    WaitForConnectionsToClose(exit_timeout_secs, service_name);
+  }
+
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
   common_handler_->Stop();
@@ -2586,6 +2591,44 @@ Server::Stop()
 
   running_ = false;
   return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::WaitForConnectionsToClose(
+    uint32_t* exit_timeout_secs, const std::string& service_name)
+{
+  uint32_t conn_cnt = AggregateConnectionCount();
+  while (*exit_timeout_secs > 0 && conn_cnt > 0) {
+    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt
+             << " " << service_name << " service connections";
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    (*exit_timeout_secs)--;
+    conn_cnt = AggregateConnectionCount();
+  }
+
+  return nullptr;  // complete
+}
+
+uint32_t 
+Server::AggregateConnectionCount()
+{
+  uint32_t total_connections = 0;
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    total_connections += modelInferHandler.connection_count();
+    LOG_INFO << "connection_count: " << modelInferHandler.connection_count();
+  }
+
+  // for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+  //   auto& modelInferHandler =
+  //       dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+  //           *model_stream_infer_handler);
+  //   total_connections += modelInferHandler.connection_count();
+  // }
+
+  return total_connections;
 }
 
 }}}  // namespace triton::server::grpc
