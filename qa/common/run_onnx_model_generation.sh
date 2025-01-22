@@ -78,7 +78,7 @@ mkdir -p \
         $SCALARMODELSDESTDIR \
         $IMAGEMODELSDESTDIR
 
-cp -r . $SRCDIR
+cp -r *.py $SRCDIR/
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \

@@ -77,7 +77,7 @@ mkdir -p \
         $SCALARMODELSDESTDIR \
         $IMAGEMODELSDESTDIR
 
-cp -r . $SRCDIR
+cp -r *.py $SRCDIR/
 # OPENVINO
 #
 # OpenVINO is not available on ARM so skip

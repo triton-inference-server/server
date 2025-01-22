@@ -73,7 +73,7 @@ mkdir -p \
         $SCALARMODELSDESTDIR \
         $IMAGEMODELSDESTDIR
 
-cp -r . $SRCDIR
+cp -r *.py $SRCDIR/
 
 python3 $SRCDIR/gen_qa_models.py --libtorch --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR

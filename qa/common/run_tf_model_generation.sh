@@ -74,7 +74,7 @@ mkdir -p \
         $SCALARMODELSDESTDIR \
         $IMAGEMODELSDESTDIR
 
-cp -r . $SRCDIR
+cp -r *.py $SRCDIR/
 
 pip3 install "protobuf>4.24.0"
 
