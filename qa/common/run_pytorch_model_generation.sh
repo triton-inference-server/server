@@ -1,15 +1,10 @@
 #!/bin/bash
 # This script will be executed inside the SLURM job with Docker container
-
-# Exit on error
+nvidia-smi -L || true
+nvidia-smi || true
 set -e
 set -x
 
-# Check for NVIDIA GPUs
-nvidia-smi -L || true
-nvidia-smi || true
-
-TRITON_VERSION=${TRITON_VERSION:=25.01}
 CUDA_DEVICE=${NV_GPU:=0}
 
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
@@ -47,52 +42,31 @@ VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
-
-
-# Ensure necessary directories exist
-mkdir -p $VOLUME_BUILD_DIR $VOLUME_SRCDIR $VOLUME_DESTDIR $VOLUME_SHAPEDESTDIR \
-         $VOLUME_VARDESTDIR $VOLUME_RESHAPEDESTDIR $VOLUME_DYNASEQDESTDIR \
-         $VOLUME_DYNASEQIMPLICITDESTDIR
-
-cp *.py $VOLUME_SRCDIR
-
-python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
-python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
-chmod -R 777 $SHAPEDESTDIR
-python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
-chmod -R 777 $DESTDIR
-python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
-chmod -R 777 $VARDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$IDENTITYDESTDIR
-chmod -R 777 $IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
-chmod -R 777 $IDENTITYBIGDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
-chmod -R 777 $RESHAPEDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
-chmod -R 777 $SEQDESTDIR
-python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$IMPLICITSEQDESTDIR
-chmod -R 777 $IMPLICITSEQDESTDIR
-python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VARIMPLICITSEQDESTDIR
-chmod -R 777 $VARIMPLICITSEQDESTDIR
-python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
-chmod -R 777 $DYNASEQDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
-chmod -R 777 $VARSEQDESTDIR
-python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$DYNASEQIMPLICITDESTDIR
-chmod -R 777 $DYNASEQIMPLICITDESTDIR
-python3 $SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$RAGGEDDESTDIR
-chmod -R 777 $RAGGEDDESTDIR
-python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
-chmod -R 777 $FORMATDESTDIR
-python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
-chmod -R 777 $DATADEPENDENTDIR
-# Make shared library for custom Hardmax plugin.
-(git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git && \
-cd /workspace/TensorRT/samples/python/onnx_custom_plugin && rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.)
-LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
-chmod -R 777 $PLGDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
+chmod -R 777 $VOLUME_DESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
+chmod -R 777 $VOLUME_VARDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
+chmod -R 777 $VOLUME_IDENTITYDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
+chmod -R 777 $VOLUME_RESHAPEDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
+chmod -R 777 $VOLUME_SEQDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
+chmod -R 777 $VOLUME_VARSEQDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --models_dir=$VOLUME_IMPLICITSEQDESTDIR
+chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
+chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
+chmod -R 777 $VOLUME_DYNASEQDESTDIR
+if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
+  python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
+  chmod -R 777 $VOLUME_TORCHTRTDESTDIR
+fi
+python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
+chmod -R 777 $VOLUME_RAGGEDDESTDIR
+# Export torchvision image models to ONNX
+python3 $VOLUME_SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
+chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
 rsync -av --ignore-existing $VOLUME_BUILD_DIR/$TRITON_VERSION/ /lustre/fsw/core_dlfw_ci/datasets/inferenceserver/${NVIDIA_TRITON_SERVER_VERSION}_${TEST_REPO_ARCH}/
