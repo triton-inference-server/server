@@ -907,7 +907,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
     && apt-get update \\
     && apt-get install --yes \\
                        --install-recommends \\
-                       datacenter-gpu-manager-4-cuda12
+                       datacenter-gpu-manager-4-cuda12 datacenter-gpu-manager-4-dev
 """.format(
                     dcgm_version
                 )
@@ -923,7 +923,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
     && apt-get update \\
     && apt-get install --yes \\
                        --install-recommends \\
-                       datacenter-gpu-manager-4-cuda12
+                       datacenter-gpu-manager-4-cuda12 datacenter-gpu-manager-4-dev
 """.format(
                     dcgm_version
                 )
