@@ -15,96 +15,96 @@ RUNNER_ID=${RUNNER_ID:=0}
 PROJECT_NAME=${CI_PROJECT_NAME:=tritonserver}
 
 # Set up environment variables and paths
-VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
-VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
-VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
-VOLUME_VARDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
-VOLUME_IDENTITYDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_SIGDEFDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
-VOLUME_IDENTITYBIGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_TFPARAMETERSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
-VOLUME_SHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-VOLUME_RESHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-VOLUME_SEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-VOLUME_DYNASEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-VOLUME_DYNASEQIMPLICITDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-VOLUME_VARSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-VOLUME_ENSEMBLEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-VOLUME_NOSHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-VOLUME_PLGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-VOLUME_RAGGEDDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-VOLUME_FORMATDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-VOLUME_DATADEPENDENTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-VOLUME_IMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-VOLUME_VARIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
-VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
-VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+BUILD_DIR=${BUILD_DIR:=/mnt/$CI_JOB_ID}
+SRCDIR=${SRCDIR:=$BUILD_DIR/gen_srcdir}
+DESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_model_repository
+VARDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
+IDENTITYDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
+SIGDEFDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
+IDENTITYBIGDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+TFPARAMETERSDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
+SHAPEDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+RESHAPEDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+SEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+DYNASEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+DYNASEQIMPLICITDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+VARSEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+ENSEMBLEDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+NOSHAPEDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+PLGDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+RAGGEDDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+FORMATDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+DATADEPENDENTDIR=$BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+IMPLICITSEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+VARIMPLICITSEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+INITIALSTATEIMPLICITSEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+VARINITIALSTATEIMPLICITSEQDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+TORCHTRTDESTDIR=$BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
+SCALARMODELSDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_scalar_models
+IMAGEMODELSDESTDIR=$BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 
 # Ensure necessary directories exist
 mkdir -p \
-        $VOLUME_BUILD_DIR \
-        $VOLUME_SRCDIR \
-        $VOLUME_DESTDIR \
-        $VOLUME_VARDESTDIR \
-        $VOLUME_IDENTITYDESTDIR \
-        $VOLUME_SIGDEFDESTDIR \
-        $VOLUME_IDENTITYBIGDESTDIR \
-        $VOLUME_TFPARAMETERSDESTDIR \
-        $VOLUME_SHAPEDESTDIR \
-        $VOLUME_RESHAPEDESTDIR \
-        $VOLUME_SEQDESTDIR \
-        $VOLUME_DYNASEQDESTDIR \
-        $VOLUME_DYNASEQIMPLICITDESTDIR \
-        $VOLUME_VARSEQDESTDIR \
-        $VOLUME_ENSEMBLEDESTDIR \
-        $VOLUME_NOSHAPEDESTDIR \
-        $VOLUME_PLGDESTDIR \
-        $VOLUME_RAGGEDDESTDIR \
-        $VOLUME_FORMATDESTDIR \
-        $VOLUME_DATADEPENDENTDIR \
-        $VOLUME_IMPLICITSEQDESTDIR \
-        $VOLUME_VARIMPLICITSEQDESTDIR \
-        $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_TORCHTRTDESTDIR \
-        $VOLUME_SCALARMODELSDESTDIR \
-        $VOLUME_IMAGEMODELSDESTDIR
+        $BUILD_DIR \
+        $SRCDIR \
+        $DESTDIR \
+        $VARDESTDIR \
+        $IDENTITYDESTDIR \
+        $SIGDEFDESTDIR \
+        $IDENTITYBIGDESTDIR \
+        $TFPARAMETERSDESTDIR \
+        $SHAPEDESTDIR \
+        $RESHAPEDESTDIR \
+        $SEQDESTDIR \
+        $DYNASEQDESTDIR \
+        $DYNASEQIMPLICITDESTDIR \
+        $VARSEQDESTDIR \
+        $ENSEMBLEDESTDIR \
+        $NOSHAPEDESTDIR \
+        $PLGDESTDIR \
+        $RAGGEDDESTDIR \
+        $FORMATDESTDIR \
+        $DATADEPENDENTDIR \
+        $IMPLICITSEQDESTDIR \
+        $VARIMPLICITSEQDESTDIR \
+        $INITIALSTATEIMPLICITSEQDESTDIR \
+        $VARINITIALSTATEIMPLICITSEQDESTDIR \
+        $TORCHTRTDESTDIR \
+        $SCALARMODELSDESTDIR \
+        $IMAGEMODELSDESTDIR
 
-cp -r . $VOLUME_SRCDIR
+cp -r . $SRCDIR
 
 pip3 install "protobuf>4.24.0"
 
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$VOLUME_NOSHAPEDESTDIR
-chmod -R 777 $VOLUME_NOSHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --savedmodel --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
-python3 $VOLUME_SRCDIR/gen_tag_sigdef.py --dir $VOLUME_SIGDEFDESTDIR
-chmod -R 777 $VOLUME_SIGDEFDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDESTDIR
-chmod -R 777 $VOLUME_TFPARAMETERSDESTDIR
-rsync -av --ignore-existing $VOLUME_BUILD_DIR/$TRITON_VERSION/ /lustre/fsw/core_dlfw_ci/datasets/inferenceserver/${NVIDIA_TRITON_SERVER_VERSION}_${TEST_REPO_ARCH}/
+python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
+chmod -R 777 $DESTDIR
+python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
+chmod -R 777 $VARDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$NOSHAPEDESTDIR
+chmod -R 777 $NOSHAPEDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --savedmodel --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
+python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
+python3 $SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_model_repository
+python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_reshape_model_repository
+python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
+python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
+python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
+chmod -R 777 $ENSEMBLEDESTDIR
+python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
+chmod -R 777 $SIGDEFDESTDIR
+python3 $SRCDIR/gen_qa_tf_parameters.py --models_dir $TFPARAMETERSDESTDIR
+chmod -R 777 $TFPARAMETERSDESTDIR
+rsync -av --ignore-existing $BUILD_DIR/$TRITON_VERSION/ /lustre/fsw/core_dlfw_ci/datasets/inferenceserver/${NVIDIA_TRITON_SERVER_VERSION}_${TEST_REPO_ARCH}/
