@@ -78,7 +78,7 @@ mkdir -p \
         $VOLUME_SCALARMODELSDESTDIR \
         $VOLUME_IMAGEMODELSDESTDIR
 
-cp . $VOLUME_SRCDIR
+cp -r . $VOLUME_SRCDIR
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \

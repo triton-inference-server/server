@@ -77,7 +77,7 @@ mkdir -p \
         $VOLUME_SCALARMODELSDESTDIR \
         $VOLUME_IMAGEMODELSDESTDIR
 
-cp . $VOLUME_SRCDIR
+cp -r . $VOLUME_SRCDIR
 
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR

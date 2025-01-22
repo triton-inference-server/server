@@ -74,7 +74,7 @@ mkdir -p \
         $VOLUME_SCALARMODELSDESTDIR \
         $VOLUME_IMAGEMODELSDESTDIR
 
-cp . $VOLUME_SRCDIR
+cp -r . $VOLUME_SRCDIR
 
 pip3 install "protobuf>4.24.0"
 

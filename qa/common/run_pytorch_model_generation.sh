@@ -73,7 +73,7 @@ mkdir -p \
         $VOLUME_SCALARMODELSDESTDIR \
         $VOLUME_IMAGEMODELSDESTDIR
 
-cp . $VOLUME_SRCDIR
+cp -r . $VOLUME_SRCDIR
 
 python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
