@@ -659,7 +659,6 @@ ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(cq_);
   context->SetCompressionLevel(compression_level_);
-  LOG_VERBOSE(1) << "increment_count";
   conn_cnt_.fetch_add(1);
   State* state = StateNew(tritonserver_.get(), context);
 
@@ -786,7 +785,6 @@ ModelInferHandler::Process(
   }
 
   if (finished) {
-    LOG_VERBOSE(1) << "decrement_count";
     conn_cnt_.fetch_sub(1);
   }
 

@@ -1491,7 +1491,6 @@ InferHandler<
   auto barrier = std::make_shared<Barrier>(2);
 
   thread_.reset(new std::thread([this, barrier] {
-    //INCREMENT COUNT
     StartNewRequest();
     barrier->Wait();
 
@@ -1530,7 +1529,6 @@ InferHandler<
         LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
         state->context_->EraseState(state);
         StateRelease(state);
-        //DECREMENT COUNT
       } else {
         LOG_VERBOSE(2) << "Returning from " << Name() << ", "
                        << state->unique_id_ << ", " << state->step_;
