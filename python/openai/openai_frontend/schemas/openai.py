@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -103,9 +103,9 @@ class CreateCompletionRequest(BaseModel):
         description="Include the log probabilities on the `logprobs` most likely output tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5.\n",
     )
     max_tokens: Optional[conint(ge=0)] = Field(
-        16,
+        256,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
-        examples=[16],
+        examples=[256],
     )
     # TODO: Extension, flesh out description and defaults
     min_tokens: Optional[conint(ge=0)] = Field(
@@ -856,7 +856,7 @@ class CreateChatCompletionRequest(BaseModel):
     )
     # TODO: Consider new max_completion_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
     max_tokens: Optional[conint(ge=0)] = Field(
-        16,
+        256,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
     )
     # TODO: Extension, flesh out description and defaults
