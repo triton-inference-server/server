@@ -40,7 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-DATADIR=/my_workspace/mnt/nvdl/datasets/tritonserver/models/${REPO_VERSION}
+DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 CLIENT_LOG="./client.log"
 ONNXTRT_OPTIMIZATION_TEST=onnxtrt_optimization_test.py
