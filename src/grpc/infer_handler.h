@@ -1252,6 +1252,12 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
+  std::atomic<uint32_t> conn_cnt_ = 0;
+
+  void IncrementConnectionCount() { conn_cnt_.fetch_add(1); }
+
+  void DecrementConnectionCount() { conn_cnt_.fetch_sub(1); }
+
   using State =
       InferHandlerState<ServerResponderType, RequestType, ResponseType>;
   using StateContext = typename State::Context;
@@ -1261,6 +1267,8 @@ class InferHandler : public HandlerBase {
       const std::shared_ptr<StateContext>& context,
       Steps start_step = Steps::START)
   {
+    IncrementConnectionCount();
+
     State* state = nullptr;
 
     if (max_state_bucket_count_ > 0) {
@@ -1300,11 +1308,13 @@ class InferHandler : public HandlerBase {
       if (state_bucket_.size() < max_state_bucket_count_) {
         state->Release();
         state_bucket_.push_back(state);
+        DecrementConnectionCount();
         return;
       }
     }
 
     delete state;
+    DecrementConnectionCount();
   }
 
   // Simple structure that carries the payload needed for
@@ -1555,7 +1565,7 @@ class ModelInferHandler
             name, tritonserver, service, cq, max_state_bucket_count,
             restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level), conn_cnt_(0)
+        compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -1581,8 +1591,7 @@ class ModelInferHandler
         "deleting response allocator");
   }
 
- public:
-  std::atomic<uint32_t> connection_count() { return conn_cnt_.load(); }
+  std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
 
  protected:
   void StartNewRequest() override;
@@ -1599,8 +1608,6 @@ class ModelInferHandler
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
-  
-  std::atomic<uint32_t> conn_cnt_;
 };
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)

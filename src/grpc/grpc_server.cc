@@ -2609,7 +2609,7 @@ Server::WaitForConnectionsToClose(
   return nullptr;  // complete
 }
 
-uint32_t 
+uint32_t
 Server::AggregateConnectionCount()
 {
   uint32_t total_connections = 0;
@@ -2617,7 +2617,14 @@ Server::AggregateConnectionCount()
     auto& modelInferHandler =
         dynamic_cast<triton::server::grpc::ModelInferHandler&>(
             *model_infer_handler);
-    total_connections += modelInferHandler.connection_count();
+    total_connections += modelInferHandler.GetConnectionCount();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    total_connections += modelStreamInferHandler.GetConnectionCount();
   }
 
   return total_connections;
