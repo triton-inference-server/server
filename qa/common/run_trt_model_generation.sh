@@ -77,7 +77,7 @@ mkdir -p \
         $SCALARMODELSDESTDIR \
         $IMAGEMODELSDESTDIR
 
-cp -r *.py $SRCDIR/
+rsync -av . $SRCDIR/
 
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
