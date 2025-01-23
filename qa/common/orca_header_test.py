@@ -68,7 +68,6 @@ def parse_header_data(header, orca_format):
             else:
                 print(f"No key '{METRIC_KEY}' in header data: {data}")
                 return None
-            return data
         elif orca_format == "http":
             # Parse the header in TEXT format
             data = {}
