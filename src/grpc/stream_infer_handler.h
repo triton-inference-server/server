@@ -104,6 +104,8 @@ class ModelStreamInferHandler
         "deleting response allocator");
   }
 
+  std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
+
  protected:
   void StartNewRequest() override;
   bool Process(

@@ -659,7 +659,6 @@ ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(cq_);
   context->SetCompressionLevel(compression_level_);
-  conn_cnt_.fetch_add(1);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -782,10 +781,6 @@ ModelInferHandler::Process(
     state->step_ = Steps::FINISH;
   } else if (state->step_ == Steps::FINISH) {
     finished = true;
-  }
-
-  if (finished) {
-    conn_cnt_.fetch_sub(1);
   }
 
   return !finished;
