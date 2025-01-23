@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -266,10 +266,6 @@ Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.htm
 For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
-
-## Building for JetPack 4.x
-
-*Under Construction*
 
 ## Building for Windows 10
 
