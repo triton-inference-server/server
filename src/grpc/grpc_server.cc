@@ -2570,14 +2570,15 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
   // Always shutdown the completion queue after the server.
   server_->Shutdown();
 
-  common_cq_->Shutdown();
-  model_infer_cq_->Shutdown();
-  model_stream_infer_cq_->Shutdown();
-
   // Wait for in progress requests to complete
   if (exit_timeout_secs != nullptr) {
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
+
+  // Shutdown completion queues
+  common_cq_->Shutdown();
+  model_infer_cq_->Shutdown();
+  model_stream_infer_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
