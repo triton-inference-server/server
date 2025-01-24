@@ -127,6 +127,45 @@ for trial in $TRIALS; do
 
   kill $SERVER_PID
   wait $SERVER_PID
+
+  SERVER_ARGS="--model-repository=$MODELDIR --grpc-max-response-pool-size=1"
+  SERVER_LOG="grpc_max_response_pool_size_1_${trial}_server.log"
+  CLIENT_LOG="grpc_max_response_pool_size_1_${trial}_client.log"
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
+
+  for test in \
+              test_one_to_none \
+              test_one_to_one \
+              test_one_to_many \
+              test_no_streaming \
+              test_response_order \
+        test_wrong_shape; do
+
+      echo "Test: $test" >>$CLIENT_LOG
+      set +e
+      python $DECOUPLED_TEST DecoupledTest.$test >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+              echo -e "\n***\n*** Test grpc-max-response-pool-size=1 ${trial} - $test Failed\n***" >>$CLIENT_LOG
+              echo -e "\n***\n*** Test grpc-max-response-pool-size=1 ${trial} - $test Failed\n***"
+              RET=1
+      else
+          check_test_results $TEST_RESULT_FILE 1
+          if [ $? -ne 0 ]; then
+              cat $CLIENT_LOG
+              echo -e "\n***\n*** Test Result Verification Failed\n***"
+              RET=1
+          fi
+      fi
+      set -e
+  done
+
+  kill $SERVER_PID
+  wait $SERVER_PID
 done
 
 # Test the server frontend can merge the responses of non-decoupled model that
