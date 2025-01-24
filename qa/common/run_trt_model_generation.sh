@@ -123,4 +123,4 @@ rm -rf build && mkdir build && \
 cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $PLGDESTDIR/.
 LD_PRELOAD=$PLGDESTDIR/libcustomHardmaxPlugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
 chmod -R 777 $PLGDESTDIR
-rsync -av --ignore-existing $BUILD_DIR/$TRITON_VERSION/ /lustre/fsw/core_dlfw_ci/datasets/inferenceserver/${NVIDIA_TRITON_SERVER_VERSION}_${TEST_REPO_ARCH}/
+rsync -av $BUILD_DIR/$TRITON_VERSION/ /lustre/fsw/core_dlfw_ci/datasets/inferenceserver/${NVIDIA_TRITON_SERVER_VERSION}_${TEST_REPO_ARCH}/
