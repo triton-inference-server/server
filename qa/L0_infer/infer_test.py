@@ -264,7 +264,9 @@ class InferTest(tu.TestResultCollector):
                 and (output0_dtype == np.int32)
                 and (output1_dtype == np.int32)
             ):
-                print("skipping pytorch test for input dtype int8 and outputs dtype int32 due to a pytorch bug")
+                print(
+                    "skipping pytorch test for input dtype int8 and outputs dtype int32 due to a pytorch bug"
+                )
             else:
                 for prefix in ensemble_prefix:
                     if "libtorch" in BACKENDS:
