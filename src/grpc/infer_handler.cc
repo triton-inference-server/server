@@ -753,14 +753,19 @@ ModelInferHandler::Process(
       StartNewRequest();
     }
 
-    if (ExecutePrecondition(state)) {
+    if (accepting_new_conn_ && ExecutePrecondition(state)) {
       Execute(state);
     } else {
-      ::grpc::Status status = ::grpc::Status(
-          ::grpc::StatusCode::UNAVAILABLE,
-          std::string("This protocol is restricted, expecting header '") +
-              restricted_kv_.first + "'");
-
+      if (accepting_new_conn_) {
+        ::grpc::Status status = ::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            std::string("This protocol is restricted, expecting header '") +
+                restricted_kv_.first + "'");
+      } else {
+        ::grpc::Status status = ::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            std::string("GRPC server is shutting down."));
+      }
 
 #ifdef TRITON_ENABLE_TRACING
       state->trace_timestamps_.emplace_back(
