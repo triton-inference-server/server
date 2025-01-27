@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -223,7 +223,7 @@ ModelStreamInferHandler::Process(
 
     if (!accepting_new_conn_) {
       err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is shutting down.");
+          TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is shutting down.");
     }
 
     int64_t requested_model_version;
