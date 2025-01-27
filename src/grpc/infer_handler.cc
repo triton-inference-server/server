@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -756,13 +756,14 @@ ModelInferHandler::Process(
     if (accepting_new_conn_ && ExecutePrecondition(state)) {
       Execute(state);
     } else {
+      ::grpc::Status status;
       if (accepting_new_conn_) {
-        ::grpc::Status status = ::grpc::Status(
+        status = ::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             std::string("This protocol is restricted, expecting header '") +
                 restricted_kv_.first + "'");
       } else {
-        ::grpc::Status status = ::grpc::Status(
+        status = ::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             std::string("GRPC server is shutting down."));
       }
