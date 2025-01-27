@@ -142,6 +142,15 @@ def clone_from_github(repo, tag, org):
     repo_url = f"https://github.com/{org}/{repo}.git"
     # Construct the git clone command
     if tag:
+        if repo_url.__contains__("/model_navigator/"):
+            clone_command = [
+                "git",
+                "clone",
+                "--branch",
+                "main",
+                "--single-branch",
+                repo_url,
+            ]
         clone_command = [
             "git",
             "clone",
