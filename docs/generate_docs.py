@@ -142,15 +142,14 @@ def clone_from_github(repo, tag, org):
     repo_url = f"https://github.com/{org}/{repo}.git"
     # Construct the git clone command
     if tag:
-        if repo_url.__contains__("/model_navigator/"):
-            clone_command = [
-                "git",
-                "clone",
-                "--branch",
-                "main",
-                "--single-branch",
-                repo_url,
-            ]
+        if re.match("model_navigator", repo):
+            tag = "main"
+
+        if re.match("tensorrtllm_backend", repo):
+            tag = os.getenv("TENSORRTLLM_BACKEND_REPO_TAG", "main")
+            token = os.getenv("CI_JOB_TOKEN")
+            repo_url = f"https://gitlab-ci-token:{token}@gitlab-master.nvidia.com/dl/triton/{repo}.git"
+
         clone_command = [
             "git",
             "clone",
