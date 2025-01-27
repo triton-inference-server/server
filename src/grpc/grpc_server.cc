@@ -2569,13 +2569,15 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  // Always shutdown the completion queue after the server.
-  server_->Shutdown();
+  DisableNewConnections();
 
   // Wait for in progress requests to complete
   if (exit_timeout_secs != nullptr) {
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
+
+  // Always shutdown the completion queue after the server.
+  server_->Shutdown();
 
   // Shutdown completion queues
   common_cq_->Shutdown();
@@ -2593,6 +2595,26 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
   }
 
   running_ = false;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::DisableNewConnections()
+{
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    modelInferHandler.DisableConnections();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    modelStreamInferHandler.DisableConnections();
+  }
+
   return nullptr;  // success
 }
 
@@ -2621,6 +2643,10 @@ Server::AggregateConnectionCount()
         dynamic_cast<triton::server::grpc::ModelInferHandler&>(
             *model_infer_handler);
     total_connections += modelInferHandler.GetConnectionCount();
+
+    // Each modelInferHandler allocates a state for itself.
+    // This must be excluded from the total connection count
+    total_connections--;
   }
 
   for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
@@ -2628,6 +2654,10 @@ Server::AggregateConnectionCount()
         dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
             *model_stream_infer_handler);
     total_connections += modelStreamInferHandler.GetConnectionCount();
+
+    // Each modelStreamInferHandler allocates a state for itself.
+    // This must be excluded from the total connection count
+    total_connections--;
   }
 
   return total_connections;

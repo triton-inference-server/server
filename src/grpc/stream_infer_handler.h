@@ -105,6 +105,7 @@ class ModelStreamInferHandler
   }
 
   std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
+  void DisableConnections() { accepting_new_conn_ = false; }
 
  protected:
   void StartNewRequest() override;

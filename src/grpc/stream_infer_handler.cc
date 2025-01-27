@@ -221,9 +221,16 @@ ModelStreamInferHandler::Process(
       return !finished;
     }
 
+    if (!accepting_new_conn_) {
+      err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is shutting down.");
+    }
+
     int64_t requested_model_version;
-    err = GetModelVersionFromString(
-        request.model_version(), &requested_model_version);
+    if (err == nullptr) {
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
+    }
 
     // Record the transaction policy of the model into the current state
     // object.

@@ -1317,6 +1317,8 @@ class InferHandler : public HandlerBase {
  protected:
   std::atomic<uint32_t> conn_cnt_ = 0;
 
+  bool accepting_new_conn_ = true;
+
   void IncrementConnectionCount() { conn_cnt_.fetch_add(1); }
 
   void DecrementConnectionCount() { conn_cnt_.fetch_sub(1); }
@@ -1658,6 +1660,7 @@ class ModelInferHandler
   }
 
   std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
+  void DisableConnections() { accepting_new_conn_ = false; }
 
  protected:
   void StartNewRequest() override;
