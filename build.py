@@ -1480,6 +1480,12 @@ RUN pip3 install vllm=={}
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
+    if "openvino" in backends:
+        df += """
+# point opencl to openvino related drivers
+RUN mkdir -p /etc/OpenCL/vendors && echo  /opt/tritonserver/backends/openvino/libigdrcl.so > /etc/OpenCL/vendors/intel_openvino.icd 
+"""
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
