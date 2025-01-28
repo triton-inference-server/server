@@ -149,7 +149,9 @@ def clone_from_github(repo, tag, org):
             tag = os.getenv("TENSORRTLLM_BACKEND_REPO_TAG", "main")
             token = os.getenv("CI_JOB_TOKEN")
             host_fqdn = os.getenv("CI_SERVER_FQDN")
-            repo_url = f"https://gitlab-ci-token:{token}@{host_fqdn}/dl/triton/{repo}.git"
+            repo_url = (
+                f"https://gitlab-ci-token:{token}@{host_fqdn}/dl/triton/{repo}.git"
+            )
 
         clone_command = [
             "git",
