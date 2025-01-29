@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,6 +66,11 @@ for MODEL in \
     (cd models/${MODEL}_test && \
             sed -i 's/_float32_float32_float32/&_test/' config.pbtxt && \
             echo -e "\ninstance_group { count: ${INSTANCE_COUNT} }" >> config.pbtxt) && \
+    # Enable session.use_device_allocator_for_initializers
+    cp -r models/${MODEL}_test models/${MODEL}_session_config && \
+    (cd models/${MODEL}_session_config && \
+            sed -i 's/_float32_test/_float32_session_config/' config.pbtxt && \
+            echo "parameters: { key: \"session.use_device_allocator_for_initializers\" value: { string_value: \"1\" }}" >> config.pbtxt) && \
     # CUDA EP optimization params
     cp -r models/${MODEL}_test models/${MODEL}_cuda_config && \
     (cd models/${MODEL}_cuda_config && \
@@ -159,6 +164,12 @@ for MODEL in \
     fi
 
     set +e
+
+    grep "Configuring 'session.use_device_allocator_for_initializers' to '1'" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring 'session.use_device_allocator_for_initializers' to '1'\n***"
+        RET=1
+    fi
 
     grep "TensorRT Execution Accelerator is set for '${MODEL}_trt'" $SERVER_LOG
     if [ $? -ne 0 ]; then
