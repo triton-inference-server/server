@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-## [[Triton Inference Server]{.underline} Release 25.01](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-25-01.html#rel-25-01)
+## [Triton Inference Server Release 25.01](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-25-01.html#rel-25-01)
 
 The Triton Inference Server container image, release 25.01, is available
 on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
