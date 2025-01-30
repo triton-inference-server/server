@@ -32,7 +32,7 @@ on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
 is open source
 on [GitHub](https://github.com/triton-inference-server/server).
 
-# Contents of the Triton Inference Server container
+## Contents of the Triton Inference Server container
 
 The [Triton Inference
 Server](https://github.com/triton-inference-server/server) Docker image
