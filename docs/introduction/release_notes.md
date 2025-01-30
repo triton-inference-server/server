@@ -162,14 +162,6 @@ enhancements.
 -   A bytes appending bug was fixed in GenAI-Perf, resulting in more
     accurate output sequence lengths for Triton.
 
-## NVIDIA Triton Inference Server Container Versions
-
-The following table shows what versions of Ubuntu, CUDA, Triton
-Inference Server, and NVIDIA TensorRT™ are supported in each of the
-NVIDIA containers for Triton Inference Server. For older container
-versions, refer to the [Frameworks Support
-Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html).
-
 
 ## Known Issues
 
