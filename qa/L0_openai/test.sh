@@ -73,10 +73,10 @@ function prepare_tensorrtllm() {
         --dtype float16
 
     # 3. Build engine
-    # max_batch_size set to 128 to avoid OOM errors
+    # max_batch_size set to 512 to avoid OOM errors
     trtllm-build --checkpoint_dir ${CKPT_PATH} \
         --gemm_plugin auto \
-        --max_batch_size 128 \
+        --max_batch_size 512 \
         --output_dir ${ENGINE_PATH}
 
     # 4. Prepare model repository
