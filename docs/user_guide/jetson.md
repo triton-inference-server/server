@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,7 +82,6 @@ apt-get update && \
             libtool \
             libboost-dev \
             rapidjson-dev \
-            patchelf \
             pkg-config \
             libopenblas-dev \
             libarchive-dev \
@@ -95,7 +94,7 @@ apt-get update && \
 Additional Onnx Runtime dependencies must be installed to build the Onnx Runtime backend:
 
 ```
-pip3 install --upgrade flake8 flatbuffers
+pip3 install --upgrade flake8 flatbuffers patchelf==0.17.2
 ```
 
 Additional PyTorch dependencies must be installed to build (and run) the PyTorch backend:
