@@ -1,0 +1,1 @@
+../../docs/client_guide/openai.md

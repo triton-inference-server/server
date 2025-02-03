@@ -33,5 +33,5 @@ API Reference
    :maxdepth: 1
    :hidden:
 
-   OpenAI API <openai_readme.md>
+   OpenAI API <openai.md>
    kserve
