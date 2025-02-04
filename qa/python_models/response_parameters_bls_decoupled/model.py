@@ -31,6 +31,14 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """
+    This model (A) is designed to test sending back response parameters when using BLS
+    with decoupled model transaction policy.
+
+    The only difference vs. response_parameters_bls model is this model turns on decoupled
+    model transaction policy. For more details, please check response_parameters_bls.
+    """
+
     def execute(self, requests):
         for request in requests:
             res_params_tensor = pb_utils.get_input_tensor_by_name(

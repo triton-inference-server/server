@@ -31,6 +31,17 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """
+    This model (A) is designed to test sending back response parameters when using BLS.
+    It takes one input tensor, which is the RESPONSE_PARAMETERS and uses BLS to
+    call response_parameters model (B). Model B would set RESPONSE_PARAMETERS (with a bit
+    of data massage) as its response parameters. In the end, model A would also set its
+    response parameters from model B's response parameters.
+
+    With above model set up, we can easily test whether the real response parameters are
+    the same as the input response parameters.
+    """
+
     def execute(self, requests):
         responses = []
 
