@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -142,6 +142,17 @@ def clone_from_github(repo, tag, org):
     repo_url = f"https://github.com/{org}/{repo}.git"
     # Construct the git clone command
     if tag:
+        if re.match("model_navigator", repo):
+            tag = "main"
+
+        if re.match("tensorrtllm_backend", repo):
+            tag = os.getenv("TENSORRTLLM_BACKEND_REPO_TAG", "main")
+            token = os.getenv("CI_JOB_TOKEN")
+            host_fqdn = os.getenv("CI_SERVER_FQDN")
+            repo_url = (
+                f"https://gitlab-ci-token:{token}@{host_fqdn}/dl/triton/{repo}.git"
+            )
+
         clone_command = [
             "git",
             "clone",
