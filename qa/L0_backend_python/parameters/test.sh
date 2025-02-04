@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,43 +25,47 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/25.01
-publishedVersion: '2.54.0'
-gcpMarketplace: true
+source ../../common/util.sh
 
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 25.01-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
+RET=0
 
-service:
-  type: NodePort
+#
+# Test response parameters
+#
+rm -rf models && mkdir models
+mkdir -p models/response_parameters/1 && \
+    cp ../../python_models/response_parameters/model.py models/response_parameters/1 && \
+    cp ../../python_models/response_parameters/config.pbtxt models/response_parameters
+mkdir -p models/response_parameters_decoupled/1 && \
+    cp ../../python_models/response_parameters_decoupled/model.py models/response_parameters_decoupled/1 && \
+    cp ../../python_models/response_parameters_decoupled/config.pbtxt models/response_parameters_decoupled
 
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+TEST_LOG="response_parameters_test.log"
+SERVER_LOG="response_parameters_test.server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/parameters/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 -m pytest --junitxml=response_parameters_test.report.xml response_parameters_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Response parameters test FAILED\n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 1 ]; then
+    echo -e "\n***\n*** Parameters test FAILED\n***"
+else
+    echo -e "\n***\n*** Parameters test Passed\n***"
+fi
+exit $RET
