@@ -39,8 +39,15 @@ mkdir -p models/response_parameters/1 && \
 mkdir -p models/response_parameters_decoupled/1 && \
     cp ../../python_models/response_parameters_decoupled/model.py models/response_parameters_decoupled/1 && \
     cp ../../python_models/response_parameters_decoupled/config.pbtxt models/response_parameters_decoupled
+mkdir -p models/response_parameters_bls/1 && \
+    cp ../../python_models/response_parameters_bls/model.py models/response_parameters_bls/1 && \
+    cp ../../python_models/response_parameters_bls/config.pbtxt models/response_parameters_bls
+mkdir -p models/response_parameters_bls_decoupled/1 && \
+    cp ../../python_models/response_parameters_bls_decoupled/model.py models/response_parameters_bls_decoupled/1 && \
+    cp ../../python_models/response_parameters_bls_decoupled/config.pbtxt models/response_parameters_bls_decoupled
 
 TEST_LOG="response_parameters_test.log"
+TEST_BLS_LOG="response_parameters_bls_test.log"
 SERVER_LOG="response_parameters_test.server.log"
 SERVER_ARGS="--model-repository=${MODELDIR}/parameters/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
@@ -56,6 +63,15 @@ python3 -m pytest --junitxml=response_parameters_test.report.xml response_parame
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Response parameters test FAILED\n***"
     cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+set +e
+python3 -m pytest --junitxml=response_parameters_bls_test.report.xml response_parameters_bls_test.py > $TEST_BLS_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Response parameters in BLS mode test FAILED\n***"
+    cat $TEST_BLS_LOG
     RET=1
 fi
 set -e
