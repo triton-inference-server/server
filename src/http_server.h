@@ -457,8 +457,8 @@ class HTTPAPIServer : public HTTPServer {
     // Creates a header string in the the proper reporting format for provided
     // KV-cache metrics.
     static std::string OrcaKVMetricHeader(
-        const std::string& reporting_format, const double kv_cache_utilization,
-        const uint64_t max_token_capacity);
+        const std::string& reporting_format,
+        const std::unordered_map<std::string, double> metrics);
 #endif  // TRITON_ENABLE_METRICS
 
     TRITONSERVER_Error* ExactMappingInput(

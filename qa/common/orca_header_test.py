@@ -40,14 +40,18 @@ import requests
 # ```
 # python3 orca_header_test.py http://localhost:8000/v2/models/ensemble/generate
 # ```
-def get_endpoint_header(url, data):
+def get_endpoint_header(url, data, request_header=None):
     """
     Sends a POST request to the given URL with the provided data and returns the value of the "endpoint-load-metrics" header,
     or None if the request fails.
     """
     HEADER_KEY = "endpoint-load-metrics"
     try:
-        response = requests.post(url, json=data)
+        response = None
+        if request_header:
+            response = requests.post(url, json=data, headers=request_header)
+        else:
+            response = requests.post(url, json=data)
         response.raise_for_status()
         return response.headers.get(HEADER_KEY, "")
     except requests.exceptions.RequestException as e:
@@ -99,34 +103,46 @@ def check_for_keys(data, desired_keys, orca_format):
         print(f"Missing keys in header: {', '.join(set(desired_keys) - set(data))}")
         return False
 
+def request_header(orca_format):
+    return {"endpoint-load-metrics-type": orca_format} if orca_format else None
+
+def test_header_type(url, data, orca_format):
+    req_header = request_header(orca_format)
+    response_header = get_endpoint_header(args.url, TEST_DATA, req_header)
+
+    desired_keys = {"kv_cache_utilization", "max_token_capacity"}  # Just the keys, no need to initialize with None
+    passed = None
+
+    if response_header is None:
+        print(f"Request to endpoint: '{args.url}' failed.")
+        return False
+    elif response_header == "":
+        if orca_format:
+            print(f"response header empty, endpoint-load-metrics-type={orca_format} is not a valid ORCA metric format")
+            return False
+        else:
+            # No request header set <=> no response header. Indended behavior.
+            print(f"response header empty, endpoint-load-metrics-type is not set")
+            return True
+
+    data = parse_header_data(response_header, orca_format)
+    if data:
+        return check_for_keys(data, desired_keys, orca_format)
+    else:
+        print(f"Unexpected response header value: {response_header}")
+        return False
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Make a POST request to generate endpoint to test the ORCA metrics header.")
     parser.add_argument("url", help="The model URL to send the request to.")
     args = parser.parse_args()
-
     TEST_DATA = json.loads('{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}')
-    ORCA_ENVVAR = "TRITON_ORCA_METRIC_FORMAT"
-    orca_format = os.environ.get(ORCA_ENVVAR, "")
+    passed = True
 
-    header = get_endpoint_header(args.url, TEST_DATA)
-    desired_keys = {"kv_cache_utilization", "max_token_capacity"}  # Just the keys, no need to initialize with None
-    passed = None
-
-    if header is None:
-        print(f"Request to endpoint: '{args.url}' failed.")
-        passed = False
-    elif orca_format in ["json", "http"]:
-        data = parse_header_data(header, orca_format)
-        if data:
-            passed = check_for_keys(data, desired_keys, orca_format)
-    elif header == "":
-        if orca_format:
-            print(f"header empty, {ORCA_ENVVAR}={orca_format} is not a valid ORCA metric format")
-        else:
-            print(f"header empty, {ORCA_ENVVAR} is not set")
-        passed = True
-    else:
-        print(f"Unexpected header value: {header}")
-        passed = False
+    for format in ["json", "http", None]:
+        print("Checking response header for ORCA format:", format)
+        if not test_header_type(args.url, TEST_DATA, format):
+            print("FAIL on format:", format)
+            passed = False
     
     sys.exit(0 if passed else 1)

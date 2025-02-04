@@ -87,6 +87,13 @@ namespace triton { namespace server {
     }                                                                   \
   } while (false)
 
+#define ENDPOINT_LOAD_METRICS_TYPE "endpoint-load-metrics-type"
+#define ENDPOINT_LOAD_METRICS_NAME "endpoint-load-metrics"
+#define KV_CACHE_BLOCK_METRICS_FAMILY "nv_trt_llm_kv_cache_block_metrics"
+#define KV_CACHE_BLOCK_TYPE "kv_cache_block_type"
+#define KV_CACHE_UTIL_KEY "kv_cache_utilization"
+#define MAX_TOKEN_CAPACITY_KEY "max_token_capacity"
+#define NAMED_METRICS "named_metrics"
 
 namespace {
 
@@ -4244,11 +4251,11 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // logic to add kv_cache metrics to response header
   // Get the metrics in Prometheus format
 
-  // "TRITON_ORCA_METRIC_FORMAT" is an environment variable that specifies which load
-  // report format `endpoint-load-metrics` will be in. If left unset the header
-  // will not be written and the feature is disabled.
+  // ENDPOINT_LOAD_METRICS_TYPE is request header that specifies which load
+  // report format `endpoint-load-metrics` will be in. If not present, the 
+  // response header will not be written and the feature is disabled.
   //
-  // When set, the valid values for "TRITON_ORCA_METRIC_FORMAT" are:
+  // The valid values for ENDPOINT_LOAD_METRICS_TYPE header are:
   //
   // "http"
   // "json"
@@ -4259,8 +4266,15 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // For specifics on the different formats for the load reporting formats, see:
   // https://docs.google.com/document/d/1C1ybMmDKJIVlrbOLbywhu9iRYo4rilR-cT50OTtOFTs/edit?tab=t.0#heading=h.do9yfa1wlpk8
   auto server = infer_request->EvHtpServer();
-  if (std::getenv("TRITON_ORCA_METRIC_FORMAT") != nullptr && server != nullptr) {
-    const std::string orca_type = std::getenv("TRITON_ORCA_METRIC_FORMAT");
+  const char* orca_metric_format = nullptr;
+  evhtp_header_t* metric_format_header =
+      evhtp_headers_find_header(req->headers_in, ENDPOINT_LOAD_METRICS_TYPE);
+
+  if (metric_format_header != nullptr) {
+    orca_metric_format = metric_format_header->val;
+  }
+  if (orca_metric_format != nullptr && server != nullptr) {
+    const std::string orca_type = orca_metric_format;
     TRITONSERVER_Metrics* metrics = nullptr;
     TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server, &metrics);
     if (err == nullptr) {
@@ -4278,9 +4292,9 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
           evhtp_headers_add_header(
               req->headers_out,
               evhtp_header_new(
-                  "endpoint-load-metrics", extracted_kv_metrics.c_str(), 1, 1));
+                  ENDPOINT_LOAD_METRICS_NAME, extracted_kv_metrics.c_str(), 1, 1));
         } else {
-          LOG_ERROR << "TRITON_ORCA_METRIC_FORMAT is set but extracted_kv_metrics is "
+          LOG_ERROR << "ENDPOINT_LOAD_METRICS_TYPE request header is set but extracted_kv_metrics is "
                        "empty, no header written. orca_type="
                     << orca_type;
         }
@@ -4388,7 +4402,7 @@ std::string
 HTTPAPIServer::GenerateRequestClass::ExtractKVMetrics(
     const std::string& prometheus_metrics, const std::string& orca_type)
 {
-  std::string metric_family = "nv_trt_llm_kv_cache_block_metrics";
+  std::string metric_family = KV_CACHE_BLOCK_METRICS_FAMILY;
   std::vector<PromMetric> kv_cache_metrics =
       MetricFamilyExtractor(prometheus_metrics, metric_family);
 
@@ -4397,8 +4411,8 @@ HTTPAPIServer::GenerateRequestClass::ExtractKVMetrics(
   double max_blocks = -1;
 
   for (const auto& metric : kv_cache_metrics) {
-    if (metric.labels.count("kv_cache_block_type") > 0) {
-      std::string type = metric.labels.at("kv_cache_block_type");
+    if (metric.labels.count(KV_CACHE_BLOCK_TYPE) > 0) {
+      std::string type = metric.labels.at(KV_CACHE_BLOCK_TYPE);
       if (type == "tokens_per") {
         tokens_per_block = metric.value;
       } else if (type == "used") {
@@ -4420,23 +4434,24 @@ HTTPAPIServer::GenerateRequestClass::ExtractKVMetrics(
   if (max_blocks > 0) {
     kv_cache_utilization = used_blocks / max_blocks;
   }
-  uint64_t max_token_capacity =
-      static_cast<uint64_t>(max_blocks * tokens_per_block);
+  double max_token_capacity = max_blocks * tokens_per_block;
+  
+  std::unordered_map<std::string, double> metrics; // metrics vector to pass down
+  metrics[KV_CACHE_UTIL_KEY] = kv_cache_utilization;
+  metrics[MAX_TOKEN_CAPACITY_KEY] = max_token_capacity;
 
-  return OrcaKVMetricHeader(
-      orca_type, kv_cache_utilization, max_token_capacity);
+  return OrcaKVMetricHeader(orca_type, metrics);
 }
 
 std::string
 HTTPAPIServer::GenerateRequestClass::OrcaKVMetricHeader(
-    const std::string& orca_type, const double kv_cache_utilization,
-    const uint64_t max_token_capacity)
+    const std::string& orca_type, std::unordered_map<std::string, double> metrics)
 {
   // Logic to construct and format response header
   std::string header_contents = "";
-  const std::string named_metrics_key = "named_metrics";
-  const std::string kv_util_key = "kv_cache_utilization";
-  const std::string max_token_key = "max_token_capacity";
+  const std::string named_metrics_key = NAMED_METRICS;
+  const std::string kv_util_key = KV_CACHE_UTIL_KEY;
+  const std::string max_token_key = MAX_TOKEN_CAPACITY_KEY;
 
   if (orca_type == "json") {
     // Format the metrics according to the ORCA protocol as JSON.
@@ -4445,8 +4460,8 @@ HTTPAPIServer::GenerateRequestClass::OrcaKVMetricHeader(
     triton::common::TritonJson::Value named_metrics(
         orca_metrics, triton::common::TritonJson::ValueType::OBJECT);
 
-    named_metrics.AddDouble(kv_util_key.c_str(), kv_cache_utilization);
-    named_metrics.AddUInt(max_token_key.c_str(), max_token_capacity);
+    named_metrics.AddDouble(kv_util_key.c_str(), metrics[kv_util_key]);
+    named_metrics.AddUInt(max_token_key.c_str(), metrics[max_token_key]);
     orca_metrics.Add(named_metrics_key.c_str(), std::move(named_metrics));
 
     triton::common::TritonJson::WriteBuffer buffer;
@@ -4460,9 +4475,9 @@ HTTPAPIServer::GenerateRequestClass::OrcaKVMetricHeader(
 
     header_contents = "TEXT ";
     header_contents += prefix + kv_util_key + "=" +
-                       std::to_string(kv_cache_utilization) + ", ";
+                       std::to_string(metrics[kv_util_key]) + ", ";
     header_contents +=
-        prefix + max_token_key + "=" + std::to_string(max_token_capacity);
+        prefix + max_token_key + "=" + std::to_string(static_cast<uint64_t>(metrics[max_token_key]));
   } else {
     LOG_ERROR << "orca_type is set to an invalid type: " << orca_type;
   }
