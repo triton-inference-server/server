@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -89,6 +89,7 @@ struct Options {
   // requests doesn't exceed this value there will be no
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
+  int max_response_pool_size_{INT_MAX};
   RestrictedFeatures restricted_protocols_;
   std::string forward_header_pattern_;
 };
