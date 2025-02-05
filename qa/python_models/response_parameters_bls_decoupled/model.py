@@ -32,58 +32,54 @@ import triton_python_backend_utils as pb_utils
 
 class TritonPythonModel:
     """
-    This model (A) is designed to test sending back response parameters when using BLS
+    This model is designed to test sending back response parameters when using BLS
     with decoupled model transaction policy.
 
-    The only difference vs. response_parameters_bls model is this model turns on decoupled
-    model transaction policy. For more details, please check response_parameters_bls.
+    The only difference vs. response_parameters_bls model is the BLS composing model
+    (i.e. response_parameters_decoupled) turns on decoupled model transaction policy.
+    For more details, please check response_parameters_bls model.
     """
 
     def execute(self, requests):
-        for request in requests:
-            res_params_tensor = pb_utils.get_input_tensor_by_name(
-                request, "RESPONSE_PARAMETERS"
-            ).as_numpy()
-            res_params_str = str(res_params_tensor[0][0], encoding="utf-8")
-            response_sender = request.get_response_sender()
-            try:
-                res_params = json.loads(res_params_str)
-                for r_params in res_params:
-                    bls_input_tensor = pb_utils.Tensor(
-                        "RESPONSE_PARAMETERS",
-                        np.array([[json.dumps(r_params)]], dtype=np.object_),
-                    )
-                    bls_request = pb_utils.InferenceRequest(
-                        model_name="response_parameters",
-                        inputs=[bls_input_tensor],
-                        requested_output_names=["OUTPUT"],
-                    )
-                    bls_response = bls_request.exec()
-                    response_tensors = bls_response.output_tensors()
-                    response_parameters_str = bls_response.parameters()
-                    if bls_response.has_error():
-                        print(bls_response.error().message())
-                        raise Exception(bls_response.error().message())
-                    res_params = json.loads(response_parameters_str)
+        responses = []
 
-                    response = pb_utils.InferenceResponse(
-                        output_tensors=response_tensors, parameters=res_params
-                    )
+        for request in requests:
+            bls_input_tensor = pb_utils.get_input_tensor_by_name(
+                request, "RESPONSE_PARAMETERS"
+            )
+            bls_request = pb_utils.InferenceRequest(
+                model_name="response_parameters_decoupled",
+                inputs=[bls_input_tensor],
+                requested_output_names=["OUTPUT"],
+            )
+
+            res_params_numpy = bls_input_tensor.as_numpy()
+            res_params_str = str(res_params_numpy[0][0], encoding="utf-8")
+            res_params = json.loads(res_params_str)
+            try:
+                bls_responses = bls_request.exec(decoupled=True)
+
+                for bls_response, r_params in zip(bls_responses, res_params):
+                    if bls_response.has_error():
+                        raise Exception(bls_response.error().message())
 
                     r_params_set = {}
-                    if response.parameters() != "":
-                        r_params_set = json.loads(response.parameters())
-                    if r_params_set != r_params:
-                        raise Exception("Response parameters set differ from provided")
+                    if bls_response.parameters() != "":
+                        r_params_set = json.loads(bls_response.parameters())
+                        if r_params_set != r_params:
+                            raise Exception(
+                                "Response parameters set differ from provided"
+                            )
 
-                    response_sender.send(response)
+                # no need to send back anything in the response since we already do the
+                # parameters matching checking above.
+                response = pb_utils.InferenceResponse()
             except Exception as e:
                 error = pb_utils.TritonError(
                     message=str(e), code=pb_utils.TritonError.INVALID_ARG
                 )
                 response = pb_utils.InferenceResponse(error=error)
-                response_sender.send(response)
 
-            response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            responses.append(response)
 
-        return None
+        return responses

@@ -1,4 +1,4 @@
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,20 +45,19 @@ class TritonPythonModel:
         responses = []
 
         for request in requests:
+            bls_input_tensor = pb_utils.get_input_tensor_by_name(
+                request, "RESPONSE_PARAMETERS"
+            )
+            bls_request = pb_utils.InferenceRequest(
+                model_name="response_parameters",
+                inputs=[bls_input_tensor],
+                requested_output_names=["OUTPUT"],
+            )
             try:
-                bls_input_tensor = pb_utils.get_input_tensor_by_name(
-                    request, "RESPONSE_PARAMETERS"
-                )
-                bls_request = pb_utils.InferenceRequest(
-                    model_name="response_parameters",
-                    inputs=[bls_input_tensor],
-                    requested_output_names=["OUTPUT"],
-                )
                 bls_response = bls_request.exec()
                 response_tensors = bls_response.output_tensors()
                 response_parameters_str = bls_response.parameters()
                 if bls_response.has_error():
-                    print(bls_response.error().message())
                     raise Exception(bls_response.error().message())
                 res_params = json.loads(response_parameters_str)
 

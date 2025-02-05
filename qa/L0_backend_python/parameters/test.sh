@@ -59,18 +59,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 -m pytest --junitxml=response_parameters_test.report.xml response_parameters_test.py > $TEST_LOG 2>&1
+MODEL_NAME=response_parameters python3 -m pytest --junitxml=response_parameters_test.report.xml response_parameters_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Response parameters test FAILED\n***"
     cat $TEST_LOG
     RET=1
 fi
-set -e
 
-set +e
-python3 -m pytest --junitxml=response_parameters_bls_test.report.xml response_parameters_bls_test.py > $TEST_BLS_LOG 2>&1
+MODEL_NAME=response_parameters_bls python3 -m pytest -s --junitxml=response_parameters_bls_test.report.xml response_parameters_test.py > $TEST_BLS_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Response parameters in BLS mode test FAILED\n***"
+    echo -e "\n***\n*** Response parameters BLS test FAILED\n***"
     cat $TEST_BLS_LOG
     RET=1
 fi

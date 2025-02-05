@@ -50,7 +50,3 @@ instance_group [
     kind: KIND_CPU
   }
 ]
-
-model_transaction_policy {
-  decoupled: True
-}

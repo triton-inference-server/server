@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 
 sys.path.append("../../common")
@@ -39,7 +40,7 @@ from tritonclient.utils import InferenceServerException
 
 class ResponseParametersTest(unittest.TestCase):
     _server_address_grpc = "localhost:8001"
-    _model_name = "response_parameters"
+    _model_name = os.environ["MODEL_NAME"]
     _shape = [1, 1]
 
     def setUp(self):
@@ -165,6 +166,18 @@ class ResponseParametersTest(unittest.TestCase):
 
             output = str(result.as_numpy("OUTPUT")[0][0], encoding="utf-8")
             self.assertEqual(json.dumps(params[i]), output)
+
+    def test_setting_response_parameters_bls_decoupled(self):
+        model_name = "response_parameters_bls_decoupled"
+        params = [{"bool": False, "int": 2048}, {"str": "Hello World!"}]
+        params_str = json.dumps(params)
+
+        inputs = [grpcclient.InferInput("RESPONSE_PARAMETERS", self._shape, "BYTES")]
+        inputs[0].set_data_from_numpy(np.array([[params_str]], dtype=np.object_))
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with grpcclient.InferenceServerClient(self._server_address_grpc) as client:
+                client.infer(model_name, inputs)
 
 
 if __name__ == "__main__":
