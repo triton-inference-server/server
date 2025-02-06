@@ -33,6 +33,11 @@ input [
     name: "RESPONSE_PARAMETERS"
     data_type: TYPE_STRING
     dims: [ 1 ]
+  },
+  {
+    name: "RESPONSE_PARAMETERS_DECOUPLED"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
   }
 ]
 

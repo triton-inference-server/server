@@ -169,15 +169,28 @@ class ResponseParametersTest(unittest.TestCase):
 
     def test_setting_response_parameters_bls_decoupled(self):
         model_name = "response_parameters_bls_decoupled"
-        params = [{"bool": False, "int": 2048}, {"str": "Hello World!"}]
+        params = {"bool": False, "int": 2048, "str": "Hello World!"}
+        params_decoupled = [{}, {"bool": True, "int": 10000}, {"str": "?"}]
         params_str = json.dumps(params)
+        params_decoupled_str = json.dumps(params_decoupled)
 
-        inputs = [grpcclient.InferInput("RESPONSE_PARAMETERS", self._shape, "BYTES")]
+        inputs = [
+            grpcclient.InferInput("RESPONSE_PARAMETERS", self._shape, "BYTES"),
+            grpcclient.InferInput(
+                "RESPONSE_PARAMETERS_DECOUPLED", self._shape, "BYTES"
+            ),
+        ]
         inputs[0].set_data_from_numpy(np.array([[params_str]], dtype=np.object_))
+        inputs[1].set_data_from_numpy(
+            np.array([[params_decoupled_str]], dtype=np.object_)
+        )
 
         with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient(self._server_address_grpc) as client:
-                client.infer(model_name, inputs)
+                result = client.infer(model_name, inputs)
+
+        output = str(result.as_numpy("OUTPUT")[0][0], encoding="utf-8")
+        self.assertEqual(output, "True")
 
 
 if __name__ == "__main__":
