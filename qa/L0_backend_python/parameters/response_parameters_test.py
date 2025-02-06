@@ -166,8 +166,8 @@ class ResponseParametersTest(unittest.TestCase):
             output = str(result.as_numpy("OUTPUT")[0][0], encoding="utf-8")
             self.assertEqual(json.dumps(params[i]), output)
 
-    def test_setting_response_parameters_bls_decoupled(self):
-        model_name = "response_parameters_bls_decoupled"
+    def test_setting_response_parameters_bls(self):
+        model_name = "response_parameters_bls"
         params = {"bool": False, "int": 2048, "str": "Hello World!"}
         params_decoupled = [{}, {"bool": True, "int": 10000}, {"str": "?"}]
         params_str = json.dumps(params)
