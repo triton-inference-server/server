@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -105,7 +105,7 @@ proposed change so that the Triton team can provide feedback.
 
 All pull requests are checked against the
 [pre-commit hooks](https://github.com/pre-commit/pre-commit-hooks)
-located [in the repository's top-level .pre-commit-config.yaml](https://github.com/NVIDIA/triton-inference-server/blob/master/pre-commit-config.yaml).
+located [in the repository's top-level .pre-commit-config.yaml](.pre-commit-config.yaml).
 The hooks do some sanity checking like linting and formatting.
 These checks must pass to merge a change.
 
