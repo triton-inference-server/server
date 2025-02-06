@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -457,7 +457,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 fi
 
-SUBTESTS="lifecycle argument_validation logging custom_metrics"
+SUBTESTS="lifecycle argument_validation logging custom_metrics parameters"
 # [DLIS-6124] Disable restart test for Windows since it requires more investigation
 # [DLIS-6122] Disable model_control & request_rescheduling tests for Windows since they require load/unload
 # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
