@@ -1868,7 +1868,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets != "":
+        if secrets:
             finalargs += [
                 f"--secret id=req,src={requirements}",
                 f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
@@ -2861,7 +2861,7 @@ if __name__ == "__main__":
             backends["python"] = backends["vllm"]
 
     secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets is not None:
+    if secrets:
         requirements = secrets.get("req", "")
         vllm_index_url = secrets.get("vllm_index_url", "")
         pytorch_triton_url = secrets.get("pytorch_triton_url", "")
