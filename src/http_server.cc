@@ -91,6 +91,9 @@ namespace triton { namespace server {
 #define ENDPOINT_LOAD_METRICS_NAME "endpoint-load-metrics"
 #define KV_CACHE_BLOCK_METRICS_FAMILY "nv_trt_llm_kv_cache_block_metrics"
 #define KV_CACHE_BLOCK_TYPE "kv_cache_block_type"
+#define KV_CACHE_BLOCK_TYPE_TOKENS_PER "tokens_per"
+#define KV_CACHE_BLOCK_TYPE_USED "used"
+#define KV_CACHE_BLOCK_TYPE_MAX "max"
 #define KV_CACHE_UTIL_KEY "kv_cache_utilization"
 #define MAX_TOKEN_CAPACITY_KEY "max_token_capacity"
 #define NAMED_METRICS "named_metrics"
@@ -4413,11 +4416,11 @@ HTTPAPIServer::GenerateRequestClass::ExtractKVMetrics(
   for (const auto& metric : kv_cache_metrics) {
     if (metric.labels.count(KV_CACHE_BLOCK_TYPE) > 0) {
       std::string type = metric.labels.at(KV_CACHE_BLOCK_TYPE);
-      if (type == "tokens_per") {
+      if (type == KV_CACHE_BLOCK_TYPE_TOKENS_PER) {
         tokens_per_block = metric.value;
-      } else if (type == "used") {
+      } else if (type == KV_CACHE_BLOCK_TYPE_USED) {
         used_blocks = metric.value;
-      } else if (type == "max") {
+      } else if (type == KV_CACHE_BLOCK_TYPE_MAX) {
         max_blocks = metric.value;
       }
     }
