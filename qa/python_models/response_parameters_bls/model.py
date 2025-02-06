@@ -58,6 +58,7 @@ class TritonPythonModel:
             bls_req = pb_utils.InferenceRequest(
                 model_name="response_parameters",
                 inputs=[bls_input_tensor],
+                requested_output_names=["OUTPUT"],
             )
             bls_res = bls_req.exec()  # decoupled=False
             bls_res_params_str = bls_res.parameters()
@@ -75,14 +76,17 @@ class TritonPythonModel:
             )
             res_params_decoupled = json.loads(res_params_decoupled_str)
             bls_decoupled_input_tensor = pb_utils.Tensor(
-                "RESPONSE_PARAMETERS_DECOUPLED", res_params_decoupled_tensor
-            )
+                "RESPONSE_PARAMETERS", res_params_decoupled_tensor
+            )  # response_parameters_decoupled model input name is RESPONSE_PARAMETERS
             bls_decoupled_req = pb_utils.InferenceRequest(
                 model_name="response_parameters_decoupled",
                 inputs=[bls_decoupled_input_tensor],
+                requested_output_names=["OUTPUT"],
             )
             bls_decoupled_res = bls_decoupled_req.exec(decoupled=True)
             for bls_decoupled_r in bls_decoupled_res:
+                if len(bls_decoupled_r.output_tensors()) == 0:
+                    break  # meaning reached final response
                 bls_decoupled_r_params_str = bls_decoupled_r.parameters()
                 bls_decoupled_r_params = (
                     json.loads(bls_decoupled_r_params_str)
