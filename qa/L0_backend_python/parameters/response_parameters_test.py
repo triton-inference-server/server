@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 import sys
 
 sys.path.append("../../common")
@@ -40,7 +39,7 @@ from tritonclient.utils import InferenceServerException
 
 class ResponseParametersTest(unittest.TestCase):
     _server_address_grpc = "localhost:8001"
-    _model_name = os.environ["MODEL_NAME"]
+    _model_name = "response_parameters"
     _shape = [1, 1]
 
     def setUp(self):

@@ -42,9 +42,6 @@ mkdir -p models/response_parameters_decoupled/1 && \
 mkdir -p models/response_parameters_bls/1 && \
     cp ../../python_models/response_parameters_bls/model.py models/response_parameters_bls/1 && \
     cp ../../python_models/response_parameters_bls/config.pbtxt models/response_parameters_bls
-mkdir -p models/response_parameters_bls_decoupled/1 && \
-    cp ../../python_models/response_parameters_bls_decoupled/model.py models/response_parameters_bls_decoupled/1 && \
-    cp ../../python_models/response_parameters_bls_decoupled/config.pbtxt models/response_parameters_bls_decoupled
 
 TEST_LOG="response_parameters_test.log"
 SERVER_LOG="response_parameters_test.server.log"
