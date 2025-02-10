@@ -163,6 +163,13 @@ endif()
 
 set_property(TARGET py-bindings PROPERTY OUTPUT_NAME tritonfrontend_bindings)
 
+target_include_directories(
+  py-bindings
+  PRIVATE
+  ${repo-core_SOURCE_DIR}/include
+  ${repo-common_SOURCE_DIR}/include
+)
+
 set_target_properties(
     py-bindings
     PROPERTIES
