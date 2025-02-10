@@ -681,11 +681,18 @@ ModelInferHandler::Process(
     InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
   // There are multiple handlers registered in the gRPC service.
-  // Hence, there we can have a case where a handler thread is
+  // Hence, we can have a case where a handler thread is
   // making progress in the state machine for a request and the
   // other thread is issuing cancellation on the same request.
   // Need to protect the state transitions for these cases.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+
+  std::lock_guard<std::recursive_mutex> lk1(conn_mtx_);
+  if (cq_shutdown_) {
+    // Connection queue has been shutdown
+    state->step_ = Steps::FINISH;
+    return false;
+  }
 
   if (state->delay_process_ms_ != 0) {
     // Will delay the Process execution by the specified time.

@@ -154,6 +154,13 @@ ModelStreamInferHandler::Process(
     }
   }
 
+  std::lock_guard<std::recursive_mutex> lk1(conn_mtx_);
+  if (cq_shutdown_) {
+    // Connection queue has been shutdown
+    state->step_ = Steps::FINISH;
+    return false;
+  }
+
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -390,9 +397,9 @@ ModelStreamInferHandler::Process(
         state->context_->WriteResponseIfReady(state);
       } else {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
           state->response_queue_->MarkNextResponseComplete();
           state->context_->ready_to_write_states_.push(state);
           if (!state->context_->ongoing_write_) {
@@ -521,9 +528,9 @@ ModelStreamInferHandler::Process(
 
       {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
           if (!state->context_->ready_to_write_states_.empty()) {
             writing_state = state->context_->ready_to_write_states_.front();
             state->context_->ready_to_write_states_.pop();
@@ -548,7 +555,7 @@ ModelStreamInferHandler::Process(
     } else if (state->step_ == Steps::WRITEREADY) {
       // Finish the state if all the transactions associated with
       // the state have completed.
-      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+      std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
       {
         if (state->IsComplete()) {
           state->context_->DecrementRequestCounter();

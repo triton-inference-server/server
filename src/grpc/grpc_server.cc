@@ -2576,6 +2576,8 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
 
+  DisableResponses();
+
   // Always shutdown the completion queue after the server.
   server_->Shutdown();
 
@@ -2661,6 +2663,26 @@ Server::AggregateConnectionCount()
   }
 
   return total_connections;
+}
+
+TRITONSERVER_Error*
+Server::DisableResponses()
+{
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    modelInferHandler.DisableResponses();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    modelStreamInferHandler.DisableResponses();
+  }
+
+  return nullptr;  // success
 }
 
 }}}  // namespace triton::server::grpc
