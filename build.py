@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.53.0dev",
-    "triton_container_version": "24.12dev",
-    "upstream_container_version": "24.11",
-    "ort_version": "1.19.2",
-    "ort_openvino_version": "2024.4.0",
-    "standalone_openvino_version": "2024.4.0",
+    "release_version": "2.55.0dev",
+    "triton_container_version": "25.02dev",
+    "upstream_container_version": "25.01",
+    "ort_version": "1.20.1",
+    "ort_openvino_version": "2024.5.0",
+    "standalone_openvino_version": "2024.5.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.5.5",
+    "vllm_version": "0.6.3.post1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -565,7 +565,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == "tensorflow":
         args = tensorflow_cmake_args(images, library_paths)
     elif be == "python":
-        args = []
+        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -628,6 +628,18 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     else:
         cargs.append("..")
+    return cargs
+
+
+def python_cmake_args():
+    cargs = []
+    if target_platform() == "rhel":
+        cargs.append(
+            cmake_backend_arg(
+                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
+            )
+        )
+
     return cargs
 
 
@@ -924,6 +936,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
     df += """
 # Install docker docker buildx
@@ -949,7 +962,6 @@ RUN yum install -y \\
             libcurl-devel \\
             libb64-devel \\
             gperftools-devel \\
-            patchelf \\
             python3-pip \\
             python3-setuptools \\
             rapidjson-devel \\
@@ -957,6 +969,10 @@ RUN yum install -y \\
             pkg-config \\
             unzip \\
             wget \\
+            ncurses-devel \\
+            readline-devel \\
+            xz-devel \\
+            bzip2-devel \\
             zlib-devel \\
             libarchive-devel \\
             libxml2-devel \\
@@ -969,10 +985,12 @@ RUN yum install -y \\
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          build \\
           wheel \\
           setuptools \\
           docker \\
-          virtualenv
+          virtualenv \\
+          patchelf==0.17.2
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1025,17 +1043,19 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
         df += """
+RUN python3 -m pip install build
+
 SHELL ["cmd", "/S", "/C"]
 """
     else:
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Install docker docker buildx
 RUN apt-get update \\
@@ -1069,7 +1089,6 @@ RUN apt-get update \\
             libcurl4-openssl-dev \\
             libb64-dev \\
             libgoogle-perftools-dev \\
-            patchelf \\
             python3-dev \\
             python3-pip \\
             python3-wheel \\
@@ -1088,8 +1107,10 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          build \\
           docker \\
-          virtualenv
+          virtualenv \\
+          patchelf==0.17.2
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1159,6 +1180,7 @@ WORKDIR /workspace
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1198,6 +1220,8 @@ FROM {} AS min_container
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${BASE_IMAGE}
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     df += dockerfile_prepare_container_linux(
@@ -1215,6 +1239,8 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+
+RUN pip3 install -r python/openai/requirements.txt
 
 """
     if not FLAGS.no_core_build:
@@ -1328,10 +1354,11 @@ RUN yum install -y \\
         libcurl-devel \\
         libb64-devel \\
         gperftools-devel \\
-        patchelf \\
         wget \\
         python3-pip \\
         numactl-devel
+
+RUN pip3 install patchelf==0.17.2
 
 """
     else:
@@ -1399,7 +1426,6 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
     if "python" in backends:
         if target_platform() == "rhel":
             df += """
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # python3, python3-pip and some pip installs required for the python backend
 RUN yum install -y \\
         libarchive-devel \\
@@ -1418,7 +1444,6 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
@@ -1443,12 +1468,31 @@ RUN apt-get update \\
     """
 
     if "vllm" in backends:
-        df += """
-# vLLM needed for vLLM backend
-RUN pip3 install vllm=={}
-""".format(
-            FLAGS.vllm_version
-        )
+        df += f"""
+ARG BUILD_PUBLIC_VLLM="true"
+ARG VLLM_INDEX_URL
+ARG PYTORCH_TRITON_URL
+
+RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
+    if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
+        pip3 install --no-cache-dir \\
+        mkl==2021.1.1 \\
+        mkl-include==2021.1.1 \\
+        mkl-devel==2021.1.1 \\
+        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
+        # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
+        && cd /tmp \\
+        && wget $PYTORCH_TRITON_URL \\
+        && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
+        && rm /tmp/pytorch_triton-*.whl; \\
+    else \\
+        # public vLLM needed for vLLM backend
+        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
+    fi
+
+ARG PYVER=3.12
+ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
+"""
 
     if "dali" in backends:
         df += """
@@ -1519,7 +1563,8 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends openmpi-bin patchelf
+      && apt-get install -y --no-install-recommends openmpi-bin
+RUN pip3 install patchelf==0.17.2
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
@@ -1542,7 +1587,7 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 
 def change_default_python_version_rhel(version):
-    df = """
+    df = f"""
 # The python library version available for install via 'yum install python3.X-devel' does not
 # match the version of python inside the RHEL base container. This means that python packages
 # installed within the container will not be picked up by the python backend stub process pybind
@@ -1551,21 +1596,17 @@ ENV PYENV_ROOT=/opt/pyenv_build
 RUN curl https://pyenv.run | bash
 ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
 RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {} \\
-    && cp ${{PYENV_ROOT}}/versions/{}/lib/libpython3* /usr/lib64/""".format(
-        version, version
-    )
-    df += """
+RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
+    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
+
 # RHEL image has several python versions. It's important
 # to set the correct version, otherwise, packages that are
 # pip installed will not be found during testing.
-ENV PYVER={} PYTHONPATH=/opt/python/v
+ENV PYVER={version} PYTHONPATH=/opt/python/v
 RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
 ENV PYBIN=${{PYTHONPATH}}/bin
 ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
-""".format(
-        version
-    )
+"""
     return df
 
 
@@ -1623,8 +1664,14 @@ def create_build_dockerfiles(
 ):
     if "base" in images:
         base_image = images["base"]
+        if target_platform() == "rhel":
+            print(
+                "warning: RHEL is not an officially supported target and you will probably experience errors attempting to build this container."
+            )
     elif target_platform() == "windows":
         base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
+    elif target_platform() == "rhel":
+        raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
         base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.upstream_container_version
@@ -1823,13 +1870,21 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         finalargs = [
             "docker",
             "build",
+        ]
+        if secrets != "":
+            finalargs += [
+                f"--secret id=req,src={requirements}",
+                f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
+                f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
+                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+            ]
+        finalargs += [
             "-t",
             "tritonserver",
             "-f",
             os.path.join(FLAGS.build_dir, "Dockerfile"),
             ".",
         ]
-
         docker_script.cwd(THIS_SCRIPT_DIR)
         docker_script.cmd(finalargs, check_exitcode=True)
 
@@ -1919,6 +1974,10 @@ def core_build(
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "include", "triton", "core"),
         os.path.join(install_dir, "include", "triton", "core"),
+    )
+
+    cmake_script.cpdir(
+        os.path.join(repo_dir, "python", "openai"), os.path.join(install_dir, "python")
     )
 
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
@@ -2676,6 +2735,19 @@ if __name__ == "__main__":
         default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
+    parser.add_argument(
+        "--build-secret",
+        action="append",
+        required=False,
+        nargs=2,
+        metavar=("key", "value"),
+        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
+        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
+        "  - 'vllm_index_url': The index URL for the pip install.\n"
+        "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
+        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
+        "Ensure that the required environment variables for these secrets are set before running the build.",
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
@@ -2702,6 +2774,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
+    if FLAGS.build_secret is None:
+        FLAGS.build_secret = []
 
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
@@ -2794,6 +2868,14 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
+
+    secrets = dict(getattr(FLAGS, "build_secret", []))
+    if secrets is not None:
+        requirements = secrets.get("req", "")
+        vllm_index_url = secrets.get("vllm_index_url", "")
+        pytorch_triton_url = secrets.get("pytorch_triton_url", "")
+        build_public_vllm = secrets.get("build_public_vllm", "true")
+        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}

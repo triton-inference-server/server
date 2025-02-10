@@ -86,6 +86,37 @@ class TestChatCompletions:
         assert message["content"].strip()
         assert message["role"] == "assistant"
 
+    def test_chat_completions_user_prompt_str(self, client, model: str):
+        # No system prompt provided
+        messages = [{"role": "user", "content": "What is machine learning?"}]
+
+        response = client.post(
+            "/v1/chat/completions", json={"model": model, "messages": messages}
+        )
+
+        assert response.status_code == 200
+        message = response.json()["choices"][0]["message"]
+        assert message["content"].strip()
+        assert message["role"] == "assistant"
+
+    def test_chat_completions_user_prompt_dict(self, client, model: str):
+        # No system prompt provided
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "What is machine learning?"}],
+            }
+        ]
+
+        response = client.post(
+            "/v1/chat/completions", json={"model": model, "messages": messages}
+        )
+
+        assert response.status_code == 200
+        message = response.json()["choices"][0]["message"]
+        assert message["content"].strip()
+        assert message["role"] == "assistant"
+
     @pytest.mark.parametrize(
         "param_key, param_value",
         [

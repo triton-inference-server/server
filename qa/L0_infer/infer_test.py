@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -264,7 +264,9 @@ class InferTest(tu.TestResultCollector):
                 and (output0_dtype == np.int32)
                 and (output1_dtype == np.int32)
             ):
-                print("skipping pytorch test for int8_int32_int32")
+                print(
+                    "skipping pytorch test for input dtype int8 and outputs dtype int32 due to a pytorch bug"
+                )
             else:
                 for prefix in ensemble_prefix:
                     if "libtorch" in BACKENDS:

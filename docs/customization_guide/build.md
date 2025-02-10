@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r24.11 branch, `<container tag>` will default to r24.11. If you are
+r24.12 branch, `<container tag>` will default to r24.12. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -267,10 +267,6 @@ For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
 
-## Building for JetPack 4.x
-
-*Under Construction*
-
 ## Building for Windows 10
 
 For Windows 10, build.py supports both a Docker build and a non-Docker
@@ -334,8 +330,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
-are building on the r24.11 branch, `<container tag>` will default to
-r24.11. Therefore, you typically do not need to provide `<container
+are building on the r24.12 branch, `<container tag>` will default to
+r24.12. Therefore, you typically do not need to provide `<container
 tag>` at all (nor the preceding colon). You can use a different
 `<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called

@@ -193,6 +193,8 @@ class Detail(Enum):
 
 
 class ImageUrl(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     url: AnyUrl = Field(
         ..., description="Either a URL of the image or the base64 encoded image data."
     )
@@ -203,6 +205,8 @@ class ImageUrl(BaseModel):
 
 
 class ChatCompletionRequestMessageContentPartImage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     type: Type = Field(..., description="The type of the content part.")
     image_url: ImageUrl
 
@@ -212,6 +216,8 @@ class Type1(Enum):
 
 
 class ChatCompletionRequestMessageContentPartText(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     type: Type1 = Field(..., description="The type of the content part.")
     text: str = Field(..., description="The text content.")
 
@@ -224,6 +230,8 @@ class Role(Enum):
 
 
 class ChatCompletionRequestSystemMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     content: str = Field(..., description="The contents of the system message.")
     role: Role = Field(
         ..., description="The role of the messages author, in this case `system`."
@@ -264,6 +272,8 @@ class Role3(Enum):
 
 
 class ChatCompletionRequestToolMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     role: Role3 = Field(
         ..., description="The role of the messages author, in this case `tool`."
     )
@@ -281,6 +291,8 @@ class Role4(Enum):
 
 
 class ChatCompletionRequestFunctionMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     role: Role4 = Field(
         ..., description="The role of the messages author, in this case `function`."
     )
@@ -656,6 +668,8 @@ class ChatCompletionRequestMessageContentPart(RootModel):
 
 
 class ChatCompletionRequestUserMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     content: Union[str, List[ChatCompletionRequestMessageContentPart]] = Field(
         ..., description="The contents of the user message.\n"
     )
@@ -768,6 +782,8 @@ class CreateChatCompletionFunctionResponse(BaseModel):
 
 
 class ChatCompletionRequestAssistantMessage(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     content: Optional[str] = Field(
         None,
         description="The contents of the assistant message. Required unless `tool_calls` or `function_call` is specified.\n",

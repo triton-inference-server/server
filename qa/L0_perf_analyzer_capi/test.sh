@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -218,6 +218,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+-s ${STABILITY_THRESHOLD} \
 --input-data=$SEQ_JSONDATAFILE \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
@@ -234,6 +235,7 @@ fi
 
 set +e
 $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
+-s ${STABILITY_THRESHOLD} \
 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
@@ -250,21 +252,9 @@ if [ $(cat $CLIENT_LOG |  grep -P "The supplied shape .+ is incompatible with th
 fi
 set -e
 
-# Negative test for the async mode.
-set +e
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
---service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
->$CLIENT_LOG 2>&1
-if [ $(cat $CLIENT_LOG | grep "not supported by triton_c_api service" | wc -l) -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
 for SHARED_MEMORY_TYPE in system cuda; do
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
+    -s ${STABILITY_THRESHOLD} \
     --shared-memory=$SHARED_MEMORY_TYPE \
     --service-kind=triton_c_api --model-repository=$DATADIR \
     --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1

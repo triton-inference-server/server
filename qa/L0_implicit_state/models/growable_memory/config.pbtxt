@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@ name: "growable_memory"
 backend: "implicit_state"
 max_batch_size: 0
 sequence_batching {
+  # Set large idle timeout to avoid inter-request timeouts for test consistency
+  max_sequence_idle_microseconds: 10000000
   control_input [
     {
       name: "START"

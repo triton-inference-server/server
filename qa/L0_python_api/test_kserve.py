@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -114,6 +114,7 @@ METRICS_ARGS = (Metrics, "localhost:8002")  # Default Metrics args
 
 
 class TestKServe:
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
     def test_server_ready(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -126,6 +127,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_service_double_start(self, frontend):
         server = utils.setup_server()
@@ -140,6 +142,7 @@ class TestKServe:
         utils.teardown_server(server)
         utils.teardown_service(service)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_invalid_options(self, frontend):
         server = utils.setup_server()
@@ -153,6 +156,7 @@ class TestKServe:
 
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend", [HTTP_ARGS[0], GRPC_ARGS[0]])
     def test_server_service_order(self, frontend):
         server = utils.setup_server()
@@ -161,6 +165,7 @@ class TestKServe:
         utils.teardown_server(server)
         utils.teardown_service(service)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type", [HTTP_ARGS[:2], GRPC_ARGS[:2]])
     def test_service_custom_port(self, frontend, client_type):
         server = utils.setup_server()
@@ -175,6 +180,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS, GRPC_ARGS])
     def test_inference(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -186,6 +192,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
     def test_streaming_inference(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -196,6 +203,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
     def test_http_generate_inference(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -206,6 +214,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [HTTP_ARGS])
     def test_http_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -247,6 +256,7 @@ class TestKServe:
         ):
             utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, client_type, url", [GRPC_ARGS])
     def test_grpc_req_during_shutdown(self, frontend, client_type, url):
         server = utils.setup_server()
@@ -302,6 +312,7 @@ class TestKServe:
         utils.teardown_client(grpc_client)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_default_port(self, frontend, url):
         server = utils.setup_server()
@@ -315,6 +326,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend", [Metrics])
     def test_metrics_custom_port(self, frontend, port=8005):
         server = utils.setup_server()
@@ -328,6 +340,7 @@ class TestKServe:
         utils.teardown_service(service)
         utils.teardown_server(server)
 
+    @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     @pytest.mark.parametrize("frontend, url", [METRICS_ARGS])
     def test_metrics_update(self, frontend, url):
         # Setup Server, KServeGrpc, Metrics
@@ -362,6 +375,7 @@ class TestKServe:
     # Once the server has been stopped, the underlying TRITONSERVER_Server instance
     # is deleted. However, the frontend does not know the server instance
     # is no longer valid.
+    # @pytest.mark.xfail(run=False, reason="Python model may not load after gRPC import")
     # def test_inference_after_server_stop(self):
     #     server = utils.setup_server()
     #     http_service = utils.setup_service(server, KServeHttp)

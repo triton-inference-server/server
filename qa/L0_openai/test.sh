@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,11 +29,12 @@
 
 function install_deps() {
     # Install python bindings for tritonserver and tritonfrontend
-    pip install /opt/tritonserver/python/triton*.whl
+    # pip install /opt/tritonserver/python/triton*.whl
 
     # Install application/testing requirements
     pushd openai/
-    pip install -r requirements.txt
+    # NOTE: Should be pre-installed in container, but can uncomment if needed
+    # pip install -r requirements.txt
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
@@ -49,21 +50,41 @@ function prepare_vllm() {
 }
 
 function prepare_tensorrtllm() {
-    MODEL="llama-3-8b-instruct"
+    # FIXME: Remove when testing TRT-LLM containers built from source
+    pip install -r requirements.txt
+
+    MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
     MODEL_REPO="tests/tensorrtllm_models"
-    rm -rf ${MODEL_REPO}
+    mkdir -p ${MODEL_REPO}
+    cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
+    # Ensemble model is not needed for the test
+    rm -rf ${MODEL_REPO}/ensemble
 
-    # FIXME: This will require an upgrade each release to match the TRT-LLM version
-    # Use Triton CLI to prepare model repository for testing
-    pip install git+https://github.com/triton-inference-server/triton_cli.git@0.0.10
-    # NOTE: Could use ENGINE_DEST_PATH set to NFS mount for pre-built engines in future
-    triton import \
-        --model ${MODEL}  \
-        --backend tensorrtllm \
-        --model-repository "${MODEL_REPO}"
+    # 1. Download model from HF
+    huggingface-cli download ${MODEL}
 
-    # WAR for tests expecting default name of "tensorrt_llm_bls"
-    mv "${MODEL_REPO}/${MODEL}" "${MODEL_REPO}/tensorrt_llm_bls"
+    HF_LLAMA_MODEL=`python3 -c "from pathlib import Path; from huggingface_hub import hf_hub_download; print(Path(hf_hub_download('${MODEL}', filename='config.json')).parent)"`
+    CKPT_PATH=/tmp/ckpt/llama/3.1-8b-instruct/
+    ENGINE_PATH=/tmp/engines/llama/3.1-8b-instruct/
+
+    # 2. Convert weights
+    python3 /app/examples/llama/convert_checkpoint.py --model_dir ${HF_LLAMA_MODEL} \
+        --output_dir ${CKPT_PATH} \
+        --dtype float16
+
+    # 3. Build engine
+    # max_batch_size set to 128 to avoid OOM errors
+    trtllm-build --checkpoint_dir ${CKPT_PATH} \
+        --gemm_plugin auto \
+        --max_batch_size 128 \
+        --output_dir ${ENGINE_PATH}
+
+    # 4. Prepare model repository
+    FILL_TEMPLATE="/app/tools/fill_template.py"
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,preprocessing_instance_count:1,max_queue_size:0
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,postprocessing_instance_count:1
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
 }
 
 function pre_test() {
