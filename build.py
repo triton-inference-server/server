@@ -1210,7 +1210,7 @@ COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
@@ -1772,8 +1772,9 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
-            if os.path.exists(os.path.expanduser("~/.docker/config.json")):
-                runargs += ["-v", os.path.expanduser("~/.docker/config.json:/root/.docker/config.json")]
+            if FLAGS.container_config:
+                if os.path.exists(FLAGS.container_config):
+                    runargs += ["-v", os.path.expanduser(FLAGS.container_config + ":/root/.docker/config.json")]
 
         runargs += ["tritonserver_buildbase"]
 
@@ -2360,6 +2361,12 @@ if __name__ == "__main__":
         action="store_true",
         required=False,
         help="Do not use Docker container for build.",
+    )
+    parser.add_argument(
+        "--container-config",
+        default=None,
+        required=False,
+        help="Path to the Docker configuration file to be used when performing container build.",
     )
     parser.add_argument(
         "--no-container-interactive",
