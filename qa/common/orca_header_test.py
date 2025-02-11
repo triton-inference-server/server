@@ -31,7 +31,6 @@ sys.path.append("../common")
 
 import argparse
 import json
-import os
 import requests
 
 # To run the test, have tritonserver running and run this script with the endpoint as a flag.
@@ -111,7 +110,6 @@ def test_header_type(url, data, orca_format):
     response_header = get_endpoint_header(args.url, TEST_DATA, req_header)
 
     desired_keys = {"kv_cache_utilization", "max_token_capacity"}  # Just the keys, no need to initialize with None
-    passed = None
 
     if response_header is None:
         print(f"Request to endpoint: '{args.url}' failed.")
