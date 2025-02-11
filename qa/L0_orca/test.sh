@@ -29,6 +29,7 @@ RET=0
 BASE_DIR=$(pwd)
 NUM_GPUS=${NUM_GPUS:=1}
 TENSORRTLLM_BACKEND_REPO_TAG=${TENSORRTLLM_BACKEND_REPO_TAG:="main"}
+TRITON_REPO_ORG=${TRITON_REPO_ORG:="https://github.com/triton-inference-server"}
 TRT_ROOT="/usr/local/tensorrt"
 
 MODEL_NAME="gpt2_tensorrt_llm"
@@ -43,6 +44,10 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_LOG="${NAME}_server.log"
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
+
+# Add these variable definitions
+CLIENT_PY=${BASE_DIR}/client.py
+CLIENT_LOG="${NAME}_client.log"
 
 function clone_tensorrt_llm_backend_repo {
     rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
