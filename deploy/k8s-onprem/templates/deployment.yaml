@@ -51,6 +51,7 @@ spec:
         release: {{ .Release.Name }}
 
     spec:
+      serviceAccountName: {{ template "triton-inference-server.fullname" . }}
       volumes:
         - name: models
           nfs:
