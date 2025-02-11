@@ -28,5 +28,5 @@
 
 # Triton Inference Server
 
-**NOTE: You are currently on the r22.12 branch which tracks stabilization
+**NOTE: You are currently on the r25.02 branch which tracks stabilization
 towards the next release. This branch is not usable during stabilization.**
