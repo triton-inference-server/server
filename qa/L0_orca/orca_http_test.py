@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--url",
         default="http://localhost:8000/v2/models/gpt2_tensorrt_llm/generate",
-        help="The model URL to send the request to."
+        help="The model URL to send the request to.",
     )
     args = parser.parse_args()
     TEST_DATA = json.loads(
@@ -169,4 +169,3 @@ if __name__ == "__main__":
             passed = False
 
     sys.exit(0 if passed else 1)
-
