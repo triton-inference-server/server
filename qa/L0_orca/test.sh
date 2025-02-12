@@ -44,10 +44,8 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_LOG="${NAME}_server.log"
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
-
-# Add these variable definitions
-CLIENT_PY=${BASE_DIR}/client.py
-CLIENT_LOG="${NAME}_client.log"
+CLIENT_PY=${BASE_DIR}/orca_http_test.py
+CLIENT_LOG="${NAME}_orca_http_test.log"
 
 function clone_tensorrt_llm_backend_repo {
     rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
@@ -101,17 +99,19 @@ function prepare_model_repository {
     replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
     replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags 'logits_datatype:${LOGITS_DATATYPE}' "logits_datatype: float32" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
 
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
     replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
     replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags 'logits_datatype:${LOGITS_DATATYPE}' "logits_datatype: float32" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
 
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
     replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
     replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags 'logits_datatype:${LOGITS_DATATYPE}' "logits_datatype: float32" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
 
     replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
@@ -120,7 +120,8 @@ function prepare_model_repository {
     replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
     replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "float32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${encoder_input_features_data_type}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
 }
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -195,7 +196,8 @@ fi
 
 RET=0
 
-python $CLIENT_PY -v >>$CLIENT_LOG 2>&1
+python3 $CLIENT_PY
+
 if [ $? -ne 0 ]; then
     echo "Failed: Client test had a non-zero return code."
     RET=1
