@@ -1819,9 +1819,9 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
-            if FLAGS.container_config:
-                if os.path.exists(FLAGS.container_config):
-                    runargs += ["-v", os.path.expanduser(FLAGS.container_config + ":/root/.docker/config.json")]
+            if FLAGS.use_user_docker_config:
+                if os.path.exists(FLAGS.use_user_docker_config):
+                    runargs += ["-v", os.path.expanduser(FLAGS.use_user_docker_config + ":/root/.docker/config.json")]
 
         runargs += ["tritonserver_buildbase"]
 
@@ -2422,7 +2422,7 @@ if __name__ == "__main__":
         help="Do not use Docker container for build.",
     )
     parser.add_argument(
-        "--container-config",
+        "--use-user-docker-config",
         default=None,
         required=False,
         help="Path to the Docker configuration file to be used when performing container build.",
