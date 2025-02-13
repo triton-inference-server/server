@@ -87,7 +87,7 @@ namespace triton { namespace server {
     }                                                                   \
   } while (false)
 
-#define ENDPOINT_LOAD_METRICS_TYPE "endpoint-load-metrics-type"
+#define ENDPOINT_LOAD_METRICS_TYPE "endpoint-load-metrics-format"
 #define ENDPOINT_LOAD_METRICS_NAME "endpoint-load-metrics"
 #define KV_CACHE_BLOCK_METRICS_FAMILY "nv_trt_llm_kv_cache_block_metrics"
 #define KV_CACHE_BLOCK_TYPE "kv_cache_block_type"

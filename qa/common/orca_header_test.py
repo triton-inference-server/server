@@ -103,7 +103,7 @@ def check_for_keys(data, desired_keys, orca_format):
         return False
 
 def request_header(orca_format):
-    return {"endpoint-load-metrics-type": orca_format} if orca_format else None
+    return {"endpoint-load-metrics-format": orca_format} if orca_format else None
 
 def test_header_type(url, data, orca_format):
     req_header = request_header(orca_format)
@@ -116,11 +116,11 @@ def test_header_type(url, data, orca_format):
         return False
     elif response_header == "":
         if orca_format:
-            print(f"response header empty, endpoint-load-metrics-type={orca_format} is not a valid ORCA metric format")
+            print(f"response header empty, endpoint-load-metrics-format={orca_format} is not a valid ORCA metric format")
             return False
         else:
             # No request header set <=> no response header. Indended behavior.
-            print(f"response header empty, endpoint-load-metrics-type is not set")
+            print(f"response header empty, endpoint-load-metrics-format is not set")
             return True
 
     data = parse_header_data(response_header, orca_format)
