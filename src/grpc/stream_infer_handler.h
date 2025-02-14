@@ -105,11 +105,13 @@ class ModelStreamInferHandler
   }
 
   std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
-  void DisableConnections() {
+  void DisableConnections()
+  {
     std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
     accepting_new_conn_ = false;
   }
-  void DisableResponses() {
+  void DisableResponses()
+  {
     std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
     cq_shutdown_ = true;
   }
