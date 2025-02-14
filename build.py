@@ -1143,7 +1143,7 @@ ENV CCACHE_REMOTE_ONLY="true"
 ENV CCACHE_REMOTE_STORAGE="{}"
 ENV CMAKE_CXX_COMPILER_LAUNCHER="ccache"
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends ccache
+      && apt-get install -y --no-install-recommends ccache && ccache -p
 """.format( os.getenv("CCACHE_REMOTE_STORAGE") )
 
     # Copy in the triton source. We remove existing contents first in
