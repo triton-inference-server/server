@@ -71,7 +71,7 @@ def parse_header_data(header, orca_format):
             else:
                 print(f"No key '{METRIC_KEY}' in header data: {data}")
                 return None
-        elif orca_format == "http":
+        elif orca_format == "text":
             # Parse the header in TEXT format
             data = {}
             for key_value_pair in header.replace("TEXT ", "").split(", "):
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     TEST_DATA = json.loads('{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}')
     passed = True
 
-    for format in ["json", "http", None]:
+    for format in ["json", "text", None]:
         print("Checking response header for ORCA format:", format)
         if not test_header_type(args.url, TEST_DATA, format):
             print("FAIL on format:", format)

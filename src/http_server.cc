@@ -4260,7 +4260,7 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   //
   // The valid values for ENDPOINT_LOAD_METRICS_TYPE header are:
   //
-  // "http"
+  // "text"
   // "json"
   //
   // Any other value will have behavior equivalent to being unset while also
@@ -4471,7 +4471,7 @@ HTTPAPIServer::GenerateRequestClass::OrcaKVMetricHeader(
     orca_metrics.Write(&buffer);
     header_contents = std::string("JSON ") + buffer.Contents();
 
-  } else if (orca_type == "http") {
+  } else if (orca_type == "text") {
     // Format the metrics according to the ORCA protocol as Native HTTP
     // (comma separated list).
     const std::string prefix = named_metrics_key + ".";
