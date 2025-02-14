@@ -234,6 +234,26 @@ EOF
 $ helm install example -f config.yaml .
 ```
 
+## Deploying the Inference Server on OpenShift or OKD
+
+Because of the default security posture of OpenShift and OKD, the configuration
+of which uses OpenShift-specific APIs, the chart needs special consideration
+when targeting those environments. Any of the above discussed customizations and
+prerequisites hold for an OpenShift environment, except that you do not need to
+install Prometheus and Grafana and can instead enable monitoring for
+user-defined projects by following
+[the OpenShift documentation on the topic](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/monitoring/enabling-monitoring-for-user-defined-projects).
+
+To deploy the configurations to enable NFS mounts and the non-root UIDs used in
+the Triton deployment, a tag can be enabled alongside any other configurations
+discussed above. In the simplest case, to use `--set` on the command line, you
+can simply update the tags.openshift parameter.
+
+```
+$ cd <directory containing Chart.yaml>
+$ helm install example --set tags.openshift=true .
+```
+
 ## Probe Configuration
 
 In `templates/deployment.yaml` is configurations for `livenessProbe`, `readinessProbe` and `startupProbe` for the Triton server container.
