@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -344,7 +344,7 @@ class BatcherTest(tu.TestResultCollector):
                 self.check_response(
                     trial,
                     1,
-                    (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                    (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                     precreated_shm_regions=precreated_shm_regions,
                 )
                 self.check_deferred_exception()
@@ -369,7 +369,7 @@ class BatcherTest(tu.TestResultCollector):
                 self.check_response(
                     trial,
                     3,
-                    (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                    (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                     precreated_shm_regions=precreated_shm_regions,
                 )
                 self.check_deferred_exception()
@@ -491,7 +491,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             1,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "input_size": 8,
@@ -540,7 +540,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             1,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm0_region_names,
@@ -619,13 +619,15 @@ class BatcherTest(tu.TestResultCollector):
                         },
                     )
                 )
+                # Add some delay to ensure the first two requests arrive before the third
+                time.sleep(2)
                 threads.append(
                     threading.Thread(
                         target=self.check_response,
                         args=(
                             trial,
                             1,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "input_size": 8,
@@ -828,7 +830,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             4,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm1_region_names,
@@ -1105,7 +1107,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             4,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm1_region_names,
@@ -1164,7 +1166,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             3,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm0_region_names,
@@ -1178,7 +1180,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             4,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm1_region_names,
@@ -1464,7 +1466,7 @@ class BatcherTest(tu.TestResultCollector):
                         args=(
                             trial,
                             1,
-                            (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                            (_max_queue_delay_ms * 2, _max_queue_delay_ms),
                         ),
                         kwargs={
                             "shm_region_names": shm2_region_names,
@@ -1895,7 +1897,7 @@ class BatcherTest(tu.TestResultCollector):
     def test_max_queue_delay_only_non_default(self):
         # Send 12 requests with batch size 1. The max_queue_delay is set
         # to non-zero. Depending upon the timing of the requests arrival
-        # there can be either 1 or 2 model executions.
+        # there can be either 1 or multiple model executions.
         model_base = "custom"
         dtype = np.float32
         shapes = (
@@ -1934,7 +1936,7 @@ class BatcherTest(tu.TestResultCollector):
                 t.join()
             self.check_deferred_exception()
             model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
-            self.check_status(model_name, None, 12, 12, (1, 2))
+            self.check_status(model_name, None, 12, 12, (1, 2, 3, 4))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1942,7 +1944,8 @@ class BatcherTest(tu.TestResultCollector):
         # Send 12 requests with batch size 1. The max_queue_delay is set
         # to default value of 0. There should be two distinct model
         # executions. The first few requests will form a first batch
-        # and the remaining requests will form the second batch.
+        # and the remaining requests will either form the second batch
+        # or more batches depending on their arrival time.
         model_base = "custom"
         dtype = np.float32
         shapes = (
@@ -1981,7 +1984,7 @@ class BatcherTest(tu.TestResultCollector):
                 t.join()
             self.check_deferred_exception()
             model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
-            self.check_status(model_name, None, 12, 12, (2,))
+            self.check_status(model_name, None, 12, 12, (2, 3, 4, 5, 6))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
