@@ -27,6 +27,7 @@
 tags:
   autoscaling: true
   loadBalancing: true
+  openshift: false
 
 image:
   imageName: nvcr.io/nvidia/tritonserver:25.01-py3
