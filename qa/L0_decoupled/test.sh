@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -124,6 +124,45 @@ for trial in $TRIALS; do
   set -e
 
   unset TRITONSERVER_DELAY_GRPC_RESPONSE
+
+  kill $SERVER_PID
+  wait $SERVER_PID
+
+  SERVER_ARGS="--model-repository=$MODELDIR --grpc-max-response-pool-size=1"
+  SERVER_LOG="grpc_max_response_pool_size_1_${trial}_server.log"
+  CLIENT_LOG="grpc_max_response_pool_size_1_${trial}_client.log"
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
+
+  for test in \
+              test_one_to_none \
+              test_one_to_one \
+              test_one_to_many \
+              test_no_streaming \
+              test_response_order \
+        test_wrong_shape; do
+
+      echo "Test: $test" >>$CLIENT_LOG
+      set +e
+      python $DECOUPLED_TEST DecoupledTest.$test >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+              echo -e "\n***\n*** Test grpc-max-response-pool-size=1 ${trial} - $test Failed\n***" >>$CLIENT_LOG
+              echo -e "\n***\n*** Test grpc-max-response-pool-size=1 ${trial} - $test Failed\n***"
+              RET=1
+      else
+          check_test_results $TEST_RESULT_FILE 1
+          if [ $? -ne 0 ]; then
+              cat $CLIENT_LOG
+              echo -e "\n***\n*** Test Result Verification Failed\n***"
+              RET=1
+          fi
+      fi
+      set -e
+  done
 
   kill $SERVER_PID
   wait $SERVER_PID

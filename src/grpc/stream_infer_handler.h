@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -71,12 +71,12 @@ class ModelStreamInferHandler
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
-      grpc_compression_level compression_level,
+      size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
       const std::string& header_forward_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            restricted_kv, header_forward_pattern),
+            max_response_queue_size, restricted_kv, header_forward_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
