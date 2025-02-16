@@ -25,13 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import unittest
-import queue
 import os
+import queue
+import unittest
+from functools import partial
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
-from functools import partial
 
 OUTPUT_NUM_ELEMENTS = int(os.getenv("OUTPUT_NUM_ELEMENTS", 1))
 
@@ -94,8 +94,6 @@ class TestTritonInference(unittest.TestCase):
                 response_idx = data_item.as_numpy("IDX")[0]
                 response_data = data_item.as_numpy("OUT")
                 expected_data = in_data[response_idx]
-
-                print("response_data:", response_data, "response_idx", response_idx, "response_data.size:", response_data.size)
 
                 self.assertEqual(
                     response_data[0],
