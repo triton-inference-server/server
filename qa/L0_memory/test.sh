@@ -93,7 +93,6 @@ MODELDIR="./python_models"
 export OUTPUT_NUM_ELEMENTS=49807360
 sed -i '$a\parameters: [{ key: "output_num_elements" value: { string_value: "'"$OUTPUT_NUM_ELEMENTS"'" }}]' $MODELDIR/repeat_int32/config.pbtxt
 
-RET=0
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_BASE_ARGS="--model-repository=${MODELDIR} --log-verbose=2 --allow-metrics=0"
 
