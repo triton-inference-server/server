@@ -533,7 +533,7 @@ TritonParser::SetupOptions()
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
-       "The maximum number of inference request/response objects that remain "
+       "The maximum number of states (inference request/response queues) that remain "
        "allocated for reuse. As long as the number of in-flight requests "
        "doesn't exceed this value there will be no allocation/deallocation of "
        "request/response objects."});
@@ -541,7 +541,7 @@ TritonParser::SetupOptions()
       {OPTION_GRPC_MAX_RESPONSE_POOL_SIZE, "grpc-max-response-pool-size",
        Option::ArgInt,
        "The maximum number of inference response objects that can remain "
-       "allocated in the pool at any given time."});
+       "allocated in the response queue at any given time."});
   grpc_options_.push_back(
       {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
        "Use SSL authentication for GRPC requests. Default is false."});
