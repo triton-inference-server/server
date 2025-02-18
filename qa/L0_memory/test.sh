@@ -98,7 +98,7 @@ SERVER_BASE_ARGS="--model-repository=${MODELDIR} --log-verbose=2 --allow-metrics
 
 declare -A MEMORY_USAGE=()
 
-for POOL_SIZE in 1 50 default; do
+for POOL_SIZE in 1 25 50 default; do
   if [[ "$POOL_SIZE" = "default" ]]; then
     SERVER_ARGS="${SERVER_BASE_ARGS}"
   else
@@ -148,7 +148,7 @@ done
 
 prev_mem=0
 prev_size=""
-for size in default 50 1; do
+for size in default 50 25 1; do
   current_mem=${MEMORY_USAGE[$size]}
   if [[ -n "$prev_size" && "$prev_mem" -ne 0 && "$current_mem" -ge "$prev_mem" ]]; then
     echo -e "\n***\n*** FAILED - Memory $current_mem KB with pool=$size >= $prev_mem KB (with pool=$prev_size)\n***"
