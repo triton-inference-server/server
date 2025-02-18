@@ -533,10 +533,10 @@ TritonParser::SetupOptions()
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
-       "The maximum number of states (inference request/response queues) that remain "
-       "allocated for reuse. As long as the number of in-flight requests "
-       "doesn't exceed this value there will be no allocation/deallocation of "
-       "request/response objects."});
+       "The maximum number of states (inference request/response queues) that "
+       "remain allocated for reuse. As long as the number of in-flight "
+       "requests doesn't exceed this value there will be no "
+       "allocation/deallocation of request/response objects."});
   grpc_options_.push_back(
       {OPTION_GRPC_MAX_RESPONSE_POOL_SIZE, "grpc-max-response-pool-size",
        Option::ArgInt,
@@ -2397,4 +2397,4 @@ TritonParser::PostProcessTraceArgs(
 }
 
 #endif  // TRITON_ENABLE_TRACING
-}}      // namespace triton::server
+}}  // namespace triton::server
