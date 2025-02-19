@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -78,6 +78,57 @@ namespace {
 //  RPCs. A single thread is created to handle all these requests as they
 //  are deemed to be not performance critical.
 //=========================================================================
+
+template <typename RequestType, typename ResponseType>
+class CommonCallbackData {
+ public:
+  using CallbackFunc =
+      std::function<void(RequestType&, ResponseType*, ::grpc::Status*)>;
+
+  CommonCallbackData(
+      const std::string& name,
+      inference::GRPCInferenceService::CallbackService* service,
+      const CallbackFunc& callback,
+      const std::pair<std::string, std::string>& restricted_kv)
+      : name_(name), service_(service), callback_(callback),
+        restricted_kv_(restricted_kv)
+  {
+  }
+
+  void operator()(RequestType* request)
+  {
+    ResponseType response;
+    ::grpc::Status status;
+
+    if (ExecutePrecondition()) {
+      callback_(*request, &response, &status);
+    } else {
+      status = ::grpc::Status(
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
+    }
+
+    request->request()->Complete(status);
+    delete this;
+  }
+
+ private:
+  bool ExecutePrecondition()
+  {
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = request->context()->client_metadata();
+      const auto it = metadata.find(restricted_kv_.first);
+      return (it != metadata.end()) && (it->second == restricted_kv_.second);
+    }
+    return true;
+  }
+
+  const std::string name_;
+  inference::GRPCInferenceService::CallbackService* service_;
+  CallbackFunc callback_;
+  std::pair<std::string, std::string> restricted_kv_;
+};
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
 class CommonCallData : public ICallData {
@@ -264,7 +315,8 @@ class CommonHandler : public HandlerBase {
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::health::v1::Health::AsyncService* health_service,
-      ::grpc::ServerCompletionQueue* cq,
+      inference::GRPCInferenceService::CallbackService*
+          non_inference_callback_service,
       const RestrictedFeatures& restricted_keys, const uint64_t response_delay);
 
   // Descriptive name of of the handler.
@@ -315,6 +367,9 @@ class CommonHandler : public HandlerBase {
 
   inference::GRPCInferenceService::AsyncService* service_;
   ::grpc::health::v1::Health::AsyncService* health_service_;
+  inference::GRPCInferenceService::CallbackService*
+      non_inference_callback_service_;
+
   ::grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
   RestrictedFeatures restricted_keys_{};
@@ -333,7 +388,8 @@ CommonHandler::CommonHandler(
     const uint64_t response_delay = 0)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
       trace_manager_(trace_manager), service_(service),
-      health_service_(health_service), cq_(cq),
+      health_service_(health_service),
+      non_inference_callback_service_(non_inference_callback_service), cq_(cq),
       restricted_keys_(restricted_keys), response_delay_(response_delay)
 {
 }
@@ -464,23 +520,18 @@ CommonHandler::RegisterServerLive()
       false /* async */, cq_, restricted_kv, response_delay_);
 }
 
+// This change leverages the callback API, simplifying the handling of the
+// ServerReady request by directly using the non_inference_callback_service_.
 void
 CommonHandler::RegisterServerReady()
 {
-  auto OnRegisterServerReady =
-      [this](
-          ::grpc::ServerContext* ctx, inference::ServerReadyRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestServerReady(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteServerReady = [this](
-                                  inference::ServerReadyRequest& request,
-                                  inference::ServerReadyResponse* response,
-                                  ::grpc::Status* status) {
+  // Define a lambda function 'callback' that takes a ServerReadyRequest,
+  // a ServerReadyResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteServerReady function.
+  auto callback = [this](
+                      inference::ServerReadyRequest& request,
+                      inference::ServerReadyResponse* response,
+                      ::grpc::Status* status) {
     bool ready = false;
     TRITONSERVER_Error* err =
         TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
@@ -493,33 +544,25 @@ CommonHandler::RegisterServerReady()
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::HEALTH);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>,
-      inference::ServerReadyRequest, inference::ServerReadyResponse>(
-      "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->ServerReady to register the callback.
+  // This replaces the use of CommonCallData.
+  non_inference_callback_service_->ServerReady(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::ServerReadyRequest, inference::ServerReadyResponse>(
+          "ServerReady", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterHealthCheck()
 {
-  auto OnRegisterHealthCheck =
-      [this](
-          ::grpc::ServerContext* ctx,
-          ::grpc::health::v1::HealthCheckRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              ::grpc::health::v1::HealthCheckResponse>* responder,
-          void* tag) {
-        this->health_service_->RequestCheck(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteHealthCheck = [this](
-                                  ::grpc::health::v1::HealthCheckRequest&
-                                      request,
-                                  ::grpc::health::v1::HealthCheckResponse*
-                                      response,
-                                  ::grpc::Status* status) {
+  auto callback = [this](
+                      ::grpc::health::v1::HealthCheckRequest& request,
+                      ::grpc::health::v1::HealthCheckResponse* response,
+                      ::grpc::Status* status) {
     bool live = false;
     TRITONSERVER_Error* err =
         TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
@@ -540,32 +583,21 @@ CommonHandler::RegisterHealthCheck()
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::HEALTH);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          ::grpc::health::v1::HealthCheckResponse>,
-      ::grpc::health::v1::HealthCheckRequest,
-      ::grpc::health::v1::HealthCheckResponse>(
-      "Check", 0, OnRegisterHealthCheck, OnExecuteHealthCheck,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  non_inference_callback_service_->Check(
+      new CommonCallbackData<
+          ::grpc::health::v1::HealthCheckRequest,
+          ::grpc::health::v1::HealthCheckResponse>(
+          "Check", non_inference_callback_service_, callback, restricted_kv));
 }
 
 void
 CommonHandler::RegisterModelReady()
 {
-  auto OnRegisterModelReady =
-      [this](
-          ::grpc::ServerContext* ctx, inference::ModelReadyRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestModelReady(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteModelReady = [this](
-                                 inference::ModelReadyRequest& request,
-                                 inference::ModelReadyResponse* response,
-                                 ::grpc::Status* status) {
+  auto callback = [this](
+                      ::grpc::health::v1::HealthCheckRequest& request,
+                      ::grpc::health::v1::HealthCheckResponse* response,
+                      ::grpc::Status* status) {
     bool is_ready = false;
     int64_t requested_model_version;
     auto err =
@@ -581,335 +613,314 @@ CommonHandler::RegisterModelReady()
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
-
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::HEALTH);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>,
-      inference::ModelReadyRequest, inference::ModelReadyResponse>(
-      "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady,
-      false /* async */, cq_, restricted_kv, response_delay_);
+  non_inference_callback_service_->ModelReady(
+      new CommonCallbackData<
+          ::grpc::health::v1::HealthCheckRequest,
+          ::grpc::health::v1::HealthCheckResponse>(
+          "ModelReady", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterServerMetadata()
 {
-  auto OnRegisterServerMetadata =
-      [this](
-          ::grpc::ServerContext* ctx, inference::ServerMetadataRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestServerMetadata(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteServerMetadata =
-      [this](
-          inference::ServerMetadataRequest& request,
-          inference::ServerMetadataResponse* response, ::grpc::Status* status) {
-        TRITONSERVER_Message* server_metadata_message = nullptr;
-        TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
-            tritonserver_.get(), &server_metadata_message);
-        GOTO_IF_ERR(err, earlyexit);
-
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            server_metadata_message, &buffer, &byte_size);
-        GOTO_IF_ERR(err, earlyexit);
-
-        {
-          triton::common::TritonJson::Value server_metadata_json;
-          err = server_metadata_json.Parse(buffer, byte_size);
-          GOTO_IF_ERR(err, earlyexit);
-
-          const char* name;
-          size_t namelen;
-          err = server_metadata_json.MemberAsString("name", &name, &namelen);
-          GOTO_IF_ERR(err, earlyexit);
-
-          const char* version;
-          size_t versionlen;
-          err = server_metadata_json.MemberAsString(
-              "version", &version, &versionlen);
-          GOTO_IF_ERR(err, earlyexit);
-
-          response->set_name(std::string(name, namelen));
-          response->set_version(std::string(version, versionlen));
-
-          if (server_metadata_json.Find("extensions")) {
-            triton::common::TritonJson::Value extensions_json;
-            err = server_metadata_json.MemberAsArray(
-                "extensions", &extensions_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            for (size_t idx = 0; idx < extensions_json.ArraySize(); ++idx) {
-              const char* ext;
-              size_t extlen;
-              err = extensions_json.IndexAsString(idx, &ext, &extlen);
-              GOTO_IF_ERR(err, earlyexit);
-              response->add_extensions(std::string(ext, extlen));
-            }
-          }
-          TRITONSERVER_MessageDelete(server_metadata_message);
-        }
-
-      earlyexit:
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
-
-  const std::pair<std::string, std::string>& restricted_kv =
-      restricted_keys_.Get(RestrictedCategory::METADATA);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>,
-      inference::ServerMetadataRequest, inference::ServerMetadataResponse>(
-      "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata,
-      false /* async */, cq_, restricted_kv, response_delay_);
-}
-
-void
-CommonHandler::RegisterModelMetadata()
-{
-  auto OnRegisterModelMetadata =
-      [this](
-          ::grpc::ServerContext* ctx, inference::ModelMetadataRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestModelMetadata(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteModelMetadata = [this](
-                                    inference::ModelMetadataRequest& request,
-                                    inference::ModelMetadataResponse* response,
-                                    ::grpc::Status* status) {
-    int64_t requested_model_version;
-    auto err =
-        GetModelVersionFromString(request.version(), &requested_model_version);
-    GOTO_IF_ERR(err, earlyexit);
-
-    {
-      TRITONSERVER_Message* model_metadata_message = nullptr;
-      err = TRITONSERVER_ServerModelMetadata(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_metadata_message);
-      GOTO_IF_ERR(err, earlyexit);
-
+  // Define a lambda function 'callback' that takes a ServerMetadataRequest,
+  // a ServerMetadataResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteServerMetadata function.
+  auto callback = [this](
+                      inference::ServerMetadataRequest& request,
+                      inference::ServerMetadataResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Message* server_metadata_message = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
+        tritonserver_.get(), &server_metadata_message);
+    if (err == nullptr) {
       const char* buffer;
       size_t byte_size;
       err = TRITONSERVER_MessageSerializeToJson(
-          model_metadata_message, &buffer, &byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      triton::common::TritonJson::Value model_metadata_json;
-      err = model_metadata_json.Parse(buffer, byte_size);
-      GOTO_IF_ERR(err, earlyexit);
-
-      const char* name;
-      size_t namelen;
-      err = model_metadata_json.MemberAsString("name", &name, &namelen);
-      GOTO_IF_ERR(err, earlyexit);
-
-      response->set_name(std::string(name, namelen));
-
-      if (model_metadata_json.Find("versions")) {
-        triton::common::TritonJson::Value versions_json;
-        err = model_metadata_json.MemberAsArray("versions", &versions_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < versions_json.ArraySize(); ++idx) {
-          const char* version;
-          size_t versionlen;
-          err = versions_json.IndexAsString(idx, &version, &versionlen);
-          GOTO_IF_ERR(err, earlyexit);
-          response->add_versions(std::string(version, versionlen));
-        }
-      }
-
-      const char* platform;
-      size_t platformlen;
-      err = model_metadata_json.MemberAsString(
-          "platform", &platform, &platformlen);
-      GOTO_IF_ERR(err, earlyexit);
-      response->set_platform(std::string(platform, platformlen));
-
-      if (model_metadata_json.Find("inputs")) {
-        triton::common::TritonJson::Value inputs_json;
-        err = model_metadata_json.MemberAsArray("inputs", &inputs_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < inputs_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value io_json;
-          err = inputs_json.IndexAsObject(idx, &io_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          inference::ModelMetadataResponse::TensorMetadata* io =
-              response->add_inputs();
-
+          server_metadata_message, &buffer, &byte_size);
+      if (err == nullptr) {
+        triton::common::TritonJson::Value server_metadata_json;
+        err = server_metadata_json.Parse(buffer, byte_size);
+        if (err == nullptr) {
           const char* name;
           size_t namelen;
-          err = io_json.MemberAsString("name", &name, &namelen);
-          GOTO_IF_ERR(err, earlyexit);
+          err = server_metadata_json.MemberAsString("name", &name, &namelen);
+          if (err == nullptr) {
+            const char* version;
+            size_t versionlen;
+            err = server_metadata_json.MemberAsString(
+                "version", &version, &versionlen);
+            if (err == nullptr) {
+              response->set_name(std::string(name, namelen));
+              response->set_version(std::string(version, versionlen));
 
-          const char* datatype;
-          size_t datatypelen;
-          err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
-          GOTO_IF_ERR(err, earlyexit);
-
-          io->set_name(std::string(name, namelen));
-          io->set_datatype(std::string(datatype, datatypelen));
-
-          if (io_json.Find("shape")) {
-            triton::common::TritonJson::Value shape_json;
-            err = io_json.MemberAsArray("shape", &shape_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
-              int64_t d;
-              err = shape_json.IndexAsInt(sidx, &d);
-              GOTO_IF_ERR(err, earlyexit);
-
-              io->add_shape(d);
+              if (server_metadata_json.Find("extensions")) {
+                triton::common::TritonJson::Value extensions_json;
+                err = server_metadata_json.MemberAsArray(
+                    "extensions", &extensions_json);
+                if (err == nullptr) {
+                  for (size_t idx = 0; idx < extensions_json.ArraySize();
+                       ++idx) {
+                    const char* ext;
+                    size_t extlen;
+                    err = extensions_json.IndexAsString(idx, &ext, &extlen);
+                    if (err == nullptr) {
+                      response->add_extensions(std::string(ext, extlen));
+                    }
+                  }
+                }
+              }
             }
           }
         }
       }
-
-      if (model_metadata_json.Find("outputs")) {
-        triton::common::TritonJson::Value outputs_json;
-        err = model_metadata_json.MemberAsArray("outputs", &outputs_json);
-        GOTO_IF_ERR(err, earlyexit);
-
-        for (size_t idx = 0; idx < outputs_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value io_json;
-          err = outputs_json.IndexAsObject(idx, &io_json);
-          GOTO_IF_ERR(err, earlyexit);
-
-          inference::ModelMetadataResponse::TensorMetadata* io =
-              response->add_outputs();
-
-          const char* name;
-          size_t namelen;
-          err = io_json.MemberAsString("name", &name, &namelen);
-          GOTO_IF_ERR(err, earlyexit);
-
-          const char* datatype;
-          size_t datatypelen;
-          err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
-          GOTO_IF_ERR(err, earlyexit);
-
-          io->set_name(std::string(name, namelen));
-          io->set_datatype(std::string(datatype, datatypelen));
-
-          if (io_json.Find("shape")) {
-            triton::common::TritonJson::Value shape_json;
-            err = io_json.MemberAsArray("shape", &shape_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
-              int64_t d;
-              err = shape_json.IndexAsInt(sidx, &d);
-              GOTO_IF_ERR(err, earlyexit);
-
-              io->add_shape(d);
-            }
-          }
-        }
-      }
-
-      TRITONSERVER_MessageDelete(model_metadata_message);
+      TRITONSERVER_MessageDelete(server_metadata_message);
     }
 
-  earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::METADATA);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>,
-      inference::ModelMetadataRequest, inference::ModelMetadataResponse>(
-      "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->ServerMetadata to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->ServerMetadata(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::ServerMetadataRequest, inference::ServerMetadataResponse>(
+          "ServerMetadata", non_inference_callback_service_, callback,
+          restricted_kv));
+}
+
+void
+CommonHandler::RegisterModelMetadata()
+{
+  // Define a lambda function 'callback' that takes a ModelMetadataRequest,
+  // a ModelMetadataResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteModelMetadata function.
+  auto callback = [this](
+                      inference::ModelMetadataRequest& request,
+                      inference::ModelMetadataResponse* response,
+                      ::grpc::Status* status) {
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
+    GOTO_IF_ERR(err, earlyexit);
+
+    TRITONSERVER_Message* model_metadata_message = nullptr;
+    err = TRITONSERVER_ServerModelMetadata(
+        tritonserver_.get(), request.name().c_str(), requested_model_version,
+        &model_metadata_message);
+    GOTO_IF_ERR(err, earlyexit);
+
+    const char* buffer;
+    size_t byte_size;
+    err = TRITONSERVER_MessageSerializeToJson(
+        model_metadata_message, &buffer, &byte_size);
+    GOTO_IF_ERR(err, earlyexit);
+
+    triton::common::TritonJson::Value model_metadata_json;
+    err = model_metadata_json.Parse(buffer, byte_size);
+    GOTO_IF_ERR(err, earlyexit);
+
+    const char* name;
+    size_t namelen;
+    err = model_metadata_json.MemberAsString("name", &name, &namelen);
+    GOTO_IF_ERR(err, earlyexit);
+
+    response->set_name(std::string(name, namelen));
+
+    if (model_metadata_json.Find("versions")) {
+      triton::common::TritonJson::Value versions_json;
+      err = model_metadata_json.MemberAsArray("versions", &versions_json);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < versions_json.ArraySize(); ++idx) {
+        const char* version;
+        size_t versionlen;
+        err = versions_json.IndexAsString(idx, &version, &versionlen);
+        GOTO_IF_ERR(err, earlyexit);
+        response->add_versions(std::string(version, versionlen));
+      }
+    }
+
+    const char* platform;
+    size_t platformlen;
+    err =
+        model_metadata_json.MemberAsString("platform", &platform, &platformlen);
+    GOTO_IF_ERR(err, earlyexit);
+    response->set_platform(std::string(platform, platformlen));
+
+    if (model_metadata_json.Find("inputs")) {
+      triton::common::TritonJson::Value inputs_json;
+      err = model_metadata_json.MemberAsArray("inputs", &inputs_json);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < inputs_json.ArraySize(); ++idx) {
+        triton::common::TritonJson::Value io_json;
+        err = inputs_json.IndexAsObject(idx, &io_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        inference::ModelMetadataResponse::TensorMetadata* io =
+            response->add_inputs();
+
+        const char* name;
+        size_t namelen;
+        err = io_json.MemberAsString("name", &name, &namelen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        const char* datatype;
+        size_t datatypelen;
+        err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        io->set_name(std::string(name, namelen));
+        io->set_datatype(std::string(datatype, datatypelen));
+
+        if (io_json.Find("shape")) {
+          triton::common::TritonJson::Value shape_json;
+          err = io_json.MemberAsArray("shape", &shape_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
+            int64_t d;
+            err = shape_json.IndexAsInt(sidx, &d);
+            GOTO_IF_ERR(err, earlyexit);
+            io->add_shape(d);
+          }
+        }
+      }
+    }
+
+    if (model_metadata_json.Find("outputs")) {
+      triton::common::TritonJson::Value outputs_json;
+      err = model_metadata_json.MemberAsArray("outputs", &outputs_json);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < outputs_json.ArraySize(); ++idx) {
+        triton::common::TritonJson::Value io_json;
+        err = outputs_json.IndexAsObject(idx, &io_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        inference::ModelMetadataResponse::TensorMetadata* io =
+            response->add_outputs();
+
+        const char* name;
+        size_t namelen;
+        err = io_json.MemberAsString("name", &name, &namelen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        const char* datatype;
+        size_t datatypelen;
+        err = io_json.MemberAsString("datatype", &datatype, &datatypelen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        io->set_name(std::string(name, namelen));
+        io->set_datatype(std::string(datatype, datatypelen));
+
+        if (io_json.Find("shape")) {
+          triton::common::TritonJson::Value shape_json;
+          err = io_json.MemberAsArray("shape", &shape_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          for (size_t sidx = 0; sidx < shape_json.ArraySize(); ++sidx) {
+            int64_t d;
+            err = shape_json.IndexAsInt(sidx, &d);
+            GOTO_IF_ERR(err, earlyexit);
+            io->add_shape(d);
+          }
+        }
+      }
+    }
+
+  earlyexit:
+    TRITONSERVER_MessageDelete(model_metadata_message);
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  const std::pair<std::string, std::string>& restricted_kv =
+      restricted_keys_.Get(RestrictedCategory::METADATA);
+
+  // Use non_inference_callback_service_->ModelMetadata to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->ModelMetadata(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::ModelMetadataRequest, inference::ModelMetadataResponse>(
+          "ModelMetadata", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterModelConfig()
 {
-  auto OnRegisterModelConfig =
-      [this](
-          ::grpc::ServerContext* ctx, inference::ModelConfigRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestModelConfig(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteModelConfig = [this](
-                                  inference::ModelConfigRequest& request,
-                                  inference::ModelConfigResponse* response,
-                                  ::grpc::Status* status) {
+  // Define a lambda function 'callback' that takes a ModelConfigRequest,
+  // a ModelConfigResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteModelConfig function.
+  auto callback = [this](
+                      inference::ModelConfigRequest& request,
+                      inference::ModelConfigResponse* response,
+                      ::grpc::Status* status) {
     int64_t requested_model_version;
     auto err =
         GetModelVersionFromString(request.version(), &requested_model_version);
-    if (err == nullptr) {
-      TRITONSERVER_Message* model_config_message = nullptr;
-      err = TRITONSERVER_ServerModelConfig(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          1 /* config_version */, &model_config_message);
-      if (err == nullptr) {
-        const char* buffer;
-        size_t byte_size;
-        err = TRITONSERVER_MessageSerializeToJson(
-            model_config_message, &buffer, &byte_size);
-        if (err == nullptr) {
-          ::google::protobuf::util::JsonStringToMessage(
-              ::google::protobuf::stringpiece_internal::StringPiece(
-                  buffer, (int)byte_size),
-              response->mutable_config());
-        }
-        TRITONSERVER_MessageDelete(model_config_message);
-      }
-    }
+    GOTO_IF_ERR(err, earlyexit);
 
+    TRITONSERVER_Message* model_config_message = nullptr;
+    err = TRITONSERVER_ServerModelConfig(
+        tritonserver_.get(), request.name().c_str(), requested_model_version,
+        1 /* config_version */, &model_config_message);
+    GOTO_IF_ERR(err, earlyexit);
+
+    const char* buffer;
+    size_t byte_size;
+    err = TRITONSERVER_MessageSerializeToJson(
+        model_config_message, &buffer, &byte_size);
+    GOTO_IF_ERR(err, earlyexit);
+
+    ::google::protobuf::util::JsonStringToMessage(
+        ::google::protobuf::stringpiece_internal::StringPiece(
+            buffer, static_cast<int>(byte_size)),
+        response->mutable_config());
+
+  earlyexit:
+    TRITONSERVER_MessageDelete(model_config_message);
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::MODEL_CONFIG);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>,
-      inference::ModelConfigRequest, inference::ModelConfigResponse>(
-      "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->ModelConfig to register the callback.
+  // This replaces the use of CommonCallData.
+  non_inference_callback_service_->ModelConfig(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::ModelConfigRequest, inference::ModelConfigResponse>(
+          "ModelConfig", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterModelStatistics()
 {
-  auto OnRegisterModelStatistics =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::ModelStatisticsRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestModelStatistics(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteModelStatistics = [this](
-                                      inference::ModelStatisticsRequest&
-                                          request,
-                                      inference::ModelStatisticsResponse*
-                                          response,
-                                      ::grpc::Status* status) {
+  // Define a lambda function 'callback' that takes a ModelStatisticsRequest,
+  // a ModelStatisticsResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteModelStatistics function.
+  auto callback = [this](
+                      inference::ModelStatisticsRequest& request,
+                      inference::ModelStatisticsResponse* response,
+                      ::grpc::Status* status) {
 #ifdef TRITON_ENABLE_STATS
     triton::common::TritonJson::Value model_stats_json;
 
@@ -918,24 +929,22 @@ CommonHandler::RegisterModelStatistics()
         GetModelVersionFromString(request.version(), &requested_model_version);
     GOTO_IF_ERR(err, earlyexit);
 
-    {
-      TRITONSERVER_Message* model_stats_message = nullptr;
-      err = TRITONSERVER_ServerModelStatistics(
-          tritonserver_.get(), request.name().c_str(), requested_model_version,
-          &model_stats_message);
-      GOTO_IF_ERR(err, earlyexit);
+    TRITONSERVER_Message* model_stats_message = nullptr;
+    err = TRITONSERVER_ServerModelStatistics(
+        tritonserver_.get(), request.name().c_str(), requested_model_version,
+        &model_stats_message);
+    GOTO_IF_ERR(err, earlyexit);
 
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_stats_message, &buffer, &byte_size);
-      GOTO_IF_ERR(err, earlyexit);
+    const char* buffer;
+    size_t byte_size;
+    err = TRITONSERVER_MessageSerializeToJson(
+        model_stats_message, &buffer, &byte_size);
+    GOTO_IF_ERR(err, earlyexit);
 
-      err = model_stats_json.Parse(buffer, byte_size);
-      GOTO_IF_ERR(err, earlyexit);
+    err = model_stats_json.Parse(buffer, byte_size);
+    GOTO_IF_ERR(err, earlyexit);
 
-      TRITONSERVER_MessageDelete(model_stats_message);
-    }
+    TRITONSERVER_MessageDelete(model_stats_message);
 
     if (model_stats_json.Find("model_stats")) {
       triton::common::TritonJson::Value stats_json;
@@ -1133,11 +1142,17 @@ CommonHandler::RegisterModelStatistics()
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::STATISTICS);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>,
-      inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
-      "ModelStatistics", 0, OnRegisterModelStatistics, OnExecuteModelStatistics,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->ModelStatistics to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->ModelStatistics(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::ModelStatisticsRequest,
+          inference::ModelStatisticsResponse>(
+          "ModelStatistics", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 template <typename PBTYPE>
@@ -1163,20 +1178,13 @@ CommonHandler::SetStatisticsDuration(
 void
 CommonHandler::RegisterTrace()
 {
-  auto OnRegisterTrace =
-      [this](
-          ::grpc::ServerContext* ctx, inference::TraceSettingRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::TraceSettingResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestTraceSetting(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteTrace = [this](
-                            inference::TraceSettingRequest& request,
-                            inference::TraceSettingResponse* response,
-                            ::grpc::Status* status) {
+  // Define a lambda function 'callback' that takes a TraceSettingRequest,
+  // a TraceSettingResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteTrace function.
+  auto callback = [this](
+                      inference::TraceSettingRequest& request,
+                      inference::TraceSettingResponse* response,
+                      ::grpc::Status* status) {
 #ifdef TRITON_ENABLE_TRACING
     TRITONSERVER_Error* err = nullptr;
     TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
@@ -1447,30 +1455,28 @@ CommonHandler::RegisterTrace()
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::TRACE);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::TraceSettingResponse>,
-      inference::TraceSettingRequest, inference::TraceSettingResponse>(
-      "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_,
-      restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->TraceSetting to register the callback.
+  // This replaces the use of CommonCallData.
+  non_inference_callback_service_->TraceSetting(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::TraceSettingRequest, inference::TraceSettingResponse>(
+          "TraceSetting", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterLogging()
 {
-  auto OnRegisterLogging =
-      [this](
-          ::grpc::ServerContext* ctx, inference::LogSettingsRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestLogSettings(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteLogging = [this](
-                              inference::LogSettingsRequest& request,
-                              inference::LogSettingsResponse* response,
-                              ::grpc::Status* status) {
+  // Define a lambda function 'callback' that takes a LogSettingsRequest,
+  // a LogSettingsResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteLogging function.
+  auto callback = [this](
+                      inference::LogSettingsRequest& request,
+                      inference::LogSettingsResponse* response,
+                      ::grpc::Status* status) {
 
 #ifdef TRITON_ENABLE_LOGGING
     TRITONSERVER_Error* err = nullptr;
@@ -1634,125 +1640,118 @@ CommonHandler::RegisterLogging()
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::LOGGING);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>,
-      inference::LogSettingsRequest, inference::LogSettingsResponse>(
-      "Logging", 0, OnRegisterLogging, OnExecuteLogging, false /* async */, cq_,
-      restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->LogSettings to register the callback.
+  // This replaces the use of CommonCallData.
+  non_inference_callback_service_->LogSettings(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::LogSettingsRequest, inference::LogSettingsResponse>(
+          "LogSettings", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterSystemSharedMemoryStatus()
 {
-  auto OnRegisterSystemSharedMemoryStatus =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::SystemSharedMemoryStatusRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::SystemSharedMemoryStatusResponse>* responder,
-          void* tag) {
-        this->service_->RequestSystemSharedMemoryStatus(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
+  // Define a lambda function 'callback' that takes a
+  // SystemSharedMemoryStatusRequest, a SystemSharedMemoryStatusResponse, and a
+  // grpc::Status. This function performs the same logic as the original
+  // OnExecuteSystemSharedMemoryStatus function.
+  auto callback = [this](
+                      inference::SystemSharedMemoryStatusRequest& request,
+                      inference::SystemSharedMemoryStatusResponse* response,
+                      ::grpc::Status* status) {
+    triton::common::TritonJson::Value shm_status_json(
+        triton::common::TritonJson::ValueType::ARRAY);
+    TRITONSERVER_Error* err = shm_manager_->GetStatus(
+        request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
+    GOTO_IF_ERR(err, earlyexit);
 
-  auto OnExecuteSystemSharedMemoryStatus =
-      [this](
-          inference::SystemSharedMemoryStatusRequest& request,
-          inference::SystemSharedMemoryStatusResponse* response,
-          ::grpc::Status* status) {
-        triton::common::TritonJson::Value shm_status_json(
-            triton::common::TritonJson::ValueType::ARRAY);
-        TRITONSERVER_Error* err = shm_manager_->GetStatus(
-            request.name(), TRITONSERVER_MEMORY_CPU, &shm_status_json);
-        GOTO_IF_ERR(err, earlyexit);
+    for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
+      triton::common::TritonJson::Value shm_region_json;
+      err = shm_status_json.IndexAsObject(idx, &shm_region_json);
+      GOTO_IF_ERR(err, earlyexit);
 
-        for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value shm_region_json;
-          err = shm_status_json.IndexAsObject(idx, &shm_region_json);
-          GOTO_IF_ERR(err, earlyexit);
+      const char* name;
+      size_t namelen;
+      err = shm_region_json.MemberAsString("name", &name, &namelen);
+      GOTO_IF_ERR(err, earlyexit);
 
-          const char* name;
-          size_t namelen;
-          err = shm_region_json.MemberAsString("name", &name, &namelen);
-          GOTO_IF_ERR(err, earlyexit);
+      const char* key;
+      size_t keylen;
+      err = shm_region_json.MemberAsString("key", &key, &keylen);
+      GOTO_IF_ERR(err, earlyexit);
 
-          const char* key;
-          size_t keylen;
-          err = shm_region_json.MemberAsString("key", &key, &keylen);
-          GOTO_IF_ERR(err, earlyexit);
+      uint64_t offset;
+      err = shm_region_json.MemberAsUInt("offset", &offset);
+      GOTO_IF_ERR(err, earlyexit);
 
-          uint64_t offset;
-          err = shm_region_json.MemberAsUInt("offset", &offset);
-          GOTO_IF_ERR(err, earlyexit);
+      uint64_t byte_size;
+      err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
 
-          uint64_t byte_size;
-          err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
-          GOTO_IF_ERR(err, earlyexit);
+      inference::SystemSharedMemoryStatusResponse::RegionStatus region_status;
+      region_status.set_name(std::string(name, namelen));
+      region_status.set_key(std::string(key, keylen));
+      region_status.set_offset(offset);
+      region_status.set_byte_size(byte_size);
 
-          inference::SystemSharedMemoryStatusResponse::RegionStatus
-              region_status;
-          region_status.set_name(std::string(name, namelen));
-          region_status.set_key(std::string(key, keylen));
-          region_status.set_offset(offset);
-          region_status.set_byte_size(byte_size);
+      (*response->mutable_regions())[name] = region_status;
+    }
 
-          (*response->mutable_regions())[name] = region_status;
-        }
-
-      earlyexit:
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+  earlyexit:
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::SystemSharedMemoryStatusResponse>,
-      inference::SystemSharedMemoryStatusRequest,
-      inference::SystemSharedMemoryStatusResponse>(
-      "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
-      OnExecuteSystemSharedMemoryStatus, false /* async */, cq_, restricted_kv,
-      response_delay_);
+
+  // Use non_inference_callback_service_->SystemSharedMemoryStatus to register
+  // the callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->SystemSharedMemoryStatus(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::SystemSharedMemoryStatusRequest,
+          inference::SystemSharedMemoryStatusResponse>(
+          "SystemSharedMemoryStatus", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterSystemSharedMemoryRegister()
 {
-  auto OnRegisterSystemSharedMemoryRegister =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::SystemSharedMemoryRegisterRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::SystemSharedMemoryRegisterResponse>* responder,
-          void* tag) {
-        this->service_->RequestSystemSharedMemoryRegister(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
+  // Define a lambda function 'callback' that takes a
+  // SystemSharedMemoryRegisterRequest, a SystemSharedMemoryRegisterResponse,
+  // and a grpc::Status. This function performs the same logic as the original
+  // OnExecuteSystemSharedMemoryRegister function.
+  auto callback = [this](
+                      inference::SystemSharedMemoryRegisterRequest& request,
+                      inference::SystemSharedMemoryRegisterResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
+        request.name(), request.key(), request.offset(), request.byte_size());
 
-  auto OnExecuteSystemSharedMemoryRegister =
-      [this](
-          inference::SystemSharedMemoryRegisterRequest& request,
-          inference::SystemSharedMemoryRegisterResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
-            request.name(), request.key(), request.offset(),
-            request.byte_size());
-
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::SystemSharedMemoryRegisterResponse>,
-      inference::SystemSharedMemoryRegisterRequest,
-      inference::SystemSharedMemoryRegisterResponse>(
-      "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
-      OnExecuteSystemSharedMemoryRegister, false /* async */, cq_,
-      restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->SystemSharedMemoryRegister to register
+  // the callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->SystemSharedMemoryRegister(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::SystemSharedMemoryRegisterRequest,
+          inference::SystemSharedMemoryRegisterResponse>(
+          "SystemSharedMemoryRegister", non_inference_callback_service_,
+          callback, restricted_kv));
 }
 
 void
@@ -1801,447 +1800,419 @@ CommonHandler::RegisterSystemSharedMemoryUnregister()
 void
 CommonHandler::RegisterCudaSharedMemoryStatus()
 {
-  auto OnRegisterCudaSharedMemoryStatus =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::CudaSharedMemoryStatusRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::CudaSharedMemoryStatusResponse>* responder,
-          void* tag) {
-        this->service_->RequestCudaSharedMemoryStatus(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-  auto OnExecuteCudaSharedMemoryStatus =
-      [this](
-          inference::CudaSharedMemoryStatusRequest& request,
-          inference::CudaSharedMemoryStatusResponse* response,
-          ::grpc::Status* status) {
-        triton::common::TritonJson::Value shm_status_json(
-            triton::common::TritonJson::ValueType::ARRAY);
-        TRITONSERVER_Error* err = shm_manager_->GetStatus(
-            request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
-        GOTO_IF_ERR(err, earlyexit);
+  // Define a lambda function 'callback' that takes a
+  // CudaSharedMemoryStatusRequest, a CudaSharedMemoryStatusResponse, and a
+  // grpc::Status. This function performs the same logic as the original
+  // OnExecuteCudaSharedMemoryStatus function.
+  auto callback = [this](
+                      inference::CudaSharedMemoryStatusRequest& request,
+                      inference::CudaSharedMemoryStatusResponse* response,
+                      ::grpc::Status* status) {
+    triton::common::TritonJson::Value shm_status_json(
+        triton::common::TritonJson::ValueType::ARRAY);
+    TRITONSERVER_Error* err = shm_manager_->GetStatus(
+        request.name(), TRITONSERVER_MEMORY_GPU, &shm_status_json);
+    GOTO_IF_ERR(err, earlyexit);
 
-        for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
-          triton::common::TritonJson::Value shm_region_json;
-          err = shm_status_json.IndexAsObject(idx, &shm_region_json);
-          GOTO_IF_ERR(err, earlyexit);
+    for (size_t idx = 0; idx < shm_status_json.ArraySize(); ++idx) {
+      triton::common::TritonJson::Value shm_region_json;
+      err = shm_status_json.IndexAsObject(idx, &shm_region_json);
+      GOTO_IF_ERR(err, earlyexit);
 
-          const char* name;
-          size_t namelen;
-          err = shm_region_json.MemberAsString("name", &name, &namelen);
-          GOTO_IF_ERR(err, earlyexit);
+      const char* name;
+      size_t namelen;
+      err = shm_region_json.MemberAsString("name", &name, &namelen);
+      GOTO_IF_ERR(err, earlyexit);
 
-          uint64_t device_id;
-          err = shm_region_json.MemberAsUInt("device_id", &device_id);
-          GOTO_IF_ERR(err, earlyexit);
+      uint64_t device_id;
+      err = shm_region_json.MemberAsUInt("device_id", &device_id);
+      GOTO_IF_ERR(err, earlyexit);
 
-          uint64_t byte_size;
-          err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
-          GOTO_IF_ERR(err, earlyexit);
+      uint64_t byte_size;
+      err = shm_region_json.MemberAsUInt("byte_size", &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
 
+      inference::CudaSharedMemoryStatusResponse::RegionStatus region_status;
+      region_status.set_name(std::string(name, namelen));
+      region_status.set_device_id(device_id);
+      region_status.set_byte_size(byte_size);
 
-          inference::CudaSharedMemoryStatusResponse::RegionStatus region_status;
-          region_status.set_name(std::string(name, namelen));
-          region_status.set_device_id(device_id);
-          region_status.set_byte_size(byte_size);
-
-          (*response->mutable_regions())[name] = region_status;
-        }
-      earlyexit:
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+      (*response->mutable_regions())[name] = region_status;
+    }
+  earlyexit:
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::CudaSharedMemoryStatusResponse>,
-      inference::CudaSharedMemoryStatusRequest,
-      inference::CudaSharedMemoryStatusResponse>(
-      "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
-      OnExecuteCudaSharedMemoryStatus, false /* async */, cq_, restricted_kv,
-      response_delay_);
+
+  // Use non_inference_callback_service_->CudaSharedMemoryStatus to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->CudaSharedMemoryStatus(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::CudaSharedMemoryStatusRequest,
+          inference::CudaSharedMemoryStatusResponse>(
+          "CudaSharedMemoryStatus", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterCudaSharedMemoryRegister()
 {
-  auto OnRegisterCudaSharedMemoryRegister =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::CudaSharedMemoryRegisterRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::CudaSharedMemoryRegisterResponse>* responder,
-          void* tag) {
-        this->service_->RequestCudaSharedMemoryRegister(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteCudaSharedMemoryRegister =
-      [this](
-          inference::CudaSharedMemoryRegisterRequest& request,
-          inference::CudaSharedMemoryRegisterResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
+  // Define a lambda function 'callback' that takes a
+  // CudaSharedMemoryRegisterRequest, a CudaSharedMemoryRegisterResponse, and a
+  // grpc::Status. This function performs the same logic as the original
+  // OnExecuteCudaSharedMemoryRegister function.
+  auto callback = [this](
+                      inference::CudaSharedMemoryRegisterRequest& request,
+                      inference::CudaSharedMemoryRegisterResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_GPU
-        err = shm_manager_->RegisterCUDASharedMemory(
-            request.name(),
-            reinterpret_cast<const cudaIpcMemHandle_t*>(
-                request.raw_handle().c_str()),
-            request.byte_size(), request.device_id());
+    err = shm_manager_->RegisterCUDASharedMemory(
+        request.name(),
+        reinterpret_cast<const cudaIpcMemHandle_t*>(
+            request.raw_handle().c_str()),
+        request.byte_size(), request.device_id());
 #else
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "failed to register CUDA shared memory region: '" +
-                request.name() + "', GPUs not supported")
-                .c_str());
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register CUDA shared memory region: '" + request.name() +
+            "', GPUs not supported")
+            .c_str());
 #endif  // TRITON_ENABLE_GPU
 
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::CudaSharedMemoryRegisterResponse>,
-      inference::CudaSharedMemoryRegisterRequest,
-      inference::CudaSharedMemoryRegisterResponse>(
-      "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
-      OnExecuteCudaSharedMemoryRegister, false /* async */, cq_, restricted_kv,
-      response_delay_);
+
+  // Use non_inference_callback_service_->CudaSharedMemoryRegister to register
+  // the callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->CudaSharedMemoryRegister(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::CudaSharedMemoryRegisterRequest,
+          inference::CudaSharedMemoryRegisterResponse>(
+          "CudaSharedMemoryRegister", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterCudaSharedMemoryUnregister()
 {
-  auto OnRegisterCudaSharedMemoryUnregister =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::CudaSharedMemoryUnregisterRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::CudaSharedMemoryUnregisterResponse>* responder,
-          void* tag) {
-        this->service_->RequestCudaSharedMemoryUnregister(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
+  // Define a lambda function 'callback' that takes a
+  // CudaSharedMemoryUnregisterRequest, a CudaSharedMemoryUnregisterResponse,
+  // and a grpc::Status. This function performs the same logic as the original
+  // OnExecuteCudaSharedMemoryUnregister function.
+  auto callback = [this](
+                      inference::CudaSharedMemoryUnregisterRequest& request,
+                      inference::CudaSharedMemoryUnregisterResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
+    if (request.name().empty()) {
+      err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
+    } else {
+      err = shm_manager_->Unregister(request.name(), TRITONSERVER_MEMORY_GPU);
+    }
 
-  auto OnExecuteCudaSharedMemoryUnregister =
-      [this](
-          inference::CudaSharedMemoryUnregisterRequest& request,
-          inference::CudaSharedMemoryUnregisterResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
-        if (request.name().empty()) {
-          err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
-        } else {
-          err =
-              shm_manager_->Unregister(request.name(), TRITONSERVER_MEMORY_GPU);
-        }
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
 
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::CudaSharedMemoryUnregisterResponse>,
-      inference::CudaSharedMemoryUnregisterRequest,
-      inference::CudaSharedMemoryUnregisterResponse>(
-      "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
-      OnExecuteCudaSharedMemoryUnregister, false /* async */, cq_,
-      restricted_kv, response_delay_);
+  // Use non_inference_callback_service_->CudaSharedMemoryUnregister to register
+  // the callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->CudaSharedMemoryUnregister(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::CudaSharedMemoryUnregisterRequest,
+          inference::CudaSharedMemoryUnregisterResponse>(
+          "CudaSharedMemoryUnregister", non_inference_callback_service_,
+          callback, restricted_kv));
 }
 
 void
 CommonHandler::RegisterRepositoryIndex()
 {
-  auto OnRegisterRepositoryIndex =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::RepositoryIndexRequest* request,
-          ::grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>*
-              responder,
-          void* tag) {
-        this->service_->RequestRepositoryIndex(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
+  // Define a lambda function 'callback' that takes a RepositoryIndexRequest,
+  // a RepositoryIndexResponse, and a grpc::Status. This function performs
+  // the same logic as the original OnExecuteRepositoryIndex function.
+  auto callback = [this](
+                      inference::RepositoryIndexRequest& request,
+                      inference::RepositoryIndexResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
+    if (request.repository_name().empty()) {
+      uint32_t flags = 0;
+      if (request.ready()) {
+        flags |= TRITONSERVER_INDEX_FLAG_READY;
+      }
 
-  auto OnExecuteRepositoryIndex =
-      [this](
-          inference::RepositoryIndexRequest& request,
-          inference::RepositoryIndexResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
-        if (request.repository_name().empty()) {
-          uint32_t flags = 0;
-          if (request.ready()) {
-            flags |= TRITONSERVER_INDEX_FLAG_READY;
-          }
+      TRITONSERVER_Message* model_index_message = nullptr;
+      err = TRITONSERVER_ServerModelIndex(
+          tritonserver_.get(), flags, &model_index_message);
+      GOTO_IF_ERR(err, earlyexit);
 
-          TRITONSERVER_Message* model_index_message = nullptr;
-          err = TRITONSERVER_ServerModelIndex(
-              tritonserver_.get(), flags, &model_index_message);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_index_message, &buffer, &byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      triton::common::TritonJson::Value model_index_json;
+      err = model_index_json.Parse(buffer, byte_size);
+      GOTO_IF_ERR(err, earlyexit);
+
+      err = model_index_json.AssertType(
+          triton::common::TritonJson::ValueType::ARRAY);
+      GOTO_IF_ERR(err, earlyexit);
+
+      for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
+        triton::common::TritonJson::Value index_json;
+        err = model_index_json.IndexAsObject(idx, &index_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        auto model_index = response->add_models();
+
+        const char* name;
+        size_t namelen;
+        err = index_json.MemberAsString("name", &name, &namelen);
+        GOTO_IF_ERR(err, earlyexit);
+        model_index->set_name(std::string(name, namelen));
+
+        if (index_json.Find("version")) {
+          const char* version;
+          size_t versionlen;
+          err = index_json.MemberAsString("version", &version, &versionlen);
           GOTO_IF_ERR(err, earlyexit);
-
-          const char* buffer;
-          size_t byte_size;
-          err = TRITONSERVER_MessageSerializeToJson(
-              model_index_message, &buffer, &byte_size);
-          GOTO_IF_ERR(err, earlyexit);
-
-          triton::common::TritonJson::Value model_index_json;
-          err = model_index_json.Parse(buffer, byte_size);
-          GOTO_IF_ERR(err, earlyexit);
-
-          err = model_index_json.AssertType(
-              triton::common::TritonJson::ValueType::ARRAY);
-          GOTO_IF_ERR(err, earlyexit);
-
-          for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
-            triton::common::TritonJson::Value index_json;
-            err = model_index_json.IndexAsObject(idx, &index_json);
-            GOTO_IF_ERR(err, earlyexit);
-
-            auto model_index = response->add_models();
-
-            const char* name;
-            size_t namelen;
-            err = index_json.MemberAsString("name", &name, &namelen);
-            GOTO_IF_ERR(err, earlyexit);
-            model_index->set_name(std::string(name, namelen));
-
-            if (index_json.Find("version")) {
-              const char* version;
-              size_t versionlen;
-              err = index_json.MemberAsString("version", &version, &versionlen);
-              GOTO_IF_ERR(err, earlyexit);
-              model_index->set_version(std::string(version, versionlen));
-            }
-            if (index_json.Find("state")) {
-              const char* state;
-              size_t statelen;
-              err = index_json.MemberAsString("state", &state, &statelen);
-              GOTO_IF_ERR(err, earlyexit);
-              model_index->set_state(std::string(state, statelen));
-            }
-            if (index_json.Find("reason")) {
-              const char* reason;
-              size_t reasonlen;
-              err = index_json.MemberAsString("reason", &reason, &reasonlen);
-              GOTO_IF_ERR(err, earlyexit);
-              model_index->set_reason(std::string(reason, reasonlen));
-            }
-          }
-
-          TRITONSERVER_MessageDelete(model_index_message);
-        } else {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "'repository_name' specification is not supported");
+          model_index->set_version(std::string(version, versionlen));
         }
+        if (index_json.Find("state")) {
+          const char* state;
+          size_t statelen;
+          err = index_json.MemberAsString("state", &state, &statelen);
+          GOTO_IF_ERR(err, earlyexit);
+          model_index->set_state(std::string(state, statelen));
+        }
+        if (index_json.Find("reason")) {
+          const char* reason;
+          size_t reasonlen;
+          err = index_json.MemberAsString("reason", &reason, &reasonlen);
+          GOTO_IF_ERR(err, earlyexit);
+          model_index->set_reason(std::string(reason, reasonlen));
+        }
+      }
 
-      earlyexit:
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+      TRITONSERVER_MessageDelete(model_index_message);
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
+
+  earlyexit:
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>,
-      inference::RepositoryIndexRequest, inference::RepositoryIndexResponse>(
-      "RepositoryIndex", 0, OnRegisterRepositoryIndex, OnExecuteRepositoryIndex,
-      false /* async */, cq_, restricted_kv, response_delay_);
+
+  // Use non_inference_callback_service_->RepositoryIndex to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->RepositoryIndex(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::RepositoryIndexRequest,
+          inference::RepositoryIndexResponse>(
+          "RepositoryIndex", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterRepositoryModelLoad()
 {
-  auto OnRegisterRepositoryModelLoad =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::RepositoryModelLoadRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::RepositoryModelLoadResponse>* responder,
-          void* tag) {
-        this->service_->RequestRepositoryModelLoad(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteRepositoryModelLoad =
-      [this](
-          inference::RepositoryModelLoadRequest& request,
-          inference::RepositoryModelLoadResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
-        if (request.repository_name().empty()) {
-          std::vector<TRITONSERVER_Parameter*> params;
-          // WAR for the const-ness check
-          std::vector<const TRITONSERVER_Parameter*> const_params;
-          for (const auto& param_proto : request.parameters()) {
-            if (param_proto.first == "config") {
-              if (param_proto.second.parameter_choice_case() !=
-                  inference::ModelRepositoryParameter::ParameterChoiceCase::
-                      kStringParam) {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    (std::string("invalid value type for load parameter '") +
-                     param_proto.first + "', expected string_param.")
-                        .c_str());
-                break;
-              } else {
-                auto param = TRITONSERVER_ParameterNew(
-                    param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
-                    param_proto.second.string_param().c_str());
-                if (param != nullptr) {
-                  params.emplace_back(param);
-                  const_params.emplace_back(param);
-                } else {
-                  err = TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "unexpected error on creating Triton parameter");
-                  break;
-                }
-              }
-            } else if (param_proto.first.rfind("file:", 0) == 0) {
-              if (param_proto.second.parameter_choice_case() !=
-                  inference::ModelRepositoryParameter::ParameterChoiceCase::
-                      kBytesParam) {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    (std::string("invalid value type for load parameter '") +
-                     param_proto.first + "', expected bytes_param.")
-                        .c_str());
-                break;
-              } else {
-                auto param = TRITONSERVER_ParameterBytesNew(
-                    param_proto.first.c_str(),
-                    param_proto.second.bytes_param().data(),
-                    param_proto.second.bytes_param().length());
-                if (param != nullptr) {
-                  params.emplace_back(param);
-                  const_params.emplace_back(param);
-                } else {
-                  err = TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "unexpected error on creating Triton parameter");
-                  break;
-                }
-              }
+  // Define a lambda function 'callback' that takes a
+  // RepositoryModelLoadRequest, a RepositoryModelLoadResponse, and a
+  // grpc::Status. This function performs the same logic as the original
+  // OnExecuteRepositoryModelLoad function.
+  auto callback = [this](
+                      inference::RepositoryModelLoadRequest& request,
+                      inference::RepositoryModelLoadResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
+    if (request.repository_name().empty()) {
+      std::vector<TRITONSERVER_Parameter*> params;
+      // WAR for the const-ness check
+      std::vector<const TRITONSERVER_Parameter*> const_params;
+      for (const auto& param_proto : request.parameters()) {
+        if (param_proto.first == "config") {
+          if (param_proto.second.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kStringParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("invalid value type for load parameter '") +
+                 param_proto.first + "', expected string_param.")
+                    .c_str());
+            break;
+          } else {
+            auto param = TRITONSERVER_ParameterNew(
+                param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
+                param_proto.second.string_param().c_str());
+            if (param != nullptr) {
+              params.emplace_back(param);
+              const_params.emplace_back(param);
             } else {
               err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG,
-                  (std::string("unrecognized load parameter '") +
-                   param_proto.first + "'.")
-                      .c_str());
+                  TRITONSERVER_ERROR_INTERNAL,
+                  "unexpected error on creating Triton parameter");
               break;
             }
           }
-          if (err == nullptr) {
-            err = TRITONSERVER_ServerLoadModelWithParameters(
-                tritonserver_.get(), request.model_name().c_str(),
-                const_params.data(), const_params.size());
-          }
-          // Assumes no further 'params' access after load API returns
-          for (auto& param : params) {
-            TRITONSERVER_ParameterDelete(param);
+        } else if (param_proto.first.rfind("file:", 0) == 0) {
+          if (param_proto.second.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kBytesParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("invalid value type for load parameter '") +
+                 param_proto.first + "', expected bytes_param.")
+                    .c_str());
+            break;
+          } else {
+            auto param = TRITONSERVER_ParameterBytesNew(
+                param_proto.first.c_str(),
+                param_proto.second.bytes_param().data(),
+                param_proto.second.bytes_param().length());
+            if (param != nullptr) {
+              params.emplace_back(param);
+              const_params.emplace_back(param);
+            } else {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INTERNAL,
+                  "unexpected error on creating Triton parameter");
+              break;
+            }
           }
         } else {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "'repository_name' specification is not supported");
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("unrecognized load parameter '") +
+               param_proto.first + "'.")
+                  .c_str());
+          break;
         }
+      }
+      if (err == nullptr) {
+        err = TRITONSERVER_ServerLoadModelWithParameters(
+            tritonserver_.get(), request.model_name().c_str(),
+            const_params.data(), const_params.size());
+      }
+      // Assumes no further 'params' access after load API returns
+      for (auto& param : params) {
+        TRITONSERVER_ParameterDelete(param);
+      }
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
 
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>,
-      inference::RepositoryModelLoadRequest,
-      inference::RepositoryModelLoadResponse>(
-      "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
-      OnExecuteRepositoryModelLoad, true /* async */, cq_, restricted_kv,
-      response_delay_);
+
+  // Use non_inference_callback_service_->RepositoryModelLoad to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->RepositoryModelLoad(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::RepositoryModelLoadRequest,
+          inference::RepositoryModelLoadResponse>(
+          "RepositoryModelLoad", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 void
 CommonHandler::RegisterRepositoryModelUnload()
 {
-  auto OnRegisterRepositoryModelUnload =
-      [this](
-          ::grpc::ServerContext* ctx,
-          inference::RepositoryModelUnloadRequest* request,
-          ::grpc::ServerAsyncResponseWriter<
-              inference::RepositoryModelUnloadResponse>* responder,
-          void* tag) {
-        this->service_->RequestRepositoryModelUnload(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
-
-  auto OnExecuteRepositoryModelUnload =
-      [this](
-          inference::RepositoryModelUnloadRequest& request,
-          inference::RepositoryModelUnloadResponse* response,
-          ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
-        if (request.repository_name().empty()) {
-          // Check if the dependent models should be removed
-          bool unload_dependents = false;
-          for (auto param : request.parameters()) {
-            if (param.first.compare("unload_dependents") == 0) {
-              const auto& unload_param = param.second;
-              if (unload_param.parameter_choice_case() !=
-                  inference::ModelRepositoryParameter::ParameterChoiceCase::
-                      kBoolParam) {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    "invalid value type for 'unload_dependents' parameter, "
-                    "expected "
-                    "bool_param.");
-              }
-              unload_dependents = unload_param.bool_param();
-              break;
-            }
+  // Define a lambda function 'callback' that takes a
+  // RepositoryModelUnloadRequest, a RepositoryModelUnloadResponse, and a
+  // grpc::Status. This function performs the same logic as the original
+  // OnExecuteRepositoryModelUnload function.
+  auto callback = [this](
+                      inference::RepositoryModelUnloadRequest& request,
+                      inference::RepositoryModelUnloadResponse* response,
+                      ::grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
+    if (request.repository_name().empty()) {
+      // Check if the dependent models should be removed
+      bool unload_dependents = false;
+      for (auto param : request.parameters()) {
+        if (param.first.compare("unload_dependents") == 0) {
+          const auto& unload_param = param.second;
+          if (unload_param.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kBoolParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "invalid value type for 'unload_dependents' parameter, "
+                "expected "
+                "bool_param.");
           }
-          if (err == nullptr) {
-            if (unload_dependents) {
-              err = TRITONSERVER_ServerUnloadModelAndDependents(
-                  tritonserver_.get(), request.model_name().c_str());
-            } else {
-              err = TRITONSERVER_ServerUnloadModel(
-                  tritonserver_.get(), request.model_name().c_str());
-            }
-          }
-        } else {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "'repository_name' specification is not supported");
+          unload_dependents = unload_param.bool_param();
+          break;
         }
+      }
+      if (err == nullptr) {
+        if (unload_dependents) {
+          err = TRITONSERVER_ServerUnloadModelAndDependents(
+              tritonserver_.get(), request.model_name().c_str());
+        } else {
+          err = TRITONSERVER_ServerUnloadModel(
+              tritonserver_.get(), request.model_name().c_str());
+        }
+      }
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
 
-        GrpcStatusUtil::Create(status, err);
-        TRITONSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
 
   const std::pair<std::string, std::string>& restricted_kv =
       restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
-  new CommonCallData<
-      ::grpc::ServerAsyncResponseWriter<
-          inference::RepositoryModelUnloadResponse>,
-      inference::RepositoryModelUnloadRequest,
-      inference::RepositoryModelUnloadResponse>(
-      "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
-      OnExecuteRepositoryModelUnload, true /* async */, cq_, restricted_kv,
-      response_delay_);
+
+  // Use non_inference_callback_service_->RepositoryModelUnload to register the
+  // callback. This replaces the use of CommonCallData.
+  non_inference_callback_service_->RepositoryModelUnload(
+      // Create a new CommonCallbackData object with the callback function
+      // and register it with the non_inference_callback_service_.
+      new CommonCallbackData<
+          inference::RepositoryModelUnloadRequest,
+          inference::RepositoryModelUnloadResponse>(
+          "RepositoryModelUnload", non_inference_callback_service_, callback,
+          restricted_kv));
 }
 
 }  // namespace
@@ -2285,6 +2256,7 @@ Server::Server(
   builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   builder_.RegisterService(&service_);
   builder_.RegisterService(&health_service_);
+  builder_.RegisterService(&non_inference_callback_service_);
   builder_.AddChannelArgument(
       GRPC_ARG_ALLOW_REUSEPORT, options.socket_.reuse_port_);
 
@@ -2383,8 +2355,8 @@ Server::Server(
   // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
-      &health_service_, common_cq_.get(), options.restricted_protocols_,
-      response_delay));
+      &health_service_, &non_inference_callback_service_, common_cq_.get(),
+      options.restricted_protocols_, response_delay));
 
   // [FIXME] "register" logic is different for infer
   // Handler for model inference requests.
@@ -2546,6 +2518,7 @@ Server::Start()
         (std::string("Socket '") + server_addr_ + "' already in use ").c_str());
   }
 
+  // Remove this
   common_handler_->Start();
   for (auto& model_infer_handler : model_infer_handlers_) {
     model_infer_handler->Start();

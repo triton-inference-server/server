@@ -1,4 +1,4 @@
-// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -139,14 +139,16 @@ class Server {
 
   inference::GRPCInferenceService::AsyncService service_;
   ::grpc::health::v1::Health::AsyncService health_service_;
+  inference::GRPCInferenceService::CallbackService
+      non_inference_callback_service_;
 
   std::unique_ptr<::grpc::Server> server_;
 
-  std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
+  // std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
 
-  std::unique_ptr<HandlerBase> common_handler_;
+  // std::unique_ptr<HandlerBase> common_handler_;
   std::vector<std::unique_ptr<HandlerBase>> model_infer_handlers_;
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
