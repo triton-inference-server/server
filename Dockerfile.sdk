@@ -242,17 +242,19 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
-    ls -l install/python/ && \
-    find install/python/ -maxdepth 1 -type f -name "tritonclient-*linux*.whl" | \
-    xargs pip3 install --upgrade
 
 RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
         pip3 install install/python/genai_perf-*.whl; \
     else \
+        mkdir -p /workspace/install/python && \
         cp /perf_analyzer/genai_perf-*.whl /workspace/install/python/ && \
         pip3 install /workspace/install/python/genai_perf-*.whl; \
     fi
+    
+RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
+    ls -l install/python/ && \
+    find install/python/ -maxdepth 1 -type f -name "tritonclient-*linux*.whl" | \
+    xargs pip3 install --upgrade
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
