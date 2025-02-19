@@ -168,6 +168,9 @@ RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
         && cd /workspace/perf_analyzer/genai-perf && \
         python3 -m build --wheel --outdir /workspace/install/python; \
     fi
+RUN ls -l /workspace/
+RUN ls -l /workspace/pa_build
+RUN ls -l /workspace/perf_analyzer
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
@@ -247,6 +250,7 @@ RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
         pip3 install install/python/genai_perf-*.whl; \
     else \
         mkdir -p /workspace/install/python && \
+        ls -l perf_analyzer/ && ls -l /workspace/perf_analyzer/ && \
         cp perf_analyzer/genai_perf-*.whl /workspace/install/python/ && \
         pip3 install /workspace/install/python/genai_perf-*.whl; \
     fi
