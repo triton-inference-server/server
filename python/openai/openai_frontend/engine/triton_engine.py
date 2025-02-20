@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,7 @@ from engine.engine import LLMEngine
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.triton import (
     _create_trtllm_inference_request,
+    _create_trtllm_llmapi_inference_request,
     _create_vllm_inference_request,
     _get_output,
     _validate_triton_responses_non_streaming,
@@ -229,6 +230,10 @@ class TritonLLMEngine(LLMEngine):
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
             return _create_vllm_inference_request
+
+        # TODO: If there's a better way to handle LLM API backend without having a separate flag.
+        if backend == "tensorrtllm-llmapi":
+            return _create_trtllm_llmapi_inference_request
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.

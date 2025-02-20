@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -75,6 +75,41 @@ def _create_vllm_inference_request(
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
+    return model.create_request(inputs=inputs)
+
+
+def _create_trtllm_llmapi_inference_request(
+    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+):
+    inputs = {}
+
+    exclude_input_in_output = True
+    echo = getattr(request, "echo", None)
+    if echo is not None:
+        exclude_input_in_output = not echo
+
+    # TODO: Add support for more parameters once supported by the LLM API backend.
+    batching = model.config().get("max_batch_size", 1)
+    inputs["text_input"] = [[prompt]] if batching else [prompt]
+    inputs["stream"] = (
+        np.bool_([[request.stream]]) if batching else np.bool_([request.stream])
+    )
+    inputs["exclude_input_in_output"] = (
+        np.bool_([[exclude_input_in_output]])
+        if batching
+        else np.bool_([exclude_input_in_output])
+    )
+    if request.temperature is not None:
+        inputs["temperature"] = (
+            np.float32([[request.temperature]])
+            if batching
+            else np.float32([request.temperature])
+        )
+    if request.top_p is not None:
+        inputs["top_p"] = (
+            np.float32([[request.top_p]]) if batching else np.float32([request.top_p])
+        )
+
     return model.create_request(inputs=inputs)
 
 

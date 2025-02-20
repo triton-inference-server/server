@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -105,7 +105,7 @@ def parse_args():
         "--backend",
         type=str,
         default=None,
-        choices=["vllm", "tensorrtllm"],
+        choices=["vllm", "tensorrtllm", "tensorrtllm-llmapi"],
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
     triton_group.add_argument(
