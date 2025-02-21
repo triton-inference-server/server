@@ -1315,10 +1315,7 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
-  std::recursive_mutex conn_mtx_;
   std::atomic<uint32_t> conn_cnt_ = 0;
-  bool accepting_new_conn_ = true;
-  bool cq_shutdown_ = false;
 
   void IncrementConnectionCount() { conn_cnt_.fetch_add(1); }
   void DecrementConnectionCount() { conn_cnt_.fetch_sub(1); }
@@ -1660,16 +1657,6 @@ class ModelInferHandler
   }
 
   std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
-  void DisableConnections()
-  {
-    std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
-    accepting_new_conn_ = false;
-  }
-  void DisableResponses()
-  {
-    std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
-    cq_shutdown_ = true;
-  }
 
  protected:
   void StartNewRequest() override;
