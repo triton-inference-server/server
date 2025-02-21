@@ -984,14 +984,15 @@ RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar
     && tar -xzf /tmp/ccache.tar.gz -C /tmp \\
     && cmake -D CMAKE_BUILD_TYPE=Release -S /tmp/ccache-4.10.2 -B /tmp/build \\
     && cmake --build /tmp/build -j$(nproc) -t install \\
-    && rm -rf /tmp/ccache.tar.gz /tmp/ccache-4.10.2 /tmp/build \\
-    && ccache -p
+    && rm -rf /tmp/ccache.tar.gz /tmp/ccache-4.10.2 /tmp/build
 
 ENV CCACHE_REMOTE_ONLY="true" \\
     CCACHE_REMOTE_STORAGE="{}" \\
     CMAKE_CXX_COMPILER_LAUNCHER="ccache" \\
     CMAKE_C_COMPILER_LAUNCHER="ccache" \\
     CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
+
+RUN ccache -p 
 """
     # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
