@@ -2575,6 +2575,9 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     server_->Shutdown();
   });
 
+  // Required to disable additional requests on existing streaming connections
+  DisableNewConnections();
+
   if (exit_timeout_secs != nullptr) {
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
@@ -2600,6 +2603,26 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
   }
 
   running_ = false;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::DisableNewConnections()
+{
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    modelInferHandler.DisableConnections();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    modelStreamInferHandler.DisableConnections();
+  }
+
   return nullptr;  // success
 }
 
