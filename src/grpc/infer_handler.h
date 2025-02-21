@@ -1315,6 +1315,13 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
+  std::recursive_mutex conn_mtx_;
+  std::atomic<uint32_t> conn_cnt_ = 0;
+  bool accepting_new_conn_ = true;
+
+  void IncrementConnectionCount() { conn_cnt_.fetch_add(1); }
+  void DecrementConnectionCount() { conn_cnt_.fetch_sub(1); }
+
   using State =
       InferHandlerState<ServerResponderType, RequestType, ResponseType>;
   using StateContext = typename State::Context;
@@ -1324,6 +1331,8 @@ class InferHandler : public HandlerBase {
       const std::shared_ptr<StateContext>& context,
       Steps start_step = Steps::START)
   {
+    IncrementConnectionCount();
+
     State* state = nullptr;
 
     if (max_state_bucket_count_ > 0) {
@@ -1364,11 +1373,13 @@ class InferHandler : public HandlerBase {
       if (state_bucket_.size() < max_state_bucket_count_) {
         state->Release();
         state_bucket_.push_back(state);
+        DecrementConnectionCount();
         return;
       }
     }
 
     delete state;
+    DecrementConnectionCount();
   }
 
   // Simple structure that carries the payload needed for
@@ -1645,6 +1656,13 @@ class ModelInferHandler
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
+  }
+
+  std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
+  void DisableConnections()
+  {
+    std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
+    accepting_new_conn_ = false;
   }
 
  protected:

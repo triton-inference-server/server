@@ -2562,16 +2562,32 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::Stop()
+Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  // Always shutdown the completion queue after the server.
-  server_->Shutdown();
+  std::thread graceful_shutdown([this]() {
+    // Stop accepting new RPC requests. Existing requests are allowed to
+    // complete
+    server_->Shutdown();
+  });
 
+  // Required to disable additional requests on existing streaming connections
+  DisableNewConnections();
+
+  if (exit_timeout_secs != nullptr) {
+    WaitForConnectionsToClose(exit_timeout_secs, service_name);
+  }
+
+  // Forcefully cancel remaining RPC connections
+  server_->Shutdown(std::chrono::system_clock::now());
+
+  graceful_shutdown.join();
+
+  // Shutdown completion queues
   common_cq_->Shutdown();
   model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
@@ -2588,6 +2604,63 @@ Server::Stop()
 
   running_ = false;
   return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::DisableNewConnections()
+{
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    modelInferHandler.DisableConnections();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    modelStreamInferHandler.DisableConnections();
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::WaitForConnectionsToClose(
+    uint32_t* exit_timeout_secs, const std::string& service_name)
+{
+  uint32_t conn_cnt = AggregateConnectionCount();
+  while (*exit_timeout_secs > 0 && conn_cnt > 0) {
+    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt
+             << " " << service_name << " service connections";
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    (*exit_timeout_secs)--;
+    conn_cnt = AggregateConnectionCount();
+  }
+
+  return nullptr;  // complete
+}
+
+uint32_t
+Server::AggregateConnectionCount()
+{
+  uint32_t total_connections = 0;
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    auto& modelInferHandler =
+        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
+            *model_infer_handler);
+    total_connections += modelInferHandler.GetConnectionCount();
+  }
+
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    auto& modelStreamInferHandler =
+        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
+            *model_stream_infer_handler);
+    total_connections += modelStreamInferHandler.GetConnectionCount();
+  }
+
+  return total_connections;
 }
 
 }}}  // namespace triton::server::grpc
