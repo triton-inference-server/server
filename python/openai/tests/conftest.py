@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,8 +31,10 @@ import pytest
 from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
-
 ### TEST ENVIRONMENT SETUP ###
+LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
+
+
 def infer_test_environment():
     # Infer the test environment for simplicity in local dev/testing.
     try:
@@ -48,7 +50,10 @@ def infer_test_environment():
         import tensorrt_llm as _
 
         backend = "tensorrtllm"
-        model = "tensorrt_llm_bls"
+        if LLMAPI_SETUP:
+            model = "tensorrt_llm"
+        else:
+            model = "tensorrt_llm_bls"
         return backend, model
     except ImportError:
         print("No tensorrt_llm installation found.")
@@ -57,7 +62,10 @@ def infer_test_environment():
 
 
 def infer_test_model_repository(backend):
-    model_repository = str(Path(__file__).parent / f"{backend}_models")
+    if LLMAPI_SETUP:
+        model_repository = str(Path(__file__).parent / f"{backend}_llmapi_models")
+    else:
+        model_repository = str(Path(__file__).parent / f"{backend}_models")
     return model_repository
 
 
