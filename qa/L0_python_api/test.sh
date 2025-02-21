@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,14 +25,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-BINDING_TEST_LOG="./python_binding.log"
+pip3 install pytest-asyncio==0.23.8
 
 RET=0
 
-rm -f $BINDING_TEST_LOG
-
 set +e
 
+BINDING_TEST_LOG="./python_binding.log"
+rm -f $BINDING_TEST_LOG
 python -m pytest --junitxml=test_binding_report.xml test_binding.py > $BINDING_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $BINDING_TEST_LOG
@@ -41,7 +41,7 @@ if [ $? -ne 0 ]; then
 fi
 
 API_TEST_LOG="./python_api.log"
-
+rm -f $API_TEST_LOG
 python -m pytest --junitxml=test_api_report.xml test_api.py > $API_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $API_TEST_LOG
@@ -49,8 +49,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-
 FRONTEND_TEST_LOG="./python_kserve.log"
+rm -f $FRONTEND_TEST_LOG
 python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $FRONTEND_TEST_LOG
