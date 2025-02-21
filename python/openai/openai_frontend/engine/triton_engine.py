@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -78,13 +78,18 @@ class TritonModelMetadata:
 
 class TritonLLMEngine(LLMEngine):
     def __init__(
-        self, server: tritonserver.Server, tokenizer: str, backend: Optional[str] = None
+        self,
+        server: tritonserver.Server,
+        tokenizer: str,
+        backend: Optional[str] = None,
+        lora_separator: Optional[str] = None,
     ):
         # Assume an already configured and started server
         self.server = server
         self.tokenizer = self._get_tokenizer(tokenizer)
         # TODO: Reconsider name of "backend" vs. something like "request_format"
         self.backend = backend
+        self.lora_separator = lora_separator
 
         # NOTE: Creation time and model metadata will be static at startup for
         # now, and won't account for dynamically loading/unloading models.
@@ -114,7 +119,8 @@ class TritonLLMEngine(LLMEngine):
     async def chat(
         self, request: CreateChatCompletionRequest
     ) -> CreateChatCompletionResponse | AsyncIterator[str]:
-        metadata = self.model_metadata.get(request.model)
+        model_name, lora_name = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
         self._validate_chat_request(request, metadata)
 
         conversation = [
@@ -130,7 +136,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, prompt, request)
+            metadata.request_converter(metadata.model, prompt, request, lora_name)
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -174,12 +180,15 @@ class TritonLLMEngine(LLMEngine):
         self, request: CreateCompletionRequest
     ) -> CreateCompletionResponse | AsyncIterator[str]:
         # Validate request and convert to Triton format
-        metadata = self.model_metadata.get(request.model)
+        model_name, lora_name = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
         self._validate_completion_request(request, metadata)
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, request.prompt, request)
+            metadata.request_converter(
+                metadata.model, request.prompt, request, lora_name
+            )
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -187,7 +196,7 @@ class TritonLLMEngine(LLMEngine):
         created = int(time.time())
         if request.stream:
             return self._streaming_completion_iterator(
-                request_id, created, metadata.name, responses
+                request_id, created, request.model, responses
             )
 
         # Response validation with decoupled models in mind
@@ -208,7 +217,7 @@ class TritonLLMEngine(LLMEngine):
             system_fingerprint=None,
             object=ObjectType.text_completion,
             created=created,
-            model=metadata.name,
+            model=request.model,
         )
 
     # TODO: This behavior should be tested further
@@ -233,6 +242,16 @@ class TritonLLMEngine(LLMEngine):
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
         return _create_trtllm_inference_request
+
+    def _get_model_and_lora_name(self, request_model_name: str):
+        if self.lora_separator is None or len(self.lora_separator) == 0:
+            return request_model_name, None
+
+        names = request_model_name.split(self.lora_separator)
+        if len(names) != 2:
+            return request_model_name, None
+
+        return names[0], names[1]
 
     def _get_tokenizer(self, tokenizer_name: str):
         tokenizer = None

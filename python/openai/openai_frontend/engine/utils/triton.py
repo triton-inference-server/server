@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import ctypes
+import json
 from typing import Iterable, List
 
 import numpy as np
@@ -33,7 +34,10 @@ from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
 
 
 def _create_vllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -59,10 +63,13 @@ def _create_vllm_inference_request(
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.
-    sampling_parameters = request.model_dump_json(
+    sampling_parameters = request.model_dump(
         exclude=excludes,
         exclude_none=True,
     )
+    if lora_name is not None:
+        sampling_parameters["lora_name"] = lora_name
+    sampling_parameters = json.dumps(sampling_parameters)
 
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
@@ -79,8 +86,14 @@ def _create_vllm_inference_request(
 
 
 def _create_trtllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
+    if lora_name is not None:
+        raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
+
     inputs = {}
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = np.bool_([[request.stream]])
