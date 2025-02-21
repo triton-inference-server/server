@@ -154,13 +154,6 @@ ModelStreamInferHandler::Process(
     }
   }
 
-  std::lock_guard<std::recursive_mutex> lk1(conn_mtx_);
-  if (cq_shutdown_) {
-    // Connection queue has been shutdown
-    state->step_ = Steps::FINISH;
-    return false;
-  }
-
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -228,16 +221,9 @@ ModelStreamInferHandler::Process(
       return !finished;
     }
 
-    if (!accepting_new_conn_) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is shutting down.");
-    }
-
     int64_t requested_model_version;
-    if (err == nullptr) {
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-    }
+    err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 
     // Record the transaction policy of the model into the current state
     // object.
