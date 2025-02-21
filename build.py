@@ -71,12 +71,12 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.55.0dev",
-    "triton_container_version": "25.02dev",
-    "upstream_container_version": "25.01",
+    "release_version": "2.55.0",
+    "triton_container_version": "25.02",
+    "upstream_container_version": "25.02",
     "ort_version": "1.20.1",
-    "ort_openvino_version": "2024.5.0",
-    "standalone_openvino_version": "2024.5.0",
+    "ort_openvino_version": "2025.0.0",
+    "standalone_openvino_version": "2025.0.0",
     "dcgm_version": "3.3.6",
     "vllm_version": "0.7.0",
     "rhel_py_version": "3.12.3",
@@ -1234,7 +1234,6 @@ COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
@@ -1819,6 +1818,14 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+            if FLAGS.use_user_docker_config:
+                if os.path.exists(FLAGS.use_user_docker_config):
+                    runargs += [
+                        "-v",
+                        os.path.expanduser(
+                            FLAGS.use_user_docker_config + ":/root/.docker/config.json"
+                        ),
+                    ]
 
         runargs += ["tritonserver_buildbase"]
 
@@ -2417,6 +2424,12 @@ if __name__ == "__main__":
         action="store_true",
         required=False,
         help="Do not use Docker container for build.",
+    )
+    parser.add_argument(
+        "--use-user-docker-config",
+        default=None,
+        required=False,
+        help="Path to the Docker configuration file to be used when performing container build.",
     )
     parser.add_argument(
         "--no-container-interactive",
