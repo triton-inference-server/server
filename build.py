@@ -985,12 +985,7 @@ ENV CCACHE_REMOTE_STORAGE="{}"
 ENV CMAKE_CXX_COMPILER_LAUNCHER="ccache"
 ENV CMAKE_C_COMPILER_LAUNCHER="ccache"
 ENV CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
-RUN dnf install -y -q \\
-        autoconf \\
-        automake \\
-        git \\
-        curl \\
-    && curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
+RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
     && tar -xzf /tmp/ccache.tar.gz -C /tmp \\
     && cmake -D CMAKE_BUILD_TYPE=Release -S /tmp/ccache-4.10.2 -B /tmp/build \\
     && cmake --build /tmp/build -j$(nproc) -t install \\
