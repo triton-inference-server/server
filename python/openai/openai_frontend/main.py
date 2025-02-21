@@ -95,11 +95,19 @@ def parse_args():
         required=True,
         help="Path to the Triton model repository holding the models to be served",
     )
+    # TODO: determine what to do with single tokenizer flag
     triton_group.add_argument(
         "--tokenizer",
         type=str,
         default=None,
         help="HuggingFace ID or local folder path of the Tokenizer to use for chat templates",
+    )
+    triton_group.add_argument(
+        "--tokenizers",
+        type=str,
+        nargs="+",  # Accept multiple arguments
+        default=[],
+        help="List of HuggingFace IDs or local folder paths of Tokenizers to use. Format: model_name:tokenizer_path",
     )
     triton_group.add_argument(
         "--backend",
@@ -166,8 +174,22 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Initialize a Triton Inference Server pointing at LLM models
-    server: tritonserver.Server = tritonserver.Server(
+    # Parse tokenizer mappings
+    tokenizer_map = {}
+    for tokenizer_spec in args.tokenizers:
+        try:
+            model_name, tokenizer_path = tokenizer_spec.split(":")
+            tokenizer_map[model_name] = tokenizer_path
+        except ValueError:
+            print(
+                f"Warning: Skipping invalid tokenizer specification: {tokenizer_spec}. Format should be 'model_name:tokenizer_path'"
+            )
+
+    if args.tokenizer:
+        tokenizer_map["default"] = args.tokenizer
+
+    # Initialize Triton server
+    server = tritonserver.Server(
         model_repository=args.model_repository,
         log_verbose=args.tritonserver_log_verbose_level,
         log_info=True,
