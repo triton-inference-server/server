@@ -980,10 +980,10 @@ RUN yum install -y \\
 """
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
-ENV CCACHE_REMOTE_ONLY="true"
-    CCACHE_REMOTE_STORAGE="{}"
-    CMAKE_CXX_COMPILER_LAUNCHER="ccache"
-    CMAKE_C_COMPILER_LAUNCHER="ccache"
+ENV CCACHE_REMOTE_ONLY="true" \\
+    CCACHE_REMOTE_STORAGE="{}" \\
+    CMAKE_CXX_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_C_COMPILER_LAUNCHER="ccache" \\
     CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
 
 RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
@@ -1153,10 +1153,10 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
-ENV CCACHE_REMOTE_ONLY="true"
-    CCACHE_REMOTE_STORAGE="{}"
-    CMAKE_CXX_COMPILER_LAUNCHER="ccache"
-    CMAKE_C_COMPILER_LAUNCHER="ccache"
+ENV CCACHE_REMOTE_ONLY="true" \\
+    CCACHE_REMOTE_STORAGE="{}" \\
+    CMAKE_CXX_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_C_COMPILER_LAUNCHER="ccache" \\
     CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
 
 RUN apt-get update \\
