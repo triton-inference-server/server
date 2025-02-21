@@ -993,7 +993,7 @@ ENV CCACHE_REMOTE_ONLY="true" \\
     CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
 
 RUN ccache -p 
-"""
+""".format( os.getenv("CCACHE_REMOTE_STORAGE") )
     # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
