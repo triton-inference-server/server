@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,9 +39,16 @@ class TestOpenAIClient:
         models = list(client.models.list())
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            # tensorrt_llm_bls +
-            # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 4
+            import os
+
+            LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
+            if LLMAPI_SETUP:
+                # LLM API setup only has the tensorrt_llm model
+                assert len(models) == 1
+            else:
+                # tensorrt_llm_bls +
+                # preprocess -> tensorrt_llm -> postprocess
+                assert len(models) == 4
         elif backend == "vllm":
             assert len(models) == 1
         else:
@@ -105,9 +112,16 @@ class TestAsyncOpenAIClient:
         models = [model async for model in async_models]
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            # tensorrt_llm_bls +
-            # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 4
+            import os
+
+            LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
+            if LLMAPI_SETUP:
+                # LLM API setup only has the tensorrt_llm model
+                assert len(models) == 1
+            else:
+                # tensorrt_llm_bls +
+                # preprocess -> tensorrt_llm -> postprocess
+                assert len(models) == 4
         elif backend == "vllm":
             assert len(models) == 1
         else:
