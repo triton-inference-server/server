@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@ fastapi==0.115.6
 # Fix httpx version to avoid bug in openai library:
 # https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
 httpx==0.27.2
-openai==1.40.6
+openai==1.60.0
 # Minimum starlette version needed to address CVE:
 # https://github.com/advisories/GHSA-f96h-pmfr-66vw
 starlette>=0.40.0
