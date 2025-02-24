@@ -148,7 +148,7 @@ class Server {
   std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
 
-  // std::unique_ptr<HandlerBase> common_handler_;
+  std::unique_ptr<HandlerBase> common_handler_;
   std::vector<std::unique_ptr<HandlerBase>> model_infer_handlers_;
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
