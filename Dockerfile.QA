@@ -128,6 +128,7 @@ RUN mkdir -p qa/common && \
     cp bin/multi_server qa/L0_multi_server/. && \
     cp bin/memory_test qa/L0_memory/. && \
     cp bin/pinned_memory_manager_test qa/L0_memory/. && \
+    mkdir -p qa/L0_memory/python_models/repeat_int32/1 && \
     cp bin/repo_agent_test qa/L0_triton_repo_agent/. && \
     cp lib/libtritonrepoagent_relocation.so qa/L0_triton_repo_agent/. && \
     mkdir qa/L0_query/models/query/1 && \
@@ -264,7 +265,11 @@ RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_model.py \
         qa/L0_decoupled/python_models/square_int32/1/. && \
     cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
-        qa/L0_decoupled/python_models/square_int32/.
+        qa/L0_decoupled/python_models/square_int32/. && \
+    cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
+        qa/L0_memory/python_models/repeat_int32/1/model.py && \
+    cp /workspace/tritonbuild/python/examples/decoupled/repeat_config.pbtxt \
+        qa/L0_memory/python_models/repeat_int32/config.pbtxt
 
 RUN mkdir -p qa/L0_decoupled_grpc_error && \
     cp -r qa/L0_decoupled/. qa/L0_decoupled_grpc_error
