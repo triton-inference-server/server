@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,5 +30,5 @@
 The Triton Inference Server container image, release 25.02, is available
 on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
 is open source
-on [GitHub](https://github.com/triton-inference-server/server). Release notes can 
+on [GitHub](https://github.com/triton-inference-server/server). Release notes can
 be found on the [GitHub Release Page](https://github.com/triton-inference-server/server/releases)
