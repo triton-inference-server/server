@@ -106,10 +106,31 @@ function run_test() {
     pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
     if [ $? -ne 0 ]; then
         cat ${TEST_LOG}
-        echo -e "\n***\n*** Test Failed\n***"
+        echo -e "\n***\n*** Test OpenAI Failed\n***"
         RET=1
     fi
     set -e
+
+    # Collect logs for error analysis when needed
+    cp *.xml *.log ../../../
+    popd
+}
+
+function run_test_lora() {
+    pushd openai/
+    TEST_LOG="test_openai_lora.log"
+
+    # Capture error code without exiting to allow log collection
+    export CUDA_VISIBLE_DEVICES=0
+    set +e
+    pytest -s -v --junitxml=test_openai_lora.xml tests_lora/ 2>&1 > ${TEST_LOG}
+    if [ $? -ne 0 ]; then
+        cat ${TEST_LOG}
+        echo -e "\n***\n*** Test OpenAI LoRA Failed\n***"
+        RET=1
+    fi
+    set -e
+    unset CUDA_VISIBLE_DEVICES
 
     # Collect logs for error analysis when needed
     cp *.xml *.log ../../../
@@ -122,5 +143,11 @@ RET=0
 
 pre_test
 run_test
+run_test_lora
 
-exit ${RET}
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+exit $RET
