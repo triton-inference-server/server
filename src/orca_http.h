@@ -25,10 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "http_server.h"
+
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "triton/common/triton_json.h"
 
 #define ENDPOINT_LOAD_METRICS_TYPE "endpoint-load-metrics-format"
 #define ENDPOINT_LOAD_METRICS_NAME "endpoint-load-metrics"
@@ -48,14 +49,14 @@ struct PromMetric {
 
 // Helper function to get the KV-cache utilization metrics for the
 // inference response header
-static std::string ExtractKVMetrics(
+std::string ExtractKVMetrics(
     const std::string& prometheus_metrics, const std::string& orca_type);
 // Generates a metric struct for a given family with a map of labels and a
 // value
-static std::vector<PromMetric> MetricFamilyExtractor(
+std::vector<PromMetric> MetricFamilyExtractor(
     const std::string& input, const std::string& metricFamily);
 // Creates a header string in the the proper reporting format for provided
 // KV-cache metrics.
-static std::string OrcaKVMetricHeader(
+std::string OrcaKVMetricHeader(
     const std::string& reporting_format,
     const std::unordered_map<std::string, double> metrics);

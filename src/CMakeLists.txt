@@ -337,10 +337,12 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_SRCS
     http_server.cc
+    orca_http.cc
   )
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
+    orca_http.h
   )
 
   # Add header / src files based on HTTP related endpoint requested

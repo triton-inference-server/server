@@ -25,8 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "orca_http.h"
-#include <re2/re2.h>          // Ensure RE2 is linked in your build system
-#include "triton/common/logging.h" // Make sure this path is correct
 
 
 std::vector<PromMetric> MetricFamilyExtractor(
