@@ -82,7 +82,7 @@ namespace {
 // Define your unified callback service that implements several non-inference
 // RPCs.
 class UnifiedCallbackService
-    : public inference::GRPCInferenceService::CallbackService {
+    : public inference::GRPCInferenceServiceCallback::CallbackService {
  public:
   UnifiedCallbackService(
       const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -1557,7 +1557,7 @@ class CommonHandler : public HandlerBase {
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::health::v1::Health::AsyncService* health_service,
-      inference::GRPCInferenceService::CallbackService*
+      inference::GRPCInferenceServiceCallback::CallbackService*
           non_inference_callback_service,
       const RestrictedFeatures& restricted_keys, const uint64_t response_delay);
 
@@ -1571,7 +1571,8 @@ class CommonHandler : public HandlerBase {
   void CreateUnifiedCallbackService();
 
   // Add a new public method to return the non_inference_callback_service_
-  inference::GRPCInferenceService::CallbackService* GetUnifiedCallbackService()
+  inference::GRPCInferenceServiceCallback::CallbackService*
+  GetUnifiedCallbackService()
   {
     return non_inference_callback_service_;
   }
@@ -1583,7 +1584,7 @@ class CommonHandler : public HandlerBase {
   TraceManager* trace_manager_;
   inference::GRPCInferenceService::AsyncService* service_;
   ::grpc::health::v1::Health::AsyncService* health_service_;
-  inference::GRPCInferenceService::CallbackService*
+  inference::GRPCInferenceServiceCallback::CallbackService*
       non_inference_callback_service_;
   std::unique_ptr<std::thread> thread_;
   RestrictedFeatures restricted_keys_;
@@ -1597,7 +1598,7 @@ CommonHandler::CommonHandler(
     TraceManager* trace_manager,
     inference::GRPCInferenceService::AsyncService* service,
     ::grpc::health::v1::Health::AsyncService* health_service,
-    inference::GRPCInferenceService::CallbackService*
+    inference::GRPCInferenceServiceCallback::CallbackService*
         non_inference_callback_service,
     const RestrictedFeatures& restricted_keys, const uint64_t response_delay)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
@@ -1657,7 +1658,7 @@ Server::Server(
 
   builder_.AddListeningPort(server_addr_, credentials, &bound_port_);
   builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
-  // builder_.RegisterService(&service_);
+  builder_.RegisterService(&service_);
   // builder_.RegisterService(&health_service_);
   builder_.AddChannelArgument(
       GRPC_ARG_ALLOW_REUSEPORT, options.socket_.reuse_port_);

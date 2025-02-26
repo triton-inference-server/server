@@ -30,6 +30,7 @@
 #include <string>
 
 #include "grpc_service.grpc.pb.h"
+#include "grpccallback_service.grpc.pb.h"
 
 namespace triton { namespace server { namespace grpc {
 class HandlerBase {
@@ -37,7 +38,7 @@ class HandlerBase {
   virtual ~HandlerBase() = default;
   virtual void Start() = 0;
   virtual void Stop() = 0;
-  virtual inference::GRPCInferenceService::CallbackService*
+  virtual inference::GRPCInferenceServiceCallback::CallbackService*
   GetUnifiedCallbackService()
   {
     return nullptr;
