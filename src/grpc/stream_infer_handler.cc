@@ -154,7 +154,7 @@ ModelStreamInferHandler::Process(
     }
   }
 
-  std::lock_guard<std::recursive_mutex> lk1(*conn_mtx_);
+  std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
 
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
