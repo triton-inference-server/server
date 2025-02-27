@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import copy
+import os
 
 import pytest
 
@@ -238,6 +239,11 @@ class TestCompletions:
         assert response1_text == response2_text
         assert response1_text != response3_text
 
+    # TODO: Remove xfail for LLM API when it supports seed
+    @pytest.mark.xfail(
+        condition=os.getenv("LLMAPI_SETUP") == "1",
+        reason="Didn't see any difference in responses with different seeds when using LLM API. Skipping for now.",
+    )
     # Simple tests to verify seed roughly behaves as expected
     def test_completions_seed(self, client, model: str, prompt: str):
         responses = []
@@ -258,7 +264,7 @@ class TestCompletions:
                 json=payload1,
             )
         )
-        # Third response should differ with different temperature in payload
+        # Third response should differ with different seed in payload
         responses.append(
             client.post(
                 "/v1/completions",

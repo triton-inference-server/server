@@ -90,8 +90,6 @@ function prepare_tensorrtllm() {
     LLMAPI_MODEL_REPO="tests/tensorrtllm_llmapi_models"
     mkdir -p ${LLMAPI_MODEL_REPO}
     cp /app/all_models/llmapi/* "${LLMAPI_MODEL_REPO}" -r
-
-    # Modify the json file model.json, from "model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0", to "model": "meta-llama/Meta-Llama-3.1-8B-Instruct"
     sed -i 's#"model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0"#"model":"meta-llama/Meta-Llama-3.1-8B-Instruct"#g' ${LLMAPI_MODEL_REPO}/tensorrt_llm/1/model.json
 }
 
@@ -145,11 +143,10 @@ function run_test() {
             RET=1
         fi
     fi
+    set -e
 
     # Collect logs for error analysis when needed
     cp *.xml *.log ../../../
-
-    set -e
     popd
 }
 
