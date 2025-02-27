@@ -317,14 +317,13 @@ StopEndpoints(uint32_t* exit_timeout_secs)
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
+  // Allow for graceful shutdown of GRPC service
   if (g_grpc_service) {
     TRITONSERVER_Error* err = g_grpc_service->Stop(exit_timeout_secs);
     if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC service");
+      LOG_TRITONSERVER_ERROR(err, "failed to gracefully stop GRPC service");
       ret = false;
     }
-
-    g_grpc_service.reset();
   }
 #endif  // TRITON_ENABLE_GRPC
 
@@ -335,6 +334,19 @@ bool
 StopEndpoints()
 {
   bool ret = true;
+
+#ifdef TRITON_ENABLE_GRPC
+  if (g_grpc_service) {
+    // Forceful shutdown of GRPC service
+    TRITONSERVER_Error* err = g_grpc_service->Stop();
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC service");
+      ret = false;
+    }
+
+    g_grpc_service.reset();
+  }
+#endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
   if (g_metrics_service) {
@@ -518,7 +530,7 @@ main(int argc, char** argv)
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  // Stop the HTTP[, gRPC, and metrics] endpoints, and update exit timeout.
+  // Stop the HTTP and gRPC endpoints, and update exit timeout.
   uint32_t exit_timeout_secs = g_triton_params.exit_timeout_secs_;
   StopEndpoints(&exit_timeout_secs);
   TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);

@@ -2396,7 +2396,8 @@ Server::Server(
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.max_response_pool_size_, options.infer_compression_level_,
-        restricted_kv, options.forward_header_pattern_));
+        restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
+        &accepting_new_conn_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2406,7 +2407,8 @@ Server::Server(
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
       options.max_response_pool_size_, options.infer_compression_level_,
-      restricted_kv, options.forward_header_pattern_));
+      restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
+      &accepting_new_conn_));
 }
 
 Server::~Server()
@@ -2569,7 +2571,7 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  std::thread graceful_shutdown([this]() {
+  graceful_shutdown_thread = std::thread([this]() {
     // Stop accepting new RPC requests. Existing requests are allowed to
     // complete
     server_->Shutdown();
@@ -2582,10 +2584,23 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
 
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::Stop()
+{
+  if (!running_) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
+  }
+
   // Forcefully cancel remaining RPC connections
   server_->Shutdown(std::chrono::system_clock::now());
 
-  graceful_shutdown.join();
+  if (graceful_shutdown_thread.joinable()) {
+    graceful_shutdown_thread.join();
+  }
 
   // Shutdown completion queues
   common_cq_->Shutdown();
@@ -2609,19 +2624,9 @@ Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 TRITONSERVER_Error*
 Server::DisableNewConnections()
 {
-  for (auto& model_infer_handler : model_infer_handlers_) {
-    auto& modelInferHandler =
-        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
-            *model_infer_handler);
-    modelInferHandler.DisableConnections();
-  }
+  std::unique_lock<std::shared_mutex> lock(conn_mtx_);
 
-  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
-    auto& modelStreamInferHandler =
-        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
-            *model_stream_infer_handler);
-    modelStreamInferHandler.DisableConnections();
-  }
+  accepting_new_conn_ = false;
 
   return nullptr;  // success
 }
@@ -2630,37 +2635,14 @@ TRITONSERVER_Error*
 Server::WaitForConnectionsToClose(
     uint32_t* exit_timeout_secs, const std::string& service_name)
 {
-  uint32_t conn_cnt = AggregateConnectionCount();
-  while (*exit_timeout_secs > 0 && conn_cnt > 0) {
-    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt
+  while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
+    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
              << " " << service_name << " service connections";
     std::this_thread::sleep_for(std::chrono::seconds(1));
     (*exit_timeout_secs)--;
-    conn_cnt = AggregateConnectionCount();
   }
 
   return nullptr;  // complete
-}
-
-uint32_t
-Server::AggregateConnectionCount()
-{
-  uint32_t total_connections = 0;
-  for (auto& model_infer_handler : model_infer_handlers_) {
-    auto& modelInferHandler =
-        dynamic_cast<triton::server::grpc::ModelInferHandler&>(
-            *model_infer_handler);
-    total_connections += modelInferHandler.GetConnectionCount();
-  }
-
-  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
-    auto& modelStreamInferHandler =
-        dynamic_cast<triton::server::grpc::ModelStreamInferHandler&>(
-            *model_stream_infer_handler);
-    total_connections += modelStreamInferHandler.GetConnectionCount();
-  }
-
-  return total_connections;
 }
 
 }}}  // namespace triton::server::grpc

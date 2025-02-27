@@ -1302,7 +1302,8 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count, size_t max_response_queue_size,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern);
+      const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -1315,12 +1316,8 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
-  std::recursive_mutex conn_mtx_;
-  std::atomic<uint32_t> conn_cnt_ = 0;
-  bool accepting_new_conn_ = true;
-
-  void IncrementConnectionCount() { conn_cnt_.fetch_add(1); }
-  void DecrementConnectionCount() { conn_cnt_.fetch_sub(1); }
+  void IncrementConnectionCount() { conn_cnt_->fetch_add(1); }
+  void DecrementConnectionCount() { conn_cnt_->fetch_sub(1); }
 
   using State =
       InferHandlerState<ServerResponderType, RequestType, ResponseType>;
@@ -1454,6 +1451,10 @@ class InferHandler : public HandlerBase {
   std::pair<std::string, std::string> restricted_kv_;
   std::string header_forward_pattern_;
   re2::RE2 header_forward_regex_;
+
+  std::shared_mutex* conn_mtx_;
+  std::atomic<uint32_t>* conn_cnt_;
+  bool* accepting_new_conn_;
 };
 
 template <
@@ -1466,13 +1467,15 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count, size_t max_response_queue_size,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_pattern)
+        const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
+        std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       max_response_queue_size_(max_response_queue_size),
       restricted_kv_(restricted_kv),
       header_forward_pattern_(header_forward_pattern),
-      header_forward_regex_(header_forward_pattern_)
+      header_forward_regex_(header_forward_pattern_), conn_mtx_(conn_mtx),
+      conn_cnt_(conn_cnt), accepting_new_conn_(accepting_new_conn)
 {
 }
 
@@ -1627,10 +1630,12 @@ class ModelInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& forward_header_pattern)
+      const std::string& forward_header_pattern, std::shared_mutex* conn_mtx,
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            max_response_queue_size, restricted_kv, forward_header_pattern),
+            max_response_queue_size, restricted_kv, forward_header_pattern,
+            conn_mtx, conn_cnt, accepting_new_conn),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
@@ -1656,13 +1661,6 @@ class ModelInferHandler
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
-  }
-
-  std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
-  void DisableConnections()
-  {
-    std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
-    accepting_new_conn_ = false;
   }
 
  protected:

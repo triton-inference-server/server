@@ -73,10 +73,12 @@ class ModelStreamInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern)
+      const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            max_response_queue_size, restricted_kv, header_forward_pattern),
+            max_response_queue_size, restricted_kv, header_forward_pattern,
+            conn_mtx, conn_cnt, accepting_new_conn),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
@@ -102,13 +104,6 @@ class ModelStreamInferHandler
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
-  }
-
-  std::atomic<uint32_t> GetConnectionCount() { return conn_cnt_.load(); }
-  void DisableConnections()
-  {
-    std::lock_guard<std::recursive_mutex> lock(conn_mtx_);
-    accepting_new_conn_ = false;
   }
 
  protected:

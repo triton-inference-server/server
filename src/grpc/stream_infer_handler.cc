@@ -154,7 +154,7 @@ ModelStreamInferHandler::Process(
     }
   }
 
-  std::lock_guard<std::recursive_mutex> lk1(conn_mtx_);
+  std::lock_guard<std::recursive_mutex> lk1(*conn_mtx_);
 
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
@@ -223,7 +223,7 @@ ModelStreamInferHandler::Process(
       return !finished;
     }
 
-    if (!accepting_new_conn_) {
+    if (!*accepting_new_conn_) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNAVAILABLE,
           "GRPC server is shutting down and has stopped accepting new "
