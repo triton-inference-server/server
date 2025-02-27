@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,8 +56,12 @@ rm -f *.out
 
 SAGEMAKER_TEST=sagemaker_test.py
 SAGEMAKER_MULTI_MODEL_TEST=sagemaker_multi_model_test.py
+SAGEMAKER_GENERATE_TEST=sagemaker_generate_test.py
+SAGEMAKER_GENERATE_STREAM_TEST=sagemaker_generate_stream_test.py
 MULTI_MODEL_UNIT_TEST_COUNT=7
 UNIT_TEST_COUNT=9
+GENERATE_UNIT_TEST_COUNT=1
+GENERATE_STREAM_UNIT_TEST_COUNT=1
 CLIENT_LOG="./client.log"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -73,6 +77,10 @@ mkdir models && \
     cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/sm_model && \
     rm -r models/sm_model/2 && rm -r models/sm_model/3 && \
     sed -i "s/onnx_int32_int32_int32/sm_model/" models/sm_model/config.pbtxt
+
+mkdir -p models/mock_llm/1 && \
+    cp ../python_models/generate_models/mock_llm/1/model.py models/mock_llm/1 && \
+    cp ../python_models/generate_models/mock_llm/config.pbtxt models/mock_llm
 
 # Use SageMaker's ping endpoint to check server status
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -259,11 +267,114 @@ else
 fi
 set -e
 
-unset SAGEMAKER_SAFE_PORT_RANGE
+kill $SERVER_PID
+wait $SERVE_PID
+
+# Start server with LLM and set inference type to generate
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=mock_llm
+export SAGEMAKER_TRITON_INFERENCE_TYPE=generate
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Inference with generate inference type
+set +e
+python $SAGEMAKER_GENERATE_TEST SageMakerGenerateTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $GENERATE_UNIT_TEST_COUNT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
 unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
+unset SAGEMAKER_TRITON_INFERENCE_TYPE
 
 kill $SERVER_PID
 wait $SERVE_PID
+
+# Start server with LLM and set inference type to generate_stream
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=mock_llm
+export SAGEMAKER_TRITON_INFERENCE_TYPE=generate_stream
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Helper library to parse SSE events
+# https://github.com/mpetazzoni/sseclient
+pip install sseclient-py
+
+# Inference with generate_stream inference type
+set +e
+python $SAGEMAKER_GENERATE_STREAM_TEST SageMakerGenerateStreamTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $GENERATE_STREAM_UNIT_TEST_COUNT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
+unset SAGEMAKER_TRITON_INFERENCE_TYPE
+
+kill $SERVER_PID
+wait $SERVE_PID
+
+# Test serve with incorrect inference type
+export SAGEMAKER_TRITON_INFERENCE_TYPE=incorrect_inference_type
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+if [ -n "$SERVER_PID" ]; then
+    echo -e "\n***\n*** Expect failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    RET=1
+else
+    grep "ERROR: Invalid SAGEMAKER_TRITON_INFERENCE_TYPE" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected error on incorrect inference type\n***"
+        RET=1
+    fi
+fi
+unset SAGEMAKER_TRITON_INFERENCE_TYPE
+
+unset SAGEMAKER_SAFE_PORT_RANGE
+unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
 
 # Test serve with incorrect model name
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=incorrect_model_name
@@ -288,6 +399,7 @@ fi
 unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
 
 # Test serve with SAGEMAKER_TRITON_DEFAULT_MODEL_NAME unset, but containing single model directory
+rm -rf models/mock_llm
 serve > $SERVER_LOG 2>&1 &
 SERVE_PID=$!
 # Obtain Triton PID in such way as $! will return the script PID
