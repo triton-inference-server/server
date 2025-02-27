@@ -259,7 +259,7 @@ RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
-# Install DCGM 
+# Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
         curl -o /tmp/cuda-keyring.deb \
