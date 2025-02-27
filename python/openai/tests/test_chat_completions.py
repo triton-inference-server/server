@@ -369,10 +369,10 @@ class TestChatCompletions:
         assert response1_text == response2_text
         assert response1_text != response3_text
 
-    # TODO: Remove xfail for LLM API when it supports seed
+    # TODO: Remove xfail for LLM API when it's verified.
     @pytest.mark.xfail(
         condition=os.getenv("LLMAPI_SETUP") == "1",
-        reason="Didn't see any difference in responses with different seeds when using LLM API. Skipping for now.",
+        reason="Seed parameter support to be verified for LLM API",
     )
     # Simple tests to verify random seed roughly behaves as expected
     def test_chat_completions_seed(self, client, model: str, messages: List[dict]):
