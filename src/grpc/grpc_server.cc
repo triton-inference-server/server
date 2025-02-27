@@ -2564,7 +2564,8 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
+Server::GracefulStop(
+    uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(

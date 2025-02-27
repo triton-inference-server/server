@@ -319,7 +319,7 @@ StopEndpoints(uint32_t* exit_timeout_secs)
 #ifdef TRITON_ENABLE_GRPC
   // Allow for graceful shutdown of GRPC service
   if (g_grpc_service) {
-    TRITONSERVER_Error* err = g_grpc_service->Stop(exit_timeout_secs);
+    TRITONSERVER_Error* err = g_grpc_service->GracefulStop(exit_timeout_secs);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to gracefully stop GRPC service");
       ret = false;

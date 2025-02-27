@@ -32,6 +32,7 @@
 #include <condition_variable>
 #include <queue>
 #include <regex>
+#include <shared_mutex>
 #include <thread>
 
 #include "../tracer.h"

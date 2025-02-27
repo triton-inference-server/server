@@ -27,6 +27,7 @@
 
 #include <grpc++/grpc++.h>
 
+#include <shared_mutex>
 #include <vector>
 
 #include "../common.h"
@@ -112,7 +113,7 @@ class Server {
   ~Server();
 
   TRITONSERVER_Error* Start();
-  TRITONSERVER_Error* Stop(
+  TRITONSERVER_Error* GracefulStop(
       uint32_t* exit_timeout_secs = nullptr,
       const std::string& service_name = "gRPC");
   TRITONSERVER_Error* Stop();
