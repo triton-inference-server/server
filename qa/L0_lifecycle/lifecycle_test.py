@@ -2670,13 +2670,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
             self.assertIn(
+                "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                + "Failed to connect to remote host: connect: Connection refused (111)",
                 ex.message(),
-                [
-                    "GRPC server is shutting down and has stopped accepting new requests.",
-                    "CANCELLED",
-                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
-                    + "Failed to connect to remote host: connect: Connection refused (111)",
-                ],
             )
 
         # Wait until the results are available in user_data
@@ -2740,7 +2736,6 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertIn(
                 ex.message(),
                 [
-                    "GRPC server is shutting down and has stopped accepting new requests.",
                     "CANCELLED",
                     "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
                     + "Failed to connect to remote host: connect: Connection refused (111)",
@@ -2752,13 +2747,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
             self.assertIn(
+                "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                + "Failed to connect to remote host: connect: Connection refused (111)",
                 ex.message(),
-                [
-                    "GRPC server is shutting down and has stopped accepting new requests.",
-                    "CANCELLED",
-                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
-                    + "Failed to connect to remote host: connect: Connection refused (111)",
-                ],
             )
         # 3: Continuing sequence after shutdown
         try:
@@ -2766,13 +2757,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
             self.assertIn(
+                "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                + "Failed to connect to remote host: connect: Connection refused (111)",
                 ex.message(),
-                [
-                    "GRPC server is shutting down and has stopped accepting new requests.",
-                    "CANCELLED",
-                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
-                    + "Failed to connect to remote host: connect: Connection refused (111)",
-                ],
             )
 
         # Wait until the results are available in user_data
@@ -2833,13 +2820,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
             self.assertIn(
+                "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                + "Failed to connect to remote host: connect: Connection refused (111)",
                 ex.message(),
-                [
-                    "GRPC server is shutting down and has stopped accepting new requests.",
-                    "CANCELLED",
-                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
-                    + "Failed to connect to remote host: connect: Connection refused (111)",
-                ],
             )
 
         # Wait until the results are available in user_data
