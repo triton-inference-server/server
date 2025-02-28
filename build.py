@@ -976,7 +976,7 @@ RUN yum install -y \\
             unzip \\
             wget \\
             xz-devel \\
-            zlib-devel 
+            zlib-devel
 """
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
@@ -992,8 +992,10 @@ ENV CCACHE_REMOTE_ONLY="true" \\
     CMAKE_C_COMPILER_LAUNCHER="ccache" \\
     CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
 
-RUN ccache -p 
-""".format( os.getenv("CCACHE_REMOTE_STORAGE") )
+RUN ccache -p
+""".format(
+            os.getenv("CCACHE_REMOTE_STORAGE")
+        )
     # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
@@ -1163,7 +1165,9 @@ ENV CCACHE_REMOTE_ONLY="true" \\
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends ccache && ccache -p \\
       && rm -rf /var/lib/apt/lists/*
-""".format( os.getenv("CCACHE_REMOTE_STORAGE") )
+""".format(
+            os.getenv("CCACHE_REMOTE_STORAGE")
+        )
 
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
