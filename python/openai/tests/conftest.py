@@ -31,9 +31,6 @@ import pytest
 from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
-### TEST ENVIRONMENT SETUP ###
-LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
-
 
 def infer_test_environment():
     # Infer the test environment for simplicity in local dev/testing.
@@ -49,10 +46,14 @@ def infer_test_environment():
     try:
         import tensorrt_llm as _
 
-        backend = "tensorrtllm"
+        # TODO: Refactor away from environment variables
+        LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
+
         if LLMAPI_SETUP:
+            backend = "llmapi"
             model = "tensorrt_llm"
         else:
+            backend = "tensorrtllm"
             model = "tensorrt_llm_bls"
         return backend, model
     except ImportError:
@@ -62,10 +63,7 @@ def infer_test_environment():
 
 
 def infer_test_model_repository(backend):
-    if LLMAPI_SETUP:
-        model_repository = str(Path(__file__).parent / f"{backend}_llmapi_models")
-    else:
-        model_repository = str(Path(__file__).parent / f"{backend}_models")
+    model_repository = str(Path(__file__).parent / f"{backend}_models")
     return model_repository
 
 
@@ -92,13 +90,23 @@ if not TEST_MODEL_REPOSITORY:
 # only once for all the tests below.
 @pytest.fixture(scope="module")
 def server():
+    # TODO: tensorrllm and llmapi backends both use "tensorrtllm" as the backend flag for OpenAI server.
+    # In the future if the backend are consolidated, this check can be updated or removed.
+    # key: the TEST_BACKEND value
+    # value: the corresponding backend flag for OpenAI server
+    backend_map = {
+        "tensorrtllm": "tensorrtllm",
+        "llmapi": "tensorrtllm",
+        "vllm": "vllm",
+    }
+
     args = [
         "--model-repository",
         TEST_MODEL_REPOSITORY,
         "--tokenizer",
         TEST_TOKENIZER,
         "--backend",
-        TEST_BACKEND,
+        backend_map[TEST_BACKEND],
     ]
     # TODO: Incorporate kserve frontend binding smoke tests to catch any
     # breakage with default values or slight cli arg variations

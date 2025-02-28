@@ -87,7 +87,7 @@ function prepare_tensorrtllm() {
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
 
     # Prepare LLM API setup
-    LLMAPI_MODEL_REPO="tests/tensorrtllm_llmapi_models"
+    LLMAPI_MODEL_REPO="tests/llmapi_models"
     mkdir -p ${LLMAPI_MODEL_REPO}
     cp /app/all_models/llmapi/* "${LLMAPI_MODEL_REPO}" -r
     sed -i 's#"model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0"#"model":"meta-llama/Meta-Llama-3.1-8B-Instruct"#g' ${LLMAPI_MODEL_REPO}/tensorrt_llm/1/model.json

@@ -311,7 +311,7 @@ class TestChatCompletions:
     def test_chat_completions_temperature_tensorrtllm(
         self, client, backend: str, model: str, messages: List[dict]
     ):
-        if backend != "tensorrtllm":
+        if backend != "tensorrtllm" and backend != "llmapi":
             pytest.skip(
                 reason="Only used to test TRT-LLM-specific temperature behavior"
             )
@@ -371,7 +371,7 @@ class TestChatCompletions:
 
     # TODO: Remove xfail for LLM API when it's verified.
     @pytest.mark.xfail(
-        condition=os.getenv("LLMAPI_SETUP") == "1",
+        condition=lambda backend: backend == "llmapi",
         reason="Seed parameter support to be verified for LLM API",
     )
     # Simple tests to verify random seed roughly behaves as expected

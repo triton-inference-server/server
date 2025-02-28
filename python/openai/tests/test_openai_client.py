@@ -39,16 +39,12 @@ class TestOpenAIClient:
         models = list(client.models.list())
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            import os
-
-            LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
-            if LLMAPI_SETUP:
-                # LLM API setup only has the tensorrt_llm model
-                assert len(models) == 1
-            else:
-                # tensorrt_llm_bls +
-                # preprocess -> tensorrt_llm -> postprocess
-                assert len(models) == 4
+            # tensorrt_llm_bls +
+            # preprocess -> tensorrt_llm -> postprocess
+            assert len(models) == 4
+        elif backend == "llmapi":
+            # Only has one tensorrt_llm model.
+            assert len(models) == 1
         elif backend == "vllm":
             assert len(models) == 1
         else:
@@ -82,7 +78,7 @@ class TestOpenAIClient:
     def test_openai_client_completion_echo(
         self, client: openai.OpenAI, echo: bool, backend: str, model: str, prompt: str
     ):
-        if backend == "tensorrtllm":
+        if backend == "tensorrtllm" or backend == "llmapi":
             pytest.skip(
                 reason="TRT-LLM backend currently only supports setting this parameter at model load time",
             )
@@ -112,16 +108,12 @@ class TestAsyncOpenAIClient:
         models = [model async for model in async_models]
         print(f"Models: {models}")
         if backend == "tensorrtllm":
-            import os
-
-            LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
-            if LLMAPI_SETUP:
-                # LLM API setup only has the tensorrt_llm model
-                assert len(models) == 1
-            else:
-                # tensorrt_llm_bls +
-                # preprocess -> tensorrt_llm -> postprocess
-                assert len(models) == 4
+            # tensorrt_llm_bls +
+            # preprocess -> tensorrt_llm -> postprocess
+            assert len(models) == 4
+        elif backend == "llmapi":
+            # Only has one tensorrt_llm model.
+            assert len(models) == 1
         elif backend == "vllm":
             assert len(models) == 1
         else:

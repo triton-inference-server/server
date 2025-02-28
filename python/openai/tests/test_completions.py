@@ -192,8 +192,8 @@ class TestCompletions:
     def test_completions_temperature_tensorrtllm(
         self, client, backend: str, model: str, prompt: str
     ):
-        if backend != "tensorrtllm":
-            pytest.skip(reason="Only used to test vLLM-specific temperature behavior")
+        if backend != "tensorrtllm" and backend != "llmapi":
+            pytest.skip(reason="Only used to test TRTLLM-specific temperature behavior")
 
         responses = []
         payload1 = {
@@ -241,7 +241,7 @@ class TestCompletions:
 
     # TODO: Remove xfail for LLM API when it's verified.
     @pytest.mark.xfail(
-        condition=os.getenv("LLMAPI_SETUP") == "1",
+        condition=lambda backend: backend == "llmapi",
         reason="Seed parameter support to be verified for LLM API",
     )
     # Simple tests to verify seed roughly behaves as expected
