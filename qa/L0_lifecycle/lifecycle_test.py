@@ -2733,7 +2733,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # 1: New sequence with new sequence ID
         try:
             triton_client.infer(
-                model_name, inputs, sequence_id=request_count, sequence_start=True
+                model_name, inputs, sequence_id=request_count + 1, sequence_start=True
             )
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
@@ -2760,20 +2760,20 @@ class LifeCycleTest(tu.TestResultCollector):
                     + "Failed to connect to remote host: connect: Connection refused (111)",
                 ],
             )
-        # 3: Continuing sequence
+        # 3: Continuing sequence after shutdown
         try:
-            res = triton_client.infer(
-                model_name, inputs, sequence_id=2, sequence_end=True
+            triton_client.infer(model_name, inputs, sequence_id=2, sequence_end=True)
+            self.assertTrue(False, "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                ex.message(),
+                [
+                    "GRPC server is shutting down and has stopped accepting new requests.",
+                    "CANCELLED",
+                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                    + "Failed to connect to remote host: connect: Connection refused (111)",
+                ],
             )
-            output_data = res.as_numpy("OUTPUT")
-            # Result are accumulated
-            np.testing.assert_allclose(
-                output_data,
-                input_data + input_data,
-                err_msg="Inference result is not correct",
-            )
-        except Exception as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Wait until the results are available in user_data
         time_out = 30
