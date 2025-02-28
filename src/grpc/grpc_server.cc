@@ -2638,7 +2638,8 @@ Server::WaitForConnectionsToClose(
 {
   while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
     LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
-             << " " << service_name << " service connections";
+             << " " << service_name
+             << " service connections and inference handlers";
     std::this_thread::sleep_for(std::chrono::seconds(1));
     (*exit_timeout_secs)--;
   }
