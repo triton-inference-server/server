@@ -2733,14 +2733,9 @@ class LifeCycleTest(tu.TestResultCollector):
             )
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
-            self.assertIn(
-                ex.message(),
-                [
-                    "CANCELLED",
-                    "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
-                    + "Failed to connect to remote host: connect: Connection refused (111)",
-                ],
-            )
+            # The first request received by the gRPC endpoint while shutting down returns CANCELLED
+            # each subsequent request returns Connection refused
+            self.assertIn("CANCELLED", ex.message())
         # 2: New sequence with existing sequence ID
         try:
             triton_client.infer(model_name, inputs, sequence_id=1, sequence_start=True)
