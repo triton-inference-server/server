@@ -109,7 +109,7 @@ def parse_args():
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
     triton_group.add_argument(
-        "--model-and-lora-name-separator",
+        "--lora-separator",
         type=str,
         default=None,
         help="LoRA name selection may be appended to the model name following this separator if the separator is provided",
@@ -180,7 +180,7 @@ def main():
         server=server,
         tokenizer=args.tokenizer,
         backend=args.backend,
-        lora_separator=args.model_and_lora_name_separator,
+        lora_separator=args.lora_separator,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management

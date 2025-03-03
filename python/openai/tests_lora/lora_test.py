@@ -169,7 +169,7 @@ class LoRATest(unittest.TestCase):
                 "models",
                 "--tokenizer",
                 "meta-llama/Meta-Llama-3.1-8B-Instruct",
-                "--model-and-lora-name-separator",
+                "--lora-separator",
                 self._lora_separator,
             ]
         ) as server:
