@@ -210,8 +210,10 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
       HTTP_RESPOND_IF_ERR(
           req, TRITONSERVER_ErrorNew(
                    TRITONSERVER_ERROR_INTERNAL,
-                   "Sever has invalid inference type '" + inference_type_ +
-                       "'. Must be one of: infer, generate, generate_stream."));
+                   std::string(
+                       "Sever has invalid inference type '" + inference_type_ +
+                       "'. Must be one of: infer, generate, generate_stream.")
+                       .c_str()));
     }
     return;
   }
