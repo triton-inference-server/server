@@ -26,15 +26,12 @@
 
 import json
 import os
-import sys
 import unittest
-from pathlib import Path
 
 from huggingface_hub import snapshot_download
 from openai import BadRequestError
 
-sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "tests"))
-from utils import OpenAIServer
+from .utils import OpenAIServer
 
 
 def is_vllm_installed():
