@@ -28,7 +28,7 @@
 
 # Use Triton on SageMaker
 
-Below are important pointers on how to deploy Triton Inference Server on AWS SageMaker to serve trained models in production.
+Below are important pointers on how to deploy Triton Inference Server on AWS SageMaker to serve trained models in production:
 
 - See [docker/sagemaker/serve](https://github.com/triton-inference-server/server/blob/main/docker/sagemaker/serve) for details on how Triton Inference Server is deployed.
 - See [qa/L0_sakemaker/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_sagemaker/test.sh) for example usage and testing.
