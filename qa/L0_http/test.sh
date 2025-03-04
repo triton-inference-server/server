@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -649,7 +649,7 @@ wait $SERVER_PID
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/generate_models"
+SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server

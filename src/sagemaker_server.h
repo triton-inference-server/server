@@ -160,9 +160,9 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   static const std::string binary_mime_type_;
 
-  // Type of inference:infer, generate or generate_stream.
-  // The type is defined in the environment variable
-  // SAGEMAKER_TRITON_INFERENCE_TYPE and the default value is "infer".
+  // Triton HTTP handler to map Sagemaker /invocations route to: "infer",
+  // "generate", or "generate_stream". The type is defined in the environment
+  // variable SAGEMAKER_TRITON_INFERENCE_TYPE and the default value is "infer".
   const std::string inference_type_;
 
   /* Maintain list of loaded models */
