@@ -3392,6 +3392,7 @@ HTTPAPIServer::HandleGenerate(
   request_release_payload.release();
 }
 
+
 TRITONSERVER_Error*
 HTTPAPIServer::ModelInputMetadata(
     const std::string& model_name, const int64_t model_version,
@@ -4237,6 +4238,69 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   if (req == nullptr) {
     return;
   }
+
+
+#ifdef TRITON_ENABLE_METRICS
+  // logic to add kv_cache metrics to response header
+  // Get the metrics in Prometheus format
+
+  // ENDPOINT_LOAD_METRICS_TYPE is request header that specifies which load
+  // report format `endpoint-load-metrics` will be in. If not present, the 
+  // response header will not be written and the feature is disabled.
+  //
+  // The valid values for ENDPOINT_LOAD_METRICS_TYPE header are:
+  //
+  // "text"
+  // "json"
+  //
+  // Any other value will have behavior equivalent to being unset while also
+  // logging and error.
+  //
+  // For specifics on the different formats for the load reporting formats, see:
+  // https://docs.google.com/document/d/1C1ybMmDKJIVlrbOLbywhu9iRYo4rilR-cT50OTtOFTs/edit?tab=t.0#heading=h.do9yfa1wlpk8
+  auto server = infer_request->EvHtpServer();
+  const char* orca_metric_format = nullptr;
+  evhtp_header_t* metric_format_header =
+      evhtp_headers_find_header(req->headers_in, ENDPOINT_LOAD_METRICS_TYPE);
+
+  if (metric_format_header != nullptr) {
+    orca_metric_format = metric_format_header->val;
+  }
+  if (orca_metric_format != nullptr && server != nullptr) {
+    const std::string orca_type = orca_metric_format;
+    TRITONSERVER_Metrics* metrics = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server, &metrics);
+    if (err == nullptr) {
+      const char* base;
+      size_t byte_size;
+      err = TRITONSERVER_MetricsFormatted(
+          metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
+      if (err == nullptr) {
+        std::string formatted_metrics(base, byte_size);
+        // Extract the KV utilization metrics from the Prometheus formatted
+        // string.
+        std::string extracted_kv_metrics =
+            ExtractKVMetrics(formatted_metrics, orca_type);
+        if (!extracted_kv_metrics.empty()) {
+          evhtp_headers_add_header(
+              req->headers_out,
+              evhtp_header_new(
+                  ENDPOINT_LOAD_METRICS_NAME, extracted_kv_metrics.c_str(), 1, 1));
+        } else {
+          LOG_ERROR << "ENDPOINT_LOAD_METRICS_TYPE request header is set but extracted_kv_metrics is "
+                       "empty, no header written. orca_type="
+                    << orca_type;
+        }
+      }
+    } else {
+      // Handle potential errors
+      LOG_ERROR << "Failed to get KV metrics: "
+                << TRITONSERVER_ErrorMessage(err);
+      TRITONSERVER_ErrorDelete(err);
+    }
+    TRITONSERVER_MetricsDelete(metrics);
+  }
+#endif  // TRITON_ENABLE_METRICS
 
   if (infer_request->streaming_) {
     AddContentTypeHeader(req, "text/event-stream; charset=utf-8");

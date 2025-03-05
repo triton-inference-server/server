@@ -39,6 +39,7 @@
 
 #include "common.h"
 #include "data_compressor.h"
+#include "orca_http.h"
 #include "restricted_features.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
@@ -396,6 +397,8 @@ class HTTPAPIServer : public HTTPServer {
     {
     }
     virtual ~GenerateRequestClass();
+
+    TRITONSERVER_Server* EvHtpServer() const { return server_; }
 
     // [FIXME] Specialize response complete function for now, should have
     // been a dispatcher and call into object specific response function.
