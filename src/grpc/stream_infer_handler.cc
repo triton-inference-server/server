@@ -154,8 +154,6 @@ ModelStreamInferHandler::Process(
     }
   }
 
-  std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
-
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -164,6 +162,8 @@ ModelStreamInferHandler::Process(
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
+
+  std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
 
   if (state->step_ == Steps::START) {
     // A new stream connection... If RPC failed on a new request then

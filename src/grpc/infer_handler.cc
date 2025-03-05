@@ -687,8 +687,6 @@ ModelInferHandler::Process(
   // Need to protect the state transitions for these cases.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
-  std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
-
   if (state->delay_process_ms_ != 0) {
     // Will delay the Process execution by the specified time.
     // This can be used to test the flow when cancellation request
@@ -754,6 +752,8 @@ ModelInferHandler::Process(
     if (!shutdown) {
       StartNewRequest();
     }
+
+    std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
 
     if (*accepting_new_conn_ && ExecutePrecondition(state)) {
       Execute(state);
