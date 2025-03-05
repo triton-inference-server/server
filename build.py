@@ -2945,7 +2945,7 @@ if __name__ == "__main__":
         )
         fail_if(
             parts[0]
-            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2","build_base","rt_base"],
+            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2","rt_base"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
