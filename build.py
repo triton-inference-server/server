@@ -1744,6 +1744,11 @@ def create_build_dockerfiles(
             FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
         )
 
+    #Update dockerfileargmap if rt_base image is provided
+    if "rt_base" in images:
+        dockerfileargmap["BASE_IMAGE"] = images["rt_base"]
+        
+        
     if target_platform() == "windows":
         create_dockerfile_windows(
             FLAGS.build_dir,
@@ -2940,7 +2945,7 @@ if __name__ == "__main__":
         )
         fail_if(
             parts[0]
-            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2"],
+            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2","build_base","rt_base"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
