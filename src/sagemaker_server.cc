@@ -1,4 +1,4 @@
-// Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -196,7 +196,25 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
   }
 
   if (RE2::FullMatch(std::string(req->uri->path->full), invocations_regex_)) {
-    HandleInfer(req, model_name_, model_version_str_);
+    if (inference_type_ == "infer") {
+      HandleInfer(req, model_name_, model_version_str_);
+    } else if (inference_type_ == "generate") {
+      HandleGenerate(
+          req, model_name_, model_version_str_, false /* is streaming */);
+    } else if (inference_type_ == "generate_stream") {
+      HandleGenerate(
+          req, model_name_, model_version_str_, true /* is streaming */);
+    } else {
+      // This error should never happen, due to the validation in tritonserver
+      // startup.
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_INTERNAL,
+                   std::string(
+                       "Server has invalid inference type '" + inference_type_ +
+                       "'. Must be one of: infer, generate, generate_stream.")
+                       .c_str()));
+    }
     return;
   }
 
