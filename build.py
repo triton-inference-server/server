@@ -1503,10 +1503,18 @@ RUN apt-get update \\
 ARG BUILD_PUBLIC_VLLM="true"
 ARG VLLM_INDEX_URL
 ARG PYTORCH_TRITON_URL
+ARG BUILDX_ARCH
+ARG BUILDX_ARCH_AMD64
 
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
+        if [ "$BUILDX_ARCH" = "$BUILDX_ARCH_AMD64" ]; then \\
+            pip3 install --no-cache-dir \\
+                mkl==2021.1.1 \\
+                mkl-include==2021.1.1 \\
+                mkl-devel==2021.1.1; \\
+        fi \\
+        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
         && wget $PYTORCH_TRITON_URL \\
