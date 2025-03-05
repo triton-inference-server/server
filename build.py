@@ -1515,11 +1515,11 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
                 mkl-include==2021.1.1 \\
                 mkl-devel==2021.1.1; \\
         elif [ "$BUILDX_ARCH" = "arm64" ]; then \\
-            curl "$NVPL_SLIM_URL" --output nvpl_slim.tar && \
-            tar -xf nvpl_slim.tar && \
-            cp -r nvpl_slim/lib/* /usr/local/lib && \
-            cp -r nvpl_slim/include/* /usr/local/include && \
-            rm -rf nvpl_slim.tar nvpl_slim ;
+            curl "$NVPL_SLIM_URL" --output nvpl_slim.tar && \\
+            tar -xf nvpl_slim.tar && \\
+            cp -r nvpl_slim/lib/* /usr/local/lib && \\
+            cp -r nvpl_slim/include/* /usr/local/include && \\
+            rm -rf nvpl_slim.tar nvpl_slim; \\
         fi \\
         && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
