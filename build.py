@@ -1515,11 +1515,11 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
         elif [ "$(uname -m)" = "aarch64" ]; then \\
             echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
             cd /tmp && \\
-            wget -O nvpl_slim.tar $NVPL_SLIM_URL && \\
-            tar -xf nvpl_slim.tar && \\
-            cp -r nvpl_slim/lib/* /usr/local/lib && \\
-            cp -r nvpl_slim/include/* /usr/local/include && \\
-            rm -rf nvpl_slim.tar nvpl_slim; \\
+            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
+            tar -xf nvpl_slim_24.04.tar && \\
+            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
+            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
+            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
         fi \\
         && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
