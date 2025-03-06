@@ -1513,6 +1513,7 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
                 mkl-include==2021.1.1 \\
                 mkl-devel==2021.1.1; \\
         elif [ "$(uname -m)" = "aarch64" ]; then \\
+            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
             curl "$NVPL_SLIM_URL" --output nvpl_slim.tar && \\
             tar -xf nvpl_slim.tar && \\
             cp -r nvpl_slim/lib/* /usr/local/lib && \\
