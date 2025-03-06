@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -138,6 +138,20 @@ if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]
     echo "ERROR: Incorrect directory structure."
     echo "       Model directory needs to contain the top level folder"
     exit 1
+fi
+
+# Validate SAGEMAKER_TRITON_INFERENCE_TYPE if set
+if [ -n "$SAGEMAKER_TRITON_INFERENCE_TYPE" ]; then
+    case "$SAGEMAKER_TRITON_INFERENCE_TYPE" in
+        "infer"|"generate"|"generate_stream")
+            # Valid value, continue
+            ;;
+        *)
+            echo "ERROR: Invalid SAGEMAKER_TRITON_INFERENCE_TYPE '${SAGEMAKER_TRITON_INFERENCE_TYPE}'"
+            echo "       Must be one of: infer, generate, generate_stream"
+            exit 1
+            ;;
+    esac
 fi
 
 if [ "${is_mme_mode}" = false ] && [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
