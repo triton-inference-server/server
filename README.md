@@ -28,8 +28,6 @@
 
 # Triton Inference Server
 
-[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
-
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
 multiple deep learning and machine learning frameworks, including TensorRT,
@@ -57,7 +55,7 @@ Major features include:
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
   allows adding custom backends and pre/post processing operations
 - Supports writing custom backends in python, a.k.a.
-  [Python-based backends.](https://github.com/triton-inference-server/backend/blob/r25.01/docs/python_based_backends.md#python-based-backends)
+  [Python-based backends.](https://github.com/triton-inference-server/backend/blob/main/docs/python_based_backends.md#python-based-backends)
 - Model pipelines using
   [Ensembling](docs/user_guide/architecture.md#ensemble-models) or [Business
   Logic Scripting
@@ -86,16 +84,16 @@ Inference Server with the
 
 ```bash
 # Step 1: Create the example model repository
-git clone -b r25.01 https://github.com/triton-inference-server/server.git
+git clone -b r25.02 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.01-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.02-py3 tritonserver --model-repository=/models
 
 # Step 3: Sending an Inference Request
 # In a separate console, launch the image_client example from the NGC Triton SDK container
-docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.01-py3-sdk
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.02-py3-sdk
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following
@@ -170,10 +168,10 @@ configuration](docs/user_guide/model_configuration.md) for the model.
   [Python](https://github.com/triton-inference-server/python_backend), and more
 - Not all the above backends are supported on every platform supported by Triton.
   Look at the
-  [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/blob/r25.01/docs/backend_platform_support_matrix.md)
+  [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/blob/main/docs/backend_platform_support_matrix.md)
   to learn which backends are supported on your target platform.
 - Learn how to [optimize performance](docs/user_guide/optimization.md) using the
-  [Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/r25.01/README.md)
+  [Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
   and
   [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
 - Learn how to [manage loading and unloading models](docs/user_guide/model_management.md) in
@@ -187,14 +185,14 @@ A Triton *client* application sends inference and other requests to Triton. The
 [Python and C++ client libraries](https://github.com/triton-inference-server/client)
 provide APIs to simplify this communication.
 
-- Review client examples for [C++](https://github.com/triton-inference-server/client/blob/r25.01/src/c%2B%2B/examples),
-  [Python](https://github.com/triton-inference-server/client/blob/r25.01/src/python/examples),
-  and [Java](https://github.com/triton-inference-server/client/blob/r25.01/src/java/src/main/java/triton/client/examples)
+- Review client examples for [C++](https://github.com/triton-inference-server/client/blob/main/src/c%2B%2B/examples),
+  [Python](https://github.com/triton-inference-server/client/blob/main/src/python/examples),
+  and [Java](https://github.com/triton-inference-server/client/blob/main/src/java/src/main/java/triton/client/examples)
 - Configure [HTTP](https://github.com/triton-inference-server/client#http-options)
   and [gRPC](https://github.com/triton-inference-server/client#grpc-options)
   client options
 - Send input data (e.g. a jpeg image) directly to Triton in the [body of an HTTP
-  request without any additional metadata](https://github.com/triton-inference-server/server/blob/r25.01/docs/protocol/extension_binary_data.md#raw-binary-request)
+  request without any additional metadata](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md#raw-binary-request)
 
 ### Extend Triton
 
@@ -203,7 +201,7 @@ designed for modularity and flexibility
 
 - [Customize Triton Inference Server container](docs/customization_guide/compose.md) for your use case
 - [Create custom backends](https://github.com/triton-inference-server/backend)
-  in either [C/C++](https://github.com/triton-inference-server/backend/blob/r25.01/README.md#triton-backend-api)
+  in either [C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
   or [Python](https://github.com/triton-inference-server/python_backend)
 - Create [decoupled backends and models](docs/user_guide/decoupled_models.md) that can send
   multiple responses for a request or not send any responses for a request
@@ -212,7 +210,7 @@ designed for modularity and flexibility
   decryption, or conversion
 - Deploy Triton on [Jetson and JetPack](docs/user_guide/jetson.md)
 - [Use Triton on AWS
-   Inferentia](https://github.com/triton-inference-server/python_backend/tree/r25.01/inferentia)
+   Inferentia](https://github.com/triton-inference-server/python_backend/tree/main/inferentia)
 
 ### Additional Documentation
 
@@ -257,3 +255,4 @@ For questions, we recommend posting in our community
 
 Please refer to the [NVIDIA Developer Triton page](https://developer.nvidia.com/nvidia-triton-inference-server)
 for more information.
+
