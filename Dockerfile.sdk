@@ -171,7 +171,7 @@ RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
         tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
         echo "Perf Analyzer binaries was extracted and not build"; \
         mkdir -p /workspace/install/python && \
-        cp perf_analyzer/genai_perf-*.whl /workspace/install/python/ \
+        cp perf_analyzer/genai_perf-*.whl /workspace/install/python/; \
     fi
 
 # Install Java API Bindings
