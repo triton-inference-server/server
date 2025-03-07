@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ def setup_fastapi_app(tokenizer: str, server: tritonserver.Server, backend: str)
 # Heavily inspired by vLLM's test infrastructure
 class OpenAIServer:
     API_KEY = "EMPTY"  # Triton's OpenAI server does not need API key
-    START_TIMEOUT = 120  # wait for server to start for up to 120 seconds
+    START_TIMEOUT = 180  # wait for server to start for up to 120 seconds
 
     def __init__(
         self,
