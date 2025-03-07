@@ -73,14 +73,6 @@ RUN apt update -q=2 \
     && apt-get update -q=2 \
     && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 
-# Add inception_graphdef model to example repo
-WORKDIR /workspace/docs/examples/model_repository
-RUN mkdir -p inception_graphdef/1 && \
-    wget -O ${TRITONTMP_DIR}/inception_v3_2016_08_28_frozen.pb.tar.gz \
-        https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
-    (cd ${TRITONTMP_DIR} && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
-    mv ${TRITONTMP_DIR}/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef
-
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
