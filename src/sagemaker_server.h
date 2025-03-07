@@ -1,4 +1,4 @@
-// Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -87,7 +87,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
             "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
-        model_version_str_("")
+        model_version_str_(""), inference_type_(GetEnvironmentVariableOrDefault(
+                                    "SAGEMAKER_TRITON_INFERENCE_TYPE", "infer"))
   {
   }
 
@@ -158,6 +159,11 @@ class SagemakerAPIServer : public HTTPAPIServer {
   const std::string model_version_str_;
 
   static const std::string binary_mime_type_;
+
+  // Triton HTTP handler to map Sagemaker /invocations route to: "infer",
+  // "generate", or "generate_stream". The type is defined in the environment
+  // variable SAGEMAKER_TRITON_INFERENCE_TYPE and the default value is "infer".
+  const std::string inference_type_;
 
   /* Maintain list of loaded models */
   std::unordered_map<std::string, std::string> sagemaker_models_list_;
