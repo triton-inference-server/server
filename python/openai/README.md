@@ -238,7 +238,9 @@ when starting the OpenAI Frontend, a vLLM LoRA adaptor listed on the
 separated by the LoRA separator, on the inference request in
 `<model_name><separator_string><lora_name>` format.
 
-For example,
+<details>
+<summary>For example</summary>
+
 ```bash
 # start server with model named gemma-2b
 python3 openai_frontend/main.py --lora-separator=_lora_ ...
@@ -279,6 +281,8 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
   ...
 }
 ```
+
+</details>
 
 When listing or retrieving model(s), the model id will include the LoRA name in
 the same `<model_name><separator_string><lora_name>` format for each LoRA
