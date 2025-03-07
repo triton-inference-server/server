@@ -27,6 +27,7 @@
 
 #include <grpc++/grpc++.h>
 
+#include <shared_mutex>
 #include <vector>
 
 #include "../common.h"
@@ -112,7 +113,13 @@ class Server {
   ~Server();
 
   TRITONSERVER_Error* Start();
+  TRITONSERVER_Error* GracefulStop(
+      uint32_t* exit_timeout_secs = nullptr,
+      const std::string& service_name = "gRPC");
   TRITONSERVER_Error* Stop();
+  TRITONSERVER_Error* DisableNewConnections();
+  TRITONSERVER_Error* WaitForConnectionsToClose(
+      uint32_t* exit_timeout_secs, const std::string& service_name);
 
  private:
   Server(
@@ -153,6 +160,11 @@ class Server {
 
   int bound_port_{0};
   bool running_{false};
+
+  std::thread graceful_shutdown_thread;
+  std::shared_mutex conn_mtx_;
+  std::atomic<uint32_t> conn_cnt_{0};
+  bool accepting_new_conn_{true};
 };
 
 }}}  // namespace triton::server::grpc
