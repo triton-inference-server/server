@@ -163,13 +163,15 @@ RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
           /workspace/perf_analyzer && \
-        make -j16 perf-analyzer python-clients && \
+        make -j16 perf-analyzer && \
         pip3 install build \
         && cd /workspace/perf_analyzer/genai-perf && \
         python3 -m build --wheel --outdir /workspace/install/python; \
     else \
         tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
         echo "Perf Analyzer binaries was extracted and not build"; \
+        mkdir -p /workspace/install/python && \
+        cp perf_analyzer/genai_perf-*.whl /workspace/install/python/ \
     fi
 
 # Install Java API Bindings
@@ -248,13 +250,7 @@ RUN pip3 install install/python/genai_perf-*.whl
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
 
-RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
-        pip3 install install/python/genai_perf-*.whl; \
-    else \
-        mkdir -p /workspace/install/python && \
-        cp perf_analyzer/genai_perf-*.whl /workspace/install/python/ && \
-        pip3 install /workspace/install/python/genai_perf-*.whl; \
-    fi
+RUN pip3 install install/python/genai_perf-*.whl;
 
 RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
