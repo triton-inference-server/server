@@ -240,11 +240,44 @@ separated by the LoRA separator, on the inference request in
 
 For example,
 ```bash
-python3 openai_frontend/main.py --lora-separator=_separator_ ...
+# start server with model named gemma-2b
+python3 openai_frontend/main.py --lora-separator=_lora_ ...
+
+# inference without LoRA
 curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
-  "model": "<model_name>_separator_<lora_name>",
-  "prompt": "Machine learning is"
+  "model": "gemma-2b",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
 }'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented by the Sumerians in Mesopotamia around 350"}],
+  ...
+}
+
+# inference with LoRA named doll
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
+  "model": "gemma-2b_lora_doll",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
+}'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented in Mesopotamia around 3500 BC.\n\n"}],
+  ...
+}
+
+# inference with LoRA named sheep
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
+  "model": "gemma-2b_lora_sheep",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
+}'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented around 3000 BC in Mesopotamia.\n\n"}],
+  ...
+}
 ```
 
 When listing or retrieving model(s), the model id will include the LoRA name in
