@@ -1,4 +1,4 @@
-// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -305,6 +305,7 @@ enum TritonOptionId {
   OPTION_REUSE_GRPC_PORT,
   OPTION_GRPC_ADDRESS,
   OPTION_GRPC_HEADER_FORWARD_PATTERN,
+  OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
   OPTION_GRPC_USE_SSL_MUTUAL,
@@ -529,6 +530,10 @@ TritonParser::SetupOptions()
        Option::ArgStr,
        "The regular expression pattern that will be used for forwarding GRPC "
        "headers as inference request parameters."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
+       Option::ArgInt,
+       "The number of gRPC inference handler threads. Default is 2."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
@@ -1434,6 +1439,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_GRPC_ADDRESS:
           lgrpc_options.socket_.address_ = optarg;
+          break;
+        case OPTION_GRPC_INFER_THREAD_COUNT:
+          lgrpc_options.infer_thread_count_ = ParseOption<int>(optarg);
           break;
         case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
           lgrpc_options.infer_allocation_pool_size_ = ParseOption<int>(optarg);
