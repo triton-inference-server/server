@@ -26,6 +26,8 @@
 
 import ctypes
 import json
+import os
+import re
 from typing import Iterable, List
 
 import numpy as np
@@ -186,3 +188,50 @@ def _validate_triton_responses_non_streaming(
         raise Exception("Unexpected internal error with incorrect response flags")
     if num_responses > 2:
         raise Exception(f"Unexpected number of responses: {num_responses}, expected 1.")
+
+
+def _get_vllm_lora_names(
+    model_repository: str | list[str], model_name: str, model_version: int
+) -> None | List[str]:
+    lora_names = []
+    repo_paths = model_repository
+    if isinstance(repo_paths, str):
+        repo_paths = [repo_paths]
+    for repo_path in repo_paths:
+        model_path = os.path.join(repo_path, model_name)
+        if not os.path.isdir(model_path):
+            # Cloud path?
+            return None
+        if model_version <= 0:
+            for version_path in os.listdir(model_path):
+                version = os.path.basename(version_path)
+                if re.fullmatch(r"^[0-9]+$", version) is None:
+                    continue
+                model_version = max(model_version, int(version))
+            if model_version <= 0:
+                # Model directory is malformed?
+                return None
+        version_path = os.path.join(model_path, str(model_version))
+        is_lora_enabled = False
+        model_file_path = os.path.join(version_path, "model.json")
+        try:
+            with open(model_file_path, "r") as f:
+                config = json.load(f)
+                if "enable_lora" in config:
+                    # The value could be a string or a bool.
+                    is_lora_enabled = str(config["enable_lora"]).lower() == "true"
+        except Exception:
+            # Model directory or model.json is malformed?
+            return None
+        if is_lora_enabled != True:
+            continue
+        lora_config_path = os.path.join(version_path, "multi_lora.json")
+        try:
+            with open(lora_config_path, "r") as f:
+                lora_config = json.load(f)
+                for lora_name in lora_config.keys():
+                    lora_names.append(lora_name)
+        except Exception:
+            # LoRA is enabled but its list is not provided or malformed?
+            return None
+    return lora_names
