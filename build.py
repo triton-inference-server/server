@@ -1220,8 +1220,13 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 
 def create_dockerfile_linux(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
+    ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints, rt_base_image=None
 ):
+    base_image = argmap["BASE_IMAGE"]
+    #If runtime base image is provided, use it as the base image
+    if rt_base_image:
+        base_image = rt_base_image
+
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1230,7 +1235,7 @@ ARG BASE_IMAGE={}
 """.format(
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
+        base_image,
     )
 
     # PyTorch and TensorFlow backends need extra CUDA and other
@@ -1642,8 +1647,13 @@ ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
 
 
 def create_dockerfile_windows(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches
+    ddir, dockerfile_name, argmap, backends, repoagents, caches, rt_base_image=None
 ):
+    base_image = argmap["BASE_IMAGE"]
+    #If runtime base image is provided, use it as the base image
+    if rt_base_image:
+        base_image = rt_base_image
+    
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1666,7 +1676,7 @@ RUN setx path "%path%;C:\opt\tritonserver\bin"
 """.format(
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
+        base_image,
     )
     df += """
 WORKDIR /opt
@@ -1744,9 +1754,6 @@ def create_build_dockerfiles(
             FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
         )
 
-    #Update dockerfileargmap if rt_base image is provided
-    if "rt_base" in images:
-        dockerfileargmap["BASE_IMAGE"] = images["rt_base"]
         
         
     if target_platform() == "windows":
@@ -1757,6 +1764,7 @@ def create_build_dockerfiles(
             backends,
             repoagents,
             caches,
+            images.get("rt_base"),
         )
     else:
         create_dockerfile_linux(
@@ -1767,6 +1775,7 @@ def create_build_dockerfiles(
             repoagents,
             caches,
             endpoints,
+            images.get("rt_base")
         )
 
     # Dockerfile used for the creating the CI base image.
