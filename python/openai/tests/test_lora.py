@@ -213,7 +213,8 @@ class LoRATest(unittest.TestCase):
                 "models",
                 "--tokenizer",
                 self._tokenizer,
-            ]
+            ],
+            env_dict={"CUDA_VISIBLE_DEVICES": "0"},
         ) as server:
             client = server.get_client()
             # Test listing/retrieving models
@@ -250,7 +251,8 @@ class LoRATest(unittest.TestCase):
                 self._tokenizer,
                 "--lora-separator",
                 self._lora_separator,
-            ]
+            ],
+            env_dict={"CUDA_VISIBLE_DEVICES": "0"},
         ) as server:
             client = server.get_client()
             # Test listing/retrieving models
@@ -290,7 +292,8 @@ class LoRATest(unittest.TestCase):
                 self._tokenizer,
                 "--lora-separator",
                 self._lora_separator,
-            ]
+            ],
+            env_dict={"CUDA_VISIBLE_DEVICES": "0"},
         ) as server:
             client = server.get_client()
             # Test listing/retrieving models
@@ -326,7 +329,8 @@ class LoRATest(unittest.TestCase):
                 "vllm",
                 "--lora-separator",
                 self._lora_separator,
-            ]
+            ],
+            env_dict={"CUDA_VISIBLE_DEVICES": "0"},
         ) as server:
             client = server.get_client()
             # Test listing/retrieving models
