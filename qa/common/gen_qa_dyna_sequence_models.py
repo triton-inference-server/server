@@ -33,7 +33,6 @@ import numpy as np
 from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
@@ -41,278 +40,6 @@ from gen_common import (
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-
-
-def create_tf_modelfile(
-    create_savedmodel, models_dir, model_version, max_batch, dtype, shape
-):
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    tf_input_dtype = np_to_tf_dtype(dtype)
-    tf_dtype = tf_input_dtype
-
-    # If the input is a string then use int32 for operation and just
-    # cast to/from string for input and output.
-    if tf_input_dtype == tf.string:
-        tf_dtype = tf.int32
-
-    # Create the model. If non-batching then don't include the batch
-    # dimension.
-    tf.compat.v1.reset_default_graph()
-    if create_savedmodel and (max_batch == 0):
-        input0 = tf.compat.v1.placeholder(
-            tf_input_dtype,
-            [
-                1,
-            ],
-            "INPUT",
-        )
-        if tf_input_dtype == tf.string:
-            input0 = tf.strings.to_number(tf.strings.join(["0", input0]), tf_dtype)
-        start0 = tf.compat.v1.placeholder(
-            tf_dtype,
-            [
-                1,
-            ],
-            "START",
-        )
-        end0 = tf.compat.v1.placeholder(
-            tf_dtype,
-            [
-                1,
-            ],
-            "END",
-        )
-        ready0 = tf.compat.v1.placeholder(
-            tf_dtype,
-            [
-                1,
-            ],
-            "READY",
-        )
-        corrid0 = tf.compat.v1.placeholder(
-            tf.uint64,
-            [
-                1,
-            ],
-            "CORRID",
-        )
-        corrid_cast0 = tf.cast(corrid0, tf_dtype)
-        acc = tf.compat.v1.get_variable(
-            "ACC",
-            [
-                1,
-            ],
-            dtype=tf_dtype,
-        )
-        tmp0 = tf.compat.v1.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
-        tmp1 = tf.compat.v1.where(tf.equal(end0, 1), tf.add(tmp0, corrid_cast0), tmp0)
-        newacc = tf.compat.v1.where(tf.equal(ready0, 1), tmp1, acc)
-        assign = tf.compat.v1.assign(acc, newacc)
-        if tf_input_dtype == tf.string:
-            tf.strings.as_string(assign, name="OUTPUT")
-        else:
-            tf.identity(assign, name="OUTPUT")
-    else:
-        # For batching we can't use a tf.variable to hold the
-        # accumulated values since that forces the size of the output
-        # to the size of the variable (which must be a max-batch-size
-        # vector since require one accumulator each), instead of the
-        # output shape being [None, 1]. So instead we just return 0 if
-        # not-ready and 'INPUT'+'START'+('END'*'CORRID')
-        # otherwise... the tests know to expect this.
-        input0 = tf.compat.v1.placeholder(
-            tf_input_dtype,
-            [
-                None,
-            ]
-            + tu.shape_to_tf_shape(shape),
-            "INPUT",
-        )
-        if tf_input_dtype == tf.string:
-            input0 = tf.strings.to_number(tf.strings.join(["0", input0]), tf_dtype)
-        start0 = tf.compat.v1.placeholder(tf_dtype, [None, 1], "START")
-        end0 = tf.compat.v1.placeholder(tf_dtype, [None, 1], "END")
-        ready0 = tf.compat.v1.placeholder(tf_dtype, [None, 1], "READY")
-        corrid0 = tf.compat.v1.placeholder(tf.uint64, [None, 1], "CORRID")
-        corrid_cast0 = tf.cast(corrid0, tf_dtype)
-        tmp = tf.compat.v1.where(
-            tf.equal(ready0, 1),
-            tf.add(tf.add(start0, input0), tf.multiply(end0, corrid_cast0)),
-            tf.zeros(tf.shape(input=input0), dtype=tf_dtype),
-        )
-        if tf_input_dtype == tf.string:
-            tf.strings.as_string(tmp, name="OUTPUT")
-        else:
-            tf.identity(tmp, name="OUTPUT")
-
-    # Use a different model name for the non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_dyna_sequence_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", dtype
-        )
-    else:
-        model_name = tu.get_dyna_sequence_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", dtype
-        )
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    if create_savedmodel:
-        with tf.compat.v1.Session() as sess:
-            sess.run(tf.compat.v1.initializers.global_variables())
-            input0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                "INPUT:0"
-            )
-            start0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                "START:0"
-            )
-            end0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name("END:0")
-            ready0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                "READY:0"
-            )
-            corrid0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                "CORRID:0"
-            )
-            output0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                "OUTPUT:0"
-            )
-            tf.compat.v1.saved_model.simple_save(
-                sess,
-                model_version_dir + "/model.savedmodel",
-                inputs={
-                    "INPUT": input0_tensor,
-                    "START": start0_tensor,
-                    "END": end0_tensor,
-                    "READY": ready0_tensor,
-                    "CORRID": corrid0_tensor,
-                },
-                outputs={"OUTPUT": output0_tensor},
-            )
-    else:
-        with tf.compat.v1.Session() as sess:
-            sess.run(tf.compat.v1.initializers.global_variables())
-            graph_io.write_graph(
-                sess.graph.as_graph_def(),
-                model_version_dir,
-                "model.graphdef",
-                as_text=False,
-            )
-
-
-def create_tf_modelconfig(
-    create_savedmodel, models_dir, model_version, max_batch, dtype, shape
-):
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    # Use a different model name for the non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_dyna_sequence_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", dtype
-        )
-    else:
-        model_name = tu.get_dyna_sequence_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", dtype
-        )
-
-    config_dir = models_dir + "/" + model_name
-    config = """
-name: "{}"
-platform: "{}"
-max_batch_size: {}
-sequence_batching {{
-  max_sequence_idle_microseconds: 5000000
-  {}
-  control_input [
-    {{
-      name: "START"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_START
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "END"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_END
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "READY"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_READY
-          {}_false_true: [ 0, 1 ]
-        }}
-      ]
-    }},
-    {{
-      name: "CORRID"
-      control [
-        {{
-          kind: CONTROL_SEQUENCE_CORRID
-          data_type: TYPE_UINT64
-        }}
-      ]
-    }}
-  ]
-}}
-input [
-  {{
-    name: "INPUT"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT"
-    data_type: {}
-    dims: [ 1 ]
-  }}
-]
-instance_group [
-  {{
-    kind: KIND_CPU
-  }}
-]
-""".format(
-        model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-        max_batch,
-        (
-            "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
-            if max_batch > 0
-            else ""
-        ),
-        "fp32" if dtype == np.float32 else "int32",
-        "fp32" if dtype == np.float32 else "int32",
-        "fp32" if dtype == np.float32 else "int32",
-        np_to_model_dtype(dtype),
-        tu.shape_to_dims_str(shape),
-        np_to_model_dtype(dtype),
-    )
-
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
 
 def create_plan_shape_tensor_modelfile(
     models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype
@@ -1433,20 +1160,6 @@ def create_shape_tensor_models(
 def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
-    if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape)
-        create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(False, models_dir, model_version, 0, dtype, shape)
-            create_tf_modelfile(False, models_dir, model_version, 0, dtype, shape)
-
-    if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, 8, dtype, shape)
-        create_tf_modelfile(True, models_dir, model_version, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(True, models_dir, model_version, 0, dtype, shape)
-            create_tf_modelfile(True, models_dir, model_version, 0, dtype, shape)
-
     if FLAGS.tensorrt:
         suffix = []
         if dtype == np.int8:
@@ -1484,18 +1197,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--models_dir", type=str, required=True, help="Top-level model directory"
-    )
-    parser.add_argument(
-        "--graphdef",
-        required=False,
-        action="store_true",
-        help="Generate GraphDef models",
-    )
-    parser.add_argument(
-        "--savedmodel",
-        required=False,
-        action="store_true",
-        help="Generate SavedModel models",
     )
     parser.add_argument(
         "--tensorrt",
@@ -1539,11 +1240,6 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
-        from tensorflow.python.framework import graph_io
-
-        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:
