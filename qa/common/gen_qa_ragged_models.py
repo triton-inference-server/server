@@ -33,102 +33,10 @@ import numpy as np
 from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_tf_dtype,
     np_to_trt_dtype,
 )
 
 np_dtype_string = np.dtype(object)
-
-
-def create_savedmodel_modelfile(models_dir, model_version, dtype):
-    # Create special identity model for batch input testing.
-    # Because the ragged input and batch input are one dimensional vector
-    # when passing to the model, the model must generate output with batch
-    # dimension so that Triton can scatter it to different responses along
-    # the batch dimension.
-    # 'BATCH_AND_SIZE_INPUT' is also used as a hint to generate output with
-    # batch dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size].
-    # Each output corresponds to the input with the same name, so if there
-    # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
-    # since the input is ragged, the model sees the input as [2, 4, 1], and
-    # "BATCH_AND_SIZE_INPUT" will have shape [2]. Then the model output will
-    # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
-    # value [[2, 4, 1]].
-    # For "BATCH_INPUT", the input tensor must only have one variable dimension
-    # to be broadcasted along the batch dimension properly, thus the currently
-    # allowed batch input types are:
-    # - BATCH_ACCUMULATED_ELEMENT_COUNT
-    # - BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO
-    # - BATCH_MAX_ELEMENT_COUNT_AS_SHAPE
-    # - BATCH_ITEM_SHAPE_FLATTEN
-
-    tf_dtype = np_to_tf_dtype(dtype)
-
-    tf.compat.v1.reset_default_graph()
-    in_node = tf.compat.v1.placeholder(
-        tf_dtype, tu.shape_to_tf_shape([-1]), "TENSOR_RAGGED_INPUT"
-    )
-    bs_node = tf.compat.v1.placeholder(
-        tf_dtype, tu.shape_to_tf_shape([-1]), "TENSOR_BATCH_AND_SIZE_INPUT"
-    )
-    batch_node = tf.compat.v1.placeholder(
-        tf_dtype, tu.shape_to_tf_shape([-1]), "TENSOR_BATCH_INPUT"
-    )
-
-    in_mat = tf.reshape(in_node, [1, -1])
-    bs_mat = tf.reshape(bs_node, [1, -1])
-    batch_mat = tf.reshape(batch_node, [1, -1])
-
-    output_expander = tf.reshape(tf.divide(bs_node, bs_node), [-1, 1])
-
-    out_node = tf.matmul(output_expander, in_mat, name="TENSOR_RAGGED_OUTPUT")
-    bs_out_node = tf.matmul(
-        output_expander, bs_mat, name="TENSOR_BATCH_AND_SIZE_OUTPUT"
-    )
-    batch_out_node = tf.matmul(output_expander, batch_mat, name="TENSOR_BATCH_OUTPUT")
-
-    model_name = "savedmodel_batch_input"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with tf.compat.v1.Session() as sess:
-        in_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_RAGGED_INPUT:0"
-        )
-        bs_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_AND_SIZE_INPUT:0"
-        )
-        batch_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_INPUT:0"
-        )
-        out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_RAGGED_OUTPUT:0"
-        )
-        bs_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_AND_SIZE_OUTPUT:0"
-        )
-        batch_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_OUTPUT:0"
-        )
-        tf.compat.v1.saved_model.simple_save(
-            sess,
-            model_version_dir + "/model.savedmodel",
-            inputs={
-                "RAGGED_INPUT": in_tensor,
-                "BATCH_AND_SIZE_INPUT": bs_tensor,
-                "BATCH_INPUT": batch_tensor,
-            },
-            outputs={
-                "RAGGED_OUTPUT": out_tensor,
-                "BATCH_AND_SIZE_OUTPUT": bs_out_tensor,
-                "BATCH_OUTPUT": batch_out_tensor,
-            },
-        )
-
 
 def create_plan_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
@@ -505,57 +413,6 @@ dynamic_batching {{
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-
-def create_savedmodel_itemshape_modelfile(models_dir, model_version, dtype):
-    # Create special identity model for batch input 'BATCH_ITEM_SHAPE' testing,
-    # such model has one ragged input and one batch input, and one output to
-    # return the batch input directly. Because 'BATCH_ITEM_SHAPE' should be
-    # generated to have matching batch dimension, the output can be produced
-    # via identity op and expect Triton will scatter the output properly.
-
-    tf_dtype = np_to_tf_dtype(dtype)
-
-    tf.compat.v1.reset_default_graph()
-    tf.compat.v1.placeholder(
-        tf_dtype, tu.shape_to_tf_shape([-1]), "TENSOR_RAGGED_INPUT"
-    )
-    # Shape is predefined
-    batch_node = tf.compat.v1.placeholder(
-        tf_dtype, tu.shape_to_tf_shape([-1, 2]), "TENSOR_BATCH_INPUT"
-    )
-    tf.identity(batch_node, name="TENSOR_BATCH_OUTPUT")
-
-    model_name = "savedmodel_batch_item"
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with tf.compat.v1.Session() as sess:
-        in_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_RAGGED_INPUT:0"
-        )
-        batch_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_INPUT:0"
-        )
-        batch_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-            "TENSOR_BATCH_OUTPUT:0"
-        )
-        tf.compat.v1.saved_model.simple_save(
-            sess,
-            model_version_dir + "/model.savedmodel",
-            inputs={
-                "RAGGED_INPUT": in_tensor,
-                "BATCH_INPUT": batch_tensor,
-            },
-            outputs={
-                "BATCH_OUTPUT": batch_out_tensor,
-            },
-        )
-
-
 def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input 'BATCH_ITEM_SHAPE' testing,
     # such model has one ragged input and one batch input, and one output to
@@ -766,15 +623,6 @@ def create_batch_input_models(models_dir):
             models_dir, 4, model_version, np.float32, "tensorrt", "plan"
         )
         create_plan_itemshape_modelfile(models_dir, model_version, np.float32)
-    if FLAGS.savedmodel:
-        create_modelconfig(
-            models_dir, 4, model_version, np.float32, "tensorflow", "savedmodel"
-        )
-        create_savedmodel_modelfile(models_dir, model_version, np.float32)
-        create_itemshape_modelconfig(
-            models_dir, 4, model_version, np.float32, "tensorflow", "savedmodel"
-        )
-        create_savedmodel_itemshape_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
         create_modelconfig(
             models_dir, 4, model_version, np.float32, "onnxruntime", "onnx"
@@ -807,18 +655,6 @@ if __name__ == "__main__":
         help="Generate TensorRT PLAN models",
     )
     parser.add_argument(
-        "--savedmodel",
-        required=False,
-        action="store_true",
-        help="Generate SavedModel models",
-    )
-    parser.add_argument(
-        "--graphdef",
-        required=False,
-        action="store_true",
-        help="Generate GraphDef models",
-    )
-    parser.add_argument(
         "--onnx",
         required=False,
         action="store_true",
@@ -844,10 +680,6 @@ if __name__ == "__main__":
 
     if FLAGS.tensorrt:
         import tensorrt as trt
-    if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
-
-        tf.compat.v1.disable_eager_execution()
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
