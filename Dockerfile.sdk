@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.01-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.02-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
@@ -238,6 +238,8 @@ COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_cli
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
+RUN pip3 install install/python/genai_perf-*.whl
+
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
@@ -245,8 +247,6 @@ RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
-
-RUN pip3 install install/python/genai_perf-*.whl
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \

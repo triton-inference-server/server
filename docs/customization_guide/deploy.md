@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -287,6 +287,21 @@ no untrusted files of same name exist in a location of higher search priority
 (e.g., System32). It is still recommended to add backend-specific dependencies
 to their corresponding backend folder when possible.
 
+# GRPC server options
+Triton Inference Server's gRPC inference handlers internally use states to manage inference requests and response queues. Each state consists of one inference request and one response queue. The response queue within a state can hold multiple response objects. These states remain allocated for reuse to optimize performance by minimizing dynamic allocations.
+
+You can configure the following parameters to balance memory usage and server performance:
+- The maximum number of states that remain allocated.
+- The maximum number of response objects that can stay allocated in the response queue.
+
+##### `--grpc-infer-allocation-pool-size=<integer>`
+Specifies the maximum number of states (inference request/response queues) that remain allocated for reuse. If the number of in-flight requests does not exceed this value, no allocation or deallocation of request/response queues will occur. By default, this value is set to `8`.
+
+##### `--grpc-max-response-pool-size=<integer>`
+Specifies the maximum number of inference response objects that can remain allocated in each response queue at any given time. This option is particularly useful in decoupled mode, where multiple responses are generated for a single request. By default, this value is set to `INT_MAX`.
+
+> [!Warning]
+> Setting this value too low may negatively impact performance.
 
 
 
