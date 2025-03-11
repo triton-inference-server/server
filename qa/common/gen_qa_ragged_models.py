@@ -337,12 +337,6 @@ backend: "{}"
 """.format(
         backend
     )
-    if backend == "tensorflow":
-        backend_spec += """
-platform: "{}_{}"
-""".format(
-            backend, platform
-        )
 
     model_name = "{}_batch_input".format(platform)
     config_dir = models_dir + "/" + model_name
@@ -557,12 +551,6 @@ backend: "{}"
 """.format(
         backend
     )
-    if backend == "tensorflow":
-        backend_spec += """
-platform: "{}_{}"
-""".format(
-            backend, platform
-        )
 
     model_name = "{}_batch_item".format(platform)
     config_dir = models_dir + "/" + model_name
