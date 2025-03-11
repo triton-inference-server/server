@@ -143,6 +143,7 @@ class Server {
   inference::GRPCInferenceServiceCallback::CallbackService
       non_inference_callback_service_;
 
+  ::grpc::health::v1::Health::CallbackService* health_callback_service_;
   std::unique_ptr<::grpc::Server> server_;
 
   // std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;

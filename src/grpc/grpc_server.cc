@@ -79,8 +79,61 @@ namespace {
 //  are deemed to be not performance critical.
 //=========================================================================
 
-// Define your unified callback service that implements several non-inference
-// RPCs.
+// Define a dedicated health service that implements the health check RPC
+class HealthCallbackService
+    : public ::grpc::health::v1::Health::CallbackService {
+ public:
+  HealthCallbackService(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
+      const std::pair<std::string, std::string>& restrictedKV)
+      : tritonserver_(server), restricted_kv_(restrictedKV)
+  {
+  }
+
+  ::grpc::ServerUnaryReactor* Check(
+      ::grpc::CallbackServerContext* context,
+      const ::grpc::health::v1::HealthCheckRequest* request,
+      ::grpc::health::v1::HealthCheckResponse* response) override
+  {
+    auto* reactor = context->DefaultReactor();
+
+    // Check restricted access if configured
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = context->client_metadata();
+      auto it = metadata.find(restricted_kv_.first);
+      if (it == metadata.end() || it->second != restricted_kv_.second) {
+        reactor->Finish(::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            "Missing or mismatched restricted header"));
+        return reactor;
+      }
+    }
+
+    // Check if server is ready
+    bool ready = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
+
+    // Set health status based on server readiness
+    if (err == nullptr && ready) {
+      response->set_status(::grpc::health::v1::HealthCheckResponse::SERVING);
+    } else {
+      response->set_status(
+          ::grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+    }
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    reactor->Finish(status);
+    return reactor;
+  }
+
+ private:
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
+  std::pair<std::string, std::string> restricted_kv_;
+};
+
 class UnifiedCallbackService
     : public inference::GRPCInferenceServiceCallback::CallbackService,
       public ::grpc::health::v1::Health::CallbackService {
@@ -1886,13 +1939,18 @@ class CommonHandler : public HandlerBase {
   // Descriptive name of of the handler.
   const std::string& Name() const { return name_; }
 
-  void CreateUnifiedCallbackService();
+  void CreateCallbackServices();
 
-  // Add a new public method to return the non_inference_callback_service_
+  // Add methods to return the callback services
   inference::GRPCInferenceServiceCallback::CallbackService*
   GetUnifiedCallbackService()
   {
     return non_inference_callback_service_;
+  }
+
+  ::grpc::health::v1::Health::CallbackService* GetHealthCallbackService()
+  {
+    return health_callback_service_;
   }
 
  private:
@@ -1904,6 +1962,7 @@ class CommonHandler : public HandlerBase {
   ::grpc::health::v1::Health::AsyncService* health_service_;
   inference::GRPCInferenceServiceCallback::CallbackService*
       non_inference_callback_service_;
+  ::grpc::health::v1::Health::CallbackService* health_callback_service_;
   std::unique_ptr<std::thread> thread_;
   RestrictedFeatures restricted_keys_;
   const uint64_t response_delay_;
@@ -1923,18 +1982,26 @@ CommonHandler::CommonHandler(
       trace_manager_(trace_manager), service_(service),
       health_service_(health_service),
       non_inference_callback_service_(non_inference_callback_service),
-      restricted_keys_(restricted_keys), response_delay_(response_delay)
+      health_callback_service_(nullptr), restricted_keys_(restricted_keys),
+      response_delay_(response_delay)
 {
-  CreateUnifiedCallbackService();
+  CreateCallbackServices();
 }
 
 void
-CommonHandler::CreateUnifiedCallbackService()
+CommonHandler::CreateCallbackServices()
 {
-  const auto& restrictedKV = restricted_keys_.Get(RestrictedCategory::HEALTH);
-  // Create a single unified callback service instance.
-  non_inference_callback_service_ =
-      new UnifiedCallbackService(tritonserver_, shm_manager_, restrictedKV);
+  // Create the unified callback service for non-inference operations
+  const auto& inference_restrictedKV =
+      restricted_keys_.Get(RestrictedCategory::INFERENCE);
+  non_inference_callback_service_ = new UnifiedCallbackService(
+      tritonserver_, shm_manager_, inference_restrictedKV);
+
+  // Create the health callback service
+  const auto& health_restrictedKV =
+      restricted_keys_.Get(RestrictedCategory::HEALTH);
+  health_callback_service_ =
+      new HealthCallbackService(tritonserver_, health_restrictedKV);
 }
 
 }  // namespace
@@ -1977,7 +2044,6 @@ Server::Server(
   builder_.AddListeningPort(server_addr_, credentials, &bound_port_);
   builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   builder_.RegisterService(&service_);
-  // builder_.RegisterService(&health_service_);
   builder_.AddChannelArgument(
       GRPC_ARG_ALLOW_REUSEPORT, options.socket_.reuse_port_);
 
@@ -2075,13 +2141,14 @@ Server::Server(
   // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
-      &health_service_, &non_inference_callback_service_,
+      &health_service_, nullptr /* non_inference_callback_service */,
       options.restricted_protocols_, response_delay));
   // Use common_handler_ and register services
   auto* handler = dynamic_cast<CommonHandler*>(common_handler_.get());
   if (handler != nullptr) {
-    // Register the unified service directly without casting
+    // Register both the unified service and health service
     builder_.RegisterService(handler->GetUnifiedCallbackService());
+    builder_.RegisterService(handler->GetHealthCallbackService());
   }
 
   // [FIXME] "register" logic is different for infer
