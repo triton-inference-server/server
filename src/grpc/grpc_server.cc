@@ -82,7 +82,8 @@ namespace {
 // Define your unified callback service that implements several non-inference
 // RPCs.
 class UnifiedCallbackService
-    : public inference::GRPCInferenceServiceCallback::CallbackService {
+    : public inference::GRPCInferenceServiceCallback::CallbackService,
+      public ::grpc::health::v1::Health::CallbackService {
  public:
   UnifiedCallbackService(
       const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -1537,6 +1538,323 @@ class UnifiedCallbackService
     return reactor;
   }
 
+  ::grpc::ServerUnaryReactor* RepositoryIndex(
+      ::grpc::CallbackServerContext* context,
+      const inference::RepositoryIndexRequest* request,
+      inference::RepositoryIndexResponse* response) override
+  {
+    auto* reactor = context->DefaultReactor();
+
+    // (Optionally) Check client metadata for restricted access.
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = context->client_metadata();
+      auto it = metadata.find(restricted_kv_.first);
+      if (it == metadata.end() || it->second != restricted_kv_.second) {
+        reactor->Finish(::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            "Missing or mismatched restricted header"));
+        return reactor;
+      }
+    }
+
+    // Core business logic
+    TRITONSERVER_Error* err = nullptr;
+    if (request->repository_name().empty()) {
+      uint32_t flags = 0;
+      if (request->ready()) {
+        flags |= TRITONSERVER_INDEX_FLAG_READY;
+      }
+
+      TRITONSERVER_Message* model_index_message = nullptr;
+      err = TRITONSERVER_ServerModelIndex(
+          tritonserver_.get(), flags, &model_index_message);
+      if (err == nullptr) {
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_index_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          triton::common::TritonJson::Value model_index_json;
+          err = model_index_json.Parse(buffer, byte_size);
+          if (err == nullptr) {
+            err = model_index_json.AssertType(
+                triton::common::TritonJson::ValueType::ARRAY);
+            if (err == nullptr) {
+              for (size_t idx = 0; idx < model_index_json.ArraySize(); ++idx) {
+                triton::common::TritonJson::Value index_json;
+                err = model_index_json.IndexAsObject(idx, &index_json);
+                if (err != nullptr) {
+                  break;
+                }
+
+                auto model_index = response->add_models();
+
+                const char* name;
+                size_t namelen;
+                err = index_json.MemberAsString("name", &name, &namelen);
+                if (err != nullptr) {
+                  break;
+                }
+                model_index->set_name(std::string(name, namelen));
+
+                if (index_json.Find("version")) {
+                  const char* version;
+                  size_t versionlen;
+                  err = index_json.MemberAsString(
+                      "version", &version, &versionlen);
+                  if (err != nullptr) {
+                    break;
+                  }
+                  model_index->set_version(std::string(version, versionlen));
+                }
+                if (index_json.Find("state")) {
+                  const char* state;
+                  size_t statelen;
+                  err = index_json.MemberAsString("state", &state, &statelen);
+                  if (err != nullptr) {
+                    break;
+                  }
+                  model_index->set_state(std::string(state, statelen));
+                }
+                if (index_json.Find("reason")) {
+                  const char* reason;
+                  size_t reasonlen;
+                  err =
+                      index_json.MemberAsString("reason", &reason, &reasonlen);
+                  if (err != nullptr) {
+                    break;
+                  }
+                  model_index->set_reason(std::string(reason, reasonlen));
+                }
+              }
+            }
+          }
+        }
+        TRITONSERVER_MessageDelete(model_index_message);
+      }
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    reactor->Finish(status);
+    return reactor;
+  }
+
+  ::grpc::ServerUnaryReactor* RepositoryModelLoad(
+      ::grpc::CallbackServerContext* context,
+      const inference::RepositoryModelLoadRequest* request,
+      inference::RepositoryModelLoadResponse* response) override
+  {
+    auto* reactor = context->DefaultReactor();
+
+    // (Optionally) Check client metadata for restricted access.
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = context->client_metadata();
+      auto it = metadata.find(restricted_kv_.first);
+      if (it == metadata.end() || it->second != restricted_kv_.second) {
+        reactor->Finish(::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            "Missing or mismatched restricted header"));
+        return reactor;
+      }
+    }
+
+    // Core business logic
+    TRITONSERVER_Error* err = nullptr;
+    if (request->repository_name().empty()) {
+      std::vector<TRITONSERVER_Parameter*> params;
+      // WAR for the const-ness check
+      std::vector<const TRITONSERVER_Parameter*> const_params;
+
+      for (const auto& param_proto : request->parameters()) {
+        if (param_proto.first == "config") {
+          if (param_proto.second.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kStringParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("invalid value type for load parameter '") +
+                 param_proto.first + "', expected string_param.")
+                    .c_str());
+            break;
+          } else {
+            auto param = TRITONSERVER_ParameterNew(
+                param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
+                param_proto.second.string_param().c_str());
+            if (param != nullptr) {
+              params.emplace_back(param);
+              const_params.emplace_back(param);
+            } else {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INTERNAL,
+                  "unexpected error on creating Triton parameter");
+              break;
+            }
+          }
+        } else if (param_proto.first.rfind("file:", 0) == 0) {
+          if (param_proto.second.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kBytesParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("invalid value type for load parameter '") +
+                 param_proto.first + "', expected bytes_param.")
+                    .c_str());
+            break;
+          } else {
+            auto param = TRITONSERVER_ParameterBytesNew(
+                param_proto.first.c_str(),
+                param_proto.second.bytes_param().data(),
+                param_proto.second.bytes_param().length());
+            if (param != nullptr) {
+              params.emplace_back(param);
+              const_params.emplace_back(param);
+            } else {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INTERNAL,
+                  "unexpected error on creating Triton parameter");
+              break;
+            }
+          }
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("unrecognized load parameter '") +
+               param_proto.first + "'.")
+                  .c_str());
+          break;
+        }
+      }
+
+      if (err == nullptr) {
+        err = TRITONSERVER_ServerLoadModelWithParameters(
+            tritonserver_.get(), request->model_name().c_str(),
+            const_params.data(), const_params.size());
+      }
+
+      // Assumes no further 'params' access after load API returns
+      for (auto& param : params) {
+        TRITONSERVER_ParameterDelete(param);
+      }
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    reactor->Finish(status);
+    return reactor;
+  }
+
+  ::grpc::ServerUnaryReactor* RepositoryModelUnload(
+      ::grpc::CallbackServerContext* context,
+      const inference::RepositoryModelUnloadRequest* request,
+      inference::RepositoryModelUnloadResponse* response) override
+  {
+    auto* reactor = context->DefaultReactor();
+
+    // (Optionally) Check client metadata for restricted access.
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = context->client_metadata();
+      auto it = metadata.find(restricted_kv_.first);
+      if (it == metadata.end() || it->second != restricted_kv_.second) {
+        reactor->Finish(::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            "Missing or mismatched restricted header"));
+        return reactor;
+      }
+    }
+
+    // Core business logic
+    TRITONSERVER_Error* err = nullptr;
+    if (request->repository_name().empty()) {
+      // Check if the dependent models should be removed
+      bool unload_dependents = false;
+      for (const auto& param : request->parameters()) {
+        if (param.first.compare("unload_dependents") == 0) {
+          const auto& unload_param = param.second;
+          if (unload_param.parameter_choice_case() !=
+              inference::ModelRepositoryParameter::ParameterChoiceCase::
+                  kBoolParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "invalid value type for 'unload_dependents' parameter, "
+                "expected bool_param.");
+          }
+          unload_dependents = unload_param.bool_param();
+          break;
+        }
+      }
+
+      if (err == nullptr) {
+        if (unload_dependents) {
+          err = TRITONSERVER_ServerUnloadModelAndDependents(
+              tritonserver_.get(), request->model_name().c_str());
+        } else {
+          err = TRITONSERVER_ServerUnloadModel(
+              tritonserver_.get(), request->model_name().c_str());
+        }
+      }
+    } else {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    reactor->Finish(status);
+    return reactor;
+  }
+
+  ::grpc::ServerUnaryReactor* Check(
+      ::grpc::CallbackServerContext* context,
+      const ::grpc::health::v1::HealthCheckRequest* request,
+      ::grpc::health::v1::HealthCheckResponse* response) override
+  {
+    auto* reactor = context->DefaultReactor();
+
+    // (Optionally) Check client metadata for restricted access.
+    if (!restricted_kv_.first.empty()) {
+      const auto& metadata = context->client_metadata();
+      auto it = metadata.find(restricted_kv_.first);
+      if (it == metadata.end() || it->second != restricted_kv_.second) {
+        reactor->Finish(::grpc::Status(
+            ::grpc::StatusCode::UNAVAILABLE,
+            "Missing or mismatched restricted header"));
+        return reactor;
+      }
+    }
+
+    // Check if server is ready
+    bool ready = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
+
+    // Set health status based on server readiness
+    if (err == nullptr && ready) {
+      response->set_status(::grpc::health::v1::HealthCheckResponse::SERVING);
+    } else {
+      response->set_status(
+          ::grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+    }
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+    reactor->Finish(status);
+    return reactor;
+  }
+
  private:
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -1759,11 +2077,10 @@ Server::Server(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
       &health_service_, &non_inference_callback_service_,
       options.restricted_protocols_, response_delay));
-  // Use common_handler_ and register
-  // builder_.RegisterService(non_inference_callback_service_); here Cast to
-  // CommonHandler to access the method
+  // Use common_handler_ and register services
   auto* handler = dynamic_cast<CommonHandler*>(common_handler_.get());
   if (handler != nullptr) {
+    // Register the unified service directly without casting
     builder_.RegisterService(handler->GetUnifiedCallbackService());
   }
 
