@@ -35,7 +35,6 @@ import numpy as np
 from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
@@ -44,199 +43,6 @@ from gen_common import (
 FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List
-
-
-def create_tf_modelfile(
-    create_savedmodel,
-    models_dir,
-    model_version,
-    max_batch,
-    dtype,
-    input_shapes,
-    output_shapes,
-):
-    assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_tf_model(
-        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
-    ):
-        return
-
-    tf_dtype = np_to_tf_dtype(dtype)
-    io_cnt = len(input_shapes)
-
-    # Create the model that copies inputs to corresponding outputs.
-    tf.compat.v1.reset_default_graph()
-    for io_num in range(io_cnt):
-        input_name = "INPUT{}".format(io_num)
-        output_name = "OUTPUT{}".format(io_num)
-        if max_batch == 0:
-            tin = tf.compat.v1.placeholder(
-                tf_dtype, tu.shape_to_tf_shape(input_shapes[io_num]), input_name
-            )
-        else:
-            tin = tf.compat.v1.placeholder(
-                tf_dtype,
-                [
-                    None,
-                ]
-                + tu.shape_to_tf_shape(input_shapes[io_num]),
-                input_name,
-            )
-
-        if input_shapes == output_shapes:
-            tf.identity(tin, name=output_name)
-        else:
-            if max_batch == 0:
-                tf.reshape(tin, output_shapes[io_num], name=output_name)
-            else:
-                tf.reshape(
-                    tin,
-                    [
-                        -1,
-                    ]
-                    + output_shapes[io_num],
-                    name=output_name,
-                )
-
-    # Use model name based on input/output count and non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype
-        )
-    else:
-        model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype
-        )
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    if create_savedmodel:
-        with tf.compat.v1.Session() as sess:
-            input_dict = {}
-            output_dict = {}
-            for io_num in range(io_cnt):
-                input_name = "INPUT{}".format(io_num)
-                output_name = "OUTPUT{}".format(io_num)
-                input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                    input_name + ":0"
-                )
-                output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                    output_name + ":0"
-                )
-                input_dict[input_name] = input_tensor
-                output_dict[output_name] = output_tensor
-            tf.compat.v1.saved_model.simple_save(
-                sess,
-                model_version_dir + "/model.savedmodel",
-                inputs=input_dict,
-                outputs=output_dict,
-            )
-    else:
-        with tf.compat.v1.Session() as sess:
-            graph_io.write_graph(
-                sess.graph.as_graph_def(),
-                model_version_dir,
-                "model.graphdef",
-                as_text=False,
-            )
-
-
-def create_tf_modelconfig(
-    create_savedmodel,
-    models_dir,
-    model_version,
-    max_batch,
-    dtype,
-    input_shapes,
-    input_model_shapes,
-    output_shapes,
-    output_model_shapes,
-):
-    assert len(input_shapes) == len(input_model_shapes)
-    assert len(output_shapes) == len(output_model_shapes)
-    assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_tf_model(
-        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
-    ):
-        return
-
-    io_cnt = len(input_shapes)
-
-    # Use a different model name for the non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype
-        )
-    else:
-        model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype
-        )
-
-    config_dir = models_dir + "/" + model_name
-    config = """
-name: "{}"
-platform: "{}"
-max_batch_size: {}
-""".format(
-        model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-        max_batch,
-    )
-
-    for io_num in range(io_cnt):
-        config += """
-input [
-  {{
-    name: "INPUT{}"
-    data_type: {}
-    dims: [ {} ]
-    {}
-  }}
-]
-output [
-  {{
-    name: "OUTPUT{}"
-    data_type: {}
-    dims: [ {} ]
-    {}
-  }}
-]
-""".format(
-            io_num,
-            np_to_model_dtype(dtype),
-            tu.shape_to_dims_str(input_shapes[io_num]),
-            (
-                "reshape: {{ shape: [ {} ] }}".format(
-                    tu.shape_to_dims_str(input_model_shapes[io_num])
-                )
-                if input_shapes[io_num] != input_model_shapes[io_num]
-                else ""
-            ),
-            io_num,
-            np_to_model_dtype(dtype),
-            tu.shape_to_dims_str(output_shapes[io_num]),
-            (
-                "reshape: {{ shape: [ {} ] }}".format(
-                    tu.shape_to_dims_str(output_model_shapes[io_num])
-                )
-                if output_shapes[io_num] != output_model_shapes[io_num]
-                else ""
-            ),
-        )
-
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
 
 def create_plan_modelfile(
     models_dir, model_version, max_batch, dtype, input_shapes, output_shapes
@@ -1064,92 +870,6 @@ def create_models(
     if output_model_shapes is None:
         output_model_shapes = input_model_shapes
 
-    if FLAGS.graphdef:
-        create_tf_modelconfig(
-            False,
-            models_dir,
-            model_version,
-            8,
-            dtype,
-            input_shapes,
-            input_model_shapes,
-            output_shapes,
-            output_model_shapes,
-        )
-        create_tf_modelfile(
-            False,
-            models_dir,
-            model_version,
-            8,
-            dtype,
-            input_model_shapes,
-            output_model_shapes,
-        )
-        if no_batch:
-            create_tf_modelconfig(
-                False,
-                models_dir,
-                model_version,
-                0,
-                dtype,
-                input_shapes,
-                input_model_shapes,
-                output_shapes,
-                output_model_shapes,
-            )
-            create_tf_modelfile(
-                False,
-                models_dir,
-                model_version,
-                0,
-                dtype,
-                input_model_shapes,
-                output_model_shapes,
-            )
-
-    if FLAGS.savedmodel:
-        create_tf_modelconfig(
-            True,
-            models_dir,
-            model_version,
-            8,
-            dtype,
-            input_shapes,
-            input_model_shapes,
-            output_shapes,
-            output_model_shapes,
-        )
-        create_tf_modelfile(
-            True,
-            models_dir,
-            model_version,
-            8,
-            dtype,
-            input_model_shapes,
-            output_model_shapes,
-        )
-        if no_batch:
-            create_tf_modelconfig(
-                True,
-                models_dir,
-                model_version,
-                0,
-                dtype,
-                input_shapes,
-                input_model_shapes,
-                output_shapes,
-                output_model_shapes,
-            )
-            create_tf_modelfile(
-                True,
-                models_dir,
-                model_version,
-                0,
-                dtype,
-                input_model_shapes,
-                output_model_shapes,
-            )
-
     if FLAGS.onnx:
         create_onnx_modelconfig(
             models_dir,
@@ -1386,18 +1106,6 @@ if __name__ == "__main__":
         "--models_dir", type=str, required=True, help="Top-level model directory"
     )
     parser.add_argument(
-        "--graphdef",
-        required=False,
-        action="store_true",
-        help="Generate GraphDef models",
-    )
-    parser.add_argument(
-        "--savedmodel",
-        required=False,
-        action="store_true",
-        help="Generate SavedModel models",
-    )
-    parser.add_argument(
         "--tensorrt",
         required=False,
         action="store_true",
@@ -1442,11 +1150,6 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
-        from tensorflow.python.framework import graph_io
-
-        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
