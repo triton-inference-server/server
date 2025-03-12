@@ -27,9 +27,10 @@
 tags:
   autoscaling: true
   loadBalancing: true
+  openshift: false
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:25.01-py3
+  imageName: nvcr.io/nvidia/tritonserver:25.02-py3
   pullPolicy: IfNotPresent
   modelRepositoryServer: < Replace with the IP Address of your file server >
   modelRepositoryPath: /srv/models

@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,44 +23,35 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+name: "response_parameters_bls"
 backend: "python"
-
-max_batch_size: 0
-
-model_transaction_policy {
-  decoupled: True
-}
+max_batch_size: 8
 
 input [
   {
-    name: "PROMPT"
+    name: "RESPONSE_PARAMETERS"
     data_type: TYPE_STRING
-    dims: [ 1, 1 ]
+    dims: [ 1 ]
   },
   {
-    name: "STREAM"
-    data_type: TYPE_BOOL
-    dims: [ 1, 1 ]
-  },
-  {
-    name: "input_ids"
-    data_type: TYPE_INT32
-    dims: [ 1, -1 ]
-    optional: true
+    name: "RESPONSE_PARAMETERS_DECOUPLED"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
   }
 ]
 
 output [
   {
-    name: "TEXT"
+    name: "OUTPUT"
     data_type: TYPE_STRING
-    dims: [ 1, -1 ]
+    dims: [ 1 ]
   }
 ]
 
 instance_group [
   {
     count: 1
-    kind: KIND_MODEL
+    kind: KIND_CPU
   }
 ]
