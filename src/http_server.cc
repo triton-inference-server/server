@@ -4254,10 +4254,7 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // "json"
   //
   // Any other value will have behavior equivalent to being unset while also
-  // logging and error.
-  //
-  // For specifics on the different formats for the load reporting formats, see:
-  // https://docs.google.com/document/d/1C1ybMmDKJIVlrbOLbywhu9iRYo4rilR-cT50OTtOFTs/edit?tab=t.0#heading=h.do9yfa1wlpk8
+  // logging an error.
   auto server = infer_request->EvHtpServer();
   const char* orca_metric_format = nullptr;
   evhtp_header_t* metric_format_header =
