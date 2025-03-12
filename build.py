@@ -1654,13 +1654,7 @@ ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
 
 
 def create_dockerfile_windows(
-    ddir,
-    dockerfile_name,
-    argmap,
-    backends,
-    repoagents,
-    caches,
-    rt_base_image=None
+    ddir, dockerfile_name, argmap, backends, repoagents, caches, rt_base_image=None
 ):
     base_image = argmap["BASE_IMAGE"]
     # If runtime base image is provided, use it as the base image
@@ -1774,7 +1768,7 @@ def create_build_dockerfiles(
             backends,
             repoagents,
             caches,
-            images.get("rt_base")
+            images.get("rt_base"),
         )
     else:
         create_dockerfile_linux(
@@ -1785,7 +1779,7 @@ def create_build_dockerfiles(
             repoagents,
             caches,
             endpoints,
-            images.get("rt_base")
+            images.get("rt_base"),
         )
 
     # Dockerfile used for the creating the CI base image.
@@ -2970,7 +2964,7 @@ if __name__ == "__main__":
                 "pytorch",
                 "tensorflow",
                 "tensorflow2",
-                "rt_base"
+                "rt_base",
             ],
             "unsupported value for --image",
         )
