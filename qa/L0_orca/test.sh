@@ -1,5 +1,5 @@
-#!/bin/bash
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/python3
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,181 +25,138 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-RET=0
-BASE_DIR=$(pwd)
-NUM_GPUS=${NUM_GPUS:=1}
-TENSORRTLLM_BACKEND_REPO_TAG=${TENSORRTLLM_BACKEND_REPO_TAG:="main"}
-TRT_ROOT="/usr/local/tensorrt"
+import argparse
+import json
+import sys
 
-MODEL_NAME="gpt2_tensorrt_llm"
-NAME="tensorrt_llm_benchmarking_test"
-MODEL_REPOSITORY="$(pwd)/triton_model_repo"
-TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
-TOKENIZER_DIR="$GPT_DIR/gpt2"
-ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_LOG="${NAME}_server.log"
-SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
+import requests
 
-function clone_tensorrt_llm_backend_repo {
-    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
-    apt-get update && apt-get install git-lfs -y --no-install-recommends
-    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
-    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
-}
 
-function build_gpt2_base_model {
-    # Download weights from HuggingFace Transformers
-    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
-    rm pytorch_model.bin model.safetensors
-    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
-        echo "Downloading pytorch_model.bin failed."
-        exit 1
-    fi
-    cd ${GPT_DIR}
+# To run the test, have tritonserver running and run this script with the endpoint as a flag.
+#
+# Example:
+# ```
+# python3 orca_header_test.py http://localhost:8000/v2/models/ensemble/generate
+# ```
+def get_endpoint_header(url, data, request_header=None):
+    """
+    Sends a POST request to the given URL with the provided data and returns the value of the "endpoint-load-metrics" header,
+    or None if the request fails.
+    """
+    HEADER_KEY = "endpoint-load-metrics"
+    try:
+        response = None
+        if request_header:
+            response = requests.post(url, json=data, headers=request_header)
+        else:
+            response = requests.post(url, json=data)
+        response.raise_for_status()
+        return response.headers.get(HEADER_KEY, "")
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
 
-    # Convert weights from HF Tranformers to FT format
-    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
-    cd ${BASE_DIR}
-}
 
-function build_gpt2_tensorrt_engine {
-    # Build TensorRT engines
-    cd ${GPT_DIR}
-    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
-        --gpt_attention_plugin float16 \
-        --remove_input_padding enable \
-        --paged_kv_cache enable \
-        --gemm_plugin float16 \
-        --workers "${NUM_GPUS}" \
-        --output_dir "${ENGINES_DIR}"
+def parse_header_data(header, orca_format):
+    """
+    Parses the header data into a dictionary based on the given format.
+    """
+    METRIC_KEY = "named_metrics"
+    try:
+        if orca_format == "json":
+            # Parse the header in JSON format
+            data = json.loads(header.replace("JSON ", ""))
+            if METRIC_KEY in data:
+                return data[METRIC_KEY]
+            else:
+                print(f"No key '{METRIC_KEY}' in header data: {data}")
+                return None
+        elif orca_format == "text":
+            # Parse the header in TEXT format
+            data = {}
+            for key_value_pair in header.replace("TEXT ", "").split(", "):
+                key, value = key_value_pair.split("=")
+                if "." in key:
+                    prefix, nested_key = key.split(".", 1)
+                    if prefix == METRIC_KEY:
+                        data[nested_key] = float(value)
+            if not data:
+                print(f"Could not parse any keys from header: {header}")
+                return None
+            return data
+        else:
+            print(f"Invalid ORCA format: {orca_format}")
+            return None
+    except (json.JSONDecodeError, ValueError, KeyError):
+        print("Error: Invalid data in the header.")
+        return None
 
-    cd ${BASE_DIR}
-}
 
-function replace_config_tags {
-    tag_to_replace="${1}"
-    new_value="${2}"
-    config_file_path="${3}"
-    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
-}
+def check_for_keys(data, desired_keys, orca_format):
+    """
+    Checks if all desired keys are present in the given data dictionary.
+    """
+    if all(key in data for key in desired_keys):
+        kv_cache_utilization = ", ".join([f"{k}: {data[k]}" for k in desired_keys])
+        print(
+            f"ORCA header present in {orca_format} format with kv_cache_utilization: {kv_cache_utilization}"
+        )
+        return True
+    else:
+        print(f"Missing keys in header: {', '.join(set(desired_keys) - set(data))}")
+        return False
 
-function prepare_model_repository {
-    rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
-    rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
-    mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
 
-    replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+def request_header(orca_format):
+    return {"endpoint-load-metrics-format": orca_format} if orca_format else None
 
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
 
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+def test_header_type(url, data, orca_format):
+    req_header = request_header(orca_format)
+    response_header = get_endpoint_header(args.url, TEST_DATA, req_header)
 
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-}
+    desired_keys = {
+        "kv_cache_utilization",
+        "max_token_capacity",
+    }  # Just the keys, no need to initialize with None
 
-# Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
-# success, 1 on failure
-function wait_for_server_ready() {
-    local wait_time_secs="${1:-30}"
-    shift
-    local spids=("$@")
+    if response_header is None:
+        print(f"Request to endpoint: '{args.url}' failed.")
+        return False
+    elif response_header == "":
+        if orca_format:
+            print(
+                f"response header empty, endpoint-load-metrics-format={orca_format} is not a valid ORCA metric format"
+            )
+            return False
+        else:
+            # No request header set <=> no response header. Intended behavior.
+            print(f"response header empty, endpoint-load-metrics-format is not set")
+            return True
 
-    WAIT_RET=0
+    data = parse_header_data(response_header, orca_format)
+    if data:
+        return check_for_keys(data, desired_keys, orca_format)
+    else:
+        print(f"Unexpected response header value: {response_header}")
+        return False
 
-    for _ in $(seq "$wait_time_secs"); do
-        for pid in "${spids[@]}"; do
-            if ! kill -0 "$pid" >/dev/null 2>&1; then
-                echo "=== Server not running."
-                WAIT_RET=1
-                return
-            fi
-        done
 
-        sleep 1
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Make a POST request to generate endpoint to test the ORCA metrics header."
+    )
+    parser.add_argument("url", help="The model URL to send the request to.")
+    args = parser.parse_args()
+    TEST_DATA = json.loads(
+        '{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}'
+    )
+    passed = True
 
-        if curl -s --fail localhost:8000/v2/health/ready &&
-            curl -s --fail -w "%{http_code}" -o /dev/null -d '{"log_verbose_level":1}' localhost:8000/v2/logging; then
-            return
-        fi
-    done
+    for format in ["json", "text", None]:
+        print("Checking response header for ORCA format:", format)
+        if not test_header_type(args.url, TEST_DATA, format):
+            print("FAIL on format:", format)
+            passed = False
 
-    echo "=== Timeout $wait_time_secs secs. Server not ready."
-    WAIT_RET=1
-}
-
-function run_server {
-    python3 ${TENSORRTLLM_BACKEND_DIR}/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
-    sleep 2 # allow time to obtain the pid(s)
-    # Read PIDs into an array, trimming whitespaces
-    readarray -t SERVER_PID < <(pgrep "tritonserver")
-
-    wait_for_server_ready ${SERVER_TIMEOUT} "${SERVER_PID[@]}"
-    if [ "$WAIT_RET" != "0" ]; then
-        # Cleanup
-        kill "${SERVER_PID[@]}" >/dev/null 2>&1 || true
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-}
-
-function kill_server {
-    pgrep tritonserver | xargs kill -SIGINT
-    for pid in "${SERVER_PID[@]}"; do
-        echo "Waiting for proc ${pid} to terminate..."
-        while kill -0 $pid >/dev/null 2>&1; do
-            sleep 1
-        done
-    done
-}
-
-clone_tensorrt_llm_backend_repo
-build_gpt2_base_model
-build_gpt2_tensorrt_engine
-prepare_model_repository
-
-set +e
-run_server
-
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-RET=0
-
-python $CLIENT_PY -v >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo "Failed: Client test had a non-zero return code."
-    RET=1
-fi
-
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** ORCA Test Passed\n***"
-else
-    cat $SERVER_LOG
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** ORCA Test FAILED\n***"
-fi
-
-kill_server
-set -e
-exit $RET
+    sys.exit(0 if passed else 1)

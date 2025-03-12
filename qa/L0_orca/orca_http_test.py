@@ -25,13 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-sys.path.append("../common")
-
 import argparse
 import json
-import os
+import sys
 
 import requests
 
@@ -75,7 +71,7 @@ def parse_header_data(header, orca_format):
             else:
                 print(f"No key '{METRIC_KEY}' in header data: {data}")
                 return None
-        elif orca_format == "http":
+        elif orca_format == "text":
             # Parse the header in TEXT format
             data = {}
             for key_value_pair in header.replace("TEXT ", "").split(", "):
@@ -112,7 +108,7 @@ def check_for_keys(data, desired_keys, orca_format):
 
 
 def request_header(orca_format):
-    return {"endpoint-load-metrics-type": orca_format} if orca_format else None
+    return {"endpoint-load-metrics-format": orca_format} if orca_format else None
 
 
 def test_header_type(url, data, orca_format):
@@ -123,7 +119,6 @@ def test_header_type(url, data, orca_format):
         "kv_cache_utilization",
         "max_token_capacity",
     }  # Just the keys, no need to initialize with None
-    passed = None
 
     if response_header is None:
         print(f"Request to endpoint: '{args.url}' failed.")
@@ -131,12 +126,12 @@ def test_header_type(url, data, orca_format):
     elif response_header == "":
         if orca_format:
             print(
-                f"response header empty, endpoint-load-metrics-type={orca_format} is not a valid ORCA metric format"
+                f"response header empty, endpoint-load-metrics-format={orca_format} is not a valid ORCA metric format"
             )
             return False
         else:
             # No request header set <=> no response header. Intended behavior.
-            print(f"response header empty, endpoint-load-metrics-type is not set")
+            print(f"response header empty, endpoint-load-metrics-format is not set")
             return True
 
     data = parse_header_data(response_header, orca_format)
@@ -158,7 +153,7 @@ if __name__ == "__main__":
     )
     passed = True
 
-    for format in ["json", "http", None]:
+    for format in ["json", "text", None]:
         print("Checking response header for ORCA format:", format)
         if not test_header_type(args.url, TEST_DATA, format):
             print("FAIL on format:", format)
