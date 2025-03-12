@@ -1220,10 +1220,17 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 
 def create_dockerfile_linux(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints, rt_base_image=None
+    ddir,
+    dockerfile_name,
+    argmap,
+    backends,
+    repoagents,
+    caches,
+    endpoints,
+    rt_base_image=None
 ):
     base_image = argmap["BASE_IMAGE"]
-    #If runtime base image is provided, use it as the base image
+    # If runtime base image is provided, use it as the base image
     if rt_base_image:
         base_image = rt_base_image
 
@@ -1647,13 +1654,18 @@ ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
 
 
 def create_dockerfile_windows(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches, rt_base_image=None
+    ddir,
+    dockerfile_name,
+    argmap,
+    backends,
+    repoagents,
+    caches,
+    rt_base_image=None
 ):
     base_image = argmap["BASE_IMAGE"]
-    #If runtime base image is provided, use it as the base image
+    # If runtime base image is provided, use it as the base image
     if rt_base_image:
         base_image = rt_base_image
-    
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1754,8 +1766,6 @@ def create_build_dockerfiles(
             FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
         )
 
-        
-        
     if target_platform() == "windows":
         create_dockerfile_windows(
             FLAGS.build_dir,
@@ -1764,7 +1774,7 @@ def create_build_dockerfiles(
             backends,
             repoagents,
             caches,
-            images.get("rt_base"),
+            images.get("rt_base")
         )
     else:
         create_dockerfile_linux(
@@ -2954,7 +2964,14 @@ if __name__ == "__main__":
         )
         fail_if(
             parts[0]
-            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2","rt_base"],
+            not in [
+                "base",
+                "gpu-base",
+                "pytorch",
+                "tensorflow",
+                "tensorflow2",
+                "rt_base"
+            ],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
