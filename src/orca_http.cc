@@ -26,6 +26,40 @@
 
 #include "orca_http.h"
 
+void SetEndpointLoadMetricsHeader(evhtp_request_t* req, const char* orca_metric_format, TRITONSERVER_Server* server) {
+  const std::string orca_type = orca_metric_format;
+  TRITONSERVER_Metrics* metrics = nullptr;
+  TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server, &metrics);
+  if (err == nullptr) {
+    const char* base;
+    size_t byte_size;
+    err = TRITONSERVER_MetricsFormatted(
+        metrics, TRITONSERVER_METRIC_PROMETHEUS, &base, &byte_size);
+    if (err == nullptr) {
+      std::string formatted_metrics(base, byte_size);
+      // Extract the KV utilization metrics from the Prometheus formatted
+      // string.
+      std::string extracted_kv_metrics =
+          ExtractKVMetrics(formatted_metrics, orca_type);
+      if (!extracted_kv_metrics.empty()) {
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new(
+                ENDPOINT_LOAD_METRICS_NAME, extracted_kv_metrics.c_str(), 1, 1));
+      } else {
+        LOG_ERROR << "ENDPOINT_LOAD_METRICS_TYPE request header is set but extracted_kv_metrics is "
+                      "empty, no header written. orca_type="
+                  << orca_type;
+      }
+    }
+  } else {
+    // Handle potential errors
+    LOG_ERROR << "Failed to get KV metrics: "
+              << TRITONSERVER_ErrorMessage(err);
+    TRITONSERVER_ErrorDelete(err);
+  }
+  TRITONSERVER_MetricsDelete(metrics);
+}
 
 std::vector<PromMetric> MetricFamilyExtractor(
     const std::string& input, const std::string& metricFamily)

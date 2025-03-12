@@ -47,6 +47,9 @@ struct PromMetric {
     double value;
 };
 
+// function with logic to pull the KV-cache metrics for the inference
+// response header
+void SetEndpointLoadMetricsHeader(evhtp_request_t* req, const char* orca_metric_format, TRITONSERVER_Server* server);
 // Helper function to get the KV-cache utilization metrics for the
 // inference response header
 std::string ExtractKVMetrics(
