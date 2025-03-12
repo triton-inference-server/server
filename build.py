@@ -1227,7 +1227,7 @@ def create_dockerfile_linux(
     repoagents,
     caches,
     endpoints,
-    rt_base_image=None
+    rt_base_image=None,
 ):
     base_image = argmap["BASE_IMAGE"]
     # If runtime base image is provided, use it as the base image
