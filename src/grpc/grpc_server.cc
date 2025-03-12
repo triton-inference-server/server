@@ -85,8 +85,8 @@ class HealthCallbackService
  public:
   HealthCallbackService(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      const std::pair<std::string, std::string>& restrictedKV)
-      : tritonserver_(server), restricted_kv_(restrictedKV)
+      RestrictedFeatures& restricted_keys_)
+      : tritonserver_(server), restricted_keys_(restricted_keys_)
   {
   }
 
@@ -98,10 +98,12 @@ class HealthCallbackService
     auto* reactor = context->DefaultReactor();
 
     // Check restricted access if configured
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::HEALTH);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -131,19 +133,18 @@ class HealthCallbackService
 
  private:
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
-  std::pair<std::string, std::string> restricted_kv_;
+  RestrictedFeatures restricted_keys_;
 };
 
 class UnifiedCallbackService
-    : public inference::GRPCInferenceServiceCallback::CallbackService,
-      public ::grpc::health::v1::Health::CallbackService {
+    : public inference::GRPCInferenceServiceCallback::CallbackService {
  public:
   UnifiedCallbackService(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::pair<std::string, std::string>& restrictedKV)
+      RestrictedFeatures& restricted_keys_)
       : tritonserver_(server), shm_manager_(shm_manager),
-        restricted_kv_(restrictedKV)
+        restricted_keys_(restricted_keys_)
   {
   }
 
@@ -174,10 +175,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::HEALTH);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -206,10 +209,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::HEALTH);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -230,45 +235,6 @@ class UnifiedCallbackService
     return reactor;
   }
 
-  // ::grpc::ServerUnaryReactor* Check(
-  //     ::grpc::CallbackServerContext* context,
-  //     const ::grpc::health::v1::HealthCheckRequest* request,
-  //     ::grpc::health::v1::HealthCheckResponse* response) override {
-  //   auto* reactor = context->DefaultReactor();
-
-  //   // (Optionally) Check client metadata for restricted access.
-  //   if (!restricted_kv_.first.empty()) {
-  //     const auto& metadata = context->client_metadata();
-  //     auto it = metadata.find(restricted_kv_.first);
-  //     if (it == metadata.end() || it->second != restricted_kv_.second) {
-  //       reactor->Finish(::grpc::Status(::grpc::StatusCode::UNAVAILABLE,
-  //         "Missing or mismatched restricted header"));
-  //       return reactor;
-  //     }
-  //   }
-
-  //   // Business logic for HealthCheck.
-  //   bool live = false;
-  //   TRITONSERVER_Error* err = TRITONSERVER_ServerIsReady(tritonserver_.get(),
-  //   &live);
-
-  //   auto serving_status =
-  //   ::grpc::health::v1::HealthCheckResponse_ServingStatus_UNKNOWN; if (err ==
-  //   nullptr) {
-  //     serving_status = live
-  //         ? ::grpc::health::v1::HealthCheckResponse_ServingStatus_SERVING
-  //         :
-  //         ::grpc::health::v1::HealthCheckResponse_ServingStatus_NOT_SERVING;
-  //   }
-  //   response->set_status(serving_status);
-
-  //   ::grpc::Status status;
-  //   GrpcStatusUtil::Create(&status, err);
-  //   TRITONSERVER_ErrorDelete(err);
-  //   reactor->Finish(status);
-  //   return reactor;
-  // }
-
   ::grpc::ServerUnaryReactor* ModelReady(
       ::grpc::CallbackServerContext* context,
       const inference::ModelReadyRequest* request,
@@ -277,10 +243,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::HEALTH);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -316,10 +284,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::METADATA);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -390,10 +360,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::METADATA);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -551,10 +523,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::MODEL_CONFIG);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -603,10 +577,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::STATISTICS);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -848,10 +824,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::TRACE);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1143,10 +1121,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::LOGGING);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1330,10 +1310,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1361,10 +1343,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1427,10 +1411,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1470,10 +1456,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1530,10 +1518,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1565,10 +1555,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::SHARED_MEMORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1599,10 +1591,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1706,10 +1700,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1815,10 +1811,12 @@ class UnifiedCallbackService
     auto* reactor = context->DefaultReactor();
 
     // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
+    const std::pair<std::string, std::string>& restricted_kv =
+        restricted_keys_.Get(RestrictedCategory::MODEL_REPOSITORY);
+    if (!restricted_kv.first.empty()) {
       const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
+      auto it = metadata.find(restricted_kv.first);
+      if (it == metadata.end() || it->second != restricted_kv.second) {
         reactor->Finish(::grpc::Status(
             ::grpc::StatusCode::UNAVAILABLE,
             "Missing or mismatched restricted header"));
@@ -1869,49 +1867,10 @@ class UnifiedCallbackService
     return reactor;
   }
 
-  ::grpc::ServerUnaryReactor* Check(
-      ::grpc::CallbackServerContext* context,
-      const ::grpc::health::v1::HealthCheckRequest* request,
-      ::grpc::health::v1::HealthCheckResponse* response) override
-  {
-    auto* reactor = context->DefaultReactor();
-
-    // (Optionally) Check client metadata for restricted access.
-    if (!restricted_kv_.first.empty()) {
-      const auto& metadata = context->client_metadata();
-      auto it = metadata.find(restricted_kv_.first);
-      if (it == metadata.end() || it->second != restricted_kv_.second) {
-        reactor->Finish(::grpc::Status(
-            ::grpc::StatusCode::UNAVAILABLE,
-            "Missing or mismatched restricted header"));
-        return reactor;
-      }
-    }
-
-    // Check if server is ready
-    bool ready = false;
-    TRITONSERVER_Error* err =
-        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
-
-    // Set health status based on server readiness
-    if (err == nullptr && ready) {
-      response->set_status(::grpc::health::v1::HealthCheckResponse::SERVING);
-    } else {
-      response->set_status(
-          ::grpc::health::v1::HealthCheckResponse::NOT_SERVING);
-    }
-
-    ::grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
-    reactor->Finish(status);
-    return reactor;
-  }
-
  private:
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
-  std::pair<std::string, std::string> restricted_kv_;
+  RestrictedFeatures restricted_keys_;
 };
 
 //
@@ -1992,16 +1951,12 @@ void
 CommonHandler::CreateCallbackServices()
 {
   // Create the unified callback service for non-inference operations
-  const auto& inference_restrictedKV =
-      restricted_keys_.Get(RestrictedCategory::INFERENCE);
-  non_inference_callback_service_ = new UnifiedCallbackService(
-      tritonserver_, shm_manager_, inference_restrictedKV);
+  non_inference_callback_service_ =
+      new UnifiedCallbackService(tritonserver_, shm_manager_, restricted_keys_);
 
   // Create the health callback service
-  const auto& health_restrictedKV =
-      restricted_keys_.Get(RestrictedCategory::HEALTH);
   health_callback_service_ =
-      new HealthCallbackService(tritonserver_, health_restrictedKV);
+      new HealthCallbackService(tritonserver_, restricted_keys_);
 }
 
 }  // namespace
