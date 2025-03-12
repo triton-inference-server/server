@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,7 +26,11 @@
 
 #include "orca_http.h"
 
-void SetEndpointLoadMetricsHeader(evhtp_request_t* req, const char* orca_metric_format, TRITONSERVER_Server* server) {
+void
+SetEndpointLoadMetricsHeader(
+    evhtp_request_t* req, const char* orca_metric_format,
+    TRITONSERVER_Server* server)
+{
   const std::string orca_type = orca_metric_format;
   TRITONSERVER_Metrics* metrics = nullptr;
   TRITONSERVER_Error* err = TRITONSERVER_ServerMetrics(server, &metrics);
@@ -43,26 +47,26 @@ void SetEndpointLoadMetricsHeader(evhtp_request_t* req, const char* orca_metric_
           ExtractKVMetrics(formatted_metrics, orca_type);
       if (!extracted_kv_metrics.empty()) {
         evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new(
-                ENDPOINT_LOAD_METRICS_NAME, extracted_kv_metrics.c_str(), 1, 1));
+            req->headers_out, evhtp_header_new(
+                                  ENDPOINT_LOAD_METRICS_NAME,
+                                  extracted_kv_metrics.c_str(), 1, 1));
       } else {
-        LOG_ERROR << "ENDPOINT_LOAD_METRICS_TYPE request header is set but extracted_kv_metrics is "
-                      "empty, no header written. orca_type="
+        LOG_ERROR << "ENDPOINT_LOAD_METRICS_TYPE request header is set but "
+                     "extracted_kv_metrics is "
+                     "empty, no header written. orca_type="
                   << orca_type;
       }
     }
   } else {
     // Handle potential errors
-    LOG_ERROR << "Failed to get KV metrics: "
-              << TRITONSERVER_ErrorMessage(err);
+    LOG_ERROR << "Failed to get KV metrics: " << TRITONSERVER_ErrorMessage(err);
     TRITONSERVER_ErrorDelete(err);
   }
   TRITONSERVER_MetricsDelete(metrics);
 }
 
-std::vector<PromMetric> MetricFamilyExtractor(
-    const std::string& input, const std::string& metricFamily)
+std::vector<PromMetric>
+MetricFamilyExtractor(const std::string& input, const std::string& metricFamily)
 {
   std::vector<PromMetric> metrics;
   // Construct the regex pattern using the provided metricFamily.
@@ -138,7 +142,8 @@ std::vector<PromMetric> MetricFamilyExtractor(
   return metrics;
 }
 
-std::string ExtractKVMetrics(
+std::string
+ExtractKVMetrics(
     const std::string& prometheus_metrics, const std::string& orca_type)
 {
   std::string metric_family = KV_CACHE_BLOCK_METRICS_FAMILY;
@@ -174,16 +179,19 @@ std::string ExtractKVMetrics(
     kv_cache_utilization = used_blocks / max_blocks;
   }
   double max_token_capacity = max_blocks * tokens_per_block;
-  
-  std::unordered_map<std::string, double> metrics; // metrics vector to pass down
+
+  std::unordered_map<std::string, double>
+      metrics;  // metrics vector to pass down
   metrics[KV_CACHE_UTIL_KEY] = kv_cache_utilization;
   metrics[MAX_TOKEN_CAPACITY_KEY] = max_token_capacity;
 
   return OrcaKVMetricHeader(orca_type, metrics);
 }
 
-std::string OrcaKVMetricHeader(
-    const std::string& orca_type, std::unordered_map<std::string, double> metrics)
+std::string
+OrcaKVMetricHeader(
+    const std::string& orca_type,
+    std::unordered_map<std::string, double> metrics)
 {
   // Logic to construct and format response header
   std::string header_contents = "";
@@ -215,7 +223,8 @@ std::string OrcaKVMetricHeader(
     header_contents += prefix + kv_util_key + "=" +
                        std::to_string(metrics[kv_util_key]) + ", ";
     header_contents +=
-        prefix + max_token_key + "=" + std::to_string(static_cast<uint64_t>(metrics[max_token_key]));
+        prefix + max_token_key + "=" +
+        std::to_string(static_cast<uint64_t>(metrics[max_token_key]));
   } else {
     LOG_ERROR << "orca_type is set to an invalid type: " << orca_type;
   }

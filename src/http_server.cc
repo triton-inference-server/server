@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -4245,7 +4245,7 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   // Get the metrics in Prometheus format
 
   // ENDPOINT_LOAD_METRICS_TYPE is request header that specifies which load
-  // report format `endpoint-load-metrics` will be in. If not present, the 
+  // report format `endpoint-load-metrics` will be in. If not present, the
   // response header will not be written and the feature is disabled.
   //
   // The valid values for ENDPOINT_LOAD_METRICS_TYPE header are:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,9 @@ sys.path.append("../common")
 
 import argparse
 import json
+
 import requests
+
 
 # To run the test, have tritonserver running and run this script with the endpoint as a flag.
 #
@@ -56,6 +58,7 @@ def get_endpoint_header(url, data, request_header=None):
     except requests.exceptions.RequestException as e:
         print(f"Error making request: {e}")
         return None
+
 
 def parse_header_data(header, orca_format):
     """
@@ -91,35 +94,48 @@ def parse_header_data(header, orca_format):
         print("Error: Invalid data in the header.")
         return None
 
+
 def check_for_keys(data, desired_keys, orca_format):
     """
     Checks if all desired keys are present in the given data dictionary.
     """
     if all(key in data for key in desired_keys):
-        print(f"ORCA header present in {orca_format} format with kv_cache_utilization: {[k + ": " + str(data[k]) for k in desired_keys]}")
+        print(
+            "ORCA header present in ",
+            orca_format,
+            "format with" "kv_cache_utilization:",
+            [k + ": " + str(data[k]) for k in desired_keys],
+        )
         return True
     else:
         print(f"Missing keys in header: {', '.join(set(desired_keys) - set(data))}")
         return False
 
+
 def request_header(orca_format):
     return {"endpoint-load-metrics-format": orca_format} if orca_format else None
+
 
 def test_header_type(url, data, orca_format):
     req_header = request_header(orca_format)
     response_header = get_endpoint_header(args.url, TEST_DATA, req_header)
 
-    desired_keys = {"kv_cache_utilization", "max_token_capacity"}  # Just the keys, no need to initialize with None
+    desired_keys = {
+        "kv_cache_utilization",
+        "max_token_capacity",
+    }  # Just the keys, no need to initialize with None
 
     if response_header is None:
         print(f"Request to endpoint: '{args.url}' failed.")
         return False
     elif response_header == "":
         if orca_format:
-            print(f"response header empty, endpoint-load-metrics-format={orca_format} is not a valid ORCA metric format")
+            print(
+                f"response header empty, endpoint-load-metrics-format={orca_format} is not a valid ORCA metric format"
+            )
             return False
         else:
-            # No request header set <=> no response header. Indended behavior.
+            # No request header set <=> no response header. Intended behavior.
             print(f"response header empty, endpoint-load-metrics-format is not set")
             return True
 
@@ -130,11 +146,16 @@ def test_header_type(url, data, orca_format):
         print(f"Unexpected response header value: {response_header}")
         return False
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Make a POST request to generate endpoint to test the ORCA metrics header.")
+    parser = argparse.ArgumentParser(
+        description="Make a POST request to generate endpoint to test the ORCA metrics header."
+    )
     parser.add_argument("url", help="The model URL to send the request to.")
     args = parser.parse_args()
-    TEST_DATA = json.loads('{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}')
+    TEST_DATA = json.loads(
+        '{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}'
+    )
     passed = True
 
     for format in ["json", "text", None]:
@@ -142,5 +163,5 @@ if __name__ == "__main__":
         if not test_header_type(args.url, TEST_DATA, format):
             print("FAIL on format:", format)
             passed = False
-    
+
     sys.exit(0 if passed else 1)

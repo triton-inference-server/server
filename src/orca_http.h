@@ -1,4 +1,4 @@
-// Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,11 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "http_server.h"
-
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
+
+#include "http_server.h"
 
 #define ENDPOINT_LOAD_METRICS_TYPE "endpoint-load-metrics-format"
 #define ENDPOINT_LOAD_METRICS_NAME "endpoint-load-metrics"
@@ -43,13 +43,15 @@
 #define NAMED_METRICS "named_metrics"
 
 struct PromMetric {
-    std::unordered_map<std::string, std::string> labels;
-    double value;
+  std::unordered_map<std::string, std::string> labels;
+  double value;
 };
 
 // function with logic to pull the KV-cache metrics for the inference
 // response header
-void SetEndpointLoadMetricsHeader(evhtp_request_t* req, const char* orca_metric_format, TRITONSERVER_Server* server);
+void SetEndpointLoadMetricsHeader(
+    evhtp_request_t* req, const char* orca_metric_format,
+    TRITONSERVER_Server* server);
 // Helper function to get the KV-cache utilization metrics for the
 // inference response header
 std::string ExtractKVMetrics(
