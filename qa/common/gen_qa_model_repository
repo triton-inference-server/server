@@ -183,7 +183,7 @@ cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -246,7 +246,7 @@ cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -320,7 +320,7 @@ cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -388,7 +388,7 @@ cat > $TRTSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
