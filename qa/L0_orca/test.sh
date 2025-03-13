@@ -154,7 +154,7 @@ fi
 
 RET=0
 
-python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
+python3 $CLIENT_PY "http://localhost:8000/v2/models/${MODEL_NAME}/generate" >>$CLIENT_LOG 2>&1
 
 if [ $? -ne 0 ]; then
     echo "Failed: Client test had a non-zero return code."
