@@ -103,7 +103,7 @@ cat > $PYTSCRIPT <<EOF
 #!/bin/bash -x
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
