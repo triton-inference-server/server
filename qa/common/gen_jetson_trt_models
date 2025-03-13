@@ -108,7 +108,7 @@ cat > $TRT_MODEL_SCRIPT <<EOF
 #!/bin/bash -xe
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 ldconfig || true
 
