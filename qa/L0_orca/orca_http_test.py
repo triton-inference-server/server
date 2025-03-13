@@ -25,9 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
+
+sys.path.append("../common")
+
 import argparse
 import json
-import sys
 
 import requests
 
@@ -97,9 +100,8 @@ def check_for_keys(data, desired_keys, orca_format):
     Checks if all desired keys are present in the given data dictionary.
     """
     if all(key in data for key in desired_keys):
-        kv_cache_utilization = ", ".join([f"{k}: {data[k]}" for k in desired_keys])
         print(
-            f"ORCA header present in {orca_format} format with kv_cache_utilization: {kv_cache_utilization}"
+            f"ORCA header present in {orca_format} format with kv_cache_utilization: {[f'{k}: {data[k]}' for k in desired_keys]}"
         )
         return True
     else:
@@ -146,11 +148,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Make a POST request to generate endpoint to test the ORCA metrics header."
     )
-    parser.add_argument(
-        "--url",
-        default="http://localhost:8000/v2/models/gpt2_tensorrt_llm/generate",
-        help="The model URL to send the request to.",
-    )
+    parser.add_argument("url", help="The model URL to send the request to.")
     args = parser.parse_args()
     TEST_DATA = json.loads(
         '{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}'
