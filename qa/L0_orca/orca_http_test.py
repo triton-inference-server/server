@@ -146,7 +146,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Make a POST request to generate endpoint to test the ORCA metrics header."
     )
-    parser.add_argument("url", help="The model URL to send the request to.")
+    parser.add_argument(
+        "--url",
+        default="http://localhost:8000/v2/models/gpt2_tensorrt_llm/generate",
+        help="The model URL to send the request to.",
+    )
     args = parser.parse_args()
     TEST_DATA = json.loads(
         '{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}'
