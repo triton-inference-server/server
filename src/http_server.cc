@@ -355,7 +355,7 @@ HTTPMetricsServer::Create(
       new HTTPMetricsServer(server, port, address, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
-  LOG_INFO << "Started Metrics Service at " << addr;
+  LOG_INFO << "Started Metrics Service 1 at " << addr;
 
   return nullptr;
 }
