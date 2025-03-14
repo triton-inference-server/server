@@ -54,7 +54,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="onnx savedmodel plan libtorch"}
+BACKENDS=${BACKENDS:="onnx plan libtorch"}
 
 rm -f $SERVER_LOG $CLIENT_LOG
 

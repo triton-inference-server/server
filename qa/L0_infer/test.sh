@@ -67,7 +67,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     rm -f $LEAKCHECK_LOG_BASE*
     # Remove 'python', 'python_dlpack' and 'onnx' from BACKENDS and test them
     # separately below.
-    BACKENDS="graphdef savedmodel libtorch plan openvino"
+    BACKENDS="libtorch plan openvino"
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
@@ -129,7 +129,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack openvino"}
+BACKENDS=${BACKENDS:="onnx libtorch plan python python_dlpack openvino"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1

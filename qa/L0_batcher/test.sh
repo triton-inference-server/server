@@ -111,7 +111,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
+BACKENDS=${BACKENDS:="onnx libtorch plan python"}
 export BACKENDS
 
 # Basic batcher tests

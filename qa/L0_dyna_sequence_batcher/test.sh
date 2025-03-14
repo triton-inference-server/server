@@ -53,7 +53,7 @@ IMPLICIT_STATE=${IMPLICIT_STATE:="0"}
 export IMPLICIT_STATE
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel libtorch onnx plan custom custom_string"}
+BACKENDS=${BACKENDS:="libtorch onnx plan custom custom_string"}
 export BACKENDS
 
 MODEL_REPOSITORY=''
