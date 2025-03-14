@@ -464,9 +464,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
         """
         if (
-            ("savedmodel" not in trial)
-            and ("graphdef" not in trial)
-            and ("custom" not in trial)
+            ("custom" not in trial)
             and ("onnx" not in trial)
             and ("libtorch" not in trial)
             and ("plan" not in trial)
