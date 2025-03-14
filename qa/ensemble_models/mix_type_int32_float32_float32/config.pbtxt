@@ -54,7 +54,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "graphdef_int32_int32_int32"
+      model_name: "onnx_int32_int32_int32"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -70,7 +70,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_int32_object_object"
+      model_name: "onnx_int32_object_object"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -86,7 +86,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_int32_object_object"
+      model_name: "onnx_int32_object_object"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -102,7 +102,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_object_int32_int32"
+      model_name: "onnx_object_int32_int32"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -118,7 +118,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_int32_float32_float32"
+      model_name: "onnx_int32_float32_float32"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -134,7 +134,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_int32_float32_float32"
+      model_name: "onnx_int32_float32_float32"
       model_version: 1
       input_map {
         key: "INPUT0"
@@ -150,7 +150,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "graphdef_float32_float32_float32"
+      model_name: "onnx_float32_float32_float32"
       model_version: 1
       input_map {
         key: "INPUT0"
