@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -533,47 +533,4 @@ function deactivate_virtualenv() {
     deactivate
     rm -fr venv
   fi
-}
-
-function clone_tensorrt_llm_backend_repo {
-    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
-    apt-get update && apt-get install git-lfs -y --no-install-recommends
-    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
-    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
-}
-
-function build_gpt2_base_model {
-    # Download weights from HuggingFace Transformers
-    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
-    rm pytorch_model.bin model.safetensors
-    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
-        echo "Downloading pytorch_model.bin failed."
-        exit 1
-    fi
-    cd ${GPT_DIR}
-
-    # Convert weights from HF Tranformers to FT format
-    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
-    cd ${BASE_DIR}
-}
-
-function build_gpt2_tensorrt_engine {
-    # Build TensorRT engines
-    cd ${GPT_DIR}
-    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
-        --gpt_attention_plugin float16 \
-        --remove_input_padding enable \
-        --paged_kv_cache enable \
-        --gemm_plugin float16 \
-        --workers "${NUM_GPUS}" \
-        --output_dir "${ENGINES_DIR}"
-
-    cd ${BASE_DIR}
-}
-
-function replace_config_tags {
-    tag_to_replace="${1}"
-    new_value="${2}"
-    config_file_path="${3}"
-    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
 }
