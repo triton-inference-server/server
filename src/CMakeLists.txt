@@ -1,4 +1,4 @@
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -337,10 +337,12 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_SRCS
     http_server.cc
+    orca_http.cc
   )
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
+    orca_http.h
   )
 
   # Add header / src files based on HTTP related endpoint requested
