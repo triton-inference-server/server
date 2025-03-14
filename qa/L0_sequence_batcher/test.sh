@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -123,7 +123,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom python"}
+BACKENDS=${BACKENDS:="onnx plan libtorch custom python"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v

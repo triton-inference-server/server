@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@ IMPLICIT_STATE=${IMPLICIT_STATE:="0"}
 export IMPLICIT_STATE
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel libtorch onnx plan custom custom_string"}
+BACKENDS=${BACKENDS:="libtorch onnx plan custom custom_string"}
 export BACKENDS
 
 MODEL_REPOSITORY=''

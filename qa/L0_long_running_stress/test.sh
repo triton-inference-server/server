@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ fi
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch"}
+BACKENDS=${BACKENDS:="onnx libtorch"}
 export BACKENDS
 
 export CI_JOB_ID=${CI_JOB_ID}

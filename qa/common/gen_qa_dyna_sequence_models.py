@@ -1433,20 +1433,6 @@ def create_shape_tensor_models(
 def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
-    if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape)
-        create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(False, models_dir, model_version, 0, dtype, shape)
-            create_tf_modelfile(False, models_dir, model_version, 0, dtype, shape)
-
-    if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, 8, dtype, shape)
-        create_tf_modelfile(True, models_dir, model_version, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(True, models_dir, model_version, 0, dtype, shape)
-            create_tf_modelfile(True, models_dir, model_version, 0, dtype, shape)
-
     if FLAGS.tensorrt:
         suffix = []
         if dtype == np.int8:
@@ -1539,11 +1525,6 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
-        from tensorflow.python.framework import graph_io
-
-        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:
