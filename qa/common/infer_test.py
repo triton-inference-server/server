@@ -40,7 +40,7 @@ import test_util as tu
 np_dtype_string = np.dtype(object)
 
 # Allow caller to setup specific set of backends to test
-DEFAULT_BACKENDS = "graphdef savedmodel plan onnx libtorch"
+DEFAULT_BACKENDS = "plan onnx libtorch"
 TEST_BACKENDS = os.environ.get("BACKENDS", DEFAULT_BACKENDS).split()
 
 
@@ -89,29 +89,6 @@ class InferTest(tu.TestResultCollector):
                 )
 
         input_size = 16
-
-        if tu.validate_for_tf_model(
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            (input_size,),
-            (input_size,),
-            (input_size,),
-        ):
-            for pf in ["graphdef", "savedmodel"]:
-                if pf in TEST_BACKENDS:
-                    _infer_exact_helper(
-                        self,
-                        pf,
-                        (input_size,),
-                        8,
-                        input_dtype,
-                        output0_dtype,
-                        output1_dtype,
-                        output0_raw=output0_raw,
-                        output1_raw=output1_raw,
-                        swap=swap,
-                    )
 
         if tu.validate_for_trt_model(
             input_dtype,
