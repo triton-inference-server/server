@@ -74,8 +74,6 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                                 test_multi_batch_different_shape_allow_ragged"
 fi
 
-TF_VERSION=${TF_VERSION:=2}
-
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -105,7 +103,7 @@ else
     fi
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 RET=0

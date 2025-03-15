@@ -87,8 +87,6 @@ if [ "$TEST_JETSON" -eq 1 ]; then
     MODEL_TRIALS="0 v"
 fi
 
-TF_VERSION=${TF_VERSION:=2}
-
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -116,7 +114,7 @@ else
     fi
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=1"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 source ../common/util.sh
 

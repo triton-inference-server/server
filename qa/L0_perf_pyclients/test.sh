@@ -43,10 +43,8 @@ REPORTER=../common/reporter.py
 CLIENT_LOG="./simple_perf_client.log"
 SIMPLE_PERF_CLIENT=simple_perf_client.py
 
-TF_VERSION=${TF_VERSION:=2}
-
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/custom_models --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=`pwd`/custom_models"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference

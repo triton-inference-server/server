@@ -76,7 +76,6 @@ else
     EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="42"}
 fi
 
-TF_VERSION=${TF_VERSION:=2}
 TEST_JETSON=${TEST_JETSON:=0}
 
 # Default size (in MB) of shared memory to be used by each python model
@@ -109,7 +108,7 @@ else
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
