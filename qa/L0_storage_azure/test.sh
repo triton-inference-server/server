@@ -252,7 +252,7 @@ sleep 10
 
 # Setup model repository with minimal configs to be autocompleted
 rm -rf models && mkdir -p models
-AUTOCOMPLETE_BACKENDS="onnx"
+AUTOCOMPLETE_BACKENDS="libtorch"
 for FW in ${AUTOCOMPLETE_BACKENDS}; do
     for model in ${FW}_float32_float32_float32 ${FW}_object_object_object; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${model} models/
