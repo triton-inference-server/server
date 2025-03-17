@@ -88,9 +88,7 @@ class BatcherTest(tu.TestResultCollector):
             start_ms = int(round(time.time() * 1000))
 
             if (
-                trial == "savedmodel"
-                or trial == "graphdef"
-                or trial == "libtorch"
+                trial == "libtorch"
                 or trial == "onnx"
                 or trial == "plan"
                 or trial == "python"
