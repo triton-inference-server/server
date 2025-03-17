@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -302,7 +302,7 @@ def create_argmap(images, skip_pull):
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "2.2.3"
+        dcgm_version = "3.3.6"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version

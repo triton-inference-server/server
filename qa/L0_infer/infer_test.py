@@ -48,7 +48,7 @@ USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
-    "BACKENDS", "graphdef savedmodel onnx libtorch plan python python_dlpack openvino"
+    "BACKENDS", "onnx libtorch plan python python_dlpack openvino"
 )
 ENSEMBLES = bool(int(os.environ.get("ENSEMBLES", 1)))
 NOBATCH = bool(int(os.environ.get("NOBATCH", 1)))
