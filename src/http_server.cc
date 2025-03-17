@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -3392,6 +3392,7 @@ HTTPAPIServer::HandleGenerate(
   request_release_payload.release();
 }
 
+
 TRITONSERVER_Error*
 HTTPAPIServer::ModelInputMetadata(
     const std::string& model_name, const int64_t model_version,
@@ -4237,6 +4238,35 @@ HTTPAPIServer::GenerateRequestClass::StartResponse(
   if (req == nullptr) {
     return;
   }
+
+
+#ifdef TRITON_ENABLE_METRICS
+  // logic to add kv_cache metrics to response header
+  // Get the metrics in Prometheus format
+
+  // ENDPOINT_LOAD_METRICS_TYPE is request header that specifies which load
+  // report format `endpoint-load-metrics` will be in. If not present, the
+  // response header will not be written and the feature is disabled.
+  //
+  // The valid values for ENDPOINT_LOAD_METRICS_TYPE header are:
+  //
+  // "text"
+  // "json"
+  //
+  // Any other value will have behavior equivalent to being unset while also
+  // logging an error.
+  auto server = infer_request->EvHtpServer();
+  const char* orca_metric_format = nullptr;
+  evhtp_header_t* metric_format_header =
+      evhtp_headers_find_header(req->headers_in, ENDPOINT_LOAD_METRICS_TYPE);
+
+  if (metric_format_header != nullptr) {
+    orca_metric_format = metric_format_header->val;
+  }
+  if (orca_metric_format != nullptr && server != nullptr) {
+    SetEndpointLoadMetricsHeader(req, orca_metric_format, server);
+  }
+#endif  // TRITON_ENABLE_METRICS
 
   if (infer_request->streaming_) {
     AddContentTypeHeader(req, "text/event-stream; charset=utf-8");
