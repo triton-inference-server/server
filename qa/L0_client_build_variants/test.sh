@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,6 +50,10 @@ mkdir -p /workspace/build
 # Build without GPU support
 #
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
+TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
+TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
+
 (cd /workspace/build && \
         rm -fr cc-clients java-clients python-clients && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
