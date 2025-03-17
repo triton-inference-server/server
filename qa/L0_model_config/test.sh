@@ -47,7 +47,7 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
-TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan onnxruntime_onnx pytorch_libtorch"
+TRIALS="tensorrt_plan onnxruntime_onnx pytorch_libtorch"
 
 # Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \
@@ -258,14 +258,7 @@ for modelpath in \
 done
 
 # Copy other required models
-mkdir -p special_cases/invalid_platform/1
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
-    special_cases/invalid_platform/1/
-# Note that graphdef models don't support auto-complete-config
-# and that is why we are using graphdef model in this test case.
-mkdir -p special_cases/noautofill_noconfig/1
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float32_float32_float32/1/model.graphdef \
-    special_cases/noautofill_noconfig/1/
+
 # Create runtime escape scenario
 mkdir -p special_cases/runtime_escape/1 special_cases/runtime_escape/dummy_runtime
 touch special_cases/runtime_escape/dummy_runtime/libtriton_identity.so
@@ -273,14 +266,6 @@ touch special_cases/runtime_escape/dummy_runtime/libtriton_identity.so
 mkdir -p special_cases/invalid_runtime/1
 
 # Copy reshape model files into the test model repositories.
-mkdir -p autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
-cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/graphdef_zero_2_float32/1/model.graphdef \
-    autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
-
-mkdir -p autofill_noplatform_success/tensorflow_savedmodel/reshape_config_provided/1
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/savedmodel_zero_2_float32/1/model.savedmodel \
-    autofill_noplatform_success/tensorflow_savedmodel/reshape_config_provided/1
-
 mkdir -p autofill_noplatform_success/tensorrt/reshape_config_provided/1
 cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/plan_zero_4_float32/1/model.plan \
     autofill_noplatform_success/tensorrt/reshape_config_provided/1
