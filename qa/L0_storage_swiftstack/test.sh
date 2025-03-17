@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -104,11 +104,11 @@ aws s3 rm $BUCKET_URL/ --recursive --include "*"
 
 # Now start model tests
 
-for FW in graphdef savedmodel onnx libtorch plan; do
+for FW in onnx libtorch plan; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
 done
 
-for FW in graphdef savedmodel onnx libtorch plan; do
+for FW in onnx libtorch plan; do
     for MC in `ls models/${FW}*/config.pbtxt`; do
         echo "instance_group [ { kind: KIND_GPU }]" >> $MC
     done

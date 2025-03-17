@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,14 +73,12 @@ COMMON_ARGS="--model-repository=`pwd`/models --strict-model-config=false --log-v
 NEGATIVE_PARSE_ARGS=("--backend-config=,default-max-batch-size=3 $COMMON_ARGS" \
                     "--backend-config=default-max-batch-size= $COMMON_ARGS" \
                     "--backend-config=default-max-batch-size $COMMON_ARGS" \
-                    "--backend-config=tensorflow,default-max-batch-size= $COMMON_ARGS" \
-                    "--backend-config=tensorflow,default-max-batch-size $COMMON_ARGS" \
 )
 
 POSITIVE_DEFAULT_ARGS=$COMMON_ARGS
-POSITIVE_TEST_ARGS=("--backend-config=tensorflow,default-max-batch-size=5 $COMMON_ARGS" \
+POSITIVE_TEST_ARGS=("--backend-config=default-max-batch-size=5 $COMMON_ARGS" \
                     "--backend-config=default-max-batch-size=6 $COMMON_ARGS" \
-                    "--backend-config=default-max-batch-size=7 --backend-config=tensorflow,default-max-batch-size=8 $COMMON_ARGS" \
+                    "--backend-config=default-max-batch-size=7 --backend-config=default-max-batch-size=8 $COMMON_ARGS" \
 )
 
 # These integers correspond to the expected default-max-batch-size which gets set
@@ -190,7 +188,7 @@ rm -rf ./models/
 mkdir -p ./models/no_config
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
 
-SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=5 $COMMON_ARGS"
+SERVER_ARGS="--backend-config=default-max-batch-size=5 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_5.log
 run_server
 
@@ -222,7 +220,7 @@ else
 fi
 
 # Tensorflow 1: Batching OFF
-SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=0 $COMMON_ARGS"
+SERVER_ARGS="--backend-config=default-max-batch-size=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_0.log
 run_server
 
