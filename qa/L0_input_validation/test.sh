@@ -124,7 +124,7 @@ dynamic_batching {
 }
 EOL
 
-cp -r $DATADIR/qa_model_repository/graphdef_object_int32_int32 models/.
+cp -r $DATADIR/qa_model_repository/onnx_object_int32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_nobatch_zero_1_float32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_zero_1_float32_int32 models/.
 
@@ -151,7 +151,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # input_byte_size_test
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{savedmodel_zero_1_float32,savedmodel_zero_1_object} ./models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{onnx_zero_1_float32,onnx_zero_1_object} ./models
 
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2>&1
