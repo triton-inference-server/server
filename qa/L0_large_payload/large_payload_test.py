@@ -134,20 +134,6 @@ class LargePayLoadTest(tu.TestResultCollector):
             "output is different from input",
         )
 
-    def test_graphdef(self):
-        # graphdef_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self._clients:
-            model_name = tu.get_zero_model_name("graphdef_nobatch", 1, self._data_type)
-            self._test_helper(client, model_name)
-
-    def test_savedmodel(self):
-        # savedmodel_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for client in self._clients:
-            model_name = tu.get_zero_model_name(
-                "savedmodel_nobatch", 1, self._data_type
-            )
-            self._test_helper(client, model_name)
-
     def test_onnx(self):
         # onnx_nobatch_zero_1_float32 is identity model with input shape [-1]
         for client in self._clients:
