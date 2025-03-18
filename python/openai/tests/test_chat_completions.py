@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -310,7 +310,7 @@ class TestChatCompletions:
     def test_chat_completions_temperature_tensorrtllm(
         self, client, backend: str, model: str, messages: List[dict]
     ):
-        if backend != "tensorrtllm":
+        if backend != "tensorrtllm" and backend != "llmapi":
             pytest.skip(
                 reason="Only used to test TRT-LLM-specific temperature behavior"
             )
@@ -368,6 +368,11 @@ class TestChatCompletions:
         assert response1_text == response2_text
         assert response1_text != response3_text
 
+    # TODO: Remove xfail for LLM API when it's verified.
+    @pytest.mark.xfail(
+        condition=lambda backend: backend == "llmapi",
+        reason="Seed parameter is not supported in LLM API PyTorch workflow yet",
+    )
     # Simple tests to verify random seed roughly behaves as expected
     def test_chat_completions_seed(self, client, model: str, messages: List[dict]):
         responses = []

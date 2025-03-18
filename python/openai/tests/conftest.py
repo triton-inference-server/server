@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@ from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 
-### TEST ENVIRONMENT SETUP ###
 def infer_test_environment():
     # Infer the test environment for simplicity in local dev/testing.
     try:
@@ -47,8 +46,15 @@ def infer_test_environment():
     try:
         import tensorrt_llm as _
 
-        backend = "tensorrtllm"
-        model = "tensorrt_llm_bls"
+        # TODO: Refactor away from environment variables
+        LLMAPI_SETUP = os.environ.get("LLMAPI_SETUP", 0)
+
+        if LLMAPI_SETUP:
+            backend = "llmapi"
+            model = "tensorrt_llm"
+        else:
+            backend = "tensorrtllm"
+            model = "tensorrt_llm_bls"
         return backend, model
     except ImportError:
         print("No tensorrt_llm installation found.")
@@ -84,13 +90,23 @@ if not TEST_MODEL_REPOSITORY:
 # only once for all the tests below.
 @pytest.fixture(scope="module")
 def server():
+    # TODO: tensorrllm and llmapi backends both use "tensorrtllm" as the backend flag for OpenAI server.
+    # In the future if the backend are consolidated, this check can be updated or removed.
+    # key: the TEST_BACKEND value
+    # value: the corresponding backend flag for OpenAI server
+    backend_map = {
+        "tensorrtllm": "tensorrtllm",
+        "llmapi": "tensorrtllm",
+        "vllm": "vllm",
+    }
+
     args = [
         "--model-repository",
         TEST_MODEL_REPOSITORY,
         "--tokenizer",
         TEST_TOKENIZER,
         "--backend",
-        TEST_BACKEND,
+        backend_map[TEST_BACKEND],
     ]
     # TODO: Incorporate kserve frontend binding smoke tests to catch any
     # breakage with default values or slight cli arg variations
