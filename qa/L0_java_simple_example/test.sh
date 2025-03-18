@@ -104,7 +104,7 @@ function run_cpu_tests_int32() {
 }
 
 function run_cpu_tests_fp32() {
-    for trial in graphdef savedmodel; do
+    for trial in onnx; do
         full=${trial}_float32_float32_float32
         set +e
         rm -rf ${MODEL_REPO}
