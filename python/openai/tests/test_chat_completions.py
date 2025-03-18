@@ -371,7 +371,7 @@ class TestChatCompletions:
     # TODO: Remove xfail for LLM API when it's verified.
     @pytest.mark.xfail(
         condition=lambda backend: backend == "llmapi",
-        reason="Seed parameter support to be verified for LLM API",
+        reason="Seed parameter is not supported in LLM API PyTorch workflow yet",
     )
     # Simple tests to verify random seed roughly behaves as expected
     def test_chat_completions_seed(self, client, model: str, messages: List[dict]):
