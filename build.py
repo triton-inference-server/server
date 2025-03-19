@@ -92,6 +92,11 @@ OVERRIDE_BACKEND_CMAKE_FLAGS = {}
 
 THIS_SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
 
+DEFAULT_GIT_ORG = "https://github.com/triton-inference-server/"
+
+COMPONENTS_KEYS = ["common", "core", "backend", "thirdparty"]
+COMPONENTS_GIT_ORG_KEYS = ["agent", "cache", "common", "core", "backend", "thirdparty"]
+
 
 def log(msg, force=False):
     if force or not FLAGS.quiet:
@@ -335,6 +340,7 @@ class BuildScript:
                 f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir};",
                 check_exitcode=True,
             )
+            print(f"Cloned {tag} {org} {repo}")
             self.cmd("}" if target_platform() == "windows" else "fi")
 
 
@@ -444,17 +450,35 @@ def cmake_cache_extra_args():
     return args
 
 
-def core_cmake_args(components, backends, cmake_dir, install_dir):
+def core_cmake_args(components, components_git_orgs, backends, cmake_dir, install_dir):
     cargs = [
         cmake_core_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
         cmake_core_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_core_arg("TRITON_VERSION", "STRING", FLAGS.version),
         cmake_core_arg("TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization),
         cmake_core_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
+        cmake_core_arg(
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
         cmake_core_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
+        cmake_core_arg(
+            "TRITON_CORE_GIT_REPO", "STRING", components_git_orgs["core"] + "core.git"
+        ),
         cmake_core_arg("TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]),
         cmake_core_arg(
+            "TRITON_BACKEND_GIT_REPO",
+            "STRING",
+            components_git_orgs["backend"] + "backend.git",
+        ),
+        cmake_core_arg(
             "TRITON_THIRD_PARTY_REPO_TAG", "STRING", components["thirdparty"]
+        ),
+        cmake_core_arg(
+            "TRITON_THIRD_PARTY_GIT_REPO",
+            "STRING",
+            components_git_orgs["thirdparty"] + "third_party.git",
         ),
     ]
 
@@ -508,7 +532,7 @@ def repoagent_repo(ra):
     return "{}_repository_agent".format(ra)
 
 
-def repoagent_cmake_args(images, components, ra, install_dir):
+def repoagent_cmake_args(images, components, components_git_orgs, ra, install_dir):
     args = []
 
     cargs = args + [
@@ -518,7 +542,15 @@ def repoagent_cmake_args(images, components, ra, install_dir):
             "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
         ),
         cmake_repoagent_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
+        cmake_repoagent_arg(
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
         cmake_repoagent_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
+        cmake_repoagent_arg(
+            "TRITON_CORE_GIT_REPO", "STRING", components_git_orgs["core"] + "core.git"
+        ),
     ]
 
     cargs.append(cmake_repoagent_enable("TRITON_ENABLE_GPU", FLAGS.enable_gpu))
@@ -532,7 +564,7 @@ def cache_repo(cache):
     return "{}_cache".format(cache)
 
 
-def cache_cmake_args(images, components, cache, install_dir):
+def cache_cmake_args(images, components, components_git_orgs, cache, install_dir):
     args = []
 
     cargs = args + [
@@ -542,7 +574,15 @@ def cache_cmake_args(images, components, cache, install_dir):
             "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
         ),
         cmake_cache_arg("TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
+        cmake_cache_arg(
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
         cmake_cache_arg("TRITON_CORE_REPO_TAG", "STRING", components["core"]),
+        cmake_cache_arg(
+            "TRITON_CORE_GIT_REPO", "STRING", components_git_orgs["core"] + "core.git"
+        ),
     ]
 
     cargs.append(cmake_cache_enable("TRITON_ENABLE_GPU", FLAGS.enable_gpu))
@@ -555,7 +595,9 @@ def backend_repo(be):
     return "{}_backend".format(be)
 
 
-def backend_cmake_args(images, components, be, install_dir, library_paths):
+def backend_cmake_args(
+    images, components, components_git_orgs, be, install_dir, library_paths
+):
     cmake_build_type = FLAGS.build_type
 
     if be == "onnxruntime":
@@ -563,7 +605,9 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == "openvino":
         args = openvino_cmake_args()
     elif be == "tensorflow":
-        args = tensorflow_cmake_args(images, library_paths)
+        args = tensorflow_cmake_args(
+            images, library_paths, components, components_git_orgs
+        )
     elif be == "python":
         args = python_cmake_args()
     elif be == "dali":
@@ -592,9 +636,27 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
             be, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
         ),
         cmake_backend_arg(be, "TRITON_COMMON_REPO_TAG", "STRING", components["common"]),
+        cmake_backend_arg(
+            be,
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
         cmake_backend_arg(be, "TRITON_CORE_REPO_TAG", "STRING", components["core"]),
         cmake_backend_arg(
+            be,
+            "TRITON_CORE_GIT_REPO",
+            "STRING",
+            components_git_orgs["core"] + "core.git",
+        ),
+        cmake_backend_arg(
             be, "TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]
+        ),
+        cmake_backend_arg(
+            be,
+            "TRITON_BACKEND_GIT_REPO",
+            "STRING",
+            components_git_orgs["backend"] + "backend.git",
         ),
     ]
 
@@ -795,9 +857,8 @@ def tensorrt_cmake_args():
     return cargs
 
 
-def tensorflow_cmake_args(images, library_paths):
+def tensorflow_cmake_args(images, library_paths, components, components_git_orgs):
     backend_name = "tensorflow"
-    extra_args = []
 
     # If a specific TF image is specified use it, otherwise pull from NGC.
     if backend_name in images:
@@ -806,8 +867,36 @@ def tensorflow_cmake_args(images, library_paths):
         image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
             FLAGS.upstream_container_version
         )
+
     extra_args = [
-        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
+        cmake_backend_arg(
+            "tensorflow", "TRITON_COMMON_REPO_TAG", "STRING", components["common"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_COMMON_GIT_REPO",
+            "STRING",
+            components_git_orgs["common"] + "common.git",
+        ),
+        cmake_backend_arg(
+            "tensorflow", "TRITON_CORE_REPO_TAG", "STRING", components["core"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_CORE_GIT_REPO",
+            "STRING",
+            components_git_orgs["core"] + "core.git",
+        ),
+        cmake_backend_arg(
+            "tensorflow", "TRITON_BACKEND_REPO_TAG", "STRING", components["backend"]
+        ),
+        cmake_backend_arg(
+            "tensorflow",
+            "TRITON_BACKEND_GIT_REPO",
+            "STRING",
+            components_git_orgs["backend"] + "backend.git",
+        ),
+        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image),
     ]
     return extra_args
 
@@ -1947,7 +2036,14 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
 
 def core_build(
-    cmake_script, repo_dir, cmake_dir, build_dir, install_dir, components, backends
+    cmake_script,
+    repo_dir,
+    cmake_dir,
+    build_dir,
+    install_dir,
+    components,
+    components_git_orgs,
+    backends,
 ):
     repo_build_dir = os.path.join(build_dir, "tritonserver", "build")
     repo_install_dir = os.path.join(build_dir, "tritonserver", "install")
@@ -1955,10 +2051,13 @@ def core_build(
     cmake_script.commentln(8)
     cmake_script.comment("Triton core library and tritonserver executable")
     cmake_script.comment()
+
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
     cmake_script.cmake(
-        core_cmake_args(components, backends, cmake_dir, repo_install_dir)
+        core_cmake_args(
+            components, components_git_orgs, backends, cmake_dir, repo_install_dir
+        )
     )
     cmake_script.makeinstall()
 
@@ -2076,9 +2175,10 @@ def backend_build(
     tag,
     build_dir,
     install_dir,
-    github_organization,
     images,
     components,
+    components_git_orgs,
+    github_org,
     library_paths,
 ):
     repo_build_dir = os.path.join(build_dir, be, "build")
@@ -2090,7 +2190,7 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    cmake_script.gitclone(backend_repo(be), tag, be, github_org)
 
     if be == "tensorrtllm":
         tensorrtllm_prebuild(cmake_script)
@@ -2098,7 +2198,14 @@ def backend_build(
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
     cmake_script.cmake(
-        backend_cmake_args(images, components, be, repo_install_dir, library_paths)
+        backend_cmake_args(
+            images,
+            components,
+            components_git_orgs,
+            be,
+            repo_install_dir,
+            library_paths,
+        )
     )
     cmake_script.makeinstall()
 
@@ -2169,7 +2276,13 @@ def backend_clone(
 
 
 def repo_agent_build(
-    ra, cmake_script, build_dir, install_dir, repoagent_repo, repoagents
+    ra,
+    cmake_script,
+    build_dir,
+    install_dir,
+    repoagent_repo,
+    repoagents,
+    components_git_orgs,
 ):
     repo_build_dir = os.path.join(build_dir, ra, "build")
     repo_install_dir = os.path.join(build_dir, ra, "install")
@@ -2181,12 +2294,16 @@ def repo_agent_build(
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     cmake_script.gitclone(
-        repoagent_repo(ra), repoagents[ra], ra, FLAGS.github_organization
+        repoagent_repo(ra), repoagents[ra], ra, components_git_orgs["agent"]
     )
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
-    cmake_script.cmake(repoagent_cmake_args(images, components, ra, repo_install_dir))
+    cmake_script.cmake(
+        repoagent_cmake_args(
+            images, components, components_git_orgs, ra, repo_install_dir
+        )
+    )
     cmake_script.makeinstall()
 
     cmake_script.mkdir(os.path.join(install_dir, "repoagents"))
@@ -2201,7 +2318,15 @@ def repo_agent_build(
     cmake_script.blankln()
 
 
-def cache_build(cache, cmake_script, build_dir, install_dir, cache_repo, caches):
+def cache_build(
+    cache,
+    cmake_script,
+    build_dir,
+    install_dir,
+    cache_repo,
+    caches,
+    components_git_orgs,
+):
     repo_build_dir = os.path.join(build_dir, cache, "build")
     repo_install_dir = os.path.join(build_dir, cache, "install")
 
@@ -2212,12 +2337,16 @@ def cache_build(cache, cmake_script, build_dir, install_dir, cache_repo, caches)
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     cmake_script.gitclone(
-        cache_repo(cache), caches[cache], cache, FLAGS.github_organization
+        cache_repo(cache), caches[cache], cache, components_git_orgs["cache"]
     )
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
-    cmake_script.cmake(cache_cmake_args(images, components, cache, repo_install_dir))
+    cmake_script.cmake(
+        cache_cmake_args(
+            images, components, components_git_orgs, cache, repo_install_dir
+        )
+    )
     cmake_script.makeinstall()
 
     cmake_script.mkdir(os.path.join(install_dir, "caches"))
@@ -2676,6 +2805,14 @@ if __name__ == "__main__":
         help='The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". <repo-tag> indicates the git tag/branch to use for the build. Currently <repo-tag> does not support pull-request reference. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).',
     )
     parser.add_argument(
+        "--git-org",
+        action="append",
+        required=False,
+        help="The org to use for a component as <component-name>:<git-org>. <component-name> can be one of {}".format(
+            COMPONENTS_GIT_ORG_KEYS
+        ),
+    )
+    parser.add_argument(
         "--repoagent",
         action="append",
         required=False,
@@ -2790,6 +2927,8 @@ if __name__ == "__main__":
         FLAGS.image = []
     if FLAGS.repo_tag is None:
         FLAGS.repo_tag = []
+    if FLAGS.git_org is None:
+        FLAGS.git_org = []
     if FLAGS.backend is None:
         FLAGS.backend = []
     if FLAGS.endpoint is None:
@@ -3020,22 +3159,37 @@ if __name__ == "__main__":
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
     # Initialize map of common components and repo-tag for each.
-    components = {
-        "common": default_repo_tag,
-        "core": default_repo_tag,
-        "backend": default_repo_tag,
-        "thirdparty": default_repo_tag,
-    }
+    components = {key: default_repo_tag for key in COMPONENTS_KEYS}
     for be in FLAGS.repo_tag:
         parts = be.split(":")
         fail_if(len(parts) != 2, "--repo-tag must specify <component-name>:<repo-tag>")
         fail_if(
             parts[0] not in components,
-            '--repo-tag <component-name> must be "common", "core", "backend", or "thirdparty"',
+            '--repo-tag <component-name> must be one of "{}"'.format(components.keys()),
         )
         components[parts[0]] = parts[1]
+
+    # Initialize map of common components and git repository for each.
+    components_git_orgs = {key: DEFAULT_GIT_ORG for key in COMPONENTS_GIT_ORG_KEYS}
+    for git_org in FLAGS.git_org:
+        parts = git_org.split("!")
+        fail_if(
+            len(parts) != 2,
+            "--git-org must specify <component-name>!<git-org>, note '!' separator.",
+        )
+        fail_if(
+            parts[0] not in components_git_orgs,
+            '--git-org <component-name> must be one of "{}"'.format(
+                components_git_orgs.keys()
+            ),
+        )
+        components_git_orgs[parts[0]] = parts[1]
     for c in components:
-        log('component "{}" at tag/branch "{}"'.format(c, components[c]))
+        log(
+            'component "{}" at tag/branch "{}" from repository "{}"'.format(
+                c, components[c], components_git_orgs[c]
+            )
+        )
 
     # Set the build, install, and cmake directories to use for the
     # generated build scripts and Dockerfiles. If building without
@@ -3052,8 +3206,11 @@ if __name__ == "__main__":
         script_build_dir = os.path.normpath(
             os.path.join(FLAGS.tmp_dir, "tritonbuild").replace("\\", "/")
         )
+        log(f"script build dir: {script_build_dir}")
         script_install_dir = os.path.normpath(os.path.join(script_build_dir, "install"))
+        log(f"script install dir: {script_install_dir}")
         script_ci_dir = os.path.normpath(os.path.join(script_build_dir, "ci"))
+        log(f"script ci dir: {script_ci_dir}")
         if target_platform() == "windows":
             script_repo_dir = script_cmake_dir = os.path.normpath("c:/workspace")
         else:
@@ -3077,16 +3234,17 @@ if __name__ == "__main__":
             cmake_script.blankln()
 
         # Commands to build the core shared library and the server executable.
-        if not FLAGS.no_core_build:
-            core_build(
-                cmake_script,
-                script_repo_dir,
-                script_cmake_dir,
-                script_build_dir,
-                script_install_dir,
-                components,
-                backends,
-            )
+        # if not FLAGS.no_core_build:
+        core_build(
+            cmake_script,
+            script_repo_dir,
+            script_cmake_dir,
+            script_build_dir,
+            script_install_dir,
+            components,
+            components_git_orgs,
+            backends,
+        )
 
         # Commands to build each backend...
         for be in backends:
@@ -3094,11 +3252,10 @@ if __name__ == "__main__":
             if be in CORE_BACKENDS:
                 continue
 
+            github_org = components_git_orgs["backend"]
             # If armnn_tflite backend, source from external repo for git clone
             if be == "armnn_tflite":
-                github_organization = "https://gitlab.com/arm-research/smarter/"
-            else:
-                github_organization = FLAGS.github_organization
+                github_org = "https://gitlab.com/arm-research/smarter/"
 
             if be == "vllm":
                 backend_clone(
@@ -3107,7 +3264,7 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
+                    github_org,
                 )
             else:
                 backend_build(
@@ -3116,9 +3273,10 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
                     images,
                     components,
+                    components_git_orgs,
+                    github_org,
                     library_paths,
                 )
 
@@ -3131,6 +3289,7 @@ if __name__ == "__main__":
                 script_install_dir,
                 repoagent_repo,
                 repoagents,
+                components_git_orgs,
             )
 
         # Commands to build each cache...
@@ -3142,6 +3301,7 @@ if __name__ == "__main__":
                 script_install_dir,
                 cache_repo,
                 caches,
+                components_git_orgs,
             )
 
         # Commands needed only when building with Docker...
