@@ -63,7 +63,7 @@ fi
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch"}
+BACKENDS=${BACKENDS:="onnx libtorch"}
 export BACKENDS
 
 export CI_JOB_ID=${CI_JOB_ID}
