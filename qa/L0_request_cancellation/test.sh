@@ -98,6 +98,7 @@ for TEST_CASE in "test_grpc_async_infer" \
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
         export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
     elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
+        export TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY=1000
         export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
     elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
@@ -161,6 +162,7 @@ for TEST_CASE in "test_grpc_async_infer" \
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
     elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
+        unset TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
     elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION

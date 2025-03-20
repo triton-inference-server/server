@@ -1122,6 +1122,8 @@ class InferHandlerState {
     delay_response_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_complete_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_COMPLETE");
     delay_process_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS");
+    delay_process_entry_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY");
     delay_notification_process_entry_ms_ =
         ParseDebugVariable("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
     delay_response_complete_exec_ms_ =
@@ -1253,6 +1255,7 @@ class InferHandlerState {
   int delay_response_ms_;
   int delay_complete_ms_;
   int delay_process_ms_;
+  int delay_process_entry_ms_;
   int delay_notification_process_entry_ms_;
   int delay_response_complete_exec_ms_;
   int delay_enqueue_ms_;
@@ -1506,7 +1509,16 @@ InferHandler<
           std::this_thread::sleep_for(std::chrono::milliseconds(
               state->delay_notification_process_entry_ms_));
         }
+      } else {
+        if (state->delay_process_entry_ms_ != 0) {
+          // Will delay the entry to Process by the specified time.
+          LOG_INFO << "Delaying the entry to Process thread by "
+                   << state->delay_process_entry_ms_ << " ms...";
+          std::this_thread::sleep_for(
+              std::chrono::milliseconds(state->delay_process_entry_ms_));
+        }
       }
+
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
       if (!Process(state, ok, is_notification)) {
