@@ -730,7 +730,7 @@ class InferHandlerState {
       ctx_->AsyncNotifyWhenDone(notify_state_.get());
     }
 
-    void SetReceivedNotification(bool value) { received_notification_ = true; }
+    void SetReceivedNotification(bool value) { received_notification_ = value; }
 
     bool ReceivedNotification() { return received_notification_; }
 
@@ -860,7 +860,8 @@ class InferHandlerState {
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
           if (state->step_ != Steps::CANCELLED &&
               state->step_ != Steps::COMPLETE) {
-            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
+            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_
+                           << " step " << state->step_;
             if (state->inference_request_.get() == nullptr) {
               // The context might be holding some states that have
               // not been issued to Triton core. Need to skip calling
@@ -895,8 +896,7 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
-        bool is_notification)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
     {
       // Check to avoid early exit in case of triton_grpc_error
       if (!IsCancelled()) {
@@ -907,12 +907,6 @@ class InferHandlerState {
             << state->context_->unique_id_ << ", " << state->unique_id_
             << " step " << state->step_;
         return true;
-      }
-      if (is_notification) {
-        LOG_VERBOSE(1) << "Cancellation notification received for " << name
-                       << ", rpc_ok=" << rpc_ok << ", context "
-                       << state->context_->unique_id_ << ", "
-                       << state->unique_id_ << " step " << state->step_;
       }
 
       if (state->step_ != Steps::CANCELLATION_ISSUED) {
@@ -933,18 +927,6 @@ class InferHandlerState {
           // be taken up along with all the other states in the
           // next iteration from the completion queue which
           // would release the state.
-          return true;
-        } else if (is_notification && state->step_ == Steps::CANCELLED) {
-          // A corner case where InferResponseComplete is called between the
-          // cancellation reception but before the cancellation notification
-          // thread enters Process function.
-          // Should let the InferResponseComplete callback trigger the state
-          // release.
-          LOG_VERBOSE(1) << "Waiting for the state enqueued by callback to "
-                            "complete cancellation for "
-                         << name << ", rpc_ok=" << rpc_ok << ", context "
-                         << state->context_->unique_id_ << ", "
-                         << state->unique_id_ << " step " << state->step_;
           return true;
         } else {
           // The cancellation request has been handled so the state can be
@@ -1142,6 +1124,8 @@ class InferHandlerState {
     delay_process_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS");
     delay_notification_process_entry_ms_ =
         ParseDebugVariable("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
+    delay_response_complete_exec_ms_ =
+        ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC");
     delay_enqueue_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_ENQUEUE");
     delay_response_completion_ms_ =
         ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
@@ -1270,6 +1254,7 @@ class InferHandlerState {
   int delay_complete_ms_;
   int delay_process_ms_;
   int delay_notification_process_entry_ms_;
+  int delay_response_complete_exec_ms_;
   int delay_enqueue_ms_;
   int delay_response_completion_ms_;
 
@@ -1503,7 +1488,6 @@ InferHandler<
       if (state->step_ == Steps::WAITING_NOTIFICATION) {
         State* state_wrapper = state;
         state = state_wrapper->state_ptr_;
-        state->context_->SetReceivedNotification(true);
         is_notification = true;
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;

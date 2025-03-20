@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -697,6 +697,26 @@ ModelInferHandler::Process(
         std::chrono::milliseconds(state->delay_process_ms_));
   }
 
+  // If notification arrives after InferResponseComplete is invoked, simply
+  // ignore it and release the state as if the request is completed.
+  if (is_notification) {
+    bool rn_prev = state->context_->ReceivedNotification();
+    state->context_->SetReceivedNotification(true);
+    if (state->IsGrpcContextCancelled()) {
+      // this is the cancellation notification
+      LOG_VERBOSE(1) << "Cancellation notification received for " << Name()
+                     << ", rpc_ok=" << rpc_ok << ", context "
+                     << state->context_->unique_id_ << " step "
+                     << state->context_->step_ << ", state "
+                     << state->unique_id_ << " step " << state->step_;
+      if (state->step_ == Steps::COMPLETE || state->step_ == Steps::FINISH) {
+        // If the request is completed, simply ignore the cancellation and
+        // restore the previous notification state.
+        state->context_->SetReceivedNotification(rn_prev);
+      }
+    }
+  }
+
   // Handle notification for cancellation which can be raised
   // asynchronously if detected on the network.
   if (state->IsGrpcContextCancelled()) {
@@ -716,8 +736,7 @@ ModelInferHandler::Process(
       // single thread scenario.
       StartNewRequest();
     }
-    bool resume = state->context_->HandleCancellation(
-        state, rpc_ok, Name(), is_notification);
+    bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
     return resume;
   }
 
@@ -1022,6 +1041,16 @@ ModelInferHandler::InferResponseComplete(
   // and the handler thread handling async cancellation
   // notification.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
+
+  if (state->delay_response_complete_exec_ms_ != 0) {
+    // Will delay the Process execution of state at step ISSUED by the
+    // specified time. This can be used to test the flow when cancellation
+    // request issued for the request before InferResponseComplete.
+    LOG_INFO << "Delaying InferResponseComplete execution by "
+             << state->delay_response_complete_exec_ms_ << " ms...";
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(state->delay_response_complete_exec_ms_));
+  }
 
   // Increment the callback index if received valid 'iresponse'
   if (iresponse != nullptr) {
