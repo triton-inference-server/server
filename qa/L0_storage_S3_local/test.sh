@@ -228,7 +228,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test with Polling, no model configuration file - with strict model config disabled
 echo "=== Running autocomplete tests ==="
-AUTOCOMPLETE_BACKENDS="libtorch"
+AUTOCOMPLETE_BACKENDS="libtorch_nobatch"
 export BACKENDS=${AUTOCOMPLETE_BACKENDS}
 
 set +e
