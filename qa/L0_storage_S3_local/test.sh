@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 # Used to control which backends are run in infer_test.py
-BACKENDS=${BACKENDS:="onnx onnx plan"}
+BACKENDS=${BACKENDS:="onnx libtorch_nobatch plan"}
 
 function run_unit_tests() {
     echo "Running unit tests: ${INFER_TEST}"
@@ -101,8 +101,8 @@ set -e
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
-cp -r models/onnx_float32_float32_float32 models/$DUMMY_MODEL
-sed -i 's/onnx_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
+cp -r models/libtorch_nobatch_float32_float32_float32 models/$DUMMY_MODEL
+sed -i 's/libtorch_nobatch_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -201,20 +201,20 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-cp -r models/onnx_float32_float32_float32/1 models/onnx_float32_float32_float32/4
+cp -r models/libtorch_nobatch_float32_float32_float32/1 models/libtorch_nobatch_float32_float32_float32/4
 awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
 sleep 20
 
 set +e
 CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
-if [[ "$CURL_LOG" != *"{\"name\":\"onnx_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
-    echo -e "\n***\n*** Failed. Server did not unload onnx_float32_float32_float32 version 3\n***"
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_nobatch_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not unload libtorch_nobatch_float32_float32_float32 version 3\n***"
     RET=1
 fi
 
-if [[ "$CURL_LOG" != *"{\"name\":\"onnx_float32_float32_float32\",\"version\":\"4\",\"state\":\"READY\"}"* ]]; then
-    echo -e "\n***\n*** Failed. Server did not load onnx_float32_float32_float32 version 4\n***"
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_nobatch_float32_float32_float32\",\"version\":\"4\",\"state\":\"READY\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not load libtorch_nobatch_float32_float32_float32 version 4\n***"
     RET=1
 fi
 set -e
@@ -228,7 +228,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test with Polling, no model configuration file - with strict model config disabled
 echo "=== Running autocomplete tests ==="
-AUTOCOMPLETE_BACKENDS="onnx"
+AUTOCOMPLETE_BACKENDS="libtorch_nobatch"
 export BACKENDS=${AUTOCOMPLETE_BACKENDS}
 
 set +e
@@ -275,7 +275,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test for multiple model repositories using S3 cloud storage
 echo "=== Running multiple-model-repository tests ==="
-BACKENDS1="onnx"
+BACKENDS1="libtorch_nobatch"
 BACKENDS2="onnx plan"
 export BACKENDS="$BACKENDS1 $BACKENDS2"
 
