@@ -116,14 +116,14 @@ else
     fi
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=1"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 source ../common/util.sh
 
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom python"}
+BACKENDS=${BACKENDS:="onnx plan libtorch custom python"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
@@ -198,10 +198,6 @@ function get_datatype () {
   local dtype="int32 bool"
   if [[ $1 == "plan" ]]; then
     dtype="float32"
-  elif [[ $1 == "savedmodel" ]]; then
-    dtype="float32 bool"
-  elif [[ $1 == "graphdef" ]]; then
-    dtype="object bool int32"
   fi
 
   # Add type string to the onnx model tests only for implicit state.
