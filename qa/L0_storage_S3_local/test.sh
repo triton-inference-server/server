@@ -275,7 +275,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test for multiple model repositories using S3 cloud storage
 echo "=== Running multiple-model-repository tests ==="
-BACKENDS1="libtorch"
+BACKENDS1="libtorch_nobatch"
 BACKENDS2="onnx plan"
 export BACKENDS="$BACKENDS1 $BACKENDS2"
 
