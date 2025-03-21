@@ -251,7 +251,7 @@ set -e
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
     awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --strict-model-config=false"
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll"
 SERVER_LOG="./inference_server_noconfig.log"
 
 run_server
