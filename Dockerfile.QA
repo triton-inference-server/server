@@ -96,8 +96,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_nodejs_client/models/. && \
     mkdir qa/L0_backend_release/simple_seq_models && \
     cp -r /workspace/docs/examples/model_repository/simple_sequence qa/L0_backend_release/simple_seq_models/. && \
-    mkdir qa/L0_shared_memory/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     mkdir qa/L0_client_java/models && \

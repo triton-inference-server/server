@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,6 +40,10 @@ pip3 install psutil
 RET=0
 rm -fr *.log
 
+mkdir -p python_models/simple/1/
+cp ../python_models/execute_delayed_model/model.py ./python_models/simple/1/
+cp ../python_models/execute_delayed_model/config.pbtxt ./python_models/simple/
+
 for i in \
         test_invalid_create_shm \
         test_valid_create_set_register \
@@ -56,7 +60,7 @@ for i in \
         test_register_out_of_bound \
         test_python_client_leak; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
+        SERVER_ARGS="--model-repository=`pwd`/python_models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -94,10 +98,6 @@ for i in \
         set -e
     done
 done
-
-mkdir -p python_models/simple/1/
-cp ../python_models/execute_delayed_model/model.py ./python_models/simple/1/
-cp ../python_models/execute_delayed_model/config.pbtxt ./python_models/simple/
 
 for test_case in \
         test_unregister_shm_during_inference_single_req \
