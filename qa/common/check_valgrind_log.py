@@ -31,19 +31,12 @@ import sys
 
 # Check the valgrind logs for memory leaks, ignoring known memory leaks
 #   * cnmem https://github.com/NVIDIA/cnmem/issues/12
-#   * Tensorflow::NewSession
 #   * dl-open leak could be due to https://bugs.kde.org/show_bug.cgi?id=358980
-#   * dlerror leak in tensorflow::HadoopFileSystem::HadoopFileSystem()
-#     -> tensorflow::LibHDFS::LoadAndBind()::{lambda(char const*, void**)#1}::operator()(char const*, void**)
-#     -> tensorflow::internal::LoadLibrary
-#     -> dlerror
 
 LEAK_WHITE_LIST = [
     "cnmem",
-    "tensorflow::NewSession",
     "dl-init",
     "dl-open",
-    "dlerror",
     "libtorch",
 ]
 

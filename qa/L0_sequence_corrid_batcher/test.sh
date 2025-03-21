@@ -59,8 +59,6 @@ export CUDA_VISIBLE_DEVICES=0
 #   models4 - four instances with batch-size 1
 rm -fr *.log  models{0,1,2,4} && mkdir models4
 for m in \
-        $DATADIR/qa_dyna_sequence_model_repository/graphdef_dyna_sequence_int32 \
-        $DATADIR/qa_dyna_sequence_model_repository/savedmodel_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/plan_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/onnx_dyna_sequence_int32 \
         $DATADIR/qa_dyna_sequence_model_repository/libtorch_dyna_sequence_int32; do

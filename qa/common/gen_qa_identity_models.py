@@ -35,7 +35,6 @@ import numpy as np
 from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_tf_dtype,
     np_to_trt_dtype,
     openvino_save_model,
 )
@@ -43,139 +42,6 @@ from gen_common import (
 FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List, Tuple
-
-
-def create_tf_modelfile(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    tf_dtype = np_to_tf_dtype(dtype)
-
-    # Create the model that copies inputs to corresponding outputs.
-    tf.compat.v1.reset_default_graph()
-    for io_num in range(io_cnt):
-        input_name = "INPUT{}".format(io_num)
-        output_name = "OUTPUT{}".format(io_num)
-        if max_batch == 0:
-            tin = tf.compat.v1.placeholder(
-                tf_dtype, tu.shape_to_tf_shape(shape), input_name
-            )
-        else:
-            tin = tf.compat.v1.placeholder(
-                tf_dtype,
-                [
-                    None,
-                ]
-                + tu.shape_to_tf_shape(shape),
-                input_name,
-            )
-        toutput = tf.identity(tin, name=output_name)
-
-    # Use model name based on io_cnt and non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype
-        )
-    else:
-        model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype
-        )
-
-    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-    os.makedirs(model_version_dir, exist_ok=True)
-
-    if create_savedmodel:
-        with tf.compat.v1.Session() as sess:
-            input_dict = {}
-            output_dict = {}
-            for io_num in range(io_cnt):
-                input_name = "INPUT{}".format(io_num)
-                output_name = "OUTPUT{}".format(io_num)
-                input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                    input_name + ":0"
-                )
-                output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
-                    output_name + ":0"
-                )
-                input_dict[input_name] = input_tensor
-                output_dict[output_name] = output_tensor
-            tf.compat.v1.saved_model.simple_save(
-                sess,
-                model_version_dir + "/model.savedmodel",
-                inputs=input_dict,
-                outputs=output_dict,
-            )
-    else:
-        with tf.compat.v1.Session() as sess:
-            graph_io.write_graph(
-                sess.graph.as_graph_def(),
-                model_version_dir,
-                "model.graphdef",
-                as_text=False,
-            )
-
-
-def create_tf_modelconfig(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    shape_str = tu.shape_to_dims_str(shape)
-
-    # Use a different model name for the non-batching variant
-    if create_savedmodel:
-        model_name = tu.get_zero_model_name(
-            "savedmodel_nobatch" if max_batch == 0 else "savedmodel", io_cnt, dtype
-        )
-    else:
-        model_name = tu.get_zero_model_name(
-            "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype
-        )
-
-    config_dir = os.path.join(models_dir, model_name)
-    config = """
-name: "{}"
-platform: "{}"
-max_batch_size: {}
-""".format(
-        model_name,
-        "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-        max_batch,
-    )
-
-    for io_num in range(io_cnt):
-        config += """
-input [
-  {{
-    name: "INPUT{}"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT{}"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-""".format(
-            io_num,
-            np_to_model_dtype(dtype),
-            shape_str,
-            io_num,
-            np_to_model_dtype(dtype),
-            shape_str,
-        )
-
-    os.makedirs(config_dir, exist_ok=True)
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
 
 def create_ensemble_modelfile(
     create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
@@ -1107,28 +973,6 @@ def create_shape_tensor_models(
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
-    if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_tf_modelfile(False, models_dir, model_version, io_cnt, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(
-                False, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
-            create_tf_modelfile(
-                False, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
-
-    if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_tf_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        if no_batch:
-            create_tf_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
-            create_tf_modelfile(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
-
     if FLAGS.onnx:
         create_onnx_modelconfig(
             True, models_dir, model_version, io_cnt, 8, dtype, shape
@@ -1222,22 +1066,12 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             )
 
 
+# FIXME: The function signatures require a `savedmodel` boolean flag 
+# on all of them even though Tensorflow has been deprecated since 25.03
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--models_dir", type=str, required=True, help="Top-level model directory"
-    )
-    parser.add_argument(
-        "--graphdef",
-        required=False,
-        action="store_true",
-        help="Generate GraphDef models",
-    )
-    parser.add_argument(
-        "--savedmodel",
-        required=False,
-        action="store_true",
-        help="Generate SavedModel models",
     )
     parser.add_argument(
         "--onnx",
@@ -1296,11 +1130,6 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
-    if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
-        from tensorflow.python.framework import graph_io
-
-        tf.compat.v1.disable_eager_execution()
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:

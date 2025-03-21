@@ -41,11 +41,9 @@ np_dtype_string = np.dtype(object)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
-BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx libtorch")
+BACKENDS = os.environ.get("BACKENDS", "onnx libtorch")
 VALIDATION_FNS = {
     "onnx": tu.validate_for_onnx_model,
-    "graphdef": tu.validate_for_tf_model,
-    "savedmodel": tu.validate_for_tf_model,
     "libtorch": tu.validate_for_libtorch_model,
 }
 

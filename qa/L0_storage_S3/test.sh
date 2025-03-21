@@ -45,7 +45,7 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST="../common/infer_test.py"
 EXPECTED_NUM_TESTS="3"
 TEST_RESULT_FILE='test_results.txt'
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
+BACKENDS=${BACKENDS:="onnx libtorch plan"}
 
 # S3 credentials are necessary for this test. Pass via ENV variables
 aws configure set default.region $AWS_DEFAULT_REGION && \

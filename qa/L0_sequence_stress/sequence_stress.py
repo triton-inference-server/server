@@ -88,8 +88,6 @@ def check_sequence_async(
 
     """
     if (
-        ("savedmodel" in trial)
-        or ("graphdef" in trial)
         or ("custom" in trial)
         or ("plan" in trial)
     ):
@@ -176,10 +174,8 @@ def check_sequence_async(
 
 def get_datatype(trial):
     # Get the datatype to use based on what models are available (see test.sh)
-    if ("plan" in trial) or ("savedmodel" in trial):
+    if ("plan" in trial):
         return np.float32
-    if "graphdef" in trial:
-        return np.dtype(object)
     return np.int32
 
 

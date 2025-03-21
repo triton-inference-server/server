@@ -50,68 +50,6 @@ class InferReshapeTest(tu.TestResultCollector):
             output_shapes = input_shapes
 
         # For validation assume any shape can be used...
-        if tu.validate_for_tf_model(
-            dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
-        ):
-            # model that supports batching
-            for bs in (1, 8):
-                full_shapes = [
-                    [
-                        bs,
-                    ]
-                    + input_shape
-                    for input_shape in input_shapes
-                ]
-                full_output_shapes = [
-                    [
-                        bs,
-                    ]
-                    + output_shape
-                    for output_shape in output_shapes
-                ]
-                iu.infer_zero(
-                    self,
-                    "graphdef",
-                    bs,
-                    dtype,
-                    full_shapes,
-                    full_output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-                iu.infer_zero(
-                    self,
-                    "savedmodel",
-                    bs,
-                    dtype,
-                    full_shapes,
-                    full_output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            # model that does not support batching
-            if no_batch:
-                iu.infer_zero(
-                    self,
-                    "graphdef_nobatch",
-                    1,
-                    dtype,
-                    input_shapes,
-                    output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-                iu.infer_zero(
-                    self,
-                    "savedmodel_nobatch",
-                    1,
-                    dtype,
-                    input_shapes,
-                    output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-
         if tu.validate_for_onnx_model(
             dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
         ):

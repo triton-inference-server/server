@@ -114,35 +114,6 @@ def np_to_trt_dtype(np_dtype):
         return trt.bfloat16
     return None
 
-
-def np_to_tf_dtype(np_dtype):
-    import tensorflow as tf
-
-    if np_dtype == bool:
-        return tf.bool
-    elif np_dtype == np.int8:
-        return tf.int8
-    elif np_dtype == np.int16:
-        return tf.int16
-    elif np_dtype == np.int32:
-        return tf.int32
-    elif np_dtype == np.int64:
-        return tf.int64
-    elif np_dtype == np.uint8:
-        return tf.uint8
-    elif np_dtype == np.uint16:
-        return tf.uint16
-    elif np_dtype == np.float16:
-        return tf.float16
-    elif np_dtype == np.float32:
-        return tf.float32
-    elif np_dtype == np.float64:
-        return tf.float64
-    elif np_dtype == np_dtype_string:
-        return tf.string
-    return None
-
-
 def np_to_torch_dtype(np_dtype):
     import torch
 

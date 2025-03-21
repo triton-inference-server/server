@@ -154,7 +154,7 @@ class InputShapeTest(unittest.TestCase):
 
     def test_input_string_shape_validation(self):
         input_size = 16
-        model_name = "graphdef_object_int32_int32"
+        model_name = "onnx_object_int32_int32"
         np_dtype_string = np.dtype(object)
         triton_client = tritongrpcclient.InferenceServerClient("localhost:8001")
 
