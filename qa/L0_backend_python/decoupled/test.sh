@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,6 +52,10 @@ mkdir -p models/execute_cancel/1/
 cp ../../python_models/execute_cancel/model.py ./models/execute_cancel/1/
 cp ../../python_models/execute_cancel/config.pbtxt ./models/execute_cancel/
 echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/config.pbtxt
+
+mkdir -p models/response_sender_until_cancelled/1/
+cp ../../python_models/response_sender_until_cancelled/model.py ./models/response_sender_until_cancelled/1/
+cp ../../python_models/response_sender_until_cancelled/config.pbtxt ./models/response_sender_until_cancelled/
 
 rm -fr python_backend
 git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
