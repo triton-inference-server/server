@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
-MODELS="graphdef_nobatch_zero_1_object savedmodel_nobatch_zero_1_object"
+MODELS="onnx_nobatch_zero_1_object libtorch_nobatch_zero_1_object"
 NULLCHAR_CLIENT_PY=nullchar_string_client.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
