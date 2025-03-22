@@ -38,3 +38,8 @@ mv /tmp/inception_v3_2016_08_28_frozen.pb model_repository/inception_graphdef/1/
 mkdir -p model_repository/densenet_onnx/1
 wget -O model_repository/densenet_onnx/1/model.onnx \
      https://github.com/onnx/models/raw/main/validated/vision/classification/densenet-121/model/densenet-7.onnx
+
+# ONNX Inception-V3
+mkdir -p model_repository/inception_v3_onnx/1
+wget -O model_repository/inception_v3_onnx/1/model.onnx \
+     https://huggingface.co/qualcomm/Inception-v3/resolve/cefe3fc32e8dab58ae04cdce911bb5f2ba69799e/Inception-v3.onnx
