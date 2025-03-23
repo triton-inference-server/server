@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 # Used to control which backends are run in infer_test.py
-BACKENDS=${BACKENDS:="onnx libtorch_nobatch plan"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 function run_unit_tests() {
     echo "Running unit tests: ${INFER_TEST}"
@@ -101,8 +101,8 @@ set -e
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
-cp -r models/onnx_float32_float32_float32 models/$DUMMY_MODEL
-sed -i 's/onnx_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
+cp -r models/libtorch_float32_float32_float32 models/$DUMMY_MODEL
+sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -153,7 +153,7 @@ RET=0
 # Test with hostname and IP address
 echo "=== Running hostname/IP tests ==="
 for HOST in "127.0.0.1" "localhost"; do
-    SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit --log-verbose=2"
+    SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit"
     if [ "$HOST" = "127.0.0.1" ]; then
         SERVER_LOG="./inference_server_hostname.log"
     else
@@ -201,20 +201,20 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-cp -r models/onnx_float32_float32_float32/1 models/onnx_float32_float32_float32/4
+cp -r models/libtorch_float32_float32_float32/1 models/libtorch_float32_float32_float32/4
 awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
 sleep 20
 
 set +e
 CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
-if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_nobatch_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
-    echo -e "\n***\n*** Failed. Server did not unload libtorch_nobatch_float32_float32_float32 version 3\n***"
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not unload libtorch_float32_float32_float32 version 3\n***"
     RET=1
 fi
 
-if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_nobatch_float32_float32_float32\",\"version\":\"4\",\"state\":\"READY\"}"* ]]; then
-    echo -e "\n***\n*** Failed. Server did not load libtorch_nobatch_float32_float32_float32 version 4\n***"
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"4\",\"state\":\"READY\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not load libtorch_float32_float32_float32 version 4\n***"
     RET=1
 fi
 set -e
@@ -228,7 +228,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test with Polling, no model configuration file - with strict model config disabled
 echo "=== Running autocomplete tests ==="
-AUTOCOMPLETE_BACKENDS="onnx"
+AUTOCOMPLETE_BACKENDS="savedmodel"
 export BACKENDS=${AUTOCOMPLETE_BACKENDS}
 
 set +e
@@ -251,7 +251,7 @@ set -e
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
     awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --log-verbose=2"
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --strict-model-config=false"
 SERVER_LOG="./inference_server_noconfig.log"
 
 run_server
@@ -275,8 +275,8 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test for multiple model repositories using S3 cloud storage
 echo "=== Running multiple-model-repository tests ==="
-BACKENDS1="libtorch_nobatch"
-BACKENDS2="onnx plan"
+BACKENDS1="graphdef libtorch"
+BACKENDS2="onnx plan savedmodel"
 export BACKENDS="$BACKENDS1 $BACKENDS2"
 
 set +e
@@ -295,10 +295,10 @@ for BUCKET_SUFFIX in 1 2; do
     awslocal $ENDPOINT_FLAG s3 mb s3://$BUCKET_NAME$BUCKET_SUFFIX && \
         awslocal $ENDPOINT_FLAG s3 sync models$BUCKET_SUFFIX s3://$BUCKET_NAME$BUCKET_SUFFIX
 
-    MODEL_REPO_ARGS="$MODEL_REPO_ARGS --model-repository=s3://localhost:4572/$BUCKET_NAME$BUCKET_SUFFIX --log-verbose=2"
+    MODEL_REPO_ARGS="$MODEL_REPO_ARGS --model-repository=s3://localhost:4572/$BUCKET_NAME$BUCKET_SUFFIX"
 done
 
-SERVER_ARGS="$MODEL_REPO_ARGS --model-control-mode=explicit --log-verbose=2"
+SERVER_ARGS="$MODEL_REPO_ARGS --model-control-mode=explicit"
 SERVER_LOG="./inference_server.multi.log"
 
 run_server
@@ -323,7 +323,7 @@ wait $SERVER_PID
 # Test access decline
 AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY="[Invalid]"
-SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120 --log-verbose=2"
+SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.access_decline.log"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
@@ -360,7 +360,7 @@ TEST_LOG="./http2_advertise_test.log"
 python3 mock_s3_service.py > $TEST_LOG 2>&1 &
 sleep 2  # make sure the mock service has started
 SERVER_LOG="./http2_advertise_test.server.log"
-SERVER_ARGS="--model-repository=s3://localhost:8080/dummy-bucket --exit-timeout-secs=120 --log-verbose=2"
+SERVER_ARGS="--model-repository=s3://localhost:8080/dummy-bucket --exit-timeout-secs=120"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Unexpected server start $SERVER\n***"
