@@ -139,13 +139,12 @@ RUN mkdir -p qa/common && \
     cp bin/triton_json_test qa/L0_json/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
-    cp bin/input_byte_size_test qa/L0_input_validation/. && \
-    cp -r docs/examples/model_repository/simple_identity qa/L0_input_validation/models
+    cp bin/input_byte_size_test qa/L0_input_validation/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
     cp -rf python/test/. qa/L0_python_api/.
- 
+
 RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp docs/examples/model_repository/simple/1/model.onnx \
         qa/L0_simple_ensemble/models/simple/1/. && \
