@@ -137,6 +137,10 @@ for trial in onnx ; do
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
 
+# custom float32 component of ensemble
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
+
 # prepare libtorch multi-device and multi-gpu models
 cp -r ../L0_libtorch_instance_group_kind_model/models/libtorch_multi_device $MODELSDIR/.
 mkdir -p $MODELSDIR/libtorch_multi_device/1
