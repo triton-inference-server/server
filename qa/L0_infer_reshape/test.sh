@@ -67,7 +67,6 @@ for i in \
         zero_1_int32 \
         zero_2_int32 \
         zero_3_int32 ; do
-    cp -r models/graphdef_${i} models/custom_${i}
     rm -fr models/custom_${i}/1/*
     (cd models/custom_${i} && \
                 sed -i "s/^platform:.*/backend: \"identity\"/" config.pbtxt && \
