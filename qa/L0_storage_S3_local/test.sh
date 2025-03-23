@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 # Used to control which backends are run in infer_test.py
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
+BACKENDS=${BACKENDS:="onnx libtorch plan"}
 
 function run_unit_tests() {
     echo "Running unit tests: ${INFER_TEST}"
@@ -228,7 +228,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test with Polling, no model configuration file - with strict model config disabled
 echo "=== Running autocomplete tests ==="
-AUTOCOMPLETE_BACKENDS="savedmodel"
+AUTOCOMPLETE_BACKENDS="onnx"
 export BACKENDS=${AUTOCOMPLETE_BACKENDS}
 
 set +e
@@ -275,8 +275,8 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test for multiple model repositories using S3 cloud storage
 echo "=== Running multiple-model-repository tests ==="
-BACKENDS1="graphdef libtorch"
-BACKENDS2="onnx plan savedmodel"
+BACKENDS1="libtorch"
+BACKENDS2="onnx plan"
 export BACKENDS="$BACKENDS1 $BACKENDS2"
 
 set +e
