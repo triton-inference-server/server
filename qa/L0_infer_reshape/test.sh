@@ -54,25 +54,6 @@ rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/* models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_reshape_model_repository/* \
        models/.
-for i in \
-        nobatch_zero_3_float32 \
-        nobatch_zero_4_float32 \
-        zero_1_float32 \
-        zero_2_float32 \
-        zero_3_float32 \
-        zero_4_float32 \
-        nobatch_zero_1_int32 \
-        nobatch_zero_2_int32 \
-        nobatch_zero_3_int32 \
-        zero_1_int32 \
-        zero_2_int32 \
-        zero_3_int32 ; do
-    rm -fr models/custom_${i}/1/*
-    (cd models/custom_${i} && \
-                sed -i "s/^platform:.*/backend: \"identity\"/" config.pbtxt && \
-                sed -i "s/^name:.*/name: \"custom_${i}\"/" config.pbtxt && \
-                echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
-done
 
 create_nop_version_dir `pwd`/models
 
