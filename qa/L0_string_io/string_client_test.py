@@ -200,7 +200,7 @@ class ClientStringTest(tu.TestResultCollector):
                     self._test_unicode_bytes_dtype(client, model_name, dtype)
 
     def test_tf_unicode_bytes(self):
-        self._test_bytes("graphdef_nobatch_zero_1_object")
+        self._test_bytes("onnx_nobatch_zero_1_object")
         self._test_bytes("string_identity")
 
 
