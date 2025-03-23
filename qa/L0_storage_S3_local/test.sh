@@ -101,8 +101,8 @@ set -e
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
-cp -r models/libtorch_nobatch_float32_float32_float32 models/$DUMMY_MODEL
-sed -i 's/libtorch_nobatch_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
+cp -r models/onnx_float32_float32_float32 models/$DUMMY_MODEL
+sed -i 's/onnx_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -201,7 +201,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-cp -r models/libtorch_nobatch_float32_float32_float32/1 models/libtorch_nobatch_float32_float32_float32/4
+cp -r models/onnx_float32_float32_float32/1 models/onnx_float32_float32_float32/4
 awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
 sleep 20
@@ -228,7 +228,7 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Test with Polling, no model configuration file - with strict model config disabled
 echo "=== Running autocomplete tests ==="
-AUTOCOMPLETE_BACKENDS="libtorch_nobatch"
+AUTOCOMPLETE_BACKENDS="onnx"
 export BACKENDS=${AUTOCOMPLETE_BACKENDS}
 
 set +e
