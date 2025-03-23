@@ -1,5 +1,5 @@
-name: "inception_graphdef"
-platform: "tensorflow_graphdef"
+name: "inception_onnx"
+platform: "onnxruntime_onnx"
 max_batch_size: 128
 input [
   {
