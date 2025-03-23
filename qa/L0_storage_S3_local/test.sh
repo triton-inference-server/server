@@ -153,7 +153,7 @@ RET=0
 # Test with hostname and IP address
 echo "=== Running hostname/IP tests ==="
 for HOST in "127.0.0.1" "localhost"; do
-    SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit"
+    SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit --log-verbose=2"
     if [ "$HOST" = "127.0.0.1" ]; then
         SERVER_LOG="./inference_server_hostname.log"
     else
@@ -251,7 +251,7 @@ set -e
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
     awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll"
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --log-verbose=2"
 SERVER_LOG="./inference_server_noconfig.log"
 
 run_server
@@ -295,10 +295,10 @@ for BUCKET_SUFFIX in 1 2; do
     awslocal $ENDPOINT_FLAG s3 mb s3://$BUCKET_NAME$BUCKET_SUFFIX && \
         awslocal $ENDPOINT_FLAG s3 sync models$BUCKET_SUFFIX s3://$BUCKET_NAME$BUCKET_SUFFIX
 
-    MODEL_REPO_ARGS="$MODEL_REPO_ARGS --model-repository=s3://localhost:4572/$BUCKET_NAME$BUCKET_SUFFIX"
+    MODEL_REPO_ARGS="$MODEL_REPO_ARGS --model-repository=s3://localhost:4572/$BUCKET_NAME$BUCKET_SUFFIX --log-verbose=2"
 done
 
-SERVER_ARGS="$MODEL_REPO_ARGS --model-control-mode=explicit"
+SERVER_ARGS="$MODEL_REPO_ARGS --model-control-mode=explicit --log-verbose=2"
 SERVER_LOG="./inference_server.multi.log"
 
 run_server
@@ -323,7 +323,7 @@ wait $SERVER_PID
 # Test access decline
 AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY="[Invalid]"
-SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120 --log-verbose=2"
 SERVER_LOG="./inference_server.access_decline.log"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
@@ -360,7 +360,7 @@ TEST_LOG="./http2_advertise_test.log"
 python3 mock_s3_service.py > $TEST_LOG 2>&1 &
 sleep 2  # make sure the mock service has started
 SERVER_LOG="./http2_advertise_test.server.log"
-SERVER_ARGS="--model-repository=s3://localhost:8080/dummy-bucket --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=s3://localhost:8080/dummy-bucket --exit-timeout-secs=120 --log-verbose=2"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Unexpected server start $SERVER\n***"
