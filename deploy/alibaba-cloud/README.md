@@ -39,7 +39,7 @@ This repository contains information about how to deploy NVIDIA Triton Inference
 - EAS provides a simple way for deep learning developers to deploy their models in Alibaba Cloud.
 - Using **Triton Processor** is the recommended way on EAS to deploy Triton Inference Server. Users can simply deploy a Triton Server by preparing models and creating a EAS service by setting processor type to `triton`.
 - Models should be uploaded to Alibaba Cloud's OSS(Object Storage Service). User's model repository in OSS will be mounted onto local path visible to Triton Server.
-- This documentation uses Triton's own example models for demo. The ONNX inception v3 model can be downloaded by the `fetch_models.sh` script.
+- This documentation uses Triton's own example models for demo. The ONNX inception v3 model can be obtained by the `fetch_models.sh` script.
 
 # Prerequisites
 - You should register an Alibaba Cloud Account, and being able to use EAS by [eascmd](https://help.aliyun.com/document_detail/111031.html?spm=a2c4g.11186623.6.752.42356f46FN5fU1), which is a command line tool to create stop or scale services on EAS.
