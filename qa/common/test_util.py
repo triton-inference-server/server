@@ -54,10 +54,6 @@ def shape_is_fixed(shape):
     return shape_element_count(shape) != -1
 
 
-def shape_to_tf_shape(shape):
-    return [None if i == -1 else i for i in shape]
-
-
 def shape_to_onnx_shape(shape, idx=0, increment_index=True):
     # Onnx use string for variable size dimension, and the same string
     # will be inferred to have same value for the model run.
@@ -76,32 +72,6 @@ def shape_to_onnx_shape(shape, idx=0, increment_index=True):
 
 def shape_to_dims_str(shape):
     return ",".join(str(i) for i in shape)
-
-
-def validate_for_tf_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
-):
-    """Return True if input and output dtypes are supported by a TF model."""
-
-    # Not extending test to uint8 yet
-    if (
-        input_dtype == np.uint8
-        or output0_dtype == np.uint8
-        or output1_dtype == np.uint8
-    ):
-        return False
-
-    # If the input type is string the output type must be string or
-    # int32. This is because the QA models we generate convert strings
-    # internally to int32 for compute.
-    if (input_dtype == np.object_) and (
-        ((output0_dtype != np.object_) and (output0_dtype != np.int32))
-        or ((output1_dtype != np.object_) and (output1_dtype != np.int32))
-    ):
-        return False
-
-    return True
-
 
 def validate_for_trt_model(
     input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape

@@ -36,7 +36,6 @@ from gen_common import (
     np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_tf_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
