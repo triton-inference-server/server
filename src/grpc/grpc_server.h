@@ -161,9 +161,13 @@ class Server {
   int bound_port_{0};
   bool running_{false};
 
+  // Thread to handle the execution of the gRPC endpoint's graceful shutdown
   std::thread graceful_shutdown_thread;
+  // Mutex to protect access to the following connection variables
   std::shared_mutex conn_mtx_;
+  // Counter to track the number of active connections and inference handlers
   std::atomic<uint32_t> conn_cnt_{0};
+  // Flag to indicate if the server is currently accepting new connections
   bool accepting_new_conn_{true};
 };
 

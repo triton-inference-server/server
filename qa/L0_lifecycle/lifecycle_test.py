@@ -2729,7 +2729,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # 1: New sequence with new sequence ID
         try:
             triton_client.infer(
-                model_name, inputs, sequence_id=request_count + 1, sequence_start=True
+                model_name, inputs, sequence_id=request_count, sequence_start=True
             )
             self.assertTrue(False, "expected error for new inference during shutdown")
         except InferenceServerException as ex:
