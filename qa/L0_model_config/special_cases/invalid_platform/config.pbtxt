@@ -1,6 +1,6 @@
 name: "invalid_platform"
-platform: "tensorflo"
-default_model_filename: "model.savedmodel"
+platform: "onnxruntim"
+default_model_filename: "model.onnx"
 max_batch_size: 8
 input [
   {
