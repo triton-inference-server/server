@@ -61,7 +61,7 @@ if USE_GRPC and USE_HTTP:
     USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx libtorch plan python")
+BACKENDS = os.environ.get("BACKENDS", "onnx libtorch plan python")
 
 _trials = BACKENDS.split(" ")
 
@@ -153,9 +153,7 @@ class BatcherTest(tu.TestResultCollector):
             start_ms = int(round(time.time() * 1000))
 
             if (
-                trial == "savedmodel"
-                or trial == "graphdef"
-                or trial == "libtorch"
+                trial == "libtorch"
                 or trial == "onnx"
                 or trial == "plan"
                 or trial == "python"
