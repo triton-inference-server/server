@@ -61,7 +61,7 @@ RET=0
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
 
-for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
+for trial in onnx libtorch plan python python_dlpack; do
     full=${trial}_float32_float32_float32
     if [ "$trial" == "python" ]; then
         mkdir -p $MODELSDIR/${full}/1 && \
@@ -127,7 +127,7 @@ for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
 done
 
 # Prepare string models with basic config
-for trial in graphdef savedmodel onnx ; do
+for trial in onnx ; do
     full=${trial}_object_object_object
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
@@ -136,11 +136,6 @@ for trial in graphdef savedmodel onnx ; do
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
-
-# set up "addsub" ensemble for custom float32 model
-cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && \
-    (cd $MODELSDIR/fan_${full} && \
-            sed -i "s/graphdef_float32_float32_float32/${full}/" config.pbtxt)
 
 # custom float32 component of ensemble
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
@@ -163,7 +158,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-TRIALS="graphdef savedmodel onnx libtorch plan python python_dlpack libtorch_multi_gpu libtorch_multi_device"
+TRIALS="onnx libtorch plan python python_dlpack libtorch_multi_gpu libtorch_multi_device"
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
         for trial in ${TRIALS}; do
@@ -230,7 +225,7 @@ for input_device in -1 0 1; do
             done
         done
 
-        for trial in graphdef savedmodel onnx; do
+        for trial in onnx; do
             model_devices="-1 0 1"
             for model_device in $model_devices; do
                 full=${trial}_object_object_object
