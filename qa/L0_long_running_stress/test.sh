@@ -75,10 +75,8 @@ rm -fr *.log *.txt  models validation_data csv_dir && mkdir models validation_da
 # Get the datatype to use based on the backend
 function get_datatype () {
   local dtype='int32'
-  if [[ $1 == "plan" ]] || [[ $1 == "savedmodel" ]]; then
+  if [[ $1 == "plan" ]]; then
       dtype='float32'
-  elif [[ $1 == "graphdef" ]]; then
-      dtype='object'
   fi
   echo $dtype
 }
@@ -132,9 +130,9 @@ cp -r ../custom_models/custom_zero_1_float32 $MODEL_DIR/custom_zero_1_float32 &&
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"10000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
-cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \
-  (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
-    sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
+cp -r $DATADIR/onnx_model_store/resnet_v1_50 $MODEL_DIR/resnet_v1_50_def && \
+  (cd $MODEL_DIR/resnet_v1_50_def && \
+    sed -i 's/^name: "resnet_v1_50"/name: "resnet_v1_50_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
 
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
