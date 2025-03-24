@@ -50,10 +50,11 @@
 
 .. toctree::
    :hidden:
-   :caption: AI Agents
+   :caption: Features
 
    Constrained Decoding <../tutorials/AI_Agents_Guide/Constrained_Decoding/README.md>
    Function Calling <../tutorials/AI_Agents_Guide/Function_Calling/README.md>
+   Speculative Decoding <../tutorials/Feature_Guide/Speculative_Decoding/README.md>
 
 .. toctree::
    :hidden:
