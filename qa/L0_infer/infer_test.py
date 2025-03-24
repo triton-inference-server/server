@@ -669,7 +669,7 @@ class InferTest(tu.TestResultCollector):
         input_size = 16
         tensor_shape = (1, input_size)
 
-        # There are 3 versions of graphdef_int8_int8_int8 but
+        # There are 3 versions of onnx_int8_int8_int8 but
         # only version 3 should be available
         for platform in ("onnx"):
             if platform not in BACKENDS:
@@ -732,7 +732,7 @@ class InferTest(tu.TestResultCollector):
         input_size = 16
         tensor_shape = (1, input_size)
 
-        # There are 3 versions of graphdef_int16_int16_int16 but only
+        # There are 3 versions of onnx_int16_int16_int16 but only
         # versions 2 and 3 should be available
         for platform in ("onnx"):
             if platform not in BACKENDS:
@@ -968,7 +968,7 @@ class InferTest(tu.TestResultCollector):
             )
 
     if ENSEMBLES:
-        if all(x in BACKENDS for x in ["graphdef", "savedmodel"]):
+        if all(x in BACKENDS for x in ["onnx", "plan"]):
 
             def test_ensemble_mix_platform(self):
                 # Skip on CPU only machine as TensorRT model is used in this ensemble
@@ -989,7 +989,7 @@ class InferTest(tu.TestResultCollector):
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                     )
 
-        if "graphdef" in BACKENDS:
+        if "onnx" in BACKENDS:
 
             def test_ensemble_mix_type(self):
                 for bs in (1, 8):
@@ -1007,7 +1007,7 @@ class InferTest(tu.TestResultCollector):
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                     )
 
-        if all(x in BACKENDS for x in ["graphdef", "savedmodel"]):
+        if all(x in BACKENDS for x in ["onnx", "plan"]):
 
             def test_ensemble_mix_ensemble(self):
                 for bs in (1, 8):
@@ -1028,7 +1028,7 @@ class InferTest(tu.TestResultCollector):
         if all(
             x in BACKENDS
             for x in [
-                "graphdef",
+                "onnx",
             ]
         ):
 
@@ -1082,7 +1082,7 @@ class InferTest(tu.TestResultCollector):
         if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
             def test_ensemble_label_lookup(self):
-                if all(x in BACKENDS for x in ["graphdef", "savedmodel"]):
+                if all(x in BACKENDS for x in ["onnx", "plan"]):
                     # Ensemble needs to look up label from the actual model
                     for bs in (1, 8):
                         iu.infer_exact(
@@ -1101,7 +1101,7 @@ class InferTest(tu.TestResultCollector):
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
 
-                if all(x in BACKENDS for x in ["graphdef", "savedmodel"]):
+                if all(x in BACKENDS for x in ["onnx", "plan"]):
                     # Label from the actual model will be passed along the nested ensemble
                     for bs in (1, 8):
                         iu.infer_exact(
@@ -1120,7 +1120,7 @@ class InferTest(tu.TestResultCollector):
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
 
-                if "graphdef" in BACKENDS:
+                if "onnx" in BACKENDS:
                     # If label file is provided, it will use the provided label file directly
                     try:
                         iu.infer_exact(
@@ -1143,7 +1143,7 @@ class InferTest(tu.TestResultCollector):
                         # with unexpected labels
                         pass
 
-                if "graphdef" in BACKENDS:
+                if "onnx" in BACKENDS:
                     for bs in (1, 8):
                         iu.infer_exact(
                             self,
