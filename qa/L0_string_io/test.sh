@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,8 +52,8 @@ source ../common/util.sh
 
 rm -f $CLIENT_LOG $SERVER_LOG
 rm -fr models && mkdir models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/graphdef_nobatch_zero_1_object models/.
-cp -r ../python_models/string_identity models/.
+cp -rv /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_object/ models/.
+cp -rv ../python_models/string_identity models/.
 mkdir models/string_identity/1/
 mv models/string_identity/model.py models/string_identity/1/model.py
 
