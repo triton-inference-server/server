@@ -67,7 +67,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     rm -f $LEAKCHECK_LOG_BASE*
     # Remove 'python', 'python_dlpack' and 'onnx' from BACKENDS and test them
     # separately below.
-    BACKENDS="graphdef savedmodel libtorch plan openvino"
+    BACKENDS="libtorch plan openvino"
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
@@ -109,7 +109,7 @@ else
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -129,7 +129,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack openvino"}
+BACKENDS=${BACKENDS:="onnx libtorch plan python python_dlpack openvino"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -234,12 +234,12 @@ function generate_model_repository() {
 
       create_nop_version_dir `pwd`/models
 
-      if [[ $BACKENDS == *"graphdef"* ]]; then
+      if [[ $BACKENDS == *"onnx"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
         ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
 
-        if [[ $BACKENDS == *"savedmodel"* ]] ; then
+        if [[ $BACKENDS == *"plan"* ]] ; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
         fi
 

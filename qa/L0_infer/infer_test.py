@@ -48,7 +48,7 @@ USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
-    "BACKENDS", "graphdef savedmodel onnx libtorch plan python python_dlpack openvino"
+    "BACKENDS", "onnx libtorch plan python python_dlpack openvino"
 )
 ENSEMBLES = bool(int(os.environ.get("ENSEMBLES", 1)))
 NOBATCH = bool(int(os.environ.get("NOBATCH", 1)))
@@ -163,7 +163,7 @@ class InferTest(tu.TestResultCollector):
                 ):
                     ensemble_prefix.append(prefix)
 
-        if tu.validate_for_tf_model(
+        if tu.validate_for_onnx_model(
             input_dtype,
             output0_dtype,
             output1_dtype,
@@ -172,21 +172,20 @@ class InferTest(tu.TestResultCollector):
             (input_size,),
         ):
             for prefix in ensemble_prefix:
-                for pf in ["graphdef", "savedmodel"]:
-                    if pf in BACKENDS:
-                        _infer_exact_helper(
-                            self,
-                            prefix + pf,
-                            (input_size,),
-                            8,
-                            input_dtype,
-                            output0_dtype,
-                            output1_dtype,
-                            output0_raw=output0_raw,
-                            output1_raw=output1_raw,
-                            swap=swap,
-                            network_timeout=network_timeout,
-                        )
+                if "onnx" in BACKENDS:
+                    _infer_exact_helper(
+                        self,
+                        prefix + "onnx",
+                        (input_size,),
+                        8,
+                        input_dtype,
+                        output0_dtype,
+                        output1_dtype,
+                        output0_raw=output0_raw,
+                        output1_raw=output1_raw,
+                        swap=swap,
+                        network_timeout=network_timeout,
+                    )
 
         if not CPU_ONLY and tu.validate_for_trt_model(
             input_dtype,
