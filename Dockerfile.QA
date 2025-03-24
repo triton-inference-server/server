@@ -62,6 +62,7 @@ RUN apt-get update && \
             python3-wheel \
             python3-setuptools \
             rapidjson-dev \
+            python3.12-venv \
             software-properties-common && \
     rm -rf /var/lib/apt/lists/*
 
