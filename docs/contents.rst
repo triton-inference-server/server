@@ -50,7 +50,7 @@
 
 .. toctree::
    :hidden:
-   :caption: Features
+   :caption: LLM Features
 
    Constrained Decoding <../tutorials/AI_Agents_Guide/Constrained_Decoding/README.md>
    Function Calling <../tutorials/AI_Agents_Guide/Function_Calling/README.md>
