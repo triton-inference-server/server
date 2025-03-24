@@ -671,7 +671,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of graphdef_int8_int8_int8 but
         # only version 3 should be available
-        for platform in ("graphdef", "savedmodel"):
+        for platform in ("onnx"):
             if platform not in BACKENDS:
                 continue
             try:
@@ -734,7 +734,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of graphdef_int16_int16_int16 but only
         # versions 2 and 3 should be available
-        for platform in ("graphdef", "savedmodel"):
+        for platform in ("onnx"):
             if platform not in BACKENDS:
                 continue
             try:
@@ -793,7 +793,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
-        for platform in ("graphdef", "savedmodel"):
+        for platform in ("onnx"):
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
@@ -848,7 +848,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float16_float16_float16 but only
         # version 1 should be available.
-        for platform in ("graphdef", "savedmodel"):
+        for platform in ("onnx"):
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
@@ -910,7 +910,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
-        for platform in ("graphdef", "savedmodel", "plan"):
+        for platform in ("onnx", "plan"):
             if platform == "plan" and CPU_ONLY:
                 continue
             if platform not in BACKENDS:
