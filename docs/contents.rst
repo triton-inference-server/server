@@ -50,10 +50,11 @@
 
 .. toctree::
    :hidden:
-   :caption: AI Agents
+   :caption: LLM Features
 
-   Constrained Decoding <../tutorials/AI_Agents_Guide/Constrained_Decoding/README.md>
-   Function Calling <../tutorials/AI_Agents_Guide/Function_Calling/README.md>
+   Constrained Decoding <../tutorials/Feature_Guide/Constrained_Decoding/README.md>
+   Function Calling <../tutorials/Feature_Guide/Function_Calling/README.md>
+   llm_features/speculative_decoding_by_backend_type
 
 .. toctree::
    :hidden:
