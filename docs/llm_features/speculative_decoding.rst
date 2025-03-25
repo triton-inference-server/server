@@ -28,11 +28,8 @@
 .. raw:: html
 
 
-Speculative Decoding
-====================
-
 About Speculative Decoding
--------------------------
+=========================
 Speculative Decoding (also referred to as Speculative Sampling) is a set of techniques designed
 to allow generation of more than one token per forward pass iteration. This can lead to a reduction
 in the average per-token latency in situations where the GPU is underutilized due to small batch sizes.
@@ -50,7 +47,7 @@ approach. If the second holds, output token generation advances by statistically
 forward pass. The combination of both these allows speculative decoding to result in reduced latency.
 
 Performance Improvements
-------------------------
+========================
 It's important to note that the effectiveness of speculative decoding techniques is highly dependent
 on the specific task at hand. For instance, forecasting subsequent tokens in a code-completion scenario
 may prove simpler than generating a summary for an article. `Spec-Bench <https://sites.google.com/view/spec-bench>`__

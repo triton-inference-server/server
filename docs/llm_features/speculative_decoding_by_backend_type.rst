@@ -26,10 +26,10 @@
 .. OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ####
-Speculative Decoding by backend
+Speculative Decoding
 ####
 
-.. include:: <../tutorials/Feature_Guide/Speculative_Decoding/README.md>
+.. include:: speculative_decoding.rst
 
 .. toctree::
    :maxdepth: 1
