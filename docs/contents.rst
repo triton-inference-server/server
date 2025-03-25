@@ -52,9 +52,9 @@
    :hidden:
    :caption: LLM Features
 
-   Constrained Decoding <../tutorials/AI_Agents_Guide/Constrained_Decoding/README.md>
-   Function Calling <../tutorials/AI_Agents_Guide/Function_Calling/README.md>
-   Speculative Decoding <../tutorials/Feature_Guide/Speculative_Decoding/README.md>
+   Constrained Decoding <../tutorials/Feature_Guide/Constrained_Decoding/README.md>
+   Function Calling <../tutorials/Feature_Guide/Function_Calling/README.md>
+   llm_features/speculative_decoding_by_backend_type
 
 .. toctree::
    :hidden:
