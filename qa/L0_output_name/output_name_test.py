@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@ from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
 
 import grpc
 
-_trials = ( "libtorch", "onnx", "plan")
+_trials = ("libtorch", "onnx", "plan")
 
 
 class OutputNameValidationTest(tu.TestResultCollector):
