@@ -29,7 +29,7 @@
 Speculative Decoding by backend
 ####
 
-.. include:: speculative_decoding.rst
+.. include:: <../tutorials/Feature_Guide/Speculative_Decoding/README.md>
 
 .. toctree::
    :maxdepth: 1
