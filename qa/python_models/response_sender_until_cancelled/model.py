@@ -44,11 +44,14 @@ class TritonPythonModel:
             request, "MAX_NUMBER_OF_RESPONSE"
         ).as_numpy()[0]
         delay = pb_utils.get_input_tensor_by_name(request, "DELAY").as_numpy()[0]
+        ignore_cancel = pb_utils.get_input_tensor_by_name(
+            request, "IGNORE_CANCEL"
+        ).as_numpy()[0]
         response_sender = request.get_response_sender()
 
         sent = 0
         while True:
-            if request.is_cancelled():
+            if not ignore_cancel and request.is_cancelled():
                 response = pb_utils.InferenceResponse(
                     error=pb_utils.TritonError(
                         message="request has been cancelled",

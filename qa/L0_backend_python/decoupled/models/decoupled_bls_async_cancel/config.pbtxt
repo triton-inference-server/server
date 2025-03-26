@@ -37,12 +37,22 @@ input [
     name: "MAX_SUM"
     data_type: TYPE_INT32
     dims: [ 1 ]
+  },
+  {
+    name: "IGNORE_CANCEL"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
   }
 ]
 output [
   {
     name: "SUM"
     data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "IS_CANCELLED"
+    data_type: TYPE_BOOL
     dims: [ 1 ]
   }
 ]

@@ -325,55 +325,129 @@ class DecoupledTest(unittest.TestCase):
             self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
     def test_decoupled_bls_cancel(self):
-        model_name = "decoupled_bls_cancel"
+        model_names = ["decoupled_bls_cancel", "decoupled_bls_async_cancel"]
         input_value = 1
         max_sum_value = 10
+        ignore_cancel = False
         user_data = UserData()
-
-        with self._shm_leak_detector.Probe() as shm_probe:
-            with grpcclient.InferenceServerClient(
-                f"{_tritonserver_ipaddr}:8001"
-            ) as client:
-                client.start_stream(callback=partial(callback, user_data))
-                input_data = np.array([input_value], dtype=np.int32)
-                max_sum_data = np.array([max_sum_value], dtype=np.int32)
-                inputs = [
-                    grpcclient.InferInput(
-                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                    ),
-                    grpcclient.InferInput(
-                        "MAX_SUM",
-                        max_sum_data.shape,
-                        np_to_triton_dtype(max_sum_data.dtype),
-                    ),
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                inputs[1].set_data_from_numpy(max_sum_data)
-                client.async_stream_infer(model_name, inputs)
-
-                # Check the results of the decoupled model using BLS
-                def check_result(result):
-                    # Make sure the result is not an exception
-                    self.assertIsNot(type(result), InferenceServerException)
-
-                    sum_data = result.as_numpy("SUM")
-                    self.assertIsNotNone(sum_data, "error: expected 'SUM'")
-                    self.assertTrue(
-                        np.array_equal(sum_data, max_sum_data),
-                        "error: expected output {} to match input {}".format(
-                            sum_data, max_sum_data
+        for model_name in model_names:
+            with self._shm_leak_detector.Probe() as shm_probe:
+                with grpcclient.InferenceServerClient(
+                    f"{_tritonserver_ipaddr}:8001"
+                ) as client:
+                    client.start_stream(callback=partial(callback, user_data))
+                    input_data = np.array([input_value], dtype=np.int32)
+                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
+                    ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "INPUT",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
                         ),
-                    )
+                        grpcclient.InferInput(
+                            "MAX_SUM",
+                            max_sum_data.shape,
+                            np_to_triton_dtype(max_sum_data.dtype),
+                        ),
+                        grpcclient.InferInput(
+                            "IGNORE_CANCEL",
+                            ignore_cancel_data.shape,
+                            np_to_triton_dtype(ignore_cancel_data.dtype),
+                        ),
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    inputs[1].set_data_from_numpy(max_sum_data)
+                    inputs[2].set_data_from_numpy(ignore_cancel_data)
+                    client.async_stream_infer(model_name, inputs)
 
-                result = user_data._completed_requests.get()
-                check_result(result)
+                    # Check the results of the decoupled model using BLS
+                    def check_result(result):
+                        # Make sure the result is not an exception
+                        self.assertIsNot(type(result), InferenceServerException)
+                        is_cancelled = result.as_numpy("IS_CANCELLED")
+                        self.assertTrue(
+                            is_cancelled[0],
+                            "error: expected the request to be cancelled",
+                        )
 
-    def test_decoupled_bls_async_cancel(self):
-        model_name = "decoupled_bls_async_cancel"
+                        sum_data = result.as_numpy("SUM")
+                        self.assertIsNotNone(sum_data, "error: expected 'SUM'")
+                        self.assertTrue(
+                            np.array_equal(sum_data, max_sum_data),
+                            "error: expected output {} to match input {}".format(
+                                sum_data, max_sum_data
+                            ),
+                        )
+
+                    result = user_data._completed_requests.get()
+                    check_result(result)
+
+    def test_decoupled_bls_ignore_cancel(self):
+        model_names = ["decoupled_bls_cancel", "decoupled_bls_async_cancel"]
         input_value = 1
         max_sum_value = 10
+        ignore_cancel = True
         user_data = UserData()
+        for model_name in model_names:
+            with self._shm_leak_detector.Probe() as shm_probe:
+                with grpcclient.InferenceServerClient(
+                    f"{_tritonserver_ipaddr}:8001"
+                ) as client:
+                    client.start_stream(callback=partial(callback, user_data))
+                    input_data = np.array([input_value], dtype=np.int32)
+                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
+                    ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
+                    inputs = [
+                        grpcclient.InferInput(
+                            "INPUT",
+                            input_data.shape,
+                            np_to_triton_dtype(input_data.dtype),
+                        ),
+                        grpcclient.InferInput(
+                            "MAX_SUM",
+                            max_sum_data.shape,
+                            np_to_triton_dtype(max_sum_data.dtype),
+                        ),
+                        grpcclient.InferInput(
+                            "IGNORE_CANCEL",
+                            ignore_cancel_data.shape,
+                            np_to_triton_dtype(ignore_cancel_data.dtype),
+                        ),
+                    ]
+                    inputs[0].set_data_from_numpy(input_data)
+                    inputs[1].set_data_from_numpy(max_sum_data)
+                    inputs[2].set_data_from_numpy(ignore_cancel_data)
+                    client.async_stream_infer(model_name, inputs)
 
+                    # Check the results of the decoupled model using BLS
+                    def check_result(result):
+                        # Make sure the result is not an exception
+                        self.assertIsNot(type(result), InferenceServerException)
+                        is_cancelled = result.as_numpy("IS_CANCELLED")
+                        self.assertFalse(
+                            is_cancelled[0],
+                            "error: expected the request not being cancelled",
+                        )
+
+                        sum_data = result.as_numpy("SUM")
+                        self.assertIsNotNone(sum_data, "error: expected 'SUM'")
+                        self.assertTrue(
+                            sum_data > max_sum_data,
+                            "error: expected sum_data {} to be greater than max_sum_data {}".format(
+                                sum_data, max_sum_data
+                            ),
+                        )
+
+                    result = user_data._completed_requests.get()
+                    check_result(result)
+
+    def test_decoupled_bls_cancel_after_completion(self):
+        model_name = "decoupled_bls_cancel_after_complete"
+        input_value = 1
+        max_sum_value = 10
+        ignore_cancel = False
+        user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient(
                 f"{_tritonserver_ipaddr}:8001"
@@ -381,6 +455,7 @@ class DecoupledTest(unittest.TestCase):
                 client.start_stream(callback=partial(callback, user_data))
                 input_data = np.array([input_value], dtype=np.int32)
                 max_sum_data = np.array([max_sum_value], dtype=np.int32)
+                ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
                 inputs = [
                     grpcclient.InferInput(
                         "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
@@ -390,15 +465,25 @@ class DecoupledTest(unittest.TestCase):
                         max_sum_data.shape,
                         np_to_triton_dtype(max_sum_data.dtype),
                     ),
+                    grpcclient.InferInput(
+                        "IGNORE_CANCEL",
+                        ignore_cancel_data.shape,
+                        np_to_triton_dtype(ignore_cancel_data.dtype),
+                    ),
                 ]
                 inputs[0].set_data_from_numpy(input_data)
                 inputs[1].set_data_from_numpy(max_sum_data)
+                inputs[2].set_data_from_numpy(ignore_cancel_data)
                 client.async_stream_infer(model_name, inputs)
 
                 # Check the results of the decoupled model using BLS
                 def check_result(result):
                     # Make sure the result is not an exception
                     self.assertIsNot(type(result), InferenceServerException)
+                    is_cancelled = result.as_numpy("IS_CANCELLED")
+                    self.assertTrue(
+                        is_cancelled[0], "error: expected the request to be cancelled"
+                    )
 
                     sum_data = result.as_numpy("SUM")
                     self.assertIsNotNone(sum_data, "error: expected 'SUM'")

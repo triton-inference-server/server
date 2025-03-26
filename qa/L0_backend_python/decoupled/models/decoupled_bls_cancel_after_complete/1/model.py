@@ -78,6 +78,16 @@ class TritonPythonModel:
             if response_sum >= max_sum:
                 response_stream.cancel()
 
+        # test cancel after request completion.
+        if not error:
+            try:
+                response_stream.cancel()
+            except Exception as e:
+                error = pb_utils.TritonError(
+                    message=str(e),
+                    code=pb_utils.TritonError.INTERNAL,
+                )
+
         responses = [
             pb_utils.InferenceResponse(
                 output_tensors=[
