@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,14 +24,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# FastAPI Application
-fastapi==0.115.6
-# Fix httpx version to avoid bug in openai library:
-# https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
-httpx==0.27.2
-Ninja
-openai==1.60.0
-partial-json-parser # used for parsing partial JSON outputs
-# Minimum starlette version needed to address CVE:
-# https://github.com/advisories/GHSA-f96h-pmfr-66vw
-starlette>=0.40.0
+FROM nvcr.io/nvidia/tritonserver:25.02-vllm-python-py3
+
+WORKDIR /opt/tritonserver
+RUN rm -rf /opt/tritonserver/python/openai
+
+COPY python/openai/ /opt/tritonserver/python/openai
+
+WORKDIR /opt/tritonserver
+RUN pip3 install -r python/openai/requirements.txt
+COPY qa/ /opt/tritonserver/qa

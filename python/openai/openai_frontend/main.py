@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -120,6 +120,18 @@ def parse_args():
         default="0.0.0.0",
         help="Address/host of frontends (default: '0.0.0.0')",
     )
+    triton_group.add_argument(
+        "--tool-call-parser",
+        type=str,
+        default=None,
+        help="Specify the parser for handling tool calling related response text. Options include: 'llama3' and 'mistral'.",
+    )
+    triton_group.add_argument(
+        "--chat-template",
+        type=str,
+        default=None,
+        help="The path of the jinja chat template file.",
+    )
 
     # OpenAI-Compatible Frontend (FastAPI)
     openai_group = parser.add_argument_group("Triton OpenAI-Compatible Frontend")
@@ -171,7 +183,11 @@ def main():
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
-        server=server, tokenizer=args.tokenizer, backend=args.backend
+        server=server,
+        tokenizer=args.tokenizer,
+        backend=args.backend,
+        tool_call_parser=args.tool_call_parser,
+        chat_template=args.chat_template,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management

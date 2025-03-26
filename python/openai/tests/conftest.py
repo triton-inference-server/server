@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,6 +69,7 @@ TEST_MODEL_REPOSITORY = os.environ.get("TEST_MODEL_REPOSITORY")
 TEST_TOKENIZER = os.environ.get(
     "TEST_TOKENIZER", "meta-llama/Meta-Llama-3.1-8B-Instruct"
 )
+TEST_TOOL_CALL_PARSER = os.environ.get("TEST_TOOL_CALL_PARSER", "llama3")
 TEST_PROMPT = "What is machine learning?"
 TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
 
@@ -91,6 +92,8 @@ def server():
         TEST_TOKENIZER,
         "--backend",
         TEST_BACKEND,
+        "--tool-call-parser",
+        TEST_TOOL_CALL_PARSER,
     ]
     # TODO: Incorporate kserve frontend binding smoke tests to catch any
     # breakage with default values or slight cli arg variations
