@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,7 +71,7 @@ cp ../python_models/identity_fp32/model.py all_models/python_$MODEL_SUFFIX/1/mod
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-for TARGET in1 onnx libtorch plan python; do
+for TARGET in onnx libtorch plan python; do
     rm -fr models && mkdir models && \
         cp -r all_models/${TARGET}_$MODEL_SUFFIX models/.
 
