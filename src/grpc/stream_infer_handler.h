@@ -106,8 +106,7 @@ class ModelStreamInferHandler
 
  protected:
   void StartNewRequest() override;
-  bool Process(
-      State* state, bool rpc_ok, bool is_notification = false) override;
+  bool Process(State* state, bool rpc_ok, bool is_notification) override;
 
  private:
   static void StreamInferResponseComplete(

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -84,7 +84,9 @@ for TEST_CASE in "test_grpc_async_infer" \
                     "test_aio_grpc_stream_infer" \
                     "test_grpc_async_infer_cancellation_at_step_start" \
                     "test_grpc_async_infer_response_complete_during_cancellation" \
-                    "test_grpc_async_infer_cancellation_during_response_complete"; do
+                    "test_grpc_async_infer_cancellation_before_finish_0" \
+                    "test_grpc_async_infer_cancellation_before_finish_1" \
+                    "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response"; do
     TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
     SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
     if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
@@ -92,12 +94,18 @@ for TEST_CASE in "test_grpc_async_infer" \
     elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
         export TRITONSERVER_DELAY_GRPC_ENQUEUE=5000
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_0" ]; then
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
         export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
+        export TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY=1000
+        export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
+        export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
+        export TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC=5000
     fi
 
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -123,6 +131,23 @@ for TEST_CASE in "test_grpc_async_infer" \
         cat $SERVER_LOG
         RET=1
     fi
+
+    # Tests "test_grpc_async_infer" and "test_aio_grpc_async_infer" ends
+    # prematurely before state is released.
+    if [[ "$TEST_CASE" != "test_grpc_async_infer" && "$TEST_CASE" != "test_aio_grpc_async_infer" ]]; then
+        count=$(grep -o "StateRelease" $SERVER_LOG | wc -l)
+        state_released=${state_released:=1}
+        if [ $count == 0 ]; then
+            echo -e "\n***\n*** State not released by server on $TEST_CASE\n***"
+            cat $SERVER_LOG
+            RET=1
+        elif [ $count -ne $state_released ]; then
+            echo -e "\n***\n*** Unexpected states released by server on $TEST_CASE. Expected $state_released but released $count.\n***"
+            cat $SERVER_LOG
+            RET=1
+        fi
+        unset state_released
+    fi
     set -e
 
     kill $SERVER_PID
@@ -133,9 +158,15 @@ for TEST_CASE in "test_grpc_async_infer" \
     elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_GRPC_ENQUEUE
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_0" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
+        unset TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY
+        unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
+        unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
+        unset TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC
     fi
 done
 
