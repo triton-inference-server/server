@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,13 +33,16 @@ from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 
 ### TEST ENVIRONMENT SETUP ###
-def infer_test_environment():
+def infer_test_environment(tool_call_parser):
     # Infer the test environment for simplicity in local dev/testing.
     try:
         import vllm as _
 
         backend = "vllm"
-        model = "llama-3.1-8b-instruct"
+        if tool_call_parser == "mistral":
+            model = "mistral-nemo-instruct-2407"
+        else:
+            model = "llama-3.1-8b-instruct"
         return backend, model
     except ImportError:
         print("No vllm installation found.")
@@ -56,8 +59,11 @@ def infer_test_environment():
     raise Exception("Unknown test environment")
 
 
-def infer_test_model_repository(backend):
-    model_repository = str(Path(__file__).parent / f"{backend}_models")
+def infer_test_model_repository(backend, tool_call_parser):
+    if tool_call_parser == "mistral":
+        model_repository = str(Path(__file__).parent / f"{backend}_mistral_models")
+    else:
+        model_repository = str(Path(__file__).parent / f"{backend}_models")
     return model_repository
 
 
@@ -69,14 +75,17 @@ TEST_MODEL_REPOSITORY = os.environ.get("TEST_MODEL_REPOSITORY")
 TEST_TOKENIZER = os.environ.get(
     "TEST_TOKENIZER", "meta-llama/Meta-Llama-3.1-8B-Instruct"
 )
+TEST_TOOL_CALL_PARSER = os.environ.get("TEST_TOOL_CALL_PARSER", "llama3")
 TEST_PROMPT = "What is machine learning?"
 TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
 
 if not TEST_BACKEND or not TEST_MODEL:
-    TEST_BACKEND, TEST_MODEL = infer_test_environment()
+    TEST_BACKEND, TEST_MODEL = infer_test_environment(TEST_TOOL_CALL_PARSER)
 
 if not TEST_MODEL_REPOSITORY:
-    TEST_MODEL_REPOSITORY = infer_test_model_repository(TEST_BACKEND)
+    TEST_MODEL_REPOSITORY = infer_test_model_repository(
+        TEST_BACKEND, TEST_TOOL_CALL_PARSER
+    )
 
 
 # NOTE: OpenAI client requires actual server running, and won't work
@@ -91,6 +100,8 @@ def server():
         TEST_TOKENIZER,
         "--backend",
         TEST_BACKEND,
+        "--tool-call-parser",
+        TEST_TOOL_CALL_PARSER,
     ]
     # TODO: Incorporate kserve frontend binding smoke tests to catch any
     # breakage with default values or slight cli arg variations

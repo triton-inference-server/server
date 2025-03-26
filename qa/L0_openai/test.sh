@@ -111,6 +111,18 @@ function run_test() {
     fi
     set -e
 
+    if [ "$RET" == "0" ]; then
+        # rerun the tool calling tests with mistral model to cover the mistral tool call parser
+        set +e
+        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" pytest -s -v --junitxml=test_openai.xml tests/test_tool_calling.py 2>&1 > ${TEST_LOG}
+        if [ $? -ne 0 ]; then
+            cat ${TEST_LOG}
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    fi
+
     # Collect logs for error analysis when needed
     cp *.xml *.log ../../../
     popd

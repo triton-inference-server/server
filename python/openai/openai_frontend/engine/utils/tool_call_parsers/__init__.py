@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,46 +23,18 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Adapted from
+# https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/openai/tool_parsers/__init__.py
+# Copyright 2024 The vLLM team.
 
-from enum import IntEnum
+from .llama_tool_call_parser import Llama3JsonToolParser
+from .mistral_tool_call_parser import MistralToolParser
+from .tool_call_parser import ToolCallParser, ToolParserManager
 
-import tritonserver
-from _typeshed import Incomplete as Incomplete
-
-class Grpc_compression_level(IntEnum):
-    NONE = 0
-    LOW = 1
-    MED = 2
-    HIGH = 3
-    COUNT = 4
-
-class KServeGrpc:
-    Grpc_compression_level = Grpc_compression_level
-    class Options:
-        address: str
-        port: int
-        reuse_port: bool
-        use_ssl: bool
-        server_cert: str
-        server_key: str
-        root_cert: str
-        use_mutual_auth: bool
-        keepalive_time_ms: int
-        keepalive_timeout_ms: int
-        keepalive_permit_without_calls: bool
-        http2_max_pings_without_data: int
-        http2_min_recv_ping_interval_without_data_ms: int
-        http2_max_ping_strikes: int
-        max_connection_age_ms: int
-        max_connection_age_grace_ms: int
-        infer_compression_level: int | Grpc_compression_level
-        infer_allocation_pool_size: int
-        max_response_pool_size: int
-        forward_header_pattern: str
-        def __post_init__(self) -> None: ...
-    triton_frontend: Incomplete
-    def __init__(self, server: tritonserver, options: KServeGrpc.Options = None) -> None: ...
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: types.TracebackType | None) -> None: ...
-    def start(self) -> None: ...
-    def stop(self) -> None: ...
+__all__ = [
+    "ToolCallParser",
+    "ToolParserManager",
+    "Llama3JsonToolParser",
+    "MistralToolParser",
+]
