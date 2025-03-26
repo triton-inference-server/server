@@ -1227,12 +1227,12 @@ def create_dockerfile_linux(
     repoagents,
     caches,
     endpoints,
-    rt_base_image=None,
+    runtime_image=None,
 ):
     base_image = argmap["BASE_IMAGE"]
     # If runtime base image is provided, use it as the base image
-    if rt_base_image:
-        base_image = rt_base_image
+    if runtime_image:
+        base_image = runtime_image
 
     df = """
 ARG TRITON_VERSION={}
@@ -1654,12 +1654,12 @@ ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
 
 
 def create_dockerfile_windows(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches, rt_base_image=None
+    ddir, dockerfile_name, argmap, backends, repoagents, caches, runtime_image=None
 ):
     base_image = argmap["BASE_IMAGE"]
     # If runtime base image is provided, use it as the base image
-    if rt_base_image:
-        base_image = rt_base_image
+    if runtime_image:
+        base_image = runtime_image
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1768,7 +1768,7 @@ def create_build_dockerfiles(
             backends,
             repoagents,
             caches,
-            images.get("rt_base"),
+            images.get("runtime"),
         )
     else:
         create_dockerfile_linux(
@@ -1779,7 +1779,7 @@ def create_build_dockerfiles(
             repoagents,
             caches,
             endpoints,
-            images.get("rt_base"),
+            images.get("runtime"),
         )
 
     # Dockerfile used for the creating the CI base image.
@@ -2964,7 +2964,7 @@ if __name__ == "__main__":
                 "pytorch",
                 "tensorflow",
                 "tensorflow2",
-                "rt_base",
+                "runtime",
             ],
             "unsupported value for --image",
         )
