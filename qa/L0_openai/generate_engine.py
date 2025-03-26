@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,46 +23,34 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from argparse import ArgumentParser
 
-from enum import IntEnum
+from tensorrt_llm import LLM, BuildConfig
+from tensorrt_llm.plugin import PluginConfig
 
-import tritonserver
-from _typeshed import Incomplete as Incomplete
 
-class Grpc_compression_level(IntEnum):
-    NONE = 0
-    LOW = 1
-    MED = 2
-    HIGH = 3
-    COUNT = 4
+def generate_model_engine(model: str, engines_path: str):
+    config = BuildConfig(plugin_config=PluginConfig.from_dict({"_gemm_plugin": "auto"}))
 
-class KServeGrpc:
-    Grpc_compression_level = Grpc_compression_level
-    class Options:
-        address: str
-        port: int
-        reuse_port: bool
-        use_ssl: bool
-        server_cert: str
-        server_key: str
-        root_cert: str
-        use_mutual_auth: bool
-        keepalive_time_ms: int
-        keepalive_timeout_ms: int
-        keepalive_permit_without_calls: bool
-        http2_max_pings_without_data: int
-        http2_min_recv_ping_interval_without_data_ms: int
-        http2_max_ping_strikes: int
-        max_connection_age_ms: int
-        max_connection_age_grace_ms: int
-        infer_compression_level: int | Grpc_compression_level
-        infer_allocation_pool_size: int
-        max_response_pool_size: int
-        forward_header_pattern: str
-        def __post_init__(self) -> None: ...
-    triton_frontend: Incomplete
-    def __init__(self, server: tritonserver, options: KServeGrpc.Options = None) -> None: ...
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: types.TracebackType | None) -> None: ...
-    def start(self) -> None: ...
-    def stop(self) -> None: ...
+    engine = LLM(
+        model,
+        dtype="float16",
+        max_batch_size=128,
+        build_config=config,
+        guided_decoding_backend="xgrammar",
+    )
+
+    engine.save(engines_path)
+    engine.shutdown()
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--model", "-m", help="model huggingface id or path to the model"
+    )
+    parser.add_argument("--engine_path", "-e", help="directory of the output engine")
+    FLAGS = parser.parse_args()
+
+    generate_model_engine(FLAGS.model, FLAGS.engine_path)
+    print(f"model {FLAGS.model}'s engine has been saved to {FLAGS.engine_path}")
