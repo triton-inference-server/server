@@ -29,11 +29,14 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """This model will send a decoupled bls request to 'response_sender_until_cancelled' model
-    The model will start adding the response from the model.
-    When the MAX_SUM is reached. The model will call the response iterarior cancel() method to
-    cancel the response stream.
-    The number of response should not reach MAX_NUMBER_OF_RESPONSE.
+    """
+    This model sends a decoupled bls inference request to 'response_sender_until_cancelled'
+    model, and sums up its responses.
+    Once the MAX_SUM is reached, the model will call the response iterator's
+    cancel() method to cancel the response stream.
+    If the IGNORE_CANCEL is set to True, the 'response_sender_until_cancelled' model will not hornor
+    the request cancellation and keep sending the output to the model.
+    The number of total responses should not reach MAX_NUMBER_OF_RESPONSE.
     """
 
     def execute(self, requests):
@@ -41,6 +44,7 @@ class TritonPythonModel:
             pb_utils.get_input_tensor_by_name(requests[0], "MAX_SUM").as_numpy().flat[0]
         )
         input = pb_utils.get_input_tensor_by_name(requests[0], "INPUT")
+        ignore_cancel = pb_utils.get_input_tensor_by_name(requests[0], "IGNORE_CANCEL")
         delay = pb_utils.Tensor("DELAY", np.array([50], dtype=np.int32))
         max_num_response = pb_utils.Tensor(
             "MAX_NUMBER_OF_RESPONSE", np.array([100], dtype=np.int32)
@@ -48,7 +52,7 @@ class TritonPythonModel:
 
         infer_request = pb_utils.InferenceRequest(
             model_name="response_sender_until_cancelled",
-            inputs=[input, max_num_response, delay],
+            inputs=[input, max_num_response, delay, ignore_cancel],
             requested_output_names=["OUTPUT"],
         )
 
@@ -68,18 +72,18 @@ class TritonPythonModel:
             out = pb_utils.get_output_tensor_by_name(
                 infer_response, "OUTPUT"
             ).as_numpy()[0]
-            if response_sum + out > max_sum:
-                response_stream.cancel()
-            else:
-                response_sum += out
 
-        if error is None and not is_cancelled:
-            error = pb_utils.TritonError("request is not cancelled!")
+            response_sum += out
+            if response_sum >= max_sum:
+                response_stream.cancel()
 
         responses = [
             pb_utils.InferenceResponse(
                 output_tensors=[
-                    pb_utils.Tensor("SUM", np.array([response_sum], dtype=np.int32))
+                    pb_utils.Tensor("SUM", np.array([response_sum], dtype=np.int32)),
+                    pb_utils.Tensor(
+                        "IS_CANCELLED", np.array([is_cancelled], dtype=np.bool_)
+                    ),
                 ],
                 error=error,
             )
