@@ -1526,8 +1526,8 @@ InferHandler<
         state->context_->EraseState(state);
         StateRelease(state);
       } else {
-        // In non-streaming infer mode, there is no guarantee that
-        // state->context_ is always valid beyond this line.
+        // In non-streaming infer mode which has multiple request handlers,
+        // there is no guarantee state->context_ is valid beyond this line.
         LOG_VERBOSE(2) << "Returning from " << Name() << ", "
                        << state->unique_id_ << ", " << state->step_;
       }
