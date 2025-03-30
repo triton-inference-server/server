@@ -141,10 +141,17 @@ class UnifiedCallbackService
  public:
   UnifiedCallbackService(
       const std::shared_ptr<TRITONSERVER_Server>& server,
+      TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      RestrictedFeatures& restricted_keys_)
+      grpc_compression_level compression_level,
+      RestrictedFeatures& restricted_keys_,
+      const std::string& forward_header_pattern)
       : tritonserver_(server), shm_manager_(shm_manager),
-        restricted_keys_(restricted_keys_)
+        trace_manager_(trace_manager), restricted_keys_(restricted_keys_),
+        model_infer_handler_(
+            "ModelInferCallbackHandler", tritonserver_, trace_manager_,
+            shm_manager_, compression_level, restricted_keys_,
+            forward_header_pattern)
   {
   }
 
@@ -164,6 +171,24 @@ class UnifiedCallbackService
     RETURN_IF_ERR(statistics_duration_json.MemberAsUInt("ns", &value));
     mutable_statistics_duration_protobuf->set_ns(value);
     return nullptr;
+  }
+
+  ::grpc::ServerUnaryReactor* ModelInfer(
+      ::grpc::CallbackServerContext* context,
+      const inference::ModelInferRequest* request,
+      inference::ModelInferResponse* response) override
+  {
+    // 1. Create reactor for this RPC - This is incorrect for callback API.
+    //    The reactor is obtained from the context, but we don't need it here
+    //    directly. The handler function will obtain and manage it.
+
+    // 2. Process request and start inference by calling the *member handler*.
+    //    The handler function itself returns the reactor.
+    return model_infer_handler_.HandleModelInfer(
+        context, request, response);  // CORRECTED CALL
+
+    // 3. Return reactor to gRPC - Handled by returning the result of the line
+    // above.
   }
 
   // Example RPC method: ServerLive
@@ -1870,7 +1895,9 @@ class UnifiedCallbackService
  private:
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
+  TraceManager* trace_manager_;
   RestrictedFeatures restricted_keys_;
+  ModelInferCallbackHandler model_infer_handler_;
 };
 
 //
@@ -1951,9 +1978,16 @@ void
 CommonHandler::CreateCallbackServices()
 {
   // Create the unified callback service for non-inference operations
-  non_inference_callback_service_ =
-      new UnifiedCallbackService(tritonserver_, shm_manager_, restricted_keys_);
-
+  // Pass all required arguments to the UnifiedCallbackService constructor
+  non_inference_callback_service_ = new UnifiedCallbackService(
+      "CommonHandler", tritonserver_,
+      trace_manager_,  // Pass the trace manager from CommonHandler
+      shm_manager_,
+      grpc_compression_level::GRPC_COMPRESS_LEVEL_NONE,  // Provide a default
+                                                         // compression level
+      restricted_keys_,
+      ""  // Provide an empty default for forward_header_pattern
+  );
   // Create the health callback service
   health_callback_service_ =
       new HealthCallbackService(tritonserver_, restricted_keys_);

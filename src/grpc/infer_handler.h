@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,13 +34,13 @@
 #include <regex>
 #include <thread>
 
+#include "../restricted_features.h"
 #include "../tracer.h"
 #include "grpc_handler.h"
 #include "grpc_service.grpc.pb.h"
 #include "grpc_utils.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
-
 // Unique IDs are only needed when debugging. They only appear in
 // verbose logging.
 #ifndef NDEBUG
@@ -938,7 +938,7 @@ class InferHandlerState {
       // FIXME: Is there a better way to put task on the
       // completion queue rather than using alarm object?
       // The alarm object will add a new task to the back of the
-      // completion queue when it expires or when it’s cancelled.
+      // completion queue when it expires or when it's cancelled.
       state->alarm_.Set(
           cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), state);
     }
@@ -1532,6 +1532,81 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
   return err;
 }
 
+class ModelInferCallbackHandler {
+ public:
+  ModelInferCallbackHandler(
+      const std::string& name,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+      TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      grpc_compression_level compression_level,
+      RestrictedFeatures& restricted_keys,
+      const std::string& forward_header_pattern);
+
+  ~ModelInferCallbackHandler();
+
+  ::grpc::ServerUnaryReactor* HandleModelInfer(
+      ::grpc::CallbackServerContext* context,
+      const inference::ModelInferRequest* request,
+      inference::ModelInferResponse* response);
+
+ private:
+  // Define CallbackState first, before any methods that use it
+  struct CallbackState {
+    CallbackState(
+        inference::ModelInferResponse* response,
+        ::grpc::ServerUnaryReactor* reactor,
+        ::grpc::CallbackServerContext* context,
+        const std::shared_ptr<TRITONSERVER_Server>& tritonserver)
+        : response_(response), reactor_(reactor), context_(context),
+          tritonserver_(tritonserver)
+    {
+    }
+
+    inference::ModelInferResponse* response_;
+    ::grpc::ServerUnaryReactor* reactor_;
+    ::grpc::CallbackServerContext* context_;
+    std::shared_ptr<TRITONSERVER_Server> tritonserver_;
+
+    // Request resources
+    AllocPayload<inference::ModelInferResponse> alloc_payload_;
+    std::list<std::string> serialized_data_;
+    std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
+        shm_regions_info_;
+
+#ifdef TRITON_ENABLE_TRACING
+    std::shared_ptr<TraceManager::Trace> trace_;
+#endif  // TRITON_ENABLE_TRACING
+  };
+
+  TRITONSERVER_Error* ForwardHeadersAsParametersCallback(
+      TRITONSERVER_InferenceRequest* irequest,
+      const ::grpc::CallbackServerContext* context);
+  // Now Execute can use CallbackState
+  void Execute(
+      ::grpc::CallbackServerContext* context,
+      const inference::ModelInferRequest* request,
+      inference::ModelInferResponse* response,
+      ::grpc::ServerUnaryReactor* reactor,
+      std::unique_ptr<CallbackState>& callback_state);
+
+  static void InferResponseComplete(
+      TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+      void* userp);
+
+  bool ExecutePrecondition(::grpc::CallbackServerContext* context);
+
+  const std::string name_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
+  TraceManager* trace_manager_;
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
+  TRITONSERVER_ResponseAllocator* allocator_;
+
+  grpc_compression_level compression_level_;
+  const std::pair<std::string, std::string> restricted_kv_;
+  const std::string header_forward_pattern_;
+  re2::RE2 header_forward_regex_;
+};
 //
 // ModelInferHandler
 //

@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -649,6 +649,265 @@ InferRequestComplete(
   }
 }
 
+ModelInferCallbackHandler::ModelInferCallbackHandler(
+    const std::string& name,
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+    TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    grpc_compression_level compression_level,
+    RestrictedFeatures& restricted_keys,
+    const std::string& forward_header_pattern)
+    : name_(name), tritonserver_(tritonserver), trace_manager_(trace_manager),
+      shm_manager_(shm_manager), compression_level_(compression_level),
+      restricted_kv_(restricted_keys.Get(RestrictedCategory::INFERENCE)),
+      header_forward_pattern_(forward_header_pattern),
+      header_forward_regex_(forward_header_pattern)
+{
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorNew(
+          &allocator_, InferResponseAlloc, InferResponseFree,
+          InferResponseStart),
+      "creating inference response allocator");
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorSetQueryFunction(
+          allocator_, OutputBufferQuery),
+      "setting allocator's query function");
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
+          allocator_, OutputBufferAttributes),
+      "setting allocator's output buffer attributes function");
+}
+
+ModelInferCallbackHandler::~ModelInferCallbackHandler()
+{
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_ResponseAllocatorDelete(allocator_),
+      "deleting response allocator");
+}
+
+::grpc::ServerUnaryReactor*
+ModelInferCallbackHandler::HandleModelInfer(
+    ::grpc::CallbackServerContext* context,
+    const inference::ModelInferRequest* request,
+    inference::ModelInferResponse* response)
+{
+  auto* reactor = context->DefaultReactor();
+
+  // Check preconditions
+  if (!ExecutePrecondition(context)) {
+    reactor->Finish(::grpc::Status(
+        ::grpc::StatusCode::UNAVAILABLE, "This protocol is restricted"));
+    return reactor;
+  }
+
+  // Create callback state
+  auto callback_state = std::make_unique<CallbackState>(
+      response, reactor, context, tritonserver_);
+
+  // Execute the request
+  Execute(context, request, response, reactor, callback_state);
+
+  return reactor;
+}
+
+void
+ModelInferCallbackHandler::InferResponseComplete(
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
+{
+  std::unique_ptr<CallbackState> callback_state(
+      static_cast<CallbackState*>(userp));
+
+  if (response != nullptr) {
+    // Dereference callback_state->response_ to pass a reference
+    TRITONSERVER_Error* err = InferResponseCompleteCommon(
+        callback_state->tritonserver_.get(),
+        response,  // Pass the TRITONSERVER_InferenceResponse*
+        *(callback_state
+              ->response_),  // Pass the inference::ModelInferResponse&
+        callback_state->alloc_payload_);  // Pass the AllocPayload<...>
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+
+    callback_state->reactor_->Finish(status);
+  } else {
+    callback_state->reactor_->Finish(
+        ::grpc::Status(::grpc::StatusCode::INTERNAL, "null response"));
+  }
+
+  TRITONSERVER_InferenceResponseDelete(
+      response);  // Delete the TRITONSERVER_InferenceResponse
+}
+
+bool
+ModelInferCallbackHandler::ExecutePrecondition(
+    ::grpc::CallbackServerContext* context)
+{
+  if (!restricted_kv_.first.empty()) {
+    const auto& metadata = context->client_metadata();
+    const auto it = metadata.find(restricted_kv_.first);
+    return (it != metadata.end()) && (it->second == restricted_kv_.second);
+  }
+  return true;
+}
+
+// Implement the new private helper function
+TRITONSERVER_Error*
+ModelInferCallbackHandler::ForwardHeadersAsParametersCallback(
+    TRITONSERVER_InferenceRequest* irequest,
+    const ::grpc::CallbackServerContext* context)
+{
+  TRITONSERVER_Error* err = nullptr;
+  // Use the members stored in *this* specific handler instance
+  if (!header_forward_pattern_.empty()) {
+    const auto& metadata =
+        context->client_metadata();  // Use the passed context
+    for (const auto& pair : metadata) {
+      // Need to convert grpc::string_ref to std::string for RE2/Triton API
+      std::string key_str(pair.first.data(), pair.first.length());
+      std::string value_str(pair.second.data(), pair.second.length());
+
+      // Use the regex member stored in *this* handler instance
+      if (RE2::PartialMatch(key_str, header_forward_regex_)) {
+        err = TRITONSERVER_InferenceRequestSetStringParameter(
+            irequest, key_str.c_str(), value_str.c_str());
+        if (err != nullptr) {
+          break;  // Exit loop on error
+        }
+      }
+    }
+  }
+  return err;
+}
+
+void
+ModelInferCallbackHandler::Execute(
+    ::grpc::CallbackServerContext* context,
+    const inference::ModelInferRequest* request,
+    inference::ModelInferResponse* response,
+    ::grpc::ServerUnaryReactor* reactor,
+    std::unique_ptr<CallbackState>& callback_state)
+{
+  TRITONSERVER_Error* err = nullptr;
+  int64_t requested_model_version;
+  if (err == nullptr) {
+    err = GetModelVersionFromString(
+        request->model_version(), &requested_model_version);
+  }
+
+  // Check if model has decoupled transaction policy
+  if (err == nullptr) {
+    uint32_t txn_flags;
+    err = TRITONSERVER_ServerModelTransactionProperties(
+        tritonserver_.get(), request->model_name().c_str(),
+        requested_model_version, &txn_flags, nullptr /* voidp */);
+    if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "ModelInfer RPC doesn't support models with decoupled "
+          "transaction policy");
+    }
+  }
+
+  // Create the inference request
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestNew(
+        &irequest, tritonserver_.get(), request->model_name().c_str(),
+        requested_model_version);
+  }
+
+  // Set metadata and parameters
+  if (err == nullptr) {
+    // Create a local StateParameters object for the call
+    StateParameters state_params;
+    // Pass the local object as the third argument
+    err = SetInferenceRequestMetadata(irequest, *request, state_params);
+  }
+
+  // Call the correct private helper function here
+  if (err == nullptr) {
+    err = ForwardHeadersAsParametersCallback(irequest, context);
+  }
+
+  // Handle input tensors and shared memory
+  if (err == nullptr) {
+    err = InferGRPCToInput(
+        tritonserver_, shm_manager_, *request,
+        &callback_state->serialized_data_, irequest,
+        &callback_state->shm_regions_info_);
+  }
+
+  // Set up allocator payload
+  if (err == nullptr) {
+    err = InferAllocatorPayload<inference::ModelInferResponse>(
+        tritonserver_, shm_manager_, *request,
+        std::move(callback_state->serialized_data_), response,
+        &callback_state->alloc_payload_, &callback_state->shm_regions_info_);
+  }
+
+  // Set response callback
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetResponseCallback(
+        irequest, allocator_, &callback_state->alloc_payload_,
+        InferResponseComplete, callback_state.get());
+  }
+
+  // Get request ID for logging
+  const char* request_id = "";
+  if (irequest != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestId(irequest, &request_id),
+        "unable to retrieve request ID string");
+  }
+
+  if (!strncmp(request_id, "", 1)) {
+    request_id = "<id_unknown>";
+  }
+
+  // Set up tracing if enabled
+  TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+#ifdef TRITON_ENABLE_TRACING
+  if (err == nullptr && trace_manager_ != nullptr) {
+    GrpcServerCarrier carrier(context);
+    auto start_options =
+        trace_manager_->GetTraceStartOptions(carrier, request->model_name());
+    callback_state->trace_ =
+        std::move(trace_manager_->SampleTrace(start_options));
+    if (callback_state->trace_ != nullptr) {
+      triton_trace = callback_state->trace_->trace_;
+    }
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  // Issue async inference request
+  if (err == nullptr) {
+    err = TRITONSERVER_ServerInferAsync(
+        tritonserver_.get(), irequest, triton_trace);
+  }
+
+  // Handle errors or complete successfully
+  if (err == nullptr) {
+    // Success case - callback_state ownership transferred to callback
+    callback_state.release();
+  } else {
+    // Error case
+    LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);  // Use existing utility
+    TRITONSERVER_ErrorDelete(err);
+
+    if (irequest != nullptr) {
+      TRITONSERVER_InferenceRequestDelete(irequest);
+    }
+
+    // Complete RPC with error
+    reactor->Finish(status);
+  }
+}
 //===========================================================================
 //  The following section contains the handling mechanism for ModelInfer RPC.
 //  This implementation is tuned towards performance and reducing latency.
