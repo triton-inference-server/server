@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.55.0dev",
-    "triton_container_version": "25.02dev",
-    "upstream_container_version": "25.01",
+    "release_version": "2.56.0dev",
+    "triton_container_version": "25.03dev",
+    "upstream_container_version": "25.02",
     "ort_version": "1.20.1",
-    "ort_openvino_version": "2024.5.0",
-    "standalone_openvino_version": "2024.5.0",
+    "ort_openvino_version": "2025.0.0",
+    "standalone_openvino_version": "2025.0.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.6.3.post1",
+    "vllm_version": "0.7.0",
     "rhel_py_version": "3.12.3",
 }
 
@@ -951,34 +951,51 @@ RUN yum install -y ca-certificates curl gnupg yum-utils \\
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
 RUN yum install -y \\
-            ca-certificates \\
             autoconf \\
             automake \\
+            bzip2-devel \\
+            ca-certificates \\
             git \\
             gperf \\
-            re2-devel \\
-            openssl-devel \\
-            libtool \\
-            libcurl-devel \\
-            libb64-devel \\
             gperftools-devel \\
+            libarchive-devel \\
+            libb64-devel \\
+            libcurl-devel \\
+            libtool \\
+            libxml2-devel \\
+            ncurses-devel \\
+            numactl-devel \\
+            openssl-devel \\
+            pkg-config \\
             python3-pip \\
+            python3-scons \\
             python3-setuptools \\
             rapidjson-devel \\
-            python3-scons \\
-            pkg-config \\
+            re2-devel \\
+            readline-devel \\
             unzip \\
             wget \\
-            ncurses-devel \\
-            readline-devel \\
             xz-devel \\
-            bzip2-devel \\
-            zlib-devel \\
-            libarchive-devel \\
-            libxml2-devel \\
-            numactl-devel \\
-            wget
+            zlib-devel
 """
+    if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
+        df += """
+RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
+    && tar -xzf /tmp/ccache.tar.gz -C /tmp \\
+    && cmake -D CMAKE_BUILD_TYPE=Release -S /tmp/ccache-4.10.2 -B /tmp/build \\
+    && cmake --build /tmp/build -j$(nproc) -t install \\
+    && rm -rf /tmp/ccache.tar.gz /tmp/ccache-4.10.2 /tmp/build
+
+ENV CCACHE_REMOTE_ONLY="true" \\
+    CCACHE_REMOTE_STORAGE="{}" \\
+    CMAKE_CXX_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_C_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
+
+RUN ccache -p
+""".format(
+            os.getenv("CCACHE_REMOTE_STORAGE")
+        )
     # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
@@ -1137,6 +1154,21 @@ ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 """
 
+    if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
+        df += """
+ENV CCACHE_REMOTE_ONLY="true" \\
+    CCACHE_REMOTE_STORAGE="{}" \\
+    CMAKE_CXX_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_C_COMPILER_LAUNCHER="ccache" \\
+    CMAKE_CUDA_COMPILER_LAUNCHER="ccache"
+
+RUN apt-get update \\
+      && apt-get install -y --no-install-recommends ccache && ccache -p \\
+      && rm -rf /var/lib/apt/lists/*
+""".format(
+            os.getenv("CCACHE_REMOTE_STORAGE")
+        )
+
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
     if target_platform() == "windows":
@@ -1234,7 +1266,6 @@ COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
@@ -1819,6 +1850,14 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+            if FLAGS.use_user_docker_config:
+                if os.path.exists(FLAGS.use_user_docker_config):
+                    runargs += [
+                        "-v",
+                        os.path.expanduser(
+                            FLAGS.use_user_docker_config + ":/root/.docker/config.json"
+                        ),
+                    ]
 
         runargs += ["tritonserver_buildbase"]
 
@@ -1868,7 +1907,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets != "":
+        if secrets:
             finalargs += [
                 f"--secret id=req,src={requirements}",
                 f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
@@ -2419,6 +2458,12 @@ if __name__ == "__main__":
         help="Do not use Docker container for build.",
     )
     parser.add_argument(
+        "--use-user-docker-config",
+        default=None,
+        required=False,
+        help="Path to the Docker configuration file to be used when performing container build.",
+    )
+    parser.add_argument(
         "--no-container-interactive",
         action="store_true",
         required=False,
@@ -2861,7 +2906,7 @@ if __name__ == "__main__":
             backends["python"] = backends["vllm"]
 
     secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets is not None:
+    if secrets:
         requirements = secrets.get("req", "")
         vllm_index_url = secrets.get("vllm_index_url", "")
         pytorch_triton_url = secrets.get("pytorch_triton_url", "")
