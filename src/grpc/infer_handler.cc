@@ -770,7 +770,7 @@ ModelInferHandler::Process(
             "GRPC server is shutting down and has stopped accepting new "
             "requests.");
       }
-      lk1.unlock_shared();
+      lk1.unlock();
 
 #ifdef TRITON_ENABLE_TRACING
       state->trace_timestamps_.emplace_back(
