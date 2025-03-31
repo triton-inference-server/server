@@ -140,6 +140,7 @@ class UnifiedCallbackService
     : public inference::GRPCInferenceServiceCallback::CallbackService {
  public:
   UnifiedCallbackService(
+      const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& server,
       TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,

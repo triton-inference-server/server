@@ -839,11 +839,17 @@ ModelInferCallbackHandler::Execute(
         &callback_state->shm_regions_info_);
   }
 
+  auto response_queue =
+      std::make_shared<ResponseQueue<inference::ModelInferResponse>>(1);
+  inference::ModelInferResponse* response_ptr =
+      response_queue->GetNonDecoupledResponse();
+  *response_ptr = *response;
+
   // Set up allocator payload
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, *request,
-        std::move(callback_state->serialized_data_), response,
+        std::move(callback_state->serialized_data_), response_queue,
         &callback_state->alloc_payload_, &callback_state->shm_regions_info_);
   }
 
