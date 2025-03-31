@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/python
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +25,44 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+import sys
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:25.02-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://https://<OCI_NAMESPACE>.compat.objectstorage.<OCI_REGION>.oraclecloud.com:443/triton-inference-server-repository
-  numGpus: 1
+sys.path.append("../common")
 
-service:
-  type: LoadBalancer
+import json
+import os
+import sys
+import unittest
 
-secret:
-  region: OCI_REGION
-  id: OCI_SECRET_KEY_ID
-  key: OCI_SECRET_ACCESS_KEY
+import requests
+import test_util as tu
+
+
+class SageMakerGenerateTest(tu.TestResultCollector):
+    def setUp(self):
+        SAGEMAKER_BIND_TO_PORT = os.getenv("SAGEMAKER_BIND_TO_PORT", "8080")
+        self.url_ = "http://localhost:{}/invocations".format(SAGEMAKER_BIND_TO_PORT)
+
+    def generate(self, inputs):
+        return requests.post(
+            self.url_, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
+        )
+
+    def test_generate(self):
+        # Setup text-based input
+        text = "hello world"
+        inputs = {"PROMPT": text, "STREAM": False}
+
+        r = self.generate(inputs)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("TEXT", data)
+        self.assertEqual(text, data["TEXT"])
+
+
+if __name__ == "__main__":
+    unittest.main()
