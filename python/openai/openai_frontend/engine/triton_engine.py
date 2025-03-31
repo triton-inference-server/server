@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -78,11 +78,22 @@ class TritonModelMetadata:
 
 class TritonLLMEngine(LLMEngine):
     def __init__(
-        self, server: tritonserver.Server, tokenizer: str, backend: Optional[str] = None
+        self,
+        server: tritonserver.Server,
+        tokenizer_map: Dict[str, str] = None,
+        backend: Optional[str] = None,
     ):
         # Assume an already configured and started server
         self.server = server
-        self.tokenizer = self._get_tokenizer(tokenizer)
+        self.tokenizer_map = {}
+        if tokenizer_map:
+            for model_name, tokenizer_path in tokenizer_map.items():
+                try:
+                    self.tokenizer_map[model_name] = get_tokenizer(tokenizer_path)
+                except Exception as e:
+                    print(
+                        f"Warning: Failed to load tokenizer for {model_name} from {tokenizer_path}: {e}"
+                    )
         # TODO: Reconsider name of "backend" vs. something like "request_format"
         self.backend = backend
 
@@ -253,12 +264,12 @@ class TritonLLMEngine(LLMEngine):
             if not backend and model.config()["platform"] == "ensemble":
                 backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
-
+            default_tokenizer = self.tokenizer_map.get("default", None)
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
-                tokenizer=self.tokenizer,
+                tokenizer=self.tokenizer_map.get(name, default_tokenizer),
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
             )
