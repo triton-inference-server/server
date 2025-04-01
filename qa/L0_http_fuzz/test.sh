@@ -46,7 +46,7 @@ rm -f *.log *.db
 EXPECTED_NUM_TESTS="1"
 
 mkdir -p models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_object models/
 
 FUZZTEST=fuzztest.py
 FUZZ_LOG=`pwd`/fuzz.log

@@ -39,7 +39,7 @@ This repository contains information about how to deploy NVIDIA Triton Inference
 - EAS provides a simple way for deep learning developers to deploy their models in Alibaba Cloud.
 - Using **Triton Processor** is the recommended way on EAS to deploy Triton Inference Server. Users can simply deploy a Triton Server by preparing models and creating a EAS service by setting processor type to `triton`.
 - Models should be uploaded to Alibaba Cloud's OSS(Object Storage Service). User's model repository in OSS will be mounted onto local path visible to Triton Server.
-- This documentation uses Triton's own example models for demo. The tensorflow inception model can be downloaded by the `fetch_models.sh` script.
+- This documentation uses Triton's own example models for demo. The ONNX inception v3 model can be obtained by the `fetch_models.sh` script.
 
 # Prerequisites
 - You should register an Alibaba Cloud Account, and being able to use EAS by [eascmd](https://help.aliyun.com/document_detail/111031.html?spm=a2c4g.11186623.6.752.42356f46FN5fU1), which is a command line tool to create stop or scale services on EAS.
@@ -48,10 +48,10 @@ This repository contains information about how to deploy NVIDIA Triton Inference
 
 # Demo Instruction
 ## Prepare a model repo directory in OSS
-Download the tensorflow inception model via [fetch_model.sh](https://github.com/triton-inference-server/server/blob/main/docs/examples/fetch_models.sh). Then using [ossutil](https://help.aliyun.com/document_detail/50452.html?spm=a2c4g.11186623.6.833.26d66d51dPEytI) , which is a command line tool to use OSS, to upload the model to a certain OSS dir as you want.
+Download the ONNX inception v3 model via [fetch_model.sh](https://github.com/triton-inference-server/server/blob/main/docs/examples/fetch_models.sh). Then using [ossutil](https://help.aliyun.com/document_detail/50452.html?spm=a2c4g.11186623.6.833.26d66d51dPEytI) , which is a command line tool to use OSS, to upload the model to a certain OSS dir as you want.
 
 ```
-./ossutil cp inception_graphdef/ oss://triton-model-repo/models
+./ossutil cp inception_v3_onnx/ oss://triton-model-repo/models
 ```
 ## Create Triton Service with json config by eascmd
 The following is the json we use when creating a Triton Server on EAS.
@@ -125,7 +125,7 @@ triton_client = httpclient.InferenceServerClient(url=URL, verbose=False)
 start = time.time()
 for i in range(10):
     results = triton_client.infer(
-        "inception_graphdef", inputs=[input_img], outputs=[output], headers=HEADERS
+        "inception_v3_onnx", inputs=[input_img], outputs=[output], headers=HEADERS
     )
     res_body = results.get_response()
     elapsed_ms = (time.time() - start) * 1000

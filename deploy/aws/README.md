@@ -224,7 +224,7 @@ using image classification models being served by the inference
 server. For example,
 
 ```
-$ image_client -u 34.83.9.133:8000 -m inception_graphdef -s INCEPTION -c3 mug.jpg
+$ image_client -u 34.83.9.133:8000 -m inception_v3_onnx -s INCEPTION -c3 mug.jpg
 Request 0, batch size 1
 Image 'images/mug.jpg':
     504 (COFFEE MUG) = 0.723992

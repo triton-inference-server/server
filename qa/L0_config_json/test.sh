@@ -52,7 +52,7 @@ RET=0
 rm -fr *.log
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
 
 # Test input and output dims are shown as numbers
 TRIAL=ios
@@ -65,7 +65,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -87,8 +87,8 @@ wait $SERVER_PID
 TRIAL=reshape
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
      sed -i "s/data_type:.*TYPE_FP32/data_type: TYPE_FP32\nreshape: { shape: [ 16 ]}/g" config.pbtxt)
 
 run_server
@@ -99,7 +99,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -121,8 +121,8 @@ wait $SERVER_PID
 TRIAL=specific
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
     sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [1] }}/" config.pbtxt)
 
 run_server
@@ -133,7 +133,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -157,8 +157,8 @@ wait $SERVER_PID
 TRIAL=dbatch
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
      echo "dynamic_batching: { max_queue_delay_microseconds: 42 \
           default_queue_policy: { default_timeout_microseconds: 123 } \
           priority_queue_policy: { key: 1  value: { default_timeout_microseconds: 123 }} \
@@ -172,7 +172,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -209,8 +209,8 @@ wait $SERVER_PID
 TRIAL=sbatch
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
      echo "sequence_batching: { max_sequence_idle_microseconds: 42 \
           oldest: { max_queue_delay_microseconds: 987 }}" >> config.pbtxt)
 
@@ -222,7 +222,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -265,7 +265,7 @@ wait $SERVER_PID
 TRIAL=ensemble
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
 mkdir -p models/simple_ensemble/1 && cp ensemble_config.pbtxt models/simple_ensemble/config.pbtxt
 
 run_server
@@ -307,8 +307,8 @@ rm -fr models/simple_ensemble
 TRIAL=warmup
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
      echo "model_warmup [{" >> config.pbtxt && \
      echo "    name : \"warmup 1\"" >> config.pbtxt && \
      echo "    batch_size: 1" >> config.pbtxt && \
@@ -355,7 +355,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out

@@ -67,8 +67,8 @@ for BACKEND in $BACKENDS; do
     # Run with a high minimum capability so that no GPUs are
     # recognized. This should cause the server to fail to start since
     # we explicitly asked for a GPU in the instance_group.
-    SERVER_ARGS="--min-supported-compute-capability=100.0 --model-repository=`pwd`/models"
-    SERVER_LOG="./inference_server_${BACKEND}_cc100.log"
+    SERVER_ARGS="--min-supported-compute-capability=900.0 --model-repository=`pwd`/models"
+    SERVER_LOG="./inference_server_${BACKEND}_cc900.log"
     run_server
     if [ "$SERVER_PID" != "0" ]; then
         echo -e "\n***\n*** Unexpected success with min compute 100.0 for ${BACKEND}\n***"

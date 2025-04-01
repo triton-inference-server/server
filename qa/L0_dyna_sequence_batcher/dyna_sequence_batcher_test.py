@@ -45,7 +45,7 @@ _test_cuda_shared_memory = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)
 
 NO_BATCHING = int(os.environ.get("NO_BATCHING", 0)) == 1
 BACKENDS = os.environ.get(
-    "BACKENDS", "graphdef savedmodel libtorch onnx plan custom custom_string"
+    "BACKENDS", "libtorch onnx plan custom custom_string"
 )
 IMPLICIT_STATE = int(os.environ["IMPLICIT_STATE"]) == 1
 
@@ -74,7 +74,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         # information.
         if (
             (("nobatch" not in trial) and ("custom" not in trial))
-            or ("graphdef" in trial)
             or ("plan" in trial)
             or ("onnx" in trial)
             or ("libtorch" in trial)

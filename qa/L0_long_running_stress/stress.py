@@ -47,7 +47,7 @@ import tritonclient.grpc as grpcclient
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 1024 * 1024
-BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx plan")
+BACKENDS = os.environ.get("BACKENDS", "onnx plan")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -66,7 +66,7 @@ def get_trials(is_sequence=True):
     _trials = ()
     if is_sequence:
         for backend in BACKENDS.split(" "):
-            if (backend != "libtorch") and (backend != "savedmodel"):
+            if (backend != "libtorch"):
                 _trials += (backend + "_nobatch",)
             _trials += (backend,)
     else:

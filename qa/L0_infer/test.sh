@@ -233,12 +233,12 @@ function generate_model_repository() {
 
       create_nop_version_dir `pwd`/models
 
-      if [[ $BACKENDS == *"graphdef"* ]]; then
+      if [[ $BACKENDS == *"onnx"* ]]; then
         ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
         ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
 
-        if [[ $BACKENDS == *"savedmodel"* ]] ; then
+        if [[ $BACKENDS == *"plan"* ]] ; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
         fi
 

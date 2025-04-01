@@ -28,9 +28,9 @@
 ############################################################################
 ## This script generates custom operations needed by some of the
 ## Triton's CI tests. Generating these custom operations requires
-## using the TensorFlow container.
+## using the Pytorch container.
 ##
-## 1. Update TENSORFLOW_IMAGE and PYTORCH_IMAGE to match what is being
+## 1. Update PYTORCH_IMAGE to match what is being
 ## used by the Triton release being tested.
 ##
 ## 2. Run this script to create /tmp/qa_custom_ops.
@@ -93,7 +93,6 @@ VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_custom_ops
 docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE \
 mkdir -p \
 $VOLUME_DESTDIR/libtorch_custom_ops
-
 
 PYTSCRIPT=gen.PyTorch.gen_qa_custom_ops.cmds
 

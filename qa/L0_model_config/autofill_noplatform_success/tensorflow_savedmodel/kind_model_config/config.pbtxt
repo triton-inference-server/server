@@ -1,3 +1,0 @@
-instance_group {
-  kind: KIND_MODEL
-}
