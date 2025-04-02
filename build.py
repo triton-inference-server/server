@@ -562,8 +562,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "tensorflow":
-        args = tensorflow_cmake_args(images, library_paths)
     elif be == "python":
         args = python_cmake_args()
     elif be == "dali":
@@ -793,23 +791,6 @@ def tensorrt_cmake_args():
         )
 
     return cargs
-
-
-def tensorflow_cmake_args(images, library_paths):
-    backend_name = "tensorflow"
-    extra_args = []
-
-    # If a specific TF image is specified use it, otherwise pull from NGC.
-    if backend_name in images:
-        image = images[backend_name]
-    else:
-        image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
-            FLAGS.upstream_container_version
-        )
-    extra_args = [
-        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
-    ]
-    return extra_args
 
 
 def dali_cmake_args():
@@ -1233,10 +1214,10 @@ ARG BASE_IMAGE={}
         argmap["BASE_IMAGE"],
     )
 
-    # PyTorch and TensorFlow backends need extra CUDA and other
+    # PyTorch backends need extra CUDA and other
     # dependencies during runtime that are missing in the CPU-only base container.
     # These dependencies must be copied from the Triton Min image.
-    if not FLAGS.enable_gpu and (("pytorch" in backends) or ("tensorflow" in backends)):
+    if not FLAGS.enable_gpu and ("pytorch" in backends):
         df += """
 ############################################################################
 ##  Triton Min image
@@ -1602,10 +1583,10 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cud
             cuda_arch=cuda_arch, libs_arch=libs_arch
         )
 
-    if ("pytorch" in backends) or ("tensorflow" in backends):
-        # Add NCCL dependency for tensorflow/pytorch backend.
+    if "pytorch" in backends:
+        # Add NCCL dependency for pytorch backend.
         # Note: Even though the build is CPU-only, the version of
-        # tensorflow/pytorch we are using depends upon the NCCL library.
+        # pytorch we are using depends upon the NCCL library.
         # Since this dependency is not present in the ubuntu base image,
         # we must copy it from the Triton min container ourselves.
         df += """
@@ -1720,11 +1701,10 @@ def create_build_dockerfiles(
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch and TensorFlow containers that
-    # are not CPU-only.
+    # since we are using PyTorch containers that are not CPU-only.
     if (
         not FLAGS.enable_gpu
-        and (("pytorch" in backends) or ("tensorflow" in backends))
+        and ("pytorch" in backends)
         and (target_platform() != "windows")
     ):
         if "gpu-base" in images:
@@ -2351,7 +2331,6 @@ def enable_all():
             "identity",
             "square",
             "repeat",
-            "tensorflow",
             "onnxruntime",
             "python",
             "dali",
@@ -2586,7 +2565,7 @@ if __name__ == "__main__":
         "--image",
         action="append",
         required=False,
-        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow", or "pytorch".',
+        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
     )
 
     parser.add_argument(
@@ -2887,12 +2866,6 @@ if __name__ == "__main__":
         parts = be.split(":")
         if len(parts) == 1:
             parts.append(default_repo_tag)
-        if parts[0] == "tensorflow1":
-            fail(
-                "Starting from Triton version 23.04, support for TensorFlow 1 has been discontinued. Please switch to Tensorflow 2."
-            )
-        if parts[0] == "tensorflow2":
-            parts[0] = "tensorflow"
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -2939,13 +2912,10 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0]
-            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2"],
+            parts[0] not in ["base", "gpu-base", "pytorch"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
-        if parts[0] == "tensorflow2":
-            parts[0] = "tensorflow"
         images[parts[0]] = parts[1]
 
     # Initialize map of library paths for each backend.
@@ -2954,8 +2924,6 @@ if __name__ == "__main__":
         parts = lpath.split(":")
         if len(parts) == 2:
             log('backend "{}" library path "{}"'.format(parts[0], parts[1]))
-            if parts[0] == "tensorflow2":
-                parts[0] = "tensorflow"
             library_paths[parts[0]] = parts[1]
 
     # Parse any explicitly specified cmake arguments

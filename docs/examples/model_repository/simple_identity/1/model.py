@@ -1,5 +1,4 @@
-
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,27 +24,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "identity"
-platform: "onnxruntime_onnx"
-max_batch_size: 8
-version_policy: { latest { num_versions: 1 }}
+import json
+
+import triton_python_backend_utils as pb_utils
 
 
+class TritonPythonModel:
+    """This model always returns the input that it has received."""
 
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_STRING
-    dims: [ -1 ]
+    def initialize(self, args):
+        self.model_config = json.loads(args["model_config"])
 
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_STRING
-    dims: [ -1 ]
+    def execute(self, requests):
+        """This function is called on inference request."""
 
-
-  }
-]
+        responses = []
+        for request in requests:
+            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", in_0.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor_0]))
+        return responses

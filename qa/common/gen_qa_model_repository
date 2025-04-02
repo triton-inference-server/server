@@ -28,9 +28,9 @@
 ############################################################################
 ## This script generates the model repository needed by some of the
 ## tritonserver CI tests. Generating these models requires using
-## the TensorFlow and PyTorch containers.
+## the PyTorch container.
 ##
-## 1. Update TENSORRT_IMAGE, PYTORCH_IMAGE and TENSORFLOW_IMAGE to
+## 1. Update TENSORRT_IMAGE and PYTORCH_IMAGE to
 ## match what is being used by the tritonserver release being
 ## tested.
 ##
@@ -169,7 +169,6 @@ docker run \
 ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
 OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
 TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
-TFSCRIPT=gen.TensorFlow.gen_qa_model_repository.cmds
 TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 
 # OPENVINO

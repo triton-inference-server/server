@@ -251,8 +251,8 @@ public class SequenceTest {
       String model_name, int expected_result, int value, String flag)
   {
     if ((!model_name.contains("nobatch") && !model_name.contains("custom"))
-        || model_name.contains("graphdef") || model_name.contains("plan")
-        || model_name.contains("onnx") || model_name.contains("libtorch")) {
+        || model_name.contains("plan") || model_name.contains("onnx")
+        || model_name.contains("libtorch")) {
       expected_result = value;
       if (flag != null && flag.contains("start")) {
         expected_result++;
