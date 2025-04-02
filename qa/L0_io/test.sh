@@ -137,6 +137,11 @@ for trial in onnx ; do
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
 
+# set up "addsub" ensemble for custom float32 model
+cp -r $MODELSDIR/fan_onnx_float32_float32_float32 $MODELSDIR/fan_${full} && \
+    (cd $MODELSDIR/fan_${full} && \
+            sed -i "s/onnx_float32_float32_float32/${full}/" config.pbtxt)
+
 # custom float32 component of ensemble
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1

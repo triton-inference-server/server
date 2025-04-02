@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -104,7 +104,7 @@ function run_cpu_tests_int32() {
 }
 
 function run_cpu_tests_fp32() {
-    for trial in graphdef savedmodel; do
+    for trial in onnx; do
         full=${trial}_float32_float32_float32
         set +e
         rm -rf ${MODEL_REPO}

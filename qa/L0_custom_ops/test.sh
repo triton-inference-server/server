@@ -41,8 +41,6 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-ZERO_OUT_TEST=zero_out_test.py
-CUDA_OP_TEST=cuda_op_test.py
 MOD_OP_TEST=mod_op_test.py
 VISION_OP_TEST=vision_op_test.py
 ONNX_OP_TEST=onnx_op_test.py

@@ -196,10 +196,6 @@ function get_datatype () {
   local dtype="int32 bool"
   if [[ $1 == "plan" ]]; then
     dtype="float32"
-  elif [[ $1 == "savedmodel" ]]; then
-    dtype="float32 bool"
-  elif [[ $1 == "graphdef" ]]; then
-    dtype="object bool int32"
   fi
 
   # Add type string to the onnx model tests only for implicit state.

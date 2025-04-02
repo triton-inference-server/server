@@ -57,7 +57,7 @@ fi
 
 rm -rf ./models/
 mkdir -p ./models/no_config
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
 
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -182,74 +182,6 @@ function save_model_config() {
         RET=1
     fi
 }
-
-# Tensorflow 1: Batching ON
-rm -rf ./models/
-mkdir -p ./models/no_config
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
-
-SERVER_ARGS="--backend-config=default-max-batch-size=5 $COMMON_ARGS"
-SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_5.log
-run_server
-
-TRIAL=tensorflow_batching_on
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "*** FAILED: Server failed to start $SERVER\n"
-    RET=1
-else
-    save_model_config
-
-    # Assert the max-batch-size is the command line value
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
-    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
-        cat $TRIAL.out
-        echo "*** FAILED: Expected max batch size to be 5 but found: $MAX_BATCH_LOG_LINE\n"
-        RET=1
-    fi
-
-    # Assert we are also turning on the dynamic_batcher
-    DYNAMIC_BATCHING_LOG_LINE=$(grep -a "Starting dynamic-batcher thread" $SERVER_LOG)
-    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
-        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
-        RET=1
-    fi
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-fi
-
-# Tensorflow 1: Batching OFF
-SERVER_ARGS="--backend-config=default-max-batch-size=0 $COMMON_ARGS"
-SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_0.log
-run_server
-
-TRIAL=tensorflow_batching_off
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "*** FAILED: Server failed to start $SERVER\n"
-    RET=1
-
-else
-    save_model_config
-
-    # Assert the max-batch-size is 0 in the case batching is supported
-    # in the model but not in the config.
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
-    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
-        echo "*** FAILED: Expected max batch size to be 0 but found: $MAX_BATCH_LOG_LINE\n"
-        RET=1
-    fi
-
-    # Assert batching disabled
-    if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
-        echo "*** FAILED: Found dynamic batching enabled in configuration when none expected.\n"
-        RET=1
-    fi
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-fi
 
 # Onnxruntime: Batching ON
 rm -rf ./models/
