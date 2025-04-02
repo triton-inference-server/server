@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,8 +64,8 @@ ENSEMBLE_CACHE_COMPOSING_DECOUPLED="${MODEL_DIR}/ensemble_cache_composing_decoup
 rm -fr ${ENSEMBLE_MODEL_DIR} && mkdir ${ENSEMBLE_MODEL_DIR}
 rm -fr ${ENSEMBLE_CACHE_DECOUPLED} && mkdir ${ENSEMBLE_CACHE_DECOUPLED}
 rm -fr ${ENSEMBLE_CACHE_COMPOSING_DECOUPLED} && mkdir ${ENSEMBLE_CACHE_COMPOSING_DECOUPLED}
-ENSEMBLE_MODEL="simple_graphdef_float32_float32_float32"
-COMPOSING_MODEL="graphdef_float32_float32_float32"
+ENSEMBLE_MODEL="simple_onnx_float32_float32_float32"
+COMPOSING_MODEL="onnx_float32_float32_float32"
 
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${ENSEMBLE_MODEL_DIR}/${ENSEMBLE_MODEL}"
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${ENSEMBLE_MODEL_DIR}/${COMPOSING_MODEL}"
