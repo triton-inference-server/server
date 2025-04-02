@@ -41,6 +41,7 @@ from gen_common import (
 FLAGS = None
 np_dtype_string = np.dtype(object)
 
+
 def create_plan_shape_tensor_modelfile(
     models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype
 ):

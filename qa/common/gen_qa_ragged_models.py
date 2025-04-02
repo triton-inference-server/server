@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,13 +30,10 @@ import argparse
 import os
 
 import numpy as np
-from gen_common import (
-    np_to_model_dtype,
-    np_to_onnx_dtype,
-    np_to_trt_dtype,
-)
+from gen_common import np_to_model_dtype, np_to_onnx_dtype, np_to_trt_dtype
 
 np_dtype_string = np.dtype(object)
+
 
 def create_plan_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
@@ -406,6 +403,7 @@ dynamic_batching {{
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input 'BATCH_ITEM_SHAPE' testing,

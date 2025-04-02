@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -84,7 +84,7 @@ class Scenario(metaclass=abc.ABCMeta):
 
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
-        if ("plan" in trial):
+        if "plan" in trial:
             return np.float32
         return np.int32
 

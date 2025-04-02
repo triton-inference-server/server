@@ -76,7 +76,7 @@ RUN apt update -q=2 \
 
 # Add inception_graphdef model to example repo
 # FIXME: This should be changed to using the  fetch_models.sh script
-# in order to ensure the public facing docs are up-to-date. 
+# in order to ensure the public facing docs are up-to-date.
 WORKDIR /workspace/docs/examples/model_repository
 RUN mkdir -p model_repository/inception_onnx/1 && \
         wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \

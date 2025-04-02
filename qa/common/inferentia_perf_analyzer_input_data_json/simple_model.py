@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,6 +50,7 @@ def gen_pytorch_model(name, batch_size):
     )
     model_neuron = torch_neuron.trace(model, example_inputs, dynamic_batch_size=True)
     model_neuron.save("{}.pt".format(name))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

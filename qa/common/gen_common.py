@@ -114,6 +114,7 @@ def np_to_trt_dtype(np_dtype):
         return trt.bfloat16
     return None
 
+
 def np_to_torch_dtype(np_dtype):
     import torch
 

@@ -500,7 +500,7 @@ if __name__ == "__main__":
     fail_if(len(images) < 2, "Need to specify both 'full' and 'min' images if at all")
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch,ontainers that
+    # since we are using PyTorch containers that
     # are not CPU-only.
     if ("pytorch" in FLAGS.backend) and ("gpu-min" not in images):
         images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(

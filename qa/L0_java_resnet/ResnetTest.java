@@ -37,7 +37,8 @@ public class ResnetTest {
   // Maximum allowed difference from expected model outputs
   private static final float ALLOWED_DELTA = .001f;
   private static final String[] MODELS = {
-      "resnet50_fp32_libtorch", "resnet50_fp32_onnx",
+      "resnet50_fp32_libtorch",
+      "resnet50_fp32_onnx",
   };
   private static final double TRITON_MIN_COMPUTE_CAPABILITY = 7.5;
   private enum Backend {

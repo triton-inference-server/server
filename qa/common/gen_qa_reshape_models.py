@@ -44,6 +44,7 @@ FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List
 
+
 def create_plan_modelfile(
     models_dir, model_version, max_batch, dtype, input_shapes, output_shapes
 ):

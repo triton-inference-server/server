@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -99,9 +99,7 @@ class ClientNoBatchTest(tu.TestResultCollector):
         # is included in the shape
         tensor_shape = (1, input_size)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name(
-                "onnx_nobatch", np.int32, np.int8, np.int8
-            )
+            model_name = tu.get_model_name("onnx_nobatch", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 
@@ -153,9 +151,7 @@ class ClientNoBatchTest(tu.TestResultCollector):
         # input shapes.
         tensor_shape = (input_size,)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name(
-                "onnx_nobatch", np.int32, np.int8, np.int8
-            )
+            model_name = tu.get_model_name("onnx_nobatch", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 

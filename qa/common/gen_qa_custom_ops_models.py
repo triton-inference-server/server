@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@ import argparse
 import os
 
 FLAGS = None
+
 
 def create_moduloop_modelfile(models_dir, model_version):
     model_name = "libtorch_modulo"
@@ -174,6 +175,7 @@ output [
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
 
 def create_modulo_op_models(models_dir):
     model_version = 1

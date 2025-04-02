@@ -1,4 +1,4 @@
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,7 +45,7 @@ class TritonPythonModel:
         return auto_complete_model_config
 
     def initialize(self, args):
-        import torch 
+        import torch
 
         self.model_config = args["model_config"]
         # This is to make sure that /bin/bash is not picking up

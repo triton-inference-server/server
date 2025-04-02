@@ -287,11 +287,11 @@ for BACKEND in ${BACKENDS}; do
         wait $SERVER_PID
     fi
 
-    # FIXME: This section of code doesn't check if the warmup model 
+    # FIXME: This section of code doesn't check if the warmup model
     # is faster than the fresh model. Thus we are not losing any coverage
     # by commenting it out. The functionality of the warmup  methods are
-    # covered by other parts of this test which will fail if the *functionality* 
-    # breaks. 
+    # covered by other parts of this test which will fail if the *functionality*
+    # breaks.
     # if [ "$BACKEND" == "graphdef" ]; then
     #     # Show effect of warmup by using a TF model with TF-TRT optimization which is
     #     # known to be slow on first inference.

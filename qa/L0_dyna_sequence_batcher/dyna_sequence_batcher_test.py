@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,9 +44,7 @@ _test_system_shared_memory = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY"
 _test_cuda_shared_memory = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
 
 NO_BATCHING = int(os.environ.get("NO_BATCHING", 0)) == 1
-BACKENDS = os.environ.get(
-    "BACKENDS", "libtorch onnx plan custom custom_string"
-)
+BACKENDS = os.environ.get("BACKENDS", "libtorch onnx plan custom custom_string")
 IMPLICIT_STATE = int(os.environ["IMPLICIT_STATE"]) == 1
 
 _trials = BACKENDS.split(" ")

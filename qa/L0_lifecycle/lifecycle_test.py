@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1043,7 +1043,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_model_modify(self):
-        models_base = ("plan")
+        models_base = "plan"
         models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
@@ -1170,7 +1170,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_file_delete(self):
-        models_base = ("plan")
+        models_base = "plan"
         models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
@@ -1266,9 +1266,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
     def test_multiple_model_repository_polling(self):
         model_shape = (1, 16)
-        plan_name = tu.get_model_name(
-            "plan", np.float32, np.float32, np.float32
-        )
+        plan_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
 
         # Models should be loaded successfully and infer
         # successfully. Initially plan only has version 1.
@@ -1305,17 +1303,13 @@ class LifeCycleTest(tu.TestResultCollector):
         # have versions 1 and 3.
         shutil.rmtree("models/" + plan_name)
         time.sleep(5)  # wait for model to unload
-        self._infer_success_models(
-            ["plan", "libtorch", "onnx"], (1, 3), model_shape
-        )
+        self._infer_success_models(["plan", "libtorch", "onnx"], (1, 3), model_shape)
 
     def test_multiple_model_repository_control(self):
         # similar to test_multiple_model_repository_polling, but the
         # model load/unload is controlled by the API
         model_shape = (1, 16)
-        plan_name = tu.get_model_name(
-            "plan", np.float32, np.float32, np.float32
-        )
+        plan_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
         model_bases = ["plan", "libtorch", "onnx"]
 
         # Initially models are not loaded
@@ -1412,9 +1406,7 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertIn("failed to load '{}'".format(plan_name), ex.message())
 
-        self._infer_success_models(
-            ["plan", "libtorch", "onnx"], (1, 3), model_shape
-        )
+        self._infer_success_models(["plan", "libtorch", "onnx"], (1, 3), model_shape)
 
     def test_model_control(self):
         model_shape = (1, 16)

@@ -43,6 +43,7 @@ FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List, Tuple
 
+
 def create_ensemble_modelfile(
     create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
@@ -1066,7 +1067,7 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             )
 
 
-# FIXME: The function signatures require a `savedmodel` boolean flag 
+# FIXME: The function signatures require a `savedmodel` boolean flag
 # on all of them even though Tensorflow has been deprecated since 25.03
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

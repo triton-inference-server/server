@@ -792,6 +792,7 @@ def tensorrt_cmake_args():
 
     return cargs
 
+
 def dali_cmake_args():
     return [
         cmake_backend_enable("dali", "TRITON_DALI_SKIP_DOWNLOAD", False),
@@ -1582,7 +1583,7 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cud
             cuda_arch=cuda_arch, libs_arch=libs_arch
         )
 
-    if ("pytorch" in backends):
+    if "pytorch" in backends:
         # Add NCCL dependency for pytorch backend.
         # Note: Even though the build is CPU-only, the version of
         # pytorch we are using depends upon the NCCL library.
@@ -2911,8 +2912,7 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0]
-            not in ["base", "gpu-base", "pytorch"],
+            parts[0] not in ["base", "gpu-base", "pytorch"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
