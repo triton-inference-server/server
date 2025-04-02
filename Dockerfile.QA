@@ -75,7 +75,7 @@ RUN apt update -q=2 \
     && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 
 # Add inception_graphdef model to example repo
-# FIXME: This should be changed to using the  fetch_models.sh script
+# FIXME: This should be changed to using the fetch_models.sh script
 # in order to ensure the public facing docs are up-to-date.
 WORKDIR /workspace/docs/examples/model_repository
 RUN mkdir -p model_repository/inception_onnx/1 && \
