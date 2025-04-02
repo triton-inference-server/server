@@ -28,6 +28,7 @@
 import os
 import re
 import sys
+import time
 
 sys.path.append("../common")
 sys.path.append("../clients")
@@ -107,6 +108,9 @@ class EnsembleCacheTest(tu.TestResultCollector):
         return outputs
 
     def _get_model_statistics(self, model):
+        # sleep for 1 second to ensure that the model stats is persisted
+        time.sleep(1)
+
         # Get the stats for the requested model
         model_stats = self.triton_client.get_inference_statistics(
             model_name=model, as_json=True
