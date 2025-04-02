@@ -89,13 +89,14 @@ if __name__ == "__main__":
 
     # Send inference request to the inference server. Get results for
     # output tensor.
-    # If using libtorch model, set input and output name to "INPUT_0" and "OUTPUT_0", otherwise use the current name.
+    input_name = "INPUT0"
+    output_name = "OUTPUT0"
+
+    # If using libtorch model, set input and output name to "INPUT__0" and "OUTPUT__0"
     if "libtorch" in FLAGS.model_name:
         input_name = "INPUT__0"
         output_name = "OUTPUT__0"
-    else:
-        input_name = "INPUT0"
-        output_name = "OUTPUT0"
+
     inputs = [
         client_util.InferInput(
             input_name, input0_data.shape, np_to_triton_dtype(np.object_)
