@@ -172,20 +172,21 @@ class InferTest(tu.TestResultCollector):
             (input_size,),
         ):
             for prefix in ensemble_prefix:
-                if "onnx" in BACKENDS:
-                    _infer_exact_helper(
-                        self,
-                        prefix + "onnx",
-                        (input_size,),
-                        8,
-                        input_dtype,
-                        output0_dtype,
-                        output1_dtype,
-                        output0_raw=output0_raw,
-                        output1_raw=output1_raw,
-                        swap=swap,
-                        network_timeout=network_timeout,
-                    )
+                for pf in ["onnx"]:
+                    if pf in BACKENDS:
+                        _infer_exact_helper(
+                            self,
+                            prefix + pf,
+                            (input_size,),
+                            8,
+                            input_dtype,
+                            output0_dtype,
+                            output1_dtype,
+                            output0_raw=output0_raw,
+                            output1_raw=output1_raw,
+                            swap=swap,
+                            network_timeout=network_timeout,
+                        )
 
         if not CPU_ONLY and tu.validate_for_trt_model(
             input_dtype,
@@ -671,7 +672,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of onnx_int8_int8_int8 but
         # only version 3 should be available
-        for platform in "onnx":
+        for platform in ["onnx"]:
             if platform not in BACKENDS:
                 continue
             try:
@@ -734,7 +735,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of onnx_int16_int16_int16 but only
         # versions 2 and 3 should be available
-        for platform in "onnx":
+        for platform in ["onnx"]:
             if platform not in BACKENDS:
                 continue
             try:
@@ -793,7 +794,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
-        for platform in "onnx":
+        for platform in ["onnx"]:
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
@@ -848,7 +849,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float16_float16_float16 but only
         # version 1 should be available.
-        for platform in "onnx":
+        for platform in ["onnx"]:
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
