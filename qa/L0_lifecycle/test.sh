@@ -333,7 +333,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_modelfail
 rm -fr models models_0
 mkdir models models_0
-for i in graphdef savedmodel ; do
+for i in openvino libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 for i in onnx plan ; do
@@ -341,7 +341,7 @@ for i in onnx plan ; do
 done
 # Change the model files so that multiple versions will be loaded, and one of
 # the versions will fail to load and cause all other versions to be unloaded.
-rm models/graphdef_float32_float32_float32/3/*
+rm models/openvino_float32_float32_float32/3/*
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
@@ -395,13 +395,13 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_no_model_config
 rm -fr models models_0
 mkdir models models_0
-for i in graphdef savedmodel ; do
+for i in openvino libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 for i in onnx plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
-rm models/graphdef_float32_float32_float32/config.pbtxt
+rm models/openvino_float32_float32_float32/config.pbtxt
 
 # Autocomplete should not be turned on for this test because it asserts an error was logged
 # when in strict model configuration mode.
@@ -428,7 +428,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # check server log for the warning messages
-if [ `grep -c "failed to open text file for read" $SERVER_LOG` == "0" ] || [ `grep -c "graphdef_float32_float32_float32/config.pbtxt: No such file or directory" $SERVER_LOG` == "0" ]; then
+if [ `grep -c "failed to open text file for read" $SERVER_LOG` == "0" ] || [ `grep -c "openvino_float32_float32_float32/config.pbtxt: No such file or directory" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not print model load failure\n***"
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -443,8 +443,11 @@ cp -r $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 models/.
 cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models_0/.
 sed -i "s/OUTPUT/_OUTPUT/" models/onnx_sequence_int32/config.pbtxt
 sed -i "s/OUTPUT/_OUTPUT/" models_0/onnx_int32_int32_int32/config.pbtxt
-for i in graphdef savedmodel; do
+for i in openvino libtorch; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    if [ $i == "openvino" ]; then
+        echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/openvino_float32_float32_float32/config.pbtxt
+    fi
 done
 for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
@@ -477,12 +480,12 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_model_no_version
 rm -fr models
 mkdir models
-for i in savedmodel onnx plan ; do
+for i in libtorch onnx plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-mkdir -p models/graphdef_float32_float32_float32
-cp $DATADIR/qa_model_repository/graphdef_float32_float32_float32/config.pbtxt \
-    models/graphdef_float32_float32_float32/.
+mkdir -p models/openvino_float32_float32_float32
+cp $DATADIR/qa_model_repository/openvino_float32_float32_float32/config.pbtxt \
+    models/openvino_float32_float32_float32/.
 
 SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
              --exit-timeout-secs=5"
@@ -511,7 +514,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_ignore_zero_prefixed_version
 rm -fr models
 mkdir models
-for i in savedmodel ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/003
 done
@@ -546,7 +549,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_ignore_non_intergral_version
 rm -fr models
 mkdir models
-for i in savedmodel ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/abc
 done
@@ -579,12 +582,12 @@ fi
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_model_load_unload
-rm -fr models savedmodel_float32_float32_float32
+rm -fr models libtorch_float32_float32_float32
 mkdir models
-for i in graphdef onnx plan ; do
+for i in openvino onnx plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 .
 
 SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
              --model-control-mode=poll --exit-timeout-secs=5"
@@ -608,12 +611,12 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
-rm -fr models savedmodel_float32_float32_float32
+rm -fr models libtorch_float32_float32_float32
 mkdir models
-for i in graphdef onnx plan; do
+for i in openvino onnx plan; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 .
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
@@ -639,7 +642,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_version_load_unload
 rm -fr models
 mkdir models
-for i in graphdef ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
@@ -667,7 +670,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_version_load_unload_disabled
 rm -fr models
 mkdir models
-for i in graphdef ; do
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
@@ -696,7 +699,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_model_modify
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel plan ; do
+for i in libtorch plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     sed '/^version_policy/d' \
         $DATADIR/qa_model_repository/${i}_float32_float32_float32/config.pbtxt > config.pbtxt.${i}
@@ -731,7 +734,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_file_delete
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel plan; do
+for i in onnx plan; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
@@ -757,17 +760,18 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_multiple_model_repository_polling
-rm -fr models models_0 savedmodel_float32_float32_float32
+rm -fr models models_0 libtorch_float32_float32_float32
 mkdir models models_0
-for i in graphdef ; do
+for i in openvino ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/openvino_float32_float32_float32/config.pbtxt
 done
 for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
-    rm -rf models/savedmodel_float32_float32_float32/3
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 .
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 models/. && \
+    rm -rf models/libtorch_float32_float32_float32/3
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=poll --repository-poll-secs=1 --exit-timeout-secs=5"
@@ -791,17 +795,18 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_multiple_model_repository_control
-rm -fr models models_0 savedmodel_float32_float32_float32
+rm -fr models models_0 libtorch_float32_float32_float32
 mkdir models models_0
-for i in graphdef ; do
+for i in openvino ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/openvino_float32_float32_float32/config.pbtxt
 done
 for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
-    rm -rf models/savedmodel_float32_float32_float32/3
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 .
+cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 models/. && \
+    rm -rf models/libtorch_float32_float32_float32/3
 
 # Show model control mode will override deprecated model control options
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
@@ -933,8 +938,8 @@ for i in plan onnx ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-# savedmodel doesn't load because it is duplicated in 2 repositories
-for i in savedmodel ; do
+# libtorch doesn't load because it is duplicated in 2 repositories
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -943,7 +948,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
-             --load-model=savedmodel_float32_float32_float32 \
+             --load-model=libtorch_float32_float32_float32 \
              --load-model=plan_float32_float32_float32 \
              --load-model=simple_onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -978,8 +983,8 @@ for i in plan onnx ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-# savedmodel doesn't load because it is duplicated in 2 repositories
-for i in savedmodel ; do
+# libtorch doesn't load because it is duplicated in 2 repositories
+for i in libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
@@ -1070,7 +1075,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
 # Ensemble models in the second repository
-for i in graphdef savedmodel ; do
+for i in plan libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
 done
@@ -1086,8 +1091,8 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --strict-readiness=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=onnx_float32_float32_float32 \
-             --load-model=graphdef_float32_float32_float32 \
-             --load-model=simple_savedmodel_float32_float32_float32"
+             --load-model=plan_float32_float32_float32 \
+             --load-model=simple_libtorch_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -1369,7 +1374,7 @@ done
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
 mkdir models
-for i in graphdef savedmodel onnx plan ; do
+for i in openvino libtorch onnx plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
@@ -1388,7 +1393,7 @@ fi
 
 # unload API should return bad request
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/unload`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/openvino_float32_float32_float32/unload`
 set -e
 if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -1397,7 +1402,7 @@ fi
 
 # the model should be available/ready
 set +e
-code=`curl -s -w %{http_code} localhost:8000/v2/models/graphdef_float32_float32_float32/ready`
+code=`curl -s -w %{http_code} localhost:8000/v2/models/openvino_float32_float32_float32/ready`
 set -e
 if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -1405,11 +1410,11 @@ if [ "$code" != "200" ]; then
 fi
 
 # remove model file so that if reload is triggered, model will become unavailable
-rm models/graphdef_float32_float32_float32/*/*
+rm models/openvino_float32_float32_float32/*/*
 
 # load API should return bad request
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/graphdef_float32_float32_float32/load`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/openvino_float32_float32_float32/load`
 set -e
 if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -1418,7 +1423,7 @@ fi
 
 # the model should be available/ready
 set +e
-code=`curl -s -w %{http_code} localhost:8000/v2/models/graphdef_float32_float32_float32/ready`
+code=`curl -s -w %{http_code} localhost:8000/v2/models/openvino_float32_float32_float32/ready`
 set -e
 if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -1434,7 +1439,7 @@ LOG_IDX=$((LOG_IDX+1))
 # some more comprehensive fuzz attacks.
 rm -fr models
 mkdir models
-for i in graphdef ; do
+for i in openvino ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
@@ -2136,7 +2141,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_add_custom_config
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel; do
+for i in libtorch; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mkdir models/${i}_float32_float32_float32/configs
     sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
@@ -2168,7 +2173,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_delete_custom_config
 rm -fr models config.pbtxt.*
 mkdir models
-for i in savedmodel; do
+for i in libtorch; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     mkdir models/${i}_float32_float32_float32/configs
     sed 's/^version_policy:.*/version_policy: { specific: { versions: [2] }}/' \
