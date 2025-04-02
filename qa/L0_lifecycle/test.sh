@@ -335,13 +335,16 @@ rm -fr models models_0
 mkdir models models_0
 for i in openvino libtorch ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    if [ $i == "openvino" ]; then
+        echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/openvino_float32_float32_float32/config.pbtxt
+    fi
 done
 for i in onnx plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 # Change the model files so that multiple versions will be loaded, and one of
 # the versions will fail to load and cause all other versions to be unloaded.
-rm models/openvino_float32_float32_float32/3/*
+rm models/libtorch_float32_float32_float32/3/*
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"

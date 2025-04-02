@@ -172,7 +172,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # Server was started but with a model that fails to load
         try:
             model_name = tu.get_model_name(
-                "openvino", np.float32, np.float32, np.float32
+                "libtorch", np.float32, np.float32, np.float32
             )
 
             triton_client = grpcclient.InferenceServerClient(
@@ -194,18 +194,18 @@ class LifeCycleTest(tu.TestResultCollector):
         # Inferencing with the missing model should fail.
         try:
             iu.infer_exact(
-                self, "openvino", tensor_shape, 1, np.float32, np.float32, np.float32
+                self, "libtorch", tensor_shape, 1, np.float32, np.float32, np.float32
             )
             self.assertTrue(False, "expected error for unavailable model " + model_name)
         except Exception as ex:
             self.assertIn(
-                "Request for unknown model: 'openvino_float32_float32_float32' has no available versions",
+                "Request for unknown model: 'libtorch_float32_float32_float32' has no available versions",
                 ex.message(),
             )
 
         # And other models should be loaded successfully
         try:
-            for base_name in ["libtorch", "onnx"]:
+            for base_name in ["openvino", "onnx"]:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
                     grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -235,7 +235,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # Server was started but with a model that fails to load
         try:
             model_name = tu.get_model_name(
-                "openvino", np.float32, np.float32, np.float32
+                "libtorch", np.float32, np.float32, np.float32
             )
 
             triton_client = grpcclient.InferenceServerClient(
@@ -257,18 +257,18 @@ class LifeCycleTest(tu.TestResultCollector):
         # Inferencing with the missing model should fail.
         try:
             iu.infer_exact(
-                self, "openvino", tensor_shape, 1, np.float32, np.float32, np.float32
+                self, "libtorch", tensor_shape, 1, np.float32, np.float32, np.float32
             )
             self.assertTrue(False, "expected error for unavailable model " + model_name)
         except Exception as ex:
             self.assertIn(
-                "Request for unknown model: 'openvino_float32_float32_float32' has no available versions",
+                "Request for unknown model: 'libtorch_float32_float32_float32' has no available versions",
                 ex.message(),
             )
 
         # And other models should be loaded successfully
         try:
-            for base_name in ["libtorch", "onnx"]:
+            for base_name in ["openvino", "onnx"]:
                 for triton_client in (
                     httpclient.InferenceServerClient("localhost:8000", verbose=True),
                     grpcclient.InferenceServerClient("localhost:8001", verbose=True),
