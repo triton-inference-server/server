@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,82 +23,22 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-name: "nobatch_to_batch_nobatch_float32_float32_float32"
-platform: "ensemble"
-max_batch_size: 0
+name: "inception_onnx"
+platform: "onnxruntime_onnx"
+max_batch_size: 128
 input [
   {
-    name: "INPUT0"
+    name: "input"
     data_type: TYPE_FP32
-    dims: [ 8, 16 ]
-  },
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 8, 16 ]
+    format: FORMAT_NHWC
+    dims: [ 299, 299, 3 ]
   }
 ]
 output [
   {
-    name: "OUTPUT0"
+    name: "InceptionV3/Predictions/Softmax"
     data_type: TYPE_FP32
-    dims: [ 8, 16 ]
-  },
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 8, 16 ]
+    dims: [ 1001 ]
+    label_filename: "inception_labels.txt"
   }
 ]
-ensemble_scheduling {
-  step [
-    {
-      # nobatch model with +1 dimension [-1, -1]
-      model_name: "custom_nobatch_zero_1_float32"
-      model_version: -1
-      input_map {
-        key: "INPUT0"
-        value: "INPUT0"
-      }
-      output_map {
-        key: "OUTPUT0"
-        value: "temp_input_0"
-      }
-    },
-    {
-      # nobatch model with +1 dimension [-1, -1]
-      model_name: "custom_nobatch_zero_1_float32"
-      model_version: -1
-      input_map {
-        key: "INPUT0"
-        value: "INPUT1"
-      }
-      output_map {
-        key: "OUTPUT0"
-        value: "temp_input_1"
-      }
-    },
-    {
-      # batch model
-      model_name: "onnx_float32_float32_float32"
-      model_version: 1
-      input_map {
-        key: "INPUT0"
-        value: "temp_input_0"
-      }
-      input_map {
-        key: "INPUT1"
-        value: "temp_input_1"
-      }
-      output_map {
-        key: "OUTPUT0"
-        value: "OUTPUT0"
-      }
-      output_map {
-        key: "OUTPUT1"
-        value: "OUTPUT1"
-      }
-    }
-  ]
-}

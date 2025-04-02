@@ -37,9 +37,8 @@ public class ResnetTest {
   // Maximum allowed difference from expected model outputs
   private static final float ALLOWED_DELTA = .001f;
   private static final String[] MODELS = {
-      "resnet50_fp32_libtorch", "resnet50_fp32_onnx",
-      // TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
-      //"resnet50v1.5_fp16_savedmodel",
+      "resnet50_fp32_libtorch",
+      "resnet50_fp32_onnx",
   };
   private static final double TRITON_MIN_COMPUTE_CAPABILITY = 7.5;
   private enum Backend {
@@ -214,7 +213,7 @@ public class ResnetTest {
   static boolean AreValidResults(
       String model_name, FloatPointer output, FloatPointer expected_output)
   {
-    int output_length = model_name.contains("tensorflow") ? 1001 : 1000;
+    int output_length = 1000;
     for (int i = 0; i < output_length; ++i) {
       float difference = output.get(i) - expected_output.get(i);
       if (difference > ALLOWED_DELTA) {
@@ -307,9 +306,6 @@ public class ResnetTest {
       case ONNX:
         file_name += "onnx";
         break;
-      case TF:
-        file_name += "tensorflow";
-        break;
       case TORCH:
         file_name += "pytorch";
         break;
@@ -345,13 +341,11 @@ public class ResnetTest {
     Backend backend = Backend.NONE;
     if (model_name.contains("onnx")) {
       backend = Backend.ONNX;
-    } else if (model_name.contains("savedmodel")) {
-      backend = Backend.TF;
     } else if (model_name.contains("torch")) {
       backend = Backend.TORCH;
     } else {
       FAIL(
-          "Supported model types (Onnx, TensorFlow, Torch) "
+          "Supported model types (Onnx, Torch) "
           + "cannot be inferred from model name " + model_name);
     }
 

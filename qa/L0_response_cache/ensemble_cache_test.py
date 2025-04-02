@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,8 +48,8 @@ class EnsembleCacheTest(tu.TestResultCollector):
         self.triton_client = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
         )
-        self.ensemble_model = "simple_graphdef_float32_float32_float32"
-        self.composing_model = "graphdef_float32_float32_float32"
+        self.ensemble_model = "simple_onnx_float32_float32_float32"
+        self.composing_model = "onnx_float32_float32_float32"
         self.model_directory = os.path.join(os.getcwd(), "models", "ensemble_models")
         self.ensemble_config_file = os.path.join(
             self.model_directory, self.ensemble_model, "config.pbtxt"
@@ -125,7 +125,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
         Helper function that takes model as a parameter to verify the corresponding model's stats
         The passed model is composing model for test case `test_ensemble_composing_model_cache_enabled`
         For other testcases, the top-level ensemble model stats are verified.
-            * loads the simple_graphdef_float32_float32_float32 and graphdef_float32_float32_float32
+            * loads the simple_onnx_float32_float32_float32 and onnx_float32_float32_float32
               and verifies if they are loaded properly.
             * Checks the initial statistics of the model passed in the parameter
               Expected - baseline statistics to be all empty metrics since

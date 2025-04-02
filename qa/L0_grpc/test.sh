@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -149,7 +149,7 @@ cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
 sed -i "s/simple_dyna_sequence/simple_string_dyna_sequence/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
 sed -i "s/^platform: .*/backend: \"dyna_sequence\"/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
 sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
-rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.graphdef
+rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.onnx
 cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
 rm -f *.log
@@ -205,19 +205,19 @@ for i in \
         EXTRA_ARGS="-i grpc -u localhost:8001"
     fi
     if [[ ($SUFFIX == "image_client") || ($SUFFIX == "grpc_image_client") ]]; then
-        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
-        python $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a --streaming -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.streaming.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.streaming.${SUFFIX}
             RET=1
         fi
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
@@ -270,19 +270,19 @@ for i in \
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
     if [[ $SUFFIX == "image_client" ]]; then
-        $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.streaming.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
