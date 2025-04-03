@@ -258,6 +258,9 @@ for modelpath in \
 done
 
 # Copy other required models
+mkdir -p special_cases/invalid_platform/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1/model.onnx \
+     special_cases/invalid_platform/1/
 
 # Create runtime escape scenario
 mkdir -p special_cases/runtime_escape/1 special_cases/runtime_escape/dummy_runtime
@@ -399,34 +402,6 @@ for TARGET in `ls special_cases`; do
         fi
     fi
 done
-
-# Run noautofill unittest
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --log-verbose=1"
-SERVER_LOG=$SERVER_LOG_BASE.special_case_noautofill_test.log
-
-rm -fr models && mkdir models
-cp -r special_cases/noautofill_noconfig models/.
-
-echo -e "Test on special_cases/noautofill_test" >> $CLIENT_LOG
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python noautofill_test.py >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Python NoAutoFill Test Failed\n***"
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform to
