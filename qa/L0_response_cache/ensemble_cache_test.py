@@ -78,6 +78,15 @@ class EnsembleCacheTest(tu.TestResultCollector):
                 with open(config_file, "w") as f:
                     config_data += config_to_add
                     f.write(config_data)
+    
+    def _add_instance_group_cpu(self, config_file):
+        # Utility function to add instance group of kind CPU to the config file
+        with open(config_file, "r") as f:
+            config_data = f.read()
+            if "instance_group" not in config_data:
+                with open(config_file, "w") as f:
+                    config_data += "instance_group {\n  kind: KIND_CPU\n}\n"
+                    f.write(config_data)
 
     def _remove_config(self, config_file, config_to_remove):
         # Utility function to remove extra added config from the config files
@@ -252,6 +261,8 @@ class EnsembleCacheTest(tu.TestResultCollector):
         self._update_config(
             self.composing_config_file, RESPONSE_CACHE_PATTERN, RESPONSE_CACHE_CONFIG
         )
+        # Currently, response cache is supported only for tensors on CPU.
+        self._add_instance_group_cpu(self.composing_config_file)
         self._run_inference_and_validate(self.composing_model)
         ensemble_model_stats = self._get_model_statistics(self.ensemble_model)
         composing_model_stats = self._get_model_statistics(self.composing_model)
