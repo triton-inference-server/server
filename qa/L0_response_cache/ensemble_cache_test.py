@@ -78,7 +78,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
                 with open(config_file, "w") as f:
                     config_data += config_to_add
                     f.write(config_data)
-    
+
     def _add_instance_group_cpu(self, config_file):
         # Utility function to add instance group of kind CPU to the config file
         with open(config_file, "r") as f:
