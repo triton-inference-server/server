@@ -140,11 +140,13 @@ GRPC status codes can be used for better visibility and monitoring. For more det
 
 For client-side documentation, see [Client-Side GRPC Status Codes](https://github.com/triton-inference-server/client/tree/main#GRPC-Status-Codes)
 
-#### GRPC Infer Handler Threads
+#### GRPC Inference Handler Threads
 
-In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices] (https://grpc.io/docs/guides/performance/#c). In certain circumstances where overhead is significant to the inference request handling (e.g. ensemble models), increasing the number of infer handler threads may lead to higher model throughput.
+In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices] (https://grpc.io/docs/guides/performance/#c). However, in cases where the performance bottleneck is at the request handling step (e.g. ensemble models), increasing the number of gRPC inference handler threads may lead to a higher throughput.
 
 * `--grpc-infer-thread-count`: 2 by default.
+
+Note: More threads don't always mean better performance.
 
 ### Limit Endpoint Access (BETA)
 

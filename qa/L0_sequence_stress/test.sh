@@ -86,7 +86,7 @@ for model_trial in 1 2 4 ; do
 done
 
 # Test invalid gRPC infer handler thread count
-for thread_cnt in -1 0 1 257; do
+for thread_cnt in -1 0 1 129; do
     MODEL_DIR=models1
     SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --grpc-infer-thread-count=$thread_cnt"
     SERVER_LOG="./$MODEL_DIR.server.log"
@@ -100,7 +100,7 @@ for thread_cnt in -1 0 1 257; do
 done
 
 # Test gRPC infer handler thread count under stress
-thread_cnt=256
+thread_cnt=128
 for model_trial in 1 2 4 ; do
     MODEL_DIR=models${model_trial}
     SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --grpc-infer-thread-count=$thread_cnt"
