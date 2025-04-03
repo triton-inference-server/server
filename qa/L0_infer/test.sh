@@ -71,9 +71,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="29"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="33"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="46"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="44"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -349,7 +349,7 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=46
+  EXPECTED_NUM_TESTS=42
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
