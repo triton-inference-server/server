@@ -2393,8 +2393,8 @@ Server::Server(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-        options.infer_compression_level_, restricted_kv,
-        options.forward_header_pattern_));
+        options.max_response_pool_size_, options.infer_compression_level_,
+        restricted_kv, options.forward_header_pattern_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2403,8 +2403,8 @@ Server::Server(
       "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-      options.infer_compression_level_, restricted_kv,
-      options.forward_header_pattern_));
+      options.max_response_pool_size_, options.infer_compression_level_,
+      restricted_kv, options.forward_header_pattern_));
 }
 
 Server::~Server()
@@ -2472,6 +2472,8 @@ Server::GetOptions(Options& options, UnorderedMapType& options_map)
   RETURN_IF_ERR(GetValue(
       options_map, "infer_allocation_pool_size",
       &options.infer_allocation_pool_size_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "max_response_pool_size", &options.max_response_pool_size_));
   RETURN_IF_ERR(GetValue(
       options_map, "forward_header_pattern", &options.forward_header_pattern_));
 
