@@ -241,9 +241,8 @@ for BACKEND in ${AUTOCOMPLETE_BACKENDS}; do
         # Config files specify things expected by unit test like label_filename
         # and max_batch_size for comparing results, so remove some key fields
         # for autocomplete to fill that won't break the unit test.
-        sed -i '/platform:/d' models/${model}/config.pbtxt
-        sed -i '/data_type:/d' models/${model}/config.pbtxt
-        sed -i '/dims:/d' models/${model}/config.pbtxt
+        sed -i '/^input {/,/^}/d' models/${model}/config.pbtxt
+        sed -i '/^output {/,/^}/d' models/${model}/config.pbtxt
     done
 done
 set -e
