@@ -73,7 +73,7 @@ fi
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="29"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="42"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="46"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -238,7 +238,7 @@ function generate_model_repository() {
 
         ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
 
-        if [[ $BACKENDS == *"plan"* ]] ; then
+        if [[ $BACKENDS == *"libtorch"* ]] ; then
           ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
         fi
 
