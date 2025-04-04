@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -139,6 +139,14 @@ Triton implements GRPC error handling for streaming requests when a specific fla
 GRPC status codes can be used for better visibility and monitoring. For more details, see [gRPC Status Codes](https://grpc.io/docs/guides/status-codes/)
 
 For client-side documentation, see [Client-Side GRPC Status Codes](https://github.com/triton-inference-server/client/tree/main#GRPC-Status-Codes)
+
+#### GRPC Inference Handler Threads
+
+In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices] (https://grpc.io/docs/guides/performance/#c). However, in cases where the performance bottleneck is at the request handling step (e.g. ensemble models), increasing the number of gRPC inference handler threads may lead to a higher throughput.
+
+* `--grpc-infer-thread-count`: 2 by default.
+
+Note: More threads don't always mean better performance.
 
 ### Limit Endpoint Access (BETA)
 
