@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,6 +57,7 @@ class KServeGrpc:
         max_connection_age_grace_ms: int
         infer_compression_level: int | Grpc_compression_level
         infer_allocation_pool_size: int
+        max_response_pool_size: int
         forward_header_pattern: str
         def __post_init__(self) -> None: ...
     triton_frontend: Incomplete

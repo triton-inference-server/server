@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -464,9 +464,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
         """
         if (
-            ("savedmodel" not in trial)
-            and ("graphdef" not in trial)
-            and ("custom" not in trial)
+            ("custom" not in trial)
             and ("onnx" not in trial)
             and ("libtorch" not in trial)
             and ("plan" not in trial)
@@ -754,9 +752,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
         """
         if (
-            ("savedmodel" not in trial)
-            and ("graphdef" not in trial)
-            and ("custom" not in trial)
+            ("custom" not in trial)
             and ("onnx" not in trial)
             and ("libtorch" not in trial)
             and ("plan" not in trial)

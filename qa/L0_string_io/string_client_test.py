@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -199,8 +199,7 @@ class ClientStringTest(tu.TestResultCollector):
                 with self.assertRaises(tritonutils.InferenceServerException):
                     self._test_unicode_bytes_dtype(client, model_name, dtype)
 
-    def test_tf_unicode_bytes(self):
-        self._test_bytes("graphdef_nobatch_zero_1_object")
+    def test_unicode_bytes(self):
         self._test_bytes("string_identity")
 
 

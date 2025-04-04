@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ sed -i 's/Simple/SequenceTest/g' $SAMPLES_REPO/pom.xml
 rm -f *.log
 RET=0
 
-for BACKEND in graphdef libtorch onnx savedmodel; do
+for BACKEND in libtorch onnx; do
     # Create local model repository
     mkdir -p ${MODEL_REPO}
     MODEL=${BACKEND}_nobatch_sequence_int32

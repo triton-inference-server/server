@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -234,6 +234,5 @@ if [ "$ARCH" == "x86_64" ]; then
        INSTANCE_CNT=${INSTANCE_CNT} \
        CONCURRENCY=${CONCURRENCY} \
        ARCH=${ARCH} \
-       BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
        bash -x run_test.sh
 fi

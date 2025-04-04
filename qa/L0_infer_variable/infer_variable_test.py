@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -145,29 +145,6 @@ class InferVariableTest(tu.TestResultCollector):
                 input_shape,
             ):
                 ensemble_prefix.append(prefix)
-
-        if tu.validate_for_tf_model(
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            input_shape,
-            output0_shape,
-            output1_shape,
-        ):
-            for prefix in ensemble_prefix:
-                for pf in ["graphdef", "savedmodel"]:
-                    _infer_exact_helper(
-                        self,
-                        prefix + pf,
-                        input_shape,
-                        8,
-                        input_dtype,
-                        output0_dtype,
-                        output1_dtype,
-                        output0_raw=output0_raw,
-                        output1_raw=output1_raw,
-                        swap=swap,
-                    )
 
         if tu.validate_for_trt_model(
             input_dtype,

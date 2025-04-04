@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -80,6 +80,7 @@ class KServeGrpc:
             int, Grpc_compression_level
         ] = Grpc_compression_level.NONE
         infer_allocation_pool_size: int = Field(8, ge=0)
+        max_response_pool_size: int = Field(2_147_483_647, ge=0)
         forward_header_pattern: str = ""
         # DLIS-7215: Add restricted protocol support
         # restricted_protocols: str = ""

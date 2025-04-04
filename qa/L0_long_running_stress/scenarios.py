@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -84,10 +84,8 @@ class Scenario(metaclass=abc.ABCMeta):
 
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
-        if ("plan" in trial) or ("savedmodel" in trial):
+        if "plan" in trial:
             return np.float32
-        if "graphdef" in trial:
-            return np.dtype(object)
         return np.int32
 
     # FIXME do we need client meta data?
@@ -205,7 +203,7 @@ class PerfAnalyzerScenario(Scenario):
         # Add no validation models
         self.options_.append(
             PerfAnalyzerScenario.ModelOption(
-                "resnet_v1_50_graphdef_def", 32, (1, 4, 1), queue_latency_range_us
+                "resnet_v1_50_def", 32, (1, 4, 1), queue_latency_range_us
             )
         )
         for trial in sequence_trials:
@@ -280,34 +278,19 @@ class PerfAnalyzerScenario(Scenario):
             input_data.append({input0: [res]})
         output0 = "OUTPUT" if "libtorch" not in trial else "OUTPUT__0"
         output_data = []
-        if ("savedmodel" in trial) and ("nobatch" in trial):
-            # Special case where the model is accumulator
-            sum = 0
-            for i in range(3):
-                sum += i
-                if dtype == np.float32:
-                    res = float(sum)
-                elif dtype == np.int32:
-                    res = sum
-                elif dtype == np.dtype(object):
-                    res = str(sum)
-                else:
-                    raise Exception("unexpected sequence data type {}".format(dtype))
-                output_data.append({output0: [res]})
-        else:
-            for i in range(3):
-                res = 1 if i == 0 else i
-                if dtype == np.float32:
-                    res = float(res)
-                elif dtype == np.int32:
-                    res = int(res)
-                elif dtype == np.dtype(object):
-                    res = str(res)
-                else:
-                    raise Exception("unexpected sequence data type {}".format(dtype))
-                output_data.append(
-                    {output0: [res if dtype != np.dtype(object) else str(res)]}
-                )
+        for i in range(3):
+            res = 1 if i == 0 else i
+            if dtype == np.float32:
+                res = float(res)
+            elif dtype == np.int32:
+                res = int(res)
+            elif dtype == np.dtype(object):
+                res = str(res)
+            else:
+                raise Exception("unexpected sequence data type {}".format(dtype))
+            output_data.append(
+                {output0: [res if dtype != np.dtype(object) else str(res)]}
+            )
         data = {"data": [input_data]}
         data["validation_data"] = [output_data]
 
@@ -351,7 +334,7 @@ class PerfAnalyzerScenario(Scenario):
 class ResNetScenario(Scenario):
     def __init__(self, name, batch_size=32, verbose=False, out_stream=sys.stdout):
         super().__init__(name, [], verbose, out_stream)
-        self.model_name_ = "resnet_v1_50_graphdef_def"
+        self.model_name_ = "resnet_v1_50_def"
         self.batch_size_ = batch_size
 
         img = self.preprocess("../images/vulture.jpeg")
@@ -525,7 +508,6 @@ class SequenceScenario(Scenario):
         # information.
         if (
             ("nobatch" not in trial and ("custom" not in trial))
-            or ("graphdef" in trial)
             or ("plan" in trial)
             or ("onnx" in trial)
         ) or ("libtorch" in trial):
@@ -555,9 +537,7 @@ class SequenceScenario(Scenario):
 
         """
         if (
-            ("savedmodel" not in trial)
-            and ("graphdef" not in trial)
-            and ("custom" not in trial)
+            ("custom" not in trial)
             and ("onnx" not in trial)
             and ("libtorch" not in trial)
             and ("plan" not in trial)

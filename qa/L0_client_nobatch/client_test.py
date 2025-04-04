@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,12 +43,12 @@ class ClientNoBatchTest(tu.TestResultCollector):
     def test_nobatch_request_for_batching_model(self):
         input_size = 16
 
-        # graphdef_int32_int8_int8 has a batching version with max batch size of 8.
+        # onnx_int32_int8_int8 has a batching version with max batch size of 8.
         # The server should return an error if the batch size is not included in the
         # input shapes.
         tensor_shape = (input_size,)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name("graphdef", np.int32, np.int8, np.int8)
+            model_name = tu.get_model_name("onnx", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 
@@ -94,14 +94,12 @@ class ClientNoBatchTest(tu.TestResultCollector):
     def test_batch_request_for_nobatching_model(self):
         input_size = 16
 
-        # graphdef_nobatch_int32_int8_int8 is non batching version.
+        # onnx_nobatch_int32_int8_int8 is non batching version.
         # The server should return an error if the batch size dimension
         # is included in the shape
         tensor_shape = (1, input_size)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name(
-                "graphdef_nobatch", np.int32, np.int8, np.int8
-            )
+            model_name = tu.get_model_name("onnx_nobatch", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 
@@ -148,14 +146,12 @@ class ClientNoBatchTest(tu.TestResultCollector):
     def test_nobatch_request_for_nonbatching_model(self):
         input_size = 16
 
-        # graphdef_int32_int8_int8 has a batching version with max batch size of 8.
+        # onnx_int32_int8_int8 has a batching version with max batch size of 8.
         # The server should return an error if the batch size is not included in the
         # input shapes.
         tensor_shape = (input_size,)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name(
-                "graphdef_nobatch", np.int32, np.int8, np.int8
-            )
+            model_name = tu.get_model_name("onnx_nobatch", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 
@@ -195,12 +191,12 @@ class ClientNoBatchTest(tu.TestResultCollector):
     def test_batch_request_for_batching_model(self):
         input_size = 16
 
-        # graphdef_nobatch_int32_int8_int8 is non batching version.
+        # onnx_nobatch_int32_int8_int8 is non batching version.
         # The server should return an error if the batch size dimension
         # is included in the shape
         tensor_shape = (1, input_size)
         for protocol in ["http", "grpc"]:
-            model_name = tu.get_model_name("graphdef", np.int32, np.int8, np.int8)
+            model_name = tu.get_model_name("onnx", np.int32, np.int8, np.int8)
             in0 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
             in1 = np.random.randint(low=0, high=100, size=tensor_shape, dtype=np.int32)
 

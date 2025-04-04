@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="4"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 MODELDIR="${PWD}/qa_model_repository"
-rm -rf ${MODELDIR} && cp -r "${DATADIR}/qa_model_repository" ${MODELDIR}
+rm -rf ${MODELDIR} && cp -r "${DATADIR}/qa_model_repository/onnx_*" ${MODELDIR} # Note there is a coupling in ./client_test.py
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server.log"

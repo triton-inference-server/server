@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -87,12 +87,7 @@ def check_sequence_async(
     (flag_str, value, expected_result, delay_ms)
 
     """
-    if (
-        ("savedmodel" in trial)
-        or ("graphdef" in trial)
-        or ("custom" in trial)
-        or ("plan" in trial)
-    ):
+    if ("custom" in trial) or ("plan" in trial):
         tensor_shape = (
             1,
             1,
@@ -176,10 +171,8 @@ def check_sequence_async(
 
 def get_datatype(trial):
     # Get the datatype to use based on what models are available (see test.sh)
-    if ("plan" in trial) or ("savedmodel" in trial):
+    if "plan" in trial:
         return np.float32
-    if "graphdef" in trial:
-        return np.dtype(object)
     return np.int32
 
 

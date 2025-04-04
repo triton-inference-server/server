@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,84 +50,16 @@ install_conda
 
 # Test other python versions
 conda update -n base -c defaults conda -y
-# Create a model with python 3.8 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-if [ ${PYTHON_ENV_VERSION} = "8" ]; then
-    create_conda_env "3.8" "python-3-8"
-    conda install -c conda-forge libstdcxx-ng=14 -y
-    conda install numpy=1.23.4 -y
-    conda install tensorflow=2.10.0 -y
-    EXPECTED_VERSION_STRING="Python version is 3.8, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
-    create_python_backend_stub
-    conda-pack -o python3.8.tar.gz
-    path_to_conda_pack="$PWD/python-3-8"
-    mkdir -p $path_to_conda_pack
-    tar -xzf python3.8.tar.gz -C $path_to_conda_pack
-    mkdir -p models/python_3_8/1/
-    cp ../python_models/python_version/config.pbtxt ./models/python_3_8
-    (cd models/python_3_8 && \
-            sed -i "s/^name:.*/name: \"python_3_8\"/" config.pbtxt && \
-            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-    cp ../python_models/python_version/model.py ./models/python_3_8/1/
-    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
-fi
-
-# Create a model with python 3.9 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-if [ ${PYTHON_ENV_VERSION} = "9" ]; then
-    create_conda_env "3.9" "python-3-9"
-    conda install -c conda-forge libstdcxx-ng=14 -y
-    conda install numpy=1.23.4 -y
-    conda install tensorflow=2.10.0 -y
-    EXPECTED_VERSION_STRING="Python version is 3.9, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
-    create_python_backend_stub
-    conda-pack -o python3.9.tar.gz
-    path_to_conda_pack="$PWD/python-3-9"
-    mkdir -p $path_to_conda_pack
-    tar -xzf python3.9.tar.gz -C $path_to_conda_pack
-    mkdir -p models/python_3_9/1/
-    cp ../python_models/python_version/config.pbtxt ./models/python_3_9
-    (cd models/python_3_9 && \
-            sed -i "s/^name:.*/name: \"python_3_9\"/" config.pbtxt && \
-            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-    cp ../python_models/python_version/model.py ./models/python_3_9/1/
-    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
-fi
-
-# Create a model with python 3.10 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-if [ ${PYTHON_ENV_VERSION} = "10" ]; then
-    create_conda_env "3.10" "python-3-10"
-    conda install -c conda-forge libstdcxx-ng=14 -y
-    conda install tensorflow=2.10.0 -y
-    conda install numpy=1.23.4 -y
-    EXPECTED_VERSION_STRING="Python version is 3.10, NumPy version is 1.23.4, and Tensorflow version is 2.10.0"
-    create_python_backend_stub
-    conda-pack -o python3.10.tar.gz
-    path_to_conda_pack="$PWD/python-3-10"
-    mkdir -p $path_to_conda_pack
-    tar -xzf python3.10.tar.gz -C $path_to_conda_pack
-    mkdir -p models/python_3_10/1/
-    cp ../python_models/python_version/config.pbtxt ./models/python_3_10
-    (cd models/python_3_10 && \
-            sed -i "s/^name:.*/name: \"python_3_10\"/" config.pbtxt && \
-            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-    cp ../python_models/python_version/model.py ./models/python_3_10/1/
-    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_10
-fi
 
 # Create a model with python 3.11 version
 # Successful execution of the Python model indicates that the environment has
 # been setup correctly.
 if [ ${PYTHON_ENV_VERSION} = "11" ]; then
     create_conda_env "3.11" "python-3-11"
-    conda install tensorflow=2.12.0 -y
+    conda install torch=2.6.0 -y
     conda install -c conda-forge libstdcxx-ng=14 -y
     conda install numpy=1.23.5 -y
-    EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and Tensorflow version is 2.12.0"
+    EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and PyTorch version is 2.6.0"
     create_python_backend_stub
     conda-pack -o python3.11.tar.gz
     path_to_conda_pack="$PWD/python-3-11"

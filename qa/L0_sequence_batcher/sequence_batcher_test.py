@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ elif USE_GRPC:
 else:
     _protocols = ("http",)
 
-BACKENDS = os.environ.get("BACKENDS", "graphdef savedmodel onnx plan custom python")
+BACKENDS = os.environ.get("BACKENDS", "onnx plan custom python")
 ENSEMBLES = bool(int(os.environ.get("ENSEMBLES", 1)))
 
 NO_BATCHING = int(os.environ["NO_BATCHING"]) == 1
@@ -126,10 +126,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return (np.float32,)
         if "custom" in trial:
             return (np.int32,)
-        if "savedmodel" in trial:
-            return (np.float32, np.bool_)
-        if "graphdef" in trial:
-            return (np.dtype(object), np.bool_)
 
         # Only test the string data type for ONNX and libtorch models in implicit state
         if IMPLICIT_STATE:
@@ -148,7 +144,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # information.
         if (
             (not NO_BATCHING and ("custom" not in trial))
-            or ("graphdef" in trial)
             or ("plan" in trial)
             or ("onnx" in trial)
         ) or ("libtorch" in trial):
