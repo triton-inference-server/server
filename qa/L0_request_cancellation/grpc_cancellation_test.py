@@ -257,6 +257,9 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         delay_notification_sec = (
             int(os.getenv("TRITONSERVER_DELAY_GRPC_NOTIFICATION")) / 1000
         )
+        delay_response_complete_exec_sec = (
+            int(os.getenv("TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC")) / 1000
+        )
         future = self._client.async_infer(
             model_name=self._model_name,
             inputs=self._inputs,
@@ -264,7 +267,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
             outputs=self._outputs,
         )
         # ensure the cancellation is received before InferResponseComplete checking cancellation
-        time.sleep(self._model_delay - 2)
+        time.sleep(self._model_delay + 2)
         future.cancel()
         time.sleep(delay_notification_sec + 1)  # ensure the cancellation is processed
         self._assert_callback_cancelled()
