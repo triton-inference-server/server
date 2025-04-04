@@ -250,7 +250,8 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
     def test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response(
         self,
     ):
-        # Received cancellation before InferResponseComplete and the notification state is processed after processing final response state.
+        # Received cancellation before InferResponseComplete and the notification
+        # state is processed after processing final response state.
         # long test
         self.test_duration_delta = 2
         delay_notification_sec = (
@@ -263,7 +264,7 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
             outputs=self._outputs,
         )
         # ensure the cancellation is received before InferResponseComplete checking cancellation
-        time.sleep(self._model_delay + 2)
+        time.sleep(self._model_delay - 2)
         future.cancel()
         time.sleep(delay_notification_sec + 1)  # ensure the cancellation is processed
         self._assert_callback_cancelled()

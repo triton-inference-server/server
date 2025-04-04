@@ -697,8 +697,6 @@ ModelInferHandler::Process(
         std::chrono::milliseconds(state->delay_process_ms_));
   }
 
-  // If notification arrives after InferResponseComplete is invoked, simply
-  // ignore it and release the state as if the request is completed.
   if (is_notification) {
     state->context_->SetReceivedNotification(true);
   }
@@ -733,8 +731,7 @@ ModelInferHandler::Process(
       StartNewRequest();
     } else if (
         state->step_ == Steps::COMPLETE || state->step_ == Steps::FINISH) {
-      // If the request is completed, simply ignore the cancellation and
-      // restore the previous notification state.
+      // If the request is completed, simply ignore the cancellation.
       skip_handle_cancellation = true;
     }
 
