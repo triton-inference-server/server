@@ -32,6 +32,7 @@
 #include <condition_variable>
 #include <queue>
 #include <regex>
+#include <shared_mutex>
 #include <thread>
 
 #include "../tracer.h"
@@ -1302,7 +1303,8 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count, size_t max_response_queue_size,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern);
+      const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -1315,6 +1317,9 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
+  void IncrementConnectionCount() { conn_cnt_->fetch_add(1); }
+  void DecrementConnectionCount() { conn_cnt_->fetch_sub(1); }
+
   using State =
       InferHandlerState<ServerResponderType, RequestType, ResponseType>;
   using StateContext = typename State::Context;
@@ -1324,6 +1329,8 @@ class InferHandler : public HandlerBase {
       const std::shared_ptr<StateContext>& context,
       Steps start_step = Steps::START)
   {
+    IncrementConnectionCount();
+
     State* state = nullptr;
 
     if (max_state_bucket_count_ > 0) {
@@ -1364,11 +1371,13 @@ class InferHandler : public HandlerBase {
       if (state_bucket_.size() < max_state_bucket_count_) {
         state->Release();
         state_bucket_.push_back(state);
+        DecrementConnectionCount();
         return;
       }
     }
 
     delete state;
+    DecrementConnectionCount();
   }
 
   // Simple structure that carries the payload needed for
@@ -1443,6 +1452,10 @@ class InferHandler : public HandlerBase {
   std::pair<std::string, std::string> restricted_kv_;
   std::string header_forward_pattern_;
   re2::RE2 header_forward_regex_;
+
+  std::shared_mutex* conn_mtx_;
+  std::atomic<uint32_t>* conn_cnt_;
+  bool* accepting_new_conn_;
 };
 
 template <
@@ -1455,13 +1468,15 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count, size_t max_response_queue_size,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_pattern)
+        const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
+        std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       max_response_queue_size_(max_response_queue_size),
       restricted_kv_(restricted_kv),
       header_forward_pattern_(header_forward_pattern),
-      header_forward_regex_(header_forward_pattern_)
+      header_forward_regex_(header_forward_pattern_), conn_mtx_(conn_mtx),
+      conn_cnt_(conn_cnt), accepting_new_conn_(accepting_new_conn)
 {
 }
 
@@ -1616,10 +1631,12 @@ class ModelInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& forward_header_pattern)
+      const std::string& forward_header_pattern, std::shared_mutex* conn_mtx,
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            max_response_queue_size, restricted_kv, forward_header_pattern),
+            max_response_queue_size, restricted_kv, forward_header_pattern,
+            conn_mtx, conn_cnt, accepting_new_conn),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
