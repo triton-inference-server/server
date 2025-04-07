@@ -29,7 +29,6 @@
 # Copyright 2024 The vLLM team.
 
 import json
-from json import JSONDecodeError, JSONDecoder
 from typing import Any
 
 import partial_json_parser
@@ -41,9 +40,9 @@ from partial_json_parser.core.options import Allow
 def partial_json_loads(input_str: str, flags: Allow) -> tuple[Any, int]:
     try:
         return (partial_json_parser.loads(input_str, flags), len(input_str))
-    except JSONDecodeError as e:
+    except json.JSONDecodeError as e:
         if "Extra data" in e.msg:
-            dec = JSONDecoder()
+            dec = json.JSONDecoder()
             return dec.raw_decode(input_str)
         raise
 
@@ -52,7 +51,7 @@ def is_complete_json(input_str: str) -> bool:
     try:
         json.loads(input_str)
         return True
-    except JSONDecodeError:
+    except json.JSONDecodeError:
         return False
 
 

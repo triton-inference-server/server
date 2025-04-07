@@ -34,7 +34,6 @@ from schemas.openai import (
     ChatCompletionRequestAssistantMessage,
     ChatCompletionRequestMessage,
     ChatCompletionRequestMessageContentPart,
-    ChatCompletionRequestMessageContentPartText,
     ChatCompletionRequestToolMessage,
     ChatCompletionRequestUserMessage,
     Type1,

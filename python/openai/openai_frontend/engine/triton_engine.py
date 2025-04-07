@@ -473,7 +473,6 @@ class TritonLLMEngine(LLMEngine):
                     role=None, content=delta_text, function_call=None
                 )
 
-            finish_reason = Optional[ChatCompletionFinishReason]
             if response.final:
                 auto_tools_called = False
                 if tool_call_parser:

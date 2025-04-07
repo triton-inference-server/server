@@ -28,9 +28,7 @@
 # https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/openai/tool_parsers/llama_tool_parser.py
 # Copyright 2024 The vLLM team.
 import json
-import re
 import uuid
-from json import JSONDecoder
 from typing import Union
 
 import partial_json_parser
@@ -92,7 +90,7 @@ class Llama3JsonToolParser(ToolCallParser):
 
             # load the JSON, and then use it to build the Function and
             # Tool Call
-            dec = JSONDecoder()
+            dec = json.JSONDecoder()
             function_call_arr = []
 
             # depending on the prompt format the Llama model may or may not
