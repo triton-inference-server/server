@@ -33,15 +33,15 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     """This model will keep repeating the INPUT as the OUTPUT,
     until the request is being cancelled or
-    the MAX_NUMBER_OF_RESPONSE has been reached.
+    the MAX_RESPONSE_COUNT has been reached.
     """
 
     def execute(self, requests):
         request = requests[0]
 
         input = pb_utils.get_input_tensor_by_name(request, "INPUT").as_numpy()
-        max_num_of_response = pb_utils.get_input_tensor_by_name(
-            request, "MAX_NUMBER_OF_RESPONSE"
+        max_response_count = pb_utils.get_input_tensor_by_name(
+            request, "MAX_RESPONSE_COUNT"
         ).as_numpy()[0]
         delay = pb_utils.get_input_tensor_by_name(request, "DELAY").as_numpy()[0]
         ignore_cancel = pb_utils.get_input_tensor_by_name(
@@ -66,7 +66,7 @@ class TritonPythonModel:
             output = pb_utils.Tensor("OUTPUT", np.array([input[0]], np.int32))
             response = pb_utils.InferenceResponse(output_tensors=[output])
 
-            if sent + 1 == max_num_of_response:
+            if sent + 1 == max_response_count:
                 response_sender.send(
                     response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
                 )

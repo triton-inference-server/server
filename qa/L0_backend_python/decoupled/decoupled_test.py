@@ -436,7 +436,7 @@ class DecoupledTest(unittest.TestCase):
                     result = user_data._completed_requests.get()
                     check_result(result)
 
-    def test_decoupled_bls_cancel_after_cancelled(self):
+    def test_decoupled_bls_cancel_after_cancellation(self):
         model_name = "decoupled_bls_cancel_after_complete"
         input_value = 1
         max_sum_value = 10
@@ -480,7 +480,7 @@ class DecoupledTest(unittest.TestCase):
         model_name = "decoupled_bls_cancel_after_complete"
         input_value = 1
         max_sum_value = 200
-        ignore_cancel = True
+        ignore_cancel = False
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
             with grpcclient.InferenceServerClient(

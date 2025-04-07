@@ -37,7 +37,7 @@ class TritonPythonModel:
     cancel() method to cancel the response stream.
     If the IGNORE_CANCEL is set to True, the 'response_sender_until_cancelled' model will not hornor
     the request cancellation and keep sending the output to the model.
-    The number of total responses should not reach MAX_NUMBER_OF_RESPONSE.
+    The number of total responses should not reach MAX_RESPONSE_COUNT.
     """
 
     async def execute(self, requests):
@@ -47,13 +47,13 @@ class TritonPythonModel:
         input = pb_utils.get_input_tensor_by_name(requests[0], "INPUT")
         ignore_cancel = pb_utils.get_input_tensor_by_name(requests[0], "IGNORE_CANCEL")
         delay = pb_utils.Tensor("DELAY", np.array([50], dtype=np.int32))
-        max_num_response = pb_utils.Tensor(
-            "MAX_NUMBER_OF_RESPONSE", np.array([100], dtype=np.int32)
+        max_response_count = pb_utils.Tensor(
+            "MAX_RESPONSE_COUNT", np.array([100], dtype=np.int32)
         )
 
         infer_request = pb_utils.InferenceRequest(
             model_name="response_sender_until_cancelled",
-            inputs=[input, max_num_response, delay, ignore_cancel],
+            inputs=[input, max_response_count, delay, ignore_cancel],
             requested_output_names=["OUTPUT"],
         )
 

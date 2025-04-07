@@ -32,7 +32,7 @@ model_transaction_policy {
 
 input [
   {
-    name: "MAX_NUMBER_OF_RESPONSE"
+    name: "MAX_RESPONSE_COUNT"
     data_type: TYPE_INT32
     dims: [ 1 ]
   },
