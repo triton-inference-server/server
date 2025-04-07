@@ -562,7 +562,7 @@ print(f"tool calling result: {available_tools[function_name](**json.loads(functi
 
 Example output:
 ```
-function name: get_current_weather
-function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit"}
+function name: get_n_day_weather_forecast
+function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit", num_days: 1}
 tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit in next 1 days.
 ```
