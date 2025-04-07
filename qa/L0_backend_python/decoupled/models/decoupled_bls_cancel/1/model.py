@@ -45,9 +45,9 @@ class TritonPythonModel:
         )
         input = pb_utils.get_input_tensor_by_name(requests[0], "INPUT")
         ignore_cancel = pb_utils.get_input_tensor_by_name(requests[0], "IGNORE_CANCEL")
-        delay = pb_utils.Tensor("DELAY", np.array([20], dtype=np.int32))
+        delay = pb_utils.Tensor("DELAY", np.array([50], dtype=np.int32))
         max_response_count = pb_utils.Tensor(
-            "MAX_RESPONSE_COUNT", np.array([100], dtype=np.int32)
+            "MAX_RESPONSE_COUNT", np.array([20], dtype=np.int32)
         )
 
         infer_request = pb_utils.InferenceRequest(

@@ -479,7 +479,7 @@ class DecoupledTest(unittest.TestCase):
     def test_decoupled_bls_cancel_after_completion(self):
         model_name = "decoupled_bls_cancel_after_complete"
         input_value = 1
-        max_sum_value = 200
+        max_sum_value = 25
         ignore_cancel = False
         user_data = UserData()
         with self._shm_leak_detector.Probe() as shm_probe:
