@@ -46,6 +46,34 @@ from tritonclient.utils import *
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
+def prepare_decoupled_bls_cancel_inputs(input_value, max_sum_value, ignore_cancel):
+    input_data = np.array([input_value], dtype=np.int32)
+    max_sum_data = np.array([max_sum_value], dtype=np.int32)
+    ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
+    inputs = [
+        grpcclient.InferInput(
+            "INPUT",
+            input_data.shape,
+            np_to_triton_dtype(input_data.dtype),
+        ),
+        grpcclient.InferInput(
+            "MAX_SUM",
+            max_sum_data.shape,
+            np_to_triton_dtype(max_sum_data.dtype),
+        ),
+        grpcclient.InferInput(
+            "IGNORE_CANCEL",
+            ignore_cancel_data.shape,
+            np_to_triton_dtype(ignore_cancel_data.dtype),
+        ),
+    ]
+    inputs[0].set_data_from_numpy(input_data)
+    inputs[1].set_data_from_numpy(max_sum_data)
+    inputs[2].set_data_from_numpy(ignore_cancel_data)
+
+    return inputs
+
+
 class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
@@ -336,29 +364,11 @@ class DecoupledTest(unittest.TestCase):
                     f"{_tritonserver_ipaddr}:8001"
                 ) as client:
                     client.start_stream(callback=partial(callback, user_data))
-                    input_data = np.array([input_value], dtype=np.int32)
-                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
-                    ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
-                    inputs = [
-                        grpcclient.InferInput(
-                            "INPUT",
-                            input_data.shape,
-                            np_to_triton_dtype(input_data.dtype),
-                        ),
-                        grpcclient.InferInput(
-                            "MAX_SUM",
-                            max_sum_data.shape,
-                            np_to_triton_dtype(max_sum_data.dtype),
-                        ),
-                        grpcclient.InferInput(
-                            "IGNORE_CANCEL",
-                            ignore_cancel_data.shape,
-                            np_to_triton_dtype(ignore_cancel_data.dtype),
-                        ),
-                    ]
-                    inputs[0].set_data_from_numpy(input_data)
-                    inputs[1].set_data_from_numpy(max_sum_data)
-                    inputs[2].set_data_from_numpy(ignore_cancel_data)
+                    inputs = prepare_decoupled_bls_cancel_inputs(
+                        input_value=input_value,
+                        max_sum_value=max_sum_value,
+                        ignore_cancel=ignore_cancel,
+                    )
                     client.async_stream_infer(model_name, inputs)
 
                     # Check the results of the decoupled model using BLS
@@ -371,6 +381,7 @@ class DecoupledTest(unittest.TestCase):
                             "error: expected the request to be cancelled",
                         )
 
+                        max_sum_data = np.array([max_sum_value], dtype=np.int32)
                         sum_data = result.as_numpy("SUM")
                         self.assertIsNotNone(sum_data, "error: expected 'SUM'")
                         self.assertTrue(
@@ -395,29 +406,11 @@ class DecoupledTest(unittest.TestCase):
                     f"{_tritonserver_ipaddr}:8001"
                 ) as client:
                     client.start_stream(callback=partial(callback, user_data))
-                    input_data = np.array([input_value], dtype=np.int32)
-                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
-                    ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
-                    inputs = [
-                        grpcclient.InferInput(
-                            "INPUT",
-                            input_data.shape,
-                            np_to_triton_dtype(input_data.dtype),
-                        ),
-                        grpcclient.InferInput(
-                            "MAX_SUM",
-                            max_sum_data.shape,
-                            np_to_triton_dtype(max_sum_data.dtype),
-                        ),
-                        grpcclient.InferInput(
-                            "IGNORE_CANCEL",
-                            ignore_cancel_data.shape,
-                            np_to_triton_dtype(ignore_cancel_data.dtype),
-                        ),
-                    ]
-                    inputs[0].set_data_from_numpy(input_data)
-                    inputs[1].set_data_from_numpy(max_sum_data)
-                    inputs[2].set_data_from_numpy(ignore_cancel_data)
+                    inputs = prepare_decoupled_bls_cancel_inputs(
+                        input_value=input_value,
+                        max_sum_value=max_sum_value,
+                        ignore_cancel=ignore_cancel,
+                    )
                     client.async_stream_infer(model_name, inputs)
 
                     # Check the results of the decoupled model using BLS
@@ -430,6 +423,7 @@ class DecoupledTest(unittest.TestCase):
                             "error: expected the request not being cancelled",
                         )
 
+                        max_sum_data = np.array([max_sum_value], dtype=np.int32)
                         sum_data = result.as_numpy("SUM")
                         self.assertIsNotNone(sum_data, "error: expected 'SUM'")
                         self.assertTrue(
@@ -453,27 +447,11 @@ class DecoupledTest(unittest.TestCase):
                 f"{_tritonserver_ipaddr}:8001"
             ) as client:
                 client.start_stream(callback=partial(callback, user_data))
-                input_data = np.array([input_value], dtype=np.int32)
-                max_sum_data = np.array([max_sum_value], dtype=np.int32)
-                ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
-                inputs = [
-                    grpcclient.InferInput(
-                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                    ),
-                    grpcclient.InferInput(
-                        "MAX_SUM",
-                        max_sum_data.shape,
-                        np_to_triton_dtype(max_sum_data.dtype),
-                    ),
-                    grpcclient.InferInput(
-                        "IGNORE_CANCEL",
-                        ignore_cancel_data.shape,
-                        np_to_triton_dtype(ignore_cancel_data.dtype),
-                    ),
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                inputs[1].set_data_from_numpy(max_sum_data)
-                inputs[2].set_data_from_numpy(ignore_cancel_data)
+                inputs = prepare_decoupled_bls_cancel_inputs(
+                    input_value=input_value,
+                    max_sum_value=max_sum_value,
+                    ignore_cancel=ignore_cancel,
+                )
                 client.async_stream_infer(model_name, inputs)
 
                 # Check the results of the decoupled model using BLS
@@ -485,6 +463,7 @@ class DecoupledTest(unittest.TestCase):
                         is_cancelled[0], "error: expected the request to be cancelled"
                     )
 
+                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
                     sum_data = result.as_numpy("SUM")
                     self.assertIsNotNone(sum_data, "error: expected 'SUM'")
                     self.assertTrue(
@@ -508,27 +487,11 @@ class DecoupledTest(unittest.TestCase):
                 f"{_tritonserver_ipaddr}:8001"
             ) as client:
                 client.start_stream(callback=partial(callback, user_data))
-                input_data = np.array([input_value], dtype=np.int32)
-                max_sum_data = np.array([max_sum_value], dtype=np.int32)
-                ignore_cancel_data = np.array([ignore_cancel], dtype=np.bool_)
-                inputs = [
-                    grpcclient.InferInput(
-                        "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                    ),
-                    grpcclient.InferInput(
-                        "MAX_SUM",
-                        max_sum_data.shape,
-                        np_to_triton_dtype(max_sum_data.dtype),
-                    ),
-                    grpcclient.InferInput(
-                        "IGNORE_CANCEL",
-                        ignore_cancel_data.shape,
-                        np_to_triton_dtype(ignore_cancel_data.dtype),
-                    ),
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                inputs[1].set_data_from_numpy(max_sum_data)
-                inputs[2].set_data_from_numpy(ignore_cancel_data)
+                inputs = prepare_decoupled_bls_cancel_inputs(
+                    input_value=input_value,
+                    max_sum_value=max_sum_value,
+                    ignore_cancel=ignore_cancel,
+                )
                 client.async_stream_infer(model_name, inputs)
 
                 # Check the results of the decoupled model using BLS
@@ -541,6 +504,7 @@ class DecoupledTest(unittest.TestCase):
                         "error: expected the request not being cancelled",
                     )
 
+                    max_sum_data = np.array([max_sum_value], dtype=np.int32)
                     sum_data = result.as_numpy("SUM")
                     self.assertIsNotNone(sum_data, "error: expected 'SUM'")
                     self.assertTrue(
