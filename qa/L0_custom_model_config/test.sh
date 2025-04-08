@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,8 +51,8 @@ RET=0
 rm -fr *.log
 
 rm -fr models && mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
-mkdir models/savedmodel_nobatch_float32_float32_float32/configs
+cp -r $DATADIR/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+mkdir models/onnx_nobatch_float32_float32_float32/configs
 
 test_custom_config()
 {
@@ -66,7 +66,7 @@ test_custom_config()
     fi
 
     set +e
-    code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
+    code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/onnx_nobatch_float32_float32_float32/config`
     set -e
     if [ "$code" != "200" ]; then
         cat $out.out
@@ -92,15 +92,15 @@ VERSION_V100="2"
 VERSION_CUSTOM="3"
 
 # Distinguish configs with different model versions
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+(cd models/onnx_nobatch_float32_float32_float32 && \
      sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [$VERSION_DEFAULT] }}/" config.pbtxt)
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+(cd models/onnx_nobatch_float32_float32_float32 && \
      cp config.pbtxt configs/h100.pbtxt && \
      sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [$VERSION_H100] }}/" configs/h100.pbtxt)
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+(cd models/onnx_nobatch_float32_float32_float32 && \
      cp config.pbtxt configs/v100.pbtxt && \
      sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [$VERSION_V100] }}/" configs/v100.pbtxt)
-(cd models/savedmodel_nobatch_float32_float32_float32 && \
+(cd models/onnx_nobatch_float32_float32_float32 && \
      cp config.pbtxt configs/config.pbtxt && \
      sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [$VERSION_CUSTOM] }}/" configs/config.pbtxt)
 

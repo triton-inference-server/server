@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -68,7 +68,7 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     # Onnx models are handled separately, see below
-    for FW in graphdef savedmodel onnx libtorch; do
+    for FW in onnx libtorch; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
