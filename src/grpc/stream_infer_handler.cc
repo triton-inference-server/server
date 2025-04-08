@@ -1,4 +1,4 @@
-// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -133,6 +133,9 @@ bool
 ModelStreamInferHandler::Process(
     InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
+  if (is_notification) {
+    state->context_->SetReceivedNotification(true);
+  }
   // Because gRPC doesn't allow concurrent writes on the
   // the stream we only have a single handler thread that
   // reads from the completion queue. Hence, cancellation
@@ -144,8 +147,16 @@ ModelStreamInferHandler::Process(
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
-      bool resume = state->context_->HandleCancellation(
-          state, rpc_ok, Name(), is_notification);
+      if (is_notification) {
+        // This is the cancellation notification
+        LOG_VERBOSE(1) << "Cancellation notification received for " << Name()
+                       << ", rpc_ok=" << rpc_ok << ", context "
+                       << state->context_->unique_id_ << " step "
+                       << state->context_->step_ << ", state "
+                       << state->unique_id_ << " step " << state->step_;
+      }
+
+      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
       return resume;
     } else {
       if (state->context_->HandleCompletion()) {

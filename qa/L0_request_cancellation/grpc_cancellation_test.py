@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -202,11 +202,33 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
         )  # ensure the cancellation is processed
         self._assert_callback_cancelled()
 
-    def test_grpc_async_infer_cancellation_during_response_complete(self):
+    def test_grpc_async_infer_cancellation_before_finish_0(self):
+        # First version of test_grpc_async_infer_cancellation_before_finish
+        # Cancellation notification is processed before the final response state.
         # long test
-        self.test_duration_delta = 2.5
+        self.test_duration_delta = 2
         delay_notification_sec = (
             int(os.getenv("TRITONSERVER_DELAY_GRPC_NOTIFICATION")) / 1000
+        )
+        future = self._client.async_infer(
+            model_name=self._model_name,
+            inputs=self._inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        # ensure the cancellation is received between InferResponseComplete checking cancellation and Finish
+        time.sleep(self._model_delay + 2)
+        future.cancel()
+        time.sleep(delay_notification_sec + 1)  # ensure the cancellation is processed
+        self._assert_callback_cancelled()
+
+    def test_grpc_async_infer_cancellation_before_finish_1(self):
+        # Second version of test_grpc_async_infer_cancellation_before_finish
+        # Cancellation notification is processed after the final response state.
+        # long test
+        self.test_duration_delta = 2
+        delay_process_entry_sec = (
+            int(os.getenv("TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY")) / 1000
         )
         delay_response_completion_sec = (
             int(os.getenv("TRITONSERVER_DELAY_RESPONSE_COMPLETION")) / 1000
@@ -218,11 +240,36 @@ class GrpcCancellationTest(unittest.IsolatedAsyncioTestCase):
             outputs=self._outputs,
         )
         # ensure the cancellation is received between InferResponseComplete checking cancellation and Finish
-        time.sleep(self._model_delay + 2)
+        time.sleep(self._model_delay + delay_process_entry_sec + 2)
         future.cancel()
         time.sleep(
-            delay_notification_sec + delay_response_completion_sec
+            delay_response_completion_sec
         )  # ensure the cancellation is processed
+        self._assert_callback_cancelled()
+
+    def test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response(
+        self,
+    ):
+        # Received cancellation before InferResponseComplete and the notification
+        # state is processed after processing final response state.
+        # long test
+        self.test_duration_delta = 2
+        delay_notification_sec = (
+            int(os.getenv("TRITONSERVER_DELAY_GRPC_NOTIFICATION")) / 1000
+        )
+        delay_response_complete_exec_sec = (
+            int(os.getenv("TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC")) / 1000
+        )
+        future = self._client.async_infer(
+            model_name=self._model_name,
+            inputs=self._inputs,
+            callback=self._callback,
+            outputs=self._outputs,
+        )
+        # ensure the cancellation is received before InferResponseComplete checking cancellation
+        time.sleep(self._model_delay + 2)
+        future.cancel()
+        time.sleep(delay_notification_sec + 1)  # ensure the cancellation is processed
         self._assert_callback_cancelled()
 
 

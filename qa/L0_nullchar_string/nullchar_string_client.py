@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -89,9 +89,17 @@ if __name__ == "__main__":
 
     # Send inference request to the inference server. Get results for
     # output tensor.
+    input_name = "INPUT0"
+    output_name = "OUTPUT0"
+
+    # If using libtorch model, set input and output name to "INPUT__0" and "OUTPUT__0"
+    if "libtorch" in FLAGS.model_name:
+        input_name = "INPUT__0"
+        output_name = "OUTPUT__0"
+
     inputs = [
         client_util.InferInput(
-            "INPUT0", input0_data.shape, np_to_triton_dtype(np.object_)
+            input_name, input0_data.shape, np_to_triton_dtype(np.object_)
         )
     ]
     inputs[0].set_data_from_numpy(input0_data)
@@ -100,7 +108,7 @@ if __name__ == "__main__":
 
     # We expect there to be 1 result (with batch-size 1). Compare the input
     # and output tensor calculated by the model. They must be the same.
-    output0_data = results.as_numpy("OUTPUT0")
+    output0_data = results.as_numpy(output_name)
 
     print(input0_data, "?=?", output0_data)
     assert np.equal(input0_data.astype(np.bytes_), output0_data).all()

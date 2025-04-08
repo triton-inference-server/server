@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,14 +71,10 @@ FROM {} AS full
         argmap["TRITON_VERSION"], argmap["TRITON_CONTAINER_VERSION"], images["full"]
     )
 
-    # PyTorch, TensorFlow backends need extra CUDA and other
+    # PyTorch backends need extra CUDA and other
     # dependencies during runtime that are missing in the CPU-only base container.
     # These dependencies must be copied from the Triton Min image.
-    if not FLAGS.enable_gpu and (
-        ("pytorch" in backends)
-        or ("tensorflow" in backends)
-        or ("tensorflow2" in backends)
-    ):
+    if not FLAGS.enable_gpu and "pytorch" in backends:
         df += """
 FROM {} AS min_container
 
@@ -302,7 +298,7 @@ def create_argmap(images, skip_pull):
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "2.2.3"
+        dcgm_version = "3.3.6"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version
@@ -406,7 +402,7 @@ if __name__ == "__main__":
         '<image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" '
         'or "full". Both "min" and "full" need to be specified at the same time.'
         'This will override "--container-version". "gpu-min" is needed for '
-        "CPU-only container to copy TensorFlow and PyTorch deps.",
+        "CPU-only container to copy PyTorch deps.",
     )
     parser.add_argument(
         "--enable-gpu",
@@ -504,13 +500,9 @@ if __name__ == "__main__":
     fail_if(len(images) < 2, "Need to specify both 'full' and 'min' images if at all")
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch, TensorFlow 1, TensorFlow 2 containers that
+    # since we are using PyTorch containers that
     # are not CPU-only.
-    if (
-        ("pytorch" in FLAGS.backend)
-        or ("tensorflow" in FLAGS.backend)
-        or ("tensorflow2" in FLAGS.backend)
-    ) and ("gpu-min" not in images):
+    if ("pytorch" in FLAGS.backend) and ("gpu-min" not in images):
         images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.container_version
         )

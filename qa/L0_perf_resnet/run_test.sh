@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 STATIC_BATCH=${STATIC_BATCH:=1}
 INSTANCE_CNT=${INSTANCE_CNT:=1}
 BACKEND_CONFIG=${BACKEND_CONFIG:=""}
-TF_VERSION=${TF_VERSION:=2}
 
 REPORTER=../common/reporter.py
 
@@ -36,7 +35,7 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference
