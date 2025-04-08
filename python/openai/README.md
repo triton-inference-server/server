@@ -345,13 +345,14 @@ For more information on the `tritonfrontend` python bindings, see the docs
 
 ## Tool Calling
 
-OpenAI Frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API, please check the OpenAI API reference for details about these parameters:
+The OpenAI frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API. Please refer to the OpenAI API reference for more details about these parameters.
   [tools](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools)
   [tool_choice](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tool_choice)
 
-To enable the tool calling feature, add the `--tool-call-parser {parser_name}` to start the server, `llama3` and `mistral` are the two available parsers.
-`llama3` parser can be used to support the llama 3.1/3.2/3.3 tool calling features, `mistral` parser can be used to support the mistral instruct model's tool calling features.
+To enable the tool-calling feature, add the `--tool-call-parser {parser_name}` flag when starting the server. The two available parsers are `llama3` and `mistral`.
+The `llama3` parser supports tool-calling features for LLaMA 3.1, 3.2, and 3.3 models, while the `mistral` parser supports tool-calling features for the Mistral Instruct model.
 
+Example for launching the OpenAI frontend with a tool call parser:
 ```
 python3 openai_frontend/main.py \
   --model-repository tests/vllm_models \
@@ -442,11 +443,11 @@ tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It i
 
 #### Named Tool Calling
 
-OpenAI Frontend supports Named function calling, it utilize the guided decoding in the vLLM and Tensorrt LLM backend. User could specify one of the tools in the `tool_choice` to force the model making a tool calling choice on a certain tool.
+The OpenAI frontend supports named function calling, utilizing guided decoding in the vLLM and TensorRT-LLM backends. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
 
 > [!NOTE]
-> Tensorrt LLM latest release version 0.18.0 doesn't support guided decoding yet. To enable the feature, use the Tensorrt LLM built on the `main` branch.
-> To enable the guided decoding in Tensorrt LLM backend, please follow this [guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
+> The latest release of TensorRT-LLM (v0.18.0) does not yet support guided decoding. To enable this feature, use a build from the main branch of TensorRT-LLM.
+> For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
 
 Example for making a named tool calling request:
 
