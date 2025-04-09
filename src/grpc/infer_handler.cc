@@ -113,6 +113,29 @@ InferResponseAlloc(
       buffer_userp, actual_memory_type, actual_memory_type_id);
 }
 
+// Make sure to keep InferResponseAllocCallback and OutputBufferQuery logic in
+// sync
+TRITONSERVER_Error*
+InferResponseAllocCallback(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  AllocPayloadCallback<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayloadCallback<inference::ModelInferResponse>*>(
+          userp);
+
+  // ModelInfer RPC expects exactly one response per request. Hence,
+  // Get pointer directly from the modified payload instead of the queue.
+  inference::ModelInferResponse* response = payload->response_ptr_;
+  return ResponseAllocatorHelper(
+      allocator, tensor_name, byte_size, preferred_memory_type,
+      preferred_memory_type_id, response, payload->shm_map_, buffer,
+      buffer_userp, actual_memory_type, actual_memory_type_id);
+}
+
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 OutputBufferQuery(
@@ -120,8 +143,9 @@ OutputBufferQuery(
     const char* tensor_name, size_t* byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+  AllocPayloadCallback<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayloadCallback<inference::ModelInferResponse>*>(
+          userp);
 
   return OutputBufferQueryHelper(
       allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
@@ -136,8 +160,9 @@ OutputBufferAttributes(
     TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
     void* buffer_userp)
 {
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+  AllocPayloadCallback<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayloadCallback<inference::ModelInferResponse>*>(
+          userp);
 
   return OutputBufferAttributesHelper(
       allocator, tensor_name, payload->shm_map_, buffer_attributes);
@@ -191,12 +216,12 @@ InferGRPCToInputHelper(
 TRITONSERVER_Error*
 InferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
 {
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+  // AllocPayload<inference::ModelInferResponse>* payload =
+  //     reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
 
   // ModelInfer RPC expects exactly one response per request. Hence, always call
   // GetNonDecoupledResponse() to create one response object on response start.
-  payload->response_queue_->GetNonDecoupledResponse();
+  // payload->response_queue_->GetNonDecoupledResponse();
 
   return nullptr;  // success
 }
@@ -639,7 +664,7 @@ void
 InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
+  LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete!";
 
   RequestReleasePayload* request_release_payload =
       static_cast<RequestReleasePayload*>(userp);
@@ -665,7 +690,7 @@ ModelInferCallbackHandler::ModelInferCallbackHandler(
 {
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorNew(
-          &allocator_, InferResponseAlloc, InferResponseFree,
+          &allocator_, InferResponseAllocCallback, InferResponseFree,
           InferResponseStart),
       "creating inference response allocator");
   FAIL_IF_ERR(
@@ -685,6 +710,28 @@ ModelInferCallbackHandler::~ModelInferCallbackHandler()
       "deleting response allocator");
 }
 
+/**
+ * @brief Handles gRPC ModelInfer requests using the callback API pattern
+ *
+ * Request flow path:
+ * 1. Client creates and sends ModelInferRequest via gRPC
+ * 2. gRPC framework deserializes the protobuf message
+ * 3. gRPC calls this handler based on service registration
+ * 4. This function creates a callback state and reactor to manage async
+ * lifecycle
+ * 5. The Execute method initiates processing with proper ownership transfer
+ *
+ * Memory management:
+ * - CallbackState manages lifecycle of request/response objects
+ * - Ownership transfers to completion callbacks for async cleanup
+ * - Response memory allocation handled through allocator_
+ * - Shared memory regions tracked and released after completion
+ *
+ * @param context The gRPC server context for this request
+ * @param request The deserialized ModelInferRequest from client
+ * @param response Output parameter for the ModelInferResponse to client
+ * @return ::grpc::ServerUnaryReactor* Reactor that signals request completion
+ */
 ::grpc::ServerUnaryReactor*
 ModelInferCallbackHandler::HandleModelInfer(
     ::grpc::CallbackServerContext* context,
@@ -714,30 +761,76 @@ void
 ModelInferCallbackHandler::InferResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
+  LOG_VERBOSE(1) << "[InferResponseComplete START] Received userp "
+                    "(CallbackState*) address: "
+                 << userp;
   std::unique_ptr<CallbackState> callback_state(
       static_cast<CallbackState*>(userp));
-
+  LOG_VERBOSE(1) << "[InferResponseComplete] CallbackState unique_ptr now owns "
+                    "state at address: "
+                 << callback_state.get();
   if (response != nullptr) {
-    // Dereference callback_state->response_ to pass a reference
-    TRITONSERVER_Error* err = InferResponseCompleteCommon(
-        callback_state->tritonserver_.get(),
-        response,  // Pass the TRITONSERVER_InferenceResponse*
-        *(callback_state
-              ->response_),  // Pass the inference::ModelInferResponse&
-        callback_state->alloc_payload_);  // Pass the AllocPayload<...>
+    // Use the pre-allocated response directly from the callback state
+    ::grpc::Status status = ::grpc::Status::OK;
 
-    ::grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);
-    TRITONSERVER_ErrorDelete(err);
+    // Get the response from the payload's response queue as a fallback
+    LOG_VERBOSE(1)
+        << "[InferResponseComplete] Attempting to retrieve response pointer "
+           "directly from callback_state->response_ which points to: "
+        << callback_state->response_;
+    inference::ModelInferResponse* grpc_response = callback_state->response_;
 
-    callback_state->reactor_->Finish(status);
+    // If not available in callback state, try to get from response queue
+    if (grpc_response == nullptr) {
+      LOG_VERBOSE(1)
+          << "[InferResponseComplete] >>> Fallback Triggered! grpc_response "
+             "from state was NULL, attempting fallback from queue.";
+      grpc_response = callback_state->alloc_payload_.response_ptr_;
+    }
+
+    if (grpc_response != nullptr) {
+      // Process the response
+      LOG_VERBOSE(1)
+          << "InferResponseComplete: Checking response object at address: "
+          << grpc_response;
+      TRITONSERVER_Error* err = InferResponseCompleteCommonCallback(
+          callback_state->tritonserver_.get(), response, *grpc_response,
+          callback_state->alloc_payload_);
+
+      if (err != nullptr) {
+        GrpcStatusUtil::Create(&status, err);
+        TRITONSERVER_ErrorDelete(err);
+      }
+    } else {
+      status = ::grpc::Status(
+          ::grpc::StatusCode::INTERNAL,
+          "response object not found in callback");
+    }
+
+    // For callback API, we complete the RPC by finishing the reactor
+    // Only finish the reactor when we get the final response or on error
+    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) || !status.ok()) {
+      callback_state->reactor_->Finish(status);
+    }
   } else {
+    // Handle null response case
     callback_state->reactor_->Finish(
         ::grpc::Status(::grpc::StatusCode::INTERNAL, "null response"));
   }
 
-  TRITONSERVER_InferenceResponseDelete(
-      response);  // Delete the TRITONSERVER_InferenceResponse
+#ifdef TRITON_ENABLE_TRACING
+  if (callback_state->trace_ != nullptr) {
+    callback_state->trace_timestamps_.emplace_back(std::make_pair(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  // Always delete the TRITONSERVER_InferenceResponse
+  if (response != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(response),
+        "deleting inference response");
+  }
 }
 
 bool
@@ -790,19 +883,23 @@ ModelInferCallbackHandler::Execute(
     std::unique_ptr<CallbackState>& callback_state)
 {
   TRITONSERVER_Error* err = nullptr;
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  LOG_VERBOSE(1) << "[Execute START] Incoming response object address: "
+                 << response;
+  // --- Step 1: Receive & Validate ---
   int64_t requested_model_version;
-  if (err == nullptr) {
-    err = GetModelVersionFromString(
-        request->model_version(), &requested_model_version);
-  }
+  err = GetModelVersionFromString(
+      request->model_version(), &requested_model_version);
 
-  // Check if model has decoupled transaction policy
+  // Check if model has decoupled transaction policy (not supported by this RPC)
   if (err == nullptr) {
     uint32_t txn_flags;
+    // Query model properties
     err = TRITONSERVER_ServerModelTransactionProperties(
         tritonserver_.get(), request->model_name().c_str(),
         requested_model_version, &txn_flags, nullptr /* voidp */);
     if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+      // Set error if decoupled
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
           "ModelInfer RPC doesn't support models with decoupled "
@@ -810,72 +907,96 @@ ModelInferCallbackHandler::Execute(
     }
   }
 
-  // Create the inference request
-  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  // --- Step 2: Prepare Triton Request Object ---
   if (err == nullptr) {
+    // Create the core Triton request object
     err = TRITONSERVER_InferenceRequestNew(
         &irequest, tritonserver_.get(), request->model_name().c_str(),
         requested_model_version);
   }
 
-  // Set metadata and parameters
+  // Populate request metadata (ID, sequence flags, priority, params, etc.)
   if (err == nullptr) {
-    // Create a local StateParameters object for the call
-    StateParameters state_params;
-    // Pass the local object as the third argument
+    StateParameters state_params;  // Temporary params for this call scope
     err = SetInferenceRequestMetadata(irequest, *request, state_params);
   }
 
-  // Call the correct private helper function here
+  // Forward relevant gRPC headers as Triton parameters
   if (err == nullptr) {
     err = ForwardHeadersAsParametersCallback(irequest, context);
   }
 
-  // Handle input tensors and shared memory
+  // --- Step 3: Process Input Tensors ---
   if (err == nullptr) {
+    // Parse inputs from request, handle shared memory (if any),
+    // serialize string data, and add data pointers/attributes to irequest.
+    // Serialized data stored in callback_state->serialized_data_
+    // SHM info stored in callback_state->shm_regions_info_
     err = InferGRPCToInput(
         tritonserver_, shm_manager_, *request,
         &callback_state->serialized_data_, irequest,
         &callback_state->shm_regions_info_);
   }
 
-  auto response_queue =
-      std::make_shared<ResponseQueue<inference::ModelInferResponse>>(1);
-  inference::ModelInferResponse* response_ptr =
-      response_queue->GetNonDecoupledResponse();
-  *response_ptr = *response;
-
-  // Set up allocator payload
+  // --- Step 4: Prepare for Response Handling (Callback Specific) ---
+  std::shared_ptr<ResponseQueue<inference::ModelInferResponse>> response_queue =
+      nullptr;
   if (err == nullptr) {
-    err = InferAllocatorPayload<inference::ModelInferResponse>(
+    // Use the externally provided response object directly.
+    // Store the external response pointer in the state for later access.
+    callback_state->response_ = response;
+    LOG_VERBOSE(1) << "[Execute] Stored response object address in "
+                      "callback_state->response_: "
+                   << callback_state->response_;
+    // Clear the externally provided response object directly.
+    response->Clear();  // Ensure it's empty before Triton writes to it
+  }
+
+  // Prepare the allocator payload: info needed by allocation callback later.
+  // Moves serialized input data into the payload. References the
+  // response_queue.
+  if (err == nullptr) {
+    err = InferAllocatorPayloadCallback<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, *request,
-        std::move(callback_state->serialized_data_), response_queue,
+        std::move(callback_state->serialized_data_), callback_state->response_,
         &callback_state->alloc_payload_, &callback_state->shm_regions_info_);
   }
 
-  // Set response callback
+  // --- Step 5: Setup Automatic Cleanup Payloads & Register Callbacks ---
+  // Create payload for request release callback (manages irequest lifetime)
+  auto request_release_payload = std::make_unique<RequestReleasePayload>(
+      std::shared_ptr<TRITONSERVER_InferenceRequest>(
+          irequest, [](TRITONSERVER_InferenceRequest* r) {
+            // Custom deleter: Ensures delete is called via shared_ptr lifecycle
+            if (r != nullptr) {
+              LOG_TRITONSERVER_ERROR(
+                  TRITONSERVER_InferenceRequestDelete(r),
+                  "deleting inference request via shared_ptr custom deleter");
+            }
+          }));
+
+  // Register the release callback (cleans up request_release_payload &
+  // irequest)
   if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+        irequest, InferRequestComplete, request_release_payload.get());
+  }
+
+  // Register the response callback (processes result, finishes RPC, cleans up
+  // callback_state)
+  if (err == nullptr) {
+    // Note: Passing callback_state.get() transfers potential ownership to the
+    // callback mechanism upon success (see step 7).
     err = TRITONSERVER_InferenceRequestSetResponseCallback(
         irequest, allocator_, &callback_state->alloc_payload_,
         InferResponseComplete, callback_state.get());
   }
 
-  // Get request ID for logging
-  const char* request_id = "";
-  if (irequest != nullptr) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestId(irequest, &request_id),
-        "unable to retrieve request ID string");
-  }
-
-  if (!strncmp(request_id, "", 1)) {
-    request_id = "<id_unknown>";
-  }
-
-  // Set up tracing if enabled
+  // --- Optional: Setup Tracing ---
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
   if (err == nullptr && trace_manager_ != nullptr) {
+    // Setup and start tracing if configured
     GrpcServerCarrier carrier(context);
     auto start_options =
         trace_manager_->GetTraceStartOptions(carrier, request->model_name());
@@ -887,31 +1008,75 @@ ModelInferCallbackHandler::Execute(
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  // Issue async inference request
+  // Get request ID for logging, handle potential null irequest if error
+  // occurred early
+  const char* request_id_cstr = "";
+  std::string request_id = "<unknown>";
+  if (irequest != nullptr) {
+    auto id_err = TRITONSERVER_InferenceRequestId(irequest, &request_id_cstr);
+    if (id_err == nullptr && request_id_cstr != nullptr &&
+        strlen(request_id_cstr) > 0) {
+      request_id = request_id_cstr;
+    }
+    TRITONSERVER_ErrorDelete(id_err);  // Delete error from ID retrieval if any
+  }
+
+
+  // --- Step 6: Start Asynchronous Inference ---
   if (err == nullptr) {
     err = TRITONSERVER_ServerInferAsync(
         tritonserver_.get(), irequest, triton_trace);
   }
 
-  // Handle errors or complete successfully
+  // --- Step 7/8: Handle Outcome (Success or Error) ---
   if (err == nullptr) {
-    // Success case - callback_state ownership transferred to callback
+    // --- Success Path ---
+    // Inference successfully submitted to Triton core.
+    // Release ownership of payloads to the callback mechanism.
+    // Callbacks (InferResponseComplete, InferRequestComplete) are now
+    // responsible for cleanup.
+    LOG_VERBOSE(1) << "[Execute SUCCESS] Releasing ownership of callback_state "
+                      "at address: "
+                   << callback_state.get();
     callback_state.release();
-  } else {
-    // Error case
+    request_release_payload.release();
+    // Execute function finishes here; gRPC call waits for reactor->Finish() in
+    // callback.
     LOG_VERBOSE(1) << "[request id: " << request_id << "] "
-                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+                   << "Async inference submitted successfully.";
 
+  } else {
+    // --- Error Path ---
+    // An error occurred during setup before submitting to Triton.
+    LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+                   << "Setup failed before submitting inference: "
+                   << TRITONSERVER_ErrorMessage(err);
+
+    // Create gRPC status from Triton error
     ::grpc::Status status;
-    GrpcStatusUtil::Create(&status, err);  // Use existing utility
-    TRITONSERVER_ErrorDelete(err);
+    GrpcStatusUtil::Create(&status, err);
 
+    // Perform explicit cleanup as callbacks won't run
+    TRITONSERVER_ErrorDelete(err);  // Delete the primary Triton error
     if (irequest != nullptr) {
-      TRITONSERVER_InferenceRequestDelete(irequest);
+      // Explicitly delete the request object as the release callback won't run
+      // Note: The shared_ptr in request_release_payload will handle this
+      // gracefully
+      //       when the unique_ptr goes out of scope below, due to the custom
+      //       deleter. However, explicit deletion here is safe and clear.
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestDelete(irequest),
+          "explicitly deleting inference request due to setup error");
+      irequest =
+          nullptr;  // Avoid potential double delete if shared_ptr logic changes
     }
+    // Note: callback_state and request_release_payload unique_ptrs will
+    //       automatically clean up their managed objects when they go out of
+    //       scope now, as .release() was not called.
 
-    // Complete RPC with error
+    // Immediately finish the gRPC call with the error status
     reactor->Finish(status);
+    // Execute function finishes here.
   }
 }
 //===========================================================================
@@ -1084,13 +1249,16 @@ ResponseAllocatorHelper(
   *actual_memory_type = preferred_memory_type;
   *actual_memory_type_id = preferred_memory_type_id;
 
+  LOG_VERBOSE(1) << "AllocatorHelper: Modifying response object at address: "
+                 << response;
   // We add an output contents even if the 'byte_size' == 0 because we
   // expect to have a contents for every output.
   inference::ModelInferResponse::InferOutputTensor* output_tensor =
       response->add_outputs();
   output_tensor->set_name(tensor_name);
   std::string* raw_output = response->add_raw_output_contents();
-
+  LOG_VERBOSE(1) << "AllocatorHelper: After add_outputs for " << tensor_name
+                 << ", response->outputs_size() = " << response->outputs_size();
   if (byte_size > 0) {
     const auto& pr = shm_map.find(tensor_name);
     if (pr != shm_map.end()) {
