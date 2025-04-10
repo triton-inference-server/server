@@ -345,8 +345,8 @@ For more information on the `tritonfrontend` python bindings, see the docs
 
 ## Tool Calling
 
-The OpenAI frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API. Please refer to the OpenAI API reference for more details about these parameters.
-  [tools](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools)
+The OpenAI frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API. Please refer to the OpenAI API reference for more details about these parameters:
+  [tools](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools),
   [tool_choice](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tool_choice)
 
 To enable the tool-calling feature, add the `--tool-call-parser {parser_name}` flag when starting the server. The two available parsers are `llama3` and `mistral`.

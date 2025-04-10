@@ -106,7 +106,7 @@ def extract_intermediate_diff(curr: str, old: str) -> str:
     are returned in streaming, so that close-quotes, close-brackets and
     close-braces are not returned prematurely. The order of arguments IS
     important - the new version of the partially-parsed JSON must be the first
-    argument, and the secnod argument must be from the previous generation.
+    argument, and the second argument must be from the previous generation.
 
     What it returns, is tokens that should be streamed to the client.
 

@@ -35,6 +35,7 @@ from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Opti
 
 import tritonserver
 from engine.engine import LLMEngine
+from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
@@ -65,8 +66,6 @@ from schemas.openai import (
     Model,
     ObjectType,
 )
-
-from .chat_utils import load_chat_template, parse_chat_messages
 
 
 # TODO: Improve type hints
@@ -193,10 +192,10 @@ class TritonLLMEngine(LLMEngine):
         text = _get_output(response)
 
         auto_tools_called = False
+        tool_function_name = self._get_named_function_name(request=request)
+
         response_message: Optional[ChatCompletionResponseMessage]
-        if request.tool_choice and isinstance(
-            request.tool_choice.root, ChatCompletionNamedToolChoice
-        ):
+        if tool_function_name:
             response_message = ChatCompletionResponseMessage(
                 content="",
                 role=role,
@@ -204,26 +203,7 @@ class TritonLLMEngine(LLMEngine):
                     ChatCompletionMessageToolCall(
                         id=request_id,
                         type="function",
-                        function=Function1(
-                            name=request.tool_choice.root.function.name, arguments=text
-                        ),
-                    )
-                ],
-            )
-        elif (
-            request.tool_choice
-            and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
-        ):
-            response_message = ChatCompletionResponseMessage(
-                content="",
-                role=role,
-                tool_calls=[
-                    ChatCompletionMessageToolCall(
-                        id=request_id,
-                        type="function",
-                        function=Function1(
-                            name=request.tools[0].function.name, arguments=text
-                        ),
+                        function=Function1(name=tool_function_name, arguments=text),
                     )
                 ],
             )
@@ -406,25 +386,12 @@ class TritonLLMEngine(LLMEngine):
     ) -> AsyncIterator[str]:
         model = request.model
 
-        if request.tool_choice and isinstance(
-            request.tool_choice.root, ChatCompletionNamedToolChoice
-        ):
-            tool_choice_function_name = request.tool_choice.root.function.name
-        else:
-            tool_choice_function_name = None
-
-        if (
-            request.tool_choice
-            and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
-        ):
-            tool_choice_required_function_name = request.tools[0].function.name
-        else:
-            tool_choice_required_function_name = None
+        tool_function_name = self._get_named_function_name(request=request)
 
         # Determine whether tools are in use with "auto" tool choice
         tool_choice_auto = (
             tool_call_parser
-            and not tool_choice_function_name
+            and not tool_function_name
             and self._should_stream_with_auto_tool_parsing(request)
         )
 
@@ -439,25 +406,13 @@ class TritonLLMEngine(LLMEngine):
             delta_text = _get_output(response)
 
             response_delta: Optional[ChatCompletionStreamResponseDelta]
-            if tool_choice_function_name:
+            if tool_function_name:
                 response_delta = ChatCompletionStreamResponseDelta(
                     tool_calls=[
                         ChatCompletionMessageToolCallChunk(
                             index=0,
                             function=Function2(
-                                name=tool_choice_function_name, arguments=delta_text
-                            ),
-                        )
-                    ]
-                )
-            elif tool_choice_required_function_name:
-                response_delta = ChatCompletionStreamResponseDelta(
-                    tool_calls=[
-                        ChatCompletionMessageToolCallChunk(
-                            index=0,
-                            function=Function2(
-                                name=tool_choice_required_function_name,
-                                arguments=delta_text,
+                                name=tool_function_name, arguments=delta_text
                             ),
                         )
                     ]
@@ -609,6 +564,15 @@ class TritonLLMEngine(LLMEngine):
             raise Exception('"auto" tool choice requires --tool-call-parser to be set')
 
         if (
+            request.tool_choice
+            and isinstance(request.tool_choice.root, ChatCompletionNamedToolChoice)
+            and not request.tools
+        ):
+            raise Exception(
+                "Named tool choice requires CreateChatCompletionRequest.tools to be provided"
+            )
+
+        if (
             request.tool_choice is None
             and request.tools
             and self.tool_call_parser is None
@@ -703,3 +667,21 @@ class TritonLLMEngine(LLMEngine):
             and response_delta.tool_calls[0].function
             and response_delta.tool_calls[0].function.arguments is not None
         )
+
+    def _get_named_function_name(self, request: CreateChatCompletionRequest):
+        if request.tool_choice and isinstance(
+            request.tool_choice.root, ChatCompletionNamedToolChoice
+        ):
+            tool_choice_function_name = request.tool_choice.root.function.name
+        else:
+            tool_choice_function_name = None
+
+        if (
+            request.tool_choice
+            and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
+        ):
+            tool_choice_required_function_name = request.tools[0].function.name
+        else:
+            tool_choice_required_function_name = None
+
+        return tool_choice_function_name or tool_choice_required_function_name

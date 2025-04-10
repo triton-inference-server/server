@@ -30,6 +30,7 @@ import openai
 import pytest
 from openai.types.chat import (
     ChatCompletionMessageParam,
+    ChatCompletionMessageToolCall,
     ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
@@ -141,6 +142,36 @@ class TestAsyncClientToolCalling:
     def client(self, server):
         return server.get_async_client()
 
+    def validate_tool_calls_present(
+        self, tool_calls: Optional[List[ChatCompletionMessageToolCall]], skip_id=False
+    ):
+        assert tool_calls is not None
+        assert len(tool_calls) == 1
+        assert tool_calls[0].type == "function"
+        assert tool_calls[0].function is not None
+        assert isinstance(tool_calls[0].id, str)
+        if not skip_id:
+            assert len(tool_calls[0].id) >= 9
+
+    def validate_weather_tool_arguments(self, parsed_arguments: Dict):
+        assert isinstance(parsed_arguments, Dict)
+        assert isinstance(parsed_arguments.get("city"), str)
+        assert isinstance(parsed_arguments.get("state"), str)
+        assert isinstance(parsed_arguments.get("unit"), str)
+        assert parsed_arguments.get("city") == "Dallas"
+        assert parsed_arguments.get("state") in ("TX", "Texas")
+        assert parsed_arguments.get("unit") == "fahrenheit"
+
+    def validate_weather_forcast_tool_arguments(self, parsed_arguments: Dict):
+        assert isinstance(parsed_arguments, Dict)
+        assert isinstance(parsed_arguments.get("city"), str)
+        assert isinstance(parsed_arguments.get("state"), str)
+        assert isinstance(parsed_arguments.get("unit"), str)
+        assert isinstance(parsed_arguments.get("num_days"), int)
+        assert parsed_arguments.get("city") == "Dallas"
+        assert parsed_arguments.get("state") in ("TX", "Texas")
+        assert parsed_arguments.get("unit") == "fahrenheit"
+
     @pytest.mark.asyncio
     async def test_tool_call_and_choice(self, client: openai.AsyncOpenAI, model: str):
         chat_completion = await client.chat.completions.create(
@@ -157,14 +188,8 @@ class TestAsyncClientToolCalling:
         tool_calls = chat_completion.choices[0].message.tool_calls
 
         # make sure a tool call is present
-        assert choice.message.role == "assistant"
-        assert choice.message.content in (None, "")
-        assert tool_calls is not None
-        assert len(tool_calls) == 1
-        assert tool_calls[0].type == "function"
-        assert tool_calls[0].function is not None
-        assert isinstance(tool_calls[0].id, str)
-        assert len(tool_calls[0].id) >= 9
+        self.validate_tool_calls_present(tool_calls)
+        assert stop_reason == "tool_calls"
 
         # make sure the weather tool was called (classic example) with arguments
         assert tool_calls[0].function.name == WEATHER_TOOL["function"]["name"]
@@ -173,13 +198,7 @@ class TestAsyncClientToolCalling:
 
         # make sure the arguments parse properly
         parsed_arguments = json.loads(tool_calls[0].function.arguments)
-        assert isinstance(parsed_arguments, Dict)
-        assert isinstance(parsed_arguments.get("city"), str)
-        assert isinstance(parsed_arguments.get("state"), str)
-        assert parsed_arguments.get("city") == "Dallas"
-        assert parsed_arguments.get("state") == "TX"
-
-        assert stop_reason == "tool_calls"
+        self.validate_weather_tool_arguments(parsed_arguments)
 
         function_name: Optional[str] = None
         function_args_str: str = ""
@@ -247,11 +266,7 @@ class TestAsyncClientToolCalling:
 
         # validate arguments
         streamed_args = json.loads(function_args_str)
-        assert isinstance(streamed_args, Dict)
-        assert isinstance(streamed_args.get("city"), str)
-        assert isinstance(streamed_args.get("state"), str)
-        assert streamed_args.get("city") == "Dallas"
-        assert streamed_args.get("state") == "TX"
+        self.validate_weather_tool_arguments(streamed_args)
 
         # make sure everything matches non-streaming except for ID
         assert function_name == tool_calls[0].function.name
@@ -319,11 +334,13 @@ class TestAsyncClientToolCalling:
         assert finish_reason_count == 1
         assert len(chunks)
 
-        # FIXME: tensorrt_llm streaming and non-streaming requests are not generating exact same text response in this case
-        # example:
-        #   streaming: The current temperature in Dallas, TX is 98°F. Is there anything else I can assist you with?
-        #   non-streaming: It's currently 98°F in Dallas.
-        if backend != "tensorrtllm":
+        if backend == "tensorrtllm":
+            # FIXME: tensorrt_llm streaming and non-streaming requests are not generating exact same text response in this case
+            # NOTE: If this assertion consistently does not get raised, then this means the TRTLLM behavior
+            # is changed and this special case can be removed.
+            with pytest.raises(AssertionError):
+                assert "".join(chunks) == choice.message.content
+        else:
             assert "".join(chunks) == choice.message.content
 
     @pytest.mark.asyncio
@@ -345,12 +362,8 @@ class TestAsyncClientToolCalling:
         tool_calls = chat_completion.choices[0].message.tool_calls
 
         # make sure a tool call is present
-        assert choice.message.role == "assistant"
-        assert choice.message.content in (None, "")
-        assert tool_calls is not None
-        assert len(tool_calls) == 1
-        assert tool_calls[0].type == "function"
-        assert tool_calls[0].function is not None
+        self.validate_tool_calls_present(tool_calls, skip_id=True)
+        assert stop_reason != "tool_calls"
 
         # make sure the weather tool was called (classic example) with arguments
         assert tool_calls[0].function.name == WEATHER_FORECAST_TOOL["function"]["name"]
@@ -359,16 +372,7 @@ class TestAsyncClientToolCalling:
 
         # make sure the arguments parse properly
         parsed_arguments = json.loads(tool_calls[0].function.arguments)
-        assert isinstance(parsed_arguments, Dict)
-        assert isinstance(parsed_arguments.get("city"), str)
-        assert isinstance(parsed_arguments.get("state"), str)
-        assert isinstance(parsed_arguments.get("unit"), str)
-        assert isinstance(parsed_arguments.get("num_days"), int)
-        assert parsed_arguments.get("city") == "Dallas"
-        assert parsed_arguments.get("state") == "TX"
-        assert parsed_arguments.get("unit") == "fahrenheit"
-
-        assert stop_reason != "tool_calls"
+        self.validate_weather_forcast_tool_arguments(parsed_arguments)
 
         function_name: Optional[str] = None
         function_args_str: str = ""
@@ -435,14 +439,7 @@ class TestAsyncClientToolCalling:
 
         # validate arguments
         streamed_args = json.loads(function_args_str)
-        assert isinstance(streamed_args, Dict)
-        assert isinstance(streamed_args.get("city"), str)
-        assert isinstance(streamed_args.get("state"), str)
-        assert isinstance(streamed_args.get("unit"), str)
-        assert isinstance(streamed_args.get("num_days"), int)
-        assert streamed_args.get("city") == "Dallas"
-        assert streamed_args.get("state") == "TX"
-        assert streamed_args.get("unit") == "fahrenheit"
+        self.validate_weather_forcast_tool_arguments(streamed_args)
 
         # make sure everything matches non-streaming except for ID
         assert function_name == tool_calls[0].function.name
@@ -468,12 +465,8 @@ class TestAsyncClientToolCalling:
         tool_calls = chat_completion.choices[0].message.tool_calls
 
         # make sure a tool call is present
-        assert choice.message.role == "assistant"
-        assert choice.message.content in (None, "")
-        assert tool_calls is not None
-        assert len(tool_calls) == 1
-        assert tool_calls[0].type == "function"
-        assert tool_calls[0].function is not None
+        self.validate_tool_calls_present(tool_calls, skip_id=True)
+        assert stop_reason != "tool_calls"
 
         # make sure the weather tool was called (classic example) with arguments
         assert tool_calls[0].function.name == WEATHER_TOOL["function"]["name"]
@@ -482,15 +475,7 @@ class TestAsyncClientToolCalling:
 
         # make sure the arguments parse properly
         parsed_arguments = json.loads(tool_calls[0].function.arguments)
-        assert isinstance(parsed_arguments, Dict)
-        assert isinstance(parsed_arguments.get("city"), str)
-        assert isinstance(parsed_arguments.get("state"), str)
-        assert isinstance(parsed_arguments.get("unit"), str)
-        assert parsed_arguments.get("city") == "Dallas"
-        assert parsed_arguments.get("state") == "TX"
-        assert parsed_arguments.get("unit") == "fahrenheit"
-
-        assert stop_reason != "tool_calls"
+        self.validate_weather_tool_arguments(parsed_arguments)
 
         function_name: Optional[str] = None
         function_args_str: str = ""
@@ -557,15 +542,47 @@ class TestAsyncClientToolCalling:
 
         # validate arguments
         streamed_args = json.loads(function_args_str)
-        assert isinstance(streamed_args, Dict)
-        assert isinstance(streamed_args.get("city"), str)
-        assert isinstance(streamed_args.get("state"), str)
-        assert isinstance(streamed_args.get("unit"), str)
-        assert streamed_args.get("city") == "Dallas"
-        assert streamed_args.get("state") in ("TX", "Texas")
-        assert streamed_args.get("unit") == "fahrenheit"
+        self.validate_weather_tool_arguments(streamed_args)
 
         # make sure everything matches non-streaming except for ID
         assert function_name == tool_calls[0].function.name
         assert choice.message.role == role_name
         assert choice.message.tool_calls[0].function.name == function_name
+
+    @pytest.mark.asyncio
+    async def test_inconsistent_tool_choice_and_tools(
+        self, client: openai.AsyncOpenAI, model: str
+    ):
+        # tool choice function but the tools are empty
+        with pytest.raises(openai.BadRequestError):
+            await client.chat.completions.create(
+                messages=MESSAGES_ASKING_FOR_TOOLS,
+                temperature=0,
+                max_tokens=128,
+                model=model,
+                tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
+                logprobs=False,
+            )
+        # tool choice function that is not provided in the tools
+        with pytest.raises(openai.BadRequestError):
+            await client.chat.completions.create(
+                messages=MESSAGES_ASKING_FOR_TOOLS,
+                temperature=0,
+                max_tokens=128,
+                model=model,
+                tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
+                tools=[WEATHER_TOOL],
+                logprobs=False,
+            )
+
+        # tool choice required but tools is empty
+        with pytest.raises(openai.BadRequestError):
+            await client.chat.completions.create(
+                messages=MESSAGES_ASKING_FOR_TOOLS,
+                temperature=0,
+                max_tokens=128,
+                model=model,
+                tool_choice="required",
+                tools=[],
+                logprobs=False,
+            )
