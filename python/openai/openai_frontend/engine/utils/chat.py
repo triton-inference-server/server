@@ -27,6 +27,7 @@ import json
 from functools import partial
 from typing import Dict, Iterable, List, Optional, Required, TypedDict, Union, cast
 
+# FIXME: Converge on single set of types in either schemas.openai or openai.types
 from openai.types.chat import ChatCompletionMessageToolCallParam
 from openai.types.chat.chat_completion_message_tool_call_param import Function
 from schemas.openai import (

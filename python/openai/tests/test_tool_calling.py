@@ -335,19 +335,12 @@ class TestAsyncClientToolCalling:
         assert finish_reason_count == 1
         assert len(chunks)
 
-        # if backend == "tensorrtllm":
-        #     # FIXME: tensorrt_llm streaming and non-streaming requests are not generating exact same text response in this case
-        #     # NOTE: If this assertion consistently does not get raised, then this means the TRTLLM behavior
-        #     # is changed and this special case can be removed.
-        #     with pytest.raises(AssertionError):
-        #         assert "".join(chunks) == choice.message.content
-        # else:
-        #     assert "".join(chunks) == choice.message.content
+        # validate if steaming and non-streaming generates the same content
         assert "".join(chunks) == choice.message.content
 
     @pytest.mark.skipif(
         os.environ.get("IMAGE_KIND") == "TRTLLM",
-        reason="latest release version of Tensorrt LLM doesn't support guided decoding",
+        reason="latest release version of Tensorrt LLM 0.18 doesn't support guided decoding",
     )
     @pytest.mark.asyncio
     async def test_tool_call_with_named_tool_choice(
@@ -454,7 +447,7 @@ class TestAsyncClientToolCalling:
 
     @pytest.mark.skipif(
         os.environ.get("IMAGE_KIND") == "TRTLLM",
-        reason="latest release version of Tensorrt LLM doesn't support guided decoding",
+        reason="latest release version of Tensorrt LLM 0.18 doesn't support guided decoding",
     )
     @pytest.mark.asyncio
     async def test_tool_call_with_required_tool_choice(
