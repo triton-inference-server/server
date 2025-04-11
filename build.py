@@ -1484,13 +1484,24 @@ RUN apt-get update \\
 ARG BUILD_PUBLIC_VLLM="true"
 ARG VLLM_INDEX_URL
 ARG PYTORCH_TRITON_URL
+ARG NVPL_SLIM_URL
 
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        pip3 install --no-cache-dir \\
-        mkl==2021.1.1 \\
-        mkl-include==2021.1.1 \\
-        mkl-devel==2021.1.1 \\
+        if [ "$(uname -m)" = "x86_64" ]; then \\
+            pip3 install --no-cache-dir \\
+                mkl==2021.1.1 \\
+                mkl-include==2021.1.1 \\
+                mkl-devel==2021.1.1; \\
+        elif [ "$(uname -m)" = "aarch64" ]; then \\
+            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
+            cd /tmp && \\
+            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
+            tar -xf nvpl_slim_24.04.tar && \\
+            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
+            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
+            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
+        fi \\
         && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
@@ -1893,6 +1904,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
                 f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+                f"--build-arg NVPL_SLIM_URL={nvpl_slim_url}",
             ]
         finalargs += [
             "-t",
@@ -2883,6 +2895,7 @@ if __name__ == "__main__":
         requirements = secrets.get("req", "")
         vllm_index_url = secrets.get("vllm_index_url", "")
         pytorch_triton_url = secrets.get("pytorch_triton_url", "")
+        nvpl_slim_url = secrets.get("nvpl_slim_url", "")
         build_public_vllm = secrets.get("build_public_vllm", "true")
         log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
