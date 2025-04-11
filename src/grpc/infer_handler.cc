@@ -938,9 +938,6 @@ ModelInferCallbackHandler::Execute(
         &callback_state->shm_regions_info_);
   }
 
-  // --- Step 4: Prepare for Response Handling (Callback Specific) ---
-  std::shared_ptr<ResponseQueue<inference::ModelInferResponse>> response_queue =
-      nullptr;
   if (err == nullptr) {
     // Use the externally provided response object directly.
     // Store the external response pointer in the state for later access.
@@ -953,8 +950,6 @@ ModelInferCallbackHandler::Execute(
   }
 
   // Prepare the allocator payload: info needed by allocation callback later.
-  // Moves serialized input data into the payload. References the
-  // response_queue.
   if (err == nullptr) {
     err = InferAllocatorPayloadCallback<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, *request,

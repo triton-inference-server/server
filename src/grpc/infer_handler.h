@@ -811,6 +811,10 @@ InferResponseCompleteCommon(
   return nullptr;  // success
 }
 
+// Common function to populate the gRPC ModelInferResponse protobuf from the
+// TRITONSERVER_InferenceResponse C structure. Handles metadata, parameters,
+// output tensor data transfer, and classification formatting. Used by the
+// callback API path.
 template <typename ResponseType>
 TRITONSERVER_Error*
 InferResponseCompleteCommonCallback(
