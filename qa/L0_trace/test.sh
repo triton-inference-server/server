@@ -1273,7 +1273,8 @@ fi
 echo "Running stress test for 120 seconds..."
 watch -n 0.1 "python3 $STRESS_CLIENT" > /dev/null 2>&1 & WATCH_PID=$!
 sleep 120
-kill $WATCH_PID 2>/dev/null
+kill $WATCH_PID
+wait $WATCH_PID
 
 set -e
 if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
@@ -1312,7 +1313,8 @@ $OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLE
 echo "Running stress test for 120 seconds..."
 watch -n 0.1 "python3 $STRESS_CLIENT" > /dev/null 2>&1 & WATCH_PID=$!
 sleep 120
-kill $WATCH_PID 2>/dev/null
+kill $WATCH_PID
+wait $WATCH_PID
 
 set -e
 kill $COLLECTOR_PID
