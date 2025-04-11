@@ -30,6 +30,7 @@ import openai
 import pytest
 
 
+@pytest.mark.openai
 class TestOpenAIClient:
     @pytest.fixture(scope="class")
     def client(self, server):
@@ -94,6 +95,7 @@ class TestOpenAIClient:
         pass
 
 
+@pytest.mark.openai
 class TestAsyncOpenAIClient:
     @pytest.fixture(scope="class")
     def client(self, server):

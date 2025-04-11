@@ -138,6 +138,7 @@ WEATHER_FORECAST_TOOL_CHOICE: ChatCompletionNamedToolChoiceParam = {
 }
 
 
+@pytest.mark.openai
 class TestAsyncClientToolCalling:
     @pytest.fixture(scope="class")
     def client(self, server):

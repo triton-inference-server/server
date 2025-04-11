@@ -156,3 +156,27 @@ def prompt():
 @pytest.fixture(scope="module")
 def messages():
     return TEST_MESSAGES
+
+
+# FIXME: In TRTLLM tests, the in-process Triton server for the FastAPI app
+# does not automatically release GPU memory, even after calling stop().
+# The memory is only released when the entire pytest process exits.
+#
+# As a result, when the OpenAI server starts another Triton server as a subprocess,
+# there may not be enough GPU memory available to launch a new model instance.
+#
+# This is a workaround to ensure that tests using the OpenAI server run first.
+# Once the OpenAI server subprocess is terminated, tests using the FastAPI app can safely run.
+def pytest_collection_modifyitems(session, config, items):
+    def get_priority(item):
+        cls = item.cls
+        if cls:
+            if getattr(cls, "pytestmark", None):
+                for mark in cls.pytestmark:
+                    if mark.name == "openai":
+                        return 0
+                    elif mark.name == "fastapi":
+                        return 1
+        return 2  # unmarked tests last
+
+    items.sort(key=get_priority)
