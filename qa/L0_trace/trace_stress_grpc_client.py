@@ -73,7 +73,7 @@ if __name__ == "__main__":
     user_data = []
 
     # Inference call
-    for i in range(1000):
+    for _ in range(1000):
         triton_client.async_infer(
             model_name=model_name,
             inputs=inputs,
