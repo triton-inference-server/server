@@ -48,7 +48,6 @@ if __name__ == "__main__":
 
     # Infer
     inputs = []
-    outputs = []
 
     input_data = np.array(
         [random.random() for i in range(50)], dtype=np.float32
