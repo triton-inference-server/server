@@ -109,6 +109,11 @@ mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_in
 
 RET=0
 
+# set up identity_fp32 model
+mkdir -p $MODELSDIR/identity_fp32/1 && \
+    cp ../python_models/identity_fp32/model.py $MODELSDIR/identity_fp32/1/. && \
+    cp ../python_models/identity_fp32/config.pbtxt $MODELSDIR/identity_fp32/.
+
 # Helpers =======================================
 function assert_curl_success {
   message="${1}"
@@ -1243,5 +1248,41 @@ assert_curl_success "PBE trace context is not None"
 set -e
 kill $SERVER_PID
 wait $SERVER_PID
+set +e
+
+# Long running stress test
+SERVER_ARGS="--model-repository=$MODELSDIR \
+                --trace-config mode=triton \
+                --trace-config triton,file=./trace \
+                --trace-config rate=1 \
+                --trace-config level=TIMESTAMPS \
+                --log-warning=1 \
+                --log-error=1"
+SERVER_LOG="./inference_server_triton_trace_stress.log"
+STRESS_CLIENT="./trace_stress_grpc_client.py"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Run stress test
+echo "Running stress test for 120 seconds..."
+watch -n 0.1 "python3 $STRESS_CLIENT" > /dev/null 2>&1 &
+WATCH_PID=$!
+sleep 120
+kill $WATCH_PID 2>/dev/null
+
+set -e
+if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
+    echo -e "\n***\n*** Server stopped unexpectedly during stress test\n***"
+    cat $SERVER_LOG
+    RET=1
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
 set +e
 exit $RET
