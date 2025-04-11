@@ -10,6 +10,8 @@ test_results.txt
 artifacts
 cprofile
 *.prof
+.venv
+**/.venv
 
 # Test exclusions
 qa/L0_openai/openai

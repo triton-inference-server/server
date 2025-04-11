@@ -38,7 +38,8 @@ function install_deps() {
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
-        prepare_tensorrtllm
+        prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/
+        prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/
     else
         prepare_vllm
     fi
@@ -53,36 +54,22 @@ function prepare_tensorrtllm() {
     # FIXME: Remove when testing TRT-LLM containers built from source
     pip install -r requirements.txt
 
-    MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
-    MODEL_REPO="tests/tensorrtllm_models"
+    MODEL="$1"
+    MODEL_REPO="$2"
+    ENGINE_PATH="$3"
+
     mkdir -p ${MODEL_REPO}
     cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
     # Ensemble model is not needed for the test
     rm -rf ${MODEL_REPO}/ensemble
 
-    # 1. Download model from HF
-    huggingface-cli download ${MODEL}
+    # 1. Generate the model's trt engines
+    python3 ../generate_engine.py --model "${MODEL}" --engine_path "${ENGINE_PATH}"
 
-    HF_LLAMA_MODEL=`python3 -c "from pathlib import Path; from huggingface_hub import hf_hub_download; print(Path(hf_hub_download('${MODEL}', filename='config.json')).parent)"`
-    CKPT_PATH=/tmp/ckpt/llama/3.1-8b-instruct/
-    ENGINE_PATH=/tmp/engines/llama/3.1-8b-instruct/
-
-    # 2. Convert weights
-    python3 /app/examples/llama/convert_checkpoint.py --model_dir ${HF_LLAMA_MODEL} \
-        --output_dir ${CKPT_PATH} \
-        --dtype float16
-
-    # 3. Build engine
-    # max_batch_size set to 128 to avoid OOM errors
-    trtllm-build --checkpoint_dir ${CKPT_PATH} \
-        --gemm_plugin auto \
-        --max_batch_size 128 \
-        --output_dir ${ENGINE_PATH}
-
-    # 4. Prepare model repository
+    # 2. Prepare model repository
     FILL_TEMPLATE="/app/tools/fill_template.py"
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,preprocessing_instance_count:1,max_queue_size:0
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,postprocessing_instance_count:1
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${ENGINE_PATH},triton_max_batch_size:64,preprocessing_instance_count:1,max_queue_size:0
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${ENGINE_PATH},triton_max_batch_size:64,postprocessing_instance_count:1
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
 }
@@ -110,6 +97,18 @@ function run_test() {
         RET=1
     fi
     set -e
+
+    if [ "$RET" == "0" ]; then
+        # rerun the tool calling tests with mistral model to cover the mistral tool call parser
+        set +e
+        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" pytest -s -v --junitxml=test_openai.xml tests/test_tool_calling.py 2>&1 > ${TEST_LOG}
+        if [ $? -ne 0 ]; then
+            cat ${TEST_LOG}
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    fi
 
     # Collect logs for error analysis when needed
     cp *.xml *.log ../../../
