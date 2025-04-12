@@ -31,7 +31,16 @@ import json
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional
+from typing import (
+    Any,
+    AsyncIterable,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 import tritonserver
 from engine.engine import LLMEngine
@@ -191,10 +200,43 @@ class TritonLLMEngine(LLMEngine):
         response = responses[0]
         text = _get_output(response)
 
+        response_message, finish_reason = self._get_chat_completion_response_message(
+            request=request,
+            request_id=request_id,
+            tool_call_parser=tool_call_parser,
+            text=text,
+            role=role,
+            backend=metadata.backend,
+        )
+
+        return CreateChatCompletionResponse(
+            id=request_id,
+            choices=[
+                ChatCompletionChoice(
+                    index=0,
+                    message=response_message,
+                    logprobs=None,
+                    finish_reason=finish_reason,
+                )
+            ],
+            created=created,
+            model=request.model,
+            system_fingerprint=None,
+            object=ObjectType.chat_completion,
+        )
+
+    def _get_chat_completion_response_message(
+        self,
+        request: CreateChatCompletionRequest,
+        request_id: str,
+        tool_call_parser: ToolCallParser,
+        text: str,
+        role: str,
+        backend: str,
+    ) -> Tuple[ChatCompletionResponseMessage, ChatCompletionFinishReason]:
+        response_message: ChatCompletionResponseMessage
         auto_tools_called = False
         tool_function_name = self._get_named_function_name(request=request)
-
-        response_message: Optional[ChatCompletionResponseMessage]
         if tool_function_name:
             response_message = ChatCompletionResponseMessage(
                 content="",
@@ -215,9 +257,7 @@ class TritonLLMEngine(LLMEngine):
                 or request.tool_choice.root == ChatCompletionToolChoiceOption1.auto
             )
         ):
-            response_message = tool_call_parser.parse_tool_calls(
-                text, role, metadata.backend
-            )
+            response_message = tool_call_parser.parse_tool_calls(text, role, backend)
             auto_tools_called = (
                 response_message.tool_calls is not None
                 and len(response_message.tool_calls.root) > 0
@@ -227,23 +267,13 @@ class TritonLLMEngine(LLMEngine):
                 content=text, role=role, tool_calls=None
             )
 
-        return CreateChatCompletionResponse(
-            id=request_id,
-            choices=[
-                ChatCompletionChoice(
-                    index=0,
-                    message=response_message,
-                    logprobs=None,
-                    finish_reason=ChatCompletionFinishReason.tool_calls
-                    if auto_tools_called
-                    else ChatCompletionFinishReason.stop,
-                )
-            ],
-            created=created,
-            model=request.model,
-            system_fingerprint=None,
-            object=ObjectType.chat_completion,
+        finish_reason = (
+            ChatCompletionFinishReason.tool_calls
+            if auto_tools_called
+            else ChatCompletionFinishReason.stop
         )
+
+        return response_message, finish_reason
 
     async def completion(
         self, request: CreateCompletionRequest
@@ -395,7 +425,7 @@ class TritonLLMEngine(LLMEngine):
             and self._should_stream_with_auto_tool_parsing(request)
         )
 
-        previous_text = "" if tool_choice_auto else None
+        previous_text = ""
 
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
@@ -405,99 +435,25 @@ class TritonLLMEngine(LLMEngine):
         async for response in responses:
             delta_text = _get_output(response)
 
-            response_delta: Optional[ChatCompletionStreamResponseDelta]
-            if tool_function_name:
-                response_delta = ChatCompletionStreamResponseDelta(
-                    tool_calls=[
-                        ChatCompletionMessageToolCallChunk(
-                            index=0,
-                            function=Function2(
-                                name=tool_function_name, arguments=delta_text
-                            ),
-                        )
-                    ]
-                )
-            elif tool_choice_auto:
-                current_text = previous_text + delta_text
-                response_delta = tool_call_parser.parse_tool_calls_streaming(
-                    current_text=current_text, delta_text=delta_text, backend=backend
-                )
-                previous_text = current_text
-            else:
-                response_delta = ChatCompletionStreamResponseDelta(
-                    role=None, content=delta_text, function_call=None
-                )
-
-            if response.final:
-                auto_tools_called = False
-                if tool_call_parser:
-                    auto_tools_called = len(tool_call_parser.prev_tool_call_arr) > 0
-                    index = (
-                        len(tool_call_parser.prev_tool_call_arr) - 1
-                        if auto_tools_called
-                        else 0
-                    )
-                else:
-                    index = 0
-
-                # check to make sure we haven't "forgotten" to stream
-                #   any tokens that were generated but previously
-                #   matched by partial json parsing, such as '}'.
-                # only happens if we are NOT using guided decoding
-                if (
-                    self._should_check_for_unstreamed_tool_arg_tokens(
-                        response_delta=response_delta,
-                        auto_tools_called=auto_tools_called,
-                    )
-                    and tool_call_parser
-                ):
-                    latest_delta_len = 0
-                    if (
-                        isinstance(response_delta.tool_calls[0].function, Function2)
-                    ) and isinstance(
-                        response_delta.tool_calls[0].function.arguments, str
-                    ):
-                        latest_delta_len = len(
-                            response_delta.tool_calls[0].function.arguments
-                        )
-                    # get the expected call based on partial JSON
-                    # parsing which "autocompletes" the JSON
-                    expected_call = json.dumps(
-                        tool_call_parser.prev_tool_call_arr[index].get("arguments", {}),
-                        ensure_ascii=False,
-                    )
-                    # get what we've streamed so far for arguments
-                    # for the current tool
-                    actual_call = tool_call_parser.streamed_args_for_tool[index]
-                    if latest_delta_len > 0:
-                        actual_call = actual_call[:-latest_delta_len]
-
-                    # check to see if there's anything left to stream
-                    remaining_call = expected_call.replace(actual_call, "", 1)
-
-                    response_delta = ChatCompletionStreamResponseDelta(
-                        tool_calls=[
-                            ChatCompletionMessageToolCallChunk(
-                                index=index,
-                                function=Function2(arguments=remaining_call).model_dump(
-                                    exclude_none=True
-                                ),
-                            )
-                        ]
-                    )
-
-                finish_reason = (
-                    ChatCompletionFinishReason.tool_calls
-                    if auto_tools_called
-                    else ChatCompletionFinishReason.stop
-                )
-            else:
-                finish_reason = None
+            (
+                response_delta,
+                finish_reason,
+                current_text,
+            ) = self._get_streaming_response_delta(
+                previous_text=previous_text,
+                delta_text=delta_text,
+                tool_function_name=tool_function_name,
+                tool_choice_auto=tool_choice_auto,
+                tool_call_parser=tool_call_parser,
+                backend=backend,
+                is_final_response=response.final,
+            )
+            previous_text = current_text
 
             # if the response delta is None (e.g. because it was a
             # "control token" for tool calls or the parser otherwise
             # wasn't ready to send a token, then
-            #   get the next token without streaming a chunk
+            # get the next token without streaming a chunk
             if response_delta is None and finish_reason is None:
                 continue
 
@@ -517,6 +473,109 @@ class TritonLLMEngine(LLMEngine):
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
+
+    def _get_streaming_response_delta(
+        self,
+        previous_text: str,
+        delta_text: str,
+        tool_function_name: Optional[str],
+        tool_choice_auto: bool,
+        tool_call_parser: ToolCallParser,
+        backend: str,
+        is_final_response: bool,
+    ) -> Tuple[
+        Optional[ChatCompletionStreamResponseDelta],
+        Optional[ChatCompletionFinishReason],
+        str,
+    ]:
+        response_delta: Optional[ChatCompletionStreamResponseDelta]
+        current_text = ""
+        if tool_function_name:
+            response_delta = ChatCompletionStreamResponseDelta(
+                tool_calls=[
+                    ChatCompletionMessageToolCallChunk(
+                        index=0,
+                        function=Function2(
+                            name=tool_function_name, arguments=delta_text
+                        ),
+                    )
+                ]
+            )
+        elif tool_choice_auto:
+            current_text = previous_text + delta_text
+            response_delta = tool_call_parser.parse_tool_calls_streaming(
+                current_text=current_text, delta_text=delta_text, backend=backend
+            )
+        else:
+            response_delta = ChatCompletionStreamResponseDelta(
+                role=None, content=delta_text, function_call=None
+            )
+
+        if is_final_response:
+            auto_tools_called = False
+            if tool_call_parser:
+                auto_tools_called = len(tool_call_parser.prev_tool_call_arr) > 0
+                index = (
+                    len(tool_call_parser.prev_tool_call_arr) - 1
+                    if auto_tools_called
+                    else 0
+                )
+            else:
+                index = 0
+
+            # check to make sure we haven't "forgotten" to stream
+            # any tokens that were generated but previously
+            # matched by partial json parsing, such as '}'.
+            # only happens if we are NOT using guided decoding
+            if (
+                self._should_check_for_unstreamed_tool_arg_tokens(
+                    response_delta=response_delta,
+                    auto_tools_called=auto_tools_called,
+                )
+                and tool_call_parser
+            ):
+                latest_delta_len = 0
+                if (
+                    isinstance(response_delta.tool_calls[0].function, Function2)
+                ) and isinstance(response_delta.tool_calls[0].function.arguments, str):
+                    latest_delta_len = len(
+                        response_delta.tool_calls[0].function.arguments
+                    )
+                # get the expected call based on partial JSON
+                # parsing which "autocompletes" the JSON
+                expected_call = json.dumps(
+                    tool_call_parser.prev_tool_call_arr[index].get("arguments", {}),
+                    ensure_ascii=False,
+                )
+                # get what we've streamed so far for arguments
+                # for the current tool
+                actual_call = tool_call_parser.streamed_args_for_tool[index]
+                if latest_delta_len > 0:
+                    actual_call = actual_call[:-latest_delta_len]
+
+                # check to see if there's anything left to stream
+                remaining_call = expected_call.replace(actual_call, "", 1)
+
+                response_delta = ChatCompletionStreamResponseDelta(
+                    tool_calls=[
+                        ChatCompletionMessageToolCallChunk(
+                            index=index,
+                            function=Function2(arguments=remaining_call).model_dump(
+                                exclude_none=True
+                            ),
+                        )
+                    ]
+                )
+
+            finish_reason = (
+                ChatCompletionFinishReason.tool_calls
+                if auto_tools_called
+                else ChatCompletionFinishReason.stop
+            )
+        else:
+            finish_reason = None
+
+        return response_delta, finish_reason, current_text
 
     def _validate_chat_request(
         self, request: CreateChatCompletionRequest, metadata: TritonModelMetadata
@@ -547,6 +606,9 @@ class TritonLLMEngine(LLMEngine):
         if request.logit_bias is not None or request.logprobs:
             raise Exception("logit bias and log probs not currently supported")
 
+        self._verify_chat_tool_call_settings(request=request)
+
+    def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
             request.tool_choice
             and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
@@ -558,19 +620,19 @@ class TritonLLMEngine(LLMEngine):
 
         if (
             request.tool_choice
-            and request.tool_choice.root == ChatCompletionToolChoiceOption1.auto
-            and self.tool_call_parser is None
-        ):
-            raise Exception('"auto" tool choice requires --tool-call-parser to be set')
-
-        if (
-            request.tool_choice
             and isinstance(request.tool_choice.root, ChatCompletionNamedToolChoice)
             and not request.tools
         ):
             raise Exception(
                 "Named tool choice requires CreateChatCompletionRequest.tools to be provided"
             )
+
+        if (
+            request.tool_choice
+            and request.tool_choice.root == ChatCompletionToolChoiceOption1.auto
+            and self.tool_call_parser is None
+        ):
+            raise Exception('"auto" tool choice requires --tool-call-parser to be set')
 
         if (
             request.tool_choice is None
@@ -668,7 +730,9 @@ class TritonLLMEngine(LLMEngine):
             and response_delta.tool_calls[0].function.arguments is not None
         )
 
-    def _get_named_function_name(self, request: CreateChatCompletionRequest):
+    def _get_named_function_name(
+        self, request: CreateChatCompletionRequest
+    ) -> Optional[str]:
         if request.tool_choice and isinstance(
             request.tool_choice.root, ChatCompletionNamedToolChoice
         ):
