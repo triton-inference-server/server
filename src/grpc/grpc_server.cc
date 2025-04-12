@@ -2564,15 +2564,14 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::GracefulStop(
-    uint32_t* exit_timeout_secs, const std::string& service_name)
+Server::Stop(uint32_t* exit_timeout_secs, const std::string& service_name)
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  graceful_shutdown_thread = std::thread([this]() {
+  std::thread graceful_shutdown_thread([this]() {
     // Stop accepting new RPC requests. Existing requests are allowed to
     // complete
     server_->Shutdown();
@@ -2585,18 +2584,7 @@ Server::GracefulStop(
     WaitForConnectionsToClose(exit_timeout_secs, service_name);
   }
 
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-Server::Stop()
-{
-  if (!running_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
-  }
-
-  // Forcefully cancel remaining RPC connections
+  // Forcefully shutdown the GRPC endpoint once the countdown has completed
   server_->Shutdown(std::chrono::system_clock::now());
 
   if (graceful_shutdown_thread.joinable()) {
