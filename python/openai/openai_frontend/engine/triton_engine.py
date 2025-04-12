@@ -118,9 +118,7 @@ class TritonLLMEngine(LLMEngine):
             if tool_call_parser
             else None
         )
-        self.chat_template = (
-            load_chat_template(chat_template) if chat_template else None
-        )
+        self.chat_template = load_chat_template(chat_template)
 
     def ready(self) -> bool:
         return self.server.ready()

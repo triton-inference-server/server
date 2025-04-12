@@ -154,6 +154,9 @@ def parse_chat_messages(
     return conversation
 
 
+# This function loads the chat template file content
+# if the user chooses to use a chat template different from
+# the original one provided with the model's tokenizer.
 def load_chat_template(chat_template) -> Optional[str]:
     if chat_template is None:
         return None
