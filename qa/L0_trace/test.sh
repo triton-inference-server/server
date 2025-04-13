@@ -191,6 +191,26 @@ function send_inference_requests {
     done
 }
 
+function run_stress_client {
+    stress_client="${1}"
+    client_log="${2}"
+    echo "Running stress test for 120 seconds..."
+    bash -c '
+        # Handle SIGTERM (signal 15) and exit gracefully
+        trap "echo \"cleaning up stress client...\"; exit 0" SIGTERM
+
+        while true; do
+            python3 "$1" >> "$2"
+            sleep 0.1
+        done' _ "$stress_client" "$client_log" & CLIENT_PID=$!
+    sleep 120
+
+    set -e
+    kill $CLIENT_PID
+    wait $CLIENT_PID
+    set +e
+}
+
 #=======================================
 
 # start with trace-level=OFF
@@ -1252,14 +1272,15 @@ set +e
 
 # Long running stress test
 # Triton trace mode
-SERVER_ARGS="--model-control-mode=explicit
-                --model-repository=$MODELSDIR
+SERVER_ARGS="--model-control-mode=explicit \
+                --model-repository=$MODELSDIR \
                 --load-model=identity_fp32 \
                 --trace-config mode=triton \
                 --trace-config triton,file=./trace \
                 --trace-config rate=1 \
                 --trace-config level=TIMESTAMPS"
 SERVER_LOG="./inference_server_triton_trace_stress.log"
+CLIENT_LOG="./client_triton_trace_stress.log"
 STRESS_CLIENT="./trace_stress_grpc_client.py"
 
 run_server
@@ -1270,13 +1291,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # Run stress test
-echo "Running stress test for 120 seconds..."
-watch -n 0.1 "python3 $STRESS_CLIENT" > /dev/null 2>&1 & WATCH_PID=$!
-sleep 120
+run_stress_client $STRESS_CLIENT $CLIENT_LOG
 
 set -e
-kill $WATCH_PID
-wait $WATCH_PID
 if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
     echo -e "\n***\n*** Server stopped unexpectedly during stress test\n***"
     cat $SERVER_LOG
@@ -1288,8 +1305,8 @@ fi
 set +e
 
 # Opentelemetry trace mode
-SERVER_ARGS="--model-control-mode=explicit
-                --model-repository=$MODELSDIR
+SERVER_ARGS="--model-control-mode=explicit \
+                --model-repository=$MODELSDIR \
                 --load-model=identity_fp32 \
                 --trace-config level=TIMESTAMPS \
                 --trace-config rate=1 \
@@ -1298,6 +1315,7 @@ SERVER_ARGS="--model-control-mode=explicit
                 --trace-config opentelemetry,resource=service.name=test_triton \
                 --trace-config opentelemetry,url=localhost:$OTLP_PORT/v1/traces"
 SERVER_LOG="./inference_server_otel_trace_stress.log"
+CLIENT_LOG="./client_otel_trace_stress.log"
 STRESS_CLIENT="./trace_stress_grpc_client.py"
 
 run_server
@@ -1310,13 +1328,9 @@ fi
 rm collected_traces.json
 $OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
 # Run stress test
-echo "Running stress test for 120 seconds..."
-watch -n 0.1 "python3 $STRESS_CLIENT" > /dev/null 2>&1 & WATCH_PID=$!
-sleep 120
+run_stress_client $STRESS_CLIENT $CLIENT_LOG
 
 set -e
-kill $WATCH_PID
-wait $WATCH_PID
 kill $COLLECTOR_PID
 wait $COLLECTOR_PID
 if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
