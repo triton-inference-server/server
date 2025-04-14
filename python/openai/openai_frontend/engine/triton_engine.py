@@ -51,6 +51,7 @@ from engine.utils.triton import (
     _create_trtllm_inference_request,
     _create_vllm_inference_request,
     _get_output,
+    _get_vllm_lora_names,
     _validate_triton_responses_non_streaming,
 )
 from schemas.openai import (
@@ -88,6 +89,8 @@ class TritonModelMetadata:
     model: tritonserver.Model
     # Tokenizers used for chat templates
     tokenizer: Optional[Any]
+    # LoRA names supported by the backend
+    lora_names: Optional[List[str]]
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
@@ -100,6 +103,7 @@ class TritonLLMEngine(LLMEngine):
         server: tritonserver.Server,
         tokenizer: str,
         backend: Optional[str] = None,
+        lora_separator: Optional[str] = None,
         tool_call_parser: Optional[str] = None,
         chat_template: Optional[str] = None,
     ):
@@ -108,6 +112,7 @@ class TritonLLMEngine(LLMEngine):
         self.tokenizer = self._get_tokenizer(tokenizer)
         # TODO: Reconsider name of "backend" vs. something like "request_format"
         self.backend = backend
+        self.lora_separator = lora_separator
 
         # NOTE: Creation time and model metadata will be static at startup for
         # now, and won't account for dynamically loading/unloading models.
@@ -129,22 +134,35 @@ class TritonLLMEngine(LLMEngine):
     def models(self) -> List[Model]:
         models = []
         for metadata in self.model_metadata.values():
-            models.append(
-                Model(
-                    id=metadata.name,
-                    created=metadata.create_time,
-                    object=ObjectType.model,
-                    owned_by="Triton Inference Server",
-                ),
-            )
+            model_names = [metadata.name]
+            if (
+                self.lora_separator is not None
+                and len(self.lora_separator) > 0
+                and metadata.lora_names is not None
+            ):
+                for lora_name in metadata.lora_names:
+                    model_names.append(
+                        f"{metadata.name}{self.lora_separator}{lora_name}"
+                    )
+
+            for model_name in model_names:
+                models.append(
+                    Model(
+                        id=model_name,
+                        created=metadata.create_time,
+                        object=ObjectType.model,
+                        owned_by="Triton Inference Server",
+                    ),
+                )
 
         return models
 
     async def chat(
         self, request: CreateChatCompletionRequest
     ) -> CreateChatCompletionResponse | AsyncIterator[str]:
-        metadata = self.model_metadata.get(request.model)
-        self._validate_chat_request(request, metadata)
+        model_name, lora_name = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
+        self._validate_chat_request(request, metadata, lora_name)
 
         conversation = parse_chat_messages(request.messages)
 
@@ -166,7 +184,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, prompt, request)
+            metadata.request_converter(metadata.model, prompt, request, lora_name)
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -277,12 +295,15 @@ class TritonLLMEngine(LLMEngine):
         self, request: CreateCompletionRequest
     ) -> CreateCompletionResponse | AsyncIterator[str]:
         # Validate request and convert to Triton format
-        metadata = self.model_metadata.get(request.model)
-        self._validate_completion_request(request, metadata)
+        model_name, lora_name = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
+        self._validate_completion_request(request, metadata, lora_name)
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, request.prompt, request)
+            metadata.request_converter(
+                metadata.model, request.prompt, request, lora_name
+            )
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -290,7 +311,7 @@ class TritonLLMEngine(LLMEngine):
         created = int(time.time())
         if request.stream:
             return self._streaming_completion_iterator(
-                request_id, created, metadata.name, responses
+                request_id, created, request.model, responses
             )
 
         # Response validation with decoupled models in mind
@@ -311,7 +332,7 @@ class TritonLLMEngine(LLMEngine):
             system_fingerprint=None,
             object=ObjectType.text_completion,
             created=created,
-            model=metadata.name,
+            model=request.model,
         )
 
     # TODO: This behavior should be tested further
@@ -337,6 +358,16 @@ class TritonLLMEngine(LLMEngine):
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
         return _create_trtllm_inference_request
 
+    def _get_model_and_lora_name(self, request_model_name: str):
+        if self.lora_separator is None or len(self.lora_separator) == 0:
+            return request_model_name, None
+
+        names = request_model_name.split(self.lora_separator)
+        if len(names) != 2:
+            return request_model_name, None
+
+        return names[0], names[1]
+
     def _get_tokenizer(self, tokenizer_name: str):
         tokenizer = None
         if tokenizer_name:
@@ -357,11 +388,18 @@ class TritonLLMEngine(LLMEngine):
                 backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
 
+            lora_names = None
+            if self.backend == "vllm" or backend == "vllm":
+                lora_names = _get_vllm_lora_names(
+                    self.server.options.model_repository, name, model.version
+                )
+
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
                 tokenizer=self.tokenizer,
+                lora_names=lora_names,
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
             )
@@ -576,7 +614,10 @@ class TritonLLMEngine(LLMEngine):
         return response_delta, finish_reason, current_text
 
     def _validate_chat_request(
-        self, request: CreateChatCompletionRequest, metadata: TritonModelMetadata
+        self,
+        request: CreateChatCompletionRequest,
+        metadata: TritonModelMetadata,
+        lora_name: str | None,
     ):
         """
         Validates a chat request to align with currently supported features.
@@ -594,6 +635,13 @@ class TritonLLMEngine(LLMEngine):
 
         if not metadata.request_converter:
             raise Exception(f"Unknown request format for model: {request.model}")
+
+        if (
+            metadata.lora_names is not None
+            and lora_name is not None
+            and lora_name not in metadata.lora_names
+        ):
+            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.n and request.n > 1:
@@ -666,7 +714,10 @@ class TritonLLMEngine(LLMEngine):
         yield "data: [DONE]\n\n"
 
     def _validate_completion_request(
-        self, request: CreateCompletionRequest, metadata: TritonModelMetadata
+        self,
+        request: CreateCompletionRequest,
+        metadata: TritonModelMetadata,
+        lora_name: str | None,
     ):
         """
         Validates a completions request to align with currently supported features.
@@ -680,6 +731,13 @@ class TritonLLMEngine(LLMEngine):
 
         if not metadata.request_converter:
             raise Exception(f"Unknown request format for model: {request.model}")
+
+        if (
+            metadata.lora_names is not None
+            and lora_name is not None
+            and lora_name not in metadata.lora_names
+        ):
+            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.suffix is not None:

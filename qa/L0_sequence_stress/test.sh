@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,6 +65,45 @@ done
 for model_trial in 1 2 4 ; do
     MODEL_DIR=models${model_trial}
     SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+    SERVER_LOG="./$MODEL_DIR.server.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python $STRESS_TEST >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Test invalid gRPC infer handler thread count
+for thread_cnt in -1 0 1 129; do
+    MODEL_DIR=models1
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --grpc-infer-thread-count=$thread_cnt"
+    SERVER_LOG="./$MODEL_DIR.server.log"
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+        RET=1
+        kill SERVER_PID
+        wait $SERVER_PID
+    fi
+done
+
+# Test gRPC infer handler thread count under stress
+thread_cnt=128
+for model_trial in 1 2 4 ; do
+    MODEL_DIR=models${model_trial}
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --grpc-infer-thread-count=$thread_cnt"
     SERVER_LOG="./$MODEL_DIR.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then

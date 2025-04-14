@@ -109,6 +109,12 @@ def parse_args():
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
     triton_group.add_argument(
+        "--lora-separator",
+        type=str,
+        default=None,
+        help="LoRA name selection may be appended to the model name following this separator if the separator is provided",
+    )
+    triton_group.add_argument(
         "--tritonserver-log-verbose-level",
         type=int,
         default=0,
@@ -190,6 +196,7 @@ def main():
         server=server,
         tokenizer=args.tokenizer,
         backend=args.backend,
+        lora_separator=args.lora_separator,
         tool_call_parser=args.tool_call_parser,
         chat_template=args.chat_template,
     )

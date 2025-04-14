@@ -25,6 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
+[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+>[!WARNING]
+>You are currently on the `main` branch which tracks under-development progress
+>towards the next release. The current release is version [2.56.0](https://github.com/triton-inference-server/server/releases/latest)
+>and corresponds to the 25.03 container release on NVIDIA GPU Cloud (NGC).
 
 # Triton Inference Server
 
@@ -89,12 +95,11 @@ cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.02-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.02-py3 tritonserver --model-repository=/models --model-control-mode explicit --load-model densenet_onnx
 
 # Step 3: Sending an Inference Request
 # In a separate console, launch the image_client example from the NGC Triton SDK container
-docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.02-py3-sdk
-/workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.02-py3-sdk /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following
 Image '/workspace/images/mug.jpg':

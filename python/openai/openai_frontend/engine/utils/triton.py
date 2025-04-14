@@ -25,6 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import ctypes
 import json
+import os
+import re
 from dataclasses import asdict
 from typing import Iterable, List, Optional, Union
 
@@ -40,7 +42,10 @@ from schemas.openai import (
 
 
 def _create_vllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -66,10 +71,13 @@ def _create_vllm_inference_request(
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.
-    sampling_parameters = request.model_dump_json(
+    sampling_parameters = request.model_dump(
         exclude=excludes,
         exclude_none=True,
     )
+    if lora_name is not None:
+        sampling_parameters["lora_name"] = lora_name
+    sampling_parameters = json.dumps(sampling_parameters)
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
@@ -96,8 +104,14 @@ def _create_vllm_inference_request(
 
 
 def _create_trtllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
+    if lora_name is not None:
+        raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
+
     inputs = {}
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = np.bool_([[request.stream]])
@@ -218,3 +232,50 @@ def _get_guided_json_from_tool(
         return tool.parameters.model_dump_json()
 
     return None
+
+
+def _get_vllm_lora_names(
+    model_repository: str | list[str], model_name: str, model_version: int
+) -> None | List[str]:
+    lora_names = []
+    repo_paths = model_repository
+    if isinstance(repo_paths, str):
+        repo_paths = [repo_paths]
+    for repo_path in repo_paths:
+        model_path = os.path.join(repo_path, model_name)
+        if not os.path.isdir(model_path):
+            # Cloud path?
+            return None
+        if model_version <= 0:
+            for version_path in os.listdir(model_path):
+                version = os.path.basename(version_path)
+                if re.fullmatch(r"^[0-9]+$", version) is None:
+                    continue
+                model_version = max(model_version, int(version))
+            if model_version <= 0:
+                # Model directory is malformed?
+                return None
+        version_path = os.path.join(model_path, str(model_version))
+        is_lora_enabled = False
+        model_file_path = os.path.join(version_path, "model.json")
+        try:
+            with open(model_file_path, "r") as f:
+                config = json.load(f)
+                if "enable_lora" in config:
+                    # The value could be a string or a bool.
+                    is_lora_enabled = str(config["enable_lora"]).lower() == "true"
+        except Exception:
+            # Model directory or model.json is malformed?
+            return None
+        if is_lora_enabled != True:
+            continue
+        lora_config_path = os.path.join(version_path, "multi_lora.json")
+        try:
+            with open(lora_config_path, "r") as f:
+                lora_config = json.load(f)
+                for lora_name in lora_config.keys():
+                    lora_names.append(lora_name)
+        except Exception:
+            # LoRA is enabled but its list is not provided or malformed?
+            return None
+    return lora_names

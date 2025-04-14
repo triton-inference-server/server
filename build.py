@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.56.0dev",
-    "triton_container_version": "25.03dev",
-    "upstream_container_version": "25.02",
-    "ort_version": "1.20.1",
+    "release_version": "2.57.0dev",
+    "triton_container_version": "25.04dev",
+    "upstream_container_version": "25.03",
+    "ort_version": "1.21.0",
     "ort_openvino_version": "2025.0.0",
     "standalone_openvino_version": "2025.0.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.7.0",
+    "vllm_version": "0.7.3",
     "rhel_py_version": "3.12.3",
 }
 
@@ -562,8 +562,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "tensorflow":
-        args = tensorflow_cmake_args(images, library_paths)
     elif be == "python":
         args = python_cmake_args()
     elif be == "dali":
@@ -793,23 +791,6 @@ def tensorrt_cmake_args():
         )
 
     return cargs
-
-
-def tensorflow_cmake_args(images, library_paths):
-    backend_name = "tensorflow"
-    extra_args = []
-
-    # If a specific TF image is specified use it, otherwise pull from NGC.
-    if backend_name in images:
-        image = images[backend_name]
-    else:
-        image = "nvcr.io/nvidia/tensorflow:{}-tf2-py3".format(
-            FLAGS.upstream_container_version
-        )
-    extra_args = [
-        cmake_backend_arg(backend_name, "TRITON_TENSORFLOW_DOCKER_IMAGE", None, image)
-    ]
-    return extra_args
 
 
 def dali_cmake_args():
@@ -1233,10 +1214,10 @@ ARG BASE_IMAGE={}
         argmap["BASE_IMAGE"],
     )
 
-    # PyTorch and TensorFlow backends need extra CUDA and other
+    # PyTorch backends need extra CUDA and other
     # dependencies during runtime that are missing in the CPU-only base container.
     # These dependencies must be copied from the Triton Min image.
-    if not FLAGS.enable_gpu and (("pytorch" in backends) or ("tensorflow" in backends)):
+    if not FLAGS.enable_gpu and ("pytorch" in backends):
         df += """
 ############################################################################
 ##  Triton Min image
@@ -1503,13 +1484,24 @@ RUN apt-get update \\
 ARG BUILD_PUBLIC_VLLM="true"
 ARG VLLM_INDEX_URL
 ARG PYTORCH_TRITON_URL
+ARG NVPL_SLIM_URL
 
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        pip3 install --no-cache-dir \\
-        mkl==2021.1.1 \\
-        mkl-include==2021.1.1 \\
-        mkl-devel==2021.1.1 \\
+        if [ "$(uname -m)" = "x86_64" ]; then \\
+            pip3 install --no-cache-dir \\
+                mkl==2021.1.1 \\
+                mkl-include==2021.1.1 \\
+                mkl-devel==2021.1.1; \\
+        elif [ "$(uname -m)" = "aarch64" ]; then \\
+            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
+            cd /tmp && \\
+            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
+            tar -xf nvpl_slim_24.04.tar && \\
+            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
+            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
+            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
+        fi \\
         && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
@@ -1580,7 +1572,6 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
 COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
@@ -1602,10 +1593,10 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cud
             cuda_arch=cuda_arch, libs_arch=libs_arch
         )
 
-    if ("pytorch" in backends) or ("tensorflow" in backends):
-        # Add NCCL dependency for tensorflow/pytorch backend.
+    if "pytorch" in backends:
+        # Add NCCL dependency for pytorch backend.
         # Note: Even though the build is CPU-only, the version of
-        # tensorflow/pytorch we are using depends upon the NCCL library.
+        # pytorch we are using depends upon the NCCL library.
         # Since this dependency is not present in the ubuntu base image,
         # we must copy it from the Triton min container ourselves.
         df += """
@@ -1720,11 +1711,10 @@ def create_build_dockerfiles(
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch and TensorFlow containers that
-    # are not CPU-only.
+    # since we are using PyTorch containers that are not CPU-only.
     if (
         not FLAGS.enable_gpu
-        and (("pytorch" in backends) or ("tensorflow" in backends))
+        and ("pytorch" in backends)
         and (target_platform() != "windows")
     ):
         if "gpu-base" in images:
@@ -1913,6 +1903,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
                 f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+                f"--build-arg NVPL_SLIM_URL={nvpl_slim_url}",
             ]
         finalargs += [
             "-t",
@@ -2351,7 +2342,6 @@ def enable_all():
             "identity",
             "square",
             "repeat",
-            "tensorflow",
             "onnxruntime",
             "python",
             "dali",
@@ -2586,7 +2576,7 @@ if __name__ == "__main__":
         "--image",
         action="append",
         required=False,
-        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow", or "pytorch".',
+        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
     )
 
     parser.add_argument(
@@ -2887,12 +2877,6 @@ if __name__ == "__main__":
         parts = be.split(":")
         if len(parts) == 1:
             parts.append(default_repo_tag)
-        if parts[0] == "tensorflow1":
-            fail(
-                "Starting from Triton version 23.04, support for TensorFlow 1 has been discontinued. Please switch to Tensorflow 2."
-            )
-        if parts[0] == "tensorflow2":
-            parts[0] = "tensorflow"
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -2910,6 +2894,7 @@ if __name__ == "__main__":
         requirements = secrets.get("req", "")
         vllm_index_url = secrets.get("vllm_index_url", "")
         pytorch_triton_url = secrets.get("pytorch_triton_url", "")
+        nvpl_slim_url = secrets.get("nvpl_slim_url", "")
         build_public_vllm = secrets.get("build_public_vllm", "true")
         log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
@@ -2939,13 +2924,10 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0]
-            not in ["base", "gpu-base", "pytorch", "tensorflow", "tensorflow2"],
+            parts[0] not in ["base", "gpu-base", "pytorch"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
-        if parts[0] == "tensorflow2":
-            parts[0] = "tensorflow"
         images[parts[0]] = parts[1]
 
     # Initialize map of library paths for each backend.
@@ -2954,8 +2936,6 @@ if __name__ == "__main__":
         parts = lpath.split(":")
         if len(parts) == 2:
             log('backend "{}" library path "{}"'.format(parts[0], parts[1]))
-            if parts[0] == "tensorflow2":
-                parts[0] = "tensorflow"
             library_paths[parts[0]] = parts[1]
 
     # Parse any explicitly specified cmake arguments
