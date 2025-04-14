@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -109,6 +109,12 @@ def parse_args():
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
     triton_group.add_argument(
+        "--lora-separator",
+        type=str,
+        default=None,
+        help="LoRA name selection may be appended to the model name following this separator if the separator is provided",
+    )
+    triton_group.add_argument(
         "--tritonserver-log-verbose-level",
         type=int,
         default=0,
@@ -171,7 +177,10 @@ def main():
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
-        server=server, tokenizer=args.tokenizer, backend=args.backend
+        server=server,
+        tokenizer=args.tokenizer,
+        backend=args.backend,
+        lora_separator=args.lora_separator,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
