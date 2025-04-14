@@ -109,6 +109,11 @@ mkdir -p $MODELSDIR/custom_identity_int32/1 && (cd $MODELSDIR/custom_identity_in
 
 RET=0
 
+# set up identity_fp32 model
+mkdir -p $MODELSDIR/identity_fp32/1 && \
+    cp ../python_models/identity_fp32/model.py $MODELSDIR/identity_fp32/1/. && \
+    cp ../python_models/identity_fp32/config.pbtxt $MODELSDIR/identity_fp32/.
+
 # Helpers =======================================
 function assert_curl_success {
   message="${1}"
@@ -184,6 +189,26 @@ function send_inference_requests {
             RET=1
         fi
     done
+}
+
+function run_stress_client {
+    stress_client="${1}"
+    client_log="${2}"
+    echo "Running stress test for 120 seconds..."
+    bash -c '
+        # Handle SIGTERM (signal 15) and exit gracefully
+        trap "echo \"cleaning up stress client...\"; exit 0" SIGTERM
+
+        while true; do
+            python3 "$1" >> "$2"
+            sleep 0.1
+        done' _ "$stress_client" "$client_log" & CLIENT_PID=$!
+    sleep 120
+
+    set -e
+    kill $CLIENT_PID
+    wait $CLIENT_PID
+    set +e
 }
 
 #=======================================
@@ -1244,4 +1269,78 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
+
+# Long running stress test
+# Triton trace mode
+SERVER_ARGS="--model-control-mode=explicit \
+                --model-repository=$MODELSDIR \
+                --load-model=identity_fp32 \
+                --trace-config mode=triton \
+                --trace-config triton,file=./trace \
+                --trace-config rate=1 \
+                --trace-config level=TIMESTAMPS"
+SERVER_LOG="./inference_server_triton_trace_stress.log"
+CLIENT_LOG="./client_triton_trace_stress.log"
+STRESS_CLIENT="./trace_stress_grpc_client.py"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Run stress test
+run_stress_client $STRESS_CLIENT $CLIENT_LOG
+
+set -e
+if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
+    echo -e "\n***\n*** Server stopped unexpectedly during stress test\n***"
+    cat $SERVER_LOG
+    RET=1
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+set +e
+
+# Opentelemetry trace mode
+SERVER_ARGS="--model-control-mode=explicit \
+                --model-repository=$MODELSDIR \
+                --load-model=identity_fp32 \
+                --trace-config level=TIMESTAMPS \
+                --trace-config rate=1 \
+                --trace-config mode=opentelemetry \
+                --trace-config opentelemetry,resource=test.key=test.value \
+                --trace-config opentelemetry,resource=service.name=test_triton \
+                --trace-config opentelemetry,url=localhost:$OTLP_PORT/v1/traces"
+SERVER_LOG="./inference_server_otel_trace_stress.log"
+CLIENT_LOG="./client_otel_trace_stress.log"
+STRESS_CLIENT="./trace_stress_grpc_client.py"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm collected_traces.json
+$OTEL_COLLECTOR --config ./trace-config.yaml >> $OTEL_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+# Run stress test
+run_stress_client $STRESS_CLIENT $CLIENT_LOG
+
+set -e
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+if ! kill -0 ${SERVER_PID} > /dev/null 2>&1; then
+    echo -e "\n***\n*** Server stopped unexpectedly during stress test\n***"
+    cat $SERVER_LOG
+    RET=1
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+set +e
+
 exit $RET
