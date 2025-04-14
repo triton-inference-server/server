@@ -230,6 +230,69 @@ pip install -r requirements-test.txt
 pytest -v tests/
 ```
 
+### LoRA Adapters
+
+If the command line argument `--lora-separator=<separator_string>` is provided
+when starting the OpenAI Frontend, a vLLM LoRA adaptor listed on the
+`multi_lora.json` may be selected by appending the LoRA name to the model name,
+separated by the LoRA separator, on the inference request in
+`<model_name><separator_string><lora_name>` format.
+
+<details>
+<summary>For example</summary>
+
+```bash
+# start server with model named gemma-2b
+python3 openai_frontend/main.py --lora-separator=_lora_ ...
+
+# inference without LoRA
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
+  "model": "gemma-2b",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
+}'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented by the Sumerians in Mesopotamia around 350"}],
+  ...
+}
+
+# inference with LoRA named doll
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
+  "model": "gemma-2b_lora_doll",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
+}'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented in Mesopotamia around 3500 BC.\n\n"}],
+  ...
+}
+
+# inference with LoRA named sheep
+curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
+  "model": "gemma-2b_lora_sheep",
+  "temperature": 0,
+  "prompt": "When was the wheel invented?"
+}'
+{
+  ...
+  "choices":[{..."text":"\n\nThe wheel was invented around 3000 BC in Mesopotamia.\n\n"}],
+  ...
+}
+```
+
+</details>
+
+When listing or retrieving model(s), the model id will include the LoRA name in
+the same `<model_name><separator_string><lora_name>` format for each LoRA
+adapter listed on the `multi_lora.json`. Note: The LoRA name inclusion is
+limited to locally stored models, inference requests are not limited though.
+
+See the
+[vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
+on how to serve a model with LoRA adapters.
+
 ## TensorRT-LLM
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
