@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -119,7 +119,7 @@ cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
 sed -i "s/simple_dyna_sequence/simple_string_dyna_sequence/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
 sed -i "s/^platform: .*/backend: \"dyna_sequence\"/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
 sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
-rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.graphdef
+rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.onnx
 cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
 rm -f *.log
@@ -163,13 +163,13 @@ for i in \
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "image_client" ]; then
-        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
@@ -649,7 +649,7 @@ wait $SERVER_PID
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/generate_models"
+SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server

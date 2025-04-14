@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 
 REPO_VERSION=$1
 
-BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
+BACKENDS=${BACKENDS:="plan custom onnx libtorch python"}
 STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
@@ -50,8 +50,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
 PERF_CLIENT=../clients/perf_client
-TF_VERSION=${TF_VERSION:=2}
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64

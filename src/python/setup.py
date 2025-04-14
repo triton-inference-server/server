@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -107,6 +107,6 @@ setup(
     zip_safe=False,
     cmdclass={"bdist_wheel": bdist_wheel},
     data_files=data_files,
-    install_requires=["tritonserver", "pydantic"],
+    install_requires=["tritonserver", "pydantic==2.10.6"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
 )

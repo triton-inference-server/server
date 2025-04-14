@@ -28,9 +28,9 @@
 ############################################################################
 ## This script generates the model repository needed by some of the
 ## tritonserver CI tests. Generating these models requires using
-## the TensorFlow and PyTorch containers.
+## the PyTorch container.
 ##
-## 1. Update TENSORRT_IMAGE, PYTORCH_IMAGE and TENSORFLOW_IMAGE to
+## 1. Update TENSORRT_IMAGE and PYTORCH_IMAGE to
 ## match what is being used by the tritonserver release being
 ## tested.
 ##
@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=25.01}
+TRITON_VERSION=${TRITON_VERSION:=25.03}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.16.1
@@ -59,7 +59,6 @@ OPENVINO_VERSION=2024.5.0
 
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf2-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
 
@@ -109,9 +108,7 @@ VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
 VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
 VOLUME_VARDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
 VOLUME_IDENTITYDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_SIGDEFDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
 VOLUME_IDENTITYBIGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_TFPARAMETERSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_tf_parameters_repository
 VOLUME_SHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
 VOLUME_RESHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 VOLUME_SEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
@@ -172,7 +169,6 @@ docker run \
 ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
 OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
 TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
-TFSCRIPT=gen.TensorFlow.gen_qa_model_repository.cmds
 TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
 
 # OPENVINO
@@ -184,7 +180,7 @@ cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -247,7 +243,7 @@ cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -288,6 +284,13 @@ python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET -
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
 chmod -R 777 $VOLUME_SCALARMODELSDESTDIR
+python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
+python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
+python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
+python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
+python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
+python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
+chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
 EOF
 
 chmod a+x $ONNXSCRIPT
@@ -321,7 +324,7 @@ cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x
@@ -380,76 +383,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Tensorflow
-cat > $TFSCRIPT <<EOF
-#!/bin/bash
-# Make all generated files accessible outside of container
-umask 0000
-nvidia-smi -L || true
-nvidia-smi || true
-set -e
-set -x
-# Segmentation fault with protobuf 4.24.0 (https://github.com/tensorflow/tensorflow/issues/61551)
-# Upgrade protobuf version to fix the issue.
-pip3 install "protobuf>4.24.0"
-
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$VOLUME_NOSHAPEDESTDIR
-chmod -R 777 $VOLUME_NOSHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --savedmodel --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
-python3 $VOLUME_SRCDIR/gen_tag_sigdef.py --dir $VOLUME_SIGDEFDESTDIR
-chmod -R 777 $VOLUME_SIGDEFDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_tf_parameters.py --models_dir $VOLUME_TFPARAMETERSDESTDIR
-chmod -R 777 $VOLUME_TFPARAMETERSDESTDIR
-EOF
-
-chmod a+x $TFSCRIPT
-if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
-    exit 1
-fi
-
-docker cp $TFSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
-docker pull $TENSORFLOW_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $TFSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $TENSORFLOW_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TFSCRIPT
-
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
-fi
-
 # TensorRT
 
 docker pull ${TENSORRT_IMAGE}
@@ -459,7 +392,7 @@ cat > $TRTSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
-nvidia-smi -L || true
+nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
 set -e
 set -x

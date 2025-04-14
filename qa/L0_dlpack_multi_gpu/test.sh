@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,6 @@ source ../common/util.sh
 # Uninstall the non CUDA version of PyTorch
 pip3 uninstall -y torch
 pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
-pip3 install tensorflow
 
 # Install CuPy for testing non_blocking compute streams
 pip3 install cupy-cuda12x

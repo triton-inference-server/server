@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -740,16 +740,27 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
 
-  auto ts = reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp);
-  std::lock_guard<std::mutex> lk((*ts)->mtx_);
-  (*ts)->spawned_traces_tracker_.erase(id);
-  // The userp will be shared with the trace children, so only delete it
-  // if no more TraceRelease calls are expected
-  if ((*ts)->spawned_traces_tracker_.empty()) {
-    delete ts;
+  auto ts_ptr = reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp);
+  std::shared_ptr<TraceManager::Trace> tracer_sp;
+  bool delete_ts = false;
+  {
+    std::lock_guard<std::mutex> lk((*ts_ptr)->mtx_);
+    (*ts_ptr)->spawned_traces_tracker_.erase(id);
+    // The userp will be shared with the trace children, so only delete it
+    // if no more TraceRelease calls are expected
+    if ((*ts_ptr)->spawned_traces_tracker_.empty()) {
+      // Move the trace shared_ptr out inside lock to ensure mutex stays alive
+      // and destruct outside lock
+      tracer_sp = std::move(*ts_ptr);
+      delete_ts = true;
+      delete ts_ptr;
+    }
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
   }
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
+  if (delete_ts) {
+    tracer_sp.reset();
+  }
 }
 
 const char*

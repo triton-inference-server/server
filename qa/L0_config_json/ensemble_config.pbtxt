@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "savedmodel_nobatch_float32_float32_float32"
+      model_name: "onnx_nobatch_float32_float32_float32"
       model_version: 1
       input_map [
         {
@@ -78,7 +78,7 @@ ensemble_scheduling {
       ]
     },
     {
-      model_name: "savedmodel_nobatch_float32_float32_float32"
+      model_name: "onnx_nobatch_float32_float32_float32"
       model_version: -1
       input_map [
         {

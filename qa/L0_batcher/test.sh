@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,8 +74,6 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                                 test_multi_batch_different_shape_allow_ragged"
 fi
 
-TF_VERSION=${TF_VERSION:=2}
-
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -105,13 +103,13 @@ else
     fi
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
+BACKENDS=${BACKENDS:="onnx libtorch plan python"}
 export BACKENDS
 
 # Basic batcher tests
