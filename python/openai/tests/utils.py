@@ -53,8 +53,17 @@ def setup_server(model_repository: str):
 
 
 def setup_fastapi_app(tokenizer: str, server: tritonserver.Server, backend: str):
+    # TODO: tensorrllm and llmapi backends both use "tensorrtllm" as the backend flag for OpenAI server.
+    # In the future if the backends are consolidated, this check can be updated or removed.
+    # key: the backend value
+    # value: the corresponding backend flag for OpenAI server
+    backend_map = {
+        "tensorrtllm": "tensorrtllm",
+        "llmapi": "tensorrtllm",
+        "vllm": "vllm",
+    }
     engine: TritonLLMEngine = TritonLLMEngine(
-        server=server, tokenizer=tokenizer, backend=backend
+        server=server, tokenizer=tokenizer, backend=backend_map[backend]
     )
     frontend: FastApiFrontend = FastApiFrontend(engine=engine)
     return frontend.app

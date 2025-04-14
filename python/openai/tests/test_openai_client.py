@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,9 @@ class TestOpenAIClient:
             # tensorrt_llm_bls +
             # preprocess -> tensorrt_llm -> postprocess
             assert len(models) == 4
+        elif backend == "llmapi":
+            # Only has one tensorrt_llm model.
+            assert len(models) == 1
         elif backend == "vllm":
             assert len(models) == 1
         else:
@@ -75,7 +78,7 @@ class TestOpenAIClient:
     def test_openai_client_completion_echo(
         self, client: openai.OpenAI, echo: bool, backend: str, model: str, prompt: str
     ):
-        if backend == "tensorrtllm":
+        if backend == "tensorrtllm" or backend == "llmapi":
             pytest.skip(
                 reason="TRT-LLM backend currently only supports setting this parameter at model load time",
             )
@@ -108,6 +111,9 @@ class TestAsyncOpenAIClient:
             # tensorrt_llm_bls +
             # preprocess -> tensorrt_llm -> postprocess
             assert len(models) == 4
+        elif backend == "llmapi":
+            # Only has one tensorrt_llm model.
+            assert len(models) == 1
         elif backend == "vllm":
             assert len(models) == 1
         else:

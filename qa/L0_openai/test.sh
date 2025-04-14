@@ -85,6 +85,12 @@ function prepare_tensorrtllm() {
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${HF_LLAMA_MODEL},triton_max_batch_size:64,postprocessing_instance_count:1
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
+
+    # Prepare LLM API setup
+    LLMAPI_MODEL_REPO="tests/llmapi_models"
+    mkdir -p ${LLMAPI_MODEL_REPO}
+    cp /app/all_models/llmapi/* "${LLMAPI_MODEL_REPO}" -r
+    sed -i 's#"model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0"#"model":"meta-llama/Meta-Llama-3.1-8B-Instruct"#g' ${LLMAPI_MODEL_REPO}/tensorrt_llm/1/model.json
 }
 
 function pre_test() {
@@ -103,11 +109,39 @@ function run_test() {
 
     # Capture error code without exiting to allow log collection
     set +e
-    pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
-    if [ $? -ne 0 ]; then
-        cat ${TEST_LOG}
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
+
+    if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
+        echo "Running TensorRT-LLM tests..."
+
+        # First run with default model setup
+        echo "Running tests with default model setup..."
+        pytest -s -v --junitxml=test_openai_default.xml tests/ 2>&1 > test_openai_default.log
+        DEFAULT_RESULT=$?
+
+        # Then run with LLM API setup
+        echo "Running tests with LLM API setup..."
+        LLMAPI_SETUP=1 pytest -s -v --junitxml=test_openai_llmapi.xml tests/ 2>&1 > test_openai_llmapi.log
+        LLMAPI_RESULT=$?
+
+        # Combine results
+        if [ $DEFAULT_RESULT -ne 0 ]; then
+            cat test_openai_default.log
+            echo -e "\n***\n*** Test Failed with default model setup\n***"
+            RET=1
+        fi
+        if [ $LLMAPI_RESULT -ne 0 ]; then
+            cat test_openai_llmapi.log
+            echo -e "\n***\n*** Test Failed with LLM API setup\n***"
+            RET=1
+        fi
+    else
+        echo "Running vLLM tests..."
+        pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
+        if [ $? -ne 0 ]; then
+            cat ${TEST_LOG}
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
     set -e
 
