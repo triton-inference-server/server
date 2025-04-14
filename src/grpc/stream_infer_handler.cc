@@ -163,8 +163,6 @@ ModelStreamInferHandler::Process(
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
 
-  std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
-
   if (state->step_ == Steps::START) {
     // A new stream connection... If RPC failed on a new request then
     // the server is shutting down and so we should do nothing.
@@ -222,6 +220,8 @@ ModelStreamInferHandler::Process(
 
       return !finished;
     }
+
+    std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
 
     if (!*accepting_new_conn_) {
       err = TRITONSERVER_ErrorNew(

@@ -162,7 +162,7 @@ class Server {
   bool running_{false};
 
   // Thread to handle the execution of the gRPC endpoint's graceful shutdown
-  std::thread graceful_shutdown_thread;
+  std::thread graceful_shutdown_thread_;
   // Mutex to protect access to the following connection variables
   std::shared_mutex conn_mtx_;
   // Counter to track the number of active connections and inference handlers
