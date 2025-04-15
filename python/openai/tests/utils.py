@@ -29,7 +29,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import openai
 import requests
@@ -52,7 +52,9 @@ def setup_server(model_repository: str):
     return server
 
 
-def setup_fastapi_app(tokenizer: str, server: tritonserver.Server, backend: str):
+def setup_fastapi_app(
+    tokenizer: Union[str, Dict[str, str]], server: tritonserver.Server, backend: str
+):
     engine: TritonLLMEngine = TritonLLMEngine(
         server=server, tokenizer=tokenizer, backend=backend
     )

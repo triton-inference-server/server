@@ -82,6 +82,27 @@ def start_kserve_frontends(server, args):
     return http_service, grpc_service
 
 
+def parse_tokenizer_arg(tokenizer_args):
+    if not tokenizer_args:
+        return {}
+
+    tokenizer_map = {}
+    # Single tokenizer case
+    if len(tokenizer_args) == 1 and ":" not in tokenizer_args[0]:
+        tokenizer_map["default"] = tokenizer_args[0]
+        return tokenizer_map
+
+    # Multiple tokenizers case
+    for arg in tokenizer_args:
+        try:
+            model_name, tokenizer_path = arg.split(":")
+            tokenizer_map[model_name] = tokenizer_path
+        except ValueError:
+            print(f"Warning: Skipping invalid tokenizer specification: {arg}")
+
+    return tokenizer_map
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Triton Inference Server with OpenAI-Compatible RESTful API server."
@@ -95,19 +116,17 @@ def parse_args():
         required=True,
         help="Path to the Triton model repository holding the models to be served",
     )
-    # TODO: determine what to do with single tokenizer flag
     triton_group.add_argument(
         "--tokenizer",
         type=str,
+        nargs="+",  # Accept either single value or multiple
         default=None,
-        help="HuggingFace ID or local folder path of the Tokenizer to use for chat templates",
-    )
-    triton_group.add_argument(
-        "--tokenizers",
-        type=str,
-        nargs="+",  # Accept multiple arguments
-        default=[],
-        help="List of HuggingFace IDs or local folder paths of Tokenizers to use. Format: model_name:tokenizer_path",
+        help=(
+            "HuggingFace ID or local folder path of Tokenizer(s). "
+            "For single tokenizer: provide path directly. "
+            "For multiple tokenizers: use format 'model_name:tokenizer_path' for each entry. "
+            "Example: --tokenizer default:/path/to/tokenizer model1:path1 model2:path2"
+        ),
     )
     triton_group.add_argument(
         "--backend",
@@ -175,18 +194,7 @@ def main():
     args = parse_args()
 
     # Parse tokenizer mappings
-    tokenizer_map = {}
-    for tokenizer_spec in args.tokenizers:
-        try:
-            model_name, tokenizer_path = tokenizer_spec.split(":")
-            tokenizer_map[model_name] = tokenizer_path
-        except ValueError:
-            print(
-                f"Warning: Skipping invalid tokenizer specification: {tokenizer_spec}. Format should be 'model_name:tokenizer_path'"
-            )
-
-    if args.tokenizer:
-        tokenizer_map["default"] = args.tokenizer
+    tokenizer_map = parse_tokenizer_arg(args.tokenizer)
 
     # Initialize Triton server
     server = tritonserver.Server(
