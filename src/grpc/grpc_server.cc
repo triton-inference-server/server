@@ -2394,7 +2394,8 @@ Server::Server(
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.max_response_pool_size_, options.infer_compression_level_,
-        restricted_kv, options.forward_header_pattern_));
+        restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
+        &accepting_new_conn_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2404,7 +2405,8 @@ Server::Server(
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
       options.max_response_pool_size_, options.infer_compression_level_,
-      restricted_kv, options.forward_header_pattern_));
+      restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
+      &accepting_new_conn_));
 }
 
 Server::~Server()
@@ -2562,6 +2564,31 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
+Server::GracefulStop(
+    uint32_t* exit_timeout_secs, const std::string& service_name)
+{
+  if (!running_) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
+  }
+
+  graceful_shutdown_thread_ = std::thread([this]() {
+    // Stop accepting new RPC requests. Existing requests are allowed to
+    // complete
+    server_->Shutdown();
+  });
+
+  // Required to disable additional requests on existing streaming connections
+  DisableNewConnections();
+
+  if (exit_timeout_secs != nullptr) {
+    WaitForConnectionsToClose(exit_timeout_secs, service_name);
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 Server::Stop()
 {
   if (!running_) {
@@ -2569,9 +2596,14 @@ Server::Stop()
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  // Always shutdown the completion queue after the server.
-  server_->Shutdown();
+  // Forcefully cancel remaining RPC connections
+  server_->Shutdown(std::chrono::system_clock::now());
 
+  if (graceful_shutdown_thread_.joinable()) {
+    graceful_shutdown_thread_.join();
+  }
+
+  // Shutdown completion queues
   common_cq_->Shutdown();
   model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
@@ -2588,6 +2620,31 @@ Server::Stop()
 
   running_ = false;
   return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::DisableNewConnections()
+{
+  std::unique_lock<std::shared_mutex> lock(conn_mtx_);
+
+  accepting_new_conn_ = false;
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+Server::WaitForConnectionsToClose(
+    uint32_t* exit_timeout_secs, const std::string& service_name)
+{
+  while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
+    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
+             << " " << service_name
+             << " service connections and inference handlers";
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    (*exit_timeout_secs)--;
+  }
+
+  return nullptr;  // complete
 }
 
 }}}  // namespace triton::server::grpc

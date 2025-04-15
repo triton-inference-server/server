@@ -232,9 +232,20 @@ ModelStreamInferHandler::Process(
       return !finished;
     }
 
+    std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
+
+    if (!*accepting_new_conn_) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNAVAILABLE,
+          "GRPC server is shutting down and has stopped accepting new "
+          "requests.");
+    }
+
     int64_t requested_model_version;
-    err = GetModelVersionFromString(
-        request.model_version(), &requested_model_version);
+    if (err == nullptr) {
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
+    }
 
     // Record the transaction policy of the model into the current state
     // object.
@@ -394,9 +405,9 @@ ModelStreamInferHandler::Process(
         state->context_->WriteResponseIfReady(state);
       } else {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
           state->response_queue_->MarkNextResponseComplete();
           state->context_->ready_to_write_states_.push(state);
           if (!state->context_->ongoing_write_) {
@@ -525,9 +536,9 @@ ModelStreamInferHandler::Process(
 
       {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
           if (!state->context_->ready_to_write_states_.empty()) {
             writing_state = state->context_->ready_to_write_states_.front();
             state->context_->ready_to_write_states_.pop();
@@ -552,7 +563,7 @@ ModelStreamInferHandler::Process(
     } else if (state->step_ == Steps::WRITEREADY) {
       // Finish the state if all the transactions associated with
       // the state have completed.
-      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
+      std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
       {
         if (state->IsComplete()) {
           state->context_->DecrementRequestCounter();
