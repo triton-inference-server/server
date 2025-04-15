@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -619,3 +619,64 @@ class TestChatCompletionsTokenizers:
         assert any(
             error in response.json()["detail"].lower() for error in expected_errors
         )
+
+
+class TestMultipleTokenizers:
+    @pytest.fixture(scope="class")
+    def model_repository(self):
+        # Custom model repository for these specific tests
+        return str(Path(__file__).parent / "vllm_tiny_models")
+
+    # Re-use a single Triton server for different frontend configurations
+    @pytest.fixture(scope="class")
+    def server(self, model_repository: str):
+        server = setup_server(model_repository)
+        yield server
+        server.stop()
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return ["tiny_llama", "phi-4"]
+
+    def test_chat_completions_multiple_tokenizers(
+        self,
+        server: tritonserver.Server,
+        models: List[str],
+        messages: List[dict],
+    ):
+        app = setup_fastapi_app(
+            tokenizer={
+                "tiny_llama:TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+                "phi-4:microsoft/Phi-4-mini-instruct"
+            },
+            server=server,
+            backend="vllm",
+        )
+        for model in models:
+            with TestClient(app) as client:
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={"model": model, "messages": messages},
+                )
+
+                assert response.status_code == 200
+                message = response.json()["choices"][0]["message"]
+                assert message["content"].strip()
+                assert message["role"] == "assistant"
+
+    def test_chat_completions_unknown_tokenizers(
+        self,
+        server: tritonserver.Server,
+        models: List[str],
+        messages: List[dict],
+    ):
+        app = setup_fastapi_app(tokenizer="", server=server, backend="vllm")
+        for model in models:
+            with TestClient(app) as client:
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={"model": model, "messages": messages},
+                )
+
+                assert response.status_code == 400
+                assert response.json()["detail"] == "Unknown tokenizer"

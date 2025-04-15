@@ -83,13 +83,21 @@ class TritonLLMEngine(LLMEngine):
     def __init__(
         self,
         server: tritonserver.Server,
-        tokenizer: str,
         backend: Optional[str] = None,
         lora_separator: Optional[str] = None,
+        tokenizer_map: Dict[str, str] = None,
     ):
         # Assume an already configured and started server
         self.server = server
-        self.tokenizer = self._get_tokenizer(tokenizer)
+        self.tokenizer_map = {}
+        if tokenizer_map:
+            for model_name, tokenizer_path in tokenizer_map.items():
+                try:
+                    self.tokenizer_map[model_name] = get_tokenizer(tokenizer_path)
+                except Exception as e:
+                    print(
+                        f"Warning: Failed to load tokenizer for {model_name} from {tokenizer_path}: {e}"
+                    )
         # TODO: Reconsider name of "backend" vs. something like "request_format"
         self.backend = backend
         self.lora_separator = lora_separator
@@ -294,12 +302,13 @@ class TritonLLMEngine(LLMEngine):
                     self.server.options.model_repository, name, model.version
                 )
 
+            default_tokenizer = self.tokenizer_map.get("default", None)
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
-                tokenizer=self.tokenizer,
                 lora_names=lora_names,
+                tokenizer=self.tokenizer_map.get(name, default_tokenizer),
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
             )
