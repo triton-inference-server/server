@@ -200,9 +200,9 @@ def main():
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
         server=server,
-        tokenizer=args.tokenizer,
         backend=args.backend,
         lora_separator=args.lora_separator,
+        tokenizer_map=tokenizer_map,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management

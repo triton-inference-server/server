@@ -83,9 +83,9 @@ class TritonLLMEngine(LLMEngine):
     def __init__(
         self,
         server: tritonserver.Server,
-        tokenizer: str,
         backend: Optional[str] = None,
         lora_separator: Optional[str] = None,
+        tokenizer_map: Dict[str, str] = None,
     ):
         # Assume an already configured and started server
         self.server = server
@@ -302,12 +302,13 @@ class TritonLLMEngine(LLMEngine):
                     self.server.options.model_repository, name, model.version
                 )
 
+            default_tokenizer = self.tokenizer_map.get("default", None)
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
-                tokenizer=self.tokenizer,
                 lora_names=lora_names,
+                tokenizer=self.tokenizer_map.get(name, default_tokenizer),
                 create_time=self.create_time,
                 request_converter=self._determine_request_converter(backend),
             )
