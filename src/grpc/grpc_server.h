@@ -36,6 +36,7 @@
 #include "grpc_handler.h"
 #include "grpc_service.grpc.pb.h"
 #include "grpc_utils.h"
+#include "grpccallback_service.grpc.pb.h"
 #include "health.grpc.pb.h"
 #include "infer_handler.h"
 #include "stream_infer_handler.h"
@@ -143,10 +144,13 @@ class Server {
 
   inference::GRPCInferenceService::AsyncService service_;
   ::grpc::health::v1::Health::AsyncService health_service_;
+  inference::GRPCInferenceServiceCallback::CallbackService
+      non_inference_callback_service_;
 
+  ::grpc::health::v1::Health::CallbackService* health_callback_service_;
   std::unique_ptr<::grpc::Server> server_;
 
-  std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
+  // std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
 
