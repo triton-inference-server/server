@@ -42,7 +42,7 @@ ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
-ARG TRITON_PERF_ANALYZER_BUILD=true
+ARG TRITON_PERF_ANALYZER_BUILD=1
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=3.3.6
 
@@ -145,7 +145,7 @@ RUN make -j16 cc-clients java-clients python-clients && \
 # the python client until now. Post-migration we should focus
 # effort on de-tangling these flows.
 WORKDIR /workspace/pa_build
-RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "true" ]; then \
+RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
