@@ -245,8 +245,6 @@ COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_cli
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
-RUN pip3 install install/python/genai_perf-*.whl
-
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
