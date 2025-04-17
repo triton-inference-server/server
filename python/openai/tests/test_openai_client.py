@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@ import openai
 import pytest
 
 
+@pytest.mark.openai
 class TestOpenAIClient:
     @pytest.fixture(scope="class")
     def client(self, server):
@@ -94,6 +95,7 @@ class TestOpenAIClient:
         pass
 
 
+@pytest.mark.openai
 class TestAsyncOpenAIClient:
     @pytest.fixture(scope="class")
     def client(self, server):
@@ -243,8 +245,3 @@ class TestAsyncOpenAIClient:
         assert len(chunks) > 1
         streamed_output = "".join(chunks)
         assert streamed_output == output
-
-    @pytest.mark.skip(reason="Not Implemented Yet")
-    @pytest.mark.asyncio
-    async def test_openai_client_function_calling(self):
-        pass
