@@ -79,7 +79,7 @@ RUN apt update -q=2 \
 # in order to ensure the public facing docs are up-to-date.
 WORKDIR /workspace/docs/examples/model_repository
 RUN mkdir -p densenet_onnx/1 && \
-        wget -O model_repository/densenet_onnx/1/model.onnx \
+        wget -O densenet_onnx/1/model.onnx \
             https://github.com/onnx/models/raw/main/validated/vision/classification/densenet-121/model/densenet-7.onnx
 
 # Update the qa/ directory with test executables, models, etc.
@@ -119,7 +119,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_identity qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_sequence qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_http/models && \
-    cp -r docs/examples/model_repository/inception_onnx qa/L0_grpc/models && \
+    cp -r docs/examples/model_repository/densenet_onnx qa/L0_grpc/models && \
     mkdir qa/L0_https/models && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
     mkdir qa/L0_secure_grpc/models && \
