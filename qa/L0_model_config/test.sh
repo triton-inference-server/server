@@ -570,7 +570,7 @@ done
 
 # Run all autofill tests that are expected to be successful. These
 # tests don't add a platform to the model config before running
-for TARGET_DIR in `ls -d autofill_noplatform_success/tensorrt/no_name_platform`; do
+for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
