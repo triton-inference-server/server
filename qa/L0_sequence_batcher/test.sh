@@ -505,411 +505,456 @@ for MODEL in $MODELS; do
   fi
 done
 
-# Same test work on all models since they all have same total number
-# of batch slots.
-for model_trial in $MODEL_TRIALS; do
-    export NO_BATCHING=1 &&
-        [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
-    export MODEL_INSTANCES=1 &&
-        [[ "$model_trial" != "v" ]] && export MODEL_INSTANCES=4 &&
-        [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
+# # Same test work on all models since they all have same total number
+# # of batch slots.
+# for model_trial in $MODEL_TRIALS; do
+#     export NO_BATCHING=1 &&
+#         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
+#     export MODEL_INSTANCES=1 &&
+#         [[ "$model_trial" != "v" ]] && export MODEL_INSTANCES=4 &&
+#         [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
 
-    MODEL_PATH=models${model_trial}
+#     MODEL_PATH=models${model_trial}
 
-    if [ "$ENSEMBLES" == "1" ]; then
-      cp -r $DATADIR/qa_ensemble_model_repository/${FIXED_MODEL_REPOSITORY}/nop_* `pwd`/$MODEL_PATH/.
-        create_nop_version_dir `pwd`/$MODEL_PATH
-      # Must load identity backend on GPU to avoid cuda init delay during 1st run
-      for NOP_MODEL in `pwd`/$MODEL_PATH/nop_*; do
-        (cd $NOP_MODEL && sed -i "s/kind: KIND_CPU/kind: KIND_GPU/" config.pbtxt)
-      done
-    fi
+#     if [ "$ENSEMBLES" == "1" ]; then
+#       cp -r $DATADIR/qa_ensemble_model_repository/${FIXED_MODEL_REPOSITORY}/nop_* `pwd`/$MODEL_PATH/.
+#         create_nop_version_dir `pwd`/$MODEL_PATH
+#       # Must load identity backend on GPU to avoid cuda init delay during 1st run
+#       for NOP_MODEL in `pwd`/$MODEL_PATH/nop_*; do
+#         (cd $NOP_MODEL && sed -i "s/kind: KIND_CPU/kind: KIND_GPU/" config.pbtxt)
+#       done
+#     fi
 
-    # Need to launch the server for each test so that the model status
-    # is reset (which is used to make sure the correct batch size was
-    # used for execution). Test everything with fixed-tensor-size
-    # models and variable-tensor-size models.
-    export BATCHER_TYPE="VARIABLE" &&
-        [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
+#     # Need to launch the server for each test so that the model status
+#     # is reset (which is used to make sure the correct batch size was
+#     # used for execution). Test everything with fixed-tensor-size
+#     # models and variable-tensor-size models.
+#     export BATCHER_TYPE="VARIABLE" &&
+#         [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
-    for i in $NO_DELAY_TESTS; do
-        SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_PATH.server.log"
+#     for i in $NO_DELAY_TESTS; do
+#         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#         SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-            run_server_leakcheck
-        else
-            run_server
-        fi
+#         if [ "$TEST_VALGRIND" -eq 1 ]; then
+#             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#             run_server_leakcheck
+#         else
+#             run_server
+#         fi
 
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
+#         if [ "$SERVER_PID" == "0" ]; then
+#             echo -e "\n***\n*** Failed to start $SERVER\n***"
+#             cat $SERVER_LOG
+#             exit 1
+#         fi
 
-        echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+#         echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-        set +e
-        python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-        else
-            check_test_results $TEST_RESULT_FILE 1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Result Verification Failed\n***"
-                RET=1
-            fi
-        fi
-        set -e
+#         set +e
+#         python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+#         if [ $? -ne 0 ]; then
+#             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#             echo -e "\n***\n*** Test $i Failed\n***"
+#             RET=1
+#         else
+#             check_test_results $TEST_RESULT_FILE 1
+#             if [ $? -ne 0 ]; then
+#                 cat $CLIENT_LOG
+#                 echo -e "\n***\n*** Test Result Verification Failed\n***"
+#                 RET=1
+#             fi
+#         fi
+#         set -e
 
-        kill_server
+#         kill_server
 
-        set +e
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-            if [ $? -ne 0 ]; then
-                RET=1
-            fi
-        fi
-        set -e
-    done
+#         set +e
+#         if [ "$TEST_VALGRIND" -eq 1 ]; then
+#             python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#             if [ $? -ne 0 ]; then
+#                 RET=1
+#             fi
+#         fi
+#         set -e
+#     done
 
-    # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
-    # scheduler is delayed and requests can collect in the queue.
-    for i in $DELAY_TESTS; do
-        export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
-            [[ "$i" != "test_backlog_fill_no_end" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
-            [[ "$i" != "test_backlog_fill" ]] &&
-            [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
-        export TRITONSERVER_DELAY_SCHEDULER=10 &&
-            [[ "$i" != "test_backlog_fill_no_end" ]] &&
-            [[ "$i" != "test_backlog_fill" ]] && export TRITONSERVER_DELAY_SCHEDULER=16 &&
-            [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRITONSERVER_DELAY_SCHEDULER=8 &&
-            [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
-            [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_PATH.server.log"
+#     # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
+#     # scheduler is delayed and requests can collect in the queue.
+#     for i in $DELAY_TESTS; do
+#         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
+#             [[ "$i" != "test_backlog_fill_no_end" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
+#             [[ "$i" != "test_backlog_fill" ]] &&
+#             [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+#         export TRITONSERVER_DELAY_SCHEDULER=10 &&
+#             [[ "$i" != "test_backlog_fill_no_end" ]] &&
+#             [[ "$i" != "test_backlog_fill" ]] && export TRITONSERVER_DELAY_SCHEDULER=16 &&
+#             [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRITONSERVER_DELAY_SCHEDULER=8 &&
+#             [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
+#             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
+#         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#         SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-            run_server_leakcheck
-        else
-            run_server
-        fi
+#         if [ "$TEST_VALGRIND" -eq 1 ]; then
+#             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#             run_server_leakcheck
+#         else
+#             run_server
+#         fi
 
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
+#         if [ "$SERVER_PID" == "0" ]; then
+#             echo -e "\n***\n*** Failed to start $SERVER\n***"
+#             cat $SERVER_LOG
+#             exit 1
+#         fi
 
-        echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+#         echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-        set +e
-        python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-        else
-            check_test_results $TEST_RESULT_FILE 1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                echo -e "\n***\n*** Test Result Verification Failed\n***"
-                RET=1
-            fi
-        fi
-        set -e
+#         set +e
+#         python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+#         if [ $? -ne 0 ]; then
+#             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#             echo -e "\n***\n*** Test $i Failed\n***"
+#             RET=1
+#         else
+#             check_test_results $TEST_RESULT_FILE 1
+#             if [ $? -ne 0 ]; then
+#                 cat $CLIENT_LOG
+#                 echo -e "\n***\n*** Test Result Verification Failed\n***"
+#                 RET=1
+#             fi
+#         fi
+#         set -e
 
-        unset TRITONSERVER_DELAY_SCHEDULER
-        unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-        kill_server
+#         unset TRITONSERVER_DELAY_SCHEDULER
+#         unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+#         kill_server
 
-        set +e
-        if [ "$TEST_VALGRIND" -eq 1 ]; then
-            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-            if [ $? -ne 0 ]; then
-                RET=1
-            fi
-        fi
-        set -e
-    done
-done
+#         set +e
+#         if [ "$TEST_VALGRIND" -eq 1 ]; then
+#             python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#             if [ $? -ne 0 ]; then
+#                 RET=1
+#             fi
+#         fi
+#         set -e
+#     done
+# done
 
-# ragged models
-if [[ $BACKENDS == *"custom"* ]]; then
-  rm -fr ragged_models && mkdir ragged_models
-  cp -r ../custom_models/custom_sequence_int32 ragged_models/.
-  (cd ragged_models/custom_sequence_int32 && \
-          sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
-  export NO_BATCHING=0
-  export MODEL_INSTANCES=1
-  export BATCHER_TYPE="FIXED"
-  MODEL_PATH=ragged_models
+if [ "$TEST_VALGRIND" -neq 1 ]; then
+  MODEL_PATH=models${model_trial}
 
   # Need to launch the server for each test so that the model status
   # is reset (which is used to make sure the correct batch size was
   # used for execution). Test everything with fixed-tensor-size
   # models and variable-tensor-size models.
-  for i in test_ragged_batch_allowed ; do
-    export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
-    export TRITONSERVER_DELAY_SCHEDULER=12
+  export BATCHER_TYPE="VARIABLE" &&
+      [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
-    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_PATH.server.log"
+  for i in $CORRID_TESTS; do
+      SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+      SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-      LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-      LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-      run_server_leakcheck
-    else
-        run_server
-    fi
+      run_server
 
-    if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      cat $SERVER_LOG
-      exit 1
-    fi
-
-    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
-
-    set +e
-    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-      echo -e "\n***\n*** Test $i Failed\n***"
-      RET=1
-    else
-      check_test_results $TEST_RESULT_FILE 1
-      if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
+      if [ "$SERVER_PID" == "0" ]; then
+          echo -e "\n***\n*** Failed to start $SERVER\n***"
+          cat $SERVER_LOG
+          exit 1
       fi
-    fi
-    set -e
 
-    unset TRITONSERVER_DELAY_SCHEDULER
-    unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-    kill_server
+      echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-    set +e
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-      python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+      set +e
+      python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
       if [ $? -ne 0 ]; then
+          echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+          echo -e "\n***\n*** Test $i Failed\n***"
           RET=1
+      else
+          check_test_results $TEST_RESULT_FILE 1
+          if [ $? -ne 0 ]; then
+              cat $CLIENT_LOG
+              echo -e "\n***\n*** Test Result Verification Failed\n***"
+              RET=1
+          fi
       fi
-    fi
-    set -e
+      set -e
+
+      kill_server
   done
 fi
 
-# max queue delay
-MODEL_PATH=queue_delay_models
-# remove ensemble models from the test model repo
-rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
-for i in $QUEUE_DELAY_TESTS ; do
-    export NO_BATCHING=0
-    export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
-    export TRITONSERVER_DELAY_SCHEDULER=2
-    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_PATH.server.log"
+# # ragged models
+# if [[ $BACKENDS == *"custom"* ]]; then
+#   rm -fr ragged_models && mkdir ragged_models
+#   cp -r ../custom_models/custom_sequence_int32 ragged_models/.
+#   (cd ragged_models/custom_sequence_int32 && \
+#           sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-        run_server_leakcheck
-    else
-        run_server
-    fi
+#   export NO_BATCHING=0
+#   export MODEL_INSTANCES=1
+#   export BATCHER_TYPE="FIXED"
+#   MODEL_PATH=ragged_models
 
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+#   # Need to launch the server for each test so that the model status
+#   # is reset (which is used to make sure the correct batch size was
+#   # used for execution). Test everything with fixed-tensor-size
+#   # models and variable-tensor-size models.
+#   for i in test_ragged_batch_allowed ; do
+#     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+#     export TRITONSERVER_DELAY_SCHEDULER=12
 
-    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+#     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#     SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
-    set +e
-    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-    set -e
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#       LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#       LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#       run_server_leakcheck
+#     else
+#         run_server
+#     fi
 
-    unset TRITONSERVER_DELAY_SCHEDULER
-    unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-    kill_server
+#     if [ "$SERVER_PID" == "0" ]; then
+#       echo -e "\n***\n*** Failed to start $SERVER\n***"
+#       cat $SERVER_LOG
+#       exit 1
+#     fi
 
-    set +e
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-        if [ $? -ne 0 ]; then
-            RET=1
-        fi
-    fi
-    set -e
-done
+#     echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-# Test request timeout with sequence batcher
-# only run the test outside shared memory setting as
-# shared memory feature is irrelevant
-if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 ]; then
-    export NO_BATCHING=0
-    export MODEL_INSTANCES=1
-    export BATCHER_TYPE="FIXED"
+#     set +e
+#     python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+#     if [ $? -ne 0 ]; then
+#       echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#       echo -e "\n***\n*** Test $i Failed\n***"
+#       RET=1
+#     else
+#       check_test_results $TEST_RESULT_FILE 1
+#       if [ $? -ne 0 ]; then
+#         cat $CLIENT_LOG
+#         echo -e "\n***\n*** Test Result Verification Failed\n***"
+#         RET=1
+#       fi
+#     fi
+#     set -e
 
-    TEST_CASE=SequenceBatcherRequestTimeoutTest
-    MODEL_PATH=request_timeout_models
-    mkdir -p ${MODEL_PATH}/custom_sequence_int32_timeout/1
+#     unset TRITONSERVER_DELAY_SCHEDULER
+#     unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+#     kill_server
 
-    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+#     set +e
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#       python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#       if [ $? -ne 0 ]; then
+#           RET=1
+#       fi
+#     fi
+#     set -e
+#   done
+# fi
 
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-        run_server_leakcheck
-    else
-        run_server
-    fi
+# # max queue delay
+# MODEL_PATH=queue_delay_models
+# # remove ensemble models from the test model repo
+# rm -rf queue_delay_models/simple_* queue_delay_models/fan_* queue_delay_models/sequence_*
+# for i in $QUEUE_DELAY_TESTS ; do
+#     export NO_BATCHING=0
+#     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+#     export TRITONSERVER_DELAY_SCHEDULER=2
+#     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#     SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#         run_server_leakcheck
+#     else
+#         run_server
+#     fi
 
-    echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
+#     if [ "$SERVER_PID" == "0" ]; then
+#         echo -e "\n***\n*** Failed to start $SERVER\n***"
+#         cat $SERVER_LOG
+#         exit 1
+#     fi
 
-    set +e
-    python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
-        RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 2
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-    set -e
+#     echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-    kill_server
+#     set +e
+#     python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+#     if [ $? -ne 0 ]; then
+#         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#         echo -e "\n***\n*** Test $i Failed\n***"
+#         RET=1
+#     else
+#         check_test_results $TEST_RESULT_FILE 1
+#         if [ $? -ne 0 ]; then
+#             cat $CLIENT_LOG
+#             echo -e "\n***\n*** Test Result Verification Failed\n***"
+#             RET=1
+#         fi
+#     fi
+#     set -e
 
-    set +e
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-        if [ $? -ne 0 ]; then
-            RET=1
-        fi
-    fi
-    set -e
-fi
+#     unset TRITONSERVER_DELAY_SCHEDULER
+#     unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+#     kill_server
 
-### Start Preserve Ordering Tests ###
+#     set +e
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#         if [ $? -ne 0 ]; then
+#             RET=1
+#         fi
+#     fi
+#     set -e
+# done
 
-# FIXME: Test only supported on windows currently due to use of python backend models.
-# Now that Windows supports the PYBE, we should check that this tests works once Windows
-# CI is stable.
+# # Test request timeout with sequence batcher
+# # only run the test outside shared memory setting as
+# # shared memory feature is irrelevant
+# if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 ]; then
+#     export NO_BATCHING=0
+#     export MODEL_INSTANCES=1
+#     export BATCHER_TYPE="FIXED"
 
-# These subtests use python models. They should not be executed if 'python' is not one
-# of the backends under test.
-if [[ $(should_test_backend "python") == "true" &&  !( -v WSL_DISTRO_NAME || -v MSYSTEM )]]; then
-    # Test preserve ordering true/false and decoupled/non-decoupled
-    TEST_CASE=SequenceBatcherPreserveOrderingTest
-    MODEL_PATH=preserve_ordering_models
-    BASE_MODEL="../python_models/sequence_py"
-    rm -rf ${MODEL_PATH}
+#     TEST_CASE=SequenceBatcherRequestTimeoutTest
+#     MODEL_PATH=request_timeout_models
+#     mkdir -p ${MODEL_PATH}/custom_sequence_int32_timeout/1
 
-    # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
-    # stream are done out of order in server, so decoupled tests are disabled.
-    MODES="decoupled nondecoupled"
-    for mode in $MODES; do
-        NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
-        mkdir -p ${NO_PRESERVE}/1
-        cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
-        cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+#     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#     SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
 
-        PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
-        cp -r ${NO_PRESERVE} ${PRESERVE}
-        sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#         run_server_leakcheck
+#     else
+#         run_server
+#     fi
 
-        if [ ${mode} == "decoupled" ]; then
-          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
-          echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
-        fi
-    done
+#     if [ "$SERVER_PID" == "0" ]; then
+#         echo -e "\n***\n*** Failed to start $SERVER\n***"
+#         cat $SERVER_LOG
+#         exit 1
+#     fi
 
-    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+#     echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
 
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-        run_server_leakcheck
-    else
-        run_server
-    fi
+#     set +e
+#     python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
+#     if [ $? -ne 0 ]; then
+#         echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
+#         echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
+#         RET=1
+#     else
+#         check_test_results $TEST_RESULT_FILE 2
+#         if [ $? -ne 0 ]; then
+#             cat $CLIENT_LOG
+#             echo -e "\n***\n*** Test Result Verification Failed\n***"
+#             RET=1
+#         fi
+#     fi
+#     set -e
 
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+#     kill_server
 
-    echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
+#     set +e
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#         if [ $? -ne 0 ]; then
+#             RET=1
+#         fi
+#     fi
+#     set -e
+# fi
 
-    set +e
-    python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
-        RET=1
-    else
-        # 2 for preserve_ordering = True/False
-        check_test_results $TEST_RESULT_FILE 2
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-    set -e
+# ### Start Preserve Ordering Tests ###
 
-    kill_server
+# # FIXME: Test only supported on windows currently due to use of python backend models.
+# # Now that Windows supports the PYBE, we should check that this tests works once Windows
+# # CI is stable.
 
-    set +e
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-        if [ $? -ne 0 ]; then
-            RET=1
-        fi
-    fi
-    set -e
-fi
+# # These subtests use python models. They should not be executed if 'python' is not one
+# # of the backends under test.
+# if [[ $(should_test_backend "python") == "true" &&  !( -v WSL_DISTRO_NAME || -v MSYSTEM )]]; then
+#     # Test preserve ordering true/false and decoupled/non-decoupled
+#     TEST_CASE=SequenceBatcherPreserveOrderingTest
+#     MODEL_PATH=preserve_ordering_models
+#     BASE_MODEL="../python_models/sequence_py"
+#     rm -rf ${MODEL_PATH}
+
+#     # FIXME [DLIS-5280]: This may fail for decoupled models if writes to GRPC
+#     # stream are done out of order in server, so decoupled tests are disabled.
+#     MODES="decoupled nondecoupled"
+#     for mode in $MODES; do
+#         NO_PRESERVE="${MODEL_PATH}/seqpy_no_preserve_ordering_${mode}"
+#         mkdir -p ${NO_PRESERVE}/1
+#         cp ${BASE_MODEL}/config.pbtxt ${NO_PRESERVE}
+#         cp ${BASE_MODEL}/model.py ${NO_PRESERVE}/1
+
+#         PRESERVE="${MODEL_PATH}/seqpy_preserve_ordering_${mode}"
+#         cp -r ${NO_PRESERVE} ${PRESERVE}
+#         sed -i "s/^preserve_ordering: False/preserve_ordering: True/" ${PRESERVE}/config.pbtxt
+
+#         if [ ${mode} == "decoupled" ]; then
+#           echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${NO_PRESERVE}/config.pbtxt
+#           echo -e "\nmodel_transaction_policy { decoupled: true }" >> ${PRESERVE}/config.pbtxt
+#         fi
+#     done
+
+#     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+#     SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
+
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+#         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+#         run_server_leakcheck
+#     else
+#         run_server
+#     fi
+
+#     if [ "$SERVER_PID" == "0" ]; then
+#         echo -e "\n***\n*** Failed to start $SERVER\n***"
+#         cat $SERVER_LOG
+#         exit 1
+#     fi
+
+#     echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
+
+#     set +e
+#     python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
+#     if [ $? -ne 0 ]; then
+#         echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
+#         echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
+#         RET=1
+#     else
+#         # 2 for preserve_ordering = True/False
+#         check_test_results $TEST_RESULT_FILE 2
+#         if [ $? -ne 0 ]; then
+#             cat $CLIENT_LOG
+#             echo -e "\n***\n*** Test Result Verification Failed\n***"
+#             RET=1
+#         fi
+#     fi
+#     set -e
+
+#     kill_server
+
+#     set +e
+#     if [ "$TEST_VALGRIND" -eq 1 ]; then
+#         python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+#         if [ $? -ne 0 ]; then
+#             RET=1
+#         fi
+#     fi
+#     set -e
+# fi
 
 ### End Preserve Ordering Tests ###
 
