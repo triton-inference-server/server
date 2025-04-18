@@ -63,7 +63,7 @@ def setup_fastapi_app(tokenizer: str, server: tritonserver.Server, backend: str)
 # Heavily inspired by vLLM's test infrastructure
 class OpenAIServer:
     API_KEY = "EMPTY"  # Triton's OpenAI server does not need API key
-    START_TIMEOUT = 180  # wait for server to start in seconds
+    START_TIMEOUT = 240  # wait for server to start for up to 240 seconds, mistral model takes longer time to start
 
     def __init__(
         self,

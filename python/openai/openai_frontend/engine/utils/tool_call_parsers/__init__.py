@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,51 +23,18 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Adapted from
+# https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/openai/tool_parsers/__init__.py
+# Copyright 2024 The vLLM team.
 
-LOG="`pwd`/doc_links.log"
-CONFIG="`pwd`/mkdocs.yml"
-RET=0
+from .llama_tool_call_parser import Llama3JsonToolParser
+from .mistral_tool_call_parser import MistralToolParser
+from .tool_call_parser import ToolCallParser, ToolParserManager
 
-# Download necessary packages
-python3 -m pip install mkdocs
-python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
-
-#Download perf_analyzer docs
-TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
-TRITON_PERF_ANALYZER_REPO_TAG="${TRITON_PERF_ANALYZER_REPO_TAG:=main}"
-git clone -b ${TRITON_PERF_ANALYZER_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/perf_analyzer.git
-cp `pwd`/perf_analyzer/README.md .
-cp -rf `pwd`/perf_analyzer/docs .
-
-# Need to remove all links that start with -- or -. Mkdocs converts all -- to - for anchor links.
-# This breaks all links to cli commands throughout the docs. This will iterate over all
-# files in the docs directory and remove -- and - at the start of options, which allows the
-# tool to check links for correctness.
-for file in `pwd`/docs/*.md
-do
-  echo $file
-  sed -i 's/`-*/`/g' $file
-  sed -i 's/#-*/#/g' $file
-done
-
-exec mkdocs serve -f $CONFIG > $LOG &
-PID=$!
-sleep 20
-
-until [[ (-z `pgrep mkdocs`) ]]; do
-    kill -2 $PID
-    sleep 2
-done
-
-if [[ ! -z `grep "invalid url" $LOG` ]]; then
-    cat $LOG
-    RET=1
-fi
-
-
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test PASSED\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-exit $RET
+__all__ = [
+    "ToolCallParser",
+    "ToolParserManager",
+    "Llama3JsonToolParser",
+    "MistralToolParser",
+]

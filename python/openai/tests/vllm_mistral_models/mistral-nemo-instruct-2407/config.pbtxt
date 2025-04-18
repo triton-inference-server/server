@@ -1,4 +1,4 @@
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,13 +24,5 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-site_name: CI Test
-use_directory_urls: False
-docs_dir: "./docs"
-plugins:
-        - htmlproofer
-        - search
-
-markdown_extensions:
-    - toc:
-        permalink: True
+backend: "vllm"
+instance_group [{kind: KIND_MODEL}]
