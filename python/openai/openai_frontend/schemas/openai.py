@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -320,10 +320,6 @@ class ChatCompletionFunctionCallOption(BaseModel):
     name: str = Field(..., description="The name of the function to call.")
 
 
-class Type2(Enum):
-    function = "function"
-
-
 class FunctionObject(BaseModel):
     description: Optional[str] = Field(
         None,
@@ -347,7 +343,7 @@ class Function(BaseModel):
 
 
 class ChatCompletionNamedToolChoice(BaseModel):
-    type: Type2 = Field(
+    type: str = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -364,7 +360,7 @@ class Function1(BaseModel):
 
 class ChatCompletionMessageToolCall(BaseModel):
     id: str = Field(..., description="The ID of the tool call.")
-    type: Type2 = Field(
+    type: str = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -382,7 +378,7 @@ class Function2(BaseModel):
 class ChatCompletionMessageToolCallChunk(BaseModel):
     index: int
     id: Optional[str] = Field(None, description="The ID of the tool call.")
-    type: Optional[Type2] = Field(
+    type: Optional[str] = Field(
         None,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -683,7 +679,7 @@ class ChatCompletionRequestUserMessage(BaseModel):
 
 
 class ChatCompletionTool(BaseModel):
-    type: Type2 = Field(
+    type: str = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )

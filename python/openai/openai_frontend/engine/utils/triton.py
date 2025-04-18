@@ -23,16 +23,22 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 import ctypes
 import json
 import os
 import re
-from typing import Iterable, List
+from dataclasses import asdict
+from typing import Iterable, List, Optional, Union
 
 import numpy as np
 import tritonserver
-from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
+from pydantic import BaseModel
+from schemas.openai import (
+    ChatCompletionNamedToolChoice,
+    ChatCompletionToolChoiceOption1,
+    CreateChatCompletionRequest,
+    CreateCompletionRequest,
+)
 
 
 def _create_vllm_inference_request(
@@ -72,6 +78,16 @@ def _create_vllm_inference_request(
     if lora_name is not None:
         sampling_parameters["lora_name"] = lora_name
     sampling_parameters = json.dumps(sampling_parameters)
+
+    guided_json = _get_guided_json_from_tool(request)
+    if guided_json is not None:
+        from vllm.sampling_params import GuidedDecodingParams
+
+        sampling_parameters_json = json.loads(sampling_parameters)
+        sampling_parameters_json["guided_decoding"] = json.dumps(
+            asdict(GuidedDecodingParams.from_optional(json=guided_json))
+        )
+        sampling_parameters = json.dumps(sampling_parameters_json)
 
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
@@ -116,6 +132,11 @@ def _create_trtllm_inference_request(
         inputs["random_seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
+
+    guided_json = _get_guided_json_from_tool(request)
+    if guided_json is not None:
+        inputs["guided_decoding_guide_type"] = [["json_schema"]]
+        inputs["guided_decoding_guide"] = [[guided_json]]
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
@@ -188,6 +209,29 @@ def _validate_triton_responses_non_streaming(
         raise Exception("Unexpected internal error with incorrect response flags")
     if num_responses > 2:
         raise Exception(f"Unexpected number of responses: {num_responses}, expected 1.")
+
+
+def _get_guided_json_from_tool(
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+) -> Optional[Union[str, dict, BaseModel]]:
+    if isinstance(request, CreateChatCompletionRequest):
+        if request.tool_choice is None or not request.tools:
+            return None
+
+        if type(request.tool_choice.root) is ChatCompletionNamedToolChoice:
+            tool_name = request.tool_choice.root.function.name
+        elif request.tool_choice.root == ChatCompletionToolChoiceOption1.required:
+            tool_name = request.tools[0].function.name
+        else:
+            return None
+
+        tools = {tool.function.name: tool.function for tool in request.tools}
+        if tool_name not in tools:
+            raise ValueError(f"Tool '{tool_name}' has not been passed in `tools`.")
+        tool = tools[tool_name]
+        return tool.parameters.model_dump_json()
+
+    return None
 
 
 def _get_vllm_lora_names(
