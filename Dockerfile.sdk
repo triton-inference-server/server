@@ -173,7 +173,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
     else \
         ls /workspace/perf_analyzer/ && ls /workspace/pa_build && \
         tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
-        echo "Perf Analyzer binaries was extracted and not build"; && \
+        echo "Perf Analyzer binaries was extracted and not build" && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
