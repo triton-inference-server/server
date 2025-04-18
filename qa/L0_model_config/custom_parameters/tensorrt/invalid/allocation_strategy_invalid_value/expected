@@ -1,1 +1,1 @@
-failed to load 'allocation_strategy_invalid_value' version 1: Invalid argument: Invalid value for 'allocation_strategy': 'UNKNOWN' for model instance 'allocation_strategy_invalid_value'
+failed to load 'allocation_strategy_invalid_value' version 1: Invalid argument: Invalid value for 'execution_context_allocation_strategy': 'UNKNOWN' for model instance 'allocation_strategy_invalid_value'
