@@ -75,6 +75,7 @@ SKIP_PATHS = (
     "qa/L0_model_config/cli_messages/cli_override/expected",
     "qa/L0_model_config/cli_messages/cli_deprecation/expected",
     "qa/L0_model_config/model_metrics",
+    "qa/L0_model_config/custom_parameters",
     "qa/L0_model_namespacing/test_duplication",
     "qa/L0_model_namespacing/test_dynamic_resolution",
     "qa/L0_model_namespacing/test_ensemble_duplication",
