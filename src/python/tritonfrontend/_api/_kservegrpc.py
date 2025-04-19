@@ -79,6 +79,7 @@ class KServeGrpc:
         infer_compression_level: Union[
             int, Grpc_compression_level
         ] = Grpc_compression_level.NONE
+        infer_thread_count: int = Field(2, ge=0)
         infer_allocation_pool_size: int = Field(8, ge=0)
         max_response_pool_size: int = Field(2_147_483_647, ge=0)
         forward_header_pattern: str = ""
