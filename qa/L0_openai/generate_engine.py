@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,14 +23,34 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from argparse import ArgumentParser
 
-# FastAPI Application
-fastapi==0.115.6
-# Fix httpx version to avoid bug in openai library:
-# https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
-httpx==0.27.2
-openai==1.60.0
-partial-json-parser # used for parsing partial JSON outputs
-# Minimum starlette version needed to address CVE:
-# https://github.com/advisories/GHSA-f96h-pmfr-66vw
-starlette>=0.40.0
+from tensorrt_llm import LLM, BuildConfig
+from tensorrt_llm.plugin import PluginConfig
+
+
+def generate_model_engine(model: str, engines_path: str):
+    config = BuildConfig(plugin_config=PluginConfig.from_dict({"_gemm_plugin": "auto"}))
+
+    engine = LLM(
+        model,
+        dtype="float16",
+        max_batch_size=128,
+        build_config=config,
+        guided_decoding_backend="xgrammar",
+    )
+
+    engine.save(engines_path)
+    engine.shutdown()
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--model", "-m", help="model huggingface id or path to the model"
+    )
+    parser.add_argument("--engine_path", "-e", help="directory of the output engine")
+    FLAGS = parser.parse_args()
+
+    generate_model_engine(FLAGS.model, FLAGS.engine_path)
+    print(f"model {FLAGS.model}'s engine has been saved to {FLAGS.engine_path}")

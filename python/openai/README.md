@@ -405,3 +405,253 @@ For more information on the `tritonfrontend` python bindings, see the docs
     - Set the following environment variable: `export TRTLLM_ORCHESTRATOR=1`
 - [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
     - Not currently supported
+
+## Tool Calling
+
+The OpenAI frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API. Please refer to the OpenAI API reference for more details about these parameters:
+  [tools](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools),
+  [tool_choice](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tool_choice)
+
+To enable the tool-calling feature, add the `--tool-call-parser {parser_name}` flag when starting the server. The two available parsers are `llama3` and `mistral`.
+The `llama3` parser supports tool-calling features for LLaMA 3.1, 3.2, and 3.3 models, while the `mistral` parser supports tool-calling features for the Mistral Instruct model.
+
+Example for launching the OpenAI frontend with a tool call parser:
+```
+python3 openai_frontend/main.py \
+  --model-repository tests/vllm_models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --tool-call-parser llama3
+```
+
+Example for making a tool calling request:
+
+```python
+import json
+from openai import OpenAI
+
+
+def get_current_weather(city: str, state: str, unit: "str"):
+    return (
+        "The weather in Dallas, Texas is 85 degrees fahrenheit. It is "
+        "partly cloudly, with highs in the 90's."
+    )
+
+available_tools = {"get_current_weather": get_current_weather}
+
+openai_api_key = "EMPTY"
+openai_api_base = "http://localhost:9000/v1"
+
+client = OpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+)
+
+model = "llama-3.1-8b-instruct" # change this to the model in the repository
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "The city to find the weather for, e.g. 'San Francisco'",
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "the two-letter abbreviation for the state that the city is"
+                        " in, e.g. 'CA' which would mean 'California'",
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "The unit to fetch the temperature in",
+                        "enum": ["celsius", "fahrenheit"],
+                    },
+                },
+                "required": ["city", "state", "unit"],
+            },
+        },
+    }
+]
+
+messages = [
+    {
+        "role": "system",
+        "content": "You're a helpful assistant! Answer the users question best you can.",
+    },
+    {"role": "user", "content": "What is the weather in Dallas, Texas in Fahrenheit?"},
+]
+
+tool_calls = client.chat.completions.create(
+    messages=messages, model=model, tools=tools, max_tokens=128
+)
+function_name = tool_calls.choices[0].message.tool_calls[0].function.name
+function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
+
+print(f"function name: " f"{function_name}")
+print(f"function arguments: {function_arguments}")
+print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
+```
+
+Example output:
+```
+function name: get_current_weather
+function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit"}
+tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It is partly cloudly, with highs in the 90's.
+```
+
+<!-- TODO: Remove this warning when the openai api supports the max_completion_tokens instead of max_tokens -->
+> [!WARNING]
+> When using LangChain to call the `v1/chat/completions` endpoint, you might encounter an exception related to `max_completion_tokens` if you have specified `max_tokens` in the request.
+>
+> Example: `openai.BadRequestError: Error code: 400 - {'object': 'error', 'message': "[{'type': 'extra_forbidden', 'loc': ('body', 'max_completion_tokens'), 'msg': 'Extra inputs are not permitted', 'input': 800}]", 'type': 'BadRequestError', 'param': None, 'code': 400}`
+>
+> This issue is due to an incompatibility between Triton's OpenAI API frontend and the latest OpenAI API. We are actively working to address this gap. A workaround is adding the `max_tokens` into the `model_kwargs` of the LangChain OpenAI request.
+>
+> Example:
+```python
+from langchain.llms import OpenAI
+
+llm = OpenAI(
+    model_name="llama-3.1-8b-instruct",
+    temperature=0.0,
+    model_kwargs={
+        "max_tokens": 4096
+    }
+)
+
+response = llm("Write a short poem about a sunset.")
+print(response)
+
+```
+
+#### Named Tool Calling
+
+The OpenAI frontend supports named function calling, utilizing guided decoding in the vLLM and TensorRT-LLM backends. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
+
+> [!NOTE]
+> The latest release of TensorRT-LLM (v0.18.0) does not yet support guided decoding. To enable this feature, use a build from the main branch of TensorRT-LLM.
+> For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
+
+Example for making a named tool calling request:
+
+```python
+import json
+from openai import OpenAI
+
+
+def get_current_weather(city: str, state: str, unit: "str"):
+    return (
+        "The weather in Dallas, Texas is 85 degrees fahrenheit. It is "
+        "partly cloudly, with highs in the 90's."
+    )
+
+def get_n_day_weather_forecast(city: str, state: str, unit: str, num_days: int):
+    return (
+        f"The weather in Dallas, Texas is 85 degrees fahrenheit in next {num_days} days."
+    )
+
+available_tools = {"get_current_weather": get_current_weather,
+                  "get_n_day_weather_forecast": get_n_day_weather_forecast}
+
+openai_api_key = "EMPTY"
+openai_api_base = "http://localhost:9000/v1"
+client = OpenAI(
+    api_key=openai_api_key,
+    base_url=openai_api_base,
+)
+model = "llama-3.1-8b-instruct" # change this to the model in the repository
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "The city to find the weather for, e.g. 'San Francisco'",
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "the two-letter abbreviation for the state that the city is"
+                        " in, e.g. 'CA' which would mean 'California'",
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "The unit to fetch the temperature in",
+                        "enum": ["celsius", "fahrenheit"],
+                    },
+                },
+                "required": ["city", "state", "unit"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_n_day_weather_forecast",
+            "description": "Get an N-day weather forecast",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "The city to find the weather for, "
+                        "e.g. 'San Francisco'",
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "must the two-letter abbreviation for the state "
+                        "that the city is in, e.g. 'CA' which would "
+                        "mean 'California'",
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "The unit to fetch the temperature in",
+                        "enum": ["celsius", "fahrenheit"],
+                    },
+                    "num_days": {
+                        "type": "integer",
+                        "description": "The number of days to forecast",
+                    },
+                },
+                "required": ["city", "state", "unit", "num_days"],
+            },
+        },
+     }
+]
+
+tool_choice = {"function": {"name": "get_n_day_weather_forecast"}, "type": "function"}
+
+messages = [
+    {
+        "role": "system",
+        "content": "You're a helpful assistant! Answer the users question best you can.",
+    },
+    {"role": "user", "content": "What is the weather in Dallas, Texas in Fahrenheit?"},
+]
+
+tool_calls = client.chat.completions.create(
+    messages=messages, model=model, tools=tools, tool_choice=tool_choice, max_tokens=128
+)
+function_name = tool_calls.choices[0].message.tool_calls[0].function.name
+function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
+
+print(f"function name: "{function_name}")
+print(f"function arguments: {function_arguments}")
+print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
+```
+
+Example output:
+```
+function name: get_n_day_weather_forecast
+function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit", num_days: 1}
+tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit in next 1 days.
+```
