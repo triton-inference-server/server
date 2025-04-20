@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,19 +31,12 @@ import sys
 
 # Check the valgrind logs for memory leaks, ignoring known memory leaks
 #   * cnmem https://github.com/NVIDIA/cnmem/issues/12
-#   * Tensorflow::NewSession
 #   * dl-open leak could be due to https://bugs.kde.org/show_bug.cgi?id=358980
-#   * dlerror leak in tensorflow::HadoopFileSystem::HadoopFileSystem()
-#     -> tensorflow::LibHDFS::LoadAndBind()::{lambda(char const*, void**)#1}::operator()(char const*, void**)
-#     -> tensorflow::internal::LoadLibrary
-#     -> dlerror
 
 LEAK_WHITE_LIST = [
     "cnmem",
-    "tensorflow::NewSession",
     "dl-init",
     "dl-open",
-    "dlerror",
     "libtorch",
 ]
 

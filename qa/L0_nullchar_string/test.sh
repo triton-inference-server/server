@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
-MODELS="graphdef_nobatch_zero_1_object savedmodel_nobatch_zero_1_object"
+MODELS="python_string libtorch_nobatch_zero_1_object"
 NULLCHAR_CLIENT_PY=nullchar_string_client.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -53,9 +53,15 @@ source ../common/util.sh
 rm -f $CLIENT_LOG $SERVER_LOG models
 
 mkdir -p models
-for MODEL in $MODELS; do
-    cp -r $DATADIR/$MODEL models/.
-done
+
+# Copy the python model
+mkdir -p models/python_string/1/
+cp -fr ../python_models/string/model.py models/python_string/1/
+cp ../python_models/string/config.pbtxt models/python_string
+sed -i 's/name: "string"/name: "python_string"/' models/python_string/config.pbtxt
+
+# Copy the libtorch model
+cp -r $DATADIR/libtorch_nobatch_zero_1_object models/.
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

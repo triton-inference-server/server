@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,6 @@ JAVACPP_BRANCH_TAG=${JAVACPP_BRANCH_TAG:="master"}
 
 # Create local model repository
 mkdir -p ${MODEL_REPO}
-# TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
 for BACKEND in _fp32_libtorch _fp32_onnx; do
     cp -r $DATADIR/perf_model_store/resnet50${BACKEND} ${MODEL_REPO}/
     echo ${MODEL_REPO}/resnet50${BACKEND}/config.pbtxt

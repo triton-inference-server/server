@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,7 +67,7 @@ for i in \
         zero_1_int32 \
         zero_2_int32 \
         zero_3_int32 ; do
-    cp -r models/graphdef_${i} models/custom_${i}
+    cp -r models/onnx_${i} models/custom_${i}
     rm -fr models/custom_${i}/1/*
     (cd models/custom_${i} && \
                 sed -i "s/^platform:.*/backend: \"identity\"/" config.pbtxt && \

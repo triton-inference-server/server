@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ for SIMPLE_CLIENT in simple ; do
     CLIENT_LOG=$SIMPLE_CLIENT
     SIMPLE_CLIENT=./$SIMPLE_CLIENT
 
-    for trial in graphdef savedmodel onnx libtorch plan; do
+    for trial in onnx libtorch plan; do
         full=${trial}_float32_float32_float32
         rm -rf $MODELSDIR
         mkdir -p $MODELSDIR/simple/1 && \
@@ -88,10 +88,10 @@ for SIMPLE_CLIENT in simple ; do
         set -e
     done
 
-    # Use savedmodel for addsub ensemble
+    # Use onnx for addsub ensemble
     mkdir -p $MODELSDIR/simple/1
-    cp -r $DATADIR/savedmodel_float32_float32_float32/1/* $MODELSDIR/simple/1/.
-    cp $DATADIR/savedmodel_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
+    cp -r $DATADIR/onnx_float32_float32_float32/1/* $MODELSDIR/simple/1/.
+    cp $DATADIR/onnx_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
     (cd $MODELSDIR/simple && \
             sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
             sed -i "s/label_filename:.*//" config.pbtxt)

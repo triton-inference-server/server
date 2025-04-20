@@ -61,6 +61,7 @@ RUN apt-get update && \
             python3-pip \
             python3-wheel \
             python3-setuptools \
+            python3-venv \
             rapidjson-dev \
             software-properties-common && \
     rm -rf /var/lib/apt/lists/*
@@ -74,12 +75,19 @@ RUN apt update -q=2 \
     && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 
 # Add inception_graphdef model to example repo
+# FIXME: This should be changed to using the fetch_models.sh script
+# in order to ensure the public facing docs are up-to-date.
 WORKDIR /workspace/docs/examples/model_repository
-RUN mkdir -p inception_graphdef/1 && \
-    wget -O ${TRITONTMP_DIR}/inception_v3_2016_08_28_frozen.pb.tar.gz \
-        https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
-    (cd ${TRITONTMP_DIR} && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
-    mv ${TRITONTMP_DIR}/inception_v3_2016_08_28_frozen.pb inception_graphdef/1/model.graphdef
+RUN mkdir -p model_repository/inception_onnx/1 && \
+        wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+            https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz && \
+        (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz) && \
+        python3 -m venv tf2onnx && \
+            source ./tf2onnx/bin/activate && \
+            pip3 install "numpy<2" tensorflow tf2onnx && \
+            python3 -m tf2onnx.convert --graphdef /tmp/inception_v3_2016_08_28_frozen.pb --output inception_v3_onnx.model.onnx --inputs input:0 --outputs InceptionV3/Predictions/Softmax:0 && \
+        deactivate  && \
+        mv inception_v3_onnx.model.onnx model_repository/inception_onnx/1/model.onnx
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
@@ -109,7 +117,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_identity qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple_sequence qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_grpc/models && \
-    cp -r docs/examples/model_repository/inception_graphdef qa/L0_grpc/models && \
+    cp -r docs/examples/model_repository/inception_onnx qa/L0_grpc/models && \
     mkdir qa/L0_grpc_state_cleanup/models && \
     cp -r /workspace/src/test/models/repeat_int32 qa/L0_grpc_state_cleanup/models/ && \
     mkdir qa/L0_http/models && \
@@ -118,7 +126,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_identity qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_sequence qa/L0_http/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_http/models && \
-    cp -r docs/examples/model_repository/inception_graphdef qa/L0_http/models && \
+    cp -r docs/examples/model_repository/inception_onnx qa/L0_grpc/models && \
     mkdir qa/L0_https/models && \
     cp -r docs/examples/model_repository/simple qa/L0_https/models/. && \
     mkdir qa/L0_secure_grpc/models && \
@@ -149,21 +157,20 @@ RUN mkdir -p qa/common && \
     cp bin/triton_json_test qa/L0_json/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
-    cp bin/input_byte_size_test qa/L0_input_validation/. && \
-    cp -r docs/examples/model_repository/simple_identity qa/L0_input_validation/models
+    cp bin/input_byte_size_test qa/L0_input_validation/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
     cp -rf python/test/. qa/L0_python_api/.
 
 RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
-    cp docs/examples/model_repository/simple/1/model.graphdef \
+    cp docs/examples/model_repository/simple/1/model.onnx \
         qa/L0_simple_ensemble/models/simple/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
-    cp docs/examples/model_repository/simple/1/model.graphdef \
+    cp docs/examples/model_repository/simple/1/model.onnx \
         qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_socket/models/simple/1 && \
-    cp docs/examples/model_repository/simple/1/model.graphdef \
+    cp docs/examples/model_repository/simple/1/model.onnx \
         qa/L0_socket/models/simple/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
