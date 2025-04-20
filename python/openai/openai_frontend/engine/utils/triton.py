@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,17 +23,29 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 import ctypes
-from typing import Iterable, List
+import json
+import os
+import re
+from dataclasses import asdict
+from typing import Iterable, List, Optional, Union
 
 import numpy as np
 import tritonserver
-from schemas.openai import CreateChatCompletionRequest, CreateCompletionRequest
+from pydantic import BaseModel
+from schemas.openai import (
+    ChatCompletionNamedToolChoice,
+    ChatCompletionToolChoiceOption1,
+    CreateChatCompletionRequest,
+    CreateCompletionRequest,
+)
 
 
 def _create_vllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -59,10 +71,23 @@ def _create_vllm_inference_request(
 
     # NOTE: The exclude_none is important, as internals may not support
     # values of NoneType at this time.
-    sampling_parameters = request.model_dump_json(
+    sampling_parameters = request.model_dump(
         exclude=excludes,
         exclude_none=True,
     )
+    if lora_name is not None:
+        sampling_parameters["lora_name"] = lora_name
+    sampling_parameters = json.dumps(sampling_parameters)
+
+    guided_json = _get_guided_json_from_tool(request)
+    if guided_json is not None:
+        from vllm.sampling_params import GuidedDecodingParams
+
+        sampling_parameters_json = json.loads(sampling_parameters)
+        sampling_parameters_json["guided_decoding"] = json.dumps(
+            asdict(GuidedDecodingParams.from_optional(json=guided_json))
+        )
+        sampling_parameters = json.dumps(sampling_parameters_json)
 
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
@@ -79,8 +104,14 @@ def _create_vllm_inference_request(
 
 
 def _create_trtllm_inference_request(
-    model, prompt, request: CreateChatCompletionRequest | CreateCompletionRequest
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_name: str | None,
 ):
+    if lora_name is not None:
+        raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
+
     inputs = {}
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = np.bool_([[request.stream]])
@@ -101,6 +132,11 @@ def _create_trtllm_inference_request(
         inputs["random_seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
+
+    guided_json = _get_guided_json_from_tool(request)
+    if guided_json is not None:
+        inputs["guided_decoding_guide_type"] = [["json_schema"]]
+        inputs["guided_decoding_guide"] = [[guided_json]]
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
@@ -173,3 +209,73 @@ def _validate_triton_responses_non_streaming(
         raise Exception("Unexpected internal error with incorrect response flags")
     if num_responses > 2:
         raise Exception(f"Unexpected number of responses: {num_responses}, expected 1.")
+
+
+def _get_guided_json_from_tool(
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+) -> Optional[Union[str, dict, BaseModel]]:
+    if isinstance(request, CreateChatCompletionRequest):
+        if request.tool_choice is None or not request.tools:
+            return None
+
+        if type(request.tool_choice.root) is ChatCompletionNamedToolChoice:
+            tool_name = request.tool_choice.root.function.name
+        elif request.tool_choice.root == ChatCompletionToolChoiceOption1.required:
+            tool_name = request.tools[0].function.name
+        else:
+            return None
+
+        tools = {tool.function.name: tool.function for tool in request.tools}
+        if tool_name not in tools:
+            raise ValueError(f"Tool '{tool_name}' has not been passed in `tools`.")
+        tool = tools[tool_name]
+        return tool.parameters.model_dump_json()
+
+    return None
+
+
+def _get_vllm_lora_names(
+    model_repository: str | list[str], model_name: str, model_version: int
+) -> None | List[str]:
+    lora_names = []
+    repo_paths = model_repository
+    if isinstance(repo_paths, str):
+        repo_paths = [repo_paths]
+    for repo_path in repo_paths:
+        model_path = os.path.join(repo_path, model_name)
+        if not os.path.isdir(model_path):
+            # Cloud path?
+            return None
+        if model_version <= 0:
+            for version_path in os.listdir(model_path):
+                version = os.path.basename(version_path)
+                if re.fullmatch(r"^[0-9]+$", version) is None:
+                    continue
+                model_version = max(model_version, int(version))
+            if model_version <= 0:
+                # Model directory is malformed?
+                return None
+        version_path = os.path.join(model_path, str(model_version))
+        is_lora_enabled = False
+        model_file_path = os.path.join(version_path, "model.json")
+        try:
+            with open(model_file_path, "r") as f:
+                config = json.load(f)
+                if "enable_lora" in config:
+                    # The value could be a string or a bool.
+                    is_lora_enabled = str(config["enable_lora"]).lower() == "true"
+        except Exception:
+            # Model directory or model.json is malformed?
+            return None
+        if is_lora_enabled != True:
+            continue
+        lora_config_path = os.path.join(version_path, "multi_lora.json")
+        try:
+            with open(lora_config_path, "r") as f:
+                lora_config = json.load(f)
+                for lora_name in lora_config.keys():
+                    lora_names.append(lora_name)
+        except Exception:
+            # LoRA is enabled but its list is not provided or malformed?
+            return None
+    return lora_names

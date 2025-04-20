@@ -298,12 +298,24 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_in
 cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_int8/output0_labels.txt \
     autofill_noplatform_success/openvino/partial_config
 
-# Copy decoupled model into the model_metrics test repository.
+# Copy decoupled model and config files into the model_metrics test repository.
 for modelpath in `ls -d model_metrics/*/*`; do
     src_dir="/opt/tritonserver/qa/python_models/async_execute_decouple"
     mkdir -p $modelpath/1
     cp $src_dir/model.py $modelpath/1/.
     cat $src_dir/config.pbtxt $modelpath/partial.pbtxt > $modelpath/config.pbtxt
+done
+
+# Copy tensorrt model and config files into the custom_parameters test repository.
+for modelpath in `ls -d custom_parameters/tensorrt/*/*`; do
+    mkdir -p $modelpath/1
+    model_name=`basename $modelpath`
+    src_dir="/data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float32_float32_float32"
+    cp ${src_dir}/1/model.plan $modelpath/1/.
+    cat ${src_dir}/config.pbtxt $modelpath/partial.pbtxt > $modelpath/config.pbtxt
+    sed -i "s/^name:.*/name: \"${model_name}\"/" $modelpath/config.pbtxt
+    sed -i "s/^version_policy:.*//" $modelpath/config.pbtxt
+    sed -i "s/label_filename:.*//" $modelpath/config.pbtxt
 done
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
@@ -688,6 +700,82 @@ for TARGET_DIR in `ls -d model_metrics/invalid_config/*`; do
             echo -e "Not found \"$EX\"" >> $CLIENT_LOG
         fi
         if [ "$EXFOUND" == "0" ]; then
+            echo -e "*** FAILED: model_metrics/$TARGET" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
+
+# Run all custom_parameters tests that are expected to succeed.
+for TARGET_DIR in `ls -d custom_parameters/*/valid/*`; do
+    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+    TARGET=`basename ${TARGET_DIR}`
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-info=true"
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+
+    rm -fr models && mkdir models
+    cp -r ${TARGET_DIR} models/.
+
+    EXPECTED=models/$TARGET/expected
+    echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
+        RET=1
+    else
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+
+    if [ -f $EXPECTED ]; then
+        EX_FOUND=0
+        EX=`cat $EXPECTED`
+        if grep ^I[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+            echo -e "Found \"$EX\"" >> $CLIENT_LOG
+            EX_FOUND=1
+        else
+            echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+        fi
+        if [ "$EX_FOUND" == "0" ]; then
+            echo -e "*** FAILED: model_metrics/$TARGET" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
+
+# Run all custom_parameters tests that have invalid values.
+for TARGET_DIR in `ls -d custom_parameters/*/invalid/*`; do
+    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+    TARGET=`basename ${TARGET_DIR}`
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-info=true"
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+
+    rm -fr models && mkdir models
+    cp -r ${TARGET_DIR} models/.
+
+    EXPECTED=models/$TARGET/expected
+    echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
+
+    # We expect all tests to fail with the expected error message
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        EX_FOUND=0
+        EX=`cat $EXPECTED`
+        if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+            echo -e "Found \"$EX\"" >> $CLIENT_LOG
+            EX_FOUND=1
+        else
+            echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+        fi
+        if [ "$EX_FOUND" == "0" ]; then
             echo -e "*** FAILED: model_metrics/$TARGET" >> $CLIENT_LOG
             RET=1
         fi

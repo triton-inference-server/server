@@ -25,6 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
+[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+>[!WARNING]
+>You are currently on the `main` branch which tracks under-development progress
+>towards the next release. The current release is version [2.56.0](https://github.com/triton-inference-server/server/releases/latest)
+>and corresponds to the 25.03 container release on NVIDIA GPU Cloud (NGC).
 
 # Triton Inference Server
 
