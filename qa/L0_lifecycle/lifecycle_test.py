@@ -2835,6 +2835,62 @@ class LifeCycleTest(tu.TestResultCollector):
                 output_data, input_data, err_msg="Inference result is not correct"
             )
 
+    def test_shutdown_timeout(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.float32)
+
+        inputs = [grpcclient.InferInput("INPUT0", model_shape, "FP32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+        model_name = "custom_zero_1_float32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        request_count = 2
+        async_results = []
+        for _ in range(request_count):
+            triton_client.async_infer(
+                model_name, inputs, partial(callback, async_results)
+            )
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ["SERVER_PID"]), signal.SIGINT)
+        time.sleep(0.5)
+
+        # Send more requests and should be rejected
+        try:
+            triton_client.infer(model_name, inputs)
+            self.assertTrue(False, "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1:8001: "
+                + "Failed to connect to remote host: connect: Connection refused (111)",
+                ex.message(),
+            )
+
+        # Wait until the results are available in user_data
+        time_out = 45
+        while (len(async_results) < request_count) and time_out > 0:
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # The requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy("OUTPUT0")
+            np.testing.assert_allclose(
+                output_data, input_data, err_msg="Inference result is not correct"
+            )
+
     def test_load_gpu_limit(self):
         model_name = "cuda_memory_consumer"
         try:

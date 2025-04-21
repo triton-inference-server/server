@@ -1656,6 +1656,44 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_shutdown_timeout
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"20000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+# Server will be shutdown in test script, need to make PID available in script
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_timeout >>$CLIENT_LOG 2>&1
+check_unit_test
+set -e
+
+# check server log
+if [ `grep -c "failed to stop server: Internal - Exit timeout expired. Exiting immediately." $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for Exit timeout expired\n***"
+    RET=1
+fi
+
+kill $SERVER_PID || true
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_load_gpu_limit
 # dependency of the Python model to be used
 pip install cuda-python
