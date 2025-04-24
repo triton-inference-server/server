@@ -485,16 +485,18 @@ SharedMemoryManager::GetMemoryInfo(
         std::string("Invalid offset for shared memory region: '" + name + "'")
             .c_str());
   }
-  
+
   // Check for potential integer overflow before validating bounds
   if (byte_size > (SIZE_MAX - offset)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
-            "Integer overflow detected: byte_size + offset exceeds maximum value for region '" + name + "'")
+            "Integer overflow detected: byte_size + offset exceeds maximum "
+            "value for region '" +
+            name + "'")
             .c_str());
   }
-  
+
   // validate byte_size + offset is within memory bounds
   size_t total_req_shm = offset + byte_size - 1;
   if (total_req_shm > shm_region_end) {
