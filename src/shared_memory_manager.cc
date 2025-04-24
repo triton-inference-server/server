@@ -25,12 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "shared_memory_manager.h"
-#include <errno.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 // Not supporting shared memory for now
 #ifdef _WIN32
