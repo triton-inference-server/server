@@ -151,7 +151,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # input_byte_size_test
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{onnx_zero_1_float32,onnx_zero_1_object} ./models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{onnx_zero_1_float32,onnx_zero_1_object,onnx_zero_1_bool} ./models
 
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2>&1
