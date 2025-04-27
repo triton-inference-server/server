@@ -273,6 +273,58 @@ class HttpTest(tu.TestResultCollector):
         except ValueError:
             self.fail("Response is not valid JSON")
 
+    def test_json_recursion_depth_limit(self):
+        """Test that server properly handles and rejects deeply nested JSON."""
+
+        # Create deeply nested JSON that exceeds the limit (HTTP_MAX_JSON_DEPTH = 100)
+        def create_nested_json(depth):
+            data = '"hello"'
+            for _ in range(depth):
+                data = f"[{data}]"
+            return json.loads(data)
+
+        headers = {"Content-Type": "application/json"}
+
+        # Create a payload with excessive nesting (depth > 100)
+        excessive_depth = 120
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT",
+                    "datatype": "BYTES",
+                    "shape": [1],
+                    "data": create_nested_json(excessive_depth),
+                }
+            ]
+        }
+
+        response = requests.post(
+            self._get_infer_url("simple"), headers=headers, json=payload
+        )
+
+        # Assert the response is not successful
+        self.assertNotEqual(response.status_code, 200)
+        try:
+            error_message = response.json().get("error", "")
+            # Check for error message
+            self.assertIn(
+                "Unable to parse 'data': JSON nesting depth exceeds maximum allowed limit (100)",
+                error_message,
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
+
+        # Test with acceptable depth to ensure valid requests work
+        acceptable_depth = 50
+        payload["inputs"][0]["data"] = create_nested_json(acceptable_depth)
+
+        # This should either succeed or fail for reasons other than recursion depth
+        response = requests.post(
+            self._get_infer_url("simple"), headers=headers, json=payload
+        )
+
+        self.assertEqual(response.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

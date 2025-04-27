@@ -466,20 +466,29 @@ TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
     triton::common::TritonJson::Value& tensor_data, int* counter,
-    int64_t expected_cnt)
+    int64_t expected_cnt, int current_depth = 0)
 {
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
+  if (current_depth >= HTTP_MAX_JSON_DEPTH) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("JSON nesting depth exceeds maximum allowed "
+         "limit (" +
+         std::to_string(HTTP_MAX_JSON_DEPTH) + ")")
+            .c_str());
+  }
+
   // Recurse on array element if not last dimension...
   if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
-      RETURN_IF_ERR(
-          ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
+      RETURN_IF_ERR(ReadDataFromJsonHelper(
+          base, dtype, el, counter, expected_cnt, current_depth + 1));
     }
   } else {
     // Check if writing to 'serialized' is overrunning the expected byte_size
