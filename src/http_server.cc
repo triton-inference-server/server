@@ -2621,17 +2621,38 @@ HTTPAPIServer::ParseJsonTritonIO(
         "Unable to parse 'datatype'");
     const TRITONSERVER_DataType dtype = TRITONSERVER_StringToDataType(datatype);
 
+    // Added debug print for datatype
+    std::cout << "[DEBUG] Processing input '" << input_name
+              << "' with datatype: " << datatype << std::endl;
+
     triton::common::TritonJson::Value shape_json;
     RETURN_MSG_IF_ERR(
         request_input.MemberAsArray("shape", &shape_json),
         "Unable to parse 'shape'");
+
+    // Added debug print for shape array
+    std::cout << "[DEBUG] Shape array size: " << shape_json.ArraySize()
+              << std::endl;
+
     std::vector<int64_t> shape_vec;
     for (size_t i = 0; i < shape_json.ArraySize(); i++) {
       uint64_t d = 0;
       RETURN_MSG_IF_ERR(
           shape_json.IndexAsUInt(i, &d), "Unable to parse 'shape'");
       shape_vec.push_back(d);
+
+      // Added debug print for each dimension
+      std::cout << "[DEBUG] Shape dimension " << i << ": " << d << std::endl;
     }
+
+    // Added debug print for overall shape vector
+    std::cout << "[DEBUG] Final shape vector: [";
+    for (size_t i = 0; i < shape_vec.size(); i++) {
+      std::cout << shape_vec[i];
+      if (i < shape_vec.size() - 1)
+        std::cout << ", ";
+    }
+    std::cout << "]" << std::endl;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         irequest, input_name, dtype, &shape_vec[0], shape_vec.size()));
@@ -2640,6 +2661,10 @@ HTTPAPIServer::ParseJsonTritonIO(
     size_t byte_size;
     RETURN_IF_ERR(
         CheckBinaryInputData(request_input, &binary_input, &byte_size));
+
+    // Added debug print for binary input flag and byte size
+    std::cout << "[DEBUG] Binary input: " << (binary_input ? "true" : "false")
+              << ", byte_size: " << byte_size << std::endl;
 
     if ((byte_size == 0) && binary_input) {
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
@@ -2736,6 +2761,10 @@ HTTPAPIServer::ParseJsonTritonIO(
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
+        // Added debug print for element count
+        std::cout << "[DEBUG] Element count calculated from shape: "
+                  << element_cnt << std::endl;
+
         // FIXME, element count should never be 0 or negative so
         // shouldn't we just return an error here?
         if (element_cnt == 0) {
@@ -2755,6 +2784,21 @@ HTTPAPIServer::ParseJsonTritonIO(
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
             byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+            // Added debug print for calculated byte size
+            std::cout << "[DEBUG] Calculated byte_size: " << byte_size
+                      << " (element_cnt: " << element_cnt << " * type size: "
+                      << TRITONSERVER_DataTypeByteSize(dtype) << ")"
+                      << std::endl;
+          }
+
+          // Check if byte_size is larger than 1GB
+          if (byte_size > (1 << 30)) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                ("input '" + std::string(input_name) +
+                 "' has a byte_size that exceeds the maximum allowed value of "
+                 "1GB")
+                    .c_str());
           }
 
           infer_req->serialized_data_.emplace_back();
