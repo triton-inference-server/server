@@ -115,7 +115,6 @@ ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
-ARG TRITON_PERF_ANALYZER_BUILD=1
 
 ENV TRITON_PERF_ANALYZER_BUILD=${TRITON_PERF_ANALYZER_BUILD}
 
@@ -147,6 +146,8 @@ RUN make -j16 cc-clients java-clients && \
 # the python client until now. Post-migration we should focus
 # effort on de-tangling these flows.
 WORKDIR /workspace/pa_build
+# NOTE: If TRITON_PERF_ANALYZER_BUILD=0, the Performance Analyzer (PA) binaries must already exist 
+# in the path specified by the ARG TRITON_PA_REPO_SUBDIR.
 RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
@@ -170,7 +171,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
         cd /workspace/perf_analyzer/genai-perf && \
         python3 -m build --wheel --outdir /workspace/install/python; \
     else \
-        ls /workspace/perf_analyzer/ && ls /workspace/pa_build && \
+        ls /workspace/perf_analyzer/ && \
         tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
         echo "Perf Analyzer binaries was extracted and not build" && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
