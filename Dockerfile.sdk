@@ -41,7 +41,7 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
-
+ARG PERF_ANALYZER_BUILD=ON
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=3.3.6
 
@@ -130,11 +130,11 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PERF_ANALYZER=OFF \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
-          -DTRITON_ENABLE_PYTHON_HTTP=OFF -DTRITON_ENABLE_PYTHON_GRPC=OFF \
+          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients java-clients && \
+RUN make -j16 cc-clients java-clients python-clients && \
     rm -fr ~/.m2
 
 # TODO: PA will rebuild the CC clients since it depends on it.
@@ -144,7 +144,8 @@ RUN make -j16 cc-clients java-clients && \
 # the python client until now. Post-migration we should focus
 # effort on de-tangling these flows.
 WORKDIR /workspace/pa_build
-RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+RUN if [ "$PERF_ANALYZER_BUILD" = "ON" ]; then \
+        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
@@ -160,12 +161,18 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
-          /workspace/perf_analyzer
-RUN make -j16 perf-analyzer python-clients
-
-RUN pip3 install build \
-    && cd /workspace/perf_analyzer/genai-perf \
-    && python3 -m build --wheel --outdir /workspace/install/python
+          /workspace/perf_analyzer && \
+        make -j16 perf-analyzer && \
+        pip3 install build \
+        && cd /workspace/perf_analyzer/genai-perf && \
+        python3 -m build --wheel --outdir /workspace/install/python; \
+    else \
+        ls /workspace/perf_analyzer/ && ls /workspace/pa_build && \
+        tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
+        echo "Perf Analyzer binaries was extracted and not build"; \
+        mkdir -p /workspace/install/python && \
+        cp /workspace/perf_analyzer/genai_perf-*.whl /workspace/install/python/; \
+    fi
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
@@ -237,11 +244,12 @@ COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_cli
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
-RUN pip3 install install/python/genai_perf-*.whl
-
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
+
+RUN pip3 install install/python/genai_perf-*.whl;
+
 RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
