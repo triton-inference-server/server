@@ -276,7 +276,7 @@ class HttpTest(tu.TestResultCollector):
     def test_json_recursion_depth_limit(self):
         """Test that server properly handles and rejects deeply nested JSON."""
 
-        # Create deeply nested JSON that exceeds the limit (HTTP_MAX_JSON_DEPTH = 100)
+        # Create deeply nested JSON
         def create_nested_json(depth):
             data = '"hello"'
             for _ in range(depth):
@@ -285,21 +285,21 @@ class HttpTest(tu.TestResultCollector):
 
         headers = {"Content-Type": "application/json"}
 
-        # Create a payload with excessive nesting (depth > 100)
+        # Create a payload with excessive nesting (exceeds the limit 100)
         excessive_depth = 120
         payload = {
             "inputs": [
                 {
-                    "name": "INPUT",
+                    "name": "INPUT0",
                     "datatype": "BYTES",
-                    "shape": [1],
+                    "shape": [1, 1],
                     "data": create_nested_json(excessive_depth),
                 }
             ]
         }
 
         response = requests.post(
-            self._get_infer_url("simple"), headers=headers, json=payload
+            self._get_infer_url("simple_identity"), headers=headers, json=payload
         )
 
         # Assert the response is not successful
@@ -318,11 +318,11 @@ class HttpTest(tu.TestResultCollector):
         acceptable_depth = 50
         payload["inputs"][0]["data"] = create_nested_json(acceptable_depth)
 
-        # This should either succeed or fail for reasons other than recursion depth
         response = requests.post(
-            self._get_infer_url("simple"), headers=headers, json=payload
+            self._get_infer_url("simple_identity"), headers=headers, json=payload
         )
 
+        # Assert the response is successful
         self.assertEqual(response.status_code, 200)
 
 
