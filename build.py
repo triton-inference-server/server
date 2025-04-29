@@ -323,7 +323,7 @@ class BuildScript:
         # reference onto a new branch we name "tritonbuildref".
         if tag.startswith("pull/"):
             self.cmd(
-                f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir};",
+                f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
             self.cmd("}" if target_platform() == "windows" else "fi")
@@ -332,7 +332,7 @@ class BuildScript:
             self.cmd(f"git checkout tritonbuildref", check_exitcode=True)
         else:
             self.cmd(
-                f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir};",
+                f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
             self.cmd("}" if target_platform() == "windows" else "fi")
