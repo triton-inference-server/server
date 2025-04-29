@@ -1,4 +1,4 @@
-// Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -316,6 +316,17 @@ StopEndpoints(uint32_t* exit_timeout_secs)
   }
 #endif  // TRITON_ENABLE_HTTP
 
+#ifdef TRITON_ENABLE_GRPC
+  // Allow for graceful shutdown of GRPC service
+  if (g_grpc_service) {
+    TRITONSERVER_Error* err = g_grpc_service->GracefulStop(exit_timeout_secs);
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to gracefully stop GRPC service");
+      ret = false;
+    }
+  }
+#endif  // TRITON_ENABLE_GRPC
+
   return ret;
 }
 
@@ -324,11 +335,9 @@ StopEndpoints()
 {
   bool ret = true;
 
-  // TODO: Add support for 'exit_timeout_secs' to the endpoints below and move
-  // them to the 'StopEndpoints(uint32_t* exit_timeout_secs)' function above.
-
 #ifdef TRITON_ENABLE_GRPC
   if (g_grpc_service) {
+    // Forceful shutdown of GRPC service
     TRITONSERVER_Error* err = g_grpc_service->Stop();
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC service");
@@ -521,7 +530,7 @@ main(int argc, char** argv)
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  // Stop the HTTP[, gRPC, and metrics] endpoints, and update exit timeout.
+  // Stop the HTTP and gRPC endpoints, and update exit timeout.
   uint32_t exit_timeout_secs = g_triton_params.exit_timeout_secs_;
   StopEndpoints(&exit_timeout_secs);
   TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);
