@@ -276,54 +276,51 @@ class HttpTest(tu.TestResultCollector):
     def test_json_recursion_depth_limit(self):
         """Test that server properly handles and rejects deeply nested JSON."""
 
-        # Create deeply nested JSON
-        def create_nested_json(depth):
-            data = '"hello"'
+        def create_nested_json(depth, value):
             for _ in range(depth):
-                data = f"[{data}]"
-            return json.loads(data)
+                value = f"[{value}]"
+            return json.loads(value)
 
         headers = {"Content-Type": "application/json"}
+        test_matrix = [
+            # (datatype, data, model, json_depth, should_succeed)
+            ("BYTES", '"hello"', "simple_identity", 120, False),
+            ("BYTES", '"hello"', "simple_identity", 50, True),
+            ("INT64", "123", "simple_identity_int64", 120, False),
+            ("INT64", "123", "simple_identity_int64", 50, True),
+        ]
 
-        # Create a payload with excessive nesting (exceeds the limit 100)
-        excessive_depth = 120
-        payload = {
-            "inputs": [
-                {
-                    "name": "INPUT0",
-                    "datatype": "BYTES",
-                    "shape": [1, 1],
-                    "data": create_nested_json(excessive_depth),
+        for dtype, data, model, json_depth, should_succeed in test_matrix:
+            with self.subTest(
+                datatype=dtype, depth=json_depth, should_succeed=should_succeed
+            ):
+                payload = {
+                    "inputs": [
+                        {
+                            "name": "INPUT0",
+                            "datatype": dtype,
+                            "shape": [1, 1],
+                            "data": create_nested_json(json_depth, data),
+                        }
+                    ]
                 }
-            ]
-        }
 
-        response = requests.post(
-            self._get_infer_url("simple_identity"), headers=headers, json=payload
-        )
+                response = requests.post(
+                    self._get_infer_url(model), headers=headers, json=payload
+                )
 
-        # Assert the response is not successful
-        self.assertNotEqual(response.status_code, 200)
-        try:
-            error_message = response.json().get("error", "")
-            # Check for error message
-            self.assertIn(
-                "Unable to parse 'data': JSON nesting depth exceeds maximum allowed limit (100)",
-                error_message,
-            )
-        except ValueError:
-            self.fail("Response is not valid JSON")
-
-        # Test with acceptable depth to ensure valid requests work
-        acceptable_depth = 50
-        payload["inputs"][0]["data"] = create_nested_json(acceptable_depth)
-
-        response = requests.post(
-            self._get_infer_url("simple_identity"), headers=headers, json=payload
-        )
-
-        # Assert the response is successful
-        self.assertEqual(response.status_code, 200)
+                if should_succeed:
+                    self.assertEqual(response.status_code, 200)
+                else:
+                    self.assertNotEqual(response.status_code, 200)
+                    try:
+                        error_message = response.json().get("error", "")
+                        self.assertIn(
+                            "JSON nesting depth exceeds maximum allowed limit (100)",
+                            error_message,
+                        )
+                    except ValueError:
+                        self.fail("Response is not valid JSON")
 
 
 if __name__ == "__main__":

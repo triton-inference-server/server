@@ -613,6 +613,10 @@ cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
         echo "}" >> config.pbtxt)
 
 cp -r ./models/simple_identity ${MODELDIR}
+cp -r ./models/simple_identity ${MODELDIR}/simple_identity_int64 && \
+    (cd $MODELDIR/simple_identity_int64 && \
+        sed -i "s/TYPE_STRING/TYPE_INT64/" config.pbtxt && \
+        sed -i "s/simple_identity/simple_identity_int64/" config.pbtxt)
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"

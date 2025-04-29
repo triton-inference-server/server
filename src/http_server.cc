@@ -437,16 +437,29 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
 // Recursively adds to byte_size from multi dimensional data input
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(
-    triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
+    triton::common::TritonJson::Value& tensor_data, size_t* byte_size,
+    int current_depth = 0)
 {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("JSON nesting depth exceeds maximum allowed "
+         "limit (" +
+         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
+            .c_str());
+  }
+
   *byte_size = 0;
   // Recurse if not last dimension...
   if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
-      RETURN_IF_ERR(tensor_data.At(i, &el));
+      RETURN_MSG_IF_ERR(
+          tensor_data.At(i, &el), "Unable to parse JSON bytes array");
       size_t byte_size_;
-      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_));
+      RETURN_MSG_IF_ERR(
+          JsonBytesArrayByteSize(el, &byte_size_, current_depth + 1),
+          "Unable to parse JSON bytes array");
       *byte_size += byte_size_;
     }
   } else {
@@ -473,12 +486,12 @@ ReadDataFromJsonHelper(
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
-  if (current_depth >= HTTP_MAX_JSON_DEPTH) {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("JSON nesting depth exceeds maximum allowed "
          "limit (" +
-         std::to_string(HTTP_MAX_JSON_DEPTH) + ")")
+         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
             .c_str());
   }
 

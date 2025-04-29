@@ -52,7 +52,7 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 constexpr int WILDCARD_DIM = -1;
 
 // Maximum allowed depth for JSON parsing
-constexpr int32_t HTTP_MAX_JSON_DEPTH = 100;
+constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 
 /// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
