@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ MODEL_NAME="gpt2_tensorrt_llm"
 NAME="tensorrt_llm_benchmarking_test"
 MODEL_REPOSITORY="$(pwd)/triton_model_repo"
 TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
+GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/models/core/gpt"
 TOKENIZER_DIR="$GPT_DIR/gpt2"
 ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
