@@ -146,7 +146,7 @@ RUN make -j16 cc-clients java-clients && \
 # the python client until now. Post-migration we should focus
 # effort on de-tangling these flows.
 WORKDIR /workspace/pa_build
-# NOTE: If TRITON_PERF_ANALYZER_BUILD=0, the Performance Analyzer (PA) binaries must already exist 
+# NOTE: If TRITON_PERF_ANALYZER_BUILD=0, the Performance Analyzer (PA) binaries must already exist
 # in the path specified by the ARG TRITON_PA_REPO_SUBDIR.
 RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
