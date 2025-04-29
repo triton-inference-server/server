@@ -454,12 +454,9 @@ JsonBytesArrayByteSize(
   if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
-      RETURN_MSG_IF_ERR(
-          tensor_data.At(i, &el), "Unable to parse JSON bytes array");
+      RETURN_IF_ERR(tensor_data.At(i, &el));
       size_t byte_size_;
-      RETURN_MSG_IF_ERR(
-          JsonBytesArrayByteSize(el, &byte_size_, current_depth + 1),
-          "Unable to parse JSON bytes array");
+      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_, current_depth + 1));
       *byte_size += byte_size_;
     }
   } else {
