@@ -2736,12 +2736,20 @@ HTTPAPIServer::ParseJsonTritonIO(
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
-        // FIXME, element count should never be 0 or negative so
-        // shouldn't we just return an error here?
-        if (element_cnt == 0) {
-          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-              irequest, input_name, nullptr, 0 /* byte_size */,
-              TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        if (element_cnt <= 0) {
+          if (element_cnt == 0) {
+            RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+                irequest, input_name, nullptr, 0 /* byte_size */,
+                TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+          } else {
+            // Negative element count indicates overflow or invalid shape
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "invalid shape for input '" + std::string(input_name) +
+                    "': shape has too many elements or causes integer overflow")
+                    .c_str());
+          }
         } else {
           // JSON... presence of "data" already validated but still
           // checking here. Flow in this endpoint needs to be
@@ -2754,7 +2762,21 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
-            byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+            const size_t type_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
+            if ((type_byte_size > 1) &&
+                (element_cnt > (INT64_MAX / type_byte_size))) {
+              return TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  std::string(
+                      "byte size overflow for input '" +
+                      std::string(input_name) + "': element count (" +
+                      std::to_string(element_cnt) + ") * data type size (" +
+                      std::to_string(type_byte_size) +
+                      ") exceeds maximum allowed size (" +
+                      std::to_string(INT64_MAX) + ")")
+                      .c_str());
+            }
+            byte_size = element_cnt * type_byte_size;
           }
 
           infer_req->serialized_data_.emplace_back();

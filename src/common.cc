@@ -1,4 +1,4 @@
-// Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -94,12 +94,17 @@ GetElementCount(const std::vector<int64_t>& dims)
       cnt = dim;
       first = false;
     } else {
+      // Check for potential overflow before multiplying
+      if (dim > 0 && cnt > (INT64_MAX / dim)) {
+        return -1;
+      }
       cnt *= dim;
     }
   }
 
   return cnt;
 }
+
 
 bool
 Contains(const std::vector<std::string>& vec, const std::string& str)
