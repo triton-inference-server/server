@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -235,6 +235,66 @@ class HttpTest(tu.TestResultCollector):
             ),
         )
         t.join()
+
+    def test_buffer_size_overflow(self):
+        model = "onnx_zero_1_float32"
+
+        # Test for overflow within GetElementCount()
+        payload1 = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "shape": [3, 1000000, 6148914691266],
+                    "datatype": "FP32",
+                    "data": [1.0],
+                }
+            ]
+        }
+
+        # Test for overflow with type_byte_size multiplication
+        payload2 = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "shape": [3, 1000000, 1537228672809],
+                    "datatype": "FP32",
+                    "data": [1.0],
+                }
+            ]
+        }
+
+        # Send request and expect a 400 error with specific overflow message
+        headers = {"Content-Type": "application/json"}
+
+        # Test the first payload (GetElementCount overflow)
+        r1 = requests.post(self._get_infer_url(model), json=payload1, headers=headers)
+
+        self.assertEqual(
+            400,
+            r1.status_code,
+            "Expected error code 400 for GetElementCount overflow check; got: {}".format(
+                r1.status_code
+            ),
+        )
+
+        error_message1 = r1.content.decode()
+        self.assertIn(
+            "shape has invalid elements or causes integer overflow", error_message1
+        )
+
+        # Test the second payload (type_byte_size multiplication overflow)
+        r2 = requests.post(self._get_infer_url(model), json=payload2, headers=headers)
+
+        self.assertEqual(
+            400,
+            r2.status_code,
+            "Expected error code 400 for type_byte_size multiplication overflow check; got: {}".format(
+                r2.status_code
+            ),
+        )
+
+        error_message2 = r2.content.decode()
+        self.assertIn("byte size overflow for input", error_message2)
 
     def test_loading_large_invalid_model(self):
         # Generate large base64 encoded data

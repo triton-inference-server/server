@@ -2747,7 +2747,7 @@ HTTPAPIServer::ParseJsonTritonIO(
                 TRITONSERVER_ERROR_INVALID_ARG,
                 std::string(
                     "invalid shape for input '" + std::string(input_name) +
-                    "': shape has too many elements or causes integer overflow")
+                    "': shape has invalid elements or causes integer overflow")
                     .c_str());
           }
         } else {
@@ -2762,7 +2762,8 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
-            const size_t type_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
+            const uint32_t type_byte_size =
+                TRITONSERVER_DataTypeByteSize(dtype);
             if ((type_byte_size > 1) &&
                 (element_cnt > (INT64_MAX / type_byte_size))) {
               return TRITONSERVER_ErrorNew(
