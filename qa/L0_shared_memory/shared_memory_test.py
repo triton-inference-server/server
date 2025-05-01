@@ -410,8 +410,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
 
             self.assertEqual(len(error_msg), 1)
             self.assertTrue(
-                "Integer overflow detected: byte_size + offset exceeds maximum value for region"
-                in error_msg[0],
+                "Integer overflow detected: byte_size " in error_msg[0],
                 f"Unexpected error message: {error_msg[0]}",
             )
             self._cleanup_shm_handles()

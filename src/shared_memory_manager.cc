@@ -491,9 +491,10 @@ SharedMemoryManager::GetMemoryInfo(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
-            "Integer overflow detected: byte_size + offset exceeds maximum "
-            "value for region '" +
-            name + "'")
+            "Integer overflow detected: byte_size (" +
+            std::to_string(byte_size) + ") + offset (" +
+            std::to_string(offset) + ") exceeds maximum value (" +
+            std::to_string(SIZE_MAX) + ") for region '" + name + "'")
             .c_str());
   }
 
