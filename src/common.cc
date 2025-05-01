@@ -86,7 +86,7 @@ GetElementCount(const std::vector<int64_t>& dims)
   bool first = true;
   int64_t cnt = 0;
   for (auto dim : dims) {
-    if (dim == WILDCARD_DIM) {
+    if (dim < 0) {
       return -1;
     }
 
