@@ -2777,12 +2777,12 @@ HTTPAPIServer::ParseJsonTritonIO(
           }
 
           // Check if byte_size is larger than 2GB. Limit for HTTP requests.
-          if (byte_size > (1 << 31)) {
+          if (byte_size > (1ULL << 31)) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
                 ("input '" + std::string(input_name) +
-                 "' has a byte_size that exceeds the maximum allowed value "
-                 "of 2GB")
+                 "' has a byte_size that exceeds the maximum allowed value of "
+                 "2GB")
                     .c_str());
           }
 

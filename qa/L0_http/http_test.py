@@ -322,6 +322,47 @@ class HttpTest(tu.TestResultCollector):
                     except ValueError:
                         self.fail("Response is not valid JSON")
 
+    def test_input_size_limit(self):
+        model = "onnx_zero_1_float32"
+        # Create input data larger than default max size (2GB)
+        large_input = np.ones(
+            536870912 + 32, dtype=np.float32
+        )  # Value resolves to just over 2GB
+        input_bytes = large_input.tobytes()
+
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": [1, 536870912 + 32],
+                    "data": [1, 1],
+                }
+            ]
+        }
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, json=payload
+        )
+
+        # Should get 400 bad request
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected error code {} returned for the request; got: {}".format(
+                400, response.status_code
+            ),
+        )
+
+        # Verify error message contains size limit info
+        error_msg = response.content.decode()
+        self.assertIn(
+            "has a byte_size that exceeds the maximum allowed value of 2GB",
+            error_msg,
+            "Expected error message about exceeding max input size",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
