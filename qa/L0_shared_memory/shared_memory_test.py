@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -384,6 +384,59 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             "Invalid offset + byte size for shared memory region", error_msg[0]
         )
         self._cleanup_shm_handles()
+
+    def test_infer_integer_overflow(self):
+        # Test for integer overflow vulnerability in offset + byte_size calculation
+        error_msg = []
+        self._configure_server()
+
+        offset = 32
+        byte_size = 2**64 - 32
+
+        if self.protocol == "http":
+            iu.shm_basic_infer(
+                self,
+                self.triton_client,
+                self._shm_handles[0],
+                self._shm_handles[1],
+                self._shm_handles[2],
+                self._shm_handles[3],
+                error_msg,
+                shm_output_offset=offset,
+                shm_output_byte_size=byte_size,
+                protocol=self.protocol,
+                use_system_shared_memory=True,
+            )
+
+            self.assertEqual(len(error_msg), 1)
+            self.assertTrue(
+                "Integer overflow detected: byte_size " in error_msg[0],
+                f"Unexpected error message: {error_msg[0]}",
+            )
+            self._cleanup_shm_handles()
+        else:
+            # The gRPC client utilizes the int64_param and will throw a separate error for values larger than 2**63-1
+            try:
+                iu.shm_basic_infer(
+                    self,
+                    self.triton_client,
+                    self._shm_handles[0],
+                    self._shm_handles[1],
+                    self._shm_handles[2],
+                    self._shm_handles[3],
+                    error_msg,
+                    shm_output_offset=offset,
+                    shm_output_byte_size=byte_size,
+                    protocol=self.protocol,
+                    use_system_shared_memory=True,
+                )
+                self.assertTrue(
+                    False,
+                    "Expected gRPC client to fail on value larger than int64_param maximum",
+                )
+            except ValueError as ex:
+                self.assertIn("Value out of range:", str(ex))
+            self._cleanup_shm_handles()
 
     def test_register_out_of_bound(self):
         create_byte_size = self.DEFAULT_SHM_BYTE_SIZE
