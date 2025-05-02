@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -272,6 +272,55 @@ class HttpTest(tu.TestResultCollector):
             )
         except ValueError:
             self.fail("Response is not valid JSON")
+
+    def test_json_recursion_depth_limit(self):
+        """Test that server properly handles and rejects deeply nested JSON."""
+
+        def create_nested_json(depth, value):
+            for _ in range(depth):
+                value = f"[{value}]"
+            return json.loads(value)
+
+        headers = {"Content-Type": "application/json"}
+        test_matrix = [
+            # (datatype, data, model, json_depth, should_succeed)
+            ("BYTES", '"hello"', "simple_identity", 120, False),
+            ("BYTES", '"hello"', "simple_identity", 50, True),
+            ("INT64", "123", "simple_identity_int64", 120, False),
+            ("INT64", "123", "simple_identity_int64", 50, True),
+        ]
+
+        for dtype, data, model, json_depth, should_succeed in test_matrix:
+            with self.subTest(
+                datatype=dtype, depth=json_depth, should_succeed=should_succeed
+            ):
+                payload = {
+                    "inputs": [
+                        {
+                            "name": "INPUT0",
+                            "datatype": dtype,
+                            "shape": [1, 1],
+                            "data": create_nested_json(json_depth, data),
+                        }
+                    ]
+                }
+
+                response = requests.post(
+                    self._get_infer_url(model), headers=headers, json=payload
+                )
+
+                if should_succeed:
+                    self.assertEqual(response.status_code, 200)
+                else:
+                    self.assertNotEqual(response.status_code, 200)
+                    try:
+                        error_message = response.json().get("error", "")
+                        self.assertIn(
+                            "JSON nesting depth exceeds maximum allowed limit (100)",
+                            error_message,
+                        )
+                    except ValueError:
+                        self.fail("Response is not valid JSON")
 
 
 if __name__ == "__main__":

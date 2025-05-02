@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,6 +50,9 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;
+
+// Maximum allowed depth for JSON parsing
+constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 
 /// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{

@@ -612,6 +612,12 @@ cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
         echo "    }" >> config.pbtxt && \
         echo "}" >> config.pbtxt)
 
+cp -r ./models/simple_identity ${MODELDIR}
+cp -r ./models/simple_identity ${MODELDIR}/simple_identity_int64 && \
+    (cd $MODELDIR/simple_identity_int64 && \
+        sed -i "s/TYPE_STRING/TYPE_INT64/" config.pbtxt && \
+        sed -i "s/simple_identity/simple_identity_int64/" config.pbtxt)
+
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
 CLIENT_LOG="./http_test.log"
@@ -624,7 +630,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=10
+EXPECTED_NUM_TESTS=11
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
