@@ -105,7 +105,6 @@ GetElementCount(const std::vector<int64_t>& dims)
   return cnt;
 }
 
-
 bool
 Contains(const std::vector<std::string>& vec, const std::string& str)
 {
