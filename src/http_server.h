@@ -198,7 +198,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
-      const RestrictedFeatures& restricted_apis,
+      const size_t max_input_size, const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* http_server);
 
   static TRITONSERVER_Error* Create(
@@ -500,6 +500,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
+      const size_t max_input_size,
       const RestrictedFeatures& restricted_apis = {});
 
   virtual void Handle(evhtp_request_t* req) override;
@@ -685,6 +686,7 @@ class HTTPAPIServer : public HTTPServer {
         new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
   }
   RestrictedFeatures restricted_apis_{};
+  size_t max_input_size_{};
   bool RespondIfRestricted(
       evhtp_request_t* req, const Restriction& restriction);
 };

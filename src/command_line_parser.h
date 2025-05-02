@@ -1,4 +1,4 @@
-// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -197,6 +197,8 @@ struct TritonServerParameters {
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
   RestrictedFeatures http_restricted_apis_{};
+  // Default max input size is 64MB (2^26 bytes)
+  size_t http_max_input_size_{1 << 26};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
