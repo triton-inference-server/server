@@ -184,11 +184,6 @@ TEST_F(BackendApiTest, GetElementCount)
   shape = {1, 2, 3, 4};
   expected_cnt = 24;
   assert_get_element_count_success(shape, expected_cnt);
-
-  // Test 4: multiple dims with 0
-  shape = {0, 1, 8};
-  expected_cnt = 0;
-  assert_get_element_count_success(shape, expected_cnt);
 }
 
 TEST_F(BackendApiTest, GetElementCountNegative)
@@ -196,16 +191,42 @@ TEST_F(BackendApiTest, GetElementCountNegative)
   std::vector<int64_t> shape;
   int64_t expected_cnt = -1;
 
-  // Test 1: one -1 dim
+  // Test 1: -1 dim
+  shape = {-1};
+  assert_get_element_count_success(shape, expected_cnt);
+
+  // Test 2: one -1 dim
   shape = {-1, 8, 8};
   assert_get_element_count_success(shape, expected_cnt);
 
-  // Test 2: multiple -1 dims
+  // Test 3: multiple -1 dims
   shape = {8, -1, -1};
   assert_get_element_count_success(shape, expected_cnt);
 
-  // Test 3: -1 dim before overflow
+  // Test 4: -1 dim before overflow
   shape = {-1, 1LL << 32, 1LL << 31};
+  assert_get_element_count_success(shape, expected_cnt);
+}
+
+TEST_F(BackendApiTest, GetElementCountZero)
+{
+  std::vector<int64_t> shape;
+  int64_t expected_cnt = 0;
+
+  // Test 1: 0 dim
+  shape = {0};
+  assert_get_element_count_success(shape, expected_cnt);
+
+  // Test 2: one 0 dim
+  shape = {1, 8, 0};
+  assert_get_element_count_success(shape, expected_cnt);
+
+  // Test 2: one 0 dim
+  shape = {0, 1, 8};
+  assert_get_element_count_success(shape, expected_cnt);
+
+  // Test 3: multiple 0 dims
+  shape = {8, 0, 0};
   assert_get_element_count_success(shape, expected_cnt);
 }
 
@@ -306,6 +327,29 @@ TEST_F(BackendApiTest, GetByteSizeNegative)
   dtype = TRITONSERVER_TYPE_INT32;
   shape = {-1, 8};
   assert_get_byte_size_success(dtype, shape, expected_size);
+}
+
+TEST_F(BackendApiTest, GetByteSizeZero)
+{
+  TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
+  std::vector<int64_t> shape;
+  int64_t expected_cnt = 0;
+
+  // Test 1: 0 dim
+  shape = {0};
+  assert_get_byte_size_success(dtype, shape, expected_cnt);
+
+  // Test 2: one 0 dim
+  shape = {1, 8, 0};
+  assert_get_byte_size_success(dtype, shape, expected_cnt);
+
+  // Test 2: one 0 dim
+  shape = {0, 1, 8};
+  assert_get_byte_size_success(dtype, shape, expected_cnt);
+
+  // Test 3: multiple 0 dims
+  shape = {8, 0, 0};
+  assert_get_byte_size_success(dtype, shape, expected_cnt);
 }
 
 TEST_F(BackendApiTest, GetByteSizeInvalidDim)
