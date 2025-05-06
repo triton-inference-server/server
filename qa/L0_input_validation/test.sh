@@ -162,15 +162,15 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-# backend_api_test
-TEST_LOG="./backend_api_test.log"
-TEST_EXEC=./backend_api_test
+# backend_tensor_size_test
+TEST_LOG="./backend_tensor_size_test.log"
+TEST_EXEC=./backend_tensor_size_test
 
 set +e
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
-    echo -e "\n***\n*** backend_api_test FAILED\n***"
+    echo -e "\n***\n*** backend_tensor_size_test FAILED\n***"
     RET=1
 fi
 set -e

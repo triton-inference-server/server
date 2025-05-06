@@ -80,11 +80,6 @@ enum class ErrorCode {
   kOverflow = -3,
 };
 
-class BackendApiTest : public ::testing::Test {
- public:
-  BackendApiTest() {}
-};
-
 void
 assert_get_element_count_success(
     std::vector<int64_t>& shape, int64_t expected_cnt)
@@ -165,7 +160,12 @@ assert_get_byte_size_error(
   ASSERT_EQ(error_msg, TRITONSERVER_ErrorMessage(err));
 }
 
-TEST_F(BackendApiTest, GetElementCount)
+class GetElementCountTest : public ::testing::Test {
+ public:
+  GetElementCountTest() {}
+};
+
+TEST_F(GetElementCountTest, GetElementCount)
 {
   std::vector<int64_t> shape;
   int64_t expected_cnt;
@@ -186,7 +186,7 @@ TEST_F(BackendApiTest, GetElementCount)
   assert_get_element_count_success(shape, expected_cnt);
 }
 
-TEST_F(BackendApiTest, GetElementCountNegative)
+TEST_F(GetElementCountTest, GetElementCountNegative)
 {
   std::vector<int64_t> shape;
   int64_t expected_cnt = -1;
@@ -208,7 +208,7 @@ TEST_F(BackendApiTest, GetElementCountNegative)
   assert_get_element_count_success(shape, expected_cnt);
 }
 
-TEST_F(BackendApiTest, GetElementCountZero)
+TEST_F(GetElementCountTest, GetElementCountZero)
 {
   std::vector<int64_t> shape;
   int64_t expected_cnt = 0;
@@ -230,7 +230,7 @@ TEST_F(BackendApiTest, GetElementCountZero)
   assert_get_element_count_success(shape, expected_cnt);
 }
 
-TEST_F(BackendApiTest, GetElementCountInvalidDim)
+TEST_F(GetElementCountTest, GetElementCountInvalidDim)
 {
   std::vector<int64_t> shape;
   std::string error_msg;
@@ -254,7 +254,7 @@ TEST_F(BackendApiTest, GetElementCountInvalidDim)
   assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
 }
 
-TEST_F(BackendApiTest, GetElementCountOverflow)
+TEST_F(GetElementCountTest, GetElementCountOverflow)
 {
   std::vector<int64_t> shape;
   std::string error_msg;
@@ -275,7 +275,12 @@ TEST_F(BackendApiTest, GetElementCountOverflow)
   assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
 }
 
-TEST_F(BackendApiTest, GetByteSize)
+class GetByteSizeTest : public ::testing::Test {
+ public:
+  GetByteSizeTest() {}
+};
+
+TEST_F(GetByteSizeTest, GetByteSize)
 {
   TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
   std::vector<int64_t> shape;
@@ -302,7 +307,7 @@ TEST_F(BackendApiTest, GetByteSize)
   assert_get_byte_size_success(dtype, shape, expected_size);
 }
 
-TEST_F(BackendApiTest, GetByteSizeNegative)
+TEST_F(GetByteSizeTest, GetByteSizeNegative)
 {
   TRITONSERVER_DataType dtype;
   std::vector<int64_t> shape;
@@ -329,7 +334,7 @@ TEST_F(BackendApiTest, GetByteSizeNegative)
   assert_get_byte_size_success(dtype, shape, expected_size);
 }
 
-TEST_F(BackendApiTest, GetByteSizeZero)
+TEST_F(GetByteSizeTest, GetByteSizeZero)
 {
   TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
   std::vector<int64_t> shape;
@@ -352,7 +357,7 @@ TEST_F(BackendApiTest, GetByteSizeZero)
   assert_get_byte_size_success(dtype, shape, expected_cnt);
 }
 
-TEST_F(BackendApiTest, GetByteSizeInvalidDim)
+TEST_F(GetByteSizeTest, GetByteSizeInvalidDim)
 {
   TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
   std::vector<int64_t> shape;
@@ -377,7 +382,7 @@ TEST_F(BackendApiTest, GetByteSizeInvalidDim)
   assert_get_byte_size_error(dtype, shape, ErrorCode::kInvalidDim, error_msg);
 }
 
-TEST_F(BackendApiTest, GetByteSizeOverflow)
+TEST_F(GetByteSizeTest, GetByteSizeOverflow)
 {
   TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
   std::vector<int64_t> shape;

@@ -81,12 +81,12 @@ endif()
 # Unit test for Backend API
 #
 add_executable(
-  backend_api_test
-  backend_api_test.cc
+  backend_tensor_size_test
+  backend_tensor_size_test.cc
 )
 
 set_target_properties(
-  backend_api_test
+  backend_tensor_size_test
   PROPERTIES
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
@@ -95,14 +95,14 @@ set_target_properties(
 )
 
 target_include_directories(
-  backend_api_test
+  backend_tensor_size_test
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${GTEST_INCLUDE_DIRS}
 )
 
 target_link_libraries(
-  backend_api_test
+  backend_tensor_size_test
   PRIVATE
     triton-backend-utils    # from repo-backend
     triton-core-serverapi   # from repo-core
@@ -112,7 +112,7 @@ target_link_libraries(
 )
 
 install(
-  TARGETS backend_api_test
+  TARGETS backend_tensor_size_test
   RUNTIME DESTINATION bin
 )
 
