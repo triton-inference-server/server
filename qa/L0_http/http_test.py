@@ -236,6 +236,104 @@ class HttpTest(tu.TestResultCollector):
         )
         t.join()
 
+    def test_buffer_size_overflow(self):
+        model = "onnx_zero_1_float32"
+
+        # Test for overflow within GetElementCount()
+        payload1 = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "shape": [
+                        2**4,
+                        2**60 + 2,
+                    ],  # This evaluates to 2^64 + 32 during GetElementCount()
+                    "datatype": "FP32",
+                    "data": [1.0],
+                }
+            ]
+        }
+
+        # Test for overflow with type_byte_size multiplication
+        payload2 = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "shape": [
+                        2**2,
+                        2**60 + 2,
+                    ],  # This evaluates to 2^64 + 32 during type_byte_size multiplication since FP32 is 4 bytes
+                    "datatype": "FP32",
+                    "data": [1.0],
+                }
+            ]
+        }
+
+        # Send request and expect a 400 error with specific overflow message
+        headers = {"Content-Type": "application/json"}
+
+        # Test the first payload (GetElementCount overflow)
+        r1 = requests.post(self._get_infer_url(model), json=payload1, headers=headers)
+
+        self.assertEqual(
+            400,
+            r1.status_code,
+            "Expected error code 400 for GetElementCount overflow check; got: {}".format(
+                r1.status_code
+            ),
+        )
+
+        error_message1 = r1.content.decode()
+        self.assertIn(
+            "causes total element count to exceed maximum size of", error_message1
+        )
+
+        # Test the second payload (type_byte_size multiplication overflow)
+        r2 = requests.post(self._get_infer_url(model), json=payload2, headers=headers)
+
+        self.assertEqual(
+            400,
+            r2.status_code,
+            "Expected error code 400 for type_byte_size multiplication overflow check; got: {}".format(
+                r2.status_code
+            ),
+        )
+
+        error_message2 = r2.content.decode()
+        self.assertIn("byte size overflow for input", error_message2)
+
+    def test_negative_dimensions(self):
+        model = "onnx_zero_1_float32"
+
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "shape": [2, -5],  # Negative dimension should be invalid
+                    "datatype": "FP32",
+                    "data": [1.0],
+                }
+            ]
+        }
+
+        # Send request and expect a 500 error
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(self._get_infer_url(model), json=payload, headers=headers)
+
+        self.assertEqual(
+            500,
+            r.status_code,
+            "Expected error code 500 for negative dimension; got: {}".format(
+                r.status_code
+            ),
+        )
+
+        error_message = r.content.decode()
+        self.assertIn(
+            "Unable to parse 'shape': attempt to access JSON non-unsigned-integer as unsigned-integer",
+            error_message,
+        )
+
     def test_loading_large_invalid_model(self):
         # Generate large base64 encoded data
         data_length = 1 << 31
