@@ -27,9 +27,9 @@
 
 export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
 export APP_NAME=tritonserver
-export MAJOR_VERSION=2.56
-export MINOR_VERSION=2.56.0
-export NGC_VERSION=25.03-py3
+export MAJOR_VERSION=2.57
+export MINOR_VERSION=2.57.0
+export NGC_VERSION=25.04-py3
 
 docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
 
