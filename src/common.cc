@@ -80,23 +80,52 @@ GetEnvironmentVariableOrDefault(
   return value ? value : default_value;
 }
 
+std::string
+ShapeToString(const int64_t* dims, const size_t dims_count)
+{
+  bool first = true;
+
+  std::string str("[");
+  for (size_t i = 0; i < dims_count; ++i) {
+    const int64_t dim = dims[i];
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(dim);
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
+
+std::string
+ShapeToString(const std::vector<int64_t>& shape)
+{
+  return ShapeToString(shape.data(), shape.size());
+}
+
 int64_t
 GetElementCount(const std::vector<int64_t>& dims)
 {
   bool first = true;
   int64_t cnt = 0;
   for (auto dim : dims) {
-    if (dim < 0) {
+    if (dim == WILDCARD_DIM) {
       return -1;
+    } else if (dim < 0) {  // invalid dim
+      return -2;
+    } else if (dim == 0) {
+      return 0;
     }
 
     if (first) {
       cnt = dim;
       first = false;
     } else {
-      // Check for potential overflow before multiplying
-      if (dim > 0 && cnt > (INT64_MAX / dim)) {
-        return -1;
+      // Check for overflow before multiplication
+      if (cnt > (INT64_MAX / dim)) {
+        return -3;
       }
       cnt *= dim;
     }

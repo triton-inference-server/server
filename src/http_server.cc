@@ -2736,20 +2736,29 @@ HTTPAPIServer::ParseJsonTritonIO(
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
-        if (element_cnt <= 0) {
-          if (element_cnt == 0) {
-            RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-                irequest, input_name, nullptr, 0 /* byte_size */,
-                TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-          } else {
-            // Negative element count indicates overflow or invalid shape
-            return TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "invalid shape for input '" + std::string(input_name) +
-                    "': shape has invalid elements or causes integer overflow")
-                    .c_str());
-          }
+        if (element_cnt == 0) {
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+              irequest, input_name, nullptr, 0 /* byte_size */,
+              TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        } else if (element_cnt == -2) {
+          // -2 indicates invalid dimension
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "invalid shape for input '" + std::string(input_name) +
+                  "': shape " + ShapeToString(shape_vec) +
+                  " contains one or more invalid dimensions")
+                  .c_str());
+        } else if (element_cnt == -3) {
+          // -3 indicates integer overflow
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "invalid shape for input '" + std::string(input_name) +
+                  "': shape " + ShapeToString(shape_vec) +
+                  " causes total element count to exceed maximum size of " +
+                  std::to_string(INT64_MAX))
+                  .c_str());
         } else {
           // JSON... presence of "data" already validated but still
           // checking here. Flow in this endpoint needs to be
