@@ -1488,6 +1488,9 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
     --mount=type=secret,id=build_public_vllm,target=/run/secrets/build_public_vllm \\
     --mount=type=secret,id=nvpl_slim_url,target=/run/secrets/nvpl_slim_url \\
     BUILD_PUBLIC_VLLM=$(cat /run/secrets/build_public_vllm) && \\
+    VLLM_INDEX_URL=$(cat /run/secrets/vllm_index_url) && \\
+    PYTORCH_TRITON_URL=$(cat /run/secrets/pytorch_triton_url) && \\
+    NVPL_SLIM_URL=$(cat /run/secrets/nvpl_slim_url) && \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
         if [ "$(uname -m)" = "x86_64" ]; then \\
             pip3 install --no-cache-dir \\
@@ -1495,27 +1498,24 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
                 mkl-include==2021.1.1 \\
                 mkl-devel==2021.1.1; \\
         elif [ "$(uname -m)" = "aarch64" ]; then \\
-            echo "Downloading NVPL from: $(cat /run/secrets/nvpl_slim_url)" && \\
+            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
             cd /tmp && \\
-            wget -O nvpl_slim_24.04.tar $(cat /run/secrets/nvpl_slim_url) && \\
+            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
             tar -xf nvpl_slim_24.04.tar && \\
             cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
             cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
             rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
         fi \\
-        && pip3 install --no-cache-dir --progress-bar on --index-url $(cat /run/secrets/vllm_index_url) -r /run/secrets/requirements \\
+        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
-        && wget $(cat /run/secrets/pytorch_triton_url) \\
+        && wget $PYTORCH_TRITON_URL \\
         && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
         && rm /tmp/pytorch_triton-*.whl; \\
     else \\
         # public vLLM needed for vLLM backend
         pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
     fi
-
-ARG PYVER=3.12
-ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
 """
 
     if "dali" in backends:
