@@ -1516,6 +1516,9 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
         # public vLLM needed for vLLM backend
         pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
     fi
+
+ARG PYVER=3.12
+ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
 """
 
     if "dali" in backends:
