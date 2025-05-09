@@ -1907,7 +1907,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 f"--secret id=vllm_index_url,src={secrets.get('vllm_index_url', '')}",
                 f"--secret id=pytorch_triton_url,src={secrets.get('pytorch_triton_url', '')}",
                 f"--secret id=build_public_vllm,src={secrets.get('build_public_vllm', '')}",
-                f"--secret id=nvpl_slim_url,src={secrets.get('nvpl_slim_url', '')}"
+                f"--secret id=nvpl_slim_url,src={secrets.get('nvpl_slim_url', '')}",
             ]
         finalargs += [
             "-t",
