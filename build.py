@@ -1481,12 +1481,16 @@ RUN apt-get update \\
 
     if "vllm" in backends:
         df += f"""
-ARG BUILD_PUBLIC_VLLM="true"
-ARG VLLM_INDEX_URL
-ARG PYTORCH_TRITON_URL
-ARG NVPL_SLIM_URL
-
+# Install required packages for vLLM models
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
+    --mount=type=secret,id=vllm_index_url,target=/run/secrets/vllm_index_url \\
+    --mount=type=secret,id=pytorch_triton_url,target=/run/secrets/pytorch_triton_url \\
+    --mount=type=secret,id=build_public_vllm,target=/run/secrets/build_public_vllm \\
+    --mount=type=secret,id=nvpl_slim_url,target=/run/secrets/nvpl_slim_url \\
+    BUILD_PUBLIC_VLLM=$(cat /run/secrets/build_public_vllm) && \\
+    VLLM_INDEX_URL=$(cat /run/secrets/vllm_index_url) && \\
+    PYTORCH_TRITON_URL=$(cat /run/secrets/pytorch_triton_url) && \\
+    NVPL_SLIM_URL=$(cat /run/secrets/nvpl_slim_url) && \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
         if [ "$(uname -m)" = "x86_64" ]; then \\
             pip3 install --no-cache-dir \\
@@ -1899,11 +1903,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         ]
         if secrets:
             finalargs += [
-                f"--secret id=req,src={requirements}",
-                f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
-                f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
-                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-                f"--build-arg NVPL_SLIM_URL={nvpl_slim_url}",
+                f"--secret id=req,src={secrets.get('req', '')}",
+                f"--secret id=vllm_index_url,src={secrets.get('vllm_index_url', '')}",
+                f"--secret id=pytorch_triton_url,src={secrets.get('pytorch_triton_url', '')}",
+                f"--secret id=build_public_vllm,src={secrets.get('build_public_vllm', '')}",
+                f"--secret id=nvpl_slim_url,src={secrets.get('nvpl_slim_url', '')}",
             ]
         finalargs += [
             "-t",
