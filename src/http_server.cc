@@ -1162,7 +1162,7 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
     const std::string& header_forward_pattern, const int thread_cnt,
-    const RestrictedFeatures& restricted_apis)
+    const size_t max_input_size, const RestrictedFeatures& restricted_apis)
     : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
@@ -1174,7 +1174,8 @@ HTTPAPIServer::HTTPAPIServer(
           R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
       cudasharedmemory_regex_(
           R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
-      trace_regex_(R"(/v2/trace/setting)"), restricted_apis_(restricted_apis)
+      trace_regex_(R"(/v2/trace/setting)"), restricted_apis_(restricted_apis),
+      max_input_size_(max_input_size)
 {
   // FIXME, don't cache server metadata. The http endpoint should
   // not be deciding that server metadata will not change during
@@ -2644,6 +2645,7 @@ HTTPAPIServer::ParseJsonTritonIO(
     RETURN_MSG_IF_ERR(
         request_input.MemberAsArray("shape", &shape_json),
         "Unable to parse 'shape'");
+
     std::vector<int64_t> shape_vec;
     for (size_t i = 0; i < shape_json.ArraySize(); i++) {
       uint64_t d = 0;
@@ -2806,6 +2808,17 @@ HTTPAPIServer::ParseJsonTritonIO(
                       .c_str());
             }
             byte_size = element_cnt * type_byte_size;
+          }
+
+          // Check if byte_size is larger than max_input_size_
+          if (byte_size > max_input_size_) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                ("input '" + std::string(input_name) +
+                 "' has a byte_size that exceeds the maximum allowed value "
+                 "of " +
+                 std::to_string(max_input_size_))
+                    .c_str());
           }
 
           infer_req->serialized_data_.emplace_back();
@@ -4795,12 +4808,12 @@ HTTPAPIServer::Create(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
     const std::string& header_forward_pattern, const int thread_cnt,
-    const RestrictedFeatures& restricted_features,
+    const size_t max_input_size, const RestrictedFeatures& restricted_apis,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_cnt, restricted_features));
+      header_forward_pattern, thread_cnt, max_input_size, restricted_apis));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
@@ -4823,6 +4836,7 @@ HTTPAPIServer::Create(
   std::string address;
   std::string header_forward_pattern;
   int thread_count;
+  int max_input_size;  // Use int for GetValue compatibility
 
   RETURN_IF_ERR(GetValue(options, "port", &port));
   RETURN_IF_ERR(GetValue(options, "reuse_port", &reuse_port));
@@ -4830,10 +4844,12 @@ HTTPAPIServer::Create(
   RETURN_IF_ERR(
       GetValue(options, "header_forward_pattern", &header_forward_pattern));
   RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
+  RETURN_IF_ERR(GetValue(options, "max_input_size", &max_input_size));
 
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_count, restricted_features, service);
+      header_forward_pattern, thread_count, static_cast<size_t>(max_input_size),
+      restricted_features, service);
 }
 
 
