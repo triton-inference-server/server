@@ -29,14 +29,16 @@
 [Please visit Deep Learning Framework (DLFW) website for the complete compatibility matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html).
 
 # Release Compatibility Matrix
- 1. [Container Name: trtllm-python-py3](#container-name-trtllm-python-py3)
- 2. [Container Name: vllm-python-py3](#container-name-vllm-python-py3)
- 3. [ONNX Runtime Versions](#onnx-runtime-versions)
+- [Release Compatibility Matrix](#release-compatibility-matrix)
+  - [Container Name: trtllm-python-py3](#container-name-trtllm-python-py3)
+  - [Container Name: vllm-python-py3](#container-name-vllm-python-py3)
+  - [ONNX Runtime Versions](#onnx-runtime-versions)
 
 ## Container Name: trtllm-python-py3
 
 | Triton release version	 | NGC Tag	 | Python version	 | Torch version | TensorRT version | TensorRT-LLM version | CUDA version | CUDA Driver version | Size |
 | --- | ---  | --- | --- | --- | --- | --- | --- | --- |
+| 25.04 | nvcr.io/nvidia/tritonserver:25.04-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0+7c8ec84dab.nv25.3 | 10.9.0.34 | 0.18.2 | 12.8.1.012 | 570.124.06 | 17G |
 | 25.03 | nvcr.io/nvidia/tritonserver:25.03-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0%2B7c8ec84dab.nv25.3 | 10.9.0.34 | 0.18.0 | 12.8.1.012 | 570.124.06 | 28G |
 | 25.02 | nvcr.io/nvidia/tritonserver:25.02-trtllm-python-py3 | Python 3.12.3 | 2.6.0a0%2Becf3bae40a.nv25.1 | 10.8.0.43 | 0.17.0.post1 | 12.8.0.038 | 570.86.10 | 28G |
 | 25.01 | nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3 | Python 3.12.3  | 2.6.0a0%2Becf3bae40a.nv25.1 | 10.8.0.43 | 0.17.0 | 12.8.0.038 | 570.86.10 | 30G |
@@ -54,6 +56,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | vLLM version | CUDA version | CUDA Driver version | Size |
 | --- | --- | --- | --- | --- | --- | --- |
+| 25.04 | nvcr.io/nvidia/tritonserver:25.04-vllm-python-py3 | Python 3.12.3  | 0.8.1+5f4af9e0.nv25.4.cu129 | 12.9.0.036 | 575.51.02 | 10G |
 | 25.03 | nvcr.io/nvidia/tritonserver:25.03-vllm-python-py3 | Python 3.12.3  | 0.7.3+04de634a.nv25.3.cu128 | 12.8.1.012 | 570.124.06 | 22G |
 | 25.02 | nvcr.io/nvidia/tritonserver:25.02-vllm-python-py3 | Python 3.12.3  | 0.7.0+5e800e3d.nv25.2.cu128 | 12.8.0.038 | 570.86.10 | 22G |
 | 25.01 | nvcr.io/nvidia/tritonserver:25.01-vllm-python-py3 | Python 3.12.3  | 0.6.3.post1 | 12.8.0.038 | 570.86.10 | 23G |
@@ -71,6 +74,7 @@
 
 | Triton release version	 | ONNX Runtime	 |
 | --- | --- |
+| 25.04 | 1.21.0 |
 | 25.03 | 1.21.0 |
 | 25.02 | 1.20.1 |
 | 25.01 | 1.20.1 |
