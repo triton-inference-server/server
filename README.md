@@ -29,8 +29,8 @@
 
 >[!WARNING]
 >You are currently on the `main` branch which tracks under-development progress
->towards the next release. The current release is version [2.56.0](https://github.com/triton-inference-server/server/releases/latest)
->and corresponds to the 25.03 container release on NVIDIA GPU Cloud (NGC).
+>towards the next release. The current release is version [2.57.0](https://github.com/triton-inference-server/server/releases/latest)
+>and corresponds to the 25.04 container release on NVIDIA GPU Cloud (NGC).
 
 # Triton Inference Server
 

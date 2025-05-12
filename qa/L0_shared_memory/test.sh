@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,6 +53,7 @@ for i in \
         test_unregisterall \
         test_infer_offset_out_of_bound \
         test_infer_byte_size_out_of_bound \
+        test_infer_integer_overflow \
         test_register_out_of_bound \
         test_python_client_leak; do
     for client_type in http grpc; do

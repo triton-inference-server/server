@@ -437,8 +437,18 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
 // Recursively adds to byte_size from multi dimensional data input
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(
-    triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
+    triton::common::TritonJson::Value& tensor_data, size_t* byte_size,
+    int current_depth = 0)
 {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("JSON nesting depth exceeds maximum allowed "
+         "limit (" +
+         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
+            .c_str());
+  }
+
   *byte_size = 0;
   // Recurse if not last dimension...
   if (tensor_data.IsArray()) {
@@ -446,7 +456,7 @@ JsonBytesArrayByteSize(
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
       size_t byte_size_;
-      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_));
+      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_, current_depth + 1));
       *byte_size += byte_size_;
     }
   } else {
@@ -466,20 +476,29 @@ TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
     triton::common::TritonJson::Value& tensor_data, int* counter,
-    int64_t expected_cnt)
+    int64_t expected_cnt, int current_depth = 0)
 {
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("JSON nesting depth exceeds maximum allowed "
+         "limit (" +
+         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
+            .c_str());
+  }
+
   // Recurse on array element if not last dimension...
   if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
-      RETURN_IF_ERR(
-          ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
+      RETURN_IF_ERR(ReadDataFromJsonHelper(
+          base, dtype, el, counter, expected_cnt, current_depth + 1));
     }
   } else {
     // Check if writing to 'serialized' is overrunning the expected byte_size
@@ -2738,12 +2757,29 @@ HTTPAPIServer::ParseJsonTritonIO(
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
-        // FIXME, element count should never be 0 or negative so
-        // shouldn't we just return an error here?
         if (element_cnt == 0) {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        } else if (element_cnt == -2) {
+          // -2 indicates invalid dimension
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "invalid shape for input '" + std::string(input_name) +
+                  "': shape " + ShapeToString(shape_vec) +
+                  " contains one or more invalid dimensions")
+                  .c_str());
+        } else if (element_cnt == -3) {
+          // -3 indicates integer overflow
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "invalid shape for input '" + std::string(input_name) +
+                  "': shape " + ShapeToString(shape_vec) +
+                  " causes total element count to exceed maximum size of " +
+                  std::to_string(INT64_MAX))
+                  .c_str());
         } else {
           // JSON... presence of "data" already validated but still
           // checking here. Flow in this endpoint needs to be
@@ -2756,7 +2792,22 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
-            byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+            const uint32_t type_byte_size =
+                TRITONSERVER_DataTypeByteSize(dtype);
+            if ((type_byte_size > 1) &&
+                (element_cnt > (INT64_MAX / type_byte_size))) {
+              return TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  std::string(
+                      "byte size overflow for input '" +
+                      std::string(input_name) + "': element count (" +
+                      std::to_string(element_cnt) + ") * data type size (" +
+                      std::to_string(type_byte_size) +
+                      ") exceeds maximum allowed size (" +
+                      std::to_string(INT64_MAX) + ")")
+                      .c_str());
+            }
+            byte_size = element_cnt * type_byte_size;
           }
 
           // Check if byte_size is larger than max_input_size_
