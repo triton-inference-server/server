@@ -2814,10 +2814,12 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (byte_size > max_input_size_) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
-                ("input '" + std::string(input_name) +
-                 "' has a byte_size that exceeds the maximum allowed value "
+                ("input '" + std::string(input_name) + "' has a byte_size (" +
+                 std::to_string(byte_size) +
+                 " bytes) that exceeds the maximum allowed value "
                  "of " +
-                 std::to_string(max_input_size_))
+                 std::to_string(max_input_size_) +
+                 " bytes. Use --http-max-input-size to increase the limit.")
                     .c_str());
           }
 
@@ -3099,6 +3101,19 @@ HTTPAPIServer::EVBufferToRawInput(
       TRITONSERVER_InferenceRequestAddRawInput(irequest, raw_input_name));
 
   size_t byte_size = evbuffer_get_length(input_buffer);
+
+  // Check if byte_size is larger than max_input_size_
+  if (byte_size > max_input_size_) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("Raw input has a byte_size (" + std::to_string(byte_size) +
+         " bytes) that exceeds the maximum allowed value "
+         "of " +
+         std::to_string(max_input_size_) +
+         " bytes. Use --http-max-input-size to increase the limit.")
+            .c_str());
+  }
+
   // zero-shape tensor
   if (byte_size == 0) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
@@ -3590,6 +3605,19 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
       byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+    }
+
+    // Check if byte_size is larger than max_input_size_
+    if (byte_size > max_input_size_) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("input '" + name + "' has a byte_size (" +
+           std::to_string(byte_size) +
+           " bytes) that exceeds the maximum allowed value "
+           "of " +
+           std::to_string(max_input_size_) +
+           " bytes. Use --http-max-input-size to increase the limit.")
+              .c_str());
     }
 
     std::vector<int64_t> shape_vec;

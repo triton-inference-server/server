@@ -1398,7 +1398,11 @@ TritonParser::Parse(int argc, char** argv)
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
           break;
         case OPTION_HTTP_MAX_INPUT_SIZE:
-          lparams.http_max_input_size_ = ParseOption<int>(optarg);
+          lparams.http_max_input_size_ = ParseOption<int64_t>(optarg);
+          if (lparams.http_max_input_size_ <= 0) {
+            throw ParseException(
+                "Error: --http-max-input-size must be greater than 0.");
+          }
           break;
         case OPTION_HTTP_RESTRICTED_API:
           ParseRestrictedFeatureOption(
