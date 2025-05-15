@@ -56,6 +56,7 @@ class KServeGrpc:
         max_connection_age_ms: int
         max_connection_age_grace_ms: int
         infer_compression_level: int | Grpc_compression_level
+        infer_thread_count: int
         infer_allocation_pool_size: int
         max_response_pool_size: int
         forward_header_pattern: str

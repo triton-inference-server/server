@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,6 +50,9 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;
+
+// Maximum allowed depth for JSON parsing
+constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 
 /// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
@@ -155,10 +158,17 @@ std::string GetEnvironmentVariableOrDefault(
 /// Get the number of elements in a shape.
 ///
 /// \param dims The shape.
-/// \return The number of elements, or -1 if the number of elements
+/// \return The number of elements, -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wildcard dimensions.
+/// wildcard dimensions, -2 if the shape contains an invalid dim,
+/// or -3 if the number is too large to represent as an int64_t.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
+
+/// Convert shape to string representation.
+///
+/// \param shape The shape as a vector.
+/// \return The string representation of the shape.
+std::string ShapeToString(const std::vector<int64_t>& shape);
 
 /// Returns if 'vec' contains 'str'.
 ///

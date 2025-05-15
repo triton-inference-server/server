@@ -1,4 +1,4 @@
-// Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -80,6 +80,31 @@ GetEnvironmentVariableOrDefault(
   return value ? value : default_value;
 }
 
+std::string
+ShapeToString(const int64_t* dims, const size_t dims_count)
+{
+  bool first = true;
+
+  std::string str("[");
+  for (size_t i = 0; i < dims_count; ++i) {
+    const int64_t dim = dims[i];
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(dim);
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
+
+std::string
+ShapeToString(const std::vector<int64_t>& shape)
+{
+  return ShapeToString(shape.data(), shape.size());
+}
+
 int64_t
 GetElementCount(const std::vector<int64_t>& dims)
 {
@@ -88,12 +113,20 @@ GetElementCount(const std::vector<int64_t>& dims)
   for (auto dim : dims) {
     if (dim == WILDCARD_DIM) {
       return -1;
+    } else if (dim < 0) {  // invalid dim
+      return -2;
+    } else if (dim == 0) {
+      return 0;
     }
 
     if (first) {
       cnt = dim;
       first = false;
     } else {
+      // Check for overflow before multiplication
+      if (cnt > (INT64_MAX / dim)) {
+        return -3;
+      }
       cnt *= dim;
     }
   }

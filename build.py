@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.57.0dev",
-    "triton_container_version": "25.04dev",
-    "upstream_container_version": "25.03",
-    "ort_version": "1.21.0",
-    "ort_openvino_version": "2025.0.0",
-    "standalone_openvino_version": "2025.0.0",
+    "release_version": "2.58.0dev",
+    "triton_container_version": "25.05dev",
+    "upstream_container_version": "25.04",
+    "ort_version": "1.22.0",
+    "ort_openvino_version": "2025.1.0",
+    "standalone_openvino_version": "2025.1.0",
     "dcgm_version": "3.3.6",
-    "vllm_version": "0.7.3",
+    "vllm_version": "0.8.4",
     "rhel_py_version": "3.12.3",
 }
 
@@ -323,7 +323,7 @@ class BuildScript:
         # reference onto a new branch we name "tritonbuildref".
         if tag.startswith("pull/"):
             self.cmd(
-                f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir};",
+                f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
             self.cmd("}" if target_platform() == "windows" else "fi")
@@ -332,7 +332,7 @@ class BuildScript:
             self.cmd(f"git checkout tritonbuildref", check_exitcode=True)
         else:
             self.cmd(
-                f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir};",
+                f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
             self.cmd("}" if target_platform() == "windows" else "fi")

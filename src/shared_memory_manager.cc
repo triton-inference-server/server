@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -485,6 +485,19 @@ SharedMemoryManager::GetMemoryInfo(
         std::string("Invalid offset for shared memory region: '" + name + "'")
             .c_str());
   }
+
+  // Check for potential integer overflow before validating bounds
+  if (byte_size > (SIZE_MAX - offset)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "Integer overflow detected: byte_size (" +
+            std::to_string(byte_size) + ") + offset (" +
+            std::to_string(offset) + ") exceeds maximum value (" +
+            std::to_string(SIZE_MAX) + ") for region '" + name + "'")
+            .c_str());
+  }
+
   // validate byte_size + offset is within memory bounds
   size_t total_req_shm = offset + byte_size - 1;
   if (total_req_shm > shm_region_end) {

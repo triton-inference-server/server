@@ -48,8 +48,6 @@ CLIENT_LOG="./input_validation_client.log"
 TEST_PY=./input_validation_test.py
 TEST_RESULT_FILE='./test_results.txt'
 SERVER_LOG="./inference_server.log"
-TEST_LOG="./input_byte_size_test.log"
-TEST_EXEC=./input_byte_size_test
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -151,6 +149,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # input_byte_size_test
+TEST_LOG="./input_byte_size_test.log"
+TEST_EXEC=./input_byte_size_test
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/{onnx_zero_1_float32,onnx_zero_1_object,onnx_zero_1_bool} ./models
 
 set +e
@@ -158,6 +158,19 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
     echo -e "\n***\n*** input_byte_size_test FAILED\n***"
+    RET=1
+fi
+set -e
+
+# backend_tensor_size_test
+TEST_LOG="./backend_tensor_size_test.log"
+TEST_EXEC=./backend_tensor_size_test
+
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >> $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** backend_tensor_size_test FAILED\n***"
     RET=1
 fi
 set -e
