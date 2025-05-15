@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -533,4 +533,81 @@ function deactivate_virtualenv() {
     deactivate
     rm -fr venv
   fi
+}
+
+function replace_config_tags {
+    tag_to_replace="${1}"
+    new_value="${2}"
+    config_file_path="${3}"
+    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
+}
+
+function prepare_model_repository {
+    rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
+    cp -r ${TENSORRTLLM_BACKEND_DIR}/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
+    rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
+    mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
+
+    replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+    replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
+
+    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
+
+    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+    replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
+
+    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+    replace_config_tags '${encoder_input_features_data_type}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
+}
+
+function clone_tensorrt_llm_backend_repo {
+    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
+    apt-get update && apt-get install git-lfs -y --no-install-recommends
+    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
+    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
+}
+
+function build_gpt2_base_model {
+    # Download weights from HuggingFace Transformers
+    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
+    rm pytorch_model.bin model.safetensors
+    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
+        echo "Downloading pytorch_model.bin failed."
+        exit 1
+    fi
+    cd ${GPT_DIR}
+
+    # Convert weights from HF Tranformers to FT format
+    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
+    cd ${BASE_DIR}
+}
+
+function build_gpt2_tensorrt_engine {
+    # Build TensorRT engines
+    cd ${GPT_DIR}
+    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
+        --gpt_attention_plugin float16 \
+        --remove_input_padding enable \
+        --paged_kv_cache enable \
+        --gemm_plugin float16 \
+        --workers "${NUM_GPUS}" \
+        --output_dir "${ENGINES_DIR}"
+
+    cd ${BASE_DIR}
 }
