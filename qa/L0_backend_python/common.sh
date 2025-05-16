@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -85,7 +85,11 @@ create_conda_env_with_specified_path() {
 create_python_backend_stub() {
   rm -rf python_backend
   git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
+  CUDA_PATH=$(readlink -f /usr/local/cuda)
   (cd python_backend/ && mkdir builddir && cd builddir && \
-  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG -DPYBIND11_PYTHON_VERSION=$PY_VERSION ../ && \
+  cmake -DTRITON_ENABLE_GPU=ON -DCMAKE_CUDA_COMPILER=$CUDA_PATH/bin/nvcc \
+     -DCUDAToolkit_ROOT=$CUDA_PATH -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+    -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG \
+    -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG -DPYBIND11_PYTHON_VERSION=$PY_VERSION ../ && \
   make -j18 triton-python-backend-stub)
 }

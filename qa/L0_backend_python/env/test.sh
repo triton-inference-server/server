@@ -182,10 +182,6 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-# Remove Python 3.7 model because it contains absolute paths and cannot be used
-# with S3.
-rm -rf models/python_3_7
-
 # Test with the bucket url as model repository
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -205,10 +201,10 @@ fi
 kill_server
 
 set +e
-grep "$PY36_VERSION_STRING" $SERVER_LOG
+grep "$PY312_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
+    echo -e "\n***\n*** $PY312_VERSION_STRING was not found in Triton logs. \n***"
     RET=1
 fi
 set -e
@@ -236,7 +232,7 @@ fi
 kill_server
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do
+for EXPECTED_VERSION_STRING in "$PY312_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
