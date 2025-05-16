@@ -50,6 +50,9 @@ create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
 TORCH_VERSION="2.6.0"
 conda install numpy=1.26.4 -y
+if [ $TRITON_RHEL -eq 1 ]; then
+    TORCH_VERISON="2.17.0"
+fi
 conda install pytorch=${TORCH_VERSION} -y
 PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and PyTorch version is ${TORCH_VERSION}"
 conda pack -o python3.12.tar.gz
@@ -214,8 +217,6 @@ set -e
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 # Test with EXECUTION_ENV_PATH outside the model directory
-sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
-mv models/python_3_6/python_3_6_environment.tar.gz models
 sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
 mv models/python_3_12/python_3_12_environment.tar.gz models
 
