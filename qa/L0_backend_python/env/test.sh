@@ -122,7 +122,7 @@ fi
 kill_server
 
 set +e
-grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
+grep "Locale is ('C', 'UTF-8')" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
         echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
