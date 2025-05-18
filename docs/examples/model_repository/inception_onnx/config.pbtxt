@@ -25,20 +25,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 name: "inception_onnx"
 platform: "onnxruntime_onnx"
-max_batch_size: 128
+max_batch_size: 0
 input [
   {
-    name: "input"
+    name: "input:0"
     data_type: TYPE_FP32
     format: FORMAT_NHWC
     dims: [ 299, 299, 3 ]
+    reshape { shape: [ 1, 299, 299, 3 ] }
   }
 ]
 output [
   {
-    name: "InceptionV3/Predictions/Softmax"
+    name: "InceptionV3/Predictions/Softmax:0"
     data_type: TYPE_FP32
     dims: [ 1001 ]
+    reshape { shape: [ 1, 1001 ] }
     label_filename: "inception_labels.txt"
   }
 ]
