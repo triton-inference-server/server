@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,7 +69,7 @@ pip3 install validators
 # Install JAX
 # Jax has dropped the support for Python 3.8. See https://jax.readthedocs.io/en/latest/changelog.html
 if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
-    pip3 install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    pip install -U "jax[cuda12]"
 fi
 
 git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
