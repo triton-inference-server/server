@@ -53,8 +53,8 @@ conda install numpy=1.26.4 -y
 if [ $TRITON_RHEL -eq 1 ]; then
     TORCH_VERISON="2.17.0"
 fi
-conda install torch=${TORCH_VERSION} -y
-PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and PyTorch version is ${TORCH_VERISON}"
+conda install pytorch=${TORCH_VERSION} -y
+PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and PyTorch version is ${TORCH_VERSION}"
 conda pack -o python3.12.tar.gz
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
@@ -122,7 +122,7 @@ fi
 kill_server
 
 set +e
-grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
+grep "Locale is ('C', 'UTF-8')" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
         echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
@@ -182,10 +182,6 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-# Remove Python 3.7 model because it contains absolute paths and cannot be used
-# with S3.
-rm -rf models/python_3_7
-
 # Test with the bucket url as model repository
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -205,10 +201,10 @@ fi
 kill_server
 
 set +e
-grep "$PY36_VERSION_STRING" $SERVER_LOG
+grep "$PY312_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
+    echo -e "\n***\n*** $PY312_VERSION_STRING was not found in Triton logs. \n***"
     RET=1
 fi
 set -e
@@ -217,8 +213,6 @@ set -e
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 # Test with EXECUTION_ENV_PATH outside the model directory
-sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
-mv models/python_3_6/python_3_6_environment.tar.gz models
 sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
 mv models/python_3_12/python_3_12_environment.tar.gz models
 
@@ -238,7 +232,7 @@ fi
 kill_server
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do
+for EXPECTED_VERSION_STRING in "$PY312_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
