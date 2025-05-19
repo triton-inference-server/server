@@ -183,7 +183,7 @@ StartSagemakerService(
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.sagemaker_port_,
       g_triton_params.sagemaker_address_, g_triton_params.sagemaker_thread_cnt_,
-      service);
+      g_triton_params.http_max_input_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -207,7 +207,8 @@ StartVertexAiService(
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.vertex_ai_port_,
       g_triton_params.vertex_ai_address_, g_triton_params.vertex_ai_thread_cnt_,
-      g_triton_params.vertex_ai_default_model_, service);
+      g_triton_params.vertex_ai_default_model_,
+      g_triton_params.http_max_input_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }

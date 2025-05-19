@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@ class VertexAiAPIServer : public HTTPAPIServer {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const std::string address, const int thread_cnt,
-      std::string default_model_name,
+      std::string default_model_name, const size_t max_input_size,
       std::unique_ptr<HTTPServer>* vertex_ai_server);
 
  private:
@@ -47,7 +47,7 @@ class VertexAiAPIServer : public HTTPAPIServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const std::string address, const int thread_cnt,
       const std::string& prediction_route, const std::string& health_route,
-      const std::string& default_model_name);
+      const std::string& default_model_name, const size_t max_input_size);
 
   void Handle(evhtp_request_t* req) override;
 

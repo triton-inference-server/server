@@ -428,6 +428,9 @@ class HTTPAPIServer : public HTTPServer {
     const MappingSchema* RequestSchema() { return request_schema_; }
     const MappingSchema* ResponseSchema() { return response_schema_; }
 
+    // Maximum input size to check when processing inputs
+    size_t max_input_size_{0};
+
    private:
     struct TritonOutput {
       enum class Type { RESERVED, TENSOR, PARAMETER };

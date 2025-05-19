@@ -1,4 +1,4 @@
-// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -42,10 +42,10 @@ VertexAiAPIServer::VertexAiAPIServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
     const std::string& prediction_route, const std::string& health_route,
-    const std::string& default_model_name)
+    const std::string& default_model_name, const size_t max_input_size)
     : HTTPAPIServer(
           server, trace_manager, shm_manager, port, false /* reuse_port */,
-          address, "" /* header_forward_pattern */, thread_cnt),
+          address, "" /* header_forward_pattern */, thread_cnt, max_input_size),
       prediction_regex_(prediction_route), health_regex_(health_route),
       health_mode_("ready"), model_name_(default_model_name),
       model_version_str_("")
@@ -269,7 +269,8 @@ VertexAiAPIServer::Create(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
-    std::string default_model_name, std::unique_ptr<HTTPServer>* http_server)
+    std::string default_model_name, const size_t max_input_size,
+    std::unique_ptr<HTTPServer>* http_server)
 {
   auto predict_route = GetEnvironmentVariableOrDefault("AIP_PREDICT_ROUTE", "");
   auto health_route = GetEnvironmentVariableOrDefault("AIP_HEALTH_ROUTE", "");
@@ -344,7 +345,7 @@ VertexAiAPIServer::Create(
 
   http_server->reset(new VertexAiAPIServer(
       server, trace_manager, shm_manager, port, address, thread_cnt,
-      predict_route, health_route, default_model_name));
+      predict_route, health_route, default_model_name, max_input_size));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Vertex AI HTTPService at " << addr;

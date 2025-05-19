@@ -2645,7 +2645,6 @@ HTTPAPIServer::ParseJsonTritonIO(
     RETURN_MSG_IF_ERR(
         request_input.MemberAsArray("shape", &shape_json),
         "Unable to parse 'shape'");
-
     std::vector<int64_t> shape_vec;
     for (size_t i = 0; i < shape_json.ArraySize(); i++) {
       uint64_t d = 0;
@@ -3381,6 +3380,8 @@ HTTPAPIServer::HandleGenerate(
         streaming, irequest_shared, shm_manager_));
   }
   generate_request->trace_ = trace;
+  // Set max_input_size for the generate request
+  generate_request->max_input_size_ = max_input_size_;
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
@@ -3606,6 +3607,20 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     } else {
       byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
     }
+
+    // Check if byte_size is larger than max_input_size_
+    if (byte_size > max_input_size_) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("input '" + name + "' has a byte_size (" +
+           std::to_string(byte_size) +
+           " bytes) that exceeds the maximum allowed value "
+           "of " +
+           std::to_string(max_input_size_) +
+           " bytes. Use --http-max-input-size to increase the limit.")
+              .c_str());
+    }
+
     std::vector<int64_t> shape_vec;
     {
       triton::common::TritonJson::Value value;
@@ -4822,12 +4837,12 @@ HTTPAPIServer::Create(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
     const std::string& header_forward_pattern, const int thread_cnt,
-    const size_t max_input_size, const RestrictedFeatures& restricted_apis,
+    const size_t max_input_size, const RestrictedFeatures& restricted_features,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_cnt, max_input_size, restricted_apis));
+      header_forward_pattern, thread_cnt, max_input_size, restricted_features));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
