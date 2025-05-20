@@ -622,7 +622,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     cargs += cmake_backend_extra_args(be)
     if be == "tensorrtllm":
-        cargs.append("-S ../inflight_batcher_llm -B .")
+        cargs.append("-S ../triton_backend/inflight_batcher_llm -B .")
 
     else:
         cargs.append("..")
@@ -2081,7 +2081,16 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    if be == "tensorrtllm":
+        github_organization = (
+            "https://github.com/NVIDIA"
+            if "triton-inference-server" in FLAGS.github_organization
+            else FLAGS.github_organization
+        )
+        repository_name = "TensorRT-LLM"
+        cmake_script.gitclone(repository_name, tag, be, github_organization)
+    else:
+        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     if be == "tensorrtllm":
         tensorrtllm_prebuild(cmake_script)
