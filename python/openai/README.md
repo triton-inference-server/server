@@ -51,7 +51,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:25.04-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:25.05-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
