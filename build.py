@@ -1482,15 +1482,12 @@ RUN apt-get update \\
     if "vllm" in backends:
         df += f"""
 # Install required packages for vLLM models
+ARG BUILD_PUBLIC_VLLM="true"
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
     --mount=type=secret,id=vllm_index_url,target=/run/secrets/vllm_index_url \\
     --mount=type=secret,id=pytorch_triton_url,target=/run/secrets/pytorch_triton_url \\
     --mount=type=secret,id=build_public_vllm,target=/run/secrets/build_public_vllm \\
     --mount=type=secret,id=nvpl_slim_url,target=/run/secrets/nvpl_slim_url \\
-    BUILD_PUBLIC_VLLM=$(cat /run/secrets/build_public_vllm) && \\
-    VLLM_INDEX_URL=$(cat /run/secrets/vllm_index_url) && \\
-    PYTORCH_TRITON_URL=$(cat /run/secrets/pytorch_triton_url) && \\
-    NVPL_SLIM_URL=$(cat /run/secrets/nvpl_slim_url) && \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
         if [ "$(uname -m)" = "x86_64" ]; then \\
             pip3 install --no-cache-dir \\
@@ -1498,18 +1495,18 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
                 mkl-include==2021.1.1 \\
                 mkl-devel==2021.1.1; \\
         elif [ "$(uname -m)" = "aarch64" ]; then \\
-            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
+            echo "Downloading NVPL from: $(cat /run/secrets/nvpl_slim_url)" && \\
             cd /tmp && \\
-            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
+            wget -O nvpl_slim_24.04.tar $(cat /run/secrets/nvpl_slim_url) && \\
             tar -xf nvpl_slim_24.04.tar && \\
             cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
             cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
             rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
         fi \\
-        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
+        && pip3 install --no-cache-dir --progress-bar on --index-url $(cat /run/secrets/vllm_index_url) -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
-        && wget $PYTORCH_TRITON_URL \\
+        && wget $(cat /run/secrets/pytorch_triton_url) \\
         && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
         && rm /tmp/pytorch_triton-*.whl; \\
     else \\
@@ -1903,11 +1900,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         ]
         if secrets:
             finalargs += [
-                f"--secret id=req,src={secrets.get('req', '')}",
-                f"--secret id=vllm_index_url,src={secrets.get('vllm_index_url', '')}",
-                f"--secret id=pytorch_triton_url,src={secrets.get('pytorch_triton_url', '')}",
-                f"--secret id=build_public_vllm,src={secrets.get('build_public_vllm', '')}",
-                f"--secret id=nvpl_slim_url,src={secrets.get('nvpl_slim_url', '')}",
+                f"--secret id=req,src={requirements}",
+                f"--secret id=vllm_index_url,src={vllm_index_url}",
+                f"--secret id=pytorch_triton_url,src={pytorch_triton_url}",
+                f"--secret id=nvpl_slim_url,src={nvpl_slim_url}",
+                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
             ]
         finalargs += [
             "-t",
