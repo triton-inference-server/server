@@ -334,47 +334,6 @@ class HttpTest(tu.TestResultCollector):
             error_message,
         )
 
-    def test_input_size_limit(self):
-        model = "onnx_zero_1_float32"
-        # Create input data larger than default max size (64MB)
-        large_input = np.ones(
-            2**23 + 32, dtype=np.float32
-        )  # Value resolves to just over 64MB
-        input_bytes = large_input.tobytes()
-
-        payload = {
-            "inputs": [
-                {
-                    "name": "INPUT0",
-                    "datatype": "FP32",
-                    "shape": [1, 2**23 + 32],
-                    "data": [1, 1],
-                }
-            ]
-        }
-
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(
-            self._get_infer_url(model), headers=headers, json=payload
-        )
-
-        # Should get 400 bad request
-        self.assertEqual(
-            400,
-            response.status_code,
-            "Expected error code {} returned for the request; got: {}".format(
-                400, response.status_code
-            ),
-        )
-
-        # Verify error message contains size limit info
-        error_msg = response.content.decode()
-        self.assertIn(
-            " bytes) that exceeds the maximum allowed value of ",
-            error_msg,
-            "Expected error message about exceeding max input size",
-        )
-
     def test_loading_large_invalid_model(self):
         # Generate large base64 encoded data
         data_length = 1 << 31
