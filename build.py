@@ -622,7 +622,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     cargs += cmake_backend_extra_args(be)
     if be == "tensorrtllm":
-        cargs.append("-S ../inflight_batcher_llm -B .")
+        cargs.append("-S ../triton_backend/inflight_batcher_llm -B .")
 
     else:
         cargs.append("..")
@@ -1481,12 +1481,12 @@ RUN apt-get update \\
 
     if "vllm" in backends:
         df += f"""
+# Install required packages for vLLM models
 ARG BUILD_PUBLIC_VLLM="true"
-ARG VLLM_INDEX_URL
-ARG PYTORCH_TRITON_URL
-ARG NVPL_SLIM_URL
-
 RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
+    --mount=type=secret,id=VLLM_INDEX_URL,env=VLLM_INDEX_URL \\
+    --mount=type=secret,id=PYTORCH_TRITON_URL,env=PYTORCH_TRITON_URL \\
+    --mount=type=secret,id=NVPL_SLIM_URL,env=NVPL_SLIM_URL \\
     if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
         if [ "$(uname -m)" = "x86_64" ]; then \\
             pip3 install --no-cache-dir \\
@@ -1900,10 +1900,10 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if secrets:
             finalargs += [
                 f"--secret id=req,src={requirements}",
-                f"--build-arg VLLM_INDEX_URL={vllm_index_url}",
-                f"--build-arg PYTORCH_TRITON_URL={pytorch_triton_url}",
+                f"--secret id=VLLM_INDEX_URL",
+                f"--secret id=PYTORCH_TRITON_URL",
+                f"--secret id=NVPL_SLIM_URL",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-                f"--build-arg NVPL_SLIM_URL={nvpl_slim_url}",
             ]
         finalargs += [
             "-t",
@@ -2081,7 +2081,16 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
+    if be == "tensorrtllm":
+        github_organization = (
+            "https://github.com/NVIDIA"
+            if "triton-inference-server" in FLAGS.github_organization
+            else FLAGS.github_organization
+        )
+        repository_name = "TensorRT-LLM"
+        cmake_script.gitclone(repository_name, tag, be, github_organization)
+    else:
+        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     if be == "tensorrtllm":
         tensorrtllm_prebuild(cmake_script)
@@ -2769,8 +2778,6 @@ if __name__ == "__main__":
         metavar=("key", "value"),
         help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
         "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'vllm_index_url': The index URL for the pip install.\n"
-        "  - 'pytorch_triton_url': The location of the PyTorch wheel to download.\n"
         "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
         "Ensure that the required environment variables for these secrets are set before running the build.",
     )
@@ -2892,9 +2899,6 @@ if __name__ == "__main__":
     secrets = dict(getattr(FLAGS, "build_secret", []))
     if secrets:
         requirements = secrets.get("req", "")
-        vllm_index_url = secrets.get("vllm_index_url", "")
-        pytorch_triton_url = secrets.get("pytorch_triton_url", "")
-        nvpl_slim_url = secrets.get("nvpl_slim_url", "")
         build_public_vllm = secrets.get("build_public_vllm", "true")
         log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
