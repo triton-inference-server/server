@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ sys.path.append("../common")
 
 import os
 import queue
+import threading
 import time
 import unittest
 from functools import partial
@@ -606,53 +607,212 @@ class DecoupledTest(tu.TestResultCollector):
 class NonDecoupledTest(tu.TestResultCollector):
     def setUp(self):
         self.model_name_ = "repeat_int32"
-        self.input_data = {
-            "IN": np.array([1], dtype=np.int32),
-            "DELAY": np.array([0], dtype=np.uint32),
-            "WAIT": np.array([0], dtype=np.uint32),
+        self.data_matrix = [
+            # ("IN", "DELAY", "WAIT")
+            ([1], [0], [0]),
+            ([1], [4000], [2000]),
+            ([1], [2000], [4000]),
+        ]
+
+        # For grpc async infer test
+        self.callback_error = None
+        self.callback_result = None
+        self.callback_invoked_event = threading.Event()
+
+    def _input_data(self, in_value, delay_value, wait_value):
+        return {
+            "IN": np.array(in_value, dtype=np.int32),
+            "DELAY": np.array(delay_value, dtype=np.uint32),
+            "WAIT": np.array(wait_value, dtype=np.uint32),
         }
 
-    def test_grpc(self):
-        inputs = [
-            grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
-                self.input_data["IN"]
-            ),
-            grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
-                self.input_data["DELAY"]
-            ),
-            grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
-                self.input_data["WAIT"]
-            ),
-        ]
+    def _async_callback(self, result, error):
+        """Callback for async_infer."""
+        self.callback_error = error
+        self.callback_result = result
+        self.callback_invoked_event.set()
 
-        triton_client = grpcclient.InferenceServerClient(
-            url="localhost:8001", verbose=True
-        )
-        # Expect the inference is successful
-        res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
-        self.assertEqual(1, res.as_numpy("OUT")[0])
-        self.assertEqual(0, res.as_numpy("IDX")[0])
+    def test_grpc(self):
+        for in_value, delay_value, wait_value in self.data_matrix:
+            with self.subTest(IN=in_value, DELAY=delay_value, WAIT=wait_value):
+                input_data = self._input_data(in_value, delay_value, wait_value)
+                inputs = [
+                    grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                        input_data["IN"]
+                    ),
+                    grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                        input_data["DELAY"]
+                    ),
+                    grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                        input_data["WAIT"]
+                    ),
+                ]
+
+                triton_client = grpcclient.InferenceServerClient(
+                    url="localhost:8001", verbose=True
+                )
+
+                # Expect the inference is successful
+                res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
+                self.assertEqual(1, res.as_numpy("OUT")[0])
+                self.assertEqual(0, res.as_numpy("IDX")[0])
 
     def test_http(self):
-        inputs = [
-            httpclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
-                self.input_data["IN"]
-            ),
-            httpclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
-                self.input_data["DELAY"]
-            ),
-            httpclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
-                self.input_data["WAIT"]
-            ),
+        for in_value, delay_value, wait_value in self.data_matrix:
+            with self.subTest(IN=in_value, DELAY=delay_value, WAIT=wait_value):
+                input_data = self._input_data(in_value, delay_value, wait_value)
+                inputs = [
+                    httpclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                        input_data["IN"]
+                    ),
+                    httpclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                        input_data["DELAY"]
+                    ),
+                    httpclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                        input_data["WAIT"]
+                    ),
+                ]
+
+                triton_client = httpclient.InferenceServerClient(
+                    url="localhost:8000", verbose=True
+                )
+
+                # Expect the inference is successful
+                res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
+                self.assertEqual(1, res.as_numpy("OUT")[0])
+                self.assertEqual(0, res.as_numpy("IDX")[0])
+
+    def test_grpc_async(self):
+        for in_value, delay_value, wait_value in self.data_matrix:
+            with self.subTest(IN=in_value, DELAY=delay_value, WAIT=wait_value):
+                input_data = self._input_data(in_value, delay_value, wait_value)
+                inputs = [
+                    grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                        input_data["IN"]
+                    ),
+                    grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                        input_data["DELAY"]
+                    ),
+                    grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                        input_data["WAIT"]
+                    ),
+                ]
+
+                triton_client = grpcclient.InferenceServerClient(
+                    url="localhost:8001",
+                    verbose=True,
+                )
+
+                # Clear previous results
+                self.callback_error = None
+                self.callback_result = None
+                self.callback_invoked_event.clear()
+
+                try:
+                    triton_client.async_infer(
+                        model_name=self.model_name_,
+                        inputs=inputs,
+                        callback=self._async_callback,
+                    )
+                except Exception as e:
+                    self.fail(f"Failed to initiate async_infer: {e}")
+                    continue
+
+                # Wait for the callback to be invoked, with a timeout
+                self.assertTrue(
+                    self.callback_invoked_event.wait(timeout=10),
+                    "Callback not invoked within timeout.",
+                )
+
+                # Expect the inference is successful
+                self.assertIsNone(
+                    self.callback_error, f"Inference failed: {self.callback_error}"
+                )
+                self.assertIsNotNone(self.callback_result, "Inference result is None.")
+                self.assertEqual(1, self.callback_result.as_numpy("OUT")[0])
+                self.assertEqual(0, self.callback_result.as_numpy("IDX")[0])
+
+                # Wait and check server/model health
+                time.sleep(5)
+                self.assertTrue(triton_client.is_model_ready(self.model_name_))
+
+    def test_grpc_async_cancel(self):
+        data_matrix = [
+            # ("IN", "DELAY", "WAIT")
+            ([1], [4000], [2000]),
+            ([1], [2000], [4000]),
         ]
 
-        triton_client = httpclient.InferenceServerClient(
-            url="localhost:8000", verbose=True
-        )
-        # Expect the inference is successful
-        res = triton_client.infer(model_name=self.model_name_, inputs=inputs)
-        self.assertEqual(1, res.as_numpy("OUT")[0])
-        self.assertEqual(0, res.as_numpy("IDX")[0])
+        for in_value, delay_value, wait_value in data_matrix:
+            with self.subTest(IN=in_value, DELAY=delay_value, WAIT=wait_value):
+                input_data = self._input_data(in_value, delay_value, wait_value)
+                inputs = [
+                    grpcclient.InferInput("IN", [1], "INT32").set_data_from_numpy(
+                        input_data["IN"]
+                    ),
+                    grpcclient.InferInput("DELAY", [1], "UINT32").set_data_from_numpy(
+                        input_data["DELAY"]
+                    ),
+                    grpcclient.InferInput("WAIT", [1], "UINT32").set_data_from_numpy(
+                        input_data["WAIT"]
+                    ),
+                ]
+
+                triton_client = grpcclient.InferenceServerClient(
+                    url="localhost:8001",
+                    verbose=True,
+                )
+
+                # Clear previous results
+                self.callback_error = None
+                self.callback_result = None
+                self.callback_invoked_event.clear()
+
+                request_handle = None
+                try:
+                    request_handle = triton_client.async_infer(
+                        model_name=self.model_name_,
+                        inputs=inputs,
+                        callback=self._async_callback,
+                    )
+                except Exception as e:
+                    self.fail(f"Failed to initiate async_infer: {e}")
+                    continue
+
+                # Allow request to be fully initiated
+                time.sleep(0.5)
+
+                # Attempt to cancel the request
+                if request_handle:
+                    try:
+                        request_handle.cancel()
+                    except Exception as e:
+                        self.fail(f"Error calling request_handle.cancel(): {e}")
+                        continue
+                else:
+                    self.fail("Invalid request_handle, cannot cancel.")
+                    continue
+
+                # Wait for the callback to be invoked
+                self.assertTrue(
+                    self.callback_invoked_event.wait(timeout=10),
+                    "Callback not invoked within timeout after cancellation.",
+                )
+
+                # Expect the inference is failed
+                self.assertIsInstance(
+                    self.callback_error,
+                    InferenceServerException,
+                    f"Unexpected error type: {type(self.callback_error)}",
+                )
+                self.assertIn(
+                    "StatusCode.CANCELLED",
+                    self.callback_error.status(),
+                )
+
+                # Wait and check server/model health
+                time.sleep(5)
+                self.assertTrue(triton_client.is_model_ready(self.model_name_))
 
 
 if __name__ == "__main__":
