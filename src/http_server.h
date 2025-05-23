@@ -202,15 +202,6 @@ class HTTPAPIServer : public HTTPServer {
       std::unique_ptr<HTTPServer>* http_server);
 
   static TRITONSERVER_Error* Create(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
-      triton::server::TraceManager* trace_manager,
-      const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const bool reuse_port, const std::string& address,
-      const std::string& header_forward_pattern, const int thread_cnt,
-      const RestrictedFeatures& restricted_features,
-      std::unique_ptr<HTTPServer>* http_server);
-
-  static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
       const UnorderedMapType& options,
       triton::server::TraceManager* trace_manager,
@@ -509,7 +500,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
-      const size_t max_input_size,
+      const size_t max_input_size = HTTP_DEFAULT_MAX_INPUT_SIZE,
       const RestrictedFeatures& restricted_apis = {});
 
   virtual void Handle(evhtp_request_t* req) override;
