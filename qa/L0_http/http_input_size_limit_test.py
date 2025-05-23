@@ -41,7 +41,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         return "http://localhost:8000/v2/models/{}/infer".format(model_name)
 
     def test_default_limit_rejection_raw_binary(self):
-        """Test raw binary inputs with defaul limit"""
+        """Test raw binary inputs with default limit"""
         model = "onnx_zero_1_float32"
 
         # Test case 1: Input just over the limit (should fail)
@@ -99,7 +99,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
     def test_default_limit_rejection_json(self):
-        """Test JSON inputs with defaul limit"""
+        """Test JSON inputs with default limit"""
         model = "onnx_zero_1_float32"
 
         # Test case 1: Input just over the limit (should fail)
