@@ -1174,8 +1174,8 @@ HTTPAPIServer::HTTPAPIServer(
           R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
       cudasharedmemory_regex_(
           R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
-      trace_regex_(R"(/v2/trace/setting)"), restricted_apis_(restricted_apis),
-      max_input_size_(max_input_size)
+      trace_regex_(R"(/v2/trace/setting)"), max_input_size_(max_input_size),
+      restricted_apis_(restricted_apis)
 {
   // FIXME, don't cache server metadata. The http endpoint should
   // not be deciding that server metadata will not change during
@@ -2813,8 +2813,8 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (byte_size > max_input_size_) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
-                ("input '" + std::string(input_name) + "' has a byte_size (" +
-                 std::to_string(byte_size) +
+                ("JSON input '" + std::string(input_name) +
+                 "' has a byte_size (" + std::to_string(byte_size) +
                  " bytes) that exceeds the maximum allowed value "
                  "of " +
                  std::to_string(max_input_size_) +
@@ -3380,8 +3380,6 @@ HTTPAPIServer::HandleGenerate(
         streaming, irequest_shared, shm_manager_));
   }
   generate_request->trace_ = trace;
-  // Set max_input_size for the generate request
-  generate_request->max_input_size_ = max_input_size_;
 
   const char* request_id = "<id_unknown>";
   // Callback to cleanup on any errors encountered below. Capture everything
@@ -3606,19 +3604,6 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
       byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
-    }
-
-    // Check if byte_size is larger than max_input_size_
-    if (byte_size > max_input_size_) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          ("input '" + name + "' has a byte_size (" +
-           std::to_string(byte_size) +
-           " bytes) that exceeds the maximum allowed value "
-           "of " +
-           std::to_string(max_input_size_) +
-           " bytes. Use --http-max-input-size to increase the limit.")
-              .c_str());
     }
 
     std::vector<int64_t> shape_vec;
@@ -4850,6 +4835,21 @@ HTTPAPIServer::Create(
   return nullptr;
 }
 
+TRITONSERVER_Error*
+HTTPAPIServer::Create(
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt,
+    const RestrictedFeatures& restricted_features,
+    std::unique_ptr<HTTPServer>* http_server)
+{
+  return Create(
+      server, trace_manager, shm_manager, port, reuse_port, address,
+      header_forward_pattern, thread_cnt, HTTP_DEFAULT_MAX_INPUT_SIZE,
+      restricted_features, http_server);
+}
 
 TRITONSERVER_Error*
 HTTPAPIServer::Create(
@@ -4865,7 +4865,6 @@ HTTPAPIServer::Create(
   std::string address;
   std::string header_forward_pattern;
   int thread_count;
-  int max_input_size;  // Use int for GetValue compatibility
 
   RETURN_IF_ERR(GetValue(options, "port", &port));
   RETURN_IF_ERR(GetValue(options, "reuse_port", &reuse_port));
@@ -4873,12 +4872,10 @@ HTTPAPIServer::Create(
   RETURN_IF_ERR(
       GetValue(options, "header_forward_pattern", &header_forward_pattern));
   RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
-  RETURN_IF_ERR(GetValue(options, "max_input_size", &max_input_size));
 
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_count, static_cast<size_t>(max_input_size),
-      restricted_features, service);
+      header_forward_pattern, thread_count, restricted_features, service);
 }
 
 

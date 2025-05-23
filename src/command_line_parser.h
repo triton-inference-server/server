@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common.h"
 #include "restricted_features.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
@@ -197,9 +198,9 @@ struct TritonServerParameters {
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
   RestrictedFeatures http_restricted_apis_{};
-  // Default max input size is 64MB (2^26 bytes)
-  size_t http_max_input_size_{1 << 26};
-#endif  // TRITON_ENABLE_HTTP
+  size_t http_max_input_size_{
+      HTTP_DEFAULT_MAX_INPUT_SIZE};  // Default value 64MB
+#endif                               // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
   bool allow_grpc_{true};

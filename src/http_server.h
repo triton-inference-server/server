@@ -202,6 +202,15 @@ class HTTPAPIServer : public HTTPServer {
       std::unique_ptr<HTTPServer>* http_server);
 
   static TRITONSERVER_Error* Create(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
+      triton::server::TraceManager* trace_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      const int32_t port, const bool reuse_port, const std::string& address,
+      const std::string& header_forward_pattern, const int thread_cnt,
+      const RestrictedFeatures& restricted_features,
+      std::unique_ptr<HTTPServer>* http_server);
+
+  static TRITONSERVER_Error* Create(
       std::shared_ptr<TRITONSERVER_Server>& server,
       const UnorderedMapType& options,
       triton::server::TraceManager* trace_manager,
@@ -427,9 +436,6 @@ class HTTPAPIServer : public HTTPServer {
 
     const MappingSchema* RequestSchema() { return request_schema_; }
     const MappingSchema* ResponseSchema() { return response_schema_; }
-
-    // Maximum input size to check when processing inputs
-    size_t max_input_size_{0};
 
    private:
     struct TritonOutput {
@@ -688,8 +694,8 @@ class HTTPAPIServer : public HTTPServer {
         parameters_field,
         new MappingSchema(MappingSchema::Kind::MAPPING_SCHEMA, true));
   }
+  size_t max_input_size_;
   RestrictedFeatures restricted_apis_{};
-  size_t max_input_size_{};
   bool RespondIfRestricted(
       evhtp_request_t* req, const Restriction& restriction);
 };
