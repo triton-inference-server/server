@@ -32,10 +32,10 @@ sys.path.append("../common")
 
 import os
 import queue
+import threading
 import time
 import unittest
 from functools import partial
-import threading
 
 import numpy as np
 import test_util as tu
