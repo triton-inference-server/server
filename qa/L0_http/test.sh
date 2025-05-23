@@ -823,6 +823,42 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test with zero max input size - should fail to start
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=0"
+SERVER_LOG="./inference_server_zero_limit.log"
+CLIENT_LOG="./http_input_size_limit_zero.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with zero max input size\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+# Test with negative max input size - should fail to start
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=-1024"
+SERVER_LOG="./inference_server_negative_limit.log"
+CLIENT_LOG="./http_input_size_limit_negative.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with negative max input size\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+# Test with very large max input size (1TB) - should fail to start
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**40))"
+SERVER_LOG="./inference_server_very_large_limit.log"
+CLIENT_LOG="./http_input_size_limit_very_large.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with very large HTTP input size limit\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    exit 1
+fi
+
 ###
 
 if [ $RET -eq 0 ]; then
