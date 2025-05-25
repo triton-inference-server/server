@@ -1068,14 +1068,14 @@ ModelInferHandler::InferResponseComplete(
     state->cb_count_++;
   }
 
-  bool is_complete = (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
+  bool is_final_response = (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
   // Allow sending 1 response and final flag separately, only mark
   // non-inflight when seeing final flag
-  if (is_complete || state->IsGrpcContextCancelled()) {
+  if (is_final_response) {
     state->context_->EraseInflightState(state);
   }
 
@@ -1087,6 +1087,7 @@ ModelInferHandler::InferResponseComplete(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
 
+    state->context_->EraseInflightState(state);
     state->step_ = Steps::CANCELLED;
 
     LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
@@ -1094,7 +1095,7 @@ ModelInferHandler::InferResponseComplete(
                    << ", skipping response generation as grpc transaction was "
                       "cancelled... ";
 
-    if (is_complete) {
+    if (is_final_response) {
       if (state->delay_enqueue_ms_ != 0) {
         // Will delay PutTaskBackToQueue by the specified time.
         // This can be used to test the flow when cancellation request
@@ -1158,7 +1159,7 @@ ModelInferHandler::InferResponseComplete(
 
   // Defer sending the response until FINAL flag is seen or
   // there is error
-  if (!is_complete) {
+  if (!is_final_response) {
     return;
   }
 
