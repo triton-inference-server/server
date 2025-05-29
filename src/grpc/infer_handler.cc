@@ -1068,12 +1068,14 @@ ModelInferHandler::InferResponseComplete(
     state->cb_count_++;
   }
 
+  bool is_final_response = (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
+
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
   // Allow sending 1 response and final flag separately, only mark
   // non-inflight when seeing final flag
-  if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+  if (is_final_response) {
     state->context_->EraseInflightState(state);
   }
 
@@ -1093,22 +1095,23 @@ ModelInferHandler::InferResponseComplete(
                    << ", skipping response generation as grpc transaction was "
                       "cancelled... ";
 
-    if (state->delay_enqueue_ms_ != 0) {
-      // Will delay PutTaskBackToQueue by the specified time.
-      // This can be used to test the flow when cancellation request
-      // issued for the request during InferResponseComplete
-      // callback right before Process in the notification thread.
-      LOG_INFO << "Delaying PutTaskBackToQueue by " << state->delay_enqueue_ms_
-               << " ms...";
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(state->delay_enqueue_ms_));
+    if (is_final_response) {
+      if (state->delay_enqueue_ms_ != 0) {
+        // Will delay PutTaskBackToQueue by the specified time.
+        // This can be used to test the flow when cancellation request
+        // issued for the request during InferResponseComplete
+        // callback right before Process in the notification thread.
+        LOG_INFO << "Delaying PutTaskBackToQueue by "
+                 << state->delay_enqueue_ms_ << " ms...";
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(state->delay_enqueue_ms_));
+      }
+
+      // Send state back to the queue so that state can be released
+      // in the next cycle.
+      state->context_->PutTaskBackToQueue(state);
+      delete response_release_payload;
     }
-
-    // Send state back to the queue so that state can be released
-    // in the next cycle.
-    state->context_->PutTaskBackToQueue(state);
-
-    delete response_release_payload;
     return;
   }
 
@@ -1156,7 +1159,7 @@ ModelInferHandler::InferResponseComplete(
 
   // Defer sending the response until FINAL flag is seen or
   // there is error
-  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+  if (!is_final_response) {
     return;
   }
 
