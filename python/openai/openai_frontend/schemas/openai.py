@@ -81,7 +81,7 @@ class CreateCompletionRequest(BaseModel):
     )
     best_of: Optional[conint(ge=0, le=20)] = Field(
         1,
-        description='Generates `best_of` completions server-side and returns the "best" (the one with the highest log probability per token). Results cannot be streamed.\n\nWhen used with `n`, `best_of` controls the number of candidate completions and `n` specifies how many to return – `best_of` must be greater than `n`.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n',
+        description='Generates `best_of` completions server-side and returns the "best" (the one with the highest log probability per token). Results cannot be streamed.\n\nWhen used with `n`, `best_of` controls the number of candidate completions and `n` specifies how many to return – `best_of` must be greater than `n`.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_completion_tokens` and `stop`.\n',
     )
     echo: Optional[bool] = Field(
         False, description="Echo back the prompt in addition to the completion\n"
@@ -103,7 +103,7 @@ class CreateCompletionRequest(BaseModel):
         description="Include the log probabilities on the `logprobs` most likely output tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5.\n",
     )
     max_tokens: Optional[conint(ge=0)] = Field(
-        16,
+        None,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
         examples=[16],
     )
@@ -114,7 +114,7 @@ class CreateCompletionRequest(BaseModel):
     )
     n: Optional[conint(ge=1, le=128)] = Field(
         1,
-        description="How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n",
+        description="How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_completion_tokens` and `stop`.\n",
         examples=[1],
     )
     presence_penalty: Optional[confloat(ge=-2.0, le=2.0)] = Field(
@@ -526,14 +526,6 @@ class Logprobs2(BaseModel):
     )
 
 
-class ChatCompletionFinishReason(Enum):
-    stop = "stop"
-    length = "length"
-    tool_calls = "tool_calls"
-    content_filter = "content_filter"
-    function_call = "function_call"
-
-
 class ChatCompletionStreamingResponseChoice(BaseModel):
     delta: ChatCompletionStreamResponseDelta
     logprobs: Optional[Logprobs2] = Field(
@@ -850,10 +842,14 @@ class CreateChatCompletionRequest(BaseModel):
         None,
         description="An integer between 0 and 20 specifying the number of most likely tokens to return at each token position, each with an associated log probability. `logprobs` must be set to `true` if this parameter is used.",
     )
-    # TODO: Consider new max_completion_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
+    max_completion_tokens: Optional[conint(ge=0)] = Field(
+        None,
+        description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion. This is the preferred parameter for controlling token count. The total length of input tokens and generated tokens is limited by the model's context length.",
+    )
+    # TODO: Remove support for max_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
     max_tokens: Optional[conint(ge=0)] = Field(
-        16,
-        description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
+        None,
+        description="DEPRECATED: Please use `max_completion_tokens` instead. The maximum number of [tokens](/tokenizer) that can be generated in the chat completion. The total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.",
     )
     # TODO: Extension, flesh out description and defaults
     min_tokens: Optional[conint(ge=0)] = Field(
@@ -871,7 +867,7 @@ class CreateChatCompletionRequest(BaseModel):
     )
     response_format: Optional[ResponseFormat] = Field(
         None,
-        description='An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.\n\nSetting to `{ "type": "json_object" }` enables JSON mode, which guarantees the message the model generates is valid JSON.\n\n**Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly "stuck" request. Also note that the message content may be partially cut off if `finish_reason="length"`, which indicates the generation exceeded `max_tokens` or the conversation exceeded the max context length.\n',
+        description='An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.\n\nSetting to `{ "type": "json_object" }` enables JSON mode, which guarantees the message the model generates is valid JSON.\n\n**Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly "stuck" request. Also note that the message content may be partially cut off if `finish_reason="length"`, which indicates the generation exceeded `max_completion_tokens` or the conversation exceeded the max context length.\n',
     )
     seed: Optional[conint(ge=-9223372036854775808, le=9223372036854775807)] = Field(
         None,
@@ -905,11 +901,11 @@ class CreateChatCompletionRequest(BaseModel):
         description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
         examples=["user-1234"],
     )
-    function_call: Optional[
-        Union[FunctionCall3, ChatCompletionFunctionCallOption]
-    ] = Field(
-        None,
-        description='Deprecated in favor of `tool_choice`.\n\nControls which (if any) function is called by the model.\n`none` means the model will not call a function and instead generates a message.\n`auto` means the model can pick between generating a message or calling a function.\nSpecifying a particular function via `{"name": "my_function"}` forces the model to call that function.\n\n`none` is the default when no functions are present. `auto` is the default if functions are present.\n',
+    function_call: Optional[Union[FunctionCall3, ChatCompletionFunctionCallOption]] = (
+        Field(
+            None,
+            description='Deprecated in favor of `tool_choice`.\n\nControls which (if any) function is called by the model.\n`none` means the model will not call a function and instead generates a message.\n`auto` means the model can pick between generating a message or calling a function.\nSpecifying a particular function via `{"name": "my_function"}` forces the model to call that function.\n\n`none` is the default when no functions are present. `auto` is the default if functions are present.\n',
+        )
     )
     functions: Optional[List[ChatCompletionFunctions]] = Field(
         None,
