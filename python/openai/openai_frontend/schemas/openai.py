@@ -849,7 +849,7 @@ class CreateChatCompletionRequest(BaseModel):
     # TODO: Remove support for max_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
     max_tokens: Optional[conint(ge=0)] = Field(
         None,
-        description="DEPRECATED: Please use `max_completion_tokens` instead. The maximum number of [tokens](/tokenizer) that can be generated in the chat completion. The total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.",
+        description="DEPRECATED: Please use `max_completion_tokens` instead. The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
     )
     # TODO: Extension, flesh out description and defaults
     min_tokens: Optional[conint(ge=0)] = Field(
