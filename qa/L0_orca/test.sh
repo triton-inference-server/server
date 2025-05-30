@@ -36,7 +36,7 @@ MODEL_NAME="gpt2_tensorrt_llm"
 NAME="tensorrt_llm_benchmarking_test"
 MODEL_REPOSITORY="$(pwd)/triton_model_repo"
 TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
+GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/models/core/gpt"
 TOKENIZER_DIR="$GPT_DIR/gpt2"
 ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -47,40 +47,6 @@ SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 CLIENT_PY=${BASE_DIR}/orca_http_test.py
 CLIENT_LOG="${NAME}_orca_http_test.log"
 source ../common/util.sh
-
-function prepare_model_repository {
-    rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
-    rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
-    mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
-
-    replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${encoder_input_features_data_type}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-}
 
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
 # success, 1 on failure
