@@ -1056,14 +1056,13 @@ SHELL ["cmd", "/S", "/C"]
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install docker docker buildx
-RUN apt-get update \\
-      && apt-get install -y --no-install-recommends apt-transport-https ca-certificates \\
-      && sed -i \\
-            -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \\
-            -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \\
-            /etc/apt/sources.list.d/ubuntu.sources \\
+RUN sed -i \\
+        -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \\
+        -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \\
+        /etc/apt/sources.list.d/ubuntu.sources \\
       && rm -rf /var/lib/apt/lists/* \\
       && apt update \\
+      && apt-get install -y --no-install-recommends apt-transport-https ca-certificates \\
       && apt-get install -y ca-certificates curl gnupg \\
       && install -m 0755 -d /etc/apt/keyrings \\
       && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \\
