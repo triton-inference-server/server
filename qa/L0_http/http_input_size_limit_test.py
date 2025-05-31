@@ -35,6 +35,20 @@ import numpy as np
 import requests
 import test_util as tu
 
+# Constants for size calculations
+# Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
+BYTES_PER_FP32 = 4
+MB = 2**20  # 1 MB = 1,048,576 bytes
+DEFAULT_LIMIT_BYTES = 64 * MB  # 64MB default limit
+INCREASED_LIMIT_BYTES = 128 * MB  # 128MB increased limit
+
+# Calculate element counts for size limits
+DEFAULT_LIMIT_ELEMENTS = DEFAULT_LIMIT_BYTES / BYTES_PER_FP32  # 16,777,216 elements
+INCREASED_LIMIT_ELEMENTS = INCREASED_LIMIT_BYTES / BYTES_PER_FP32  # 33,554,432 elements
+
+# Small offsets to go just over/under the limits
+OFFSET_ELEMENTS = 32
+
 
 class InferSizeLimitTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
@@ -44,9 +58,13 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """Test raw binary inputs with default limit"""
         model = "onnx_zero_1_float32"
 
-        # Test case 1: Input just over the limit (should fail)
-        large_input = np.ones(2**24 + 32, dtype=np.float32)  # Just over 64MB
+        # Test case 1: Input just over the 64MB limit (should fail)
+        # (2^24 + 32) elements * 4 bytes = 64MB + 128 bytes = 67,108,992 bytes
+        large_input = np.ones(
+            DEFAULT_LIMIT_ELEMENTS + OFFSET_ELEMENTS, dtype=np.float32
+        )
         input_bytes = large_input.tobytes()
+        assert len(input_bytes) > 64 * MB  # Verify we're actually over the 64MB limit
 
         headers = {"Inference-Header-Content-Length": "0"}
         response = requests.post(
@@ -70,9 +88,13 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Expected error message about exceeding max input size",
         )
 
-        # Test case 2: Input just under the limit (should succeed)
-        small_input = np.ones(2**24 - 32, dtype=np.float32)  # Just under 64MB
+        # Test case 2: Input just under the 64MB limit (should succeed)
+        # (2^24 - 32) elements * 4 bytes = 64MB - 128 bytes = 67,108,736 bytes
+        small_input = np.ones(
+            DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS, dtype=np.float32
+        )
         input_bytes = small_input.tobytes()
+        assert len(input_bytes) < 64 * MB  # Verify we're actually under the 64MB limit
 
         response = requests.post(
             self._get_infer_url(model), data=input_bytes, headers=headers
@@ -102,8 +124,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """Test JSON inputs with default limit"""
         model = "onnx_zero_1_float32"
 
-        # Test case 1: Input just over the limit (should fail)
-        shape_size = 2**24 + 32  # Just over 64MB of float32 data
+        # Test case 1: Input just over the 64MB limit (should fail)
+        # (2^24 + 32) elements * 4 bytes = 64MB + 128 bytes = 67,108,992 bytes
+        shape_size = DEFAULT_LIMIT_ELEMENTS + OFFSET_ELEMENTS
 
         payload = {
             "inputs": [
@@ -115,6 +138,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
+        assert (
+            shape_size * BYTES_PER_FP32 > 64 * MB
+        )  # Verify we're actually over the 64MB limit
 
         headers = {"Content-Type": "application/json"}
         response = requests.post(
@@ -138,8 +164,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Expected error message about exceeding max input size",
         )
 
-        # Test case 2: Input just under the limit (should succeed)
-        shape_size = 2**24 - 32  # Just under 64MB of float32 data
+        # Test case 2: Input just under the 64MB limit (should succeed)
+        # (2^24 - 32) elements * 4 bytes = 64MB - 128 bytes = 67,108,736 bytes
+        shape_size = DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS
 
         payload = {
             "inputs": [
@@ -151,6 +178,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
+        assert (
+            shape_size * BYTES_PER_FP32 < 64 * MB
+        )  # Verify we're actually under the 64MB limit
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
@@ -179,9 +209,13 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """Test raw binary input larger with custom limit set"""
         model = "onnx_zero_1_float32"
 
-        # Test case 1: Input just over our configured limit (should fail)
-        large_input = np.ones(2**25 + 32, dtype=np.float32)  # Just over 128MB
+        # Test case 1: Input just over the 128MB configured limit (should fail)
+        # (2^25 + 32) elements * 4 bytes = 128MB + 128 bytes = 134,217,856 bytes
+        large_input = np.ones(
+            INCREASED_LIMIT_ELEMENTS + OFFSET_ELEMENTS, dtype=np.float32
+        )
         input_bytes = large_input.tobytes()
+        assert len(input_bytes) > 128 * MB  # Verify we're actually over the 128MB limit
 
         headers = {"Inference-Header-Content-Length": "0"}
         response = requests.post(
@@ -205,9 +239,15 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Expected error message about exceeding max input size",
         )
 
-        # Test case 2: Input just under our configured limit (should succeed)
-        small_input = np.ones(2**25 - 32, dtype=np.float32)  # Just under 128MB
+        # Test case 2: Input just under the 128MB configured limit (should succeed)
+        # (2^25 - 32) elements * 4 bytes = 128MB - 128 bytes = 134,217,600 bytes
+        small_input = np.ones(
+            INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS, dtype=np.float32
+        )
         input_bytes = small_input.tobytes()
+        assert (
+            len(input_bytes) < 128 * MB
+        )  # Verify we're actually under the 128MB limit
 
         response = requests.post(
             self._get_infer_url(model), data=input_bytes, headers=headers
@@ -237,8 +277,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """Test JSON input larger with custom limit set"""
         model = "onnx_zero_1_float32"
 
-        # Test case 1: Input just over our configured limit (should fail)
-        shape_size = 2**25 + 32  # Just over 128MB
+        # Test case 1: Input just over the 128MB configured limit (should fail)
+        # (2^25 + 32) elements * 4 bytes = 128MB + 128 bytes = 134,217,856 bytes
+        shape_size = INCREASED_LIMIT_ELEMENTS + OFFSET_ELEMENTS
 
         payload = {
             "inputs": [
@@ -250,6 +291,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
+        assert (
+            shape_size * BYTES_PER_FP32 > 128 * MB
+        )  # Verify we're actually over the 128MB limit
 
         headers = {"Content-Type": "application/json"}
         response = requests.post(
@@ -273,8 +317,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Expected error message about exceeding max input size",
         )
 
-        # Test case 2: Input just under our configured limit (should succeed)
-        shape_size = 2**25 - 32  # Just under 128MB
+        # Test case 2: Input just under the 128MB configured limit (should succeed)
+        # (2^25 - 32) elements * 4 bytes = 128MB - 128 bytes = 134,217,600 bytes
+        shape_size = INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS
 
         payload = {
             "inputs": [
@@ -286,6 +331,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
+        assert (
+            shape_size * BYTES_PER_FP32 < 128 * MB
+        )  # Verify we're actually under the 128MB limit
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload

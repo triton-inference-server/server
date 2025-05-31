@@ -833,6 +833,10 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
     RET=1
+elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
 fi
 
 # Test with negative max input size - should fail to start
@@ -844,6 +848,10 @@ if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Server should not start with negative max input size\n***"
     kill $SERVER_PID
     wait $SERVER_PID
+    RET=1
+elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
+    cat $SERVER_LOG
     RET=1
 fi
 
