@@ -198,9 +198,9 @@ struct TritonServerParameters {
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
   RestrictedFeatures http_restricted_apis_{};
-  size_t http_max_input_size_{
-      HTTP_DEFAULT_MAX_INPUT_SIZE};  // Default value 64MB
-#endif                               // TRITON_ENABLE_HTTP
+  // Default value 64MB
+  size_t http_max_input_size_{HTTP_DEFAULT_MAX_INPUT_SIZE};
+#endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
   bool allow_grpc_{true};
