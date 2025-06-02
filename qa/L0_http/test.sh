@@ -793,7 +793,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Now run with increased size limit (128MB) - large inputs should succeed
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=128"
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
 SERVER_LOG="./inference_server_increased_limit.log"
 CLIENT_LOG="./http_input_size_limit_increased.log"
 run_server

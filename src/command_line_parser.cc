@@ -500,9 +500,8 @@ TritonParser::SetupOptions()
        "Number of threads handling HTTP requests."});
   http_options_.push_back(
       {OPTION_HTTP_MAX_INPUT_SIZE, "http-max-input-size", Option::ArgInt,
-       ("Maximum allowed HTTP request input size in megabytes (MB). Default "
-        "is " +
-        std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + "MB.")});
+       ("Maximum allowed HTTP request input size in bytes. Default is " +
+        std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + " bytes (64MB).")});
   http_options_.push_back(
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",
        "<string>:<string>=<string>",
@@ -1405,8 +1404,7 @@ TritonParser::Parse(int argc, char** argv)
             throw ParseException(
                 "Error: --http-max-input-size must be greater than 0.");
           }
-          // Convert MB to bytes
-          lparams.http_max_input_size_ = temp_input_size * 1024 * 1024;
+          lparams.http_max_input_size_ = temp_input_size;
           break;
         }
         case OPTION_HTTP_RESTRICTED_API:
