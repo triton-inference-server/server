@@ -3106,10 +3106,10 @@ HTTPAPIServer::EVBufferToRawInput(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("Raw input has a byte_size (" + std::to_string(byte_size) +
-         " bytes) that exceeds the maximum allowed value "
-         "of " +
+         " bytes) that exceeds the maximum allowed value of " +
          std::to_string(max_input_size_) +
-         " bytes. Use --http-max-input-size to increase the limit.")
+         " bytes. Use --http-max-input-size to increase the limit (specify "
+         "value in MB).")
             .c_str());
   }
 
