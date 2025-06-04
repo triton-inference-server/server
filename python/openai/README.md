@@ -619,7 +619,7 @@ tool_calls = client.chat.completions.create(
 function_name = tool_calls.choices[0].message.tool_calls[0].function.name
 function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
 
-print(f"function name: "{function_name}")
+print(f"function name: {function_name}")
 print(f"function arguments: {function_arguments}")
 print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
 ```
