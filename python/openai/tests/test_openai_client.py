@@ -200,13 +200,13 @@ class TestAsyncOpenAIClient:
         seed = 0
         temperature = 0.0
         # Generate enough tokens to easily identify stop words are working.
-        max_tokens = 64
+        max_completion_tokens = 64
 
         # Test single chat completion for comparison
         chat_completion = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             temperature=temperature,
             seed=seed,
             stream=False,
@@ -219,7 +219,7 @@ class TestAsyncOpenAIClient:
         stream = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             temperature=temperature,
             seed=seed,
             stream=True,
