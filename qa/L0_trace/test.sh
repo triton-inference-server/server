@@ -1087,6 +1087,9 @@ for p in {1..10}; do
     sleep 10
 done
 
+# Wait for all traces to be collected
+sleep 5
+
 if ! [[ -s collected_traces.json && `grep -c "\"parentSpanId\":\"\"" ./collected_traces.json` == 1 && `grep -c "\"parentSpanId\":\"b7ad6b7169242424\"" ./collected_traces.json` == 10 ]] ; then
     echo -e "\n***\n*** collected_traces.json should contain 11 OTel trace, but it is not. \n***"
     exit 1
