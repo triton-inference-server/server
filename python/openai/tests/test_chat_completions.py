@@ -123,6 +123,7 @@ class TestChatCompletions:
         [
             ("temperature", 0.7),
             ("max_tokens", 10),
+            ("max_completion_tokens", 10),
             ("top_p", 0.9),
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
@@ -172,6 +173,7 @@ class TestChatCompletions:
             ("temperature", 2.1),
             ("temperature", -0.1),
             ("max_tokens", -1),
+            ("max_completion_tokens", -1),
             ("top_p", 1.1),
             ("frequency_penalty", 3),
             ("frequency_penalty", -3),
@@ -199,14 +201,21 @@ class TestChatCompletions:
         assert response.status_code == 422
 
     # Simple tests to verify max_tokens roughly behaves as expected
+    @pytest.mark.parametrize(
+        "param_key",
+        [
+            "max_tokens",
+            "max_completion_tokens",
+        ],
+    )
     def test_chat_completions_max_tokens(
-        self, client, model: str, messages: List[dict]
+        self, client, param_key, model: str, messages: List[dict]
     ):
         responses = []
-        payload = {"model": model, "messages": messages, "max_tokens": 1}
+        payload = {"model": model, "messages": messages}
 
-        # Send two requests with max_tokens = 1 to check their similarity
-        payload["max_tokens"] = 1
+        # Send two requests with max_tokens/max_completion_tokens = 1 to check their similarity
+        payload[param_key] = 1
         responses.append(
             client.post(
                 "/v1/chat/completions",
@@ -219,8 +228,8 @@ class TestChatCompletions:
                 json=payload,
             )
         )
-        # Send one requests with larger max_tokens to check its dis-similarity
-        payload["max_tokens"] = 100
+        # Send one requests with larger max_tokens/max_completion_tokens to check its dis-similarity
+        payload[param_key] = 100
         responses.append(
             client.post(
                 "/v1/chat/completions",
@@ -245,6 +254,30 @@ class TestChatCompletions:
         assert len(response1_text) == len(response2_text) == 1
         assert len(response3_text) > len(response1_text)
 
+    def test_chat_completions_max_completion_tokens_precedence(
+        self, client, model: str, messages: List[dict]
+    ):
+        payload = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": 50,  # Higher value for max_tokens
+            "max_completion_tokens": 1,  # Lower, expected to take precedence
+        }
+
+        response = client.post(
+            "/v1/chat/completions",
+            json=payload,
+        )
+
+        print("Response:", response.json())
+        assert response.status_code == 200
+
+        response_text_words = (
+            response.json()["choices"][0]["message"]["content"].strip().split()
+        )
+        # Check if the number of words is around max_completion_tokens
+        assert len(response_text_words) == 1
+
     @pytest.mark.parametrize(
         "temperature",
         [0.0, 1.0],
@@ -260,7 +293,7 @@ class TestChatCompletions:
         payload = {
             "model": model,
             "messages": messages,
-            "max_tokens": 256,
+            "max_completion_tokens": 256,
             "temperature": temperature,
         }
 
@@ -321,7 +354,7 @@ class TestChatCompletions:
             "model": model,
             "messages": messages,
             # Increase token length to allow more room for variability
-            "max_tokens": 200,
+            "max_completion_tokens": 200,
             "temperature": 0.0,
             # TRT-LLM requires certain settings of `top_k` / `top_p` to
             # respect changes in `temperature`
@@ -376,7 +409,7 @@ class TestChatCompletions:
             "model": model,
             "messages": messages,
             # Increase token length to allow more room for variability
-            "max_tokens": 200,
+            "max_completion_tokens": 200,
             "seed": 1,
         }
         payload2 = copy.deepcopy(payload1)
