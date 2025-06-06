@@ -196,7 +196,12 @@ function run_server () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>${SERVER_ERROR_LOG:-SERVER_LOG} &
+    # If SERVER_ERROR_LOG is not set, redirect stderr to stdout
+    if [ -z "${SERVER_ERROR_LOG:-}" ]; then
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    else
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>$SERVER_ERROR_LOG &
+    fi
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
