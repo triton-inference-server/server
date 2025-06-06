@@ -630,20 +630,24 @@ fi
 set +e
 # Only INFO logs in SERVER_LOG
 if [ `grep -c -P "I$LOG_REGEX" $SERVER_LOG` == "0" ]; then
-  echo -e "\n***\n*** Test Failed: INFO logs are not directed to SERVER_LOG\n***"
+  echo -e "\n***\n*** Test Failed: INFO logs are not written to $SERVER_LOG\n***"
   RET=1
 fi
 if [ `grep -c -P "(W|E)$LOG_REGEX" $SERVER_LOG` != "0" ]; then
-  echo -e "\n***\n*** Test Failed: WARNING/ERROR logs are directed to SERVER_LOG\n***"
+  echo -e "\n***\n*** Test Failed: WARNING/ERROR logs are written to $SERVER_LOG\n***"
   RET=1
 fi
 # Only WARNING and ERROR logs in SERVER_ERROR_LOG
 if [ `grep -c -P "I$LOG_REGEX" $SERVER_ERROR_LOG` != "0" ]; then
-  echo -e "\n***\n*** Test Failed: INFO logs are directed to SERVER_ERROR_LOG\n***"
+  echo -e "\n***\n*** Test Failed: INFO logs are written to $SERVER_ERROR_LOG\n***"
   RET=1
 fi
-if [ `grep -c -P "(W|E)$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
-  echo -e "\n***\n*** Test Failed: WARNING/ERROR logs are not directed to SERVER_ERROR_LOG\n***"
+if [ `grep -c -P "W$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
+  echo -e "\n***\n*** Test Failed: ERROR logs are not written to $SERVER_ERROR_LOG\n***"
+  RET=1
+fi
+if [ `grep -c -P "E$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
+  echo -e "\n***\n*** Test Failed: ERROR logs are not written to $SERVER_ERROR_LOG\n***"
   RET=1
 fi
 
