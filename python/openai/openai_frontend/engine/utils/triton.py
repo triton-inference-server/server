@@ -100,6 +100,8 @@ def _create_vllm_inference_request(
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
+    inputs["return_num_input_tokens"] = np.bool_([True])
+    inputs["return_num_output_tokens"] = np.bool_([True])
     return model.create_request(inputs=inputs)
 
 
