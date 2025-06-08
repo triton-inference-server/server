@@ -202,20 +202,20 @@ class TestChatCompletions:
 
     # Simple tests to verify max_tokens roughly behaves as expected
     @pytest.mark.parametrize(
-        "param_key",
+        "max_tokens_key",
         [
             "max_tokens",
             "max_completion_tokens",
         ],
     )
     def test_chat_completions_max_tokens(
-        self, client, param_key, model: str, messages: List[dict]
+        self, client, max_tokens_key, model: str, messages: List[dict]
     ):
         responses = []
         payload = {"model": model, "messages": messages}
 
         # Send two requests with max_tokens/max_completion_tokens = 1 to check their similarity
-        payload[param_key] = 1
+        payload[max_tokens_key] = 1
         responses.append(
             client.post(
                 "/v1/chat/completions",
@@ -229,7 +229,7 @@ class TestChatCompletions:
             )
         )
         # Send one requests with larger max_tokens/max_completion_tokens to check its dis-similarity
-        payload[param_key] = 100
+        payload[max_tokens_key] = 100
         responses.append(
             client.post(
                 "/v1/chat/completions",

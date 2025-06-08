@@ -81,7 +81,7 @@ class CreateCompletionRequest(BaseModel):
     )
     best_of: Optional[conint(ge=0, le=20)] = Field(
         1,
-        description='Generates `best_of` completions server-side and returns the "best" (the one with the highest log probability per token). Results cannot be streamed.\n\nWhen used with `n`, `best_of` controls the number of candidate completions and `n` specifies how many to return – `best_of` must be greater than `n`.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_completion_tokens` and `stop`.\n',
+        description='Generates `best_of` completions server-side and returns the "best" (the one with the highest log probability per token). Results cannot be streamed.\n\nWhen used with `n`, `best_of` controls the number of candidate completions and `n` specifies how many to return – `best_of` must be greater than `n`.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n',
     )
     echo: Optional[bool] = Field(
         False, description="Echo back the prompt in addition to the completion\n"
@@ -114,7 +114,7 @@ class CreateCompletionRequest(BaseModel):
     )
     n: Optional[conint(ge=1, le=128)] = Field(
         1,
-        description="How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_completion_tokens` and `stop`.\n",
+        description="How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n",
         examples=[1],
     )
     presence_penalty: Optional[confloat(ge=-2.0, le=2.0)] = Field(
