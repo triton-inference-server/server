@@ -186,7 +186,9 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, prompt, request, lora_name, self.default_max_tokens)
+            metadata.request_converter(
+                metadata.model, prompt, request, lora_name, self.default_max_tokens
+            )
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -304,7 +306,11 @@ class TritonLLMEngine(LLMEngine):
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
             metadata.request_converter(
-                metadata.model, request.prompt, request, lora_name, self.default_max_tokens
+                metadata.model,
+                request.prompt,
+                request,
+                lora_name,
+                self.default_max_tokens,
             )
         )
 
