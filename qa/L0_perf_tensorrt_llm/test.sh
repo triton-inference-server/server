@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ MODEL_NAME="gpt2_tensorrt_llm"
 NAME="tensorrt_llm_benchmarking_test"
 MODEL_REPOSITORY="$(pwd)/triton_model_repo"
 TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
+GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/models/core/gpt"
 TOKENIZER_DIR="$GPT_DIR/gpt2"
 ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -133,7 +133,7 @@ function replace_config_tags {
 
 function prepare_model_repository {
     rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
+    cp -r ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
     rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
     mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
 
@@ -189,7 +189,7 @@ function wait_for_server_ready() {
 }
 
 function run_server {
-    python3 ${TENSORRTLLM_BACKEND_DIR}/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
+    python3 ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
     sleep 2 # allow time to obtain the pid(s)
     # Read PIDs into an array, trimming whitespaces
     readarray -t SERVER_PID < <(pgrep "tritonserver")
