@@ -46,6 +46,7 @@ def _create_vllm_inference_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    default_max_tokens: int,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -86,10 +87,14 @@ def _create_vllm_inference_request(
         # Fallback to deprecated request.max_tokens
         elif request.max_tokens is not None:
             sampling_parameters["max_tokens"] = request.max_tokens
-        # If neither is set, vLLM uses its internal default for max_tokens
+        # If neither is set, use a default value for max_tokens
+        else:
+            sampling_parameters["max_tokens"] = default_max_tokens
     # Indicates CreateCompletionRequest
     elif request.max_tokens is not None:
         sampling_parameters["max_tokens"] = request.max_tokens
+    else:
+        sampling_parameters["max_tokens"] = default_max_tokens
 
     if lora_name is not None:
         sampling_parameters["lora_name"] = lora_name
@@ -124,6 +129,7 @@ def _create_trtllm_inference_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    default_max_tokens: int,
 ):
     if lora_name is not None:
         raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
@@ -139,10 +145,14 @@ def _create_trtllm_inference_request(
         # Fallback to deprecated request.max_tokens
         elif request.max_tokens is not None:
             inputs["max_tokens"] = np.int32([[request.max_tokens]])
-        # If neither is set, TRT-LLM uses its internal default for max_tokens
+        # If neither is set, use a default value for max_tokens
+        else:
+            inputs["max_tokens"] = np.int32([[default_max_tokens]])
     # Indicates CreateCompletionRequest
     elif request.max_tokens is not None:
         inputs["max_tokens"] = np.int32([[request.max_tokens]])
+    else:
+        inputs["max_tokens"] = np.int32([[default_max_tokens]])
 
     if request.stop:
         if isinstance(request.stop, str):

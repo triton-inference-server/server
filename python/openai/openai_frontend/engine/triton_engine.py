@@ -102,6 +102,7 @@ class TritonLLMEngine(LLMEngine):
         self,
         server: tritonserver.Server,
         tokenizer: str,
+        default_max_tokens: int,
         backend: Optional[str] = None,
         lora_separator: Optional[str] = None,
         tool_call_parser: Optional[str] = None,
@@ -113,6 +114,7 @@ class TritonLLMEngine(LLMEngine):
         # TODO: Reconsider name of "backend" vs. something like "request_format"
         self.backend = backend
         self.lora_separator = lora_separator
+        self.default_max_tokens = default_max_tokens
 
         # NOTE: Creation time and model metadata will be static at startup for
         # now, and won't account for dynamically loading/unloading models.
@@ -184,7 +186,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(metadata.model, prompt, request, lora_name)
+            metadata.request_converter(metadata.model, prompt, request, lora_name, self.default_max_tokens)
         )
 
         # Prepare and send responses back to client in OpenAI format
@@ -302,7 +304,7 @@ class TritonLLMEngine(LLMEngine):
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
             metadata.request_converter(
-                metadata.model, request.prompt, request, lora_name
+                metadata.model, request.prompt, request, lora_name, self.default_max_tokens
             )
         )
 
