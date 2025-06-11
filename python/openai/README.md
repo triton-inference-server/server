@@ -293,6 +293,80 @@ See the
 [vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
 on how to serve a model with LoRA adapters.
 
+### Guided Decoding
+
+The OpenAI frontend supports guided decoding to constrain model outputs to specific formats. Three types of guided decoding are available through the `guided_decoding_guide_type` parameter: `json` , `regex`, `choice`
+
+**JSON Schema Example:**
+```python
+from openai import OpenAI
+from pydantic import BaseModel
+from enum import Enum
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+class CarType(str, Enum):
+    sedan = "sedan"
+    suv = "SUV"
+    truck = "Truck"
+
+class CarDescription(BaseModel):
+    brand: str
+    model: str
+    car_type: CarType
+
+json_schema = CarDescription.model_json_schema()
+
+completion = client.chat.completions.create(
+    model="llama-3.1-8b-instruct",  # vLLM model name
+    messages=[{"role": "user", "content": "Generate a 90's iconic car"}],
+    max_tokens=100,
+    extra_body={
+        "guided_decoding_guide_type": "json",
+        "guided_decoding_guide": json_schema,
+    },
+)
+print(completion.choices[0].message.content)
+# Output: { "brand": "Chevrolet", "model": "Silverado", "car_type": "SUV" }
+```
+
+**Regex Pattern Example:**
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+completion = client.chat.completions.create(
+    model="llama-3.1-8b-instruct",  # vLLM model name
+    messages=[{"role": "user", "content": "Generate an example email address for Alan Turing, who works in Enigma. End in .com"}],
+    extra_body={
+        "guided_decoding_guide_type": "regex",
+        "guided_decoding_guide": "\\w+@\\w+\\.com",
+    },
+)
+print(completion.choices[0].message.content)
+# Output: alan777@enigma.com
+```
+
+**Choice-based Example:**
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+completion = client.chat.completions.create(
+    model="llama-3.1-8b-instruct",
+    messages=[{"role": "user", "content": "What's the sentiment: 'I love this!'"}],
+    extra_body={
+        "guided_decoding_guide_type": "choice",
+        "guided_decoding_guide": ["positive", "negative", "neutral"],
+    },
+)
+print(completion.choices[0].message.content)
+# Output: positive
+```
+
+
 ## TensorRT-LLM
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
@@ -372,6 +446,86 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 The other examples should be the same as vLLM, except that you should set `MODEL="tensorrt_llm_bls"` or `MODEL="ensemble"`,
 everywhere applicable as seen in the example request above.
+
+### Guided Decoding
+
+The OpenAI frontend supports guided decoding to constrain model outputs to specific formats. Four types of guided decoding are available through the `guided_decoding_guide_type` parameter: `json_schema`, `json`, `regex`, and `ebnf_grammar`.
+
+**JSON Schema Example:**
+```python
+from openai import OpenAI
+from pydantic import BaseModel
+from enum import Enum
+import json
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+class CarType(str, Enum):
+    sedan = "sedan"
+    suv = "SUV"
+    truck = "Truck"
+
+class CarDescription(BaseModel):
+    brand: str
+    model: str
+    car_type: CarType
+
+json_schema = CarDescription.model_json_schema()
+
+completion = client.chat.completions.create(
+    model="ensemble",  # or "tensorrt_llm_bls"
+    messages=[{"role": "user", "content": "Generate a 90's iconic car"}],
+    max_tokens=100,
+    extra_body={
+        "guided_decoding_guide_type": "json_schema",
+        "guided_decoding_guide": json.dumps(json_schema),
+    },
+)
+print(completion.choices[0].message.content)
+# Output: { "brand": "Ford", "model": "Mustang", "car_type": "SUV" }
+```
+
+**Regex Pattern Example:**
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+completion = client.chat.completions.create(
+    model="ensemble",  # or "tensorrt_llm_bls"
+    messages=[{"role": "user", "content": "Generate an example email address for Alan Turing, who works in Enigma. End in .com"}],
+    extra_body={
+        "guided_decoding_guide_type": "regex",
+        "guided_decoding_guide": "\\w+@\\w+\\.com",
+    },
+)
+print(completion.choices[0].message.content)
+# Output: alan_turing@enigma.com
+```
+
+**EBNF Grammar Example:**
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:9000/v1", api_key="EMPTY")
+
+ebnf_grammar_str = """root ::= (expr "=" term)+
+expr  ::= term ([-+*/] term)*
+term  ::= num | "(" expr ")"
+num   ::= [0-9]+"""
+
+completion = client.chat.completions.create(
+    model="ensemble",  # or "tensorrt_llm_bls"
+    messages=[{"role": "user", "content": "Generate mathematical equations with basic arithmetic operations"}],
+    max_tokens=100,
+    extra_body={
+        "guided_decoding_guide_type": "ebnf_grammar",
+        "guided_decoding_guide": ebnf_grammar_str,
+    },
+)
+print(completion.choices[0].message.content)
+# Output: 10+5=15
+```
 
 ## KServe Frontends
 
