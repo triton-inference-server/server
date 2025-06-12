@@ -89,6 +89,23 @@ def _create_vllm_inference_request(
         )
         sampling_parameters = json.dumps(sampling_parameters_json)
 
+    elif request.guided_decoding_guide_type is not None:
+        from vllm.sampling_params import GuidedDecodingParams
+
+        sampling_parameters_json = json.loads(sampling_parameters)
+        sampling_parameters_json["guided_decoding"] = json.dumps(
+            asdict(
+                GuidedDecodingParams.from_optional(
+                    **{
+                        request.guided_decoding_guide_type: request.guided_decoding_guide
+                    }
+                )
+            )
+        )
+        sampling_parameters_json.pop("guided_decoding_guide_type", None)
+        sampling_parameters_json.pop("guided_decoding_guide", None)
+        sampling_parameters = json.dumps(sampling_parameters_json)
+
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
     if echo is not None:
@@ -137,6 +154,9 @@ def _create_trtllm_inference_request(
     if guided_json is not None:
         inputs["guided_decoding_guide_type"] = [["json_schema"]]
         inputs["guided_decoding_guide"] = [[guided_json]]
+    elif request.guided_decoding_guide_type is not None:
+        inputs["guided_decoding_guide_type"] = [[request.guided_decoding_guide_type]]
+        inputs["guided_decoding_guide"] = [[request.guided_decoding_guide]]
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
