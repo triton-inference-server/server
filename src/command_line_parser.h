@@ -1,4 +1,4 @@
-// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common.h"
 #include "restricted_features.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
@@ -197,6 +198,8 @@ struct TritonServerParameters {
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
   RestrictedFeatures http_restricted_apis_{};
+  // Default value 64MB
+  size_t http_max_input_size_{HTTP_DEFAULT_MAX_INPUT_SIZE};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC
