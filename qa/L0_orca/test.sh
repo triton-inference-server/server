@@ -36,7 +36,7 @@ MODEL_NAME="gpt2_tensorrt_llm"
 NAME="tensorrt_llm_benchmarking_test"
 MODEL_REPOSITORY="$(pwd)/triton_model_repo"
 TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/gpt"
+GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/models/core/gpt"
 TOKENIZER_DIR="$GPT_DIR/gpt2"
 ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -48,9 +48,52 @@ CLIENT_PY=${BASE_DIR}/orca_http_test.py
 CLIENT_LOG="${NAME}_orca_http_test.log"
 source ../common/util.sh
 
+function clone_tensorrt_llm_backend_repo {
+    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
+    apt-get update && apt-get install git-lfs -y --no-install-recommends
+    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
+    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
+}
+
+function build_gpt2_base_model {
+    # Download weights from HuggingFace Transformers
+    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
+    rm pytorch_model.bin model.safetensors
+    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
+        echo "Downloading pytorch_model.bin failed."
+        exit 1
+    fi
+    cd ${GPT_DIR}
+
+    # Convert weights from HF Tranformers to FT format
+    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
+    cd ${BASE_DIR}
+}
+
+function build_gpt2_tensorrt_engine {
+    # Build TensorRT engines
+    cd ${GPT_DIR}
+    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
+        --gpt_attention_plugin float16 \
+        --remove_input_padding enable \
+        --paged_kv_cache enable \
+        --gemm_plugin float16 \
+        --workers "${NUM_GPUS}" \
+        --output_dir "${ENGINES_DIR}"
+
+    cd ${BASE_DIR}
+}
+
+function replace_config_tags {
+    tag_to_replace="${1}"
+    new_value="${2}"
+    config_file_path="${3}"
+    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
+}
+
 function prepare_model_repository {
     rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
+    cp -r ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
     rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
     mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
 
@@ -113,7 +156,7 @@ function wait_for_server_ready() {
 }
 
 function run_server {
-    python3 ${TENSORRTLLM_BACKEND_DIR}/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
+    python3 ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
     sleep 2 # allow time to obtain the pid(s)
     # Read PIDs into an array, trimming whitespaces
     readarray -t SERVER_PID < <(pgrep "tritonserver")

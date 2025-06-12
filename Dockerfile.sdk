@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.04-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.05-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo

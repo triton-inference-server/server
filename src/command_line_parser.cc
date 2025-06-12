@@ -298,6 +298,7 @@ enum TritonOptionId {
   OPTION_HTTP_ADDRESS,
   OPTION_HTTP_THREAD_COUNT,
   OPTION_HTTP_RESTRICTED_API,
+  OPTION_HTTP_MAX_INPUT_SIZE,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
@@ -497,6 +498,10 @@ TritonParser::SetupOptions()
   http_options_.push_back(
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
        "Number of threads handling HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_MAX_INPUT_SIZE, "http-max-input-size", Option::ArgInt,
+       ("Maximum allowed HTTP request input size in bytes. Default is " +
+        std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + " bytes (64MB).")});
   http_options_.push_back(
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",
        "<string>:<string>=<string>",
@@ -1393,6 +1398,15 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_HTTP_THREAD_COUNT:
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
           break;
+        case OPTION_HTTP_MAX_INPUT_SIZE: {
+          int64_t temp_input_size = ParseOption<int64_t>(optarg);
+          if (temp_input_size <= 0) {
+            throw ParseException(
+                "Error: --http-max-input-size must be greater than 0.");
+          }
+          lparams.http_max_input_size_ = temp_input_size;
+          break;
+        }
         case OPTION_HTTP_RESTRICTED_API:
           ParseRestrictedFeatureOption(
               optarg, long_options[option_index].name, "", "api",

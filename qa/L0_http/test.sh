@@ -753,6 +753,108 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+### Test HTTP input size limits ###
+
+# Setup models needed for the test
+MODELDIR=http_input_size_limit_test_models
+mkdir -p $MODELDIR
+rm -rf ${MODELDIR}/*
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+
+# First run with default size limit - large inputs should fail
+SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_LOG="./inference_server_default_limit.log"
+CLIENT_LOG="./http_input_size_limit_default.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+# Run test to verify that large inputs fail with default limit
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_rejection_raw_binary >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for raw binary input\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_rejection_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for JSON input\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Now run with increased size limit (128MB) - large inputs should succeed
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
+SERVER_LOG="./inference_server_increased_limit.log"
+CLIENT_LOG="./http_input_size_limit_increased.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER with increased HTTP input size limit\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_raw_binary >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Input Size Limit Test Failed for raw binary input with increased limits\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Input Size Limit Test Failed for JSON input with increased limits\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test with zero max input size - should fail to start
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=0"
+SERVER_LOG="./inference_server_zero_limit.log"
+CLIENT_LOG="./http_input_size_limit_zero.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with zero max input size\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+# Test with negative max input size - should fail to start
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=-1024"
+SERVER_LOG="./inference_server_negative_limit.log"
+CLIENT_LOG="./http_input_size_limit_negative.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with negative max input size\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
 ###
 
 if [ $RET -eq 0 ]; then

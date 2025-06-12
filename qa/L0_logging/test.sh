@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -490,7 +490,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-#Test Negative Test Cases
+# Test Negative Test Cases
 SERVER_ARGS="--log-warn="false" --model-repository=$MODELSDIR"
 SERVER_LOG="./server.log"
 run_server
@@ -605,6 +605,53 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+set -e
+
+# Test Log Output Stream
+# Set up an invalid model with a leading zero in the version number. This will print warning and error logs.
+MODELSDIR_INVALID=`pwd`/log_models_invalid
+rm -rf $MODELSDIR_INVALID && \
+  cp -r $MODELSDIR $MODELSDIR_INVALID && \
+  mv $MODELSDIR_INVALID/simple/1 $MODELSDIR_INVALID/simple/01
+
+rm -f log_file.log
+LOG_REGEX="(?P<month>\d{2})(?P<day>\d{2}) (?P<timestamp>\d{2}:\d{2}:\d{2}\.\d{6}) (?P<pid>\d+) (?P<file>[\w\.]+):(?P<line>\d+)] (?P<message>.*)"
+SERVER_ARGS="--log-verbose=1 --model-repository=$MODELSDIR_INVALID"
+SERVER_LOG="./inference_server_log_file.log"
+SERVER_ERROR_LOG="./inference_server_error_log_file.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+    cat $SERVER_LOG
+    kill_server
+    exit 1
+fi
+
+set +e
+# Only INFO logs in SERVER_LOG
+if [ `grep -c -P "I$LOG_REGEX" $SERVER_LOG` == "0" ]; then
+  echo -e "\n***\n*** Test Failed: INFO logs are not written to $SERVER_LOG\n***"
+  RET=1
+fi
+if [ `grep -c -P "(W|E)$LOG_REGEX" $SERVER_LOG` != "0" ]; then
+  echo -e "\n***\n*** Test Failed: WARNING/ERROR logs are written to $SERVER_LOG\n***"
+  RET=1
+fi
+# Only WARNING and ERROR logs in SERVER_ERROR_LOG
+if [ `grep -c -P "I$LOG_REGEX" $SERVER_ERROR_LOG` != "0" ]; then
+  echo -e "\n***\n*** Test Failed: INFO logs are written to $SERVER_ERROR_LOG\n***"
+  RET=1
+fi
+if [ `grep -c -P "W$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
+  echo -e "\n***\n*** Test Failed: ERROR logs are not written to $SERVER_ERROR_LOG\n***"
+  RET=1
+fi
+if [ `grep -c -P "E$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
+  echo -e "\n***\n*** Test Failed: ERROR logs are not written to $SERVER_ERROR_LOG\n***"
+  RET=1
+fi
+
+unset $SERVER_ERROR_LOG
 set -e
 
 if [ $RET -eq 0 ]; then
