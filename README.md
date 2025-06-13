@@ -25,12 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
+
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
->[!WARNING]
->You are currently on the `main` branch which tracks under-development progress
->towards the next release. The current release is version [2.58.0](https://github.com/triton-inference-server/server/releases/latest)
->and corresponds to the 25.05 container release on NVIDIA GPU Cloud (NGC).
+> [!WARNING]
+> You are currently on the `main` branch which tracks under-development progress
+> towards the next release. The current release is version [2.58.0](https://github.com/triton-inference-server/server/releases/latest)
+> and corresponds to the 25.05 container release on NVIDIA GPU Cloud (NGC).
 
 # Triton Inference Server
 
@@ -41,7 +42,7 @@ TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton
 Inference Server supports inference across cloud, data center, edge and embedded
 devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton Inference
 Server delivers optimized performance for many query types, including real time,
-batched, ensembles and audio/video streaming. Triton inference Server is part of
+batched, ensembles and audio/video streaming. Triton Inference Server is part of
 [NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/),
 a software platform that accelerates the data science pipeline and streamlines
 the development and deployment of production AI.
@@ -82,7 +83,7 @@ to begin your Triton journey!
 
 Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and
 stay current on the latest product updates, bug fixes, content, best practices,
-and more.  Need enterprise support?  NVIDIA global support is available for Triton
+and more. Need enterprise support? NVIDIA global support is available for Triton
 Inference Server with the
 [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
@@ -107,6 +108,7 @@ Image '/workspace/images/mug.jpg':
     13.224326 (968) = CUP
     10.422965 (505) = COFFEEPOT
 ```
+
 Please read the [QuickStart](docs/getting_started/quickstart.md) guide for additional information
 regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/getting_started/quickstart.md#run-on-cpu-only-system). New to Triton and wondering where to get started? Watch the [Getting Started video](https://youtu.be/NQDtfSi5QF4).
 
@@ -130,7 +132,7 @@ contains additional documentation, presentations, and examples.
 The recommended way to build and use Triton Inference Server is with Docker
 images.
 
-- [Install Triton Inference Server with Docker containers](docs/customization_guide/build.md#building-with-docker) (*Recommended*)
+- [Install Triton Inference Server with Docker containers](docs/customization_guide/build.md#building-with-docker) (_Recommended_)
 - [Install Triton Inference Server without Docker containers](docs/customization_guide/build.md#building-without-docker)
 - [Build a custom Triton Inference Server Docker container](docs/customization_guide/compose.md)
 - [Build Triton Inference Server from source](docs/customization_guide/build.md#building-on-unsupported-platforms)
@@ -186,7 +188,7 @@ configuration](docs/user_guide/model_configuration.md) for the model.
 
 #### Client Support and Examples
 
-A Triton *client* application sends inference and other requests to Triton. The
+A Triton _client_ application sends inference and other requests to Triton. The
 [Python and C++ client libraries](https://github.com/triton-inference-server/client)
 provide APIs to simplify this communication.
 
@@ -215,7 +217,7 @@ designed for modularity and flexibility
   decryption, or conversion
 - Deploy Triton on [Jetson and JetPack](docs/user_guide/jetson.md)
 - [Use Triton on AWS
-   Inferentia](https://github.com/triton-inference-server/python_backend/tree/main/inferentia)
+  Inferentia](https://github.com/triton-inference-server/python_backend/tree/main/inferentia)
 
 ### Additional Documentation
 
@@ -224,7 +226,7 @@ designed for modularity and flexibility
 - [Customization Guide](docs/README.md#customization-guide)
 - [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
 - [GPU, Driver, and CUDA Support
-Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
+  Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
 
 ## Contributing
 
@@ -241,6 +243,7 @@ We appreciate any feedback, questions or bug reporting regarding this project.
 When posting [issues in GitHub](https://github.com/triton-inference-server/server/issues),
 follow the process outlined in the [Stack Overflow document](https://stackoverflow.com/help/mcve).
 Ensure posted examples are:
+
 - minimal – use as little code as possible that still produces the
   same problem
 - complete – provide all parts needed to reproduce the problem. Check
