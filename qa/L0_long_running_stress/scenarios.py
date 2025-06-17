@@ -203,7 +203,7 @@ class PerfAnalyzerScenario(Scenario):
         # Add no validation models
         self.options_.append(
             PerfAnalyzerScenario.ModelOption(
-                "resnet_v1_50_def", 32, (1, 4, 1), queue_latency_range_us
+                "resnet_v1_50", 32, (1, 4, 1), queue_latency_range_us
             )
         )
         for trial in sequence_trials:
@@ -334,7 +334,7 @@ class PerfAnalyzerScenario(Scenario):
 class ResNetScenario(Scenario):
     def __init__(self, name, batch_size=32, verbose=False, out_stream=sys.stdout):
         super().__init__(name, [], verbose, out_stream)
-        self.model_name_ = "resnet_v1_50_def"
+        self.model_name_ = "resnet_v1_50"
         self.batch_size_ = batch_size
 
         img = self.preprocess("../images/vulture.jpeg")
@@ -353,7 +353,7 @@ class ResNetScenario(Scenario):
         return scaled
 
     def postprocess(self, results):
-        output_array = results.as_numpy("resnet_v1_50/predictions/Softmax")
+        output_array = results.as_numpy("resnet_v1_50/predictions/Softmax:0")
         if len(output_array) != self.batch_size_:
             raise Exception(
                 "expected {} results, got {}".format(
@@ -382,7 +382,7 @@ class ResNetScenario(Scenario):
 
         outputs = [
             grpcclient.InferRequestedOutput(
-                "resnet_v1_50/predictions/Softmax", class_count=1
+                "resnet_v1_50/predictions/Softmax:0", class_count=1
             )
         ]
         res = triton_client.infer(self.model_name_, inputs, outputs=outputs)
