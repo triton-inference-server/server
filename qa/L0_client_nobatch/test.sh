@@ -47,7 +47,7 @@ EXPECTED_NUM_TESTS="4"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 MODELDIR="${PWD}/qa_model_repository"
-rm -rf ${MODELDIR} && mkdir -p ${MODELDIR} && cp -r ${DATADIR}/qa_model_repository/onnx_* ${MODELDIR} # Note there is a coupling in ./client_test.py
+rm -rf ${MODELDIR} && mkdir -p ${MODELDIR} && cp -r ${DATADIR}/qa_model_repository/onnx_* ${MODELDIR}/. # Note there is a coupling in ./client_test.py
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server.log"
