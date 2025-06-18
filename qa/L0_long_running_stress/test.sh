@@ -130,9 +130,8 @@ cp -r ../custom_models/custom_zero_1_float32 $MODEL_DIR/custom_zero_1_float32 &&
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"10000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
-cp -r $DATADIR/onnx_model_store/resnet_v1_50 $MODEL_DIR/resnet_v1_50_def && \
-  (cd $MODEL_DIR/resnet_v1_50_def && \
-    sed -i 's/^name: "resnet_v1_50"/name: "resnet_v1_50_def"/' config.pbtxt && \
+cp -r $DATADIR/onnx_model_store/resnet_v1_50 $MODEL_DIR/. && \
+  (cd $MODEL_DIR/resnet_v1_50 && \
     echo "optimization { }" >> config.pbtxt)
 
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
