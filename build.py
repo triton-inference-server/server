@@ -1459,15 +1459,15 @@ RUN pip3 install --upgrade pip \\
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
-            python3 \\
             libarchive-dev \\
-            python3-pip \\
-            python3-wheel \\
-            python3-setuptools \\
             libpython3-dev \\
+            python3 \\
+            python3-pip \\
       && pip3 install --upgrade \\
             \"numpy<2\" \\
             virtualenv \\
+            setuptools \\
+            wheel \\
       && rm -rf /var/lib/apt/lists/*
 """
     if "tensorrtllm" in backends:
