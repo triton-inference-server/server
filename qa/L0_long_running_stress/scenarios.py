@@ -377,7 +377,7 @@ class ResNetScenario(Scenario):
     def run(self, client_metadata):
         triton_client = client_metadata[0]
 
-        inputs = [grpcclient.InferInput("input", self.image_data_.shape, "FP32")]
+        inputs = [grpcclient.InferInput("input:0", self.image_data_.shape, "FP32")]
         inputs[0].set_data_from_numpy(self.image_data_)
 
         outputs = [
