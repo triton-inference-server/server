@@ -292,6 +292,7 @@ class TestAsyncClientToolCalling:
             model=model,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
+            seed=0,
         )
 
         choice = chat_completion.choices[0]
@@ -309,6 +310,7 @@ class TestAsyncClientToolCalling:
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
             stream=True,
+            seed=0,
         )
 
         chunks: List[str] = []

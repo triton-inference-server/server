@@ -152,6 +152,7 @@ class TestAsyncOpenAIClient:
             max_tokens=10,
             temperature=0.0,
             stream=False,
+            seed=0,
         )
         output = chat_completion.choices[0].text
         stop_reason = chat_completion.choices[0].finish_reason
@@ -163,6 +164,7 @@ class TestAsyncOpenAIClient:
             max_tokens=10,
             temperature=0.0,
             stream=True,
+            seed=0,
         )
         chunks = []
         finish_reason_count = 0
