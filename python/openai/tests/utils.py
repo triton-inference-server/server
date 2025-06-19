@@ -52,9 +52,17 @@ def setup_server(model_repository: str):
     return server
 
 
-def setup_fastapi_app(tokenizer: str, server: tritonserver.Server, backend: str):
+def setup_fastapi_app(
+    tokenizer: str,
+    server: tritonserver.Server,
+    backend: str,
+    default_max_tokens: int = 16,
+):
     engine: TritonLLMEngine = TritonLLMEngine(
-        server=server, tokenizer=tokenizer, backend=backend
+        server=server,
+        tokenizer=tokenizer,
+        backend=backend,
+        default_max_tokens=default_max_tokens,
     )
     frontend: FastApiFrontend = FastApiFrontend(engine=engine)
     return frontend.app

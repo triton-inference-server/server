@@ -152,6 +152,7 @@ class TestAsyncOpenAIClient:
             max_tokens=10,
             temperature=0.0,
             stream=False,
+            seed=0,
         )
         output = chat_completion.choices[0].text
         stop_reason = chat_completion.choices[0].finish_reason
@@ -163,6 +164,7 @@ class TestAsyncOpenAIClient:
             max_tokens=10,
             temperature=0.0,
             stream=True,
+            seed=0,
         )
         chunks = []
         finish_reason_count = 0
@@ -200,13 +202,13 @@ class TestAsyncOpenAIClient:
         seed = 0
         temperature = 0.0
         # Generate enough tokens to easily identify stop words are working.
-        max_tokens = 64
+        max_completion_tokens = 64
 
         # Test single chat completion for comparison
         chat_completion = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             temperature=temperature,
             seed=seed,
             stream=False,
@@ -219,7 +221,7 @@ class TestAsyncOpenAIClient:
         stream = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             temperature=temperature,
             seed=seed,
             stream=True,
