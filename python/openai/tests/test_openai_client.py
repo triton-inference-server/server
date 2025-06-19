@@ -60,6 +60,15 @@ class TestOpenAIClient:
         assert completion.choices[0].text
         assert completion.choices[0].finish_reason == "stop"
 
+        usage = completion.usage
+        assert usage is not None
+        assert isinstance(usage.prompt_tokens, int)
+        assert isinstance(usage.completion_tokens, int)
+        assert isinstance(usage.total_tokens, int)
+        assert usage.prompt_tokens > 0
+        assert usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+
     def test_openai_client_chat_completion(
         self, client: openai.OpenAI, model: str, messages: List[dict]
     ):
@@ -71,6 +80,15 @@ class TestOpenAIClient:
         print(f"Chat completion results: {chat_completion}")
         assert chat_completion.choices[0].message.content
         assert chat_completion.choices[0].finish_reason == "stop"
+
+        usage = chat_completion.usage
+        assert usage is not None
+        assert isinstance(usage.prompt_tokens, int)
+        assert isinstance(usage.completion_tokens, int)
+        assert isinstance(usage.total_tokens, int)
+        assert usage.prompt_tokens > 0
+        assert usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
 
     @pytest.mark.parametrize("echo", [False, True])
     def test_openai_client_completion_echo(
@@ -128,6 +146,15 @@ class TestAsyncOpenAIClient:
         assert completion.choices[0].text
         assert completion.choices[0].finish_reason == "stop"
 
+        usage = completion.usage
+        assert usage is not None
+        assert isinstance(usage.prompt_tokens, int)
+        assert isinstance(usage.completion_tokens, int)
+        assert isinstance(usage.total_tokens, int)
+        assert usage.prompt_tokens > 0
+        assert usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+
     @pytest.mark.asyncio
     async def test_openai_client_chat_completion(
         self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
@@ -139,6 +166,16 @@ class TestAsyncOpenAIClient:
 
         assert chat_completion.choices[0].message.content
         assert chat_completion.choices[0].finish_reason == "stop"
+
+        usage = chat_completion.usage
+        assert usage is not None
+        assert isinstance(usage.prompt_tokens, int)
+        assert isinstance(usage.completion_tokens, int)
+        assert isinstance(usage.total_tokens, int)
+        assert usage.prompt_tokens > 0
+        assert usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+
         print(f"Chat completion results: {chat_completion}")
 
     @pytest.mark.asyncio
@@ -245,3 +282,87 @@ class TestAsyncOpenAIClient:
         assert len(chunks) > 1
         streamed_output = "".join(chunks)
         assert streamed_output == output
+
+    @pytest.mark.asyncio
+    async def test_chat_streaming_usage_option(
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+    ):
+        # First, run with include_usage=False to establish a baseline chunk count.
+        stream_false = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=16,
+            stream=True,
+            stream_options={"include_usage": False},
+        )
+        chunks_false = [chunk async for chunk in stream_false]
+        for chunk in chunks_false:
+            assert chunk.usage is None, "Usage should be null when include_usage=False"
+
+        # Now, run with include_usage=True.
+        stream_true = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=16,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        chunks_true = [chunk async for chunk in stream_true]
+
+        # Verify that we received exactly one extra chunk.
+        assert len(chunks_true) == len(chunks_false) + 1
+
+        # Verify the final chunk has usage data and empty choices.
+        final_chunk = chunks_true[-1]
+        assert final_chunk.usage is not None
+        assert len(final_chunk.choices) == 0
+        usage = final_chunk.usage
+        assert isinstance(usage.prompt_tokens, int) and usage.prompt_tokens > 0
+        assert isinstance(usage.completion_tokens, int) and usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+
+        # Verify other chunks have no usage data.
+        for chunk in chunks_true[:-1]:
+            assert chunk.usage is None
+
+    @pytest.mark.asyncio
+    async def test_completion_streaming_usage_option(
+        self, client: openai.AsyncOpenAI, model: str, prompt: str
+    ):
+        # First, run with include_usage=False to establish a baseline chunk count.
+        stream_false = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            stream=True,
+            stream_options={"include_usage": False},
+        )
+        chunks_false = [chunk async for chunk in stream_false]
+        for chunk in chunks_false:
+            assert chunk.usage is None
+
+        # Now, run with include_usage=True.
+        stream_true = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        chunks_true = [chunk async for chunk in stream_true]
+
+        # Verify that we received exactly one extra chunk.
+        assert len(chunks_true) == len(chunks_false) + 1
+
+        # Verify the final chunk has usage data and empty choices.
+        final_chunk = chunks_true[-1]
+        assert final_chunk.usage is not None
+        assert len(final_chunk.choices) == 0
+        usage = final_chunk.usage
+        assert isinstance(usage.prompt_tokens, int) and usage.prompt_tokens > 0
+        assert isinstance(usage.completion_tokens, int) and usage.completion_tokens > 0
+        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+
+        # Verify other chunks have no usage data.
+        for chunk in chunks_true[:-1]:
+            assert chunk.usage is None

@@ -43,11 +43,19 @@ class TestCompletions:
 
         print("Response:", response.json())
         assert response.status_code == 200
+        response_json = response.json()
         # NOTE: Could be improved to look for certain quality of response,
         #       or tested with dummy identity model.
-        assert response.json()["choices"][0]["text"].strip()
-        # "usage" currently not supported
-        assert not response.json()["usage"]
+        assert response_json["choices"][0]["text"].strip()
+        # "usage" is now supported
+        usage = response_json.get("usage")
+        assert usage is not None
+        assert isinstance(usage["prompt_tokens"], int)
+        assert isinstance(usage["completion_tokens"], int)
+        assert isinstance(usage["total_tokens"], int)
+        assert usage["prompt_tokens"] > 0
+        assert usage["completion_tokens"] > 0
+        assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
 
     @pytest.mark.parametrize(
         "sampling_parameter, value",

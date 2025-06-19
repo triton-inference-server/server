@@ -133,6 +133,10 @@ class CreateCompletionRequest(BaseModel):
         False,
         description="Whether to stream back partial progress. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).\n",
     )
+    stream_options: Optional[StreamOptions] = Field(
+        None,
+        description="Options for streaming response. Only set this when you set `stream: true`.",
+    )
     suffix: Optional[str] = Field(
         None,
         description="The suffix that comes after a completion of inserted text.\n\nThis parameter is only supported for `gpt-3.5-turbo-instruct`.\n",
@@ -467,6 +471,13 @@ class ResponseFormat(BaseModel):
     )
 
 
+class StreamOptions(BaseModel):
+    include_usage: Optional[bool] = Field(
+        False,
+        description='If set, an additional chunk will be streamed before the `data: [DONE]` message. The `usage` field on this chunk shows the token usage statistics for the entire request, and the `choices` field will always be an empty array. All other chunks will also include a `usage` field, but with a null value.',
+    )
+
+
 class FunctionCall3(Enum):
     none = "none"
     auto = "auto"
@@ -526,14 +537,6 @@ class Logprobs2(BaseModel):
     )
 
 
-class ChatCompletionFinishReason(Enum):
-    stop = "stop"
-    length = "length"
-    tool_calls = "tool_calls"
-    content_filter = "content_filter"
-    function_call = "function_call"
-
-
 class ChatCompletionStreamingResponseChoice(BaseModel):
     delta: ChatCompletionStreamResponseDelta
     logprobs: Optional[Logprobs2] = Field(
@@ -573,6 +576,7 @@ class CreateChatCompletionStreamResponse(BaseModel):
     object: Object4 = Field(
         ..., description="The object type, which is always `chat.completion.chunk`."
     )
+    usage: Optional[CompletionUsage] = None
 
 
 class CreateChatCompletionImageResponse(BaseModel):
@@ -884,6 +888,10 @@ class CreateChatCompletionRequest(BaseModel):
     stream: Optional[bool] = Field(
         False,
         description="If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).\n",
+    )
+    stream_options: Optional[StreamOptions] = Field(
+        None,
+        description="Options for streaming response. Only set this when you set `stream: true`.",
     )
     temperature: Optional[confloat(ge=0.0, le=2.0)] = Field(
         0.7,

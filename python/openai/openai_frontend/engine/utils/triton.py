@@ -37,7 +37,9 @@ from schemas.openai import (
     ChatCompletionNamedToolChoice,
     ChatCompletionToolChoiceOption1,
     CreateChatCompletionRequest,
+    CreateCompletionResponse,
     CreateCompletionRequest,
+    CompletionUsage,
 )
 
 
@@ -184,6 +186,43 @@ def _to_string(tensor: tritonserver.Tensor) -> str:
 
     # NOTE: +/- 4 accounts for serialized byte string length in first 4 bytes of buffer
     return _construct_string_from_pointer(tensor.data_ptr + 4, tensor.size - 4)
+
+
+def _get_usage_from_response(
+    response: tritonserver._api._response.InferenceResponse,
+) -> Optional[CompletionUsage]:
+    """Extracts token usage statistics from a Triton inference response."""
+    prompt_tokens = None
+    completion_tokens = None
+
+    if (
+        "num_input_tokens" in response.outputs
+        and "num_output_tokens" in response.outputs
+    ):
+        input_token_tensor = response.outputs["num_input_tokens"]
+        output_token_tensor = response.outputs["num_output_tokens"]
+
+        if input_token_tensor.data_type == tritonserver.DataType.UINT32:
+            prompt_tokens_ptr = ctypes.cast(
+                input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            prompt_tokens = prompt_tokens_ptr[0]
+
+        if output_token_tensor.data_type == tritonserver.DataType.UINT32:
+            completion_tokens_ptr = ctypes.cast(
+                output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            completion_tokens = completion_tokens_ptr[0]
+
+        if prompt_tokens is not None and completion_tokens is not None:
+            total_tokens = prompt_tokens + completion_tokens
+            return CompletionUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            )
+
+    return None
 
 
 # TODO: Use tritonserver.InferenceResponse when support is published
