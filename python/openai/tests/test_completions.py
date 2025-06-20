@@ -35,7 +35,7 @@ class TestCompletions:
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
 
-    def test_completions_defaults(self, client, model: str, prompt: str):
+    def test_completions_defaults(self, client, model: str, prompt: str, backend: str):
         response = client.post(
             "/v1/completions",
             json={"model": model, "prompt": prompt},
@@ -46,9 +46,12 @@ class TestCompletions:
         # NOTE: Could be improved to look for certain quality of response,
         #       or tested with dummy identity model.
         assert response.json()["choices"][0]["text"].strip()
-        # "usage" is now validated in its own test.
-        # Depending on backend, it may or may not be present.
-        assert "usage" in response.json()
+
+        usage = response.json().get("usage")
+        if backend == "vllm":
+            assert usage is not None
+        else:
+            assert usage is None
 
     @pytest.mark.parametrize(
         "sampling_parameter, value",
@@ -385,4 +388,6 @@ class TestCompletions:
         assert isinstance(usage["total_tokens"], int)
         assert usage["prompt_tokens"] > 0
         assert usage["completion_tokens"] > 0
-        assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+        assert (
+            usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+        )
