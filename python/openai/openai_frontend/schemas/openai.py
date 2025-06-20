@@ -135,7 +135,7 @@ class CreateCompletionRequest(BaseModel):
     )
     stream_options: Optional[StreamOptions] = Field(
         None,
-        description="Options for streaming response. Only set this when you set `stream: true`.",
+        description="Options for streaming responses. Only use when `stream` is set to `true`.",
     )
     suffix: Optional[str] = Field(
         None,
@@ -474,7 +474,7 @@ class ResponseFormat(BaseModel):
 class StreamOptions(BaseModel):
     include_usage: Optional[bool] = Field(
         False,
-        description='If set, an additional chunk will be streamed before the `data: [DONE]` message. The `usage` field on this chunk shows the token usage statistics for the entire request, and the `choices` field will always be an empty array. All other chunks will also include a `usage` field, but with a null value.',
+        description="If enabled, an additional chunk is sent before the `data: [DONE]` message. That chunk’s `usage` field reports the total token usage for the request and its `choices` array is always empty. All other chunks include a `usage` field with a null value.",
     )
 
 
@@ -891,7 +891,7 @@ class CreateChatCompletionRequest(BaseModel):
     )
     stream_options: Optional[StreamOptions] = Field(
         None,
-        description="Options for streaming response. Only set this when you set `stream: true`.",
+        description="Options for streaming responses. Only use when `stream` is set to `true`.",
     )
     temperature: Optional[confloat(ge=0.0, le=2.0)] = Field(
         0.7,

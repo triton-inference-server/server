@@ -373,7 +373,7 @@ class TestCompletions:
 
     def test_usage_response(self, client, model: str, prompt: str, backend: str):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently only supported for vLLM backend")
+            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
 
         response = client.post(
             "/v1/completions",

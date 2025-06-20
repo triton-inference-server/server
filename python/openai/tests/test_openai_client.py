@@ -272,6 +272,7 @@ class TestAsyncOpenAIClient:
                 chunks.append(delta.content)
             if chunk.choices[0].finish_reason is not None:
                 finish_reason_count += 1
+            assert chunk.usage is None
 
         # finish reason should only return in last block
         assert finish_reason_count == 1
@@ -288,15 +289,19 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, messages: List[dict], backend: str
     ):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently only supported for vLLM backend")
+            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
 
+        seed = 0
+        temperature = 0.0
+        max_tokens = 16
+        
         # Get usage and content from a non-streaming call
         stream_false = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=16,
-            temperature=0,
-            seed=0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=False,
         )
         usage_stream_false = stream_false.usage
@@ -308,9 +313,9 @@ class TestAsyncOpenAIClient:
         stream_options_false = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=16,
-            temperature=0,
-            seed=0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=True,
             stream_options={"include_usage": False},
         )
@@ -327,9 +332,9 @@ class TestAsyncOpenAIClient:
         stream_options_true = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=16,
-            temperature=0,
-            seed=0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=True,
             stream_options={"include_usage": True},
         )
@@ -379,29 +384,33 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, prompt: str, backend: str
     ):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently only supported for vLLM backend")
+            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
 
-        # Get baseline usage and content from a non-streaming call
+        seed = 0
+        temperature = 0.0
+        max_tokens = 16
+        
+        # Get usage and content from a non-streaming call
         stream_false = await client.completions.create(
             model=model,
             prompt=prompt,
-            max_tokens=10,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
             stream=False,
-            seed=0,
+            seed=seed,
         )
         usage_stream_false = stream_false.usage
         stream_false_output = stream_false.choices[0].text
         assert usage_stream_false is not None
         assert stream_false_output is not None
 
-        # First, run with include_usage=False to establish a baseline chunk count and content.
+        # First, run with include_usage=False.
         stream_options_false = await client.completions.create(
             model=model,
             prompt=prompt,
-            max_tokens=10,
-            temperature=0.0,
-            seed=0,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            seed=seed,
             stream=True,
             stream_options={"include_usage": False},
         )
@@ -416,10 +425,10 @@ class TestAsyncOpenAIClient:
         stream_options_true = await client.completions.create(
             model=model,
             prompt=prompt,
-            max_tokens=10,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
             stream=True,
-            seed=0,
+            seed=seed,
             stream_options={"include_usage": True},
         )
         chunks_true = [chunk async for chunk in stream_options_true]
