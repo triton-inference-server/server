@@ -193,8 +193,9 @@ def _get_usage_from_response(
 ) -> Optional[CompletionUsage]:
     """
     Extracts token usage statistics from a Triton inference response.
-    Only vLLM backend currently provides these output tensors.
     """
+    # TODO: Remove this check once TRT-LLM backend supports both "num_input_tokens"
+    # and "num_output_tokens", and update the test cases accordingly.
     if backend != "vllm":
         return None
 

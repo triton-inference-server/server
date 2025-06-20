@@ -30,7 +30,6 @@ from __future__ import annotations
 import json
 import time
 import uuid
-import ctypes
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -473,7 +472,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
-        usage_payload: Optional[CompletionUsage] = None
+        usage_payload = None
 
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
@@ -730,7 +729,7 @@ class TritonLLMEngine(LLMEngine):
         backend: str,
     ) -> AsyncIterator[str]:
         model = request.model
-        usage_payload: Optional[CompletionUsage] = None
+        usage_payload = None
 
         async for response in responses:
             if response.final:

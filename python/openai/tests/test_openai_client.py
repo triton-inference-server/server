@@ -285,84 +285,178 @@ class TestAsyncOpenAIClient:
 
     @pytest.mark.asyncio
     async def test_chat_streaming_usage_option(
-        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict], backend: str
     ):
-        # First, run with include_usage=False to establish a baseline chunk count.
+        if backend != "vllm":
+            pytest.skip("Usage reporting is currently only supported for vLLM backend")
+
+        # Get usage and content from a non-streaming call
         stream_false = await client.chat.completions.create(
             model=model,
             messages=messages,
             max_tokens=16,
-            stream=True,
-            stream_options={"include_usage": False},
+            temperature=0,
+            seed=0,
+            stream=False,
         )
-        chunks_false = [chunk async for chunk in stream_false]
-        for chunk in chunks_false:
-            assert chunk.usage is None, "Usage should be null when include_usage=False"
+        usage_stream_false = stream_false.usage
+        stream_false_output = stream_false.choices[0].message.content
+        assert usage_stream_false is not None
+        assert stream_false_output is not None
 
-        # Now, run with include_usage=True.
-        stream_true = await client.chat.completions.create(
+        # First, run with include_usage=False.
+        stream_options_false = await client.chat.completions.create(
             model=model,
             messages=messages,
             max_tokens=16,
+            temperature=0,
+            seed=0,
+            stream=True,
+            stream_options={"include_usage": False},
+        )
+        chunks_false = [chunk async for chunk in stream_options_false]
+        for chunk in chunks_false:
+            assert chunk.usage is None, "Usage should be null when include_usage=False"
+        stream_options_false_output = "".join(
+            c.choices[0].delta.content
+            for c in chunks_false
+            if c.choices and c.choices[0].delta.content
+        )
+
+        # Now, run with include_usage=True.
+        stream_options_true = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=16,
+            temperature=0,
+            seed=0,
             stream=True,
             stream_options={"include_usage": True},
         )
-        chunks_true = [chunk async for chunk in stream_true]
+        chunks_true = [chunk async for chunk in stream_options_true]
+        content_chunks = [c for c in chunks_true if c.usage is None]
 
         # Verify that we received exactly one extra chunk.
         assert len(chunks_true) == len(chunks_false) + 1
+
+        # Verify content is consistent
+        stream_options_true_output = "".join(
+            c.choices[0].delta.content
+            for c in content_chunks
+            if c.choices and c.choices[0].delta.content
+        )
+        assert stream_options_true_output == stream_false_output
+        assert stream_options_true_output == stream_options_false_output
 
         # Verify the final chunk has usage data and empty choices.
         final_chunk = chunks_true[-1]
         assert final_chunk.usage is not None
         assert len(final_chunk.choices) == 0
-        usage = final_chunk.usage
-        assert isinstance(usage.prompt_tokens, int) and usage.prompt_tokens > 0
-        assert isinstance(usage.completion_tokens, int) and usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        usage_stream_options_true = final_chunk.usage
+        assert (
+            isinstance(usage_stream_options_true.prompt_tokens, int)
+            and usage_stream_options_true.prompt_tokens > 0
+        )
+        assert (
+            isinstance(usage_stream_options_true.completion_tokens, int)
+            and usage_stream_options_true.completion_tokens > 0
+        )
+        assert (
+            usage_stream_options_true.total_tokens
+            == usage_stream_options_true.prompt_tokens
+            + usage_stream_options_true.completion_tokens
+        )
 
         # Verify other chunks have no usage data.
         for chunk in chunks_true[:-1]:
             assert chunk.usage is None
 
+        # Assert usage is consistent between streaming and non-streaming calls
+        assert usage_stream_false.model_dump() == usage_stream_options_true.model_dump()
+
     @pytest.mark.asyncio
     async def test_completion_streaming_usage_option(
-        self, client: openai.AsyncOpenAI, model: str, prompt: str
+        self, client: openai.AsyncOpenAI, model: str, prompt: str, backend: str
     ):
-        # First, run with include_usage=False to establish a baseline chunk count.
+        if backend != "vllm":
+            pytest.skip("Usage reporting is currently only supported for vLLM backend")
+
+        # Get baseline usage and content from a non-streaming call
         stream_false = await client.completions.create(
             model=model,
             prompt=prompt,
             max_tokens=10,
-            stream=True,
-            stream_options={"include_usage": False},
+            temperature=0.0,
+            stream=False,
+            seed=0,
         )
-        chunks_false = [chunk async for chunk in stream_false]
-        for chunk in chunks_false:
-            assert chunk.usage is None
+        usage_stream_false = stream_false.usage
+        stream_false_output = stream_false.choices[0].text
+        assert usage_stream_false is not None
+        assert stream_false_output is not None
 
-        # Now, run with include_usage=True.
-        stream_true = await client.completions.create(
+        # First, run with include_usage=False to establish a baseline chunk count and content.
+        stream_options_false = await client.completions.create(
             model=model,
             prompt=prompt,
             max_tokens=10,
+            temperature=0.0,
+            seed=0,
             stream=True,
+            stream_options={"include_usage": False},
+        )
+        chunks_false = [chunk async for chunk in stream_options_false]
+        for chunk in chunks_false:
+            assert chunk.usage is None
+        stream_options_false_output = "".join(
+            c.choices[0].text for c in chunks_false if c.choices and c.choices[0].text
+        )
+
+        # Now, run with include_usage=True.
+        stream_options_true = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            temperature=0.0,
+            stream=True,
+            seed=0,
             stream_options={"include_usage": True},
         )
-        chunks_true = [chunk async for chunk in stream_true]
+        chunks_true = [chunk async for chunk in stream_options_true]
+        content_chunks = [c for c in chunks_true if c.usage is None]
 
         # Verify that we received exactly one extra chunk.
         assert len(chunks_true) == len(chunks_false) + 1
+
+        # Verify content is consistent
+        stream_options_true_output = "".join(
+            c.choices[0].text for c in content_chunks if c.choices and c.choices[0].text
+        )
+        assert stream_options_true_output == stream_false_output
+        assert stream_options_true_output == stream_options_false_output
 
         # Verify the final chunk has usage data and empty choices.
         final_chunk = chunks_true[-1]
         assert final_chunk.usage is not None
         assert len(final_chunk.choices) == 0
-        usage = final_chunk.usage
-        assert isinstance(usage.prompt_tokens, int) and usage.prompt_tokens > 0
-        assert isinstance(usage.completion_tokens, int) and usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        usage_stream_options_true = final_chunk.usage
+        assert (
+            isinstance(usage_stream_options_true.prompt_tokens, int)
+            and usage_stream_options_true.prompt_tokens > 0
+        )
+        assert (
+            isinstance(usage_stream_options_true.completion_tokens, int)
+            and usage_stream_options_true.completion_tokens > 0
+        )
+        assert (
+            usage_stream_options_true.total_tokens
+            == usage_stream_options_true.prompt_tokens
+            + usage_stream_options_true.completion_tokens
+        )
 
         # Verify other chunks have no usage data.
         for chunk in chunks_true[:-1]:
             assert chunk.usage is None
+
+        # Assert usage is consistent between streaming and non-streaming calls
+        assert usage_stream_false.model_dump() == usage_stream_options_true.model_dump()
