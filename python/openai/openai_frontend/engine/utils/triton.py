@@ -37,7 +37,6 @@ from schemas.openai import (
     ChatCompletionNamedToolChoice,
     ChatCompletionToolChoiceOption1,
     CreateChatCompletionRequest,
-    CreateCompletionResponse,
     CreateCompletionRequest,
     CompletionUsage,
 )
@@ -190,8 +189,15 @@ def _to_string(tensor: tritonserver.Tensor) -> str:
 
 def _get_usage_from_response(
     response: tritonserver._api._response.InferenceResponse,
+    backend: str,
 ) -> Optional[CompletionUsage]:
-    """Extracts token usage statistics from a Triton inference response."""
+    """
+    Extracts token usage statistics from a Triton inference response.
+    Only vLLM backend currently provides these output tensors.
+    """
+    if backend != "vllm":
+        return None
+
     prompt_tokens = None
     completion_tokens = None
 

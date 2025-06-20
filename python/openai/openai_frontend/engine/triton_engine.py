@@ -228,7 +228,7 @@ class TritonLLMEngine(LLMEngine):
             backend=metadata.backend,
         )
 
-        usage = _get_usage_from_response(response)
+        usage = _get_usage_from_response(response, metadata.backend)
 
         return CreateChatCompletionResponse(
             id=request_id,
@@ -317,7 +317,7 @@ class TritonLLMEngine(LLMEngine):
         created = int(time.time())
         if request.stream:
             return self._streaming_completion_iterator(
-                request_id, created, request, responses
+                request_id, created, request, responses, metadata.backend
             )
 
         # Response validation with decoupled models in mind
@@ -326,7 +326,7 @@ class TritonLLMEngine(LLMEngine):
         response = responses[0]
         text = _get_output(response)
 
-        usage = _get_usage_from_response(response)
+        usage = _get_usage_from_response(response, metadata.backend)
 
         choice = Choice(
             finish_reason=FinishReason.stop,
@@ -486,7 +486,7 @@ class TritonLLMEngine(LLMEngine):
             # If this is the backend's final response for the entire inference call,
             # attempt to get token counts. For vLLM, these are sent with the final packet.
             if response.final:
-                usage_payload = _get_usage_from_response(response)
+                usage_payload = _get_usage_from_response(response, backend)
 
             (
                 response_delta,
@@ -727,13 +727,14 @@ class TritonLLMEngine(LLMEngine):
         created: int,
         request: CreateCompletionRequest,
         responses: AsyncIterable,
+        backend: str,
     ) -> AsyncIterator[str]:
         model = request.model
         usage_payload: Optional[CompletionUsage] = None
 
         async for response in responses:
             if response.final:
-                usage_payload = _get_usage_from_response(response)
+                usage_payload = _get_usage_from_response(response, backend)
 
             text = _get_output(response)
             choice = Choice(
