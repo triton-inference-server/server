@@ -50,12 +50,11 @@ class TestChatCompletions:
         )
 
         assert response.status_code == 200
-        response_json = response.json()
-        message = response_json["choices"][0]["message"]
+        message = response.json()["choices"][0]["message"]
         assert message["content"].strip()
         assert message["role"] == "assistant"
 
-        usage = response_json.get("usage")
+        usage = response.json().get("usage")
         if backend == "vllm":
             assert usage is not None
         else:
