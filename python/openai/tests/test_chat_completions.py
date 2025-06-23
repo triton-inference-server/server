@@ -592,7 +592,12 @@ class TestChatCompletionsTokenizers:
 
         responses = []
         with TestClient(app_local) as client_local, TestClient(app_hf) as client_hf:
-            payload = {"model": model, "messages": messages, "temperature": 0}
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0,
+                "seed": 0,
+            }
             responses.append(client_local.post("/v1/chat/completions", json=payload))
             responses.append(client_hf.post("/v1/chat/completions", json=payload))
 
