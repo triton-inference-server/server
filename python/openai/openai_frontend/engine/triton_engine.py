@@ -48,6 +48,7 @@ from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
+    _StreamingUsageAccumulator,
     _create_trtllm_inference_request,
     _create_vllm_inference_request,
     _get_output,
@@ -472,7 +473,13 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
-        usage_payload = None
+        include_usage = (
+            # TODO: Remove backend check condition once tensorrt-llm backend also supports usage
+            backend == "vllm"
+            and request.stream_options
+            and request.stream_options.include_usage
+        )
+        usage_accumulator = _StreamingUsageAccumulator(backend)
 
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
@@ -481,11 +488,8 @@ class TritonLLMEngine(LLMEngine):
 
         async for response in responses:
             delta_text = _get_output(response)
-
-            # If this is the backend's final response for the entire inference call,
-            # attempt to get token counts. For vLLM, these are sent with the final packet.
-            if response.final:
-                usage_payload = _get_usage_from_response(response, backend)
+            if include_usage:
+                usage_accumulator.update(response)
 
             (
                 response_delta,
@@ -525,8 +529,9 @@ class TritonLLMEngine(LLMEngine):
             )
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
-        # After the loop, send the final usage chunk if requested via stream_options.
-        if request.stream_options and request.stream_options.include_usage:
+        # Send the final usage chunk if requested via stream_options.
+        if include_usage:
+            usage_payload = usage_accumulator.get_final_usage()
             if usage_payload:
                 final_usage_chunk = CreateChatCompletionStreamResponse(
                     id=request_id,
@@ -729,11 +734,17 @@ class TritonLLMEngine(LLMEngine):
         backend: str,
     ) -> AsyncIterator[str]:
         model = request.model
-        usage_payload = None
+        include_usage = (
+            # TODO: Remove backend check condition once tensorrt-llm backend also supports usage
+            backend == "vllm"
+            and request.stream_options
+            and request.stream_options.include_usage
+        )
+        usage_accumulator = _StreamingUsageAccumulator(backend)
 
         async for response in responses:
-            if response.final:
-                usage_payload = _get_usage_from_response(response, backend)
+            if include_usage:
+                usage_accumulator.update(response)
 
             text = _get_output(response)
             choice = Choice(
@@ -749,12 +760,14 @@ class TritonLLMEngine(LLMEngine):
                 object=ObjectType.text_completion,
                 created=created,
                 model=model,
-                usage=usage_payload,
+                usage=None,
             )
 
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
-        if request.stream_options and request.stream_options.include_usage:
+        # Send the final usage chunk if requested via stream_options.
+        if include_usage:
+            usage_payload = usage_accumulator.get_final_usage()
             if usage_payload:
                 final_usage_chunk = CreateCompletionResponse(
                     id=request_id,
