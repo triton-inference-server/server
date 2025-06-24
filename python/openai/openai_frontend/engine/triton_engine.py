@@ -531,7 +531,6 @@ class TritonLLMEngine(LLMEngine):
                 finish_reason=finish_reason,
             )
 
-            # All intermediate chunks have usage=None.
             chunk = self._get_streaming_chat_response_chunk(
                 choice, request_id, created, model, usage=None
             )

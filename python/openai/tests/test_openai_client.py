@@ -49,7 +49,7 @@ class TestOpenAIClient:
             raise Exception(f"Unexpected backend {backend=}")
 
     def test_openai_client_completion(
-        self, client: openai.OpenAI, model: str, prompt: str
+        self, client: openai.OpenAI, model: str, prompt: str, backend: str
     ):
         completion = client.completions.create(
             prompt=prompt,
@@ -61,16 +61,19 @@ class TestOpenAIClient:
         assert completion.choices[0].finish_reason == "stop"
 
         usage = completion.usage
-        assert usage is not None
-        assert isinstance(usage.prompt_tokens, int)
-        assert isinstance(usage.completion_tokens, int)
-        assert isinstance(usage.total_tokens, int)
-        assert usage.prompt_tokens > 0
-        assert usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        if backend == "vllm":
+            assert usage is not None
+            assert isinstance(usage.prompt_tokens, int)
+            assert isinstance(usage.completion_tokens, int)
+            assert isinstance(usage.total_tokens, int)
+            assert usage.prompt_tokens > 0
+            assert usage.completion_tokens > 0
+            assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        else:
+            assert usage is None
 
     def test_openai_client_chat_completion(
-        self, client: openai.OpenAI, model: str, messages: List[dict]
+        self, client: openai.OpenAI, model: str, messages: List[dict], backend: str
     ):
         chat_completion = client.chat.completions.create(
             messages=messages,
@@ -82,13 +85,16 @@ class TestOpenAIClient:
         assert chat_completion.choices[0].finish_reason == "stop"
 
         usage = chat_completion.usage
-        assert usage is not None
-        assert isinstance(usage.prompt_tokens, int)
-        assert isinstance(usage.completion_tokens, int)
-        assert isinstance(usage.total_tokens, int)
-        assert usage.prompt_tokens > 0
-        assert usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        if backend == "vllm":
+            assert usage is not None
+            assert isinstance(usage.prompt_tokens, int)
+            assert isinstance(usage.completion_tokens, int)
+            assert isinstance(usage.total_tokens, int)
+            assert usage.prompt_tokens > 0
+            assert usage.completion_tokens > 0
+            assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        else:
+            assert usage is None
 
     @pytest.mark.parametrize("echo", [False, True])
     def test_openai_client_completion_echo(
@@ -135,7 +141,7 @@ class TestAsyncOpenAIClient:
 
     @pytest.mark.asyncio
     async def test_openai_client_completion(
-        self, client: openai.AsyncOpenAI, model: str, prompt: str
+        self, client: openai.AsyncOpenAI, model: str, prompt: str, backend: str
     ):
         completion = await client.completions.create(
             prompt=prompt,
@@ -147,17 +153,20 @@ class TestAsyncOpenAIClient:
         assert completion.choices[0].finish_reason == "stop"
 
         usage = completion.usage
-        assert usage is not None
-        assert isinstance(usage.prompt_tokens, int)
-        assert isinstance(usage.completion_tokens, int)
-        assert isinstance(usage.total_tokens, int)
-        assert usage.prompt_tokens > 0
-        assert usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        if backend == "vllm":
+            assert usage is not None
+            assert isinstance(usage.prompt_tokens, int)
+            assert isinstance(usage.completion_tokens, int)
+            assert isinstance(usage.total_tokens, int)
+            assert usage.prompt_tokens > 0
+            assert usage.completion_tokens > 0
+            assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        else:
+            assert usage is None
 
     @pytest.mark.asyncio
     async def test_openai_client_chat_completion(
-        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict], backend: str
     ):
         chat_completion = await client.chat.completions.create(
             messages=messages,
@@ -168,13 +177,16 @@ class TestAsyncOpenAIClient:
         assert chat_completion.choices[0].finish_reason == "stop"
 
         usage = chat_completion.usage
-        assert usage is not None
-        assert isinstance(usage.prompt_tokens, int)
-        assert isinstance(usage.completion_tokens, int)
-        assert isinstance(usage.total_tokens, int)
-        assert usage.prompt_tokens > 0
-        assert usage.completion_tokens > 0
-        assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        if backend == "vllm":
+            assert usage is not None
+            assert isinstance(usage.prompt_tokens, int)
+            assert isinstance(usage.completion_tokens, int)
+            assert isinstance(usage.total_tokens, int)
+            assert usage.prompt_tokens > 0
+            assert usage.completion_tokens > 0
+            assert usage.total_tokens == usage.prompt_tokens + usage.completion_tokens
+        else:
+            assert usage is None
 
         print(f"Chat completion results: {chat_completion}")
 
@@ -291,12 +303,14 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, messages: List[dict], backend: str
     ):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
+            pytest.skip(
+                "Usage reporting is currently available only for the vLLM backend."
+            )
 
         seed = 0
         temperature = 0.0
         max_tokens = 16
-        
+
         # Get usage and content from a non-streaming call
         stream_false = await client.chat.completions.create(
             model=model,
@@ -386,12 +400,14 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, prompt: str, backend: str
     ):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
+            pytest.skip(
+                "Usage reporting is currently available only for the vLLM backend."
+            )
 
         seed = 0
         temperature = 0.0
         max_tokens = 16
-        
+
         # Get usage and content from a non-streaming call
         stream_false = await client.completions.create(
             model=model,
