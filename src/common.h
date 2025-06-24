@@ -54,6 +54,9 @@ constexpr int WILDCARD_DIM = -1;
 // Maximum allowed depth for JSON parsing
 constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 
+// Default maximum allowed HTTP request input size in bytes (64MB)
+constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
+
 /// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     "triton_enable_empty_final_response"};

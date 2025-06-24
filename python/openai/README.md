@@ -51,7 +51,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:25.04-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:25.05-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -216,7 +216,7 @@ completion = client.chat.completions.create(
         },
         {"role": "user", "content": "What are LLMs?"},
     ],
-    max_tokens=256,
+    max_completion_tokens=256,
 )
 
 print(completion.choices[0].message.content)
@@ -487,7 +487,7 @@ messages = [
 ]
 
 tool_calls = client.chat.completions.create(
-    messages=messages, model=model, tools=tools, max_tokens=128
+    messages=messages, model=model, tools=tools, max_completion_tokens=128
 )
 function_name = tool_calls.choices[0].message.tool_calls[0].function.name
 function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
@@ -502,31 +502,6 @@ Example output:
 function name: get_current_weather
 function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit"}
 tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It is partly cloudly, with highs in the 90's.
-```
-
-<!-- TODO: Remove this warning when the openai api supports the max_completion_tokens instead of max_tokens -->
-> [!WARNING]
-> When using LangChain to call the `v1/chat/completions` endpoint, you might encounter an exception related to `max_completion_tokens` if you have specified `max_tokens` in the request.
->
-> Example: `openai.BadRequestError: Error code: 400 - {'object': 'error', 'message': "[{'type': 'extra_forbidden', 'loc': ('body', 'max_completion_tokens'), 'msg': 'Extra inputs are not permitted', 'input': 800}]", 'type': 'BadRequestError', 'param': None, 'code': 400}`
->
-> This issue is due to an incompatibility between Triton's OpenAI API frontend and the latest OpenAI API. We are actively working to address this gap. A workaround is adding the `max_tokens` into the `model_kwargs` of the LangChain OpenAI request.
->
-> Example:
-```python
-from langchain.llms import OpenAI
-
-llm = OpenAI(
-    model_name="llama-3.1-8b-instruct",
-    temperature=0.0,
-    model_kwargs={
-        "max_tokens": 4096
-    }
-)
-
-response = llm("Write a short poem about a sunset.")
-print(response)
-
 ```
 
 #### Named Tool Calling
@@ -639,12 +614,12 @@ messages = [
 ]
 
 tool_calls = client.chat.completions.create(
-    messages=messages, model=model, tools=tools, tool_choice=tool_choice, max_tokens=128
+    messages=messages, model=model, tools=tools, tool_choice=tool_choice, max_completion_tokens=128
 )
 function_name = tool_calls.choices[0].message.tool_calls[0].function.name
 function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
 
-print(f"function name: "{function_name}")
+print(f"function name: {function_name}")
 print(f"function arguments: {function_arguments}")
 print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
 ```

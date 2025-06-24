@@ -143,6 +143,13 @@ def parse_args():
         help="The path to the custom Jinja chat template file. This is useful if you'd like to use a different chat template than the one provided by the model.",
     )
 
+    triton_group.add_argument(
+        "--default-max-tokens",
+        type=int,
+        default=16,
+        help="The default maximum number of tokens to generate if not specified in the request. The default is 16.",
+    )
+
     # OpenAI-Compatible Frontend (FastAPI)
     openai_group = parser.add_argument_group("Triton OpenAI-Compatible Frontend")
     openai_group.add_argument(
@@ -199,6 +206,7 @@ def main():
         lora_separator=args.lora_separator,
         tool_call_parser=args.tool_call_parser,
         chat_template=args.chat_template,
+        default_max_tokens=args.default_max_tokens,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management

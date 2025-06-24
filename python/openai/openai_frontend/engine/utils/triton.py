@@ -47,6 +47,7 @@ def _create_vllm_inference_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    default_max_tokens: int,
 ):
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
@@ -68,6 +69,9 @@ def _create_vllm_inference_request(
         "function_call",
         "functions",
         "suffix",
+        "max_completion_tokens",
+        # will be handled explicitly
+        "max_tokens",
     }
 
     # NOTE: The exclude_none is important, as internals may not support
@@ -76,6 +80,23 @@ def _create_vllm_inference_request(
         exclude=excludes,
         exclude_none=True,
     )
+
+    # Indicates CreateChatCompletionRequest
+    if hasattr(request, "max_completion_tokens"):
+        if request.max_completion_tokens is not None:
+            sampling_parameters["max_tokens"] = request.max_completion_tokens
+        # Fallback to deprecated request.max_tokens
+        elif request.max_tokens is not None:
+            sampling_parameters["max_tokens"] = request.max_tokens
+        # If neither is set, use a default value for max_tokens
+        else:
+            sampling_parameters["max_tokens"] = default_max_tokens
+    # Indicates CreateCompletionRequest
+    elif request.max_tokens is not None:
+        sampling_parameters["max_tokens"] = request.max_tokens
+    else:
+        sampling_parameters["max_tokens"] = default_max_tokens
+
     if lora_name is not None:
         sampling_parameters["lora_name"] = lora_name
     sampling_parameters = json.dumps(sampling_parameters)
@@ -111,6 +132,7 @@ def _create_trtllm_inference_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    default_max_tokens: int,
 ):
     if lora_name is not None:
         raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
@@ -118,8 +140,23 @@ def _create_trtllm_inference_request(
     inputs = {}
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = np.bool_([[request.stream]])
-    if request.max_tokens:
+
+    # Indicates CreateChatCompletionRequest
+    if hasattr(request, "max_completion_tokens"):
+        if request.max_completion_tokens is not None:
+            inputs["max_tokens"] = np.int32([[request.max_completion_tokens]])
+        # Fallback to deprecated request.max_tokens
+        elif request.max_tokens is not None:
+            inputs["max_tokens"] = np.int32([[request.max_tokens]])
+        # If neither is set, use a default value for max_tokens
+        else:
+            inputs["max_tokens"] = np.int32([[default_max_tokens]])
+    # Indicates CreateCompletionRequest
+    elif request.max_tokens is not None:
         inputs["max_tokens"] = np.int32([[request.max_tokens]])
+    else:
+        inputs["max_tokens"] = np.int32([[default_max_tokens]])
+
     if request.stop:
         if isinstance(request.stop, str):
             request.stop = [request.stop]
@@ -132,7 +169,7 @@ def _create_trtllm_inference_request(
     if request.presence_penalty is not None:
         inputs["presence_penalty"] = np.float32([[request.presence_penalty]])
     if request.seed is not None:
-        inputs["random_seed"] = np.uint64([[request.seed]])
+        inputs["seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
 

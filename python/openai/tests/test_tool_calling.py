@@ -179,7 +179,7 @@ class TestAsyncClientToolCalling:
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             model=model,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
@@ -213,7 +213,7 @@ class TestAsyncClientToolCalling:
             model=model,
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
             stream=True,
@@ -288,10 +288,11 @@ class TestAsyncClientToolCalling:
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_WITH_TOOL_RESPONSE,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             model=model,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
+            seed=0,
         )
 
         choice = chat_completion.choices[0]
@@ -304,11 +305,12 @@ class TestAsyncClientToolCalling:
         stream = await client.chat.completions.create(
             messages=MESSAGES_WITH_TOOL_RESPONSE,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             model=model,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
             stream=True,
+            seed=0,
         )
 
         chunks: List[str] = []
@@ -350,7 +352,7 @@ class TestAsyncClientToolCalling:
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             model=model,
             tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
@@ -385,7 +387,7 @@ class TestAsyncClientToolCalling:
             model=model,
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
@@ -457,7 +459,7 @@ class TestAsyncClientToolCalling:
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             model=model,
             tool_choice="required",
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
@@ -492,7 +494,7 @@ class TestAsyncClientToolCalling:
             model=model,
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
-            max_tokens=128,
+            max_completion_tokens=128,
             tool_choice="required",
             tools=[WEATHER_TOOL, WEATHER_FORECAST_TOOL],
             logprobs=False,
@@ -562,7 +564,7 @@ class TestAsyncClientToolCalling:
             await client.chat.completions.create(
                 messages=MESSAGES_ASKING_FOR_TOOLS,
                 temperature=0,
-                max_tokens=128,
+                max_completion_tokens=128,
                 model=model,
                 tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
                 logprobs=False,
@@ -572,7 +574,7 @@ class TestAsyncClientToolCalling:
             await client.chat.completions.create(
                 messages=MESSAGES_ASKING_FOR_TOOLS,
                 temperature=0,
-                max_tokens=128,
+                max_completion_tokens=128,
                 model=model,
                 tool_choice=WEATHER_FORECAST_TOOL_CHOICE,
                 tools=[WEATHER_TOOL],
@@ -584,7 +586,7 @@ class TestAsyncClientToolCalling:
             await client.chat.completions.create(
                 messages=MESSAGES_ASKING_FOR_TOOLS,
                 temperature=0,
-                max_tokens=128,
+                max_completion_tokens=128,
                 model=model,
                 tool_choice="required",
                 tools=[],
