@@ -98,7 +98,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-0242093d-51ae-11f0-b339-e7480668bfbe",,
+  "id": "cmpl-0242093d-51ae-11f0-b339-e7480668bfbe",
   "choices": [
     {
       "finish_reason": "stop",
