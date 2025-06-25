@@ -36,9 +36,9 @@ from pydantic import BaseModel
 from schemas.openai import (
     ChatCompletionNamedToolChoice,
     ChatCompletionToolChoiceOption1,
+    CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
-    CompletionUsage,
 )
 
 

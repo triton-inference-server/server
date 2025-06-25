@@ -540,7 +540,9 @@ class TestChatCompletions:
         self, client, model: str, messages: List[dict], backend: str
     ):
         if backend != "vllm":
-            pytest.skip("Usage reporting is currently available only for the vLLM backend.")
+            pytest.skip(
+                "Usage reporting is currently available only for the vLLM backend."
+            )
 
         response = client.post(
             "/v1/chat/completions",

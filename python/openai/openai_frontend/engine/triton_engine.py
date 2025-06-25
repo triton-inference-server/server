@@ -48,12 +48,12 @@ from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
-    _StreamingUsageAccumulator,
     _create_trtllm_inference_request,
     _create_vllm_inference_request,
     _get_output,
     _get_usage_from_response,
     _get_vllm_lora_names,
+    _StreamingUsageAccumulator,
     _validate_triton_responses_non_streaming,
 )
 from schemas.openai import (
