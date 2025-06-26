@@ -76,7 +76,7 @@ class ClassificationParameterTest(tu.TestResultCollector):
 
         self.assertEqual(output_dtype, "BYTES")
 
-    def test_classificattion_incorrect_data_type(self):
+    def test_classificattion_unsupported_data_type(self):
         shape = (1, 8)
         model_name = "identity_bytes"
         dtype = "BYTES"
