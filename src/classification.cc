@@ -77,8 +77,19 @@ TopkClassifications(
     const TRITONSERVER_DataType datatype, const uint32_t req_class_count,
     std::vector<std::string>* class_strs)
 {
-  const size_t element_cnt =
-      byte_size / TRITONSERVER_DataTypeByteSize(datatype);
+  const uint32_t dtype_byte_size = TRITONSERVER_DataTypeByteSize(datatype);
+  if (dtype_byte_size == 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            std::string(
+                "class result not available for output due to "
+                "unsupported type '") +
+            std::string(TRITONSERVER_DataTypeString(datatype)) + "'")
+            .c_str());
+  }
+
+  const size_t element_cnt = byte_size / dtype_byte_size;
 
   switch (datatype) {
     case TRITONSERVER_TYPE_UINT8:
@@ -118,8 +129,9 @@ TopkClassifications(
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
-              std::string("class result not available for output due to "
-                          "unsupported type '") +
+              std::string(
+                  "class result not available for output due to "
+                  "unsupported type '") +
               std::string(TRITONSERVER_DataTypeString(datatype)) + "'")
               .c_str());
   }
