@@ -482,10 +482,7 @@ class TritonLLMEngine(LLMEngine):
 
         previous_text = ""
         include_usage = (
-            # TODO: Remove backend check condition once tensorrt-llm backend also supports usage
-            backend == "vllm"
-            and request.stream_options
-            and request.stream_options.include_usage
+            request.stream_options and request.stream_options.include_usage
         )
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
@@ -697,6 +694,18 @@ class TritonLLMEngine(LLMEngine):
 
         self._verify_chat_tool_call_settings(request=request)
 
+        if request.stream_options and not request.stream:
+            raise Exception("`stream_options` can only be used when `stream` is True")
+
+        if (
+            request.stream_options
+            and request.stream_options.include_usage
+            and metadata.backend != "vllm"
+        ):
+            raise Exception(
+                "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            )
+
     def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
             request.tool_choice
@@ -742,10 +751,7 @@ class TritonLLMEngine(LLMEngine):
     ) -> AsyncIterator[str]:
         model = request.model
         include_usage = (
-            # TODO: Remove backend check condition once tensorrt-llm backend also supports usage
-            backend == "vllm"
-            and request.stream_options
-            and request.stream_options.include_usage
+            request.stream_options and request.stream_options.include_usage
         )
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
@@ -838,6 +844,18 @@ class TritonLLMEngine(LLMEngine):
 
         if request.logit_bias is not None or request.logprobs is not None:
             raise Exception("logit bias and log probs not supported")
+
+        if request.stream_options and not request.stream:
+            raise Exception("`stream_options` can only be used when `stream` is True")
+
+        if (
+            request.stream_options
+            and request.stream_options.include_usage
+            and metadata.backend != "vllm"
+        ):
+            raise Exception(
+                "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            )
 
     def _should_stream_with_auto_tool_parsing(
         self, request: CreateChatCompletionRequest

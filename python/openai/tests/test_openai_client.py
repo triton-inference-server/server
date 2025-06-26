@@ -487,3 +487,60 @@ class TestAsyncOpenAIClient:
 
         # Assert usage is consistent between streaming and non-streaming calls
         assert usage_stream_false.model_dump() == usage_stream_options_true.model_dump()
+
+    @pytest.mark.asyncio
+    async def test_stream_options_without_streaming(
+        self, client: openai.AsyncOpenAI, model: str, prompt: str
+    ):
+        with pytest.raises(openai.BadRequestError) as e:
+            await client.completions.create(
+                model=model,
+                prompt=prompt,
+                stream=False,
+                stream_options={"include_usage": True},
+            )
+        assert "`stream_options` can only be used when `stream` is True" in str(
+            e.value
+        )
+
+        with pytest.raises(openai.BadRequestError) as e:
+            await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                stream=False,
+                stream_options={"include_usage": True},
+            )
+        assert "`stream_options` can only be used when `stream` is True" in str(
+            e.value
+        )
+
+    @pytest.mark.asyncio
+    async def test_streaming_usage_unsupported_backend(
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict], backend: str
+    ):
+        if backend == "vllm":
+            pytest.skip("This test is for backends that do not support usage reporting.")
+
+        with pytest.raises(openai.BadRequestError) as e:
+            await client.completions.create(
+                model=model,
+                prompt="Test prompt",
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+        assert (
+            "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            in str(e.value)
+        )
+
+        with pytest.raises(openai.BadRequestError) as e:
+            await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+        assert (
+            "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            in str(e.value)
+        )
