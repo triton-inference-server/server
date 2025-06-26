@@ -101,7 +101,7 @@ done
 # Test Classification Extension
 MODELDIR="models"
 TEST_RESULT_FILE="test_results.txt"
-TEST_SCRIPT_PY="./classification_parameter_test.py"
+TEST_SCRIPT_PY="./class_count_test.py"
 
 rm -rf $MODELDIR
 mkdir -p "${MODELDIR}/identity_fp32/1"
@@ -118,8 +118,8 @@ cp ../python_models/identity_fp32/model.py "${MODELDIR}/identity_bytes/1/"
 SERVER_ARGS="--model-repository=`pwd`/${MODELDIR} --log-verbose=1"
 for client_type in http grpc; do
   export CLIENT_TYPE=$client_type
-  SERVER_LOG="./classification_param_${client_type}_test_server.log"
-  CLIENT_LOG="./classification_param_${client_type}_test_client.log"
+  SERVER_LOG="./class_count_test_${client_type}_server.log"
+  CLIENT_LOG="./class_count_test_${client_type}_client.log"
   rm -f $SERVER_LOG $CLIENT_LOG
   run_server
   if [ "$SERVER_PID" == "0" ]; then
@@ -132,13 +132,13 @@ for client_type in http grpc; do
   python3 $TEST_SCRIPT_PY -v >>"$CLIENT_LOG" 2>&1
   if [ $? -ne 0 ]; then
       cat $CLIENT_LOG
-      echo -e "\n***\n*** Test Failed - classification_param_${client_type}_test_client\n***"
+      echo -e "\n***\n*** Test Failed - class_count_${client_type}_test_client\n***"
       RET=1
   else
       check_test_results $TEST_RESULT_FILE 2
       if [ $? -ne 0 ]; then
           cat $TEST_RESULT_FILE
-          echo -e "\n***\n*** Test Result Verification Failed - classification_param_${client_type}_test_client\n***"
+          echo -e "\n***\n*** Test Result Verification Failed - class_count_${client_type}_test_client\n***"
           RET=1
       fi
   fi

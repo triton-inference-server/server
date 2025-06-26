@@ -76,6 +76,15 @@ class ClassificationParameterTest(tu.TestResultCollector):
 
         self.assertEqual(output_dtype, "BYTES")
 
+        # Validate shape matches to the class_count
+        output_data = result.as_numpy("OUTPUT0")
+        self.assertIsNotNone(output_data)
+        self.assertEqual(output_data.shape, (1, 5))
+
+        for res_str_bytes in np.nditer(output_data, flags=["refs_ok"]):
+            res_str = res_str_bytes.item().decode("utf-8")
+            self.assertTrue(res_str.startswith("1.000000:"))
+
     def test_classificattion_unsupported_data_type(self):
         shape = (1, 8)
         model_name = "identity_bytes"
