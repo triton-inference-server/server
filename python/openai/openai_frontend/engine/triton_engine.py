@@ -481,9 +481,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
-        include_usage = (
-            request.stream_options and request.stream_options.include_usage
-        )
+        include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
         chunk = self._get_first_streaming_chat_response(
@@ -750,9 +748,7 @@ class TritonLLMEngine(LLMEngine):
         backend: str,
     ) -> AsyncIterator[str]:
         model = request.model
-        include_usage = (
-            request.stream_options and request.stream_options.include_usage
-        )
+        include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
         async for response in responses:
