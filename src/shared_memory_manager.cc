@@ -354,6 +354,17 @@ SharedMemoryManager::RegisterSystemSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
+  // Check if the shared memory key starts with the reserved prefix
+  if (shm_key.rfind(kTritonSharedMemoryRegionPrefix, 0) == 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "cannot register shared memory region '" + name + "' with key '" +
+            shm_key + "' as it uses the reserved prefix '" +
+            kTritonSharedMemoryRegionPrefix + "'")
+            .c_str());
+  }
+
   std::lock_guard<std::mutex> lock(mu_);
 
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
@@ -670,7 +681,6 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
       ++next_it;
       if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
         TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
-        ;
         if (err != nullptr) {
           unregister_fails.push_back(it->first);
           LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);

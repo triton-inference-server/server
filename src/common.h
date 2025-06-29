@@ -45,6 +45,9 @@ constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
 
+// This prefix is reserved for shared memory regions created internally by Triton
+constexpr char kTritonSharedMemoryRegionPrefix[] = "triton_";
+
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 
 /// The value for a dimension in a shape that indicates that that
