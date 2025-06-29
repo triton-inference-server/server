@@ -51,7 +51,9 @@ from engine.utils.triton import (
     _create_trtllm_inference_request,
     _create_vllm_inference_request,
     _get_output,
+    _get_usage_from_response,
     _get_vllm_lora_names,
+    _StreamingUsageAccumulator,
     _validate_triton_responses_non_streaming,
 )
 from schemas.openai import (
@@ -65,6 +67,7 @@ from schemas.openai import (
     ChatCompletionStreamResponseDelta,
     ChatCompletionToolChoiceOption1,
     Choice,
+    CompletionUsage,
     CreateChatCompletionRequest,
     CreateChatCompletionResponse,
     CreateChatCompletionStreamResponse,
@@ -229,6 +232,8 @@ class TritonLLMEngine(LLMEngine):
             backend=metadata.backend,
         )
 
+        usage = _get_usage_from_response(response, metadata.backend)
+
         return CreateChatCompletionResponse(
             id=request_id,
             choices=[
@@ -243,6 +248,7 @@ class TritonLLMEngine(LLMEngine):
             model=request.model,
             system_fingerprint=None,
             object=ObjectType.chat_completion,
+            usage=usage,
         )
 
     def _get_chat_completion_response_message(
@@ -319,7 +325,7 @@ class TritonLLMEngine(LLMEngine):
         created = int(time.time())
         if request.stream:
             return self._streaming_completion_iterator(
-                request_id, created, request.model, responses
+                request_id, created, request, responses, metadata.backend
             )
 
         # Response validation with decoupled models in mind
@@ -327,6 +333,8 @@ class TritonLLMEngine(LLMEngine):
         _validate_triton_responses_non_streaming(responses)
         response = responses[0]
         text = _get_output(response)
+
+        usage = _get_usage_from_response(response, metadata.backend)
 
         choice = Choice(
             finish_reason=FinishReason.stop,
@@ -341,6 +349,7 @@ class TritonLLMEngine(LLMEngine):
             object=ObjectType.text_completion,
             created=created,
             model=request.model,
+            usage=usage,
         )
 
     # TODO: This behavior should be tested further
@@ -421,6 +430,7 @@ class TritonLLMEngine(LLMEngine):
         request_id: str,
         created: int,
         model: str,
+        usage: Optional[CompletionUsage] = None,
     ) -> CreateChatCompletionStreamResponse:
         return CreateChatCompletionStreamResponse(
             id=request_id,
@@ -429,6 +439,7 @@ class TritonLLMEngine(LLMEngine):
             model=model,
             system_fingerprint=None,
             object=ObjectType.chat_completion_chunk,
+            usage=usage,
         )
 
     def _get_first_streaming_chat_response(
@@ -444,7 +455,7 @@ class TritonLLMEngine(LLMEngine):
             finish_reason=None,
         )
         chunk = self._get_streaming_chat_response_chunk(
-            choice, request_id, created, model
+            choice, request_id, created, model, usage=None
         )
         return chunk
 
@@ -470,6 +481,8 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
+        include_usage = request.stream_options and request.stream_options.include_usage
+        usage_accumulator = _StreamingUsageAccumulator(backend)
 
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
@@ -478,6 +491,8 @@ class TritonLLMEngine(LLMEngine):
 
         async for response in responses:
             delta_text = _get_output(response)
+            if include_usage:
+                usage_accumulator.update(response)
 
             (
                 response_delta,
@@ -512,9 +527,24 @@ class TritonLLMEngine(LLMEngine):
             )
 
             chunk = self._get_streaming_chat_response_chunk(
-                choice, request_id, created, model
+                choice, request_id, created, model, usage=None
             )
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+
+        # Send the final usage chunk if requested via stream_options.
+        if include_usage:
+            usage_payload = usage_accumulator.get_final_usage()
+            if usage_payload:
+                final_usage_chunk = CreateChatCompletionStreamResponse(
+                    id=request_id,
+                    choices=[],
+                    created=created,
+                    model=model,
+                    system_fingerprint=None,
+                    object=ObjectType.chat_completion_chunk,
+                    usage=usage_payload,
+                )
+                yield f"data: {final_usage_chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -662,6 +692,18 @@ class TritonLLMEngine(LLMEngine):
 
         self._verify_chat_tool_call_settings(request=request)
 
+        if request.stream_options and not request.stream:
+            raise Exception("`stream_options` can only be used when `stream` is True")
+
+        if (
+            request.stream_options
+            and request.stream_options.include_usage
+            and metadata.backend != "vllm"
+        ):
+            raise Exception(
+                "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            )
+
     def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
             request.tool_choice
@@ -698,9 +740,21 @@ class TritonLLMEngine(LLMEngine):
             )
 
     async def _streaming_completion_iterator(
-        self, request_id: str, created: int, model: str, responses: AsyncIterable
+        self,
+        request_id: str,
+        created: int,
+        request: CreateCompletionRequest,
+        responses: AsyncIterable,
+        backend: str,
     ) -> AsyncIterator[str]:
+        model = request.model
+        include_usage = request.stream_options and request.stream_options.include_usage
+        usage_accumulator = _StreamingUsageAccumulator(backend)
+
         async for response in responses:
+            if include_usage:
+                usage_accumulator.update(response)
+
             text = _get_output(response)
             choice = Choice(
                 finish_reason=FinishReason.stop if response.final else None,
@@ -715,9 +769,25 @@ class TritonLLMEngine(LLMEngine):
                 object=ObjectType.text_completion,
                 created=created,
                 model=model,
+                usage=None,
             )
 
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+
+        # Send the final usage chunk if requested via stream_options.
+        if include_usage:
+            usage_payload = usage_accumulator.get_final_usage()
+            if usage_payload:
+                final_usage_chunk = CreateCompletionResponse(
+                    id=request_id,
+                    choices=[],
+                    system_fingerprint=None,
+                    object=ObjectType.text_completion,
+                    created=created,
+                    model=model,
+                    usage=usage_payload,
+                )
+                yield f"data: {final_usage_chunk.model_dump_json(exclude_unset=True)}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -770,6 +840,18 @@ class TritonLLMEngine(LLMEngine):
 
         if request.logit_bias is not None or request.logprobs is not None:
             raise Exception("logit bias and log probs not supported")
+
+        if request.stream_options and not request.stream:
+            raise Exception("`stream_options` can only be used when `stream` is True")
+
+        if (
+            request.stream_options
+            and request.stream_options.include_usage
+            and metadata.backend != "vllm"
+        ):
+            raise Exception(
+                "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            )
 
     def _should_stream_with_auto_tool_parsing(
         self, request: CreateChatCompletionRequest

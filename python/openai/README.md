@@ -98,7 +98,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
+  "id": "cmpl-0242093d-51ae-11f0-b339-e7480668bfbe",
   "choices": [
     {
       "finish_reason": "stop",
@@ -113,11 +113,15 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
       "logprobs": null
     }
   ],
-  "created": 1727679085,
+  "created": 1750846825,
   "model": "llama-3.1-8b-instruct",
   "system_fingerprint": null,
   "object": "chat.completion",
-  "usage": null
+  "usage": {
+    "completion_tokens": 7,
+    "prompt_tokens": 42,
+    "total_tokens": 49
+  }
 }
 ```
 
@@ -138,20 +142,24 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 
 ```json
 {
-  "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
+  "id": "cmpl-58fba3a0-51ae-11f0-859d-e7480668bfbe",
   "choices": [
     {
       "finish_reason": "stop",
       "index": 0,
       "logprobs": null,
-      "text": " a field of computer science that focuses on developing algorithms that allow computers to learn from"
+      "text": " an amazing field that can truly understand the hidden patterns that exist in the data,"
     }
   ],
-  "created": 1727679266,
+  "created": 1750846970,
   "model": "llama-3.1-8b-instruct",
   "system_fingerprint": null,
   "object": "text_completion",
-  "usage": null
+  "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 4,
+    "total_tokens": 20
+  }
 }
 ```
 
