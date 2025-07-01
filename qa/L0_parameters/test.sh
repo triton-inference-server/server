@@ -99,18 +99,19 @@ done
 
 
 # Test Classification Extension
+PYTHON_MODELS_DIR="${PYTHON_MODELS_DIR:-/opt/tritonserver/qa/python_models}"
 MODELDIR="models"
 TEST_RESULT_FILE="test_results.txt"
 TEST_SCRIPT_PY="./class_count_test.py"
 
 rm -rf $MODELDIR
 mkdir -p "${MODELDIR}/identity_fp32/1"
-cp /opt/tritonserver/qa/python_models/identity_fp32/config.pbtxt "${MODELDIR}/identity_fp32/"
-cp /opt/tritonserver/qa/python_models/identity_fp32/model.py "${MODELDIR}/identity_fp32/1/"
+cp ${PYTHON_MODELS_DIR}/identity_fp32/config.pbtxt "${MODELDIR}/identity_fp32/"
+cp ${PYTHON_MODELS_DIR}/identity_fp32/model.py "${MODELDIR}/identity_fp32/1/"
 
 mkdir -p "${MODELDIR}/identity_bytes/1"
-cp /opt/tritonserver/qa/python_models/identity_fp32/config.pbtxt "${MODELDIR}/identity_bytes/"
-cp /opt/tritonserver/qa/python_models/identity_fp32/model.py "${MODELDIR}/identity_bytes/1/"
+cp ${PYTHON_MODELS_DIR}/identity_fp32/config.pbtxt "${MODELDIR}/identity_bytes/"
+cp ${PYTHON_MODELS_DIR}/identity_fp32/model.py "${MODELDIR}/identity_bytes/1/"
 (cd "${MODELDIR}/identity_bytes" && \
     sed -i 's/identity_fp32/identity_bytes/' config.pbtxt && \
     sed -i 's/TYPE_FP32/TYPE_STRING/' config.pbtxt )
