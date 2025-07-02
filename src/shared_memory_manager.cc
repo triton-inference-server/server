@@ -360,7 +360,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "cannot register shared memory region '" + name + "' with key '" +
-            shm_key + "' as it uses the reserved prefix '" +
+            shm_key + "' as the key contains the reserved prefix '" +
             kTritonSharedMemoryRegionPrefix + "'")
             .c_str());
   }
