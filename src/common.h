@@ -46,7 +46,8 @@ constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
 
 // This prefix is reserved for shm regions created internally by Triton
-constexpr char kTritonSharedMemoryRegionPrefix[] = "triton_";
+constexpr char kTritonSharedMemoryRegionPrefix[] =
+    "triton_python_backend_shm_region_";
 
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 

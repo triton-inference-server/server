@@ -515,7 +515,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         prefix for the shm key.
         """
         # This matches kTritonSharedMemoryRegionPrefix in the server code.
-        reserved_prefix = "triton_"
+        reserved_prefix = "triton_python_backend_shm_region_"
 
         # The shared memory key cannot start with the reserved prefix.
         shm_name = "my_test_shm_name"
