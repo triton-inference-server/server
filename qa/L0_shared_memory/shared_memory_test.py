@@ -523,7 +523,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
 
         with self.assertRaisesRegex(
             utils.InferenceServerException,
-            f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as it uses the reserved prefix '{reserved_prefix}'",
+            f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'",
         ) as e:
             self.triton_client.register_system_shared_memory(shm_name, shm_key, 10000)
 
