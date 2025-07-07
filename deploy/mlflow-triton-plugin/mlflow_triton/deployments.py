@@ -463,20 +463,28 @@ default_model_filename: "{}"
         triton_deployment_dir = os.path.join(self.triton_model_repo, name)
 
         if "s3" in self.server_config:
-            objs = self.server_config["s3"].list_objects(
-                Bucket=self.server_config["s3_bucket"],
-                Prefix=os.path.join(self.server_config["s3_prefix"], name),
-            )
-
-            for key in objs["Contents"]:
-                key = key["Key"]
-                try:
+            # Ensure the prefix ends with a slash to treat it as a folder
+            # This is the key change to prevent deleting "name_1" when "name" is specified.
+            folder_prefix = os.path.join(self.server_config["s3_prefix"], name, '')
+            # use paginator because `list_objects` is limited to list 1000 objects
+            paginator = self.server_config["s3"].get_paginator("list_objects_v2")
+            pages = paginator.paginate(Bucket=self.server_config["s3_bucket"], Prefix=folder_prefix)
+            objects_to_delete = []
+            for page in pages:
+                if "Contents" in page:
+                    for item in page["Contents"]:
+                        objects_to_delete.append(item["Key"])
+            if not objects_to_delete:
+                print("Folder is empty. Nothing to delete")
+                return
+            try:
+                for object_key in objects_to_delete:
                     self.server_config["s3"].delete_object(
                         Bucket=self.server_config["s3_bucket"],
-                        Key=key,
+                        Key=object_key
                     )
-                except Exception as e:
-                    raise Exception(f"Could not delete {key}: {e}")
+            except Exception as e:
+                raise Exception(f"Could not delete objects in folder {folder_prefix}: {e}")
 
         else:
             # Check if the deployment directory exists
