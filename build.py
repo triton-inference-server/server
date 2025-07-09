@@ -988,7 +988,8 @@ RUN pip3 install --upgrade pip \\
           setuptools \\
           docker \\
           virtualenv \\
-          patchelf==0.17.2
+          patchelf==0.17.2 \\
+          cmake==4.0.3
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -996,16 +997,6 @@ RUN wget -O /tmp/boost.tar.gz \\
           https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
-
-# Server build requires recent version of CMake (FetchContent required)
-# Might not need this if the installed version of cmake is high enough for our build.
-# RUN apt update -q=2 \\
-#       && apt install -y gpg wget \\
-#       && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-#       && . /etc/os-release \\
-#       && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-#       && apt-get update -q=2 \\
-#       && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
     if FLAGS.enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
@@ -1108,7 +1099,8 @@ RUN pip3 install --upgrade \\
           build \\
           docker \\
           virtualenv \\
-          patchelf==0.17.2
+          patchelf==0.17.2 \\
+          cmake==4.0.3
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1117,14 +1109,6 @@ RUN wget -O /tmp/boost.tar.gz \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 
-# Server build requires recent version of CMake (FetchContent required)
-RUN apt update -q=2 \\
-      && apt install -y gpg wget \\
-      && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-      && . /etc/os-release \\
-      && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-      && apt-get update -q=2 \\
-      && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 """
 
         if FLAGS.enable_gpu:
