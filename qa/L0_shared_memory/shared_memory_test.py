@@ -509,6 +509,24 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             "client memory usage is increasing",
         )
 
+    def test_register_reserved_names(self):
+        """
+        Test that registration fails if attempting to use a reserved
+        prefix for the shm key.
+        """
+        # This matches kTritonSharedMemoryRegionPrefix in the server code.
+        reserved_prefix = "triton_python_backend_shm_region_"
+
+        # The shared memory key cannot start with the reserved prefix.
+        shm_name = "my_test_shm_name"
+        shm_key = f"{reserved_prefix}_my_test_shm_key"
+
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'",
+        ) as e:
+            self.triton_client.register_system_shared_memory(shm_name, shm_key, 10000)
+
 
 def callback(user_data, result, error):
     if error:

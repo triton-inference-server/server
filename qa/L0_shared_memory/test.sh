@@ -55,6 +55,7 @@ for i in \
         test_infer_byte_size_out_of_bound \
         test_infer_integer_overflow \
         test_register_out_of_bound \
+        test_register_reserved_names \
         test_python_client_leak; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
