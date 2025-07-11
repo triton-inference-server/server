@@ -86,18 +86,7 @@ RUN apt-get update && \
             python3-pdfkit \
             openjdk-11-jdk \
             maven && \
-    pip3 install --upgrade "grpcio-tools<1.68"
-
-# Client build requires recent version of CMake (FetchContent required)
-# Using CMAKE installation instruction from:: https://apt.kitware.com/
-RUN apt update -q=2 \
-    && apt install -y gpg wget \
-    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
-    && . /etc/os-release \
-    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
-    && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3* \
-    && cmake --version
+    pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \

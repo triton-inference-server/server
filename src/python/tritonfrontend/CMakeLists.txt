@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.31.8)
 
 # ================= Ensures Package is Structured Properly ==================
 # Top level module entry point and typed marker

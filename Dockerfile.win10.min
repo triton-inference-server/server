@@ -87,7 +87,7 @@ LABEL PYTHON_VERSION=${PYTHON_VERSION}
 #
 # Installing CMake
 #
-ARG CMAKE_VERSION=3.30.5
+ARG CMAKE_VERSION=4.0.3
 RUN pip install cmake==%CMAKE_VERSION%
 
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
