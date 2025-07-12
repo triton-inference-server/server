@@ -1,0 +1,68 @@
+# Example configuration for an NLP model (e.g., BERT for text classification)
+name: "bert_classifier_coreml"
+platform: "coreml"
+max_batch_size: 1
+
+# Input configuration for tokenized text
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT32
+    dims: [ 512 ]  # Maximum sequence length
+  },
+  {
+    name: "attention_mask"
+    data_type: TYPE_INT32
+    dims: [ 512 ]
+  }
+]
+
+# Output configuration for classification
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [ 2 ]  # Binary classification
+  }
+]
+
+# Backend-specific parameters
+parameters: {
+  key: "compute_units"
+  value: {
+    string_value: "CPU_AND_NE"  # Use CPU and Neural Engine for transformer models
+  }
+}
+
+parameters: {
+  key: "use_neural_engine"
+  value: {
+    string_value: "true"  # Neural Engine is efficient for transformer operations
+  }
+}
+
+parameters: {
+  key: "prefer_power_efficiency"
+  value: {
+    string_value: "true"  # Optimize for battery life on mobile devices
+  }
+}
+
+# Instance group configuration
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+
+# Version policy
+version_policy: { latest { num_versions: 1 } }
+
+# Optimization settings
+optimization {
+  # CoreML handles its own graph optimizations
+  graph {
+    level: 1
+  }
+}

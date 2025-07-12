@@ -1,0 +1,68 @@
+# Makefile for Apple Silicon Optimization Demo
+
+CXX = clang++
+CXXFLAGS = -std=c++17 -O3 -march=native -Wall
+INCLUDES = -I.
+LDFLAGS = -framework Accelerate -framework CoreML -framework Metal -framework MetalPerformanceShaders
+
+# Source files
+DEMO_SRC = demo_apple_silicon.cc
+
+# Apple optimization sources
+APPLE_SRCS = \
+    src/apple/amx_provider.cc \
+    src/apple/amx_kernels.cc \
+    src/apple/amx_metal_interop.cc \
+    src/apple/winograd_conv3x3.cc \
+    src/apple/profile_guided_optimizer.cc
+
+# Object files
+APPLE_OBJS = $(APPLE_SRCS:.cc=.o)
+DEMO_OBJ = $(DEMO_SRC:.cc=.o)
+
+# Target
+TARGET = demo_apple_silicon
+
+.PHONY: all clean run
+
+all: $(TARGET)
+
+$(TARGET): $(DEMO_OBJ) $(APPLE_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+%.o: %.cc
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Special rule for Objective-C++ files
+src/apple/ane_provider.o: src/apple/ane_provider.mm
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+clean:
+	rm -f $(TARGET) $(DEMO_OBJ) $(APPLE_OBJS)
+
+# Quick test target
+test: $(TARGET)
+	@echo "Running Apple Silicon optimization demo..."
+	@./$(TARGET)
+
+# Benchmark target (if you have the benchmark binary)
+benchmark:
+	@if [ -f "build/src/benchmarks/apple_silicon_benchmarks" ]; then \
+		echo "Running benchmarks..."; \
+		./build/src/benchmarks/apple_silicon_benchmarks --iterations 50; \
+	else \
+		echo "Benchmark binary not found. Build with CMake first."; \
+	fi
+
+help:
+	@echo "Apple Silicon Optimization Demo"
+	@echo "=============================="
+	@echo "Targets:"
+	@echo "  make         - Build the demo"
+	@echo "  make run     - Build and run the demo"
+	@echo "  make test    - Run quick test"
+	@echo "  make clean   - Clean build files"
+	@echo "  make help    - Show this help"

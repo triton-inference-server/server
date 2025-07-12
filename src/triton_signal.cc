@@ -32,6 +32,11 @@
 #include <windows.h>
 #else
 #include <csignal>
+#include <cstring>  // for memset
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <sys/socket.h>
+#endif
 #endif
 
 #define BOOST_STACKTRACE_USE_ADDR2LINE
@@ -117,10 +122,25 @@ void
 ErrorSignalHandler(int signum)
 {
   std::cerr << "Signal (" << signum << ") received." << std::endl;
+  
+#ifdef __APPLE__
+  // On macOS, boost::stacktrace might not work as expected
+  // due to different debugging symbols format
+  try {
+    std::cerr << boost::stacktrace::stacktrace() << std::endl;
+  } catch (...) {
+    std::cerr << "Failed to capture stack trace on macOS" << std::endl;
+  }
+#else
   std::cerr << boost::stacktrace::stacktrace() << std::endl;
+#endif
 
-  // Trigger the core dump
-  signal(signum, SIG_DFL);
+  // Reset signal handler to default and re-raise to trigger core dump
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = SIG_DFL;
+  sigemptyset(&sa.sa_mask);
+  sigaction(signum, &sa, nullptr);
   raise(signum);
 }
 
@@ -129,13 +149,53 @@ ErrorSignalHandler(int signum)
 TRITONSERVER_Error*
 RegisterSignalHandler()
 {
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  
+  // Set up the signal handler for graceful shutdown
+  sa.sa_handler = SignalHandler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART;  // Restart interrupted system calls
+  
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
-  signal(SIGINT, SignalHandler);
-  signal(SIGTERM, SignalHandler);
-
+  if (sigaction(SIGINT, &sa, nullptr) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Failed to register SIGINT handler");
+  }
+  if (sigaction(SIGTERM, &sa, nullptr) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Failed to register SIGTERM handler");
+  }
+  
+  // Set up the error signal handler
+  sa.sa_handler = ErrorSignalHandler;
+  sa.sa_flags = SA_RESETHAND;  // Reset to default after handling
+  
   // Trap SIGSEGV and SIGABRT to exit when server crashes
-  signal(SIGSEGV, ErrorSignalHandler);
-  signal(SIGABRT, ErrorSignalHandler);
+  if (sigaction(SIGSEGV, &sa, nullptr) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Failed to register SIGSEGV handler");
+  }
+  if (sigaction(SIGABRT, &sa, nullptr) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Failed to register SIGABRT handler");
+  }
+  
+#ifdef __APPLE__
+  // On macOS, we need to ignore SIGPIPE to prevent process termination
+  // when writing to closed sockets. This is especially important for
+  // HTTP/gRPC servers.
+  sa.sa_handler = SIG_IGN;
+  sa.sa_flags = 0;
+  if (sigaction(SIGPIPE, &sa, nullptr) != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Failed to ignore SIGPIPE");
+  }
+#else
+  // On Linux, we can use MSG_NOSIGNAL flag on send() calls instead
+  // But we still ignore SIGPIPE as a safety measure
+  signal(SIGPIPE, SIG_IGN);
+#endif
 
   return nullptr;  // success
 }

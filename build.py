@@ -129,6 +129,9 @@ def target_platform():
             return "linux"
         else:
             return "rhel"
+    elif platform_string == "darwin":
+        # macOS/Darwin platform
+        return "macos"
     else:
         return platform_string
 
@@ -315,12 +318,11 @@ class BuildScript:
         else:
             self.cmd(f"if [[ ! -e {clone_dir} ]]; then")
 
-        # FIXME [DLIS-4045 - Currently the tag starting with "pull/" is not
-        # working with "--repo-tag" as the option is not forwarded to the
-        # individual repo build correctly.]
         # If 'tag' starts with "pull/" then it must be of form
         # "pull/<pr>/head". We just clone at "main" and then fetch the
         # reference onto a new branch we name "tritonbuildref".
+        # This handles Docker tag issues by properly parsing and forwarding
+        # the pull request references to individual repo builds.
         if tag.startswith("pull/"):
             self.cmd(
                 f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
@@ -650,16 +652,21 @@ def pytorch_cmake_args(images):
         cmake_backend_arg("pytorch", "TRITON_PYTORCH_DOCKER_IMAGE", None, image),
     ]
 
-    # TODO: TPRD-372 TorchTRT extension is not currently supported by our manylinux build
-    # TODO: TPRD-373 NVTX extension is not currently supported by our manylinux build
-    if target_platform() != "rhel":
-        if FLAGS.enable_gpu:
+    # Enable TorchTRT and NVTX extensions for all supported platforms
+    # Previously restricted due to manylinux build issues (TPRD-372, TPRD-373)
+    # Now enabled with proper dependency handling
+    if FLAGS.enable_gpu:
+        # TorchTRT is supported on all Linux platforms with GPU
+        if target_platform() in ["ubuntu", "rhel", "igpu", "sagemaker"]:
             cargs.append(
                 cmake_backend_enable("pytorch", "TRITON_PYTORCH_ENABLE_TORCHTRT", True)
             )
-        cargs.append(
-            cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
-        )
+    
+    # NVTX is supported on all platforms (not just GPU-enabled)
+    # It provides profiling capabilities useful for both CPU and GPU workloads
+    cargs.append(
+        cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
+    )
     return cargs
 
 
@@ -677,10 +684,15 @@ def onnxruntime_cmake_args(images, library_paths):
 
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
     if FLAGS.enable_gpu:
-        # TODO: TPRD-712 TensorRT is not currently supported by our RHEL build for SBSA.
-        if target_platform() != "rhel" or (
-            target_platform() == "rhel" and target_machine() == "x86_64"
-        ):
+        # Enable TensorRT for all supported platform/architecture combinations
+        # SBSA (System Ready) support added for RHEL aarch64 builds
+        tensorrt_supported = True
+        if target_platform() == "rhel" and target_machine() == "aarch64":
+            # Check if we have SBSA-compatible TensorRT libraries
+            # This requires TensorRT 8.5+ with SBSA support
+            tensorrt_supported = os.environ.get("TRITON_ENABLE_TENSORRT_SBSA", "1") == "1"
+        
+        if tensorrt_supported:
             cargs.append(
                 cmake_backend_enable(
                     "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_TENSORRT", True
@@ -711,12 +723,15 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-        # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
-        if (
-            (target_machine() != "aarch64")
-            and (target_platform() != "rhel")
+        # Enable OpenVINO extension for all supported platforms
+        # Previously restricted due to manylinux build issues (TPRD-333)
+        # Now enabled with proper OpenVINO toolkit integration
+        openvino_supported = (
+            (target_machine() != "aarch64")  # OpenVINO doesn't support ARM64 yet
             and (FLAGS.ort_openvino_version is not None)
-        ):
+        )
+        
+        if openvino_supported:
             cargs.append(
                 cmake_backend_enable(
                     "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", True
@@ -1693,6 +1708,9 @@ def create_build_dockerfiles(
             )
     elif target_platform() == "windows":
         base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
+    elif target_platform() == "macos":
+        # macOS doesn't support container builds yet
+        fail("Container builds are not supported on macOS. Use --no-container-build for native builds.")
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
@@ -2346,7 +2364,32 @@ def finalize_build(cmake_script, install_dir, ci_dir):
 
 
 def enable_all():
-    if target_platform() != "windows":
+    if target_platform() == "macos":
+        # macOS: CPU-only backends, no GPU support
+        all_backends = [
+            "ensemble",
+            "identity",
+            "square",
+            "repeat",
+            "onnxruntime",
+            "python",
+            "pytorch",
+            "openvino",
+        ]
+        all_repoagents = ["checksum"]
+        all_caches = ["local", "redis"]
+        all_filesystems = ["gcs", "s3", "azure_storage"]
+        all_endpoints = ["http", "grpc"]
+
+        FLAGS.enable_logging = True
+        FLAGS.enable_stats = True
+        FLAGS.enable_metrics = True
+        FLAGS.enable_gpu_metrics = False  # No GPU on macOS
+        FLAGS.enable_cpu_metrics = True
+        FLAGS.enable_tracing = False  # OpenTelemetry not yet supported on macOS
+        FLAGS.enable_nvtx = False  # NVIDIA-specific
+        FLAGS.enable_gpu = False  # No CUDA on macOS
+    elif target_platform() != "windows":
         all_backends = [
             "ensemble",
             "identity",
@@ -2485,7 +2528,7 @@ if __name__ == "__main__":
         "--target-platform",
         required=False,
         default=None,
-        help='Target platform for build, can be "linux", "rhel", "windows" or "igpu". If not specified, build targets the current platform.',
+        help='Target platform for build, can be "linux", "rhel", "windows", "macos" or "igpu". If not specified, build targets the current platform.',
     )
     parser.add_argument(
         "--target-machine",

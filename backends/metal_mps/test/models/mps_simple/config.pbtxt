@@ -1,0 +1,32 @@
+name: "mps_simple"
+backend: "metal_mps"
+max_batch_size: 1
+
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+
+output [
+  {
+    name: "output" 
+    data_type: TYPE_FP32
+    dims: [ 64, 56, 56 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+
+parameters: {
+  key: "optimization_level"
+  value: { string_value: "1" }
+}

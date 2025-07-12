@@ -1,0 +1,85 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-DCMAKE_INSTALL_PREFIX:STRING=/opt/tritonserver/",
+                "-DTRITON_COMMON_REPO_TAG:STRING=main",
+                "-DTRITON_BACKEND_REPO_TAG:STRING=main",
+                "-DTRITON_CORE_REPO_TAG:STRING=main",
+                "-DTRITON_ENABLE_GPU:STRING=ON",
+                "-DTRITON_ENABLE_NVTX:STRING=ON",
+                "-DCMAKE_INSTALL_PREFIX:STRING=${workspaceFolder}/build/install",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE",
+                "-DCMAKE_BUILD_TYPE:STRING=Debug",
+                "-DCMAKE_C_COMPILER:FILEPATH=/usr/bin/gcc",
+                "-DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/g++",
+                "-S${workspaceFolder}",
+                "-B${workspaceFolder}/build",
+                "-G",
+                "Unix Makefiles"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "/${workspaceFolder}/build",
+                "--config",
+                "Debug",
+                "--target",
+                "all",
+                "-j",
+                "18",
+                "--"
+            ]
+        },
+        {
+            "label": "Install",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "--config",
+                "Debug",
+                "--target",
+                "install",
+                "-j",
+                "18",
+                "--"
+            ]
+        },
+        {
+            "label": "Move",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "cp",
+                "-r",
+                "${workspaceFolder}/build/install/backends/python/*",
+                "/opt/tritonserver/backends/python"
+            ]
+        },
+        {
+            "label": "Build Python Backend",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Configure",
+                "Build",
+                "Install",
+                "Move"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

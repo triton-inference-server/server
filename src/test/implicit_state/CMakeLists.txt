@@ -63,9 +63,16 @@ set_target_properties(
   triton-implicit-state-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_implicit_state
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_implicit_state.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-implicit-state-backend PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_implicit_state.ldscript"
+  )
+endif()
 
 #
 # Install

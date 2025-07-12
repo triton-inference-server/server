@@ -1,0 +1,58 @@
+name: "pytorch_mps_example"
+backend: "pytorch"
+max_batch_size: 8
+
+# Model input configuration
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+
+# Model output configuration
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  }
+]
+
+# Instance group configuration for MPS
+instance_group [
+  {
+    name: "mps_instance"
+    count: 1
+    kind: KIND_GPU  # KIND_GPU is used for both CUDA and MPS
+  }
+]
+
+# Optional: Explicit MPS configuration through optimization
+optimization {
+  execution_accelerators {
+    gpu_execution_accelerator [
+      {
+        name: "mps"
+        # Additional MPS-specific parameters can be added here
+      }
+    ]
+  }
+}
+
+# Model warmup for better initial performance
+model_warmup [
+  {
+    name: "warmup"
+    batch_size: 1
+    inputs {
+      key: "input"
+      value: {
+        data_type: TYPE_FP32
+        dims: [ 3, 224, 224 ]
+        zero_data: true
+      }
+    }
+  }
+]

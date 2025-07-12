@@ -1,0 +1,40 @@
+# Build configuration for private buffer operations test
+
+cmake_minimum_required(VERSION 3.17)
+
+# Find Metal framework
+find_library(METAL_FRAMEWORK Metal)
+find_library(FOUNDATION_FRAMEWORK Foundation)
+
+# Create test executable
+add_executable(test_private_buffer_ops
+  test_private_buffer_ops.mm
+  metal_memory_manager.mm
+  metal_device.mm
+  metal_command.mm
+)
+
+# Set properties
+set_target_properties(test_private_buffer_ops PROPERTIES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED ON
+)
+
+# Include directories
+target_include_directories(test_private_buffer_ops PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+# Link libraries
+target_link_libraries(test_private_buffer_ops
+  ${METAL_FRAMEWORK}
+  ${FOUNDATION_FRAMEWORK}
+)
+
+# Compile options
+target_compile_options(test_private_buffer_ops PRIVATE
+  -Wall
+  -Wextra
+  -fobjc-arc
+)

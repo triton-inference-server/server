@@ -78,7 +78,7 @@ endif()
 
 # OpenTelemetry
 #
-if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+if (NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
     find_package(absl CONFIG REQUIRED)
     find_package(CURL CONFIG REQUIRED)
     find_package(nlohmann_json CONFIG REQUIRED)
@@ -139,6 +139,26 @@ if(WIN32)
       ${B64_LIBRARY}
   )
 
+elseif(MACOS)
+  target_compile_options(
+    main
+    PRIVATE
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+      -stdlib=libc++ -fvisibility=hidden
+  )
+  
+  # macOS-specific compile definitions
+  target_compile_definitions(main
+    PRIVATE
+      TRITON_MACOS=1
+  )
+  
+  # Dependency from common.h
+  target_link_libraries(
+    main
+    PRIVATE
+      b64
+  )
 else()
 
   target_compile_options(
@@ -162,17 +182,39 @@ if(LINUX)
     set (LIB_DIR "lib64")
   endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
 endif(LINUX)
+
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(MACOS ON)
+  set(TRITON_PLATFORM_MACOS ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WINDOWS ON)
+endif()
 set(TRITON_CORE_HEADERS_ONLY OFF)
 
-set_target_properties(
-  main
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
-)
+if(MACOS)
+  set_target_properties(
+    main
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH FALSE
+      BUILD_WITH_INSTALL_RPATH FALSE
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+      INSTALL_RPATH "@loader_path/../${LIB_DIR}"
+  )
+else()
+  set_target_properties(
+    main
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
+  )
+endif()
 
 target_link_libraries(
   main
@@ -208,6 +250,38 @@ if(${TRITON_ENABLE_GPU})
       CUDA::cudart
   )
 endif() # TRITON_ENABLE_GPU
+
+# Metal support for macOS
+if(APPLE)
+  option(TRITON_ENABLE_METAL "Enable Metal device support" ON)
+  option(TRITON_ENABLE_APPLE_OPTIMIZATIONS "Enable Apple Silicon optimizations (AMX, ANE, Winograd)" ON)
+  
+  if(${TRITON_ENABLE_METAL})
+    add_subdirectory(metal)
+    target_compile_definitions(
+      main
+      PRIVATE TRITON_ENABLE_METAL=1
+    )
+    target_link_libraries(
+      main
+      PRIVATE
+        triton-metal-device
+    )
+  endif() # TRITON_ENABLE_METAL
+  
+  if(${TRITON_ENABLE_APPLE_OPTIMIZATIONS})
+    add_subdirectory(apple)
+    target_compile_definitions(
+      main
+      PRIVATE TRITON_ENABLE_APPLE_OPTIMIZATIONS=1
+    )
+    target_link_libraries(
+      main
+      PRIVATE
+        triton-apple-optimizations
+    )
+  endif() # TRITON_ENABLE_APPLE_OPTIMIZATIONS
+endif() # APPLE
 
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
@@ -275,14 +349,20 @@ if(${TRITON_ENABLE_NVTX})
   )
 endif() # TRITON_ENABLE_NVTX
 
-if (NOT WIN32)
+if (LINUX)
   target_link_libraries(
     main
     PRIVATE
       rt
       dl
   )
-endif() # NOT WIN32
+elseif(MACOS)
+  target_link_libraries(
+    main
+    PRIVATE
+      dl
+  )
+endif() # Platform-specific libraries
 
 if (NOT WIN32)
   install(
@@ -411,10 +491,10 @@ if(${TRITON_ENABLE_HTTP}
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
 
-  # FIXME when Triton support of Opentelemetry is available on Windows
+  # FIXME when Triton support of Opentelemetry is available on Windows and macOS
   # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
   # JIRA DLIS-4786
-  if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+  if (NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
     target_link_libraries(
       http-endpoint-library
       PRIVATE tracing-library
@@ -528,8 +608,8 @@ if(${TRITON_ENABLE_TRACING})
   )
 
   target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-  # FIXME: remove, when Windows support is added for Opentelemetry
-  if (NOT WIN32)
+  # FIXME: remove, when Windows and macOS support is added for Opentelemetry
+  if (NOT WIN32 AND NOT MACOS)
     target_include_directories(
       tracing-library
       PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
@@ -799,11 +879,11 @@ if (NOT WIN32)
   endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
-# DLIS-7292: Extend tritonfrontend to build for Windows
-if (NOT WIN32)
+# DLIS-7292: Extend tritonfrontend to build for Windows and macOS
+if (NOT WIN32 AND NOT MACOS)
   # tritonfrontend python package
   add_subdirectory(python)
-endif (NOT WIN32)
+endif (NOT WIN32 AND NOT MACOS)
 
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)

@@ -1,0 +1,131 @@
+--- a/src/onnxruntime_loader.cc
++++ b/src/onnxruntime_loader.cc
+@@ -33,6 +33,10 @@
+ #include <string>
+ #include <thread>
+ 
++#ifdef __APPLE__
++#include <dlfcn.h>
++#endif
++
+ #include "onnxruntime_utils.h"
+ 
+ namespace triton { namespace backend { namespace onnxruntime {
+@@ -104,6 +108,26 @@ OnnxLoader::Init(common::TritonJson::Value& backend_config)
+           }
+         }
+       }
++      
++#ifdef TRITON_ENABLE_ONNXRUNTIME_COREML
++      // Enable CoreML provider on macOS if available
++      bool enable_coreml = false;
++      if (cmdline.Find("enable-coreml", &value)) {
++        RETURN_IF_ERROR(value.AsString(&value_str));
++        RETURN_IF_ERROR(ParseBoolValue(value_str, &enable_coreml));
++        
++        if (enable_coreml) {
++          LOG_MESSAGE(
++              TRITONSERVER_LOG_INFO,
++              "CoreML execution provider enabled for ONNX Runtime backend");
++        }
++      }
++#endif
++
++      // macOS specific: Adjust thread priorities for better performance
++#ifdef __APPLE__
++      // macOS handles thread scheduling differently
++#endif
+     }
+ 
+     if (threading_options == nullptr) {
+@@ -165,6 +189,16 @@ OnnxLoader::LoadSession(
+       RETURN_IF_ORT_ERROR(
+           ort_api->CreateSession(loader->env_, model_path, session_options, session));
+     } else {
++#ifdef __APPLE__
++      // On macOS, we need to handle memory mapping differently
++      // due to security restrictions on newer versions
++      OrtStatus* status = ort_api->CreateSessionFromArray(
++          loader->env_, model.data(), model.size(), session_options, session);
++      if (status != nullptr) {
++        std::string error_message = std::string(ort_api->GetErrorMessage(status));
++        ort_api->ReleaseStatus(status);
++        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, error_message.c_str());
++      }
++#else
+       // convert std::string to std::wstring
+       std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+       std::wstring wide_string = converter.from_bytes(model);
+@@ -172,6 +206,7 @@ OnnxLoader::LoadSession(
+           ort_api->CreateSessionFromArray(
+               loader->env_, wide_string.c_str(), wide_string.size() * sizeof(wchar_t),
+               session_options, session));
++#endif
+     }
+   }
+ 
+--- a/src/onnxruntime.cc
++++ b/src/onnxruntime.cc
+@@ -85,6 +85,12 @@
+ #include <cuda_runtime_api.h>
+ #endif  // TRITON_ENABLE_GPU
+ 
++#ifdef __APPLE__
++#include <mach/mach_time.h>
++#include <dispatch/dispatch.h>
++#include <os/signpost.h>
++#endif
++
+ namespace triton { namespace backend { namespace onnxruntime {
+ 
+ //
+@@ -1120,6 +1126,25 @@ ModelInstanceState::ValidateOutputs()
+             output_datatype = TRITONSERVER_TYPE_UINT64;
+             break;
+           }
++#ifdef __APPLE__
++          // Handle macOS-specific data types that might come from CoreML
++          case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16: {
++            // Float16 is supported on Apple Silicon
++            output_datatype = TRITONSERVER_TYPE_FP16;
++            break;
++          }
++          case ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16: {
++            // BFloat16 support on Apple Silicon
++            output_datatype = TRITONSERVER_TYPE_BF16;
++            break;
++          }
++#else
++          case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16:
++          case ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16: {
++            output_datatype = TRITONSERVER_TYPE_FP16;
++            break;
++          }
++#endif
+           case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16: {
+             output_datatype = TRITONSERVER_TYPE_FP16;
+             break;
+@@ -1373,6 +1398,21 @@ ModelInstanceState::Run(
+   // Add TensorRT provider if enabled
+   // Add TensorRT provider if available and not using global thread pool.
+   // Global Threadpool should not be used with TensorRT.
++  
++#ifdef TRITON_ENABLE_ONNXRUNTIME_COREML
++  // Add CoreML provider for macOS
++  if (model_state_->EnableCoreML()) {
++    // CoreML provider options
++    OrtStatus* status = OrtSessionOptionsAppendExecutionProvider_CoreML(
++        session_options, 0);  // 0 = use default options
++    if (status != nullptr) {
++      LOG_MESSAGE(
++          TRITONSERVER_LOG_WARN,
++          (std::string("Failed to add CoreML execution provider: ") +
++           std::string(ort_api->GetErrorMessage(status))).c_str());
++      ort_api->ReleaseStatus(status);
++    }
++  }
++#endif
++
+ #ifdef TRITON_ENABLE_ONNXRUNTIME_TENSORRT
+   if (model_state_->TensorRTEnabled() && !OnnxLoader::IsGlobalThreadPoolEnabled()) {
+     // Get TensorRT provider

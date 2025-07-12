@@ -1,0 +1,52 @@
+name: ok-to-test-command
+on:
+  repository_dispatch:
+    types: [ok-to-test-command]
+
+jobs:
+  # Repo owner has commented /ok-to-test on a pull request. For both a
+  # fork-based or trusted request a SHA must be supplied which is checked against
+  # the request SHA.
+  buildAndTest:
+    runs-on: [self-hosted, triton]
+    if:
+      (github.event.client_payload.slash_command.args.named.sha != '') &&
+      contains(github.event.client_payload.pull_request.head.sha,
+               github.event.client_payload.slash_command.args.named.sha)
+    steps:
+      - name: Build Server Container
+        if: github.event.client_payload.slash_command.args.named.skipbuild == ''
+        run: (cd /home/runner &&
+              bash -x ./build.sh --serverbranch "${{ github.event.client_payload.slash_command.args.named.serverbranch }}" --buildargs "--enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --endpoint=http --endpoint=grpc --backend=custom --backend=ensemble --backend=identity --backend=repeat --backend=square --backend=onnxruntime:pull/${{ github.event.client_payload.pull_request.number }}/head ${{ github.event.client_payload.slash_command.args.named.buildargs }}")
+
+      - name: Build QA Container
+        if: github.event.client_payload.slash_command.args.named.skipbuildqa == ''
+        run: (cd /home/runner && bash -x ./buildqa.sh)
+
+      - name: Run Explicit Tests
+        id: explicit
+        if: github.event.client_payload.slash_command.args.named.tests != ''
+        continue-on-error: true
+        run: (cd /home/runner &&
+              bash -x ./test.sh --tests "${{ github.event.client_payload.slash_command.args.named.tests }}")
+
+      - name: Run Sanity Tests
+        id: sanity
+        if: github.event.client_payload.slash_command.args.named.skipsanity == ''
+        continue-on-error: true
+        run: (cd /home/runner &&
+              bash -x ./test.sh --backends onnx --expected 38 --tests "L0_infer" &&
+              bash -x ./test.sh --backends onnx --tests "L0_batcher" &&
+              bash -x ./test.sh --backends onnx --tests "L0_sequence_batcher")
+
+      - name: Show Result
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          body: |
+            ```
+            sanity ${{ toJson(steps.sanity.outputs) }}
+            explicit ${{ toJson(steps.explicit.outputs) }}
+            ```

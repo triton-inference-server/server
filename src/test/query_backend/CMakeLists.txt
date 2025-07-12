@@ -63,9 +63,16 @@ set_target_properties(
   triton-query-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_query
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_query.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_query.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-query-backend PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_query.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_query.ldscript"
+  )
+endif()
 
 #
 # Install

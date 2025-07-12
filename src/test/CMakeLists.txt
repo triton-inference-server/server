@@ -127,3 +127,187 @@ if(${TRITON_ENABLE_GPU})
   add_subdirectory(sequence sequence)
   add_subdirectory(implicit_state implicit_state)
 endif()
+
+#
+# Apple Silicon Backend Tests
+#
+if(APPLE)
+  # AMX Provider Test
+  add_executable(
+    amx_provider_test
+    amx_provider_test.cc
+  )
+
+  set_target_properties(
+    amx_provider_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    amx_provider_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    amx_provider_test
+    PRIVATE
+      triton-core-serverapi
+      triton-core-serverstub
+      GTest::gtest
+      GTest::gtest_main
+      triton-apple-silicon
+  )
+
+  # ANE Provider Test
+  add_executable(
+    ane_provider_test
+    ane_provider_test.cc
+  )
+
+  set_target_properties(
+    ane_provider_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    ane_provider_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    ane_provider_test
+    PRIVATE
+      triton-core-serverapi
+      triton-core-serverstub
+      GTest::gtest
+      GTest::gtest_main
+      triton-apple-silicon
+      "-framework CoreML"
+  )
+
+  # AMX-Metal Interop Test
+  add_executable(
+    amx_metal_interop_test
+    amx_metal_interop_test.cc
+  )
+
+  set_target_properties(
+    amx_metal_interop_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    amx_metal_interop_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    amx_metal_interop_test
+    PRIVATE
+      triton-core-serverapi
+      triton-core-serverstub
+      GTest::gtest
+      GTest::gtest_main
+      triton-apple-silicon
+      triton-metal-backend
+      "-framework Metal"
+  )
+
+  # ANE Transformer Engine Test
+  add_executable(
+    ane_transformer_engine_test
+    ane_transformer_engine_test.cc
+  )
+
+  set_target_properties(
+    ane_transformer_engine_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    ane_transformer_engine_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    ane_transformer_engine_test
+    PRIVATE
+      triton-core-serverapi
+      triton-core-serverstub
+      GTest::gtest
+      GTest::gtest_main
+      triton-apple-silicon
+      "-framework CoreML"
+  )
+
+  # Apple Silicon Integration Test
+  add_executable(
+    apple_silicon_integration_test
+    apple_silicon_integration_test.cc
+  )
+
+  set_target_properties(
+    apple_silicon_integration_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    apple_silicon_integration_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    apple_silicon_integration_test
+    PRIVATE
+      triton-core-serverapi
+      triton-core-serverstub
+      GTest::gtest
+      GTest::gtest_main
+      triton-apple-silicon
+      triton-metal-backend
+      triton-model-router
+      "-framework Metal"
+      "-framework CoreML"
+  )
+
+  # Install test executables
+  install(
+    TARGETS
+      amx_provider_test
+      ane_provider_test
+      amx_metal_interop_test
+      ane_transformer_engine_test
+      apple_silicon_integration_test
+    RUNTIME DESTINATION bin
+  )
+endif()

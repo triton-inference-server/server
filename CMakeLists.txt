@@ -123,6 +123,19 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
 
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(MACOS ON)
+  set(TRITON_PLATFORM_MACOS ON)
+  message(STATUS "Detected macOS/Darwin platform")
+  # Include macOS-specific configuration
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/MacOS.cmake)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WINDOWS ON)
+endif()
+
 # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
 # of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
 set(LIB_DIR "lib")
@@ -170,6 +183,8 @@ endif()
 # platform
 if (WIN32)
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/cmake")
+elseif(MACOS)
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/lib/cmake/protobuf")
 else()
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
 endif()
@@ -179,6 +194,8 @@ endif()
 # JIRA DLIS-4786
 if (WIN32)
   set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
+elseif(MACOS)
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/lib/cmake/opentelemetry-cpp")
 else()
   set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
 endif()
@@ -202,7 +219,7 @@ endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 if(${TRITON_ENABLE_GRPC})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
 endif() # TRITON_ENABLE_GRPC
-if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+if(NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
 endif() # TRITON_ENABLE_TRACING
 

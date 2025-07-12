@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required frameworks
+find_library(METAL_FRAMEWORK Metal REQUIRED)
+find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+
+# Include targets
+include("${CMAKE_CURRENT_LIST_DIR}/TritonMetalTargets.cmake")
+
+# Check that all required components are available
+check_required_components(TritonMetal)

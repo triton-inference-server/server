@@ -26,6 +26,8 @@
 //
 
 #include "command_line_parser.h"
+#include "platform_library.h"
+
 constexpr const char* GLOBAL_OPTION_GROUP = "";
 
 #ifdef _WIN32
@@ -760,7 +762,7 @@ TritonParser::SetupOptions()
        "The global directory searched for cache shared libraries. Default is "
        "'/opt/tritonserver/caches'. This directory is expected to contain a "
        "cache implementation as a shared library with the name "
-       "'libtritoncache.so'."});
+       "'" + triton::core::GetPlatformLibraryName("tritoncache") + "'."});
 
 
   rate_limiter_options_.push_back(

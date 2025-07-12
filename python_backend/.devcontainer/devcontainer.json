@@ -1,0 +1,26 @@
+{
+	"name": "Python Backend",
+
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.vscode-pylance",
+				"ms-python.python",
+				"ms-vscode.cpptools-extension-pack",
+				"ms-vscode.cmake-tools",
+				"github.vscode-pull-request-github"
+			]
+		}
+	},
+	"postCreateCommand": "sudo chown -R triton-server:triton-server ~/.cache",
+
+	"runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined", "--gpus=all", "--shm-size=2g", "--ulimit", "stack=67108864" ],
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/home/triton-server/.ssh,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.cache/huggingface,target=/home/triton-server/.cache/huggingface,type=bind,consistency=cached"
+	],
+	"remoteUser": "triton-server"
+}

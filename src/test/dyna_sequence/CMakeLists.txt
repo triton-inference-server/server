@@ -63,9 +63,16 @@ set_target_properties(
   triton-dyna-sequence-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_dyna_sequence
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_dyna_sequence.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_dyna_sequence.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-dyna-sequence-backend PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_dyna_sequence.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_dyna_sequence.ldscript"
+  )
+endif()
 
 #
 # Install

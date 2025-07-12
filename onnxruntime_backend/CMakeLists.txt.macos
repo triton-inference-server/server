@@ -1,0 +1,341 @@
+# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+cmake_minimum_required(VERSION 3.17)
+
+project(tritononnxruntimebackend LANGUAGES C CXX)
+
+#
+# Options
+#
+# macOS ONNX Runtime Backend Build Options:
+#
+# To build the ONNX Runtime backend on macOS you can either:
+#
+#   - Use Homebrew-installed ONNX Runtime:
+#     ONNX Runtime will be automatically detected if installed via Homebrew
+#
+#   - Point to a custom ONNX Runtime installation using:
+#     TRITON_ONNXRUNTIME_INCLUDE_PATHS and TRITON_ONNXRUNTIME_LIB_PATHS
+#
+#   - Download a pre-built ONNX Runtime package:
+#     Set TRITON_ONNXRUNTIME_PACKAGE_URL to download from a URL
+#
+option(TRITON_ENABLE_GPU "Enable GPU support in backend" OFF)
+option(TRITON_ENABLE_STATS "Include statistics collections in backend" ON)
+option(TRITON_ENABLE_ONNXRUNTIME_TENSORRT "Enable TensorRT execution provider for ONNXRuntime backend" OFF)
+option(TRITON_ENABLE_ONNXRUNTIME_OPENVINO "Enable OpenVINO execution provider for ONNXRuntime backend" OFF)
+option(TRITON_ENABLE_ONNXRUNTIME_COREML "Enable CoreML execution provider for ONNXRuntime backend on macOS" ON)
+
+set(TRITON_BUILD_ONNXRUNTIME_VERSION "1.16.3" CACHE STRING "ONNXRuntime version to use")
+set(TRITON_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
+set(TRITON_ONNXRUNTIME_LIB_PATHS "" CACHE PATH "Paths to ONNXRuntime libraries")
+set(TRITON_ONNXRUNTIME_PACKAGE_URL "" CACHE STRING "URL to download pre-built ONNX Runtime package")
+
+set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
+set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
+set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
+set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
+
+# Use C++17 standard as Triton's minimum required.
+set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+
+# macOS doesn't support TensorRT or OpenVINO currently
+if(APPLE)
+  if(TRITON_ENABLE_ONNXRUNTIME_TENSORRT)
+    message(FATAL_ERROR "TRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON not supported on macOS")
+  endif()
+  if(TRITON_ENABLE_ONNXRUNTIME_OPENVINO)
+    message(FATAL_ERROR "TRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON not supported on macOS")
+  endif()
+  # GPU support is limited on macOS
+  if(TRITON_ENABLE_GPU)
+    message(WARNING "GPU support on macOS is limited to Metal Performance Shaders through CoreML provider")
+  endif()
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Find or download ONNX Runtime
+if(TRITON_ONNXRUNTIME_INCLUDE_PATHS STREQUAL "" AND TRITON_ONNXRUNTIME_LIB_PATHS STREQUAL "")
+  # First try to find ONNX Runtime via Homebrew
+  if(APPLE)
+    find_path(HOMEBREW_ONNXRUNTIME_INCLUDE onnxruntime_cxx_api.h
+      PATHS /usr/local/include/onnxruntime /opt/homebrew/include/onnxruntime
+      NO_DEFAULT_PATH
+    )
+    
+    find_library(HOMEBREW_ONNXRUNTIME_LIB onnxruntime
+      PATHS /usr/local/lib /opt/homebrew/lib
+      NO_DEFAULT_PATH
+    )
+    
+    if(HOMEBREW_ONNXRUNTIME_INCLUDE AND HOMEBREW_ONNXRUNTIME_LIB)
+      message(STATUS "Found Homebrew ONNX Runtime")
+      set(TRITON_ONNXRUNTIME_INCLUDE_PATHS ${HOMEBREW_ONNXRUNTIME_INCLUDE})
+      get_filename_component(HOMEBREW_ONNXRUNTIME_LIB_DIR ${HOMEBREW_ONNXRUNTIME_LIB} DIRECTORY)
+      set(TRITON_ONNXRUNTIME_LIB_PATHS ${HOMEBREW_ONNXRUNTIME_LIB_DIR})
+    endif()
+  endif()
+  
+  # If not found and package URL is provided, download it
+  if(TRITON_ONNXRUNTIME_INCLUDE_PATHS STREQUAL "" AND NOT TRITON_ONNXRUNTIME_PACKAGE_URL STREQUAL "")
+    include(cmake/download_onnxruntime.cmake)
+  endif()
+  
+  # If still not found, provide instructions
+  if(TRITON_ONNXRUNTIME_INCLUDE_PATHS STREQUAL "")
+    message(FATAL_ERROR 
+      "ONNX Runtime not found. Please either:\n"
+      "1. Install ONNX Runtime via Homebrew: brew install onnxruntime\n"
+      "2. Set TRITON_ONNXRUNTIME_INCLUDE_PATHS and TRITON_ONNXRUNTIME_LIB_PATHS\n"
+      "3. Set TRITON_ONNXRUNTIME_PACKAGE_URL to download a pre-built package"
+    )
+  endif()
+endif()
+
+message(STATUS "Using ONNX Runtime includes: ${TRITON_ONNXRUNTIME_INCLUDE_PATHS}")
+message(STATUS "Using ONNX Runtime libraries: ${TRITON_ONNXRUNTIME_LIB_PATHS}")
+
+# Find the ONNX Runtime library
+find_library(ONNXRUNTIME_LIBRARY 
+  NAMES onnxruntime libonnxruntime.dylib libonnxruntime.so
+  PATHS ${TRITON_ONNXRUNTIME_LIB_PATHS}
+  REQUIRED
+)
+
+#
+# Dependencies
+#
+# FetchContent's composability isn't very good. We must include the
+# transitive closure of all repos so that we can override the tag.
+#
+include(FetchContent)
+
+FetchContent_Declare(
+  repo-common
+  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
+  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(
+  repo-core
+  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
+  GIT_TAG ${TRITON_CORE_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(
+  repo-backend
+  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/backend.git
+  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+  GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+
+#
+# Shared library implementing the Triton Backend API
+#
+add_library(
+  triton-onnxruntime-backend SHARED
+  src/onnxruntime.cc
+  src/onnxruntime_loader.cc
+  src/onnxruntime_loader.h
+  src/onnxruntime_utils.cc
+  src/onnxruntime_utils.h
+)
+
+add_library(
+  TritonOnnxRuntimeBackend::triton-onnxruntime-backend ALIAS triton-onnxruntime-backend
+)
+
+target_include_directories(
+  triton-onnxruntime-backend
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${TRITON_ONNXRUNTIME_INCLUDE_PATHS}
+)
+
+target_compile_features(triton-onnxruntime-backend PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_options(
+  triton-onnxruntime-backend PRIVATE
+  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits>
+)
+
+# Platform-specific compile definitions
+if(APPLE)
+  target_compile_definitions(
+    triton-onnxruntime-backend
+    PRIVATE TRITON_PLATFORM_MACOS=1
+  )
+endif()
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+    triton-onnxruntime-backend
+    PRIVATE TRITON_ENABLE_GPU=1
+  )
+endif()
+
+if(${TRITON_ENABLE_ONNXRUNTIME_COREML} AND APPLE)
+  target_compile_definitions(
+    triton-onnxruntime-backend
+    PRIVATE TRITON_ENABLE_ONNXRUNTIME_COREML=1
+  )
+endif()
+
+# macOS-specific linker settings
+if(APPLE)
+  set_target_properties(
+    triton-onnxruntime-backend
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      OUTPUT_NAME triton_onnxruntime
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH "@loader_path"
+      # macOS specific: use @rpath for dynamic library loading
+      MACOSX_RPATH ON
+      # Ensure compatibility with macOS 11.0+
+      OSX_DEPLOYMENT_TARGET "11.0"
+  )
+else()
+  # Linux linker settings
+  configure_file(src/libtriton_onnxruntime.ldscript libtriton_onnxruntime.ldscript COPYONLY)
+  set_target_properties(
+    triton-onnxruntime-backend
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      OUTPUT_NAME triton_onnxruntime
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH "$\{ORIGIN\}"
+      LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_onnxruntime.ldscript
+      LINK_FLAGS "-Wl,--version-script libtriton_onnxruntime.ldscript"
+  )
+endif()
+
+# Link directories
+foreach(p ${TRITON_ONNXRUNTIME_LIB_PATHS})
+  target_link_directories(
+    triton-onnxruntime-backend
+    PRIVATE ${p}
+  )
+endforeach(p)
+
+# Link libraries
+target_link_libraries(
+  triton-onnxruntime-backend
+  PRIVATE
+    triton-core-serverapi   # from repo-core
+    triton-core-backendapi  # from repo-core
+    triton-core-serverstub  # from repo-core
+    triton-backend-utils    # from repo-backend
+    ${ONNXRUNTIME_LIBRARY}
+)
+
+# macOS specific: link against system frameworks if CoreML is enabled
+if(APPLE AND ${TRITON_ENABLE_ONNXRUNTIME_COREML})
+  target_link_libraries(
+    triton-onnxruntime-backend
+    PRIVATE
+      "-framework CoreML"
+      "-framework Foundation"
+  )
+endif()
+
+#
+# Install
+#
+include(GNUInstallDirs)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/TritonOnnxRuntimeBackend)
+
+install(
+  TARGETS
+    triton-onnxruntime-backend
+  EXPORT
+    triton-onnxruntime-backend-targets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/onnxruntime
+  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/onnxruntime
+)
+
+# Install ONNX Runtime libraries if we downloaded them
+if(DEFINED TRITON_ONNXRUNTIME_PACKAGE_URL AND EXISTS ${CMAKE_CURRENT_BINARY_DIR}/onnxruntime)
+  install(
+    DIRECTORY
+      ${CMAKE_CURRENT_BINARY_DIR}/onnxruntime/
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/onnxruntime
+    PATTERN *include EXCLUDE
+    PATTERN *cmake EXCLUDE
+  )
+endif()
+
+# Create a test model configuration
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/test_model_config.pbtxt
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/backends/onnxruntime
+  OPTIONAL
+)
+
+install(
+  EXPORT
+    triton-onnxruntime-backend-targets
+  FILE
+    TritonOnnxRuntimeBackendTargets.cmake
+  NAMESPACE
+    TritonOnnxRuntimeBackend::
+  DESTINATION
+    ${INSTALL_CONFIGDIR}
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/TritonOnnxRuntimeBackendConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TritonOnnxRuntimeBackendConfig.cmake
+  INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+install(
+  FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/TritonOnnxRuntimeBackendConfig.cmake
+  DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+#
+# Export from build tree
+#
+export(
+  EXPORT triton-onnxruntime-backend-targets
+  FILE ${CMAKE_CURRENT_BINARY_DIR}/TritonOnnxRuntimeBackendTargets.cmake
+  NAMESPACE TritonOnnxRuntimeBackend::
+)
+
+export(PACKAGE TritonOnnxRuntimeBackend)

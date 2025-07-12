@@ -60,9 +60,16 @@ set_target_properties(
   triton-relocation-repoagent PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME tritonrepoagent_relocation
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript
-  LINK_FLAGS "-Wl,--version-script libtritonrepoagent_relocation.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-relocation-repoagent PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript
+    LINK_FLAGS "-Wl,--version-script libtritonrepoagent_relocation.ldscript"
+  )
+endif()
 
 #
 # Install

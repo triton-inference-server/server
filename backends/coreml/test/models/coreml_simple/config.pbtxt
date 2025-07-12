@@ -1,0 +1,36 @@
+name: "coreml_simple"
+platform: "coreml"
+max_batch_size: 1
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 5 ]
+  }
+]
+
+# Use all available compute units (CPU, GPU, Neural Engine)
+parameters: {
+  key: "compute_units"
+  value: {
+    string_value: "ALL"
+  }
+}
+
+# Enable Neural Engine
+parameters: {
+  key: "use_neural_engine"
+  value: {
+    string_value: "true"
+  }
+}
+
+# Version policy
+version_policy: { latest { num_versions: 1 } }
