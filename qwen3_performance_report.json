@@ -1,0 +1,34 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "device": "mps",
+  "parameters": "7,615,616,512",
+  "performance_results": [
+    {
+      "generation_length": 50,
+      "avg_time_ms": 2098.187583195977,
+      "avg_tokens_per_second": 24.152173306627013,
+      "device": "mps",
+      "model": "Qwen/Qwen2.5-7B-Instruct"
+    },
+    {
+      "generation_length": 100,
+      "avg_time_ms": 3728.205375187099,
+      "avg_tokens_per_second": 27.85695498687524,
+      "device": "mps",
+      "model": "Qwen/Qwen2.5-7B-Instruct"
+    },
+    {
+      "generation_length": 200,
+      "avg_time_ms": 7142.038233019412,
+      "avg_tokens_per_second": 28.421595995005436,
+      "device": "mps",
+      "model": "Qwen/Qwen2.5-7B-Instruct"
+    }
+  ],
+  "apple_silicon_optimizations": {
+    "metal_performance_shaders": true,
+    "fp16_precision": true,
+    "unified_memory": true,
+    "optimized_threading": true
+  }
+}

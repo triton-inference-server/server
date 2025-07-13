@@ -28,6 +28,11 @@ cmake_minimum_required(VERSION 3.18)
 
 project(tritonserver LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(CMakeDependentOption)
 
 # Use C++17 standard as Triton's minimum required.

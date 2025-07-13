@@ -1,0 +1,65 @@
+{
+  "models_loaded": 2,
+  "model_details": {
+    "qwen3-7b": {
+      "model_name": "Qwen/Qwen2.5-7B-Instruct",
+      "parameters": 7615616512,
+      "device": "mps"
+    },
+    "qwen3-3b": {
+      "model_name": "Qwen/Qwen2.5-3B-Instruct",
+      "parameters": 3085938688,
+      "device": "mps"
+    }
+  },
+  "performance_results": {
+    "qwen3-7b": {
+      "Short Response": {
+        "avg_time_ms": 2444.274138620434,
+        "avg_throughput": 22.44776248665806,
+        "max_tokens": 50
+      },
+      "Medium Response": {
+        "avg_time_ms": 5783.374999960263,
+        "avg_throughput": 26.603644851684496,
+        "max_tokens": 150
+      },
+      "Long Response": {
+        "avg_time_ms": 12157.48369464806,
+        "avg_throughput": 25.246884613893652,
+        "max_tokens": 300
+      }
+    },
+    "qwen3-3b": {
+      "Short Response": {
+        "avg_time_ms": 2721.9845969617986,
+        "avg_throughput": 19.10690711680853,
+        "max_tokens": 50
+      },
+      "Medium Response": {
+        "avg_time_ms": 6648.13519467134,
+        "avg_throughput": 22.672897803480954,
+        "max_tokens": 150
+      },
+      "Long Response": {
+        "avg_time_ms": 13317.177471976416,
+        "avg_throughput": 22.63701642844161,
+        "max_tokens": 300
+      }
+    }
+  },
+  "apple_silicon_optimizations": {
+    "metal_performance_shaders": true,
+    "unified_memory_architecture": true,
+    "fp16_precision": true,
+    "multi_model_deployment": true
+  },
+  "recommendations": [
+    "For fastest inference: Use qwen3-7b",
+    "For best quality: Use qwen3-7b",
+    "For balanced performance: Use qwen3-3b",
+    "Enable Metal Performance Shaders for 2-3x speedup",
+    "Use FP16 precision to reduce memory usage by 50%",
+    "Implement model switching based on request priority"
+  ]
+}

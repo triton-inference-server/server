@@ -28,6 +28,11 @@ cmake_minimum_required(VERSION 3.17)
 
 project(tritoniterativesequencebackend LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 #
 # libtriton_iterative_sequence.so
 # Shared library implementing the Triton Sequence Backend API

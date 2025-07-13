@@ -1,0 +1,22 @@
+diff --git a/build/_deps/repo-core-src/src/CMakeLists.txt b/build/_deps/repo-core-src/src/CMakeLists.txt
+index abc1234..def5678 100644
+--- a/build/_deps/repo-core-src/src/CMakeLists.txt
++++ b/build/_deps/repo-core-src/src/CMakeLists.txt
+@@ -289,11 +289,16 @@ set_target_properties(
+ target_include_directories(
+   triton-core
+   PRIVATE
+     ${CMAKE_CURRENT_SOURCE_DIR}/../include
+     ${CMAKE_CURRENT_SOURCE_DIR}
+-    ${Boost_INCLUDE_DIRS}
+-    ${Protobuf_INCLUDE_DIRS}
+ )
+ 
++# Add Protobuf includes before Boost to avoid conflicts with system protobuf
++target_include_directories(triton-core SYSTEM PRIVATE ${Protobuf_INCLUDE_DIRS})
++
++# Add Boost includes as SYSTEM to prevent them from overriding protobuf
++target_include_directories(triton-core SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
++
+ if(${TRITON_ENABLE_GPU})
+   target_include_directories(
