@@ -20,7 +20,12 @@ stages:
 - incremental rollout 100%
 - performance
 - cleanup
+- secret-detection
 sast:
   stage: test
 include:
 - template: Auto-DevOps.gitlab-ci.yml
+variables:
+  SECRET_DETECTION_ENABLED: 'true'
+secret_detection:
+  stage: secret-detection
