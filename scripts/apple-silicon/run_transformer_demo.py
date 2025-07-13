@@ -34,4 +34,4 @@ os.system("python3 generate_performance_charts.py")
 
 print("\n✅ Demo complete! Check the generated PNG/PDF files for performance charts.")
 print("\n💡 To monitor real-time performance, run in another terminal:")
-print("   ./examples/monitor_apple_silicon.sh")
+print("   ./scripts/apple-silicon/monitor_apple_silicon.sh")

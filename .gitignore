@@ -20,3 +20,7 @@ custom_tokenizer
 models/
 CMakeFiles/
 build/
+
+# Generated outputs
+outputs/
+/outputs
