@@ -17,3 +17,6 @@ cprofile
 qa/L0_openai/openai
 tensorrtllm_models
 custom_tokenizer
+models/
+CMakeFiles/
+build/
