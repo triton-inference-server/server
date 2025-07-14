@@ -67,6 +67,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install cmake==4.0.3
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 # Add densenet_onnx model to example repo
 # FIXME: This should be changed to using the fetch_models.sh script
