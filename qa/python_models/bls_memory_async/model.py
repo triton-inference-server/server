@@ -1,4 +1,4 @@
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@ async def test_bls_out_of_memory():
     tensor_size = 256 * 1024 * 1024
     input0_np, infer_response = await _send_identity_tensor(tensor_size, is_decoupled)
 
-    out_of_memory_message = "Failed to increase the shared memory pool size for key"
+    out_of_memory_message = "Failed to increase the shared memory pool size"
 
     if infer_response.has_error():
         if not (out_of_memory_message in infer_response.error().message()):

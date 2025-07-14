@@ -75,8 +75,8 @@ DEFAULT_TRITON_VERSION_MAP = {
     "triton_container_version": "25.07dev",
     "upstream_container_version": "25.06",
     "ort_version": "1.22.0",
-    "ort_openvino_version": "2025.1.0",
-    "standalone_openvino_version": "2025.1.0",
+    "ort_openvino_version": "2025.2.0",
+    "standalone_openvino_version": "2025.2.0",
     "dcgm_version": "3.3.6",
     "vllm_version": "0.9.0.1",
     "rhel_py_version": "3.12.3",
@@ -1573,6 +1573,7 @@ RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
 COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1

@@ -131,6 +131,18 @@ class LoRATest(unittest.TestCase):
                         name: "exclude_input_in_output"
                         data_type: TYPE_BOOL
                         dims: [ 1 ]
+                    },
+                    {
+                        name: "return_num_input_tokens"
+                        data_type: TYPE_BOOL
+                        dims: [1]
+                        optional: true
+                    },
+                    {
+                        name: "return_num_output_tokens"
+                        data_type: TYPE_BOOL
+                        dims: [1]
+                        optional: true
                     }
                 ]
                 output [

@@ -41,7 +41,9 @@ class TestChatCompletions:
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
 
-    def test_chat_completions_defaults(self, client, model: str, messages: List[dict]):
+    def test_chat_completions_defaults(
+        self, client, model: str, messages: List[dict], backend: str
+    ):
         response = client.post(
             "/v1/chat/completions",
             json={"model": model, "messages": messages},
@@ -51,8 +53,12 @@ class TestChatCompletions:
         message = response.json()["choices"][0]["message"]
         assert message["content"].strip()
         assert message["role"] == "assistant"
-        # "usage" currently not supported
-        assert not response.json()["usage"]
+
+        usage = response.json().get("usage")
+        if backend == "vllm":
+            assert usage is not None
+        else:
+            assert usage is None
 
     def test_chat_completions_system_prompt(self, client, model: str):
         # NOTE: Currently just sanity check that there are no issues when a
@@ -530,9 +536,30 @@ class TestChatCompletions:
     def test_request_logit_bias(self):
         pass
 
-    @pytest.mark.skip(reason="Not Implemented Yet")
-    def test_usage_response(self):
-        pass
+    def test_usage_response(
+        self, client, model: str, messages: List[dict], backend: str
+    ):
+        if backend != "vllm":
+            pytest.skip(
+                "Usage reporting is currently available only for the vLLM backend."
+            )
+
+        response = client.post(
+            "/v1/chat/completions",
+            json={"model": model, "messages": messages},
+        )
+
+        assert response.status_code == 200
+        usage = response.json().get("usage")
+        assert usage is not None
+        assert isinstance(usage["prompt_tokens"], int)
+        assert isinstance(usage["completion_tokens"], int)
+        assert isinstance(usage["total_tokens"], int)
+        assert usage["prompt_tokens"] > 0
+        assert usage["completion_tokens"] > 0
+        assert (
+            usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+        )
 
 
 # For tests that won't use the same pytest fixture for server startup across
