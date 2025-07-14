@@ -1265,8 +1265,8 @@ RUN ldconfig && \\
     rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
     rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
     pip3 install --no-cache-dir transformers && \\
-    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
+    find /usr -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \\; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
     pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
@@ -1633,11 +1633,11 @@ FROM ${{BASE_IMAGE}}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+ENV TRITON_SERVER_VERSION=${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION=${{TRITON_CONTAINER_VERSION}}
 LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
 
-RUN setx path "%path%;C:\opt\tritonserver\bin"
+RUN setx path "%path%;C:\\opt\\tritonserver\\bin"
 
 """.format(
         argmap["TRITON_VERSION"],
@@ -1822,7 +1822,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if target_platform() == "windows":
             if FLAGS.container_memory:
                 runargs += ["--memory", FLAGS.container_memory]
-            runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
+            runargs += ["-v", "\\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
             if FLAGS.use_user_docker_config:
