@@ -28,6 +28,7 @@
 
 import json
 import os
+import subprocess
 import sys
 
 sys.path.append("../../common")
@@ -112,10 +113,8 @@ class InputValidationTest(unittest.TestCase):
 
         url = f"http://{self._triton_host}:{self._triton_port}/v2/repository/models/{model_name}/load"
 
-        # Create a temporary file for the JSON payload
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(payload, f)
-            payload_file = f.name
+        # Convert payload to JSON string
+        payload_json = json.dumps(payload)
 
         try:
             # Use curl to send the request
@@ -129,7 +128,7 @@ class InputValidationTest(unittest.TestCase):
                 "-H",
                 "Content-Type: application/json",
                 "-d",
-                f"@{payload_file}",
+                payload_json,
                 "--connect-timeout",
                 "10",
             ]
@@ -184,12 +183,6 @@ class InputValidationTest(unittest.TestCase):
                     self.content = self.text.encode()
 
             return ErrorResponse(str(e))
-        finally:
-            # Clean up temporary file
-            try:
-                os.unlink(payload_file)
-            except:
-                pass
 
     def test_invalid_character_model_names(self):
         """Test that model names with invalid characters are properly rejected"""
