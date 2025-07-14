@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import subprocess
 import sys
 
 sys.path.append("../../common")
@@ -81,6 +82,171 @@ class ExplicitModelTest(unittest.TestCase):
                 client.unload_model(model_name)
                 self.assertFalse(client.is_model_ready(model_name))
                 self.assertFalse(client.is_model_ready(ensemble_model_name))
+
+
+class InputValidationTest(unittest.TestCase):
+    """
+    Test input validation for user-provided inputs
+    """
+
+    def setUp(self):
+        self._shm_leak_detector = shm_util.ShmLeakDetector()
+        self._client = httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000")
+        self._triton_host = _tritonserver_ipaddr
+        self._triton_port = 8000
+
+        # Check if curl is available
+        try:
+            subprocess.run(["curl", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            self.skipTest("curl command not available - required for raw HTTP testing")
+
+    def _send_load_model_request(self, model_name):
+        """Send HTTP request to load model for testing input validation using curl"""
+        payload = {
+            "parameters": {
+                "config": f'{{"name": "{model_name}", "backend": "python", "max_batch_size": 4}}',
+                "file:/1/model.py": "print('Hello from Python Model')",
+            }
+        }
+
+        url = f"http://{self._triton_host}:{self._triton_port}/v2/repository/models/{model_name}/load"
+
+        # Convert payload to JSON string
+        payload_json = json.dumps(payload)
+
+        try:
+            # Use curl to send the request
+            curl_cmd = [
+                "curl",
+                "-s",
+                "-w",
+                "\n%{http_code}",
+                "-X",
+                "POST",
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                payload_json,
+                "--connect-timeout",
+                "10",
+            ]
+
+            # Add the URL as a separate argument to avoid shell interpretation issues
+            curl_cmd.append(url)
+
+            # Debug: print the exact URL being requested
+            print(f"DEBUG: Curl URL: {url}")
+
+            result = subprocess.run(
+                curl_cmd, capture_output=True, text=True, timeout=15
+            )
+
+            # Parse curl output - last line is status code, rest is response body
+            output_lines = (
+                result.stdout.strip().split("\n") if result.stdout.strip() else []
+            )
+            if len(output_lines) >= 2:
+                try:
+                    status_code = int(output_lines[-1])
+                    response_text = "\n".join(output_lines[:-1])
+                except ValueError:
+                    status_code = 0
+                    response_text = result.stdout or result.stderr or "Invalid response"
+            elif len(output_lines) == 1 and output_lines[0].isdigit():
+                status_code = int(output_lines[0])
+                response_text = result.stderr or "No response body"
+            else:
+                status_code = 0
+                response_text = result.stdout or result.stderr or "No response"
+
+            # Return an object similar to requests.Response
+            class CurlResponse:
+                def __init__(self, status_code, text):
+                    self.status_code = status_code
+                    self.text = text
+                    self.content = text.encode()
+
+            return CurlResponse(status_code, response_text)
+
+        except (
+            subprocess.TimeoutExpired,
+            subprocess.CalledProcessError,
+            ValueError,
+        ) as e:
+            # Return a mock response for errors
+            class ErrorResponse:
+                def __init__(self, error_msg):
+                    self.status_code = 0
+                    self.text = f"Error: {error_msg}"
+                    self.content = self.text.encode()
+
+            return ErrorResponse(str(e))
+
+    def test_invalid_character_model_names(self):
+        """Test that model names with invalid characters are properly rejected"""
+
+        # Model names with various invalid characters that should be rejected
+        invalid_model_names = [
+            "model$(test)",
+            "model\{test\}",
+            "model`test`",
+            "model;test",
+            "model|test",
+            "model&test",
+            "model'test'",
+            "model*test",
+            "model!test",
+        ]
+
+        for invalid_name in invalid_model_names:
+            with self.subTest(model_name=invalid_name):
+                print(f"Testing invalid model name: {invalid_name}")
+
+                response = self._send_load_model_request(invalid_name)
+                print(
+                    f"Response for '{invalid_name}': Status {response.status_code}, Text: {response.text[:200]}..."
+                )
+
+                # Should not get a successful 200 response
+                self.assertNotEqual(
+                    200,
+                    response.status_code,
+                    f"Invalid model name '{invalid_name}' should not get 200 OK response",
+                )
+
+                self.assertIn(
+                    "Invalid stub name: contains invalid characters",
+                    response.text,
+                    f"invalid response for '{invalid_name}' should contain 'Invalid stub name: contains invalid characters'",
+                )
+
+    def test_valid_model_names(self):
+        """Test that valid model names work"""
+
+        valid_model_names = [
+            "TestModel123",
+            "model-with-hyphens",
+            "model_with_underscores",
+        ]
+
+        for valid_name in valid_model_names:
+            with self.subTest(model_name=valid_name):
+                print(f"Testing valid model name: {valid_name}")
+
+                response = self._send_load_model_request(valid_name)
+                print(
+                    f"Response for valid '{valid_name}': Status {response.status_code}, Text: {response.text[:100]}..."
+                )
+
+                # Valid names might still fail for other reasons (model doesn't exist, etc.)
+                # but they should not be rejected due to character validation
+                # We just check it's not a validation error
+                self.assertNotIn(
+                    "Invalid stub name: contains invalid characters",
+                    response.text,
+                    f"valid response for '{valid_name}' should not contain 'Invalid stub name: contains invalid characters'",
+                )
 
 
 if __name__ == "__main__":
