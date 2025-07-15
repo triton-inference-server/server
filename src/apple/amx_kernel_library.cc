@@ -9,9 +9,10 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
-#include <immintrin.h>
+#include <vector>
 
 #ifdef __APPLE__
+#include <Accelerate/Accelerate.h>
 // AMX intrinsics are not publicly documented, so we use inline assembly
 // Based on reverse engineering and public research on Apple AMX
 
@@ -243,19 +244,28 @@ void hgemm_amx_impl(
     std::vector<float> B_fp32(K * N);
     std::vector<float> C_fp32(M * N);
     
-    // Simple conversion (real implementation would use NEON/vectorized conversion)
-    for (size_t i = 0; i < M * K; ++i) {
-        A_fp32[i] = static_cast<float>(A[i]) / 65536.0f;
-    }
-    for (size_t i = 0; i < K * N; ++i) {
-        B_fp32[i] = static_cast<float>(B[i]) / 65536.0f;
-    }
+#ifdef __APPLE__
+    // Use vImage for proper FP16 to FP32 conversion
+    vImage_Buffer src_A = {const_cast<uint16_t*>(A), M * K * sizeof(uint16_t), 1, M * K};
+    vImage_Buffer dst_A = {A_fp32.data(), M * K * sizeof(float), 1, M * K};
+    vImageConvert_Planar16FtoPlanarF(&src_A, &dst_A, 0);
+    
+    vImage_Buffer src_B = {const_cast<uint16_t*>(B), K * N * sizeof(uint16_t), 1, K * N};
+    vImage_Buffer dst_B = {B_fp32.data(), K * N * sizeof(float), 1, K * N};
+    vImageConvert_Planar16FtoPlanarF(&src_B, &dst_B, 0);
+#else
+    // Cannot proceed without proper FP16 support
+    return;
+#endif
     
     sgemm_amx_impl(A_fp32.data(), B_fp32.data(), C_fp32.data(), M, N, K, alpha, beta);
     
-    for (size_t i = 0; i < M * N; ++i) {
-        C[i] = static_cast<uint16_t>(C_fp32[i] * 65536.0f);
-    }
+#ifdef __APPLE__
+    // Convert result back to FP16
+    vImage_Buffer src_C = {C_fp32.data(), M * N * sizeof(float), 1, M * N};
+    vImage_Buffer dst_C = {C, M * N * sizeof(uint16_t), 1, M * N};
+    vImageConvert_PlanarFtoPlanar16F(&src_C, &dst_C, 0);
+#endif
 #endif
 }
 

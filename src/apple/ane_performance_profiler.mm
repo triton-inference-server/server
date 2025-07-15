@@ -689,13 +689,12 @@ TRITONSERVER_Error* ANEPerformanceProfiler::ProfileBatchSizes(
             best_batch_size = batch_size;
         }
         
-        // Measure power (simplified)
-        double power = 2.0 + 0.5 * std::log2(batch_size);  // Placeholder
-        results.power_consumption.push_back(power);
+        // Power measurement not available through public APIs
+        // Skip power-based metrics
+        results.power_consumption.push_back(0.0);
         
-        // Calculate efficiency
-        double efficiency = throughput / power;
-        results.efficiency_scores.push_back(efficiency);
+        // Cannot calculate efficiency without power metrics
+        results.efficiency_scores.push_back(0.0);
     }
     
     results.optimal_batch_size = best_batch_size;
@@ -878,29 +877,25 @@ TRITONSERVER_Error* ANEPerformanceProfiler::GetANEUtilization(double& utilizatio
     auto& ane_provider = ANEProvider::Instance();
     auto caps = ane_provider.GetCapabilities();
     
-    if (caps.peak_tops > 0) {
-        // Rough estimation: if we're getting close to peak TOPS, utilization is high
-        // This is a placeholder - real implementation would need system metrics
-        utilization_percent = 75.0;  // Placeholder
-    } else {
-        utilization_percent = 0.0;
-    }
-    
-    return nullptr;
+    // ANE utilization is not directly exposed by macOS APIs
+    // Return an error to indicate this metric is not available
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        "ANE utilization metrics are not available through public APIs");
 }
 
 TRITONSERVER_Error* ANEPerformanceProfiler::GetThermalState(double& temperature_celsius) {
-    // Would require IOKit thermal sensors
-    // Placeholder implementation
-    temperature_celsius = 35.0;  // Typical operating temperature
-    return nullptr;
+    // Thermal state is not directly exposed for ANE
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        "ANE thermal metrics are not available through public APIs");
 }
 
 TRITONSERVER_Error* ANEPerformanceProfiler::GetPowerMetrics(double& current_watts) {
-    // Would require IOKit power monitoring
-    // Placeholder implementation
-    current_watts = 2.0;  // Typical ANE power
-    return nullptr;
+    // Power metrics are not directly exposed for ANE
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        "ANE power metrics are not available through public APIs");
 }
 #endif
 

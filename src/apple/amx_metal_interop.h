@@ -12,9 +12,12 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <future>
 
 #ifdef __APPLE__
+#ifdef __OBJC__
 #include <Metal/Metal.h>
+#endif
 #endif
 
 #include "amx_provider.h"
@@ -60,7 +63,7 @@ public:
     
     // Initialize interop system
     TRITONSERVER_Error* Initialize(
-        metal::MetalDevice* metal_device = nullptr);
+        triton::core::metal::MetalDevice* metal_device = nullptr);
     
     // Shutdown interop system
     void Shutdown();
@@ -105,7 +108,11 @@ public:
         const void* GetCPUPointer() const { return cpu_ptr_; }
         
 #ifdef __APPLE__
+#ifdef __OBJC__
         id<MTLBuffer> GetMetalBuffer() { return metal_buffer_; }
+#else
+        void* GetMetalBuffer() { return metal_buffer_; }
+#endif
 #endif
         
         size_t GetSize() const { return size_; }
@@ -117,7 +124,11 @@ public:
     private:
         void* cpu_ptr_ = nullptr;
 #ifdef __APPLE__
+#ifdef __OBJC__
         id<MTLBuffer> metal_buffer_ = nil;
+#else
+        void* metal_buffer_ = nullptr;
+#endif
 #endif
         size_t size_ = 0;
         bool is_unified_ = false;
@@ -163,7 +174,7 @@ public:
         const float* input,
         const float* kernel,
         float* output,
-        const ConvParams& params,
+        const void* params,  // ConvParams struct
         ExecutionLocation location = ExecutionLocation::AUTO);
     
     // ======================
@@ -256,7 +267,7 @@ private:
     
     // Member variables
     AMXProvider* amx_provider_ = nullptr;
-    metal::MetalDevice* metal_device_ = nullptr;
+    triton::core::metal::MetalDevice* metal_device_ = nullptr;
     
     ExecutionPolicy policy_ = ExecutionPolicy::BALANCED;
     size_t batch_size_ = 1;

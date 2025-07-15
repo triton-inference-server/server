@@ -13,6 +13,7 @@
 #include <sys/sysctl.h>
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#include <Accelerate/Accelerate.h>
 #endif
 
 namespace triton {
@@ -132,21 +133,15 @@ TRITONSERVER_Error* AMXProvider::Initialize() {
 
 // AMX instruction wrappers
 void AMXProvider::AMXStart() {
-#ifdef __APPLE__
-    // AMX state initialization
-    // Note: In practice, we would use Accelerate framework or 
-    // undocumented AMX instructions. This is a placeholder.
-    
-    // The actual instruction would be something like:
-    // __asm__ volatile("amx_start");
-#endif
+    // The Accelerate framework manages AMX state automatically.
+    // No explicit start/stop is needed when using Accelerate.
+    // This function is kept for API compatibility.
 }
 
 void AMXProvider::AMXStop() {
-#ifdef __APPLE__
-    // AMX state cleanup
-    // __asm__ volatile("amx_stop");
-#endif
+    // The Accelerate framework manages AMX state automatically.
+    // No explicit start/stop is needed when using Accelerate.
+    // This function is kept for API compatibility.
 }
 
 TRITONSERVER_Error* AMXProvider::ExecuteGEMM(
@@ -164,9 +159,18 @@ TRITONSERVER_Error* AMXProvider::ExecuteGEMM(
     auto start = std::chrono::high_resolution_clock::now();
     
     try {
-        // For small matrices, use direct computation
+        // Use Accelerate framework's BLAS which automatically uses AMX when available
+#ifdef __APPLE__
+        // Use cblas_sgemm from Accelerate framework
+        // This will automatically use AMX on Apple Silicon
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                    static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+                    alpha, A, static_cast<int>(K), B, static_cast<int>(N),
+                    beta, C, static_cast<int>(N));
+#else
+        // Fallback for non-Apple platforms
         if (M * N * K < 1000) {
-            // Simple implementation for testing
+            // Simple implementation for small matrices
             for (size_t m = 0; m < M; ++m) {
                 for (size_t n = 0; n < N; ++n) {
                     float sum = 0.0f;
@@ -177,6 +181,7 @@ TRITONSERVER_Error* AMXProvider::ExecuteGEMM(
                 }
             }
         } else {
+#endif
             // Use optimized AMX kernel library
             kernel_library_->sgemm_amx(A, B, C, M, N, K, alpha, beta);
             return nullptr;
@@ -233,23 +238,25 @@ TRITONSERVER_Error* AMXProvider::ExecuteTiledGEMM(
     float alpha, float beta,
     const AMXConfig& config) {
     
-    // AMX uses 32x32 tiles for optimal performance
+    // Use Accelerate framework which handles tiling internally for AMX
+#ifdef __APPLE__
+    // Accelerate's BLAS automatically uses AMX with optimal tiling
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+                alpha, A, static_cast<int>(K), B, static_cast<int>(N),
+                beta, C, static_cast<int>(N));
+    return nullptr;
+#else
+    // Fallback tiled implementation for non-Apple platforms
     const size_t TILE_M = config.tile_m;
     const size_t TILE_N = config.tile_n;
     const size_t TILE_K = config.tile_k;
     
-    // In a real implementation, we would:
-    // 1. Configure AMX tile layout
-    // 2. Load data into AMX tiles
-    // 3. Perform tiled matrix multiplication
-    // 4. Store results back
-    
-    // Placeholder implementation using standard loops
-    // In practice, this would use AMX instructions
     for (size_t m = 0; m < M; m += TILE_M) {
         for (size_t n = 0; n < N; n += TILE_N) {
             // Initialize accumulator tile
-            float tile_c[TILE_M * TILE_N] = {0};
+            float tile_c[TILE_M * TILE_N];
+            std::memset(tile_c, 0, sizeof(tile_c));
             
             for (size_t k = 0; k < K; k += TILE_K) {
                 // Load tiles from A and B
@@ -292,6 +299,7 @@ TRITONSERVER_Error* AMXProvider::ExecuteTiledGEMM(
     }
     
     return nullptr;
+#endif
 }
 
 TRITONSERVER_Error* AMXProvider::ExecuteGEMM_FP16(

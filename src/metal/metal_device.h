@@ -32,12 +32,14 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef __APPLE__
 #ifdef __OBJC__
 #import <Metal/Metal.h>
 #import <Foundation/Foundation.h>
 #else
 // Forward declarations for non-Objective-C++ files
-typedef void* id;
+typedef struct objc_object* id;
+#endif
 #endif
 
 namespace triton { namespace core { namespace metal {

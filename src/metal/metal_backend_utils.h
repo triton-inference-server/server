@@ -30,28 +30,21 @@
 #include <vector>
 #include "metal_device.h"
 
-// Forward declarations for Triton types
-typedef enum tritonserver_memorytype_enum {
-  TRITONSERVER_MEMORY_CPU,
-  TRITONSERVER_MEMORY_CPU_PINNED,
-  TRITONSERVER_MEMORY_GPU
-} TRITONSERVER_MemoryType;
-
-typedef enum tritonserver_instancegroupkind_enum {
-  TRITONSERVER_INSTANCEGROUPKIND_AUTO,
-  TRITONSERVER_INSTANCEGROUPKIND_CPU,
-  TRITONSERVER_INSTANCEGROUPKIND_GPU,
-  TRITONSERVER_INSTANCEGROUPKIND_MODEL
-} TRITONSERVER_InstanceGroupKind;
+// Include the actual Triton headers for proper type definitions
+#include "triton/core/tritonserver.h"
 
 namespace triton { namespace core { namespace metal {
 
+// Forward declarations
+class MetalBuffer;
+
 // Metal-specific memory type extension
-constexpr TRITONSERVER_MemoryType TRITONSERVER_MEMORY_METAL = 
+// Using high values to avoid conflicts with future Triton enums
+const TRITONSERVER_MemoryType TRITONSERVER_MEMORY_METAL = 
     static_cast<TRITONSERVER_MemoryType>(100);
 
 // Metal-specific instance group kind
-constexpr TRITONSERVER_InstanceGroupKind TRITONSERVER_INSTANCEGROUPKIND_METAL = 
+const TRITONSERVER_InstanceGroupKind TRITONSERVER_INSTANCEGROUPKIND_METAL = 
     static_cast<TRITONSERVER_InstanceGroupKind>(100);
 
 // Backend utility functions for Metal integration

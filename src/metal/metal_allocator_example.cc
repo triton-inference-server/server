@@ -87,7 +87,7 @@ void DemoBasicUsage()
   }
   
   std::cout << "\nAfter freeing all allocations:" << std::endl;
-  auto stats = allocator.GetStats();
+  const auto& stats = allocator.GetStats();
   std::cout << "Current usage: " << stats.current_usage.load() << " bytes" << std::endl;
 }
 
@@ -129,7 +129,7 @@ void DemoPoolEfficiency()
             << duration.count() << " microseconds" << std::endl;
   std::cout << "Average: " << duration.count() / iterations << " us per operation" << std::endl;
   
-  auto stats = allocator.GetStats();
+  const auto& stats = allocator.GetStats();
   double hit_rate = (stats.pool_hits.load() + stats.pool_misses.load() > 0) ?
       (100.0 * stats.pool_hits.load()) / (stats.pool_hits.load() + stats.pool_misses.load()) : 0.0;
   std::cout << "Pool hit rate: " << hit_rate << "%" << std::endl;
@@ -152,30 +152,21 @@ void DemoResponseAllocator()
   
   std::cout << "Allocating response buffer for tensor output..." << std::endl;
   
-  // Note: This is a simplified call - normally done through TRITONSERVER APIs
-  // The ResponseAlloc function would be called internally by Triton
-  auto err = MetalResponseAllocator::ResponseAlloc(
-      triton_allocator, "output_tensor", 1048576,
-      TRITONSERVER_MEMORY_GPU, METAL_DEVICE_ID_OFFSET,
-      &response_allocator, &buffer, &buffer_userp,
-      &actual_memory_type, &actual_memory_type_id);
+  // Note: In a real scenario, the response allocator would be used internally by Triton
+  // Here we just demonstrate that it was created successfully
+  std::cout << "Response allocator created successfully" << std::endl;
+  std::cout << "This would be used internally by Triton for output tensor allocation" << std::endl;
+  
+  // Demonstrate direct allocation through the Metal allocator
+  void* test_buffer = nullptr;
+  MetalAllocation* test_allocation = nullptr;
+  auto err = metal_allocator->Allocate(1048576, &test_buffer, &test_allocation);
   
   if (err == nullptr) {
-    std::cout << "Successfully allocated response buffer" << std::endl;
-    std::cout << "Memory type: " << 
-        (actual_memory_type == TRITONSERVER_MEMORY_GPU ? "GPU" : "CPU") << std::endl;
-    std::cout << "Memory type ID: " << actual_memory_type_id << std::endl;
-    
-    // Release the buffer
-    err = MetalResponseAllocator::ResponseRelease(
-        triton_allocator, buffer, buffer_userp, 1048576,
-        actual_memory_type, actual_memory_type_id);
-    
-    if (err != nullptr) {
-      PrintError(err, "Failed to release response buffer");
-    }
+    std::cout << "Successfully allocated test buffer through Metal allocator" << std::endl;
+    metal_allocator->Free(test_allocation);
   } else {
-    PrintError(err, "Failed to allocate response buffer");
+    PrintError(err, "Failed to allocate test buffer");
   }
 }
 
@@ -247,7 +238,7 @@ void DemoMemoryPressure()
   allocator.RunGarbageCollection();
   
   // Check final state
-  auto stats = allocator.GetStats();
+  const auto& stats = allocator.GetStats();
   std::cout << "\nFinal statistics:" << std::endl;
   std::cout << "GC runs: " << stats.gc_runs.load() << std::endl;
   std::cout << "Fragmentation: " << stats.fragmentation_bytes.load() / (1024.0 * 1024.0) 

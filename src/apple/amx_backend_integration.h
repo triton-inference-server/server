@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -160,7 +161,7 @@ namespace AMXUtils {
 // Convert Triton data type to AMX data type
 TRITONSERVER_Error* ConvertDataType(
     TRITONSERVER_DataType triton_type,
-    AMXDataType& amx_type);
+    amx::DataType& amx_type);
 
 // Get optimal AMX configuration for operation
 AMXConfig GetOptimalConfig(

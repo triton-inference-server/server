@@ -26,6 +26,10 @@
 
 #include "metal_allocator.h"
 
+#ifdef __APPLE__
+#import <Foundation/Foundation.h>
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -461,7 +465,19 @@ void MetalAllocator::UpdateFreeStats(size_t size, bool to_pool)
 
 void MetalAllocator::ResetStats()
 {
-  stats_ = MetalAllocationStats();
+  // Reset atomic members individually
+  stats_.total_allocated.store(0);
+  stats_.total_freed.store(0);
+  stats_.current_usage.store(0);
+  stats_.peak_usage.store(0);
+  stats_.allocation_count.store(0);
+  stats_.free_count.store(0);
+  stats_.pool_hits.store(0);
+  stats_.pool_misses.store(0);
+  stats_.fragmentation_bytes.store(0);
+  stats_.gc_runs.store(0);
+  stats_.heap_allocations.store(0);
+  stats_.unified_allocations.store(0);
 }
 
 void MetalAllocator::RunGarbageCollection()
@@ -784,6 +800,11 @@ MetalResponseAllocator::MetalResponseAllocator(
   TRITONSERVER_Error* err = TRITONSERVER_ResponseAllocatorNew(
       &allocator_, ResponseAlloc, ResponseRelease, ResponseStart);
   
+  if (err == nullptr) {
+    // Set this object as the user data for the allocator
+    err = TRITONSERVER_ResponseAllocatorSetUserData(allocator_, this);
+  }
+  
   if (err != nullptr) {
     TRITONSERVER_ErrorDelete(err);
     throw std::runtime_error("Failed to create response allocator");
@@ -845,11 +866,20 @@ TRITONSERVER_Error* MetalResponseAllocator::ResponseRelease(
   if (memory_type == TRITONSERVER_MEMORY_GPU &&
       memory_type_id >= METAL_DEVICE_ID_OFFSET && buffer_userp != nullptr) {
     
+    // Get the response allocator instance
     auto* self = reinterpret_cast<MetalResponseAllocator*>(
-        TRITONSERVER_ResponseAllocatorUserObject(allocator));
+        TRITONSERVER_ResponseAllocatorUserData(allocator));
     
+    // The allocation object contains the info needed to free it
     auto* allocation = reinterpret_cast<MetalAllocation*>(buffer_userp);
-    return self->metal_allocator_->Free(allocation);
+    
+    // Properly free the Metal allocation
+    TRITONSERVER_Error* err = self->metal_allocator_->Free(allocation);
+    if (err != nullptr) {
+      return err;
+    }
+    
+    return nullptr;
   }
   
   // CPU memory

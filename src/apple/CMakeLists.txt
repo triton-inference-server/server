@@ -8,6 +8,7 @@ cmake_minimum_required(VERSION 3.18)
 add_library(
   triton-apple-optimizations
   STATIC
+  apple_silicon_config.cc
   amx_provider.cc
   amx_kernel_library.cc
   amx_kernel_advanced.cc
@@ -16,7 +17,7 @@ add_library(
   ane_provider.mm
   winograd_conv3x3.cc
   profile_guided_optimizer.cc
-  ane_performance_profiler.cc
+  ane_performance_profiler.mm
 )
 
 # Set C++ standard
@@ -74,6 +75,7 @@ install(
 # Install headers
 install(
   FILES
+    apple_silicon_config.h
     amx_provider.h
     amx_kernels.h
     amx_metal_interop.h

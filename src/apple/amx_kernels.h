@@ -1,6 +1,11 @@
 // Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // AMX Optimized Kernel Library
+//
+// This library provides optimized kernels for Apple Silicon's AMX (Apple Matrix
+// coprocessor) through Apple's Accelerate framework. The Accelerate framework
+// automatically utilizes AMX hardware when available, providing optimal
+// performance for matrix operations without requiring direct AMX instruction access.
 
 #pragma once
 
@@ -301,6 +306,65 @@ float reduce_min(const float* input, size_t size);
 void copy(const float* src, float* dst, size_t size);
 void fill(float* data, size_t size, float value);
 void transpose(const float* input, float* output, size_t rows, size_t cols);
+
+// Advanced AMX kernels (from amx_kernel_advanced.cc)
+void amx_sgemm_kernel_32x32(
+    const float* A, size_t lda,
+    const float* B, size_t ldb,
+    float* C, size_t ldc,
+    size_t K, float alpha, float beta);
+
+void amx_hgemm_kernel_64x64(
+    const uint16_t* A, size_t lda,
+    const uint16_t* B, size_t ldb,
+    uint16_t* C, size_t ldc,
+    size_t K, float alpha, float beta);
+
+void amx_i8gemm_kernel_64x64(
+    const int8_t* A, size_t lda,
+    const int8_t* B, size_t ldb,
+    int32_t* C, size_t ldc,
+    size_t K);
+
+void amx_sgemm_kernel_16x16(
+    const float* A, size_t lda,
+    const float* B, size_t ldb,
+    float* C, size_t ldc,
+    size_t K, float alpha, float beta);
+
+void amx_sgemm_kernel_8x8(
+    const float* A, size_t lda,
+    const float* B, size_t ldb,
+    float* C, size_t ldc,
+    size_t K, float alpha, float beta);
+
+void amx_conv2d_kernel_3x3(
+    const float* input, size_t height, size_t width, size_t channels,
+    const float* kernel,
+    float* output, size_t out_channels,
+    size_t stride, size_t padding);
+
+void amx_depthwise_conv_kernel(
+    const float* input, size_t height, size_t width, size_t channels,
+    const float* kernel, size_t kernel_size,
+    float* output,
+    size_t stride, size_t padding);
+
+void amx_batch_matmul_fp32(
+    const float* A, const float* B, float* C,
+    size_t batch_size, size_t M, size_t N, size_t K,
+    float alpha, float beta);
+
+void amx_gemm_relu_fp32(
+    const float* A, const float* B, float* C,
+    size_t M, size_t N, size_t K,
+    float alpha, float beta);
+
+void amx_gemm_bias_relu_fp32(
+    const float* A, const float* B, float* C,
+    const float* bias,
+    size_t M, size_t N, size_t K,
+    float alpha, float beta);
 
 } // namespace kernels
 

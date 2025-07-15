@@ -77,26 +77,36 @@ void hgemm(
     std::vector<float> b_fp32(k * n);
     std::vector<float> c_fp32(m * n);
     
-    // Simple conversion (real implementation would use vectorized conversion)
-    for (size_t i = 0; i < m * k; ++i) {
-        a_fp32[i] = static_cast<float>(a[i]) / 65536.0f;
-    }
-    for (size_t i = 0; i < k * n; ++i) {
-        b_fp32[i] = static_cast<float>(b[i]) / 65536.0f;
-    }
-    for (size_t i = 0; i < m * n; ++i) {
-        c_fp32[i] = static_cast<float>(c[i]) / 65536.0f;
-    }
+#ifdef __APPLE__
+    // Use vImage for proper FP16 conversion on Apple platforms
+    vImage_Buffer src_a = {const_cast<uint16_t*>(a), m * k * sizeof(uint16_t), 1, m * k};
+    vImage_Buffer dst_a = {a_fp32.data(), m * k * sizeof(float), 1, m * k};
+    vImageConvert_Planar16FtoPlanarF(&src_a, &dst_a, 0);
+    
+    vImage_Buffer src_b = {const_cast<uint16_t*>(b), k * n * sizeof(uint16_t), 1, k * n};
+    vImage_Buffer dst_b = {b_fp32.data(), k * n * sizeof(float), 1, k * n};
+    vImageConvert_Planar16FtoPlanarF(&src_b, &dst_b, 0);
+    
+    vImage_Buffer src_c = {const_cast<uint16_t*>(c), m * n * sizeof(uint16_t), 1, m * n};
+    vImage_Buffer dst_c = {c_fp32.data(), m * n * sizeof(float), 1, m * n};
+    vImageConvert_Planar16FtoPlanarF(&src_c, &dst_c, 0);
+#else
+    // Fallback: FP16 is not a simple integer division
+    // This is a placeholder - proper implementation would use a FP16 library
+    return; // Cannot proceed without proper FP16 support
+#endif
     
     gemm(trans_a, trans_b, m, n, k, alpha, 
          a_fp32.data(), (trans_a == TransposeOp::NoTrans) ? k : m,
          b_fp32.data(), (trans_b == TransposeOp::NoTrans) ? n : k,
          beta, c_fp32.data(), n);
     
-    // Convert back
-    for (size_t i = 0; i < m * n; ++i) {
-        c[i] = static_cast<uint16_t>(c_fp32[i] * 65536.0f);
-    }
+#ifdef __APPLE__
+    // Convert back to FP16
+    vImage_Buffer src_result = {c_fp32.data(), m * n * sizeof(float), 1, m * n};
+    vImage_Buffer dst_result = {c, m * n * sizeof(uint16_t), 1, m * n};
+    vImageConvert_PlanarFtoPlanar16F(&src_result, &dst_result, 0);
+#endif
 }
 
 void gemm_batch(
@@ -254,7 +264,8 @@ void sigmoid(const float* input, float* output, size_t size) {
 void tanh(const float* input, float* output, size_t size) {
 #ifdef __APPLE__
     // Use Accelerate's vectorized tanh
-    vvtanhf(output, input, &size);
+    int n = static_cast<int>(size);
+    vvtanhf(output, input, &n);
 #else
     for (size_t i = 0; i < size; ++i) {
         output[i] = std::tanh(input[i]);
@@ -406,7 +417,11 @@ void transpose(const float* input, float* output, size_t rows, size_t cols) {
 void* allocate_aligned(size_t size, size_t alignment) {
 #ifdef __APPLE__
     void* ptr = nullptr;
-    posix_memalign(&ptr, alignment, size);
+    int result = posix_memalign(&ptr, alignment, size);
+    if (result != 0) {
+        // posix_memalign returns 0 on success, errno on failure
+        return nullptr;
+    }
     return ptr;
 #else
     return aligned_alloc(alignment, size);

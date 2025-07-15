@@ -76,6 +76,10 @@ option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 # ASAN
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
 
+# Testing and Benchmarking
+option(TRITON_ENABLE_TESTS "Build unit tests" ON)
+option(TRITON_ENABLE_BENCHMARKS "Build benchmarks" OFF)
+
 # Repo tags
 set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
@@ -256,6 +260,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+    -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/${LIB_DIR}/cmake/prometheus-cpp
     -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
     -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}

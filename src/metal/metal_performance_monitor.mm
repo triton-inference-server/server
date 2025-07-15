@@ -32,11 +32,17 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <iomanip>
 
 #include "metal_device.h"
 #include "metal_memory_manager.h"
+#include "triton/core/tritonserver.h"
+#include "triton/core/tritonbackend.h"
+#include "../../build/triton-server/_deps/repo-core-src/src/status.h"
 
 namespace triton { namespace metal {
+
+using triton::core::Status;
 
 namespace {
 
@@ -77,7 +83,7 @@ MetalPerformanceMonitor::~MetalPerformanceMonitor() {
   }
 }
 
-Status MetalPerformanceMonitor::Initialize() {
+triton::core::Status MetalPerformanceMonitor::Initialize() {
   @autoreleasepool {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -102,7 +108,7 @@ Status MetalPerformanceMonitor::Initialize() {
   }
 }
 
-Status MetalPerformanceMonitor::StartMonitoring() {
+triton::core::Status MetalPerformanceMonitor::StartMonitoring() {
   if (is_monitoring_) {
     return Status(Status::Code::ALREADY_EXISTS,
                   "Performance monitoring is already active");
@@ -115,7 +121,7 @@ Status MetalPerformanceMonitor::StartMonitoring() {
   return Status::Success;
 }
 
-Status MetalPerformanceMonitor::StopMonitoring() {
+triton::core::Status MetalPerformanceMonitor::StopMonitoring() {
   if (!is_monitoring_) {
     return Status(Status::Code::UNAVAILABLE,
                   "Performance monitoring is not active");
@@ -144,16 +150,16 @@ void MetalPerformanceMonitor::BeginKernelProfiling(
     profile.gpu_start_time_ns = 0;  // Will be set from GPU timestamp
 
     // Get thread execution details
+    // Note: MTLComputeCommandEncoder doesn't expose the pipeline state directly
+    // This information would need to be tracked when the encoder is created
     if (encoder) {
-      id<MTLComputePipelineState> pipeline = [encoder computePipelineState];
-      if (pipeline) {
-        profile.thread_count = [pipeline threadExecutionWidth];
-        profile.threadgroup_size = [pipeline maxTotalThreadsPerThreadgroup];
-        profile.shared_memory_bytes = [pipeline staticThreadgroupMemoryLength];
-      }
+      // TODO: Track pipeline state information when encoder is created
+      profile.thread_count = 0;
+      profile.threadgroup_size = 0;
+      profile.shared_memory_bytes = 0;
     }
 
-    active_kernel_profiles_[encoder] = profile;
+    active_kernel_profiles_[(__bridge void*)encoder] = profile;
 
     // Insert debug signpost if available
     if (@available(macOS 10.14, *)) {
@@ -173,7 +179,7 @@ void MetalPerformanceMonitor::EndKernelProfiling(
   @autoreleasepool {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    auto it = active_kernel_profiles_.find(encoder);
+    auto it = active_kernel_profiles_.find((__bridge void*)encoder);
     if (it != active_kernel_profiles_.end()) {
       it->second.end_time_ns = GetCurrentTimeNs();
 
@@ -210,7 +216,7 @@ void MetalPerformanceMonitor::RegisterCommandBuffer(
     profile.identifier = identifier;
     profile.submit_time_ns = GetCurrentTimeNs();
 
-    command_buffer_profiles_[buffer] = profile;
+    command_buffer_profiles_[(__bridge void*)buffer] = profile;
 
     // Set up completion handler
     __weak id<MTLCommandBuffer> weakBuffer = buffer;
@@ -230,7 +236,7 @@ void MetalPerformanceMonitor::OnCommandBufferScheduled(id<MTLCommandBuffer> buff
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
-  auto it = command_buffer_profiles_.find(buffer);
+  auto it = command_buffer_profiles_.find((__bridge void*)buffer);
   if (it != command_buffer_profiles_.end()) {
     it->second.scheduled_time_ns = GetCurrentTimeNs();
     if (@available(macOS 10.15, *)) {
@@ -245,7 +251,7 @@ void MetalPerformanceMonitor::OnCommandBufferCompleted(id<MTLCommandBuffer> buff
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
-  auto it = command_buffer_profiles_.find(buffer);
+  auto it = command_buffer_profiles_.find((__bridge void*)buffer);
   if (it != command_buffer_profiles_.end()) {
     it->second.completed_time_ns = GetCurrentTimeNs();
     if (@available(macOS 10.15, *)) {
@@ -540,7 +546,6 @@ void MetalPerformanceMonitor::RegisterPrometheusMetrics(
   command_buffer_latency_family_ = &prometheus::BuildHistogram()
       .Name("metal_command_buffer_latency_milliseconds")
       .Help("Command buffer submission to completion latency")
-      .Buckets({0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000})
       .Register(*registry);
 }
 
@@ -730,7 +735,7 @@ void MetalPerformanceMonitor::CollectGPUUtilization() {
     // Get GPU utilization from system
     // Note: This is a simplified implementation. Real GPU utilization
     // would require more sophisticated system queries
-    id<MTLDevice> mtl_device = device_->GetDevice();
+    // id<MTLDevice> mtl_device = device_->GetDevice();
     
     // Check if device supports GPU utilization queries
     if (@available(macOS 10.15, *)) {
