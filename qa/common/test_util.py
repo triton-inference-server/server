@@ -309,17 +309,36 @@ def check_gpus_compute_capability(min_capability):
     Returns:
         bool
     """
-    import pycuda.driver as cuda
 
-    cuda.init()
+    import importlib.util
 
-    for device_index in range(cuda.Device.count()):
-        device = cuda.Device(device_index)
-        compute_capability = device.compute_capability()
-        compute_capability_value = compute_capability[0] + compute_capability[1] / 10.0
+    if importlib.util.find_spec("cuda.core.experimental"):
+        import cuda.core.experimental as cuda_core_experimental
 
-        if compute_capability_value < min_capability:
-            return False
+        devices = cuda_core_experimental.system.devices
+
+        for device in devices:
+            compute_capability = (
+                device.compute_capability.major + device.compute_capability.minor / 10.0
+            )
+
+            if compute_capability < min_capability:
+                return False
+
+    elif importlib.util.find_spec("pycuda.driver"):
+        import pycuda.driver as cuda
+
+        cuda.init()
+
+        for device_index in range(cuda.Device.count()):
+            device = cuda.Device(device_index)
+            compute_capability = device.compute_capability()
+            compute_capability_value = (
+                compute_capability[0] + compute_capability[1] / 10.0
+            )
+
+            if compute_capability_value < min_capability:
+                return False
 
     return True
 
