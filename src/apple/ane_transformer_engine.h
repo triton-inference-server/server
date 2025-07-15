@@ -13,10 +13,11 @@
 #include <CoreML/CoreML.h>
 #endif
 
-#include "ane_provider.h"
-
 namespace triton {
 namespace apple {
+
+// Forward declaration of ANEOptimizationOptions
+struct ANEOptimizationOptions;
 
 // Transformer model types
 enum class TransformerType {
@@ -58,8 +59,7 @@ struct TransformerConfig {
     bool use_fused_operations = true;
     bool use_mixed_precision = true;
     bool enable_quantization = true;
-    ANEOptimizationOptions::QuantizationMode quantization_mode = 
-        ANEOptimizationOptions::QuantizationMode::INT8_SYMMETRIC;
+    int quantization_mode = 1; // INT8_SYMMETRIC
 };
 
 // KV-cache for efficient autoregressive generation
@@ -207,7 +207,7 @@ public:
     // Quantize transformer weights
     TRITONSERVER_Error* QuantizeTransformer(
         const std::string& model_name,
-        ANEOptimizationOptions::QuantizationMode mode,
+        int quantization_mode,
         const std::string& calibration_data_path = "");
     
     // Fuse transformer operations

@@ -1,6 +1,11 @@
 // Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // AMX Optimized Kernel Library
+//
+// This library provides optimized kernels for Apple Silicon's AMX (Apple Matrix
+// coprocessor) through Apple's Accelerate framework. The Accelerate framework
+// automatically utilizes AMX hardware when available, providing optimal
+// performance for matrix operations without requiring direct AMX instruction access.
 
 #pragma once
 

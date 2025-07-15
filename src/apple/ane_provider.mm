@@ -203,7 +203,7 @@ TRITONSERVER_Error* ANEProvider::LoadModel(
                 config.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
                 break;
             case PowerMode::LOW_POWER:
-                config.computeUnits = MLComputeUnitsNeuralEngine;
+                config.computeUnits = MLComputeUnitsCPUAndNeuralEngine;  // Neural Engine only not exposed
                 break;
         }
         
@@ -380,7 +380,7 @@ TRITONSERVER_Error* ANEProvider::AnalyzeModel(
         
         // Load compiled model to analyze
         MLModelConfiguration* config = [[MLModelConfiguration alloc] init];
-        config.computeUnits = MLComputeUnitsNeuralEngine;
+        config.computeUnits = MLComputeUnitsCPUAndNeuralEngine;  // Neural Engine only not exposed
         
         MLModel* model = [MLModel modelWithContentsOfURL:compiledURL
                                             configuration:config

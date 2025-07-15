@@ -33,23 +33,34 @@
 #include <vector>
 
 #include "triton/core/tritonserver.h"
+#include "triton/core/tritonbackend.h"
 
 namespace triton {
 namespace apple {
+
+// AMXProvider: High-performance matrix operations for Apple Silicon
+//
+// This provider leverages Apple's Accelerate framework to automatically
+// utilize the AMX (Apple Matrix coprocessor) when available. The Accelerate
+// framework provides optimal performance and handles AMX state management
+// transparently, making it the recommended approach for production use.
 
 // Forward declarations
 class AMXKernelLibrary;
 
 // AMX capability flags
+// These capabilities are detected at runtime based on the CPU model.
+// The Accelerate framework will automatically use the best available
+// instructions for the current hardware.
 struct AMXCapabilities {
-    bool has_amx = false;
-    bool has_amx2 = false;  // M2 and later
-    bool has_amx_fp16 = false;
-    bool has_amx_int8 = false;
-    bool has_amx_bf16 = false;  // M3 and later
-    size_t max_tile_rows = 0;
-    size_t max_tile_cols = 0;
-    size_t tile_palette_size = 0;
+    bool has_amx = false;           // M1 and later
+    bool has_amx2 = false;          // M2 and later (enhanced AMX)
+    bool has_amx_fp16 = false;      // FP16 support
+    bool has_amx_int8 = false;      // INT8 support
+    bool has_amx_bf16 = false;      // M3 and later (BF16 support)
+    size_t max_tile_rows = 0;       // Maximum tile dimensions
+    size_t max_tile_cols = 0;       // Maximum tile dimensions
+    size_t tile_palette_size = 0;   // Number of available tiles
 };
 
 // AMX operation types
@@ -233,7 +244,7 @@ size_t GetAMXPeakGFLOPS();
 class AMXBackendFactory {
 public:
     static TRITONSERVER_Error* CreateBackend(
-        TRITONSERVER_Backend** backend,
+        TRITONBACKEND_Backend** backend,
         const char* name,
         const uint64_t version);
 };

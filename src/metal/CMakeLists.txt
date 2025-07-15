@@ -45,7 +45,7 @@ endif()
 # Metal allocator library
 add_library(
   triton-metal-allocator STATIC
-  metal_allocator.cc
+  metal_allocator.mm
 )
 
 target_include_directories(
@@ -109,8 +109,9 @@ target_link_libraries(
 
 # Check if metrics are enabled
 if(TRITON_ENABLE_METRICS)
+  find_package(prometheus-cpp CONFIG REQUIRED)
   target_compile_definitions(triton-metal-performance-monitor PRIVATE TRITON_ENABLE_METRICS)
-  target_link_libraries(triton-metal-performance-monitor PUBLIC prometheus-cpp::prometheus-cpp)
+  target_link_libraries(triton-metal-performance-monitor PUBLIC prometheus-cpp::core)
 endif()
 
 target_compile_features(triton-metal-performance-monitor PRIVATE cxx_std_17)

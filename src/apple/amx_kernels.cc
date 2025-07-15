@@ -254,7 +254,8 @@ void sigmoid(const float* input, float* output, size_t size) {
 void tanh(const float* input, float* output, size_t size) {
 #ifdef __APPLE__
     // Use Accelerate's vectorized tanh
-    vvtanhf(output, input, &size);
+    int n = static_cast<int>(size);
+    vvtanhf(output, input, &n);
 #else
     for (size_t i = 0; i < size; ++i) {
         output[i] = std::tanh(input[i]);
@@ -406,7 +407,11 @@ void transpose(const float* input, float* output, size_t rows, size_t cols) {
 void* allocate_aligned(size_t size, size_t alignment) {
 #ifdef __APPLE__
     void* ptr = nullptr;
-    posix_memalign(&ptr, alignment, size);
+    int result = posix_memalign(&ptr, alignment, size);
+    if (result != 0) {
+        // posix_memalign returns 0 on success, errno on failure
+        return nullptr;
+    }
     return ptr;
 #else
     return aligned_alloc(alignment, size);

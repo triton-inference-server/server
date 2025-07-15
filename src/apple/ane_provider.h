@@ -33,8 +33,15 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef __OBJC__
 #ifdef __APPLE__
 #include <CoreML/CoreML.h>
+#endif
+#else
+// Forward declarations for C++ compilation units
+#ifdef __APPLE__
+typedef struct objc_object* id;
+#endif
 #endif
 
 #include "triton/core/tritonserver.h"
@@ -231,7 +238,7 @@ public:
     ANEModelOptimizer* GetOptimizer() { return optimizer_.get(); }
     
     // Get the transformer engine
-    ANETransformerEngine* GetTransformerEngine() { return transformer_engine_.get(); }
+    class ANETransformerEngine* GetTransformerEngine() { return transformer_engine_.get(); }
     
     // Profile model on ANE
     TRITONSERVER_Error* ProfileModel(
@@ -275,7 +282,7 @@ private:
     
     // Components
     std::unique_ptr<ANEModelOptimizer> optimizer_;
-    std::unique_ptr<ANETransformerEngine> transformer_engine_;
+    std::unique_ptr<class ANETransformerEngine> transformer_engine_;
     
     // Global metrics
     mutable std::mutex metrics_mutex_;
@@ -342,7 +349,7 @@ size_t GetANEPeakTOPS();
 class ANEBackendFactory {
 public:
     static TRITONSERVER_Error* CreateBackend(
-        TRITONSERVER_Backend** backend,
+        void** backend,
         const char* name,
         const uint64_t version);
 };

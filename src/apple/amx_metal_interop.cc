@@ -5,6 +5,7 @@
 #include "amx_metal_interop.h"
 #include "amx_kernels.h"
 #include "../metal/metal_backend_utils.h"
+#include "../metal/metal_device.h"
 
 #include <algorithm>
 #include <chrono>
@@ -31,7 +32,7 @@ AMXMetalInterop::~AMXMetalInterop() {
     Shutdown();
 }
 
-TRITONSERVER_Error* AMXMetalInterop::Initialize(metal::MetalDevice* metal_device) {
+TRITONSERVER_Error* AMXMetalInterop::Initialize(triton::core::metal::MetalDevice* metal_device) {
     // Initialize AMX
     auto err = amx_provider_->Initialize();
     if (err != nullptr) {
@@ -41,7 +42,7 @@ TRITONSERVER_Error* AMXMetalInterop::Initialize(metal::MetalDevice* metal_device
     // Set Metal device
     if (metal_device == nullptr) {
         // Use default Metal device
-        metal_device_ = metal::MetalDeviceManager::Instance().GetDefaultDevice();
+        metal_device_ = triton::core::metal::MetalDeviceManager::Instance().GetDefaultDevice();
     } else {
         metal_device_ = metal_device;
     }
@@ -53,7 +54,9 @@ TRITONSERVER_Error* AMXMetalInterop::Initialize(metal::MetalDevice* metal_device
     }
     
     // Check for unified memory support
-    supports_unified_memory_ = metal_device_->HasUnifiedMemory();
+    // Check for unified memory support
+    // Apple Silicon has unified memory architecture
+    supports_unified_memory_ = true;
     
     // Start transfer worker thread
     running_ = true;
@@ -152,7 +155,7 @@ ExecutionLocation AMXMetalInterop::RouteByPolicy(const OpCharacteristics& op) co
         }
         
         // Medium size - check if it's AMX-friendly (multiple of 32)
-        if (amx::kernels::is_amx_friendly_size(m, n, k)) {
+        if (amx::is_amx_friendly_size(m, n, k)) {
             return ExecutionLocation::AMX;
         }
     }

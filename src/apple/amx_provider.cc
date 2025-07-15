@@ -249,7 +249,8 @@ TRITONSERVER_Error* AMXProvider::ExecuteTiledGEMM(
     for (size_t m = 0; m < M; m += TILE_M) {
         for (size_t n = 0; n < N; n += TILE_N) {
             // Initialize accumulator tile
-            float tile_c[TILE_M * TILE_N] = {0};
+            float tile_c[TILE_M * TILE_N];
+            std::memset(tile_c, 0, sizeof(tile_c));
             
             for (size_t k = 0; k < K; k += TILE_K) {
                 // Load tiles from A and B

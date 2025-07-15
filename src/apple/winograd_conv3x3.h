@@ -6,7 +6,7 @@
 
 #include <memory>
 #include <vector>
-#include "tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace triton {
 namespace apple {
@@ -72,6 +72,15 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    
+    // Direct convolution for testing/comparison
+    void DirectConv3x3(const float* input, const float* kernel, float* output);
+    
+    // Transformation functions
+    void TransformInputTiles(const float* input, float* transformed);
+    void TransformOutputTiles(const float* transformed, float* output);
+    void AddBias(float* output, const float* bias);
+    void TransformInputTileNEON(const float* tile, float* transformed);
     
     // Transformation matrices
     static constexpr float G[4][3] = {

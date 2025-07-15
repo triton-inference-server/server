@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <random>
 
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
@@ -21,6 +22,9 @@
 
 namespace triton {
 namespace apple {
+
+// Maximum channels for stack allocation to prevent overflow
+static constexpr size_t MAX_STACK_CHANNELS = 256;
 
 // ===========================
 // WinogradConv3x3 F(2x2, 3x3)
@@ -268,8 +272,15 @@ void WinogradConv3x3::TransformInputTiles(const float* input, float* transformed
     size_t tile_idx = 0;
     for (size_t ty = 0; ty < impl_->tiles_h; ++ty) {
         for (size_t tx = 0; tx < impl_->tiles_w; ++tx) {
+            // Validate channel count to prevent buffer overflow
+            if (cfg.in_channels > MAX_STACK_CHANNELS) {
+                return TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "Channel count exceeds maximum supported for stack allocation");
+            }
+            
             // Extract 4x4 input tile
-            float tile[4][4][256];  // Max 256 channels for stack allocation
+            float tile[4][4][MAX_STACK_CHANNELS];
             
             for (size_t c = 0; c < cfg.in_channels; ++c) {
                 for (size_t i = 0; i < 4; ++i) {

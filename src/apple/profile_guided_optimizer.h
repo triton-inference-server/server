@@ -11,8 +11,9 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <random>
 
-#include "tritonserver.h"
+#include "triton/core/tritonserver.h"
 
 namespace triton {
 namespace apple {

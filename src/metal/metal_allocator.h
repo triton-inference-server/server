@@ -39,9 +39,18 @@
 #include <unordered_map>
 #include <vector>
 
-#ifdef __APPLE__
+#ifdef __OBJC__
 #include <Metal/Metal.h>
 #include <MetalPerformanceShaders/MetalPerformanceShaders.h>
+#else
+// Forward declarations for C++ compilation units
+#ifdef __APPLE__
+typedef struct objc_object* id;
+typedef id MTLDevice;
+typedef id MTLCommandQueue;
+typedef id MTLBuffer;
+typedef id MTLHeap;
+#endif
 #endif
 
 #include "triton/core/tritonserver.h"
@@ -136,8 +145,13 @@ struct MetalAllocation {
   int64_t device_id;
   std::chrono::steady_clock::time_point allocation_time;
 #ifdef __APPLE__
+#ifdef __OBJC__
   id<MTLBuffer> mtl_buffer;
   id<MTLHeap> mtl_heap;  // If allocated from heap
+#else
+  id mtl_buffer;
+  id mtl_heap;
+#endif
 #endif
 };
 
@@ -217,8 +231,13 @@ class MetalAllocator {
   MetalAllocationStats stats_;
   
 #ifdef __APPLE__
+#ifdef __OBJC__
   id<MTLDevice> device_;
   std::vector<id<MTLHeap>> heaps_;
+#else
+  id device_;
+  std::vector<id> heaps_;
+#endif
   std::mutex heap_mutex_;
 #endif
   
@@ -285,8 +304,13 @@ class MetalMemoryPool {
   std::mutex mutex_;
   
 #ifdef __APPLE__
+#ifdef __OBJC__
   id<MTLDevice> device_;
   id<MTLHeap> heap_;  // Dedicated heap for this pool
+#else
+  id device_;
+  id heap_;
+#endif
 #endif
 };
 

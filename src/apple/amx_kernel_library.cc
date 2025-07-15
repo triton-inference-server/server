@@ -9,7 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
-#include <immintrin.h>
+#include <vector>
 
 #ifdef __APPLE__
 // AMX intrinsics are not publicly documented, so we use inline assembly

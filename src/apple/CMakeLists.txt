@@ -16,7 +16,7 @@ add_library(
   ane_provider.mm
   winograd_conv3x3.cc
   profile_guided_optimizer.cc
-  ane_performance_profiler.cc
+  ane_performance_profiler.mm
 )
 
 # Set C++ standard

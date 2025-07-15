@@ -26,8 +26,21 @@
 
 #pragma once
 
+#ifdef __OBJC__
 #include <Metal/Metal.h>
 #include <MetalPerformanceShaders/MetalPerformanceShaders.h>
+#else
+// Forward declarations for C++ compilation units
+#ifdef __APPLE__
+typedef struct objc_object* id;
+typedef id MTLDevice;
+typedef id MTLCommandQueue;
+typedef id MTLBuffer;
+typedef id MTLHeap;
+typedef id MTLCommandBuffer;
+typedef id MTLComputeCommandEncoder;
+#endif
+#endif
 #include <chrono>
 #include <map>
 #include <memory>
@@ -37,6 +50,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "metal_device.h"
+
 #ifdef TRITON_ENABLE_METRICS
 #include "prometheus/counter.h"
 #include "prometheus/gauge.h"
@@ -45,10 +60,16 @@
 #include "prometheus/summary.h"
 #endif
 
+namespace triton { namespace core {
+class Status;
+}}  // namespace triton::core
+
 namespace triton { namespace metal {
 
+// Import MetalDevice from the correct namespace
+using MetalDevice = triton::core::metal::MetalDevice;
+
 // Forward declarations
-class MetalDevice;
 class MetalMemoryManager;
 
 // Performance counter types
@@ -129,11 +150,11 @@ class MetalPerformanceMonitor {
   ~MetalPerformanceMonitor();
 
   // Initialize monitoring
-  Status Initialize();
+  triton::core::Status Initialize();
 
   // Start/stop monitoring
-  Status StartMonitoring();
-  Status StopMonitoring();
+  triton::core::Status StartMonitoring();
+  triton::core::Status StopMonitoring();
   bool IsMonitoring() const { return is_monitoring_; }
 
   // Kernel profiling
@@ -250,11 +271,11 @@ class MetalPerformanceMonitor {
   // Kernel profiling data
   std::unordered_map<std::string, std::vector<KernelProfilingData>>
       kernel_profiles_;
-  std::unordered_map<id<MTLComputeCommandEncoder>, KernelProfilingData>
+  std::unordered_map<void*, KernelProfilingData>
       active_kernel_profiles_;
 
   // Command buffer tracking
-  std::unordered_map<id<MTLCommandBuffer>, CommandBufferProfile>
+  std::unordered_map<void*, CommandBufferProfile>
       command_buffer_profiles_;
   std::vector<CommandBufferProfile> completed_command_buffers_;
 
@@ -322,7 +343,7 @@ class PerformanceMonitorManager {
 
   // Global metrics aggregation
   std::vector<MetalPerformanceMetric> GetAggregatedMetrics() const;
-  PerformanceAnalysis GetAggregatedAnalysis() const;
+  MetalPerformanceMonitor::PerformanceAnalysis GetAggregatedAnalysis() const;
 
  private:
   PerformanceMonitorManager() = default;
