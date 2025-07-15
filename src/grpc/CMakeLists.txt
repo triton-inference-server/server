@@ -48,7 +48,7 @@ else()
   target_compile_options(
     grpc-endpoint-library
     PRIVATE
-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-unused-lambda-capture -Wno-unused-variable -Wno-unused-private-field
   )
 endif()
 

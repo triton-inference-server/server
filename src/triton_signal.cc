@@ -40,6 +40,7 @@
 #endif
 
 #define BOOST_STACKTRACE_USE_ADDR2LINE
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 #include <boost/stacktrace.hpp>
 
 namespace triton { namespace server {

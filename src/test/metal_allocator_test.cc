@@ -35,6 +35,10 @@
 #include <thread>
 #include <vector>
 
+#ifdef __APPLE__
+#include <Metal/Metal.h>
+#endif
+
 namespace triton { namespace server {
 
 class MetalAllocatorTest : public ::testing::Test {

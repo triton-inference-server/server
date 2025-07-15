@@ -151,6 +151,13 @@ StringTo(const std::string& arg)
   return std::stod(arg);
 }
 
+template <>
+unsigned long
+StringTo(const std::string& arg)
+{
+  return std::stoul(arg);
+}
+
 // There must be specialization for the types to be parsed into so that
 // the argument is properly validated and parsed. Attempted to use input
 // operator (>>) but it will consume improper argument without error
@@ -1395,7 +1402,7 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_HTTP_HEADER_FORWARD_PATTERN:
           lparams.http_forward_header_pattern_ =
-              std::move(case_insensitive_prefix + optarg);
+              case_insensitive_prefix + optarg;
           break;
         case OPTION_HTTP_THREAD_COUNT:
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
@@ -1560,7 +1567,7 @@ TritonParser::Parse(int argc, char** argv)
         }
         case OPTION_GRPC_HEADER_FORWARD_PATTERN:
           lgrpc_options.forward_header_pattern_ =
-              std::move(case_insensitive_prefix + optarg);
+              case_insensitive_prefix + optarg;
           break;
 #endif  // TRITON_ENABLE_GRPC
 

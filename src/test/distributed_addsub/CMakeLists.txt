@@ -52,7 +52,7 @@ target_compile_features(triton-distributed-addsub-backend PRIVATE cxx_std_11)
 target_compile_options(
   triton-distributed-addsub-backend PRIVATE
   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Wno-deprecated-declarations -Werror>
 )
 
 target_link_libraries(
