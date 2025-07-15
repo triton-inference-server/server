@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,11 +29,11 @@ from setuptools import find_packages, setup
 
 setup(
     name="mlflow-triton",
-    version="0.2.0",
+    version="0.2.1",
     description="Triton Mlflow Deployment",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(),
-    install_requires=["mlflow>=2.2.1,<3.0", "tritonclient[all]", "boto3"],
+    install_requires=["mlflow>=3.1.1", "tritonclient[all]", "boto3"],
     entry_points={"mlflow.deployments": "triton=mlflow_triton.deployments"},
 )
