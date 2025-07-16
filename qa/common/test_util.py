@@ -312,8 +312,13 @@ def check_gpus_compute_capability(min_capability):
 
     import importlib.util
 
-    if importlib.util.find_spec("cuda.core.experimental"):
-        import cuda.core.experimental as cuda_core_experimental
+    if importlib.util.find_spec("cuda") is not None:
+        try:
+            import cuda.core.experimental as cuda_core_experimental
+        except ImportError:
+            print(
+                "cuda-python package has missed objects. Please check the installation."
+            )
 
         devices = cuda_core_experimental.system.devices
 
@@ -325,8 +330,11 @@ def check_gpus_compute_capability(min_capability):
             if compute_capability < min_capability:
                 return False
 
-    elif importlib.util.find_spec("pycuda.driver"):
-        import pycuda.driver as cuda
+    elif importlib.util.find_spec("pycuda") is not None:
+        try:
+            import pycuda.driver as cuda
+        except ImportError:
+            print("PyCuda has missed objects. Please check the installation.")
 
         cuda.init()
 
