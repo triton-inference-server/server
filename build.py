@@ -917,7 +917,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     df += """
 # Install docker docker buildx
@@ -988,7 +988,8 @@ RUN pip3 install --upgrade pip \\
           setuptools \\
           docker \\
           virtualenv \\
-          patchelf==0.17.2
+          patchelf==0.17.2 \\
+          cmake==4.0.3
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -996,16 +997,6 @@ RUN wget -O /tmp/boost.tar.gz \\
           https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
-
-# Server build requires recent version of CMake (FetchContent required)
-# Might not need this if the installed version of cmake is high enough for our build.
-# RUN apt update -q=2 \\
-#       && apt install -y gpg wget \\
-#       && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-#       && . /etc/os-release \\
-#       && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-#       && apt-get update -q=2 \\
-#       && apt-get install -y --no-install-recommends cmake=3.27.7* cmake-data=3.27.7*
 """
     if FLAGS.enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
@@ -1041,7 +1032,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
@@ -1108,7 +1099,8 @@ RUN pip3 install --upgrade \\
           build \\
           docker \\
           virtualenv \\
-          patchelf==0.17.2
+          patchelf==0.17.2 \\
+          cmake==4.0.3
 
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1117,14 +1109,6 @@ RUN wget -O /tmp/boost.tar.gz \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 
-# Server build requires recent version of CMake (FetchContent required)
-RUN apt update -q=2 \\
-      && apt install -y gpg wget \\
-      && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - |  tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \\
-      && . /etc/os-release \\
-      && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \\
-      && apt-get update -q=2 \\
-      && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 """
 
         if FLAGS.enable_gpu:
@@ -1281,8 +1265,8 @@ RUN ldconfig && \\
     rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
     rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
     pip3 install --no-cache-dir transformers && \\
-    find /usr -name libtensorrt_llm.so -exec dirname {} \; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
+    find /usr -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
+    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \\; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
     pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
@@ -1649,11 +1633,11 @@ FROM ${{BASE_IMAGE}}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 
-ENV TRITON_SERVER_VERSION ${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION ${{TRITON_CONTAINER_VERSION}}
+ENV TRITON_SERVER_VERSION=${{TRITON_VERSION}}
+ENV NVIDIA_TRITON_SERVER_VERSION=${{TRITON_CONTAINER_VERSION}}
 LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
 
-RUN setx path "%path%;C:\opt\tritonserver\bin"
+RUN setx path "%path%;C:\\opt\\tritonserver\\bin"
 
 """.format(
         argmap["TRITON_VERSION"],
@@ -1838,7 +1822,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if target_platform() == "windows":
             if FLAGS.container_memory:
                 runargs += ["--memory", FLAGS.container_memory]
-            runargs += ["-v", "\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine"]
+            runargs += ["-v", "\\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine"]
         else:
             runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
             if FLAGS.use_user_docker_config:
