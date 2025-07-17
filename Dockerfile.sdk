@@ -43,7 +43,7 @@ ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 ARG TRITON_PERF_ANALYZER_BUILD=1
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=3.3.6
+ARG DCGM_VERSION=4.4.0
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -265,7 +265,15 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         curl -o /tmp/cuda-keyring.deb \
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$arch/cuda-keyring_1.1-1_all.deb \
         && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-        apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
+        if [ "${BUILDX_ARCH}" == "amd64" ]; then \
+            curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/${DCGM_VERSION}/001/local_installers/dcgm-local-repo-ubuntu2404-${DCGM_VERSION}_1.0-1_amd64.deb -o /tmp/dcgm-local.deb \
+            && apt install /tmp/dcgm-local.deb \
+            && rm /tmp/dcgm-local.deb; \
+        else \
+            curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/${DCGM_VERSION}/001/local_installers/dcgm-local-repo-ubuntu2404-${DCGM_VERSION}_1.0-1_arm64.deb -o /tmp/dcgm-local.deb \
+            && apt install /tmp/dcgm-local.deb \
+            && rm /tmp/dcgm-local.deb; \
+        fi; \
     fi
 
 # Build expects "python" executable (not python3).
