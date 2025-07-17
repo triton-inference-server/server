@@ -310,9 +310,9 @@ def check_gpus_compute_capability(min_capability):
         bool
     """
 
-    import sys
+    import importlib.util
 
-    if "cuda" in sys.modules:
+    if importlib.util.find_spec("cuda") is not None:
         import cuda.core.experimental as cuda_core_experimental
 
         devices = cuda_core_experimental.system.devices
@@ -325,7 +325,7 @@ def check_gpus_compute_capability(min_capability):
             if compute_capability < min_capability:
                 return False
 
-    elif "pycuda" in sys.modules:
+    elif importlib.util.find_spec("pycuda") is not None:
         import pycuda.driver as cuda
 
         cuda.init()
@@ -343,7 +343,6 @@ def check_gpus_compute_capability(min_capability):
         raise RuntimeError(
             "No packages found to determine the compute capability. Please check the environment."
         )
-        return False
 
     return True
 
