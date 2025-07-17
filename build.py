@@ -858,11 +858,12 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
-    && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/${}/001/local_installers/dcgm-local-repo-rhel8-${}-1.0-1.aarch64.rpm -o /tmp/dcgm-local.rpm \\
+    && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-rhel8-{}-1.0-1.aarch64.rpm -o /tmp/dcgm-local.rpm \\
     && dnf install /tmp/dcgm-local.rpm \\
+    && cp /var/dcgm-local-repo-rhel8-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
     && rm /tmp/dcgm-local.rpm
 """.format(
-                    dcgm_version, dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
             else:
                 return """
@@ -870,11 +871,12 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
-    && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/${}/001/local_installers/dcgm-local-repo-rhel8-${}-1.0-1.x86_64.rpm -o /tmp/dcgm-local.rpm \\
+    && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-rhel8-{}-1.0-1.x86_64.rpm -o /tmp/dcgm-local.rpm \\
     && dnf install /tmp/dcgm-local.rpm \\
+    && cp /var/dcgm-local-repo-rhel8-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
     && rm /tmp/dcgm-local.rpm
 """.format(
-                    dcgm_version, dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
         else:
             if target_machine == "aarch64":
@@ -887,9 +889,10 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_arm64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
+      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/
       && rm /tmp/dcgm-local.deb
 """.format(
-                    dcgm_version, dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
             else:
                 return """
@@ -901,9 +904,10 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_amd64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
+      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/
       && rm /tmp/dcgm-local.deb
 """.format(
-                    dcgm_version, dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
 
 
