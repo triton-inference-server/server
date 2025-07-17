@@ -889,7 +889,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_arm64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
-      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/
+      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
       && rm /tmp/dcgm-local.deb
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
@@ -904,7 +904,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_amd64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
-      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/
+      && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
       && rm /tmp/dcgm-local.deb
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
