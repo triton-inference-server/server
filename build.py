@@ -841,7 +841,15 @@ def tensorrtllm_cmake_args(images):
     return cargs
 
 
-def install_dcgm_libraries(dcgm_version, target_machine):
+def install_dcgm_libraries(dcgm_version):
+    if os.getenv("DCGM_SOURCE_LIST"):
+        dcgm_source_list = """
+RUN echo "deb [trusted=yes] {} / " > /etc/apt/sources.list.d/dcgm-list.list \\
+    && cat /etc/apt/sources.list.d/dcgm-list.list""".format(
+            os.getenv("DCGM_SOURCE_LIST")
+        )
+    else:
+        dcgm_source_list = ""
     if dcgm_version == "":
         fail(
             "unable to determine default repo-tag, DCGM version not known for {}".format(
@@ -852,11 +860,13 @@ def install_dcgm_libraries(dcgm_version, target_machine):
     else:
         # RHEL has the same install instructions for both aarch64 and x86
         if target_platform() == "rhel":
-            if target_machine == "aarch64":
-                return """
+            return (
+                dcgm_source_list
+                + """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
+RUN ARCH=$( [ $(uname -m) = "x86_64" ] && echo "$(uname -m)" || echo "sbsa" ) && \\
+    && dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/${{ARCH}}/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
     && dnf install --assumeyes \\
                  datacenter-gpu-manager-4-core=1:{} \\
@@ -876,13 +886,16 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
+            )
         else:
-            if target_machine == "aarch64":
-                return """
+            return (
+                dcgm_source_list
+                + """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
+RUN ARCH=$( [ $(uname -m) = "x86_64" ] && echo "$(uname -m)" || echo "sbsa" ) \\
+      && curl -o /tmp/cuda-keyring.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${{ARCH}}/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt update \\
@@ -907,6 +920,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
+            )
 
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
@@ -1007,7 +1021,7 @@ RUN wget -O /tmp/boost.tar.gz \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
     if FLAGS.enable_gpu:
-        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"])
     df += """
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -1120,7 +1134,7 @@ RUN wget -O /tmp/boost.tar.gz \\
 """
 
         if FLAGS.enable_gpu:
-            df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+            df += install_dcgm_libraries(argmap["DCGM_VERSION"])
 
     df += """
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -1412,7 +1426,7 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
 
     if enable_gpu:
-        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"])
         # This segment will break the RHEL SBSA build. Need to determine whether
         # this is necessary to incorporate.
         if target_platform() != "rhel":
