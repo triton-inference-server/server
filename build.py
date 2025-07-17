@@ -860,8 +860,9 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
     && dnf clean expire-cache \\
     && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-rhel8-{}-1.0-1.aarch64.rpm -o /tmp/dcgm-local.rpm \\
     && dnf install /tmp/dcgm-local.rpm \\
+    && rm /tmp/dcgm-local.rpm \\
     && cp /var/dcgm-local-repo-rhel8-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
-    && rm /tmp/dcgm-local.rpm
+    && dnf install --assumeyes datacenter-gpu-manager-4-devel
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
@@ -873,8 +874,9 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
     && dnf clean expire-cache \\
     && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-rhel8-{}-1.0-1.x86_64.rpm -o /tmp/dcgm-local.rpm \\
     && dnf install /tmp/dcgm-local.rpm \\
+    && rm /tmp/dcgm-local.rpm \\
     && cp /var/dcgm-local-repo-rhel8-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
-    && rm /tmp/dcgm-local.rpm
+    && dnf install --assumeyes datacenter-gpu-manager-4-devel
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
@@ -889,8 +891,9 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_arm64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
+      && rm /tmp/dcgm-local.deb \\
       && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
-      && rm /tmp/dcgm-local.deb
+      && apt install --yes datacenter-gpu-manager-4-dev
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
@@ -904,8 +907,9 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && curl -kL https://kitmaker-web.nvidia.com/kitpicks/dcgm-rel-dcgm-4-4/{}/001/local_installers/dcgm-local-repo-ubuntu2404-{}_1.0-1_amd64.deb -o /tmp/dcgm-local.deb \\
       && apt install /tmp/dcgm-local.deb \\
+      && rm /tmp/dcgm-local.deb \\
       && cp /var/dcgm-local-repo-ubuntu2404-{}/dcgm-local-*-keyring.gpg /usr/share/keyrings/ \\
-      && rm /tmp/dcgm-local.deb
+      && apt install --yes datacenter-gpu-manager-4-dev
 """.format(
                     dcgm_version, dcgm_version, dcgm_version, dcgm_version
                 )
