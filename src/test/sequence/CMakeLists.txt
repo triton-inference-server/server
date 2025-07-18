@@ -28,6 +28,11 @@ cmake_minimum_required(VERSION 3.31.8)
 
 project(tritonsequencebackend LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 #
 # libtriton_sequence.so
 # Shared library implementing the Triton Sequence Backend API
@@ -47,7 +52,7 @@ target_compile_features(triton-sequence-backend PRIVATE cxx_std_17)
 target_compile_options(
   triton-sequence-backend PRIVATE
   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Werror>
+    -Wall -Wextra -Wno-unused-parameter -Wno-type-limits -Wno-deprecated-declarations -Werror>
 )
 
 target_link_libraries(
@@ -63,9 +68,16 @@ set_target_properties(
   triton-sequence-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_sequence
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_sequence.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-sequence-backend PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_sequence.ldscript"
+  )
+endif()
 
 #
 # Install

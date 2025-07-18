@@ -125,6 +125,11 @@ SharedMemoryManager::UnregisterHelper(
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+#include <set>
+#include <algorithm>
+#endif
+
 #include "common.h"
 #include "triton/common/logging.h"
 
@@ -132,13 +137,43 @@ namespace triton { namespace server {
 
 namespace {
 
+// Platform-specific shared memory name handling
+std::string
+NormalizeSharedMemoryName(const std::string& shm_key)
+{
+#ifdef __APPLE__
+  // macOS requires shared memory names to start with a single slash
+  // and contain no other slashes
+  std::string normalized = shm_key;
+  
+  // Remove leading slashes
+  size_t start = normalized.find_first_not_of('/');
+  if (start != std::string::npos) {
+    normalized = normalized.substr(start);
+  }
+  
+  // Replace any remaining slashes with underscores
+  std::replace(normalized.begin(), normalized.end(), '/', '_');
+  
+  // Add single leading slash
+  return "/" + normalized;
+#else
+  // Linux accepts the name as-is
+  return shm_key;
+#endif
+}
+
 TRITONSERVER_Error*
 OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
 {
+  // Normalize the shared memory name for the platform
+  std::string normalized_key = NormalizeSharedMemoryName(shm_key);
+  
   // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  *shm_fd = shm_open(normalized_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
   if (*shm_fd == -1) {
-    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
+    LOG_VERBOSE(1) << "shm_open failed for key '" << normalized_key 
+                   << "' (original: '" << shm_key << "'), errno: " << errno;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string("Unable to open shared memory region: '" + shm_key + "'")
@@ -227,6 +262,43 @@ CloseSharedMemoryRegion(int shm_fd)
 
   return nullptr;
 }
+
+#ifdef __APPLE__
+// On macOS, we need to track created shared memory regions for cleanup
+// This is a simple tracking mechanism - in production, this might need
+// to be more sophisticated
+static std::set<std::string> created_shm_regions;
+static std::mutex shm_registry_mutex;
+
+void
+RegisterSharedMemoryRegion(const std::string& shm_key)
+{
+  std::lock_guard<std::mutex> lock(shm_registry_mutex);
+  created_shm_regions.insert(NormalizeSharedMemoryName(shm_key));
+}
+
+void
+UnlinkSharedMemoryRegion(const std::string& shm_key)
+{
+  std::string normalized_key = NormalizeSharedMemoryName(shm_key);
+  {
+    std::lock_guard<std::mutex> lock(shm_registry_mutex);
+    created_shm_regions.erase(normalized_key);
+  }
+  // Attempt to unlink - ignore errors as the region might not exist
+  shm_unlink(normalized_key.c_str());
+}
+
+void
+CleanupAllSharedMemoryRegions()
+{
+  std::lock_guard<std::mutex> lock(shm_registry_mutex);
+  for (const auto& region : created_shm_regions) {
+    shm_unlink(region.c_str());
+  }
+  created_shm_regions.clear();
+}
+#endif // __APPLE__
 
 TRITONSERVER_Error*
 UnmapSharedMemory(void* mapped_addr, size_t byte_size)
@@ -347,6 +419,10 @@ SharedMemoryManager::~SharedMemoryManager()
 {
   UnregisterAll(TRITONSERVER_MEMORY_CPU);
   UnregisterAll(TRITONSERVER_MEMORY_GPU);
+#ifdef __APPLE__
+  // Clean up any remaining shared memory regions on macOS
+  CleanupAllSharedMemoryRegions();
+#endif
 }
 
 TRITONSERVER_Error*
@@ -391,6 +467,10 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   // open and set new shm_fd if new shared memory key
   if (shm_fd == -1) {
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+#ifdef __APPLE__
+    // Track this region for cleanup on macOS
+    RegisterSharedMemoryRegion(shm_key);
+#endif
   }
 
   // Enforce that registered region is in-bounds of shm file object.
@@ -719,6 +799,11 @@ SharedMemoryManager::UnregisterHelper(
     if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
       RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+#ifdef __APPLE__
+      // On macOS, unlink the shared memory region when unregistering
+      // This helps ensure cleanup even if the process terminates unexpectedly
+      UnlinkSharedMemoryRegion(it->second->shm_key_);
+#endif
     } else {
 #ifdef TRITON_ENABLE_GPU
       cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);

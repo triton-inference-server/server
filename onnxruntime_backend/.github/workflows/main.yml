@@ -1,0 +1,16 @@
+name: CI
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  slashCommandDispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Command Dispatch
+        uses: peter-evans/slash-command-dispatch@v2
+        with:
+          token: ${{ secrets.PAT }}
+          permission: maintain
+          issue-type: pull-request
+          commands: |
+            ok-to-test

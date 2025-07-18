@@ -1,0 +1,183 @@
+# Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Metal Unified Memory Optimization Components
+
+if(TRITON_ENABLE_METAL)
+  # Check for Apple platform
+  if(NOT APPLE)
+    message(FATAL_ERROR "Metal support requires Apple platform")
+  endif()
+
+  # Find Metal framework
+  find_library(METAL_FRAMEWORK Metal REQUIRED)
+  find_library(METALPERFORMANCESHADERS_FRAMEWORK MetalPerformanceShaders REQUIRED)
+  find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+
+  # Unified Memory Library
+  add_library(triton-metal-unified-memory SHARED
+    metal_unified_memory.mm
+    metal_unified_memory.h
+  )
+
+  target_include_directories(triton-metal-unified-memory
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/include
+      ${CMAKE_SOURCE_DIR}/src
+  )
+
+  target_link_libraries(triton-metal-unified-memory
+    PUBLIC
+      triton-core-serverapi
+      triton-core-serverstub
+      triton-backend-utils
+      ${METAL_FRAMEWORK}
+      ${METALPERFORMANCESHADERS_FRAMEWORK}
+      ${FOUNDATION_FRAMEWORK}
+  )
+
+  target_compile_options(triton-metal-unified-memory
+    PRIVATE
+      -fobjc-arc
+      -std=c++17
+  )
+
+  target_compile_definitions(triton-metal-unified-memory
+    PUBLIC
+      TRITON_ENABLE_METAL
+  )
+
+  # Backend Integration Library
+  add_library(triton-metal-backend-integration SHARED
+    metal_backend_unified_integration.cc
+    metal_backend_unified_integration.h
+  )
+
+  target_include_directories(triton-metal-backend-integration
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/include
+      ${CMAKE_SOURCE_DIR}/src
+  )
+
+  target_link_libraries(triton-metal-backend-integration
+    PUBLIC
+      triton-metal-unified-memory
+      triton-core-serverapi
+      triton-core-serverstub
+      triton-backend-utils
+  )
+
+  target_compile_options(triton-metal-backend-integration
+    PRIVATE
+      -std=c++17
+  )
+
+  # Unified Memory Benchmark
+  add_executable(metal-unified-memory-benchmark
+    ../test/metal_unified_memory_benchmark.cc
+  )
+
+  target_include_directories(metal-unified-memory-benchmark
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}
+      ${CMAKE_SOURCE_DIR}/include
+      ${CMAKE_SOURCE_DIR}/src
+  )
+
+  target_link_libraries(metal-unified-memory-benchmark
+    PRIVATE
+      triton-metal-unified-memory
+      triton-core-serverapi
+      triton-core-serverstub
+      ${METAL_FRAMEWORK}
+      ${FOUNDATION_FRAMEWORK}
+  )
+
+  target_compile_options(metal-unified-memory-benchmark
+    PRIVATE
+      -std=c++17
+  )
+
+  target_compile_definitions(metal-unified-memory-benchmark
+    PRIVATE
+      TRITON_ENABLE_METAL
+  )
+
+  # Installation
+  install(
+    TARGETS
+      triton-metal-unified-memory
+      triton-metal-backend-integration
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+  install(
+    FILES
+      metal_unified_memory.h
+      metal_backend_unified_integration.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/triton/metal
+  )
+
+  install(
+    TARGETS metal-unified-memory-benchmark
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+
+  # Export targets
+  install(
+    TARGETS
+      triton-metal-unified-memory
+      triton-metal-backend-integration
+    EXPORT triton-metal-targets
+  )
+
+  install(
+    EXPORT triton-metal-targets
+    FILE TritonMetalTargets.cmake
+    NAMESPACE Triton::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TritonMetal
+  )
+
+  # Tests
+  if(BUILD_TESTS)
+    add_executable(metal-unified-memory-test
+      test/metal_unified_memory_test.cc
+    )
+
+    target_link_libraries(metal-unified-memory-test
+      PRIVATE
+        triton-metal-unified-memory
+        gtest
+        gtest_main
+    )
+
+    add_test(NAME metal-unified-memory-test COMMAND metal-unified-memory-test)
+  endif()
+
+endif() # TRITON_ENABLE_METAL

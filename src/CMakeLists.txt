@@ -28,6 +28,11 @@ cmake_minimum_required (VERSION 3.31.8)
 
 project(tritonserverexe LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(GNUInstallDirs)
 
 #
@@ -78,7 +83,7 @@ endif()
 
 # OpenTelemetry
 #
-if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+if (NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
     find_package(absl CONFIG REQUIRED)
     find_package(CURL CONFIG REQUIRED)
     find_package(nlohmann_json CONFIG REQUIRED)
@@ -132,13 +137,35 @@ if(WIN32)
       NOMINMAX)
 
   # Dependency from common.h
-  find_library(B64_LIBRARY NAMES b64)
+  find_library(B64_LIBRARY NAMES b64 libb64)
   target_link_libraries(
     main
     PRIVATE
       ${B64_LIBRARY}
   )
 
+elseif(MACOS)
+  target_compile_options(
+    main
+    PRIVATE
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+      -stdlib=libc++ -fvisibility=hidden
+  )
+  
+  # macOS-specific compile definitions
+  target_compile_definitions(main
+    PRIVATE
+      TRITON_MACOS=1
+      BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+  )
+  
+  # Dependency from common.h
+  find_library(B64_LIBRARY NAMES b64 libb64 PATHS /opt/homebrew/lib)
+  target_link_libraries(
+    main
+    PRIVATE
+      ${B64_LIBRARY}
+  )
 else()
 
   target_compile_options(
@@ -148,10 +175,11 @@ else()
   )
 
   # Dependency from common.h
+  find_library(B64_LIBRARY NAMES b64 libb64)
   target_link_libraries(
     main
     PRIVATE
-      b64
+      ${B64_LIBRARY}
   )
   endif()
 
@@ -162,17 +190,39 @@ if(LINUX)
     set (LIB_DIR "lib64")
   endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
 endif(LINUX)
+
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(MACOS ON)
+  set(TRITON_PLATFORM_MACOS ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WINDOWS ON)
+endif()
 set(TRITON_CORE_HEADERS_ONLY OFF)
 
-set_target_properties(
-  main
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
-)
+if(MACOS)
+  set_target_properties(
+    main
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH FALSE
+      BUILD_WITH_INSTALL_RPATH FALSE
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+      INSTALL_RPATH "@loader_path/../${LIB_DIR}"
+  )
+else()
+  set_target_properties(
+    main
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH "$\{ORIGIN\}/../${LIB_DIR}"
+  )
+endif()
 
 target_link_libraries(
   main
@@ -208,6 +258,39 @@ if(${TRITON_ENABLE_GPU})
       CUDA::cudart
   )
 endif() # TRITON_ENABLE_GPU
+
+# Metal support for macOS
+if(APPLE)
+  option(TRITON_ENABLE_METAL "Enable Metal device support" ON)
+  option(TRITON_ENABLE_APPLE_OPTIMIZATIONS "Enable Apple Silicon optimizations (AMX, ANE, Winograd)" ON)
+  
+  if(${TRITON_ENABLE_METAL})
+    add_subdirectory(metal)
+    target_compile_definitions(
+      main
+      PRIVATE TRITON_ENABLE_METAL=1
+    )
+    target_link_libraries(
+      main
+      PRIVATE
+        triton-metal-allocator
+        triton-metal-performance-monitor
+    )
+  endif() # TRITON_ENABLE_METAL
+  
+  if(${TRITON_ENABLE_APPLE_OPTIMIZATIONS})
+    add_subdirectory(apple)
+    target_compile_definitions(
+      main
+      PRIVATE TRITON_ENABLE_APPLE_OPTIMIZATIONS=1
+    )
+    target_link_libraries(
+      main
+      PRIVATE
+        triton-apple-optimizations
+    )
+  endif() # TRITON_ENABLE_APPLE_OPTIMIZATIONS
+endif() # APPLE
 
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
@@ -275,14 +358,20 @@ if(${TRITON_ENABLE_NVTX})
   )
 endif() # TRITON_ENABLE_NVTX
 
-if (NOT WIN32)
+if (LINUX)
   target_link_libraries(
     main
     PRIVATE
       rt
       dl
   )
-endif() # NOT WIN32
+elseif(MACOS)
+  target_link_libraries(
+    main
+    PRIVATE
+      dl
+  )
+endif() # Platform-specific libraries
 
 if (NOT WIN32)
   install(
@@ -384,7 +473,7 @@ if(${TRITON_ENABLE_HTTP}
     target_compile_options(
       http-endpoint-library
       PRIVATE
-        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-error=maybe-uninitialized -Werror
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-unused-lambda-capture -Wno-unused-variable -Wno-unused-private-field
     )
   endif()
 
@@ -411,10 +500,10 @@ if(${TRITON_ENABLE_HTTP}
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
 
-  # FIXME when Triton support of Opentelemetry is available on Windows
+  # FIXME when Triton support of Opentelemetry is available on Windows and macOS
   # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
   # JIRA DLIS-4786
-  if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+  if (NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
     target_link_libraries(
       http-endpoint-library
       PRIVATE tracing-library
@@ -492,7 +581,7 @@ if(${TRITON_ENABLE_HTTP}
   endif() # TRITON_ENABLE_NVTX
 
   if (WIN32)
-    find_library(B64_LIBRARY NAMES b64)
+    find_library(B64_LIBRARY NAMES b64 libb64)
     find_library(ZLIB_LIBRARY NAMES zlib)
     target_link_libraries(
       http-endpoint-library
@@ -500,11 +589,20 @@ if(${TRITON_ENABLE_HTTP}
         ${B64_LIBRARY}
         ${ZLIB_LIBRARY}
     )
-  else()
+  elseif(MACOS)
+    find_library(B64_LIBRARY NAMES b64 libb64 PATHS /opt/homebrew/lib)
     target_link_libraries(
       http-endpoint-library
       PUBLIC
-        b64
+        ${B64_LIBRARY}
+        z
+    )
+  else()
+    find_library(B64_LIBRARY NAMES b64 libb64)
+    target_link_libraries(
+      http-endpoint-library
+      PUBLIC
+        ${B64_LIBRARY}
         z
     )
   endif()
@@ -528,8 +626,8 @@ if(${TRITON_ENABLE_TRACING})
   )
 
   target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-  # FIXME: remove, when Windows support is added for Opentelemetry
-  if (NOT WIN32)
+  # FIXME: remove, when Windows and macOS support is added for Opentelemetry
+  if (NOT WIN32 AND NOT MACOS)
     target_include_directories(
       tracing-library
       PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
@@ -612,132 +710,132 @@ endif() # TRITON_ENABLE_TRACING
 
 if (NOT WIN32)
   #
-  # simple
+  # simple - Disabled until rapidjson dependency is resolved
   #
-  add_executable(
-    simple
-    simple.cc
-  )
+  # add_executable(
+  #   simple
+  #   simple.cc
+  # )
 
-  target_compile_features(simple PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    message("Using MSVC as compiler, default target on Windows 10. "
-            "If the target system is not Windows 10, please update _WIN32_WINNT "
-            "to corresponding value.")
-    target_compile_options(
-      simple
-      PRIVATE
-        /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
-    )
-  else()
-    target_compile_options(
-      simple
-      PRIVATE
-        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
-    )
-  endif()
+  # target_compile_features(simple PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  # if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  #   message("Using MSVC as compiler, default target on Windows 10. "
+  #           "If the target system is not Windows 10, please update _WIN32_WINNT "
+  #           "to corresponding value.")
+  #   target_compile_options(
+  #     simple
+  #     PRIVATE
+  #       /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
+  #   )
+  # else()
+  #   target_compile_options(
+  #     simple
+  #     PRIVATE
+  #       -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+  #   )
+  # endif()
 
-  set_target_properties(
-    simple
-    PROPERTIES
-      POSITION_INDEPENDENT_CODE ON
-      SKIP_BUILD_RPATH TRUE
-      BUILD_WITH_INSTALL_RPATH TRUE
-      INSTALL_RPATH_USE_LINK_PATH FALSE
-      INSTALL_RPATH ""
-  )
+  # set_target_properties(
+  #   simple
+  #   PROPERTIES
+  #     POSITION_INDEPENDENT_CODE ON
+  #     SKIP_BUILD_RPATH TRUE
+  #     BUILD_WITH_INSTALL_RPATH TRUE
+  #     INSTALL_RPATH_USE_LINK_PATH FALSE
+  #     INSTALL_RPATH ""
+  # )
 
-  target_link_libraries(
-    simple
-    PRIVATE
-      triton-common-async-work-queue  # from repo-common
-      triton-common-error             # from repo-common
-      triton-core-serverapi           # from repo-core
-      triton-core-serverstub          # from repo-core
-    )
+  # target_link_libraries(
+  #   simple
+  #   PRIVATE
+  #     triton-common-async-work-queue  # from repo-common
+  #     triton-common-error             # from repo-common
+  #     triton-core-serverapi           # from repo-core
+  #     triton-core-serverstub          # from repo-core
+  #   )
 
-  if(${TRITON_ENABLE_GPU})
-    target_compile_definitions(
-      simple
-      PRIVATE TRITON_ENABLE_GPU=1
-      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-    )
+  # if(${TRITON_ENABLE_GPU})
+  #   target_compile_definitions(
+  #     simple
+  #     PRIVATE TRITON_ENABLE_GPU=1
+  #     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  #   )
 
-    target_link_libraries(
-      simple
-      PRIVATE
-        CUDA::cudart
-    )
-  endif() # TRITON_ENABLE_GPU
+  #   target_link_libraries(
+  #     simple
+  #     PRIVATE
+  #       CUDA::cudart
+  #   )
+  # endif() # TRITON_ENABLE_GPU
 
-  install(
-    TARGETS simple
-    RUNTIME DESTINATION bin
-  )
+  # install(
+  #   TARGETS simple
+  #   RUNTIME DESTINATION bin
+  # )
 
   #
-  # multi_server example
+  # multi_server example - Disabled until rapidjson dependency is resolved
   #
-  add_executable(
-    multi_server
-    multi_server.cc
-  )
+  # add_executable(
+  #   multi_server
+  #   multi_server.cc
+  # )
 
-  target_compile_features(multi_server PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    message("Using MSVC as compiler, default target on Windows 10. "
-            "If the target system is not Windows 10, please update _WIN32_WINNT "
-            "to corresponding value.")
-    target_compile_options(
-      multi_server
-      PRIVATE
-        /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
-    )
-  else()
-    target_compile_options(
-      multi_server
-      PRIVATE
-        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
-    )
-  endif()
+  # target_compile_features(multi_server PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  # if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  #   message("Using MSVC as compiler, default target on Windows 10. "
+  #           "If the target system is not Windows 10, please update _WIN32_WINNT "
+  #           "to corresponding value.")
+  #   target_compile_options(
+  #     multi_server
+  #     PRIVATE
+  #       /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
+  #   )
+  # else()
+  #   target_compile_options(
+  #     multi_server
+  #     PRIVATE
+  #       -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+  #   )
+  # endif()
 
-  set_target_properties(
-    multi_server
-    PROPERTIES
-      POSITION_INDEPENDENT_CODE ON
-      SKIP_BUILD_RPATH TRUE
-      BUILD_WITH_INSTALL_RPATH TRUE
-      INSTALL_RPATH_USE_LINK_PATH FALSE
-      INSTALL_RPATH ""
-  )
+  # set_target_properties(
+  #   multi_server
+  #   PROPERTIES
+  #     POSITION_INDEPENDENT_CODE ON
+  #     SKIP_BUILD_RPATH TRUE
+  #     BUILD_WITH_INSTALL_RPATH TRUE
+  #     INSTALL_RPATH_USE_LINK_PATH FALSE
+  #     INSTALL_RPATH ""
+  # )
 
-  target_link_libraries(
-    multi_server
-    PRIVATE
-      triton-common-async-work-queue  # from repo-common
-      triton-common-error             # from repo-common
-      triton-core-serverapi           # from repo-core
-      triton-core-serverstub          # from repo-core
-    )
+  # target_link_libraries(
+  #   multi_server
+  #   PRIVATE
+  #     triton-common-async-work-queue  # from repo-common
+  #     triton-common-error             # from repo-common
+  #     triton-core-serverapi           # from repo-core
+  #     triton-core-serverstub          # from repo-core
+  #   )
 
-  if(${TRITON_ENABLE_GPU})
-    target_compile_definitions(
-      multi_server
-      PRIVATE TRITON_ENABLE_GPU=1
-      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-    )
+  # if(${TRITON_ENABLE_GPU})
+  #   target_compile_definitions(
+  #     multi_server
+  #     PRIVATE TRITON_ENABLE_GPU=1
+  #     PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  #   )
 
-    target_link_libraries(
-      multi_server
-      PRIVATE
-        CUDA::cudart
-    )
-  endif() # TRITON_ENABLE_GPU
+  #   target_link_libraries(
+  #     multi_server
+  #     PRIVATE
+  #       CUDA::cudart
+  #   )
+  # endif() # TRITON_ENABLE_GPU
 
-  install(
-    TARGETS multi_server
-    RUNTIME DESTINATION bin
-  )
+  # install(
+  #   TARGETS multi_server
+  #   RUNTIME DESTINATION bin
+  # )
 
   if(${TRITON_ENABLE_GPU})
     #
@@ -799,11 +897,11 @@ if (NOT WIN32)
   endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
-# DLIS-7292: Extend tritonfrontend to build for Windows
-if (NOT WIN32)
+# DLIS-7292: Extend tritonfrontend to build for Windows and macOS
+if (NOT WIN32 AND NOT MACOS)
   # tritonfrontend python package
   add_subdirectory(python)
-endif (NOT WIN32)
+endif (NOT WIN32 AND NOT MACOS)
 
 # Currently unit tests do not build for windows...
 if ( NOT WIN32)

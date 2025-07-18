@@ -1,0 +1,193 @@
+name: macOS Compatibility Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run nightly tests
+    - cron: '0 2 * * *'
+
+jobs:
+  test-macos-x86:
+    runs-on: macos-13  # Intel-based macOS
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        brew install cmake boost
+        pip install numpy
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build
+      run: |
+        cd build
+        make -j$(sysctl -n hw.ncpu)
+    
+    - name: Generate test data
+      run: |
+        cd tests
+        python scripts/generate_test_data.py
+    
+    - name: Run unit tests
+      run: |
+        cd tests
+        ./scripts/run_tests.sh --category unit
+    
+    - name: Run integration tests
+      run: |
+        cd tests
+        ./scripts/run_tests.sh --category integration
+    
+    - name: Run platform tests
+      run: |
+        cd tests
+        ./scripts/run_tests.sh --category macos
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-macos-x86-py${{ matrix.python-version }}
+        path: tests/results/
+    
+    - name: Upload test report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-report-macos-x86-py${{ matrix.python-version }}
+        path: |
+          tests/results/test_report.html
+          tests/results/test_report.md
+
+  test-macos-arm64:
+    runs-on: macos-14  # Apple Silicon macOS
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        brew install cmake boost
+        pip install numpy
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build
+      run: |
+        cd build
+        make -j$(sysctl -n hw.ncpu)
+    
+    - name: Generate test data
+      run: |
+        cd tests
+        python scripts/generate_test_data.py
+    
+    - name: Run all tests
+      run: |
+        cd tests
+        ./scripts/run_tests.sh --category all
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-macos-arm64-py${{ matrix.python-version }}
+        path: tests/results/
+    
+    - name: Upload test report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-report-macos-arm64-py${{ matrix.python-version }}
+        path: |
+          tests/results/test_report.html
+          tests/results/test_report.md
+
+  performance-tests:
+    runs-on: macos-14
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[perf]')
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        brew install cmake boost
+        pip install numpy matplotlib pandas
+    
+    - name: Build with performance tests
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DBUILD_PERFORMANCE_TESTS=ON
+        make -j$(sysctl -n hw.ncpu)
+    
+    - name: Run performance tests
+      run: |
+        cd tests
+        ./scripts/run_tests.sh --category performance
+    
+    - name: Generate performance report
+      run: |
+        cd tests
+        python scripts/generate_performance_report.py results/
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: tests/results/performance/
+
+  cross-platform-validation:
+    needs: [test-macos-x86, test-macos-arm64]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download all test results
+      uses: actions/download-artifact@v3
+      with:
+        path: test-artifacts/
+    
+    - name: Validate cross-platform compatibility
+      run: |
+        python tests/scripts/validate_compatibility.py test-artifacts/
+    
+    - name: Create summary report
+      run: |
+        python tests/scripts/create_summary.py test-artifacts/ > $GITHUB_STEP_SUMMARY

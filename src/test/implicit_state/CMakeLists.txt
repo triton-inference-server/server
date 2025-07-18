@@ -28,6 +28,11 @@ cmake_minimum_required(VERSION 3.31.8)
 
 project(tritonimplicitsequencebackend LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 #
 # libtriton_implicit_state.so
 # Shared library implementing the Triton Implicit Sequence Backend API
@@ -63,9 +68,16 @@ set_target_properties(
   triton-implicit-state-backend PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_implicit_state
-  LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_implicit_state.ldscript"
 )
+
+# Platform-specific linker settings
+if(NOT APPLE)
+  set_target_properties(
+    triton-implicit-state-backend PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_implicit_state.ldscript
+    LINK_FLAGS "-Wl,--version-script libtriton_implicit_state.ldscript"
+  )
+endif()
 
 #
 # Install

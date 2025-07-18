@@ -1,0 +1,51 @@
+# Example configuration for an image classification model
+name: "resnet50_coreml"
+platform: "coreml"
+max_batch_size: 1
+
+# Input configuration for 224x224 RGB images
+input [
+  {
+    name: "image"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+
+# Output configuration for 1000 class probabilities
+output [
+  {
+    name: "classLabelProbs"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  }
+]
+
+# Backend-specific parameters
+parameters: {
+  key: "compute_units"
+  value: {
+    string_value: "ALL"  # Use all available hardware (CPU, GPU, Neural Engine)
+  }
+}
+
+parameters: {
+  key: "use_neural_engine"
+  value: {
+    string_value: "true"  # Enable Neural Engine for best performance
+  }
+}
+
+# Instance group configuration
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU  # CoreML manages its own hardware acceleration
+  }
+]
+
+# Version policy
+version_policy: { latest { num_versions: 1 } }
+
+# Dynamic batching is not recommended for CoreML
+# as it doesn't natively support batching

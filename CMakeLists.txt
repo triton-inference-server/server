@@ -28,6 +28,11 @@ cmake_minimum_required(VERSION 3.31.8)
 
 project(tritonserver LANGUAGES C CXX)
 
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(CMakeDependentOption)
 
 # Use C++17 standard as Triton's minimum required.
@@ -70,6 +75,10 @@ option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 
 # ASAN
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
+
+# Testing and Benchmarking
+option(TRITON_ENABLE_TESTS "Build unit tests" ON)
+option(TRITON_ENABLE_BENCHMARKS "Build benchmarks" OFF)
 
 # Repo tags
 set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
@@ -123,6 +132,19 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
 
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(MACOS ON)
+  set(TRITON_PLATFORM_MACOS ON)
+  message(STATUS "Detected macOS/Darwin platform")
+  # Include macOS-specific configuration
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/MacOS.cmake)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX ON)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WINDOWS ON)
+endif()
+
 # Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
 # of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
 set(LIB_DIR "lib")
@@ -170,6 +192,8 @@ endif()
 # platform
 if (WIN32)
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/cmake")
+elseif(MACOS)
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/lib/cmake/protobuf")
 else()
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
 endif()
@@ -179,6 +203,8 @@ endif()
 # JIRA DLIS-4786
 if (WIN32)
   set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
+elseif(MACOS)
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/lib/cmake/opentelemetry-cpp")
 else()
   set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
 endif()
@@ -202,7 +228,7 @@ endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 if(${TRITON_ENABLE_GRPC})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
 endif() # TRITON_ENABLE_GRPC
-if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+if(NOT WIN32 AND NOT MACOS AND ${TRITON_ENABLE_TRACING})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
 endif() # TRITON_ENABLE_TRACING
 
@@ -234,6 +260,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
     -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
+    -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/${LIB_DIR}/cmake/prometheus-cpp
     -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
     -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}

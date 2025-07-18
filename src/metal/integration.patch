@@ -1,0 +1,153 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -100,6 +100,7 @@ option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
+ option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
+ option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
+ option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
++option(TRITON_ENABLE_METAL "Enable Metal GPU support on macOS" OFF)
+ option(TRITON_ENABLE_METRICS "Include metrics support in server" ON)
+ option(TRITON_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
+ option(TRITON_ENABLE_METRICS_CPU "Include CPU metrics support in server" ON)
+@@ -200,6 +201,14 @@ if(TRITON_ENABLE_GPU)
+   endif()
+ endif() # TRITON_ENABLE_GPU
+ 
++# Metal support for macOS
++if(TRITON_ENABLE_METAL)
++  if(NOT APPLE)
++    message(FATAL_ERROR "TRITON_ENABLE_METAL is only supported on macOS")
++  endif()
++  add_definitions(-DTRITON_ENABLE_METAL=1)
++endif()
++
+ # MALI GPU
+ if (TRITON_ENABLE_MALI_GPU)
+   add_definitions(-DTRITON_ENABLE_MALI_GPU=1)
+@@ -300,6 +309,11 @@ add_subdirectory(src)
+ # being registered even when the functions provided by the libraries
+ # are not used in the code
+ add_subdirectory(deploy)
++
++# Metal memory support
++if(APPLE AND TRITON_ENABLE_METAL)
++  add_subdirectory(src/metal)
++endif()
+ endif()
+ 
+ if(TRITON_BUILD_TESTS)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 2345678..cdefghi 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -500,6 +500,14 @@ if(${TRITON_ENABLE_GPU})
+   )
+ endif() # TRITON_ENABLE_GPU
+ 
++if(${TRITON_ENABLE_METAL})
++  target_link_libraries(
++    main
++    PRIVATE
++      triton-metal-memory
++  )
++endif() # TRITON_ENABLE_METAL
++
+ if(${TRITON_ENABLE_METRICS})
+   target_link_libraries(
+     main
+diff --git a/src/memory.cc b/src/memory.cc
+index 3456789..bcdefgh 100644
+--- a/src/memory.cc
++++ b/src/memory.cc
+@@ -40,6 +40,10 @@
+ #include "pinned_memory_manager.h"
+ #endif  // TRITON_ENABLE_GPU
+ 
++#ifdef TRITON_ENABLE_METAL
++#include "metal/triton_metal_memory.h"
++#endif  // TRITON_ENABLE_METAL
++
+ namespace triton { namespace core {
+ 
+ namespace {
+@@ -175,6 +179,28 @@ AllocatedMemory::AllocatedMemory(
+     buffer_attributes_ =
+         BufferAttributes(total_byte_size_, memory_type, memory_type_id, buffer_);
+   }
++#ifdef TRITON_ENABLE_METAL
++  else if (metal::IsInitialized() && IsMetalMemoryType(memory_type)) {
++    // Allocate Metal memory
++    Status status = metal::Allocate(
++        reinterpret_cast<void**>(&buffer_), byte_size, memory_type, memory_type_id);
++    
++    if (!status.IsOk()) {
++      // Fallback to CPU memory
++      memory_type = TRITONSERVER_MEMORY_CPU;
++      memory_type_id = 0;
++      buffer_ = static_cast<char*>(malloc(byte_size));
++      if (buffer_ == nullptr) {
++        throw std::runtime_error(
++            "failed to allocate " + std::to_string(byte_size) + " bytes");
++      }
++    }
++    
++    total_byte_size_ = byte_size;
++    buffer_count_ = 1;
++    buffer_attributes_ =
++        BufferAttributes(total_byte_size_, memory_type, memory_type_id, buffer_);
++  }
++#endif  // TRITON_ENABLE_METAL
+   else {
+     memory_type = TRITONSERVER_MEMORY_CPU;
+     memory_type_id = 0;
+@@ -207,6 +233,16 @@ AllocatedMemory::~AllocatedMemory()
+       CudaMemoryManager::Free(buffer_, buffer_attributes_.MemoryTypeId());
+     }
+   }
++#ifdef TRITON_ENABLE_METAL
++  else if (metal::IsInitialized() && 
++           IsMetalMemoryType(buffer_attributes_.MemoryType())) {
++    Status status = metal::Free(
++        buffer_, 
++        buffer_attributes_.MemoryType(),
++        buffer_attributes_.MemoryTypeId());
++    // Log error if free fails
++  }
++#endif  // TRITON_ENABLE_METAL
+   else {
+     free(buffer_);
+   }
+diff --git a/src/response_allocator.h b/src/response_allocator.h
+index 4567890..cdefghi 100644
+--- a/src/response_allocator.h
++++ b/src/response_allocator.h
+@@ -36,6 +36,10 @@
+ #include "tritonserver_apis.h"
+ #include "cuda_memory_manager.h"
+ 
++#ifdef TRITON_ENABLE_METAL
++#include "metal/triton_metal_memory.h"
++#endif
++
+ namespace triton { namespace core {
+ 
+ //
+diff --git a/python_backend/build/_deps/repo-core-src/include/triton/core/tritonserver.h b/python_backend/build/_deps/repo-core-src/include/triton/core/tritonserver.h
+index 5678901..abcdefg 100644
+--- a/python_backend/build/_deps/repo-core-src/include/triton/core/tritonserver.h
++++ b/python_backend/build/_deps/repo-core-src/include/triton/core/tritonserver.h
+@@ -300,7 +300,12 @@ TRITONSERVER_DataTypeByteSize(TRITONSERVER_DataType datatype);
+ typedef enum TRITONSERVER_memorytype_enum {
+   TRITONSERVER_MEMORY_CPU,
+   TRITONSERVER_MEMORY_CPU_PINNED,
+-  TRITONSERVER_MEMORY_GPU
++  TRITONSERVER_MEMORY_GPU,
++#ifdef TRITON_ENABLE_METAL
++  TRITONSERVER_MEMORY_METAL = 100,
++  TRITONSERVER_MEMORY_METAL_UNIFIED = 101,
++  TRITONSERVER_MEMORY_METAL_MANAGED = 102
++#endif
+ } TRITONSERVER_MemoryType;
+ /// Get the string representation of a memory type. The returned
+ /// string is not owned by the caller and so should not be modified or

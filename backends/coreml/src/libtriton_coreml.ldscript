@@ -1,0 +1,10 @@
+# Linker script for CoreML backend
+# Note: macOS doesn't use linker scripts, this is for compatibility
+# with the CMake build system if needed on other platforms
+
+{
+  global:
+    TRITONBACKEND_*;
+  local:
+    *;
+};

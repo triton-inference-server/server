@@ -1,0 +1,59 @@
+# Test model configuration for ONNX Runtime backend on macOS
+name: "simple_onnx_model"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+
+# Model input
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+  }
+]
+
+# Model output
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+  }
+]
+
+# Backend-specific parameters
+parameters [
+  {
+    key: "execution_mode"
+    value: { string_value: "sequential" }
+  }
+]
+
+# Instance group configuration
+instance_group [
+  {
+    count: 2
+    kind: KIND_CPU
+  }
+]
+
+# macOS-specific optimization parameters
+optimization {
+  # CoreML execution provider for Apple Silicon
+  execution_accelerators {
+    cpu_execution_accelerator [
+      {
+        name: "coreml"
+        parameters [
+          {
+            key: "enable_coreml"
+            value: { string_value: "true" }
+          }
+        ]
+      }
+    ]
+  }
+}
+
+# Version policy
+version_policy: { latest { num_versions: 1 } }

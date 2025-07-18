@@ -1,0 +1,69 @@
+# Example configuration for an object detection model (e.g., YOLO)
+name: "yolov5_coreml"
+platform: "coreml"
+max_batch_size: 1
+
+# Input configuration for 640x640 RGB images
+input [
+  {
+    name: "image"
+    data_type: TYPE_FP32
+    dims: [ 3, 640, 640 ]
+  }
+]
+
+# Output configurations for detections
+output [
+  {
+    name: "confidence"
+    data_type: TYPE_FP32
+    dims: [ 25200, 85 ]  # Number of anchors x (5 + num_classes)
+  },
+  {
+    name: "coordinates"
+    data_type: TYPE_FP32
+    dims: [ 25200, 4 ]  # Bounding box coordinates
+  }
+]
+
+# Backend-specific parameters
+parameters: {
+  key: "compute_units"
+  value: {
+    string_value: "CPU_AND_GPU"  # Use CPU and GPU, skip Neural Engine for complex ops
+  }
+}
+
+parameters: {
+  key: "use_neural_engine"
+  value: {
+    string_value: "false"  # Disable Neural Engine for models with unsupported ops
+  }
+}
+
+# Instance group configuration
+instance_group [
+  {
+    count: 2  # Multiple instances for better throughput
+    kind: KIND_CPU
+  }
+]
+
+# Version policy
+version_policy: { latest { num_versions: 1 } }
+
+# Model warmup for better first-inference performance
+model_warmup [
+  {
+    name: "warmup_sample"
+    batch_size: 1
+    inputs: {
+      key: "image"
+      value: {
+        data_type: TYPE_FP32
+        dims: [ 3, 640, 640 ]
+        zero_data: true
+      }
+    }
+  }
+]

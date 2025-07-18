@@ -1,0 +1,11 @@
+--- a/build/third-party/libevent/lib/cmake/libevent/LibeventTargets-static.cmake
++++ b/build/third-party/libevent/lib/cmake/libevent/LibeventTargets-static.cmake
+@@ -68,7 +68,7 @@ set_target_properties(libevent::event_static PROPERTIES
+   IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "C"
+   IMPORTED_LOCATION_RELEASE "${_IMPORT_PREFIX}/lib/libevent.a"
+   )
+-  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;/opt/homebrew/include"
++  INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
+ 
+ list(APPEND _cmake_import_check_targets libevent::event_static )
+ list(APPEND _cmake_import_check_files_for_libevent::event_static "${_IMPORT_PREFIX}/lib/libevent.a" )
