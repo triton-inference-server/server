@@ -882,7 +882,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
-      && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}
+      && apt install --yes datacenter-gpu-manager-4-dev=1:${}
 """.format(
                     dcgm_version, dcgm_version
                 )
@@ -895,7 +895,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt-get update \\
-      && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}
+      && apt install --yes datacenter-gpu-manager-4-dev=1:${}
 """.format(
                     dcgm_version, dcgm_version
                 )
