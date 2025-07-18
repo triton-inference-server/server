@@ -77,7 +77,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.22.0",
     "ort_openvino_version": "2025.2.0",
     "standalone_openvino_version": "2025.2.0",
-    "dcgm_version": "3.3.6",
+    "dcgm_version": "4",
     "vllm_version": "0.9.0.1",
     "rhel_py_version": "3.12.3",
 }
@@ -841,7 +841,15 @@ def tensorrtllm_cmake_args(images):
     return cargs
 
 
-def install_dcgm_libraries(dcgm_version, target_machine):
+def install_dcgm_libraries(dcgm_version):
+    if os.getenv("DCGM_SOURCE_LIST"):
+        dcgm_source_list = """
+RUN echo "deb [trusted=yes] {} / " > /etc/apt/sources.list.d/dcgm-list.list \\
+    && cat /etc/apt/sources.list.d/dcgm-list.list""".format(
+            os.getenv("DCGM_SOURCE_LIST")
+        )
+    else:
+        dcgm_source_list = ""
     if dcgm_version == "":
         fail(
             "unable to determine default repo-tag, DCGM version not known for {}".format(
@@ -852,53 +860,36 @@ def install_dcgm_libraries(dcgm_version, target_machine):
     else:
         # RHEL has the same install instructions for both aarch64 and x86
         if target_platform() == "rhel":
-            if target_machine == "aarch64":
-                return """
+            return (
+                dcgm_source_list
+                + """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
+RUN ARCH=$( [ $(uname -m) = "x86_64" ] && echo "$(uname -m)" || echo "sbsa" ) && \\
+    && dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/${{ARCH}}/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
-    && dnf install -y datacenter-gpu-manager-{}
+    && dnf install -y datacenter-gpu-manager-{}-dev
 """.format(
                     dcgm_version, dcgm_version
                 )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf install -y datacenter-gpu-manager-{}
-""".format(
-                    dcgm_version, dcgm_version
-                )
+            )
         else:
-            if target_machine == "aarch64":
-                return """
+            return (
+                dcgm_source_list
+                + """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
+RUN ARCH=$( [ $(uname -m) = "x86_64" ] && echo "$(uname -m)" || echo "sbsa" ) \\
+      && curl -o /tmp/cuda-keyring.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${{ARCH}}/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
+      && rm /tmp/cuda-keyring.deb   \\
       && apt-get update \\
-      && apt-get install -y datacenter-gpu-manager=1:{}
+      && apt-get install -y datacenter-gpu-manager-{}-dev
 """.format(
                     dcgm_version, dcgm_version
                 )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt-get update \\
-      && apt-get install -y datacenter-gpu-manager=1:{}
-""".format(
-                    dcgm_version, dcgm_version
-                )
+            )
 
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
@@ -999,7 +990,7 @@ RUN wget -O /tmp/boost.tar.gz \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
     if FLAGS.enable_gpu:
-        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"])
     df += """
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -1112,7 +1103,7 @@ RUN wget -O /tmp/boost.tar.gz \\
 """
 
         if FLAGS.enable_gpu:
-            df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+            df += install_dcgm_libraries(argmap["DCGM_VERSION"])
 
     df += """
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -1251,7 +1242,7 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
         df += """
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
     if "tensorrtllm" in backends:
         df += """
@@ -1404,7 +1395,7 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
 
     if enable_gpu:
-        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"])
         # This segment will break the RHEL SBSA build. Need to determine whether
         # this is necessary to incorporate.
         if target_platform() != "rhel":
@@ -1546,18 +1537,18 @@ def add_cpu_libs_to_linux_dockerfile(backends, target_machine):
         df += """
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.12
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.13
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.13
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
