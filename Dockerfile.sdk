@@ -262,7 +262,7 @@ RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
-        apt-get update && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
+        apt update && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
     fi
 
 # Build expects "python" executable (not python3).

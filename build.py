@@ -881,7 +881,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt-get update \\
+      && apt update \\
       && apt install --yes datacenter-gpu-manager-4-dev=1:${}
 """.format(
                     dcgm_version, dcgm_version
@@ -894,7 +894,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
           https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt-get update \\
+      && apt update \\
       && apt install --yes datacenter-gpu-manager-4-dev=1:${}
 """.format(
                     dcgm_version, dcgm_version
