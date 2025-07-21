@@ -418,7 +418,7 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/non_existent_model/confi
 
 SERVER_LOG="./non_existent_model_server.log"
 CLIENT_LOG="./non_existent_model_client.log"
-ERROR_MESSAGE_1="Failed to preinitialize Python stub: Python model file not found in './models/non_existent_model/1/model.py'"
+ERROR_MESSAGE_1="Failed to preinitialize Python stub: Python model file not found in '`pwd`/models/non_existent_model/1/model.py'"
 ERROR_MESSAGE_2="failed to load 'non_existent_model'"
 
 prev_num_pages=`get_shm_pages`
