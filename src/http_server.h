@@ -623,7 +623,7 @@ class HTTPAPIServer : public HTTPServer {
     size_t buffer_len = 0;
     TRITONSERVER_Error* err =
         EVRequestToJsonImpl(req, request_kind, true, request_json, &buffer_len);
-    return err;  // success
+    return err;
   }
 
   TRITONSERVER_Error* EVRequestToJson(
@@ -632,7 +632,7 @@ class HTTPAPIServer : public HTTPServer {
   {
     TRITONSERVER_Error* err =
         EVRequestToJsonImpl(req, request_kind, false, request_json, buffer_len);
-    return err;  // success
+    return err;
   }
 
   // Parses evhtp request buffers into Triton Inference Request.

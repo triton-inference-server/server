@@ -2184,7 +2184,7 @@ HTTPAPIServer::HandleSystemSharedMemory(
       triton::common::TritonJson::Value register_request;
       triton::common::TritonJson::Value key_json;
       RETURN_AND_RESPOND_IF_ERR(
-          req, EVRequestToJsonAllowsEmpty(req, "register", &register_request));
+          req, EVRequestToJsonAllowsEmpty(req, action, &register_request));
       if (!register_request.Find("key", &key_json)) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -2880,7 +2880,8 @@ HTTPAPIServer::EVRequestToJsonImpl(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("Chunks in the " + std::string(request_kind) +
-         " request buffer exceed the limit " + std::to_string(HTTP_MAX_CHUNKS))
+         " request buffer exceed the limit " + std::to_string(HTTP_MAX_CHUNKS) +
+         ", got " + std::to_string(n) + " chunks")
             .c_str());
   }
 
@@ -2923,8 +2924,9 @@ HTTPAPIServer::EVBufferToInput(
   if (n > HTTP_MAX_CHUNKS) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("chunks in the input buffer exceed the limit " +
-         std::to_string(HTTP_MAX_CHUNKS))
+        ("Chunks in the input buffer exceed the limit " +
+         std::to_string(HTTP_MAX_CHUNKS) + ", got " + std::to_string(n) +
+         " chunks")
             .c_str());
   }
   if (n > 0) {
@@ -2988,8 +2990,9 @@ HTTPAPIServer::EVBufferToRawInput(
     if (n > HTTP_MAX_CHUNKS) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          ("chunks in the input buffer exceed the limit " +
-           std::to_string(HTTP_MAX_CHUNKS))
+          ("Chunks in the input buffer exceed the limit " +
+           std::to_string(HTTP_MAX_CHUNKS) + ", got " + std::to_string(n) +
+           " chunks")
               .c_str());
     }
     if (n > 0) {
