@@ -856,8 +856,11 @@ elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_
 fi
 
 ### Test HTTP Requests Containing Many Chunks ###
-SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode=explicit --load-model=simple"
+REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
+CLIENT_LOG="./client.http_request_many_chunks.log"
+SERVER_ARGS="--model-repository=${MODELDIR} --allow-sagemaker=true --log-verbose=1 --model-control-mode=explicit --load-model=simple"
 SERVER_LOG="./inference_server_request_many_chunks.log"
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -866,11 +869,10 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
-CLIENT_LOG="./http_request_many_chunks.log"
 python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}
+    echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e

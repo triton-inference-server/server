@@ -209,7 +209,9 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
 
           std::unordered_map<std::string, std::string> parse_load_map;
           ParseSageMakerRequest(req, &parse_load_map, "load");
-          SageMakerMMELoadModel(req, parse_load_map);
+          if (!parse_load_map.empty()) {
+            SageMakerMMELoadModel(req, parse_load_map);
+          }
           return;
         }
         break;

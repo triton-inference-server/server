@@ -565,6 +565,47 @@ kill $SERVER_PID
 wait $SERVE_PID
 # MME end
 
+### Test Sagemaker Requests Containing Many Chunks ###
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_model
+REQUEST_MANY_CHUNKS_PY="sagemaker_request_many_chunks.py"
+CLIENT_LOG="./client.sagemaker_request_many_chunks.log"
+SERVER_LOG="./server_request_many_chunks.log"
+
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Ping
+set +e
+code=`curl -s -w %{http_code} -o ./ping.out localhost:8080/ping`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./ping.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set +e
+python $REQUEST_MANY_CHUNKS_PY >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Sagemaker Request Many Chunks Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVE_PID
+
 unlink /opt/ml/model
 rm -rf /opt/ml/model
 

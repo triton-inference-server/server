@@ -29,10 +29,10 @@ import socket
 import unittest
 
 
-class ManyChunksTest(unittest.TestCase):
+class HTTPRequestManyChunksTest(unittest.TestCase):
     def setUp(self):
         self._model_name = "simple"
-        self._http_host = "localhost"
+        self._local_host = "localhost"
         self._http_port = 8000
         self._max_chunk_count = (
             1000000  # defined in server/src/common.h HTTP_MAX_CHUNKS
@@ -47,14 +47,14 @@ class ManyChunksTest(unittest.TestCase):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         header = (
             f"{header}"
-            f"Host: {self._http_host}:{self._http_port}\r\n"
+            f"Host: {self._local_host}:{self._http_port}\r\n"
             f"Content-Type: application/octet-stream\r\n"
             f"Transfer-Encoding: chunked\r\n"
             f"Connection: close\r\n"
             f"\r\n"
         )
         try:
-            s.connect((self._http_host, self._http_port))
+            s.connect((self._local_host, self._http_port))
             # HTTP request with chunked encoding
             s.sendall((header.encode()))
 
