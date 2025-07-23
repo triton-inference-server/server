@@ -856,6 +856,7 @@ elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_
 fi
 
 ### Test HTTP Requests Containing Many Chunks ###
+MODELDIR="`pwd`/models"
 REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
 CLIENT_LOG="./client.http_request_many_chunks.log"
 SERVER_ARGS="--model-repository=${MODELDIR} --allow-sagemaker=true --log-verbose=1 --model-control-mode=explicit --load-model=simple"
