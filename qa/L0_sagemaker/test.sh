@@ -603,6 +603,7 @@ set +e
 python $REQUEST_MANY_CHUNKS_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Sagemaker Request Many Chunks Test Failed\n***"
+    cat $SERVER_LOG
     cat $CLIENT_LOG
     RET=1
 fi
