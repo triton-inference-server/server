@@ -566,6 +566,11 @@ wait $SERVE_PID
 # MME end
 
 ### Test Sagemaker Requests Containing Many Chunks ###
+rm -rf models && mkdir models && \
+    cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 models/sm_model && \
+    rm -r models/sm_model/2 && rm -r models/sm_model/3 && \
+    sed -i "s/onnx_int32_int32_int32/sm_model/" models/sm_model/config.pbtxt
+
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_model
 REQUEST_MANY_CHUNKS_PY="sagemaker_request_many_chunks.py"
 CLIENT_LOG="./client.sagemaker_request_many_chunks.log"
