@@ -33,8 +33,8 @@ class SagemakerRequestManyChunksTest(unittest.TestCase):
     def setUp(self):
         self._local_host = "localhost"
         self._sagemaker_port = 8080
-        self._max_chunk_count = (
-            1000000  # defined in server/src/common.h HTTP_MAX_CHUNKS
+        self._malicious_chunk_count = (
+            1000000  # large enough to cause a stack overflow if using alloca()
         )
 
     def send_chunked_request(
@@ -82,13 +82,8 @@ class SagemakerRequestManyChunksTest(unittest.TestCase):
         )
         self.send_chunked_request(
             request_header,
-            self._max_chunk_count,
+            self._malicious_chunk_count,
             "failed to parse the request JSON buffer: Invalid value. at 0",
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            f"Chunks in the load model request buffer exceed the limit {self._max_chunk_count}, got {self._max_chunk_count + 1} chunks",
         )
 
 

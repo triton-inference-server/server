@@ -574,7 +574,7 @@ rm -rf models && mkdir models && \
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_model
 REQUEST_MANY_CHUNKS_PY="sagemaker_request_many_chunks.py"
 CLIENT_LOG="./client.sagemaker_request_many_chunks.log"
-SERVER_LOG="./server_request_many_chunks.log"
+SERVER_LOG="./server.sagemaker_request_many_chunks.log"
 
 serve > $SERVER_LOG 2>&1 &
 SERVE_PID=$!

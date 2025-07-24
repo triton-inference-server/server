@@ -34,8 +34,8 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         self._model_name = "simple"
         self._local_host = "localhost"
         self._http_port = 8000
-        self._max_chunk_count = (
-            1000000  # defined in server/src/common.h HTTP_MAX_CHUNKS
+        self._malicious_chunk_count = (
+            1000000  # large enough to cause a stack overflow if using alloca()
         )
         self._parse_error = (
             "failed to parse the request JSON buffer: Invalid value. at 0"
@@ -80,13 +80,6 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         finally:
             s.close()
 
-    def chunk_exceed_error(self, request_kind: str, chunk_count: int):
-        # defined in server/src/http_server.cc
-        if request_kind == "input":
-            return f"Chunks in the {request_kind} buffer exceed the limit {self._max_chunk_count}, got {chunk_count} chunks"
-        else:
-            return f"Chunks in the {request_kind} request buffer exceed the limit {self._max_chunk_count}, got {chunk_count} chunks"
-
     def test_infer(self):
         request_header = (
             f"POST /v2/models/{self._model_name}/infer HTTP/1.1\r\n"
@@ -95,25 +88,15 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
 
         self.send_chunked_request(
             request_header,
-            self._max_chunk_count,
+            self._malicious_chunk_count,
             "Raw request must only have 1 input (found 1) to be deduced but got 2 inputs in 'simple' model configuration",
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("input", self._max_chunk_count + 1),
         )
 
     def test_registry_index(self):
         request_header = f"POST /v2/repository/index HTTP/1.1\r\n"
 
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("registry index", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_model_control(self):
@@ -123,20 +106,10 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         unload_request_header = load_request_header.replace("/load", "/unload")
 
         self.send_chunked_request(
-            load_request_header, self._max_chunk_count, self._parse_error
+            load_request_header, self._malicious_chunk_count, self._parse_error
         )
         self.send_chunked_request(
-            load_request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("load model", self._max_chunk_count + 1),
-        )
-        self.send_chunked_request(
-            unload_request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            unload_request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("unload model", self._max_chunk_count + 1),
+            unload_request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_trace(self):
@@ -145,59 +118,34 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         )
 
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("trace", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_logging(self):
         request_header = f"POST /v2/logging HTTP/1.1\r\n"
 
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("dynamic logging", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_system_shm_register(self):
         request_header = f"POST /v2/systemsharedmemory/region/test_system_shm_register/register HTTP/1.1\r\n"
 
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("register", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_cuda_shm_register(self):
         request_header = f"POST /v2/cudasharedmemory/region/test_cuda_shm_register/register HTTP/1.1\r\n"
 
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("register", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
     def test_generate(self):
         request_header = f"POST /v2/models/{self._model_name}/generate HTTP/1.1\r\n"
         self.send_chunked_request(
-            request_header, self._max_chunk_count, self._parse_error
-        )
-        self.send_chunked_request(
-            request_header,
-            self._max_chunk_count + 1,
-            self.chunk_exceed_error("generate", self._max_chunk_count + 1),
+            request_header, self._malicious_chunk_count, self._parse_error
         )
 
 

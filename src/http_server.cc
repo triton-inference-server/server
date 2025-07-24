@@ -2875,18 +2875,25 @@ HTTPAPIServer::EVRequestToJsonImpl(
   std::vector<struct evbuffer_iovec> v_vec;
 
   int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
-
-  if (n > HTTP_MAX_CHUNKS) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("Chunks in the " + std::string(request_kind) +
-         " request buffer exceed the limit " + std::to_string(HTTP_MAX_CHUNKS) +
-         ", got " + std::to_string(n) + " chunks")
-            .c_str());
-  }
-
   if (n > 0) {
-    v_vec = std::vector<struct evbuffer_iovec>(n);
+    try {
+      v_vec = std::vector<struct evbuffer_iovec>(n);
+    }
+    catch (const std::bad_alloc& e) {
+      // Handle memory allocation failure
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("Memory allocation failed for evbuffer: ") + e.what())
+              .c_str());
+    }
+    catch (const std::exception& e) {
+      // Catch any other std exceptions
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          (std::string("Exception while creating evbuffer vector: ") + e.what())
+              .c_str());
+    }
+
     v = v_vec.data();
     if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
       return TRITONSERVER_ErrorNew(
@@ -2921,16 +2928,25 @@ HTTPAPIServer::EVBufferToInput(
   std::vector<struct evbuffer_iovec> v_vec;
 
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > HTTP_MAX_CHUNKS) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("Chunks in the input buffer exceed the limit " +
-         std::to_string(HTTP_MAX_CHUNKS) + ", got " + std::to_string(n) +
-         " chunks")
-            .c_str());
-  }
   if (n > 0) {
-    v_vec = std::vector<struct evbuffer_iovec>(n);
+    try {
+      v_vec = std::vector<struct evbuffer_iovec>(n);
+    }
+    catch (const std::bad_alloc& e) {
+      // Handle memory allocation failure
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("Memory allocation failed for evbuffer: ") + e.what())
+              .c_str());
+    }
+    catch (const std::exception& e) {
+      // Catch any other std exceptions
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          (std::string("Exception while creating evbuffer vector: ") + e.what())
+              .c_str());
+    }
+
     v = v_vec.data();
     if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
       return TRITONSERVER_ErrorNew(
@@ -2987,16 +3003,26 @@ HTTPAPIServer::EVBufferToRawInput(
     std::vector<struct evbuffer_iovec> v_vec;
 
     int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-    if (n > HTTP_MAX_CHUNKS) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          ("Chunks in the input buffer exceed the limit " +
-           std::to_string(HTTP_MAX_CHUNKS) + ", got " + std::to_string(n) +
-           " chunks")
-              .c_str());
-    }
     if (n > 0) {
-      v_vec = std::vector<struct evbuffer_iovec>(n);
+      try {
+        v_vec = std::vector<struct evbuffer_iovec>(n);
+      }
+      catch (const std::bad_alloc& e) {
+        // Handle memory allocation failure
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Memory allocation failed for evbuffer: ") + e.what())
+                .c_str());
+      }
+      catch (const std::exception& e) {
+        // Catch any other std exceptions
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            (std::string("Exception while creating evbuffer vector: ") +
+             e.what())
+                .c_str());
+      }
+
       v = v_vec.data();
       if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
         return TRITONSERVER_ErrorNew(
