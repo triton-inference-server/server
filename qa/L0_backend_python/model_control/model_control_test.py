@@ -88,7 +88,11 @@ class ExplicitModelTest(unittest.TestCase):
 
 class ModelIDValidationTest(unittest.TestCase):
     """
-    Test model ID validation for user-provided model names
+    Test model ID validation for user-provided model names.
+
+    Verifies that model names containing dangerous characters are properly rejected.
+    Uses raw HTTP requests via curl instead of the Triton client to test server-side
+    validation without the Triton client encoding special characters.
     """
 
     def setUp(self):
@@ -210,7 +214,6 @@ class TritonPythonModel:
     def test_invalid_character_model_names(self):
         """Test that model names with invalid characters are properly rejected"""
 
-        # Model names with various invalid characters that should be rejected. These requests are using curl to avoid the client encoding these values. Encoded model names are safe and can be accepted by the server.
         # Based on INVALID_CHARS = ";|&$`<>()[]{}\\\"'*?~#!"
         invalid_model_names = [
             r"model;test",
