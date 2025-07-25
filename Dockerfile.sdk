@@ -75,7 +75,6 @@ RUN apt-get update && \
             libtool \
             maven \
             openjdk-11-jdk \
-            perl \
             pkg-config \
             python3 \
             python3-dev \
@@ -86,8 +85,8 @@ RUN apt-get update && \
             rapidjson-dev \
             software-properties-common \
             vim \
-            wget && \
-    pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3
+            wget &&
+    pip3 install --upgrade "grpcio-tools<1.68" cmake==3.28.3
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
@@ -129,8 +128,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients java-clients && \
-    rm -fr ~/.m2
+RUN cmake -v --parallel cc-clients java-clients
 
 # TODO: PA will rebuild the CC clients since it depends on it.
 # This should be optimized so that we do not have to build
@@ -148,6 +146,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
@@ -159,7 +158,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
         /workspace/perf_analyzer && \
-        make -j16 perf-analyzer python-clients && \
+        cmake -v --parallel perf-analyzer python-clients && \
         pip3 install build && \
         cd /workspace/perf_analyzer/genai-perf && \
         python3 -m build --wheel --outdir /workspace/install/python; \
@@ -172,12 +171,13 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PYTHON_HTTP=ON \
           -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
         /workspace/perf_analyzer && \
-        make -j16 python-clients && \
+        cmake -v --parallel python-clients && \
         mkdir -p /workspace/install/python && \
         cp /workspace/perf_analyzer/genai_perf-*.whl /workspace/install/python/; \
     fi
@@ -208,27 +208,27 @@ ARG TRITON_ENABLE_GPU
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            software-properties-common \
             curl \
+            default-jdk \
             git \
             gperf \
             libb64-dev \
             libgoogle-perftools-dev \
-            libopencv-dev \
             libopencv-core-dev \
+            libopencv-dev \
             libssl-dev \
             libtool \
-            python3 \
-            python3-pip \
-            python3-dev \
-            python3-wheel \
-            python3-setuptools \
-            vim \
-            wget \
-            python3-pdfkit \
             maven \
             perl \
-            default-jdk && \
+            python3 \
+            python3-dev \
+            python3-pdfkit \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel \
+            software-properties-common \
+            vim \
+            wget && \
     pip3 install "grpcio<1.68" "grpcio-tools<1.68"
 
 WORKDIR /workspace
