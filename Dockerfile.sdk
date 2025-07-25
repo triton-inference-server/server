@@ -85,7 +85,7 @@ RUN apt-get update && \
             rapidjson-dev \
             software-properties-common \
             vim \
-            wget &&
+            wget && \
     pip3 install --upgrade "grpcio-tools<1.68" cmake==3.28.3
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
