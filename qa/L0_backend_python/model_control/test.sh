@@ -55,12 +55,25 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** model_control_test.py FAILED. \n***"
     RET=1
 fi
+
+echo -e "\n***\n*** Running model ID validation test\n***"
+SUBTEST="model_id_validation"
+python3 -m pytest --junitxml=model_control.${SUBTEST}.report.xml model_control_test.py::ModelIDValidationTest >> ${CLIENT_LOG} 2>&1
+
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** model_id_validation_test.py FAILED. \n***"
+    echo -e "\n***\n*** Server logs:\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Client logs:\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
 set -e
 
 kill_server
 
 if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
     echo -e "\n***\n*** model_control_test FAILED. \n***"
 else
     echo -e "\n***\n*** model_control_test PASSED. \n***"

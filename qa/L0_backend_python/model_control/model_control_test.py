@@ -26,6 +26,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import base64
+import json
 import os
 import subprocess
 import sys
@@ -84,9 +86,9 @@ class ExplicitModelTest(unittest.TestCase):
                 self.assertFalse(client.is_model_ready(ensemble_model_name))
 
 
-class InputValidationTest(unittest.TestCase):
+class ModelIDValidationTest(unittest.TestCase):
     """
-    Test input validation for user-provided inputs
+    Test model ID validation for user-provided model names
     """
 
     def setUp(self):
@@ -103,10 +105,39 @@ class InputValidationTest(unittest.TestCase):
 
     def _send_load_model_request(self, model_name):
         """Send HTTP request to load model for testing input validation using curl"""
+
+        # Create simple Triton Python model code
+        python_model_code = f"""import triton_python_backend_utils as pb_utils
+
+class TritonPythonModel:
+    def execute(self, requests):
+        print('Hello world from model {model_name}')
+        responses = []
+        for request in requests:
+            # Simple identity function
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses"""
+
+        # Base64 encode the Python code (as required by Triton server)
+        python_code_b64 = base64.b64encode(python_model_code.encode("utf-8")).decode(
+            "ascii"
+        )
+
+        # Create simple config
+        config = {
+            "name": model_name,
+            "backend": "python",
+            "max_batch_size": 4,
+            "input": [{"name": "INPUT0", "data_type": "TYPE_FP32", "dims": [-1]}],
+            "output": [{"name": "OUTPUT0", "data_type": "TYPE_FP32", "dims": [-1]}],
+        }
+
         payload = {
             "parameters": {
-                "config": f'{{"name": "{model_name}", "backend": "python", "max_batch_size": 4}}',
-                "file:/1/model.py": "print('Hello from Python Model')",
+                "config": json.dumps(config),
+                "file:/1/model.py": python_code_b64,
             }
         }
 
@@ -121,25 +152,18 @@ class InputValidationTest(unittest.TestCase):
                 "curl",
                 "-s",
                 "-w",
-                "\n%{http_code}",
+                "\n%{http_code}",  # Write HTTP status code on separate line
                 "-X",
                 "POST",
                 "-H",
                 "Content-Type: application/json",
                 "-d",
                 payload_json,
-                "--connect-timeout",
-                "10",
+                url,
             ]
 
-            # Add the URL as a separate argument to avoid shell interpretation issues
-            curl_cmd.append(url)
-
-            # Debug: print the exact URL being requested
-            print(f"DEBUG: Curl URL: {url}")
-
             result = subprocess.run(
-                curl_cmd, capture_output=True, text=True, timeout=15
+                curl_cmd, capture_output=True, text=True, timeout=10
             )
 
             # Parse curl output - last line is status code, rest is response body
@@ -187,16 +211,24 @@ class InputValidationTest(unittest.TestCase):
         """Test that model names with invalid characters are properly rejected"""
 
         # Model names with various invalid characters that should be rejected
+        # Based on INVALID_CHARS = ";|&$<>(){}\\\"'`*?~#!"
         invalid_model_names = [
-            "model$(test)",
-            "model\{test\}",
-            "model`test`",
-            "model;test",
-            "model|test",
-            "model&test",
-            "model'test'",
-            "model*test",
-            "model!test",
+            r"model;test",
+            r"model|test",
+            r"model&test",
+            r"model$test",
+            r"model<test>",
+            r"model(test)",
+            r"model{test}",
+            r"model\test",
+            r'model"test"',
+            r"model'test'",
+            r"model`test`",
+            r"model*test",
+            # r"model?test", # curl fails to send this request
+            r"model~test",
+            # r"model#test", # curl fails to send this request
+            r"model!test",
         ]
 
         for invalid_name in invalid_model_names:
@@ -215,11 +247,32 @@ class InputValidationTest(unittest.TestCase):
                     f"Invalid model name '{invalid_name}' should not get 200 OK response",
                 )
 
-                self.assertIn(
-                    "Invalid stub name: contains invalid characters",
-                    response.text,
-                    f"invalid response for '{invalid_name}' should contain 'Invalid stub name: contains invalid characters'",
-                )
+                # Special case for curly braces - they get stripped and cause load failures prior to the validation check
+                if "{" in invalid_name or "}" in invalid_name:
+                    self.assertIn(
+                        "failed to load",
+                        response.text,
+                        f"Model with curly braces '{invalid_name}' should fail to load",
+                    )
+                else:
+                    # Normal case - should get character validation error
+                    self.assertIn(
+                        "Invalid stub name: contains invalid characters",
+                        response.text,
+                        f"invalid response for '{invalid_name}' should contain 'Invalid stub name: contains invalid characters'",
+                    )
+
+                # Verify the model is not loaded/ready since it was rejected
+                try:
+                    self.assertFalse(
+                        self._client.is_model_ready(invalid_name),
+                        f"Model '{invalid_name}' should not be ready after failed load attempt",
+                    )
+                except Exception as e:
+                    # If checking model readiness fails, that's also acceptable since the model name is invalid
+                    print(
+                        f"Note: Could not check model readiness for '{invalid_name}': {e}"
+                    )
 
     def test_valid_model_names(self):
         """Test that valid model names work"""
@@ -239,14 +292,30 @@ class InputValidationTest(unittest.TestCase):
                     f"Response for valid '{valid_name}': Status {response.status_code}, Text: {response.text[:100]}..."
                 )
 
-                # Valid names might still fail for other reasons (model doesn't exist, etc.)
-                # but they should not be rejected due to character validation
-                # We just check it's not a validation error
+                # Valid model names should be accepted and load successfully
+                self.assertEqual(
+                    200,
+                    response.status_code,
+                    f"Valid model name '{valid_name}' should get 200 OK response, got {response.status_code}. Response: {response.text}",
+                )
+
+                # Should not contain validation error message
                 self.assertNotIn(
                     "Invalid stub name: contains invalid characters",
                     response.text,
-                    f"valid response for '{valid_name}' should not contain 'Invalid stub name: contains invalid characters'",
+                    f"Valid model name '{valid_name}' should not contain validation error message",
                 )
+
+                # Verify the model is actually loaded by checking if it's ready
+                try:
+                    self.assertTrue(
+                        self._client.is_model_ready(valid_name),
+                        f"Model '{valid_name}' should be ready after successful load",
+                    )
+                    # Clean up - unload the model after testing
+                    self._client.unload_model(valid_name)
+                except Exception as e:
+                    self.fail(f"Failed to check if model '{valid_name}' is ready: {e}")
 
 
 if __name__ == "__main__":
