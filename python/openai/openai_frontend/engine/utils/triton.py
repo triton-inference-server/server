@@ -27,7 +27,7 @@ import ctypes
 import json
 import os
 import re
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from typing import Iterable, List, Optional, Union
 
 import numpy as np
@@ -36,6 +36,7 @@ from pydantic import BaseModel
 from schemas.openai import (
     ChatCompletionNamedToolChoice,
     ChatCompletionToolChoiceOption1,
+    CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
 )
@@ -100,6 +101,8 @@ def _create_vllm_inference_request(
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
+    inputs["return_num_input_tokens"] = np.bool_([True])
+    inputs["return_num_output_tokens"] = np.bool_([True])
     return model.create_request(inputs=inputs)
 
 
@@ -182,6 +185,85 @@ def _to_string(tensor: tritonserver.Tensor) -> str:
 
     # NOTE: +/- 4 accounts for serialized byte string length in first 4 bytes of buffer
     return _construct_string_from_pointer(tensor.data_ptr + 4, tensor.size - 4)
+
+
+@dataclass
+class _StreamingUsageAccumulator:
+    """Helper class to accumulate token usage from a streaming response."""
+
+    backend: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    _prompt_tokens_set: bool = field(init=False, default=False)
+
+    def update(self, response: tritonserver.InferenceResponse):
+        """Extracts usage from a response and updates the token counts."""
+        usage = _get_usage_from_response(response, self.backend)
+        if usage:
+            # The prompt_tokens is received with every chunk but should only be set once.
+            if not self._prompt_tokens_set:
+                self.prompt_tokens = usage.prompt_tokens
+                self._prompt_tokens_set = True
+            self.completion_tokens += usage.completion_tokens
+
+    def get_final_usage(self) -> Optional[CompletionUsage]:
+        """
+        Returns the final populated CompletionUsage object if any tokens were tracked.
+        """
+        # If _prompt_tokens_set is True, it means we have received and processed
+        # at least one valid usage payload.
+        if self._prompt_tokens_set:
+            return CompletionUsage(
+                prompt_tokens=self.prompt_tokens,
+                completion_tokens=self.completion_tokens,
+                total_tokens=self.prompt_tokens + self.completion_tokens,
+            )
+        return None
+
+
+def _get_usage_from_response(
+    response: tritonserver._api._response.InferenceResponse,
+    backend: str,
+) -> Optional[CompletionUsage]:
+    """
+    Extracts token usage statistics from a Triton inference response.
+    """
+    # TODO: Remove this check once TRT-LLM backend supports both "num_input_tokens"
+    # and "num_output_tokens", and also update the test cases accordingly.
+    if backend != "vllm":
+        return None
+
+    prompt_tokens = None
+    completion_tokens = None
+
+    if (
+        "num_input_tokens" in response.outputs
+        and "num_output_tokens" in response.outputs
+    ):
+        input_token_tensor = response.outputs["num_input_tokens"]
+        output_token_tensor = response.outputs["num_output_tokens"]
+
+        if input_token_tensor.data_type == tritonserver.DataType.UINT32:
+            prompt_tokens_ptr = ctypes.cast(
+                input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            prompt_tokens = prompt_tokens_ptr[0]
+
+        if output_token_tensor.data_type == tritonserver.DataType.UINT32:
+            completion_tokens_ptr = ctypes.cast(
+                output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            completion_tokens = completion_tokens_ptr[0]
+
+        if prompt_tokens is not None and completion_tokens is not None:
+            total_tokens = prompt_tokens + completion_tokens
+            return CompletionUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            )
+
+    return None
 
 
 # TODO: Use tritonserver.InferenceResponse when support is published
