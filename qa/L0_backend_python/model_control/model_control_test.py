@@ -210,24 +210,25 @@ class TritonPythonModel:
     def test_invalid_character_model_names(self):
         """Test that model names with invalid characters are properly rejected"""
 
-        # Model names with various invalid characters that should be rejected
-        # Based on INVALID_CHARS = ";|&$<>(){}\\\"'`*?~#!"
+        # Model names with various invalid characters that should be rejected. These requests are using curl to avoid the client encoding these values. Encoded model names are safe and can be accepted by the server.
+        # Based on INVALID_CHARS = ";|&$`<>()[]{}\\\"'*?~#!"
         invalid_model_names = [
             r"model;test",
             r"model|test",
             r"model&test",
             r"model$test",
+            r"model`test`",
             r"model<test>",
             r"model(test)",
+            # r"model[test]", # request fails to send unencoded
             r"model{test}",
             r"model\test",
             r'model"test"',
             r"model'test'",
-            r"model`test`",
             r"model*test",
-            # r"model?test", # curl fails to send this request
+            # r"model?test", # request fails to send unencoded
             r"model~test",
-            # r"model#test", # curl fails to send this request
+            # r"model#test", # request fails to send unencoded
             r"model!test",
         ]
 
