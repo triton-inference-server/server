@@ -132,7 +132,7 @@ To load the model from the OCI Object Storage Bucket, you need to convert the fo
 echo -n 'REGION' | base64
 ```
 ```
-echo -n 'SECRECT_KEY_ID' | base64
+echo -n 'SECRET_KEY_ID' | base64
 ```
 ```
 echo -n 'SECRET_ACCESS_KEY' | base64

@@ -118,7 +118,7 @@ can access the model repository. If the bucket is public then no
 additional changes are needed and you can proceed to "Deploy
 Prometheus and Grafana" section.
 
-If bucket premissions need to be set with the
+If bucket permissions need to be set with the
 GOOGLE_APPLICATION_CREDENTIALS environment variable then perform the
 following steps:
 

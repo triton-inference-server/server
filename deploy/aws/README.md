@@ -39,7 +39,7 @@ This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prpmetheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. To use this helm chart you must install Prometheus and Grafana in your cluster as described below and your cluster must contain sufficient CPU resources to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
 must be configured to contain the desired number of GPU nodes (EC2 G4 instances recommended)
@@ -113,7 +113,7 @@ To load the model from the AWS S3, you need to convert the following AWS credent
 echo -n 'REGION' | base64
 ```
 ```
-echo -n 'SECRECT_KEY_ID' | base64
+echo -n 'SECRET_KEY_ID' | base64
 ```
 ```
 echo -n 'SECRET_ACCESS_KEY' | base64
@@ -189,7 +189,7 @@ $ cat << EOF > config.yaml
 namespace: MyCustomNamespace
 image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
-  modelRepositoryPath: gs://my_model_repository
+  modelRepositoryPath: s3://my_model_repository
 EOF
 $ helm install example -f config.yaml .
 ```
@@ -258,5 +258,5 @@ You may also want to delete the AWS bucket you created to hold the
 model repository.
 
 ```
-$ aws s3 rm -r gs://triton-inference-server-repository
+$ aws s3 rm -r s3://triton-inference-server-repository
 ```
