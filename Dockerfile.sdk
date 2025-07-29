@@ -265,7 +265,10 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         curl -o /tmp/cuda-keyring.deb \
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$arch/cuda-keyring_1.1-1_all.deb \
         && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-        apt update && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
+        apt update && \
+        apt install --yes --no-install-recommends \
+               datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \
+               datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
     fi
 
 # Build expects "python" executable (not python3).

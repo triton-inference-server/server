@@ -858,9 +858,11 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
-    && dnf install --assumeyes datacenter-gpu-manager-4-devel=1:{}
+    && dnf install --assumeyes \\
+                 datacenter-gpu-manager-4-core=1:{} \\
+                 datacenter-gpu-manager-4-devel=1:{}
 """.format(
-                    dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version
                 )
             else:
                 return """
@@ -868,9 +870,11 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
-    && dnf install --assumeyes datacenter-gpu-manager-4-devel=1:{}
+    && dnf install --assumeyes \\
+                 datacenter-gpu-manager-4-core=1:{} \\
+                 datacenter-gpu-manager-4-devel=1:{}
 """.format(
-                    dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version
                 )
         else:
             if target_machine == "aarch64":
@@ -882,9 +886,11 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt update \\
-      && apt install --yes datacenter-gpu-manager-4-dev=1:{}
+      && apt install --yes --no-install-recommends \\
+                  datacenter-gpu-manager-4-core=1:{} \\
+                  datacenter-gpu-manager-4-dev=1:{}
 """.format(
-                    dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version
                 )
             else:
                 return """
@@ -895,9 +901,11 @@ RUN curl -o /tmp/cuda-keyring.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
       && apt update \\
-      && apt install --yes datacenter-gpu-manager-4-dev=1:{}
+      && apt install --yes --no-install-recommends \\
+                   datacenter-gpu-manager-4-core=1:{} \\
+                   datacenter-gpu-manager-4-dev=1:{}
 """.format(
-                    dcgm_version, dcgm_version
+                    dcgm_version, dcgm_version, dcgm_version
                 )
 
 
