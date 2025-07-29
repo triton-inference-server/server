@@ -27,7 +27,7 @@
 replicaCount: 1
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:25.06-py3
+  imageName: nvcr.io/nvidia/tritonserver:25.07-py3
   pullPolicy: IfNotPresent
   numGpus: 1
   serverCommand: tritonserver
@@ -47,13 +47,13 @@ image:
     #
     # To set model control mode, uncomment and configure below
     # TODO: Fix the following url, it is invalid
-    # See https://github.com/triton-inference-server/server/blob/r25.06/docs/user_guide/model_management.md
+    # See https://github.com/triton-inference-server/server/blob/r25.07/docs/user_guide/model_management.md
     #  for more details
     #- --model-control-mode=explicit|poll|none
     #
     # Additional server args
     #
-    # see https://github.com/triton-inference-server/server/blob/r25.06/README.md
+    # see https://github.com/triton-inference-server/server/blob/r25.07/README.md
     #  for more details
 
 service:
