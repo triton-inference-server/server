@@ -74,11 +74,11 @@ DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.60.0dev",
     "triton_container_version": "25.08dev",
     "upstream_container_version": "25.07",
-    "ort_version": "1.22.0",
+    "ort_version": "1.23.0",
     "ort_openvino_version": "2025.2.0",
     "standalone_openvino_version": "2025.2.0",
     "dcgm_version": "4.2.3-2",
-    "vllm_version": "0.9.0.1",
+    "vllm_version": "0.9.2",
     "rhel_py_version": "3.12.3",
 }
 
@@ -1259,7 +1259,7 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
         df += """
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
     if "tensorrtllm" in backends:
         df += """
@@ -1494,7 +1494,7 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
             cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
             rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
         fi \\
-        && pip3 install --no-cache-dir --progress-bar on --index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
+        && pip3 install --no-cache-dir --extra-index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
         # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
         && cd /tmp \\
         && wget $PYTORCH_TRITON_URL \\
@@ -1554,18 +1554,18 @@ def add_cpu_libs_to_linux_dockerfile(backends, target_machine):
         df += """
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.12
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.13
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.13
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcupti.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
