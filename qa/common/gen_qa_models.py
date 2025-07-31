@@ -66,7 +66,11 @@ def create_plan_dynamic_rf_modelfile(
     trt_memory_format = trt.TensorFormat.LINEAR
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     if max_batch == 0:
@@ -206,7 +210,11 @@ def create_plan_dynamic_modelfile(
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     if max_batch == 0:
@@ -372,7 +380,11 @@ def create_plan_fixed_rf_modelfile(
     trt_memory_format = trt.TensorFormat.LINEAR
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     if max_batch == 0:
@@ -483,7 +495,11 @@ def create_plan_fixed_modelfile(
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     if max_batch == 0:
