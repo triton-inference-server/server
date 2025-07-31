@@ -463,6 +463,7 @@ if [ "$MODEL_TYPE" != "igpu" ] ; then
     --label PROJECT_NAME=$PROJECT_NAME \
     $DOCKER_GPU_ARGS \
     -v $DOCKER_VOLUME:/mnt \
+    -e TRT_VERBOSE \
     $TENSORRT_IMAGE \
     bash -xe $VOLUME_SRCDIR/$TRTSCRIPT
 

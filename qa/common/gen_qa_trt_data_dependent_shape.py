@@ -45,7 +45,13 @@ def create_data_dependent_modelfile(
     trt_input_dtype = np_to_trt_dtype(input_dtype)
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 

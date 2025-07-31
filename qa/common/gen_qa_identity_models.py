@@ -545,7 +545,11 @@ def create_plan_dynamic_rf_modelfile(
     models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size
 ):
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -644,7 +648,11 @@ def create_plan_shape_tensor_modelfile(
     # Note that values of OUTPUT tensor must be identical
     # to INPUT values
 
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -748,7 +756,11 @@ def create_plan_dynamic_modelfile(
     models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size
 ):
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
