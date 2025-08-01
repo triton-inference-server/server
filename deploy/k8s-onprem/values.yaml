@@ -32,13 +32,30 @@ tags:
 image:
   imageName: nvcr.io/nvidia/tritonserver:25.07-py3
   pullPolicy: IfNotPresent
-  modelRepositoryServer: < Replace with the IP Address of your file server >
-  modelRepositoryPath: /srv/models
-  numGpus: 1
 
 # add server args here e.g. --grpc-use-ssl, --grpc-server-certs, repository-poll-secs, etc
 serverArgs:
   - '--model-repository=/models'
+
+envFrom: []
+# - secretRef:
+#     name: triton-secret-name
+
+volumes: 
+  - name: models
+    nfs:
+      server: < Replace with the IP Address of your file server >
+      path: /srv/models
+      readOnly: false
+
+volumeMounts:
+  - name: models
+    mountPath: /models
+
+# CPU and memory constraint can also be specified here
+resources: 
+  limits:
+    nvidia.com/gpu: 1
 
 traefik:
   ports:
