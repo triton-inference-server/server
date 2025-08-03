@@ -40,6 +40,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+source ../common/util.sh
 RET=0
 
 CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
@@ -129,7 +130,6 @@ set -e
 
 CLIENT_LOG=`pwd`/client.log
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
-source ../common/util.sh
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -855,7 +855,32 @@ elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_
     RET=1
 fi
 
-###
+### Test HTTP Requests Containing Many Chunks ###
+MODELDIR="`pwd`/models"
+REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
+CLIENT_LOG="./client.http_request_many_chunks.log"
+SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode=explicit --load-model=simple"
+SERVER_LOG="./inference_server_request_many_chunks.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
+    cat $SERVER_LOG
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

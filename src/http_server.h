@@ -607,9 +607,34 @@ class HTTPAPIServer : public HTTPServer {
       std::map<std::string, triton::common::TritonJson::Value>* input_metadata,
       triton::common::TritonJson::Value* meta_data_root);
 
+  // Internal utility method for parsing evhtp request to JSON
+  // Should not be called directly - use EVRequestToJson or
+  // EVRequestToJsonAllowsEmpty instead
+  TRITONSERVER_Error* EVRequestToJsonImpl(
+      evhtp_request_t* req, std::string_view request_kind,
+      bool allows_empty_body, triton::common::TritonJson::Value* request_json,
+      size_t* buffer_len);
+
   // Parses full evhtp request and its evbuffers into JSON.
+  TRITONSERVER_Error* EVRequestToJsonAllowsEmpty(
+      evhtp_request_t* req, std::string_view request_kind,
+      triton::common::TritonJson::Value* request_json)
+  {
+    size_t buffer_len = 0;
+    TRITONSERVER_Error* err =
+        EVRequestToJsonImpl(req, request_kind, true, request_json, &buffer_len);
+    return err;
+  }
+
   TRITONSERVER_Error* EVRequestToJson(
-      evhtp_request_t* req, triton::common::TritonJson::Value* request_json);
+      evhtp_request_t* req, std::string_view request_kind,
+      triton::common::TritonJson::Value* request_json, size_t* buffer_len)
+  {
+    TRITONSERVER_Error* err =
+        EVRequestToJsonImpl(req, request_kind, false, request_json, buffer_len);
+    return err;
+  }
+
   // Parses evhtp request buffers into Triton Inference Request.
   TRITONSERVER_Error* EVRequestToTritonRequest(
       evhtp_request_t* req, const std::string& model_name,
@@ -622,6 +647,9 @@ class HTTPAPIServer : public HTTPServer {
   TRITONSERVER_Error* EVBufferToRawInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
       evbuffer* input_buffer, InferRequestClass* infer_req);
+  TRITONSERVER_Error* EVBufferToJson(
+      triton::common::TritonJson::Value* document, evbuffer_iovec* v,
+      int* v_idx, const size_t length, int n);
 
 
   // Helpers for parsing JSON requests for Triton-specific fields

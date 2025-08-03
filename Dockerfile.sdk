@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.06-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.07-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
@@ -60,33 +60,35 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            ca-certificates \
-            software-properties-common \
             autoconf \
             automake \
             build-essential \
+            ca-certificates \
             curl \
             git \
             gperf \
             libb64-dev \
             libgoogle-perftools-dev \
-            libopencv-dev \
             libopencv-core-dev \
+            libopencv-dev \
             libssl-dev \
             libtool \
+            maven \
+            openjdk-11-jdk \
             pkg-config \
             python3 \
-            python3-pip \
             python3-dev \
-            python3-wheel \
-            python3-setuptools \
-            rapidjson-dev \
-            vim \
-            wget \
             python3-pdfkit \
-            openjdk-11-jdk \
-            maven && \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel \
+            rapidjson-dev \
+            software-properties-common \
+            vim \
+            wget && \
     pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3
+
+ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -126,8 +128,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients java-clients && \
-    rm -fr ~/.m2
+RUN cmake --build . -v --parallel --target cc-clients java-clients
 
 # TODO: PA will rebuild the CC clients since it depends on it.
 # This should be optimized so that we do not have to build
@@ -145,6 +146,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
@@ -156,7 +158,7 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
         /workspace/perf_analyzer && \
-        make -j16 perf-analyzer python-clients && \
+        cmake --build . -v --parallel --target perf-analyzer python-clients && \
         pip3 install build && \
         cd /workspace/perf_analyzer/genai-perf && \
         python3 -m build --wheel --outdir /workspace/install/python; \
@@ -169,12 +171,13 @@ RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PYTHON_HTTP=ON \
           -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_PACKAGE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
         /workspace/perf_analyzer && \
-        make -j16 python-clients && \
+        cmake --build . -v --parallel --target python-clients && \
         mkdir -p /workspace/install/python && \
         cp /workspace/perf_analyzer/genai_perf-*.whl /workspace/install/python/; \
     fi
@@ -205,26 +208,27 @@ ARG TRITON_ENABLE_GPU
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            software-properties-common \
             curl \
+            default-jdk \
             git \
             gperf \
             libb64-dev \
             libgoogle-perftools-dev \
-            libopencv-dev \
             libopencv-core-dev \
+            libopencv-dev \
             libssl-dev \
             libtool \
-            python3 \
-            python3-pip \
-            python3-dev \
-            python3-wheel \
-            python3-setuptools \
-            vim \
-            wget \
-            python3-pdfkit \
             maven \
-            default-jdk && \
+            perl \
+            python3 \
+            python3-dev \
+            python3-pdfkit \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel \
+            software-properties-common \
+            vim \
+            wget && \
     pip3 install "grpcio<1.68" "grpcio-tools<1.68"
 
 WORKDIR /workspace
@@ -265,7 +269,10 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         curl -o /tmp/cuda-keyring.deb \
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$arch/cuda-keyring_1.1-1_all.deb \
         && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-        apt update && apt install --yes datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
+        apt update && \
+        apt install --yes --no-install-recommends \
+               datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \
+               datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
     fi
 
 # Build expects "python" executable (not python3).

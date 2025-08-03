@@ -54,63 +54,6 @@ EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
 
   evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
 }
-
-TRITONSERVER_Error*
-EVBufferToJson(
-    triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
-    const size_t length, int n)
-{
-  size_t offset = 0, remaining_length = length;
-  char* json_base;
-  std::vector<char> json_buffer;
-
-  // No need to memcpy when number of iovecs is 1
-  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
-    json_base = static_cast<char*>(v[0].iov_base);
-    if (v[0].iov_len > remaining_length) {
-      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
-      v[0].iov_len -= remaining_length;
-      remaining_length = 0;
-    } else if (v[0].iov_len == remaining_length) {
-      remaining_length = 0;
-      *v_idx += 1;
-    }
-  } else {
-    json_buffer.resize(length);
-    json_base = json_buffer.data();
-    while ((remaining_length > 0) && (*v_idx < n)) {
-      char* base = static_cast<char*>(v[*v_idx].iov_base);
-      size_t base_size;
-      if (v[*v_idx].iov_len > remaining_length) {
-        base_size = remaining_length;
-        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
-        v[*v_idx].iov_len -= remaining_length;
-        remaining_length = 0;
-      } else {
-        base_size = v[*v_idx].iov_len;
-        remaining_length -= v[*v_idx].iov_len;
-        *v_idx += 1;
-      }
-
-      memcpy(json_base + offset, base, base_size);
-      offset += base_size;
-    }
-  }
-
-  if (remaining_length != 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size for request JSON, expecting " +
-            std::to_string(remaining_length) + " more bytes")
-            .c_str());
-  }
-
-  RETURN_IF_ERR(document->Parse(json_base, length));
-
-  return nullptr;  // success
-}
-
 }  // namespace
 
 
@@ -266,7 +209,9 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
 
           std::unordered_map<std::string, std::string> parse_load_map;
           ParseSageMakerRequest(req, &parse_load_map, "load");
-          SageMakerMMELoadModel(req, parse_load_map);
+          if (!parse_load_map.empty()) {
+            SageMakerMMELoadModel(req, parse_load_map);
+          }
           return;
         }
         break;
@@ -320,29 +265,15 @@ SagemakerAPIServer::ParseSageMakerRequest(
     std::unordered_map<std::string, std::string>* parse_map,
     const std::string& action)
 {
-  struct evbuffer_iovec* v = nullptr;
-  int v_idx = 0;
-  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
-      HTTP_RESPOND_IF_ERR(
-          req, TRITONSERVER_ErrorNew(
-                   TRITONSERVER_ERROR_INTERNAL,
-                   "unexpected error getting load model request buffers"));
-    }
-  }
+  size_t buffer_len;
+  triton::common::TritonJson::Value request;
+  HTTP_RESPOND_IF_ERR(
+      req, EVRequestToJson(req, "load model", &request, &buffer_len));
 
   std::string model_name_string;
   std::string url_string;
 
-  size_t buffer_len = evbuffer_get_length(req->buffer_in);
   if (buffer_len > 0) {
-    triton::common::TritonJson::Value request;
-    HTTP_RESPOND_IF_ERR(
-        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
-
     triton::common::TritonJson::Value url;
     triton::common::TritonJson::Value model_name;
 
