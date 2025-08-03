@@ -418,6 +418,7 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/non_existent_model/confi
 
 SERVER_LOG="./non_existent_model_server.log"
 CLIENT_LOG="./non_existent_model_client.log"
+SERVER_ARGS=$BASE_SERVER_ARGS
 ERROR_MESSAGE_1="Failed to preinitialize Python stub: Python model file not found in '`pwd`/models/non_existent_model/1/model.py'"
 ERROR_MESSAGE_2="failed to load 'non_existent_model'"
 
@@ -443,6 +444,52 @@ else
         cat $SERVER_LOG >> $CLIENT_LOG
         RET=1
     fi
+fi
+
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $SERVER_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    exit 1
+fi
+
+SERVER_LOG="./non_existent_model_server_auto_config_disabled.log"
+CLIENT_LOG="./non_existent_model_client_auto_config_disabled.log"
+SERVER_ARGS="$BASE_SERVER_ARGS --disable-auto-complete-config"
+
+prev_num_pages=`get_shm_pages`
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+    RET=1
+    kill_server
+else
+    if grep -q "$ERROR_MESSAGE_1" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE_1\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE_1\" in $SERVER_LOG" >> $CLIENT_LOG
+        cat $SERVER_LOG >> $CLIENT_LOG
+        RET=1
+    fi
+
+    if grep -q "$ERROR_MESSAGE_2" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE_2\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE_2\" in $SERVER_LOG" >> $CLIENT_LOG
+        cat $SERVER_LOG >> $CLIENT_LOG
+        RET=1
+    fi
+fi
+
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $SERVER_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    exit 1
 fi
 
 # Disable env test for Jetson since cloud storage repos are not supported
