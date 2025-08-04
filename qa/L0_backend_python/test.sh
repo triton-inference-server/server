@@ -555,18 +555,19 @@ fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
-    setup_virtualenv
 
     set +e
-    (cd ${TEST} && bash -ex test.sh)
+    (
+        setup_virtualenv
+        cd ${TEST} && bash -ex test.sh
+        deactivate_virtualenv
+    )
 
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
     fi
     set -e
-
-    deactivate_virtualenv
 done
 
 if [ $RET -eq 0 ]; then
