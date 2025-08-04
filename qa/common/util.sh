@@ -522,7 +522,7 @@ function setup_virtualenv() {
     if [[ -v MSYSTEM ]]; then
       pip3 install pytest
     else
-      virtualenv --system-site-packages venv
+      python3 -m venv --system-site-packages venv
       source venv/bin/activate
       pip install pytest
     fi
