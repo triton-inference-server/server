@@ -508,10 +508,14 @@ if [ "$TEST_JETSON" == "0" ]; then
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
-        setup_virtualenv
 
         set +e
-        (cd ${TEST} && bash -ex test.sh)
+        (
+            setup_virtualenv
+            cd ${TEST} && bash -ex test.sh
+            deactivate_virtualenv
+        )
+
         EXIT_CODE=$?
         if [ $EXIT_CODE -ne 0 ]; then
             echo "Subtest ${TEST} FAILED"
@@ -524,8 +528,6 @@ if [ "$TEST_JETSON" == "0" ]; then
             fi
         fi
         set -e
-
-        deactivate_virtualenv
     done
 
     # [DLIS-5969]: Incorporate env test for windows
