@@ -142,6 +142,7 @@ docker pull $TENSORRT_IMAGE
 
 docker run $DOCKER_GPU_ARGS \
    --rm -v $DOCKER_VOLUME:/mnt \
+   -e TRT_VERBOSE \
   $TENSORRT_IMAGE bash -xe $VOLUME_SRCDIR/$TRT_MODEL_SCRIPT
 
 # Copy generated models to /tmp/ if not running in CI
