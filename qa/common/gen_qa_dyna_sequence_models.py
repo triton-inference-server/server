@@ -59,7 +59,11 @@ def create_plan_shape_tensor_modelfile(
     trt_shape_dtype = np_to_trt_dtype(shape_tensor_input_dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -202,7 +206,11 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -310,7 +318,11 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 

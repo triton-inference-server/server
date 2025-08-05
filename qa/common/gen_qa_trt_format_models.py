@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -81,7 +81,11 @@ def create_plan_modelfile(
     trt_output_memory_format = output_memory_format
 
     # Create the model
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     if max_batch == 0:
