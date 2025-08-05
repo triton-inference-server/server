@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,10 +62,6 @@ python3 -m pytest --junitxml=model_control.${SUBTEST}.report.xml model_control_t
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** model_id_validation_test.py FAILED. \n***"
-    echo -e "\n***\n*** Server logs:\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Client logs:\n***"
-    cat $CLIENT_LOG
     RET=1
 fi
 
@@ -74,6 +70,10 @@ set -e
 kill_server
 
 if [ $RET -eq 1 ]; then
+    echo -e "\n***\n*** Server logs:\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Client logs:\n***"
+    cat $CLIENT_LOG
     echo -e "\n***\n*** model_control_test FAILED. \n***"
 else
     echo -e "\n***\n*** model_control_test PASSED. \n***"
