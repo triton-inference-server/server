@@ -1453,7 +1453,6 @@ def shm_basic_infer(
                 shm_op0_handle,
                 output_dtype,
                 output_shape,
-                offset=register_offset + shm_output_offset,
             )
 
         tester.assertTrue(
