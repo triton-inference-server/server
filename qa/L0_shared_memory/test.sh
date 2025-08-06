@@ -178,7 +178,7 @@ for backend in ${BACKENDS} ; do
 done
 
 test_case="test_large_shm_register_offset"
-for client_type in "http grpc"; do
+for client_type in http grpc; do
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
     SERVER_LOG="./${test_case}.${client_type}.server.log"
     run_server
