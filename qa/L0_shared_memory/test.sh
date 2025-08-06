@@ -158,22 +158,22 @@ done
 
 # Test large system shared memory offset
 rm -rf models/*
-
-# Prepare add_sub model of various backends
+# prepare add_sub model of various backends
 BACKENDS="python onnx libtorch plan openvino"
 for backend in ${BACKENDS} ; do
+    model="${backend}_int32_int32_int32"
+    model_dir="models/${model}"
     if [[ $backend == "python" ]]; then
-        mkdir -p models/simple/1
-        cp ../python_models/add_sub/model.py ./models/simple/1/
-        cp ../python_models/add_sub/config.pbtxt ./models/simple/
-        sed -i 's/TYPE_FP32/TYPE_INT32/g' ./models/simple/config.pbtxt
-        echo "max_batch_size: 8" >> ./models/simple/config.pbtxt
+        mkdir -p ${model_dir}/1
+        cp ../python_models/add_sub/model.py ${model_dir}/1/
+        cp ../python_models/add_sub/config.pbtxt ${model_dir}/
+        sed -i 's/TYPE_FP32/TYPE_INT32/g' ${model_dir}/config.pbtxt
+        echo "max_batch_size: 8" >> ${model_dir}/config.pbtxt
     else
-        model="${backend}_int32_int32_int32"
-        mkdir -p models/${model}
-        cp -r $DATADIR/qa_model_repository/${model}/1 models/${model}/1
-        cp $DATADIR/qa_model_repository/${model}/config.pbtxt models/${model}/
-        cp $DATADIR/qa_model_repository/${model}/output0_labels.txt models/${model}/
+        mkdir -p ${model_dir}
+        cp -r $DATADIR/qa_model_repository/${model}/1 ${model_dir}/1
+        cp $DATADIR/qa_model_repository/${model}/config.pbtxt ${model_dir}/
+        cp $DATADIR/qa_model_repository/${model}/output0_labels.txt ${model_dir}/
         if [ $backend == "openvino" ]; then
             echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/${model}/config.pbtxt
         fi
