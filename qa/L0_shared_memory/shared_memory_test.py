@@ -113,14 +113,6 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
             shm_op1_handle,
         ]
         # Implicit assumption that input and output byte_sizes are 64 bytes for now
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-        input1_data = np.ones(shape=16, dtype=np.int32)
-        shm.set_shared_memory_region(
-            shm_ip0_handle, [input0_data], offset=register_offset
-        )
-        shm.set_shared_memory_region(
-            shm_ip1_handle, [input1_data], offset=register_offset
-        )
         self.triton_client.register_system_shared_memory(
             "input0_data", "/input0_data", register_byte_size, offset=register_offset
         )
@@ -132,6 +124,16 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         )
         self.triton_client.register_system_shared_memory(
             "output1_data", "/output1_data", register_byte_size, offset=register_offset
+        )
+
+        # Write data to shared memory regions
+        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+        input1_data = np.ones(shape=16, dtype=np.int32)
+        shm.set_shared_memory_region(
+            shm_ip0_handle, [input0_data], offset=register_offset
+        )
+        shm.set_shared_memory_region(
+            shm_ip1_handle, [input1_data], offset=register_offset
         )
         self.shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
