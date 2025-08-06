@@ -309,7 +309,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             # Test for large offset
             error_msg = []
             page_size = os.sysconf("SC_PAGE_SIZE")
-            # Create an large shm size (page_size * 1024 is large enough to reproduce a segfault).
+            # Create a large shm size (page_size * 1024 is large enough to reproduce a segfault).
             # Register offset at 1 page before the end of the shm region to give enough space for the input/output data.
             create_byte_size = page_size * 1024
             register_offset = page_size * 1023
