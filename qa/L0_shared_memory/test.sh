@@ -25,12 +25,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CLIENT_LOG="./client.log"
 SHM_TEST=shared_memory_test.py
 TEST_RESULT_FILE='test_results.txt'
 
 # Configure to support test on jetson as well
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
@@ -140,6 +151,60 @@ for test_case in \
         fi
         set -e
     done
+done
+
+# Test large system shared memory offset
+rm -rf models/*
+
+# Prepare add_sub model of various backends
+BACKENDS="python onnx libtorch plan openvino"
+for backend in ${BACKENDS} ; do
+    if [[ $backend == "python" ]]; then
+        mkdir -p models/simple/1
+        cp ../python_models/add_sub/model.py ./models/simple/1/
+        cp ../python_models/add_sub/config.pbtxt ./models/simple/
+        sed -i 's/TYPE_FP32/TYPE_INT32/g' ./models/simple/config.pbtxt
+        echo "max_batch_size: 8" >> ./models/simple/config.pbtxt
+    else
+        model="${backend}_int32_int32_int32"
+        mkdir -p models/${model}
+        cp -r $DATADIR/qa_model_repository/${model}/1 models/${model}/1
+        cp $DATADIR/qa_model_repository/${model}/config.pbtxt models/${model}/
+        cp $DATADIR/qa_model_repository/${model}/output0_labels.txt models/${model}/
+        if [ $backend == "openvino" ]; then
+            echo 'parameters { key: "ENABLE_BATCH_PADDING" value { string_value: "YES" } }' >> models/${model}/config.pbtxt
+        fi
+    fi
+done
+
+test_case="test_large_shm_register_offset"
+for client_type in "http grpc"; do
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./${test_case}.${client_type}.server.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    export CLIENT_TYPE=$client_type
+    CLIENT_LOG="./${test_case}.${client_type}.client.log"
+    set +e
+    python3 $SHM_TEST SharedMemoryTest.${test_case} >>"$CLIENT_LOG" 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed - ${client_type}\n***"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Server shut down non-gracefully\n***"
+        RET=1
+    fi
+    set -e
 done
 
 if [ $RET -eq 0 ]; then
