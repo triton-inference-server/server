@@ -47,6 +47,7 @@ from tritonclient import utils
 
 class SystemSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
+    SYS_PAGE_SIZE = 4096
 
     def setUp(self):
         self._setup_client()
@@ -305,11 +306,10 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
 
             # Test for large offset
             error_msg = []
-            page_size = os.sysconf("SC_PAGE_SIZE")
             # Create a large shm size (page_size * 1024 is large enough to reproduce a segfault).
             # Register offset at 1 page before the end of the shm region to give enough space for the input/output data.
-            create_byte_size = page_size * 1024
-            register_offset = page_size * 1023
+            create_byte_size = self.SYS_PAGE_SIZE * 1024
+            register_offset = self.SYS_PAGE_SIZE * 1023
             self._configure_server(
                 create_byte_size=create_byte_size,
                 register_offset=register_offset,
@@ -372,7 +372,12 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_infer_offset_out_of_bound(self):
         # Shared memory offset outside output region - Throws error
         error_msg = []
-        self._configure_server()
+        create_byte_size = self.SYS_PAGE_SIZE + self.DEFAULT_SHM_BYTE_SIZE
+        register_offset = self.SYS_PAGE_SIZE
+        self._configure_server(
+            create_byte_size=create_byte_size,
+            register_offset=register_offset,
+        )
         if self.protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
@@ -403,7 +408,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         # Shared memory byte_size outside output region - Throws error
         error_msg = []
         self._configure_server()
-        offset = 60
+        offset = 1
         byte_size = self.DEFAULT_SHM_BYTE_SIZE
 
         iu.shm_basic_infer(
