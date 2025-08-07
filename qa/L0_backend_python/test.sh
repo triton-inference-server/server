@@ -531,6 +531,7 @@ for TEST in ${SUBTESTS}; do
 
     set +e
     (cd ${TEST} && bash -ex test.sh)
+
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
