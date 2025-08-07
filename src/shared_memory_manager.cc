@@ -524,12 +524,7 @@ SharedMemoryManager::GetMemoryInfo(
     *shm_info = std::static_pointer_cast<const SharedMemoryInfo>(it->second);
   }
 
-  if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
-                               it->second->offset_ + offset);
-  } else {
-    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
-  }
+  *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
 
   *memory_type = it->second->kind_;
   *device_id = it->second->device_id_;
