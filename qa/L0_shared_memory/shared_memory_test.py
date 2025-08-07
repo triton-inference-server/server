@@ -113,10 +113,6 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
             shm_op1_handle,
         ]
         # Implicit assumption that input and output byte_sizes are 64 bytes for now
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-        input1_data = np.ones(shape=16, dtype=np.int32)
-        shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-        shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
         self.triton_client.register_system_shared_memory(
             "input0_data", "/input0_data", register_byte_size, offset=register_offset
         )
@@ -128,6 +124,16 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         )
         self.triton_client.register_system_shared_memory(
             "output1_data", "/output1_data", register_byte_size, offset=register_offset
+        )
+
+        # Write data to shared memory regions
+        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+        input1_data = np.ones(shape=16, dtype=np.int32)
+        shm.set_shared_memory_region(
+            shm_ip0_handle, [input0_data], offset=register_offset
+        )
+        shm.set_shared_memory_region(
+            shm_ip1_handle, [input1_data], offset=register_offset
         )
         self.shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
@@ -291,6 +297,40 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             )
         self._shm_handles.append(shm_ip2_handle)
         self._cleanup_shm_handles()
+
+    def test_large_shm_register_offset(self):
+        # Test for out of bounds read vulnerability when registering system shared memory with large offset
+        for platform in ["python", "onnx", "libtorch", "plan", "openvino"]:
+            model_name = f"{platform}_int32_int32_int32"
+
+            # Test for large offset
+            error_msg = []
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            # Create a large shm size (page_size * 1024 is large enough to reproduce a segfault).
+            # Register offset at 1 page before the end of the shm region to give enough space for the input/output data.
+            create_byte_size = page_size * 1024
+            register_offset = page_size * 1023
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_offset=register_offset,
+            )
+
+            iu.shm_basic_infer(
+                self,
+                self.triton_client,
+                self._shm_handles[0],
+                self._shm_handles[1],
+                self._shm_handles[2],
+                self._shm_handles[3],
+                error_msg,
+                register_offset=register_offset,
+                protocol=self.protocol,
+                use_system_shared_memory=True,
+                override_model_name=model_name,
+            )
+            self.triton_client.unregister_system_shared_memory()
+            if len(error_msg) > 0:
+                raise Exception(str(error_msg))
 
     def test_mixed_raw_shm(self):
         # Mix of shared memory and RAW inputs
