@@ -407,7 +407,12 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_infer_byte_size_out_of_bound(self):
         # Shared memory byte_size outside output region - Throws error
         error_msg = []
-        self._configure_server()
+        create_byte_size = self.SYS_PAGE_SIZE + self.DEFAULT_SHM_BYTE_SIZE
+        register_offset = self.SYS_PAGE_SIZE
+        self._configure_server(
+            create_byte_size=create_byte_size,
+            register_offset=register_offset,
+        )
         offset = 1
         byte_size = self.DEFAULT_SHM_BYTE_SIZE
 
