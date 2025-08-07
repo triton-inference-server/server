@@ -416,81 +416,55 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/non_existent_model/confi
 (cd models/non_existent_model && \
           sed -i "s/^name:.*/name: \"non_existent_model\"/" config.pbtxt)
 
-SERVER_LOG="./non_existent_model_server.log"
-CLIENT_LOG="./non_existent_model_client.log"
-SERVER_ARGS=$BASE_SERVER_ARGS
 ERROR_MESSAGE_1="Failed to preinitialize Python stub: Python model file not found in '`pwd`/models/non_existent_model/1/model.py'"
 ERROR_MESSAGE_2="failed to load 'non_existent_model'"
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    if grep -q "$ERROR_MESSAGE_1" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE_1\"" >> $CLIENT_LOG
+for test_mode in "default" "auto_config_disabled"; do
+    if [ "$test_mode" == "default" ]; then
+        SERVER_LOG_SUFFIX=""
+        SERVER_ARGS=$BASE_SERVER_ARGS
     else
-        echo -e "Not found \"$ERROR_MESSAGE_1\" in $SERVER_LOG" >> $CLIENT_LOG
-        cat $SERVER_LOG >> $CLIENT_LOG
-        RET=1
+        SERVER_LOG_SUFFIX="_auto_config_disabled"
+        SERVER_ARGS="$BASE_SERVER_ARGS --disable-auto-complete-config"
     fi
 
-    if grep -q "$ERROR_MESSAGE_2" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE_2\"" >> $CLIENT_LOG
-    else
-        echo -e "Not found \"$ERROR_MESSAGE_2\" in $SERVER_LOG" >> $CLIENT_LOG
-        cat $SERVER_LOG >> $CLIENT_LOG
-        RET=1
-    fi
-fi
+    SERVER_LOG="./non_existent_model_server${SERVER_LOG_SUFFIX}.log"
+    CLIENT_LOG="./non_existent_model_client${SERVER_LOG_SUFFIX}.log"
 
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
+    prev_num_pages=`get_shm_pages`
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill_server
+    else
+        if grep -q "$ERROR_MESSAGE_1" $SERVER_LOG; then
+            echo -e "Found \"$ERROR_MESSAGE_1\"" >> $CLIENT_LOG
+        else
+            echo -e "Not found \"$ERROR_MESSAGE_1\" in $SERVER_LOG" >> $CLIENT_LOG
+            cat $SERVER_LOG >> $CLIENT_LOG
+            RET=1
+        fi
+
+        if grep -q "$ERROR_MESSAGE_2" $SERVER_LOG; then
+            echo -e "Found \"$ERROR_MESSAGE_2\"" >> $CLIENT_LOG
+        else
+            echo -e "Not found \"$ERROR_MESSAGE_2\" in $SERVER_LOG" >> $CLIENT_LOG
+            cat $SERVER_LOG >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        cat $SERVER_LOG
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
-
-SERVER_LOG="./non_existent_model_server_auto_config_disabled.log"
-CLIENT_LOG="./non_existent_model_client_auto_config_disabled.log"
-SERVER_ARGS="$BASE_SERVER_ARGS --disable-auto-complete-config"
-
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-    RET=1
-    kill_server
-else
-    if grep -q "$ERROR_MESSAGE_1" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE_1\"" >> $CLIENT_LOG
-    else
-        echo -e "Not found \"$ERROR_MESSAGE_1\" in $SERVER_LOG" >> $CLIENT_LOG
-        cat $SERVER_LOG >> $CLIENT_LOG
-        RET=1
+        exit 1
     fi
-
-    if grep -q "$ERROR_MESSAGE_2" $SERVER_LOG; then
-        echo -e "Found \"$ERROR_MESSAGE_2\"" >> $CLIENT_LOG
-    else
-        echo -e "Not found \"$ERROR_MESSAGE_2\" in $SERVER_LOG" >> $CLIENT_LOG
-        cat $SERVER_LOG >> $CLIENT_LOG
-        RET=1
-    fi
-fi
-
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $SERVER_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
-fi
+done
 
 # Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
@@ -508,14 +482,10 @@ if [ "$TEST_JETSON" == "0" ]; then
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.
+        setup_virtualenv
 
         set +e
-        (
-            setup_virtualenv
-            cd ${TEST} && bash -ex test.sh
-            deactivate_virtualenv
-        )
-
+        (cd ${TEST} && bash -ex test.sh)
         EXIT_CODE=$?
         if [ $EXIT_CODE -ne 0 ]; then
             echo "Subtest ${TEST} FAILED"
@@ -528,6 +498,8 @@ if [ "$TEST_JETSON" == "0" ]; then
             fi
         fi
         set -e
+
+        deactivate_virtualenv
     done
 
     # [DLIS-5969]: Incorporate env test for windows
@@ -555,19 +527,17 @@ fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
     # between dependencies.
+    setup_virtualenv
 
     set +e
-    (
-        setup_virtualenv
-        cd ${TEST} && bash -ex test.sh
-        deactivate_virtualenv
-    )
-
+    (cd ${TEST} && bash -ex test.sh)
     if [ $? -ne 0 ]; then
         echo "Subtest ${TEST} FAILED"
         RET=1
     fi
     set -e
+
+    deactivate_virtualenv
 done
 
 if [ $RET -eq 0 ]; then
