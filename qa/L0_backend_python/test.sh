@@ -449,7 +449,7 @@ fi
 if [ $current_num_pages -ne $prev_num_pages ]; then
     cat $SERVER_LOG
     ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
     exit 1
