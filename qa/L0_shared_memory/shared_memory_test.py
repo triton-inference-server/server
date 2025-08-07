@@ -47,7 +47,7 @@ from tritonclient import utils
 
 class SystemSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
-    SYS_PAGE_SIZE = 4096
+    SYS_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 
     def setUp(self):
         self._setup_client()
