@@ -483,14 +483,11 @@ SharedMemoryManager::GetMemoryInfo(
   }
 
   // validate offset
-  size_t shm_region_end = 0;
-  if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-    shm_region_end = it->second->offset_;
-  }
+  size_t shm_region_size = 0;
   if (it->second->byte_size_ > 0) {
-    shm_region_end += it->second->byte_size_ - 1;
+    shm_region_size += it->second->byte_size_;
   }
-  if (offset > shm_region_end) {
+  if (offset >= shm_region_size) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("Invalid offset for shared memory region: '" + name + "'")
@@ -510,8 +507,8 @@ SharedMemoryManager::GetMemoryInfo(
   }
 
   // validate byte_size + offset is within memory bounds
-  size_t total_req_shm = offset + byte_size - 1;
-  if (total_req_shm > shm_region_end) {
+  size_t total_req_shm = offset + byte_size;
+  if (total_req_shm > shm_region_size) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
