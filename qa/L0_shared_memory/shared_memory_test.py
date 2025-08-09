@@ -566,16 +566,45 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         """
         # This matches kTritonSharedMemoryRegionPrefix in the server code.
         reserved_prefix = "triton_python_backend_shm_region_"
-
-        # The shared memory key cannot start with the reserved prefix.
         shm_name = "my_test_shm_name"
-        shm_key = f"{reserved_prefix}_my_test_shm_key"
 
-        with self.assertRaisesRegex(
-            utils.InferenceServerException,
-            f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'",
-        ) as e:
-            self.triton_client.register_system_shared_memory(shm_name, shm_key, 10000)
+        # The shared memory key cannot start with the reserved prefix,
+        # regardless of leading slashes.
+        shm_keys_to_test = [
+            f"{reserved_prefix}_my_test_shm_key",
+            f"/{reserved_prefix}_my_test_shm_key",
+            f"///{reserved_prefix}_my_test_shm_key",
+        ]
+
+        for shm_key in shm_keys_to_test:
+            with self.subTest(shm_key=shm_key):
+                expected_msg = f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'"
+                with self.assertRaisesRegex(
+                    utils.InferenceServerException, expected_msg
+                ):
+                    self.triton_client.register_system_shared_memory(
+                        shm_name, shm_key, 10000
+                    )
+
+    def test_register_invalid_shm_key(self):
+        """
+        Test that registration fails if attempting to use an invalid name for the shm key.
+        """
+        shm_name = "my_test_shm_name"
+        shm_keys_to_test = [
+            "/",
+            "///",
+        ]
+
+        for shm_key in shm_keys_to_test:
+            with self.subTest(shm_key=shm_key):
+                expected_msg = f"cannot register shared memory region '{shm_name}' - invalid shm key '{shm_key}'"
+                with self.assertRaisesRegex(
+                    utils.InferenceServerException, expected_msg
+                ):
+                    self.triton_client.register_system_shared_memory(
+                        shm_name, shm_key, 10000
+                    )
 
 
 def callback(user_data, result, error):

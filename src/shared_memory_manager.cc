@@ -355,15 +355,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
     const size_t byte_size)
 {
   // Check if the shared memory key starts with the reserved prefix
-  if (shm_key.rfind(kTritonSharedMemoryRegionPrefix, 0) == 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "cannot register shared memory region '" + name + "' with key '" +
-            shm_key + "' as the key contains the reserved prefix '" +
-            kTritonSharedMemoryRegionPrefix + "'")
-            .c_str());
-  }
+  RETURN_IF_ERR(ValidateSharedMemoryKey(name, shm_key));
 
   std::lock_guard<std::mutex> lock(mu_);
 
