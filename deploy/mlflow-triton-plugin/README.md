@@ -171,7 +171,7 @@ To delete a MLflow deployment using CLI
 mlflow deployments delete -t triton --name model_name
 ```
 
-To delete a MLflow deployment using CLI
+To delete a MLflow deployment using Python API
 
 ```
 from mlflow.deployments import get_deploy_client

@@ -64,7 +64,7 @@ Triton Inference Server has a considerable list versatile and powerful features.
 The User Guide describes how to configure Triton, organize and configure your models, use the C++ and Python clients, etc. This guide includes the following:
 * Creating a Model Repository [[Overview](README.md#model-repository) || [Details](user_guide/model_repository.md)]
 * Writing a Model Configuration [[Overview](README.md#model-configuration) || [Details](user_guide/model_configuration.md)]
-* Buillding a Model Pipeline [[Overview](README.md#model-pipeline)]
+* Building a Model Pipeline [[Overview](README.md#model-pipeline)]
 * Managing Model Availability [[Overview](README.md#model-management) || [Details](user_guide/model_management.md)]
 * Collecting Server Metrics [[Overview](README.md#metrics) || [Details](user_guide/metrics.md)]
 * Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details](user_guide/custom_operations.md)]
@@ -169,7 +169,7 @@ Use the [Triton Client](https://github.com/triton-inference-server/client) API t
 ### Cancelling Inference Requests
 Triton can detect and handle requests that have been cancelled from the client-side. This [document](user_guide/request_cancellation.md) discusses scope and limitations of the feature.
 ### Performance Analysis
-Understanding Inference performance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
+Understanding Inference performance is key to better resource utilization. Use Triton's Tools to customize your deployment.
 - [Performance Tuning Guide](user_guide/performance_tuning.md)
 - [Optimization](user_guide/optimization.md)
 - [Model Analyzer](user_guide/model_analyzer.md)

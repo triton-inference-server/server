@@ -77,7 +77,7 @@ section when creating the Fleet Command Deployment.
 
 ```
 echo -n 'REGION' | base64
-echo -n 'SECRECT_KEY_ID' | base64
+echo -n 'SECRET_KEY_ID' | base64
 echo -n 'SECRET_ACCESS_KEY' | base64
 # Optional for using session token
 echo -n 'AWS_SESSION_TOKEN' | base64
