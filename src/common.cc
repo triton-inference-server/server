@@ -163,4 +163,39 @@ DecodeBase64(
   return nullptr;
 }
 
+TRITONSERVER_Error*
+ValidateSharedMemoryKey(const std::string& name, const std::string& shm_key)
+{
+  std::string_view key_view(shm_key);
+
+  // Find the index of the first character that is not a slash
+  const std::size_t first_non_slash = key_view.find_first_not_of('/');
+
+  // If the entire key is slashes
+  if (first_non_slash == std::string_view::npos) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "cannot register shared memory region '" + name +
+            "' - invalid shm key '" + shm_key + "'")
+            .c_str());
+  }
+
+  // Check whether the substring starting at first_non_slash starts with the
+  // reserved prefix
+  if (key_view.substr(first_non_slash)
+          .rfind(kTritonSharedMemoryRegionPrefix, 0) == 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "cannot register shared memory region '" + name + "' with key '" +
+            shm_key + "' as the key contains the reserved prefix '" +
+            kTritonSharedMemoryRegionPrefix + "'")
+            .c_str());
+  }
+
+  // Valid shm key
+  return nullptr;
+}
+
 }}  // namespace triton::server
