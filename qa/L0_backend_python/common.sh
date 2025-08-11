@@ -88,6 +88,7 @@ create_python_backend_stub() {
   CUDA_PATH=$(readlink -f /usr/local/cuda)
   export CMAKE_POLICY_VERSION_MINIMUM=3.5
   (cd python_backend/ && mkdir builddir && cd builddir && \
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
   cmake -DTRITON_ENABLE_GPU=ON -DCMAKE_CUDA_COMPILER=$CUDA_PATH/bin/nvcc \
      -DCUDAToolkit_ROOT=$CUDA_PATH -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
     -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG \

@@ -48,6 +48,7 @@ pip3 install --upgrade wheel setuptools grpcio-tools
 
 # Build client library and kaldi perf client
 (cd triton-inference-server/build && \
+    export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
     make -j16 trtis-clients)
