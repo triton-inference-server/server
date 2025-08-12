@@ -305,14 +305,14 @@ docker pull $UBUNTU_IMAGE
 
 echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
 
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $UBUNTU_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
+# docker run \
+#     --rm \
+#     --label RUNNER_ID=$RUNNER_ID \
+#     --label PROJECT_NAME=$PROJECT_NAME \
+#     $DOCKER_GPU_ARGS \
+#     -v $DOCKER_VOLUME:/mnt \
+#     $UBUNTU_IMAGE \
+#     bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
