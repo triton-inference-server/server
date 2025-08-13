@@ -2717,6 +2717,12 @@ if __name__ == "__main__":
         help="This flag sets the upstream container version for Triton Inference Server to be built. Default: the latest released version.",
     )
     parser.add_argument(
+        "--default-repo-tag",
+        required=False,
+        default=None,
+        help="Override the calculated default-repo-tag value",
+    )
+    parser.add_argument(
         "--ort-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["ort_version"],
@@ -2857,6 +2863,8 @@ if __name__ == "__main__":
         if FLAGS.triton_container_version.endswith("dev")
         else "r" + FLAGS.triton_container_version
     )
+    if FLAGS.default_repo_tag:
+        default_repo_tag = FLAGS.default_repo_tag
     log("default repo-tag: {}".format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
