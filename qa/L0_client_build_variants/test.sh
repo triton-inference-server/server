@@ -56,6 +56,7 @@ TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
 (cd /workspace/build && \
         rm -fr cc-clients java-clients python-clients && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -85,6 +86,7 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc-clients python-clients && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=OFF \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -112,6 +114,7 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc-clients python-clients && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=OFF \
@@ -141,6 +144,7 @@ mkdir -p /workspace/build
 # Build without C API in Perf Analyzer
 #
 (cd /workspace/build && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -166,6 +170,7 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc_clients perf_analyzer && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -191,6 +196,7 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc_clients perf_analyzer && \
+        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \

@@ -113,6 +113,7 @@ find /opt/tritonserver/qa/pkgs/ -maxdepth 1 -type f -name \
 
 # Build triton-shm-monitor for the test
 cd python_backend && rm -rf install build && mkdir build && cd build && \
+    export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=$PWD/install \
         -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
