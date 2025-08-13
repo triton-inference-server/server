@@ -347,7 +347,7 @@ chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
 python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
+  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
   chmod -R 777 $VOLUME_TORCHTRTDESTDIR
 fi
 python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
