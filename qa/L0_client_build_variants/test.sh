@@ -54,6 +54,8 @@ TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
+
 (cd /workspace/build && \
         rm -fr cc-clients java-clients python-clients && \
         export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
