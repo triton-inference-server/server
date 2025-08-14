@@ -32,6 +32,7 @@ import os
 import os.path
 import pathlib
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -2045,14 +2046,14 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
 def backend_build(
     be,
     cmake_script,
-    tag,
+    tag_org,
     build_dir,
     install_dir,
-    github_organization,
     images,
     components,
     library_paths,
 ):
+    tag, github_organization = tag_org
     repo_build_dir = os.path.join(build_dir, be, "build")
     repo_install_dir = os.path.join(build_dir, be, "install")
 
@@ -2110,11 +2111,11 @@ def backend_build(
 def backend_clone(
     be,
     clone_script,
-    tag,
+    tag_org,
     build_dir,
     install_dir,
-    github_organization,
 ):
+    tag, github_organization = tag_org
     clone_script.commentln(8)
     clone_script.comment(f"'{be}' backend")
     clone_script.comment("Delete this section to remove backend from build")
@@ -2654,7 +2655,7 @@ if __name__ == "__main__":
         "--backend",
         action="append",
         required=False,
-        help='Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).',
+        help='Include specified backend in build as <backend-name>[:<repo-tag>][:<org>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main). <org> allows using a forked repository instead of the default --github-organization value.',
     )
     parser.add_argument(
         "--repo-tag",
@@ -2890,11 +2891,14 @@ if __name__ == "__main__":
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
     for be in FLAGS.backend:
-        parts = be.split(":")
+        pattern = r"(https?:\/\/[^\s:]+)|:"
+        parts = list(filter(None,re.split(pattern, be)))
         if len(parts) == 1:
             parts.append(default_repo_tag)
-        log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
-        backends[parts[0]] = parts[1]
+        if len(parts) == 2:
+            parts.append(FLAGS.github_organization)
+        log('backend "{}" at tag/branch "{}" from org "{}"'.format(parts[0], parts[1], parts[2]))
+        backends[parts[0]] = parts[1:]
 
     if "vllm" in backends:
         if "python" not in backends:
@@ -3105,7 +3109,6 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
                 )
             else:
                 backend_build(
@@ -3114,7 +3117,6 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
                     images,
                     components,
                     library_paths,
