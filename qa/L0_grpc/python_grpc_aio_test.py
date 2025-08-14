@@ -100,9 +100,11 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
     async def test_register_system_shared_memory(self):
         with self.assertRaisesRegex(
             InferenceServerException,
-            "\[StatusCode\.INTERNAL\] Unable to open shared memory region: ''",
+            "\[StatusCode\.INTERNAL\] Unable to open shared memory region: '/test_shm'",
         ):
-            await self._triton_client.register_system_shared_memory("", "", 0)
+            await self._triton_client.register_system_shared_memory(
+                "test_shm", "/test_shm", 0
+            )
 
     async def test_unregister_system_shared_memory(self):
         await self._triton_client.unregister_system_shared_memory()
