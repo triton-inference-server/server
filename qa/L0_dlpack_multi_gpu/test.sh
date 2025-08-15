@@ -47,17 +47,15 @@ pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable
 pip3 install cupy-cuda12x
 
 if [ ${CUDA_VERSION%%.*} -ge 13 ]; then
-    # curl -L https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/linux-x86_64/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz -o /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz ;
-    # cd /tmp ;
-    # tar -xvf /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz --strip-components=1 ;
-    # export LD_LIBRARY_PATH=/tmp/lib:$LD_LIBRARY_PATH ;
-    # cd -
-    # for i in $(pip3 show -f cupy-cuda12x | grep '\.so') ; do echo $i;  ldd /usr/local/lib/python3.12/dist-packages/$i | grep found ; done
-    CUDA12_LIB_LIST=$(for i in $(pip3 show -f cupy-cuda12x | grep '\.so') ; do ldd /usr/local/lib/python3.12/dist-packages/$i | grep found | cut -d = -f 1 ; done)
-    # for lib in $CUDA12_LIB_LIST; do find /usr -name ${lib%.*} -not -path "*stub*" -exec ln -s {} /usr/local/lib/python3.12/dist-packages/${lib} \; ; done
-    # for lib in $CUDA12_LIB_LIST; do find /usr -name ${lib%.*} -not -path "*stub*" -exec ln -s {} /usr/local/lib/python3.12/dist-packages/${lib} \; ; done
-
-    for lib in $CUDA12_LIB_LIST; do TARGET=$(find /usr -name ${lib%.*} -not -path "*stub*" );  LINK_NAME=${TARGET%/*}/${lib} ; ln -snf  $TARGET $LINK_NAME ; done
+    curl -L https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/linux-x86_64/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz \
+         -o /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz ;
+    curl -L https://developer.download.nvidia.com/compute/cuda/redist/libcublas/linux-x86_64/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz \
+         -o /tmp/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz ;
+    cd /tmp ;
+    tar -xvf /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz --strip-components=1 ;
+    tar -xvf /tmp/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz --strip-components=1 ;
+    export LD_LIBRARY_PATH=/tmp/lib:$LD_LIBRARY_PATH ;
+    cd -
 fi
 
 rm -fr *.log ./models
