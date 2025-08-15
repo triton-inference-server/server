@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 apiVersion: v1
-appVersion: "2.59"
+appVersion: "2.60"
 description: Triton Inference Server
 name: triton-inference-server
-version: 2.59.1
+version: 2.60.0
