@@ -71,7 +71,7 @@ class TritonPythonModel:
             bf16_dlpack = input_tensor.to_dlpack()
 
             # OPTIONAL: The tensor can be converted to other dlpack-compatible
-            # frameworks like PyTorch and TensorFlow with their dlpack utilities.
+            # frameworks like PyTorch with their dlpack utilities.
             torch_tensor = torch.utils.dlpack.from_dlpack(bf16_dlpack)
 
             # When complete, convert back to a pb_utils.Tensor via DLPack.
