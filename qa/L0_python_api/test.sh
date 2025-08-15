@@ -27,6 +27,11 @@
 
 pip3 install pytest-asyncio==0.23.8
 
+# Create CUDA compatibility symlink for CuPy
+# TODO: Remove patch once CuPy supports CUDA 13
+ln -sf /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.13.0.48 /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.12
+export LD_LIBRARY_PATH="/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+
 RET=0
 
 set +e
