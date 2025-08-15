@@ -58,6 +58,7 @@ if [ ${CUDA_VERSION%%.*} -ge 13 ]; then
     # for lib in $CUDA12_LIB_LIST; do find /usr -name ${lib%.*} -not -path "*stub*" -exec ln -s {} /usr/local/lib/python3.12/dist-packages/${lib} \; ; done
 
     for lib in $CUDA12_LIB_LIST; do TARGET=$(find /usr -name ${lib%.*} -not -path "*stub*" );  LINK_NAME=${TARGET%/*}/${lib} ; ln -snf  $TARGET $LINK_NAME ; done
+fi
 
 rm -fr *.log ./models
 
