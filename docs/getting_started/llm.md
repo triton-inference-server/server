@@ -28,7 +28,7 @@
 
 # Deploying Phi-3 Model with Triton and TRT-LLM
 
-This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows a shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency.
+This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency.
 
 This guide is tested on A100 80GB SXM4 and H100 80GB PCIe. It is confirmed to work with Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi) for full list) using TRT-LLM v0.11 and Triton Inference Server 24.07.
 

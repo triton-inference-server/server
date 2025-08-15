@@ -152,15 +152,15 @@ You will get the following result by running the python script:
 [10] Avg rt(ms): 34.27
 ```
 # Additional Resources
-See the following resources to learn more about how to use Alibaba Cloud's OSS orEAS.
+See the following resources to learn more about how to use Alibaba Cloud's OSS or EAS.
 - [Alibaba Cloud OSS's Document](https://help.aliyun.com/product/31815.html?spm=a2c4g.11186623.6.540.3c0f62e7q3jw8b)
 
 
 # Known Issues
 - [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, it is only available in cn-shanghai region of PAI-EAS.
-- Currently only HTTP/1 is supported, hence gRPC cannot be used when query Triton servers on EAS. HTP/2 will be officially supported in a short time.
-- Users should not mount a whole OSS bucket when launching Triton processor, but an arbitrarily deep sub-directory in bucket. Otherwise the mounted path will no be as expected.
-- Not all of Triton Server parameters are be supported on EAS, the following params are supported on EAS:
+- Currently only HTTP/1 is supported, hence gRPC cannot be used when query Triton servers on EAS. HTTP/2 will be officially supported in a short time.
+- Users should not mount a whole OSS bucket when launching Triton processor, but an arbitrarily deep sub-directory in bucket. Otherwise the mounted path will not be as expected.
+- Not all of Triton Server parameters are supported on EAS, the following params are supported on EAS:
 ```
 model-repository
 log-verbose
