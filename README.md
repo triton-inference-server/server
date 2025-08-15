@@ -37,7 +37,7 @@
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
 multiple deep learning and machine learning frameworks, including TensorRT,
-TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton
+PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton
 Inference Server supports inference across cloud, data center, edge and embedded
 devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton Inference
 Server delivers optimized performance for many query types, including real time,
@@ -90,16 +90,16 @@ Inference Server with the
 
 ```bash
 # Step 1: Create the example model repository
-git clone -b r25.07 https://github.com/triton-inference-server/server.git
+git clone -b r25.08 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.07-py3 tritonserver --model-repository=/models --model-control-mode explicit --load-model densenet_onnx
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:25.08-py3 tritonserver --model-repository=/models --model-control-mode explicit --load-model densenet_onnx
 
 # Step 3: Sending an Inference Request
 # In a separate console, launch the image_client example from the NGC Triton SDK container
-docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.07-py3-sdk /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:25.08-py3-sdk /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following
 Image '/workspace/images/mug.jpg':
@@ -166,7 +166,6 @@ configuration](docs/user_guide/model_configuration.md) for the model.
 - Triton supports multiple execution engines, called
   [backends](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton), including
   [TensorRT](https://github.com/triton-inference-server/tensorrt_backend),
-  [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend),
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend),
   [ONNX](https://github.com/triton-inference-server/onnxruntime_backend),
   [OpenVINO](https://github.com/triton-inference-server/openvino_backend),

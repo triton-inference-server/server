@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.07-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.08-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
@@ -43,7 +43,7 @@ ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 ARG TRITON_PERF_ANALYZER_BUILD=1
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=4.2.3-2
+ARG DCGM_VERSION=4.4.0-1
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
