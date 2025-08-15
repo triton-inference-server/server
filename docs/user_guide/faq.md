@@ -42,7 +42,7 @@ is that Triton can be deployed as a Docker container, anywhere – on
 premises and on public clouds. Triton Inference Server also [supports
 multiple
 frameworks](https://github.com/triton-inference-server/backend) such
-as TensorRT, TensorFlow, PyTorch, and ONNX on both GPUs and CPUs
+as TensorRT, PyTorch, and ONNX on both GPUs and CPUs
 leading to a streamlined deployment.
 
 ## Can Triton Inference Server run on systems that don't have GPUs?

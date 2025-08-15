@@ -87,7 +87,7 @@ tritonserver ``nvcr.io/nvidia/tritonserver:24.01-py3`` container.
 
 ::
 
-   dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorflow  tensorrt
+   dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorrt
 
 Included Models
 ^^^^^^^^^^^^^^^
@@ -185,7 +185,7 @@ tritonserver ``nvcr.io/nvidia/tritonserver:24.01-py3`` container.
 
 ::
 
-   dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorflow  tensorrt
+   dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorrt
 
 .. _included-models-1:
 

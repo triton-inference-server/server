@@ -47,7 +47,7 @@ For additional material, see the
     [supported backends](https://github.com/triton-inference-server/backend),
     then we can simply try to deploy the model as described in the
     [Quickstart](../getting_started/quickstart.md) guide.
-    For the ONNXRuntime, TensorFlow SavedModel, and TensorRT backends, the
+    For the ONNXRuntime and TensorRT backends, the
     minimal model configuration can be inferred from the model using Triton's
     [AutoComplete](model_configuration.md#auto-generated-model-configuration)
     feature.

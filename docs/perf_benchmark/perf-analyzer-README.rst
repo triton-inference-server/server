@@ -77,11 +77,6 @@ Other Features
 -  `Input Data <docs/input_data.md>`__ to model inferences can be
    auto-generated or specified as well as verifying output
 
--  `TensorFlow
-   Serving <docs/benchmarking.md#benchmarking-tensorflow-serving>`__ and
-   `TorchServe <docs/benchmarking.md#benchmarking-torchserve>`__ can be
-   used as the inference server in addition to the default Triton server
-
 Quick Start
 ===========
 

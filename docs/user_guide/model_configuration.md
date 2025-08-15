@@ -283,7 +283,7 @@ fill in missing [`instance_group`](#instance-groups) settings with
 default values.
 
 Triton can derive all the required settings automatically for
-most of the TensorRT, TensorFlow saved-model, ONNX models, and OpenVINO models.
+most of the TensorRT saved-model, ONNX models, and OpenVINO models.
 For Python models, [`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
 function can be implemented in Python backend to provide
 [`max_batch_size`](#maximum-batch-size), [`input`](#inputs-and-outputs)
@@ -296,8 +296,7 @@ All other model types *must* provide a model configuration file.
 When developing a custom backend, you can populate required settings
 in the configuration and call `TRITONBACKEND_ModelSetConfig` API to
 update completed configuration with Triton core. You can take a
-look at [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
-and [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
+look at [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
 backends as examples of how to achieve this. Currently, only
 [inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size)
 and [dynamic batching](#dynamic-batcher) settings can be populated by
@@ -411,9 +410,8 @@ by obtaining it from the TRITONBACKEND_BackendConfig api. Currently, the
 following backends which utilize these default batch values and turn on
 dynamic batching in their generated model configurations are:
 
-1. [TensorFlow backend](https://github.com/triton-inference-server/tensorflow_backend)
-2. [Onnxruntime backend](https://github.com/triton-inference-server/onnxruntime_backend)
-3. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
+1. [Onnxruntime backend](https://github.com/triton-inference-server/onnxruntime_backend)
+2. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
    1. TensorRT models store the maximum batch size explicitly and do not make use
    of the default-max-batch-size parameter. However, if max_batch_size > 1
    and no [scheduler](model_configuration.md#scheduling-and-batching)
@@ -437,29 +435,26 @@ API, TRITONBACKEND C API, HTTP/REST protocol and GRPC protocol. The
 last column shows the corresponding datatype for the Python numpy
 library.
 
-|Model Config  |TensorRT      |TensorFlow    |ONNX Runtime  |PyTorch  |API      |NumPy         |
-|--------------|--------------|--------------|--------------|---------|---------|--------------|
-|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |kBool    |BOOL     |bool          |
-|TYPE_UINT8    | kUINT8       |DT_UINT8      |UINT8         |kByte    |UINT8    |uint8         |
-|TYPE_UINT16   |              |DT_UINT16     |UINT16        |         |UINT16   |uint16        |
-|TYPE_UINT32   |              |DT_UINT32     |UINT32        |         |UINT32   |uint32        |
-|TYPE_UINT64   |              |DT_UINT64     |UINT64        |         |UINT64   |uint64        |
-|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |kChar    |INT8     |int8          |
-|TYPE_INT16    |              |DT_INT16      |INT16         |kShort   |INT16    |int16         |
-|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |kInt     |INT32    |int32         |
-|TYPE_INT64    | kINT64       |DT_INT64      |INT64         |kLong    |INT64    |int64         |
-|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |         |FP16     |float16       |
-|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
-|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
-|TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
+|Model Config  |TensorRT      |ONNX Runtime  |PyTorch  |API      |NumPy         |
+|--------------|--------------|--------------|---------|---------|--------------|
+|TYPE_BOOL     | kBOOL        |BOOL          |kBool    |BOOL     |bool          |
+|TYPE_UINT8    | kUINT8       |UINT8         |kByte    |UINT8    |uint8         |
+|TYPE_UINT16   |              |UINT16        |         |UINT16   |uint16        |
+|TYPE_UINT32   |              |UINT32        |         |UINT32   |uint32        |
+|TYPE_UINT64   |              |UINT64        |         |UINT64   |uint64        |
+|TYPE_INT8     | kINT8        |INT8          |kChar    |INT8     |int8          |
+|TYPE_INT16    |              |INT16         |kShort   |INT16    |int16         |
+|TYPE_INT32    | kINT32       |INT32         |kInt     |INT32    |int32         |
+|TYPE_INT64    | kINT64       |INT64         |kLong    |INT64    |int64         |
+|TYPE_FP16     | kHALF        |FLOAT16       |         |FP16     |float16       |
+|TYPE_FP32     | kFLOAT       |FLOAT         |kFloat   |FP32     |float32       |
+|TYPE_FP64     |              |DOUBLE        |kDouble  |FP64     |float64       |
+|TYPE_STRING   |              |STRING        |         |BYTES    |dtype(object) |
 |TYPE_BF16     | kBF16        |              |              |         |BF16     |              |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
 datatype.
-
-For TensorFlow each value is in the tensorflow namespace. For example,
-tensorflow::DT_FLOAT is the 32-bit floating-point value.
 
 For ONNX Runtime each value is prepended with ONNX_TENSOR_ELEMENT_DATA_TYPE_.
 For example, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT is the 32-bit floating-point
@@ -750,7 +745,7 @@ on the CPU.
 ```
 
 If no `count` is specified for a KIND_CPU instance group, then the default instance
-count will be 2 for selected backends (Tensorflow and Onnxruntime). All
+count will be 2 for selected backends (Onnxruntime). All
 other backends will default to 1.
 
 ### Host Policy

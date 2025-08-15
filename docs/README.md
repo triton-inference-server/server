@@ -85,7 +85,7 @@ A [Model Configuration](user_guide/model_configuration.md) file is where you set
 
 #### Required Model Configuration
 
-Triton Inference Server requires some [Minimum Required parameters](user_guide/model_configuration.md#minimal-model-configuration) to be filled in the Model Configuration. These required parameters essentially pertain to the structure of the model. For TensorFlow, ONNX and TensorRT models, users can rely on Triton to [Auto Generate](user_guide/model_configuration.md#auto-generated-model-configuration) the Minimum Required model configuration.
+Triton Inference Server requires some [Minimum Required parameters](user_guide/model_configuration.md#minimal-model-configuration) to be filled in the Model Configuration. These required parameters essentially pertain to the structure of the model. For ONNX and TensorRT models, users can rely on Triton to [Auto Generate](user_guide/model_configuration.md#auto-generated-model-configuration) the Minimum Required model configuration.
 - [Maximum Batch Size - Batching and Non-Batching Models](user_guide/model_configuration.md#maximum-batch-size)
 - [Input and Output Tensors](user_guide/model_configuration.md#inputs-and-outputs)
     - [Tensor Datatypes](user_guide/model_configuration.md#datatypes)
@@ -107,8 +107,6 @@ The Model Configuration ModelOptimizationPolicy property is used to specify opti
 - [Framework-Specific Optimization](user_guide/optimization.md#framework-specific-optimization)
   - [ONNX-TensorRT](user_guide/optimization.md#onnx-with-tensorrt-optimization-ort-trt)
   - [ONNX-OpenVINO](user_guide/optimization.md#onnx-with-openvino-optimization)
-  - [TensorFlow-TensorRT](user_guide/optimization.md#tensorflow-with-tensorrt-optimization-tf-trt)
-  - [TensorFlow-Mixed-Precision](user_guide/optimization.md#tensorflow-automatic-fp16-optimization)
 - [NUMA Optimization](user_guide/optimization.md#numa-optimization)
 
 #### Scheduling and Batching
@@ -153,7 +151,6 @@ Triton provides Prometheus metrics like GPU Utilization, Memory Usage, Latency a
 ### Framework Custom Operations
 Some frameworks provide the option of building custom layers/operations. These can be added to specific Triton Backends for the those frameworks. [Learn more](user_guide/custom_operations.md)
 - [TensorRT](user_guide/custom_operations.md#tensorrt)
-- [TensorFlow](user_guide/custom_operations.md#tensorflow)
 - [PyTorch](user_guide/custom_operations.md#pytorch)
 - [ONNX](user_guide/custom_operations.md#onnx)
 ### Client Libraries and Examples
@@ -194,7 +191,6 @@ The following resources are recommended to explore the full suite of Triton Infe
 
 - **Backends**: Triton supports a wide variety of frameworks used to run models. Users can extend this functionality by creating custom backends.
   - [PyTorch](https://github.com/triton-inference-server/pytorch_backend): Widely used Open Source DL Framework
-  - [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend): Widely used Open Source DL Framework
   - [TensorRT](https://github.com/triton-inference-server/tensorrt_backend): NVIDIA [TensorRT](https://developer.nvidia.com/tensorrt) is an inference acceleration SDK that provide a with range of graph optimizations, kernel optimization, use of lower precision, and more.
   - [ONNX](https://github.com/triton-inference-server/onnxruntime_backend): ONNX Runtime is a cross-platform inference and training machine-learning accelerator.
   - [OpenVINO](https://github.com/triton-inference-server/openvino_backend): OpenVINO™ is an open-source toolkit for optimizing and deploying AI inference.
