@@ -40,5 +40,4 @@ Quick Deployment Guide by backend
    Python with HuggingFace <../tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>
    PyTorch <../tutorials/Quick_Deploy/PyTorch/README.md>
    ONNX <../tutorials/Quick_Deploy/ONNX/README.md>
-   TensorFlow <../tutorials/Quick_Deploy/TensorFlow/README.md>
    Openvino <../tutorials/Quick_Deploy/OpenVINO/README.md>

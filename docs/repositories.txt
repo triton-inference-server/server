@@ -8,7 +8,6 @@ onnxruntime_backend
 perf_analyzer
 python_backend
 pytorch_backend
-tensorflow_backend
 tensorrt_backend
 tensorrtllm_backend
 tutorials
