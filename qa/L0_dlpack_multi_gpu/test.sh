@@ -46,6 +46,18 @@ pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable
 # Install CuPy for testing non_blocking compute streams
 pip3 install cupy-cuda12x
 
+if [ ${CUDA_VERSION%%.*} -gt 12 ]; then
+    curl -L https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/linux-x86_64/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz \
+         -o /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz ;
+    curl -L https://developer.download.nvidia.com/compute/cuda/redist/libcublas/linux-x86_64/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz \
+         -o /tmp/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz ;
+    cd /tmp ;
+    tar -xvf /tmp/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz --strip-components=1 ;
+    tar -xvf /tmp/libcublas-linux-x86_64-12.9.1.4-archive.tar.xz --strip-components=1 ;
+    export LD_LIBRARY_PATH=/tmp/lib:$LD_LIBRARY_PATH ;
+    cd -
+fi
+
 rm -fr *.log ./models
 
 mkdir -p models/dlpack_test/1/
