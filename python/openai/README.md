@@ -34,6 +34,13 @@
 
 ## Pre-requisites
 
+> [!WARNING]
+> **CuPy CUDA 13 Compatibility Issue**: The Triton Inference Server Image has been upgraded to CUDA 13. The latest CuPy wheel released at the time of writing is not fully compatible with CUDA 13. If you encounter issues with CuPy, they may be fixed by running the following commands before starting the Frontend:
+> ```bash
+> ln -sf /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.13.0.48 /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.12
+> export LD_LIBRARY_PATH="/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+> ```
+
 1. Docker + NVIDIA Container Runtime
 2. A correctly configured `HF_TOKEN` for access to HuggingFace models.
     - The current examples and testing primarily use the
