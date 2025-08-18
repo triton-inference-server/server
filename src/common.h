@@ -196,6 +196,16 @@ TRITONSERVER_Error* DecodeBase64(
     const char* input, size_t input_len, std::vector<char>& decoded_data,
     size_t& decoded_size, const std::string& name);
 
+
+/// Validate shared memory key
+///
+/// \param name The name of the memory block.
+/// \param shm_key The name of the posix shared memory object
+/// \return The error status.
+TRITONSERVER_Error* ValidateSharedMemoryKey(
+    const std::string& name, const std::string& shm_key);
+
+
 /// Joins container of strings into a single string delimited by
 /// 'delim'.
 ///
