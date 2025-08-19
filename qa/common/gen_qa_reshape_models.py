@@ -58,7 +58,11 @@ def create_plan_modelfile(
     io_cnt = len(input_shapes)
 
     # Create the model that copies inputs to corresponding outputs.
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
