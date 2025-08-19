@@ -113,6 +113,8 @@ building with Docker.
     build Triton. When building without GPU support, the *min* image
     is the standard ubuntu:22.04 image.
 
+    * The flag `--use-buildbase` can be specified to automate the use of the *tritonserver_buildbase* image to build backends that require a base image.
+
   * Run the cmake_build script within the *tritonserver_buildbase*
     image to actually build Triton. The cmake_build script performs
     the following steps.
@@ -159,7 +161,7 @@ If you want to enable only certain Triton features, backends and
 repository agents, do not specify --enable-all. Instead you must
 specify the individual flags as documented by --help.
 
-#### Building With Specific GitHub Branches
+#### Building With Specific GitHub Branches and Organization
 
 As described above, the build is performed in the server repo, but
 source from several other repos is fetched during the build
@@ -182,7 +184,12 @@ instead use the corresponding branch/tag in the build. For example, if
 you have a branch called "mybranch" in the
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
 repo that you want to use in the build, you would specify
---backend=onnxruntime:mybranch.
+`--backend=onnxruntime:mybranch`.
+
+If you want to build a backend from an alternative organization or user `<org>`, you can extend this syntax as follows:
+```bash
+$ ./build.py ... --backend=onnxruntime:mybranch:https://github.com/<org>
+```
 
 #### CPU-Only Build
 
