@@ -688,17 +688,17 @@ def onnxruntime_cmake_args(images, library_paths):
             )
 
     if target_platform() == "windows":
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
     else:
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
         else:
@@ -754,17 +754,17 @@ def openvino_cmake_args():
         )
     ]
     if target_platform() == "windows":
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "openvino", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
     else:
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "openvino", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
         else:
@@ -801,9 +801,9 @@ def dali_cmake_args():
 
 def fil_cmake_args(images):
     cargs = [cmake_backend_enable("fil", "TRITON_FIL_DOCKER_BUILD", True)]
-    if "base" in images:
+    if "buildbase" in images:
         cargs.append(
-            cmake_backend_arg("fil", "TRITON_BUILD_CONTAINER", None, images["base"])
+            cmake_backend_arg("fil", "TRITON_BUILD_CONTAINER", None, images["buildbase"])
         )
     else:
         cargs.append(
@@ -2592,6 +2592,12 @@ if __name__ == "__main__":
         required=False,
         help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
     )
+    parser.add_argument(
+        "--use-buildbase",
+        default=False,
+        action="store_true",
+        help='Use local temporary "buildbase" Docker image as "base" image to build backends',
+    )
 
     parser.add_argument(
         "--enable-all",
@@ -2946,6 +2952,11 @@ if __name__ == "__main__":
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
+    if FLAGS.use_buildbase:
+        images["buildbase"] = "tritonserver_buildbase"
+    else:
+        if "base" in images:
+            images["buildbase"] = images["base"]
 
     # Initialize map of library paths for each backend.
     library_paths = {}
