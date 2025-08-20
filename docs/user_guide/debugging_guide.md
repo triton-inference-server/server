@@ -129,7 +129,7 @@ The easiest step to start with is running perf_analyzer to get a breakdown of th
 
 The next step would be to use a performance profiler. One profiler we recommend is [Nsight Systems](https://developer.nvidia.com/nsight-systems) (nsys), optionally including NVIDIA Tools Extension (NVTX) markers to profile Triton.
 
-The Triton server container already has nsys installed. However, Triton does not build with the NVTX markers by default. If you want to use NVTX markers, you should build Triton with build.py, using the “--enable-nvtx” flag. This will provide details around some phases of processing a request, such as queueing, running inference, and handling outputs.
+The Triton server container already has nsys installed. However, Triton does not build with the NVTX markers by default. If you want to use NVTX markers, you should build Triton with build.py, using the “--enable-feature nvtx” flag. This will provide details around some phases of processing a request, such as queueing, running inference, and handling outputs.
 
 You can profile Triton by running `nsys profile tritonserver --model-repository …`. The [nsys documentation](https://docs.nvidia.com/nsight-systems/UserGuide/index.html) provides more options and details for getting a thorough overview of what is going on.
 
