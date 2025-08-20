@@ -32,7 +32,6 @@ import os
 import os.path
 import pathlib
 import platform
-import re
 import stat
 import subprocess
 import sys
