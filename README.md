@@ -32,7 +32,7 @@
 Triton Inference Server is an open source inference serving software that
 streamlines AI inferencing. Triton enables teams to deploy any AI model from
 multiple deep learning and machine learning frameworks, including TensorRT,
-TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton
+PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton
 Inference Server supports inference across cloud, data center, edge and embedded
 devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton Inference
 Server delivers optimized performance for many query types, including real time,
@@ -161,7 +161,6 @@ configuration](docs/user_guide/model_configuration.md) for the model.
 - Triton supports multiple execution engines, called
   [backends](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton), including
   [TensorRT](https://github.com/triton-inference-server/tensorrt_backend),
-  [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend),
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend),
   [ONNX](https://github.com/triton-inference-server/onnxruntime_backend),
   [OpenVINO](https://github.com/triton-inference-server/openvino_backend),
@@ -210,7 +209,7 @@ designed for modularity and flexibility
   decryption, or conversion
 - Deploy Triton on [Jetson and JetPack](docs/user_guide/jetson.md)
 - [Use Triton on AWS
-   Inferentia](https://github.com/triton-inference-server/python_backend/tree/main/inferentia)
+   Inferentia](https://github.com/triton-inference-server/python_backend/tree/r25.08/inferentia)
 
 ### Additional Documentation
 
