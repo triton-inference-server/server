@@ -210,7 +210,7 @@ designed for modularity and flexibility
   decryption, or conversion
 - Deploy Triton on [Jetson and JetPack](docs/user_guide/jetson.md)
 - [Use Triton on AWS
-   Inferentia](https://github.com/triton-inference-server/python_backend/tree/r25.08/inferentia)
+   Inferentia](https://github.com/triton-inference-server/python_backend/tree/main/inferentia)
 
 ### Additional Documentation
 
