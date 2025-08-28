@@ -57,7 +57,11 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     # - BATCH_MAX_ELEMENT_COUNT_AS_SHAPE
     # - BATCH_ITEM_SHAPE_FLATTEN
 
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     trt_dtype = np_to_trt_dtype(dtype)
@@ -412,7 +416,11 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
     # generated to have matching batch dimension, the output can be produced
     # via identity op and expect Triton will scatter the output properly.
 
-    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    TRT_LOGGER = (
+        trt.Logger(trt.Logger.INFO)
+        if os.environ.get("TRT_VERBOSE") != "1"
+        else trt.Logger(trt.Logger.VERBOSE)
+    )
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     trt_dtype = np_to_trt_dtype(dtype)
