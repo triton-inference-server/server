@@ -34,6 +34,13 @@
 
 ## Pre-requisites
 
+> [!WARNING]
+> **CuPy CUDA 13 Compatibility Issue**: The Triton Inference Server Image has been upgraded to CUDA 13. You may encounter issues when using CuPy before it officially supports CUDA 13 (see [this issue](https://github.com/cupy/cupy/issues/9286) requesting CUDA 13 support). Some issues may be resolved by linking CUDA 12 shared objects to CUDA 13, for example:
+> ```bash
+> ln -sf /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.13.0.48 /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.12
+> export LD_LIBRARY_PATH="/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+> ```
+
 1. Docker + NVIDIA Container Runtime
 2. A correctly configured `HF_TOKEN` for access to HuggingFace models.
     - The current examples and testing primarily use the
@@ -51,7 +58,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:25.07-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:25.08-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
