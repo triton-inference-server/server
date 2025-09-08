@@ -71,7 +71,7 @@ platform_package_data = [
     "_c/triton_bindings.pyi",
 ]
 
-gpu_extras = ["cupy-cuda12x"]
+gpu_extras = ["cupy-cuda13x"]
 test_extras = ["pytest"]
 all_extras = gpu_extras + test_extras
 
