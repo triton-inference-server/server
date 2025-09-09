@@ -121,5 +121,5 @@ class FastApiFrontend(OpenAIFrontend):
             APIRestrictionMiddleware, restricted_apis=self.restricted_apis
         )
         print(
-            f"[INFO] API restrictions enabled. Restricted endpoints: {self.restricted_apis.RestritionDict()}"
+            f"[INFO] API restrictions enabled. Restricted endpoints: {self.restricted_apis.RestrictionDict()}"
         )

@@ -133,7 +133,7 @@ class RestrictedFeatures:
 
                 self.Insert(endpoint, (key, value))
 
-    def RestritionDict(self) -> dict[str, tuple[str, str]]:
+    def RestrictionDict(self) -> dict[str, tuple[str, str]]:
         """
         Get a copy of the restrictions dictionary.
 
@@ -195,7 +195,7 @@ class APIRestrictionMiddleware(BaseHTTPMiddleware):
         for (
             restricted_category,
             auth_spec,
-        ) in self.restricted_apis.RestritionDict().items():
+        ) in self.restricted_apis.RestrictionDict().items():
             # Check each endpoint in the category
             for restricted_endpoint in ENDPOINT_MAPPING[restricted_category]:
                 restricted_method, restricted_path = restricted_endpoint.split(" ")
