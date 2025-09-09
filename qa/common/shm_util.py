@@ -27,7 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import threading
 import time
 from ctypes import *
 from os import listdir
@@ -35,8 +34,6 @@ from os import listdir
 import numpy as np
 import tritonclient.http as httpclient
 from tritonclient.utils import *
-
-CREATION_LOCK = threading.Lock()
 
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
@@ -97,69 +94,64 @@ def create_set_shm_regions(
     shm_op0_handle = None
     shm_op1_handle = None
 
-    with CREATION_LOCK:
-        if use_system_shared_memory:
-            shm_ip0_handle = shm.create_shared_memory_region(
-                shm_region_names[0] + "_data",
-                "/" + shm_region_names[0],
-                input0_byte_size,
-            )
-            shm_ip1_handle = shm.create_shared_memory_region(
-                shm_region_names[1] + "_data",
-                "/" + shm_region_names[1],
-                input1_byte_size,
-            )
+    if use_system_shared_memory:
+        shm_ip0_handle = shm.create_shared_memory_region(
+            shm_region_names[0] + "_data", "/" + shm_region_names[0], input0_byte_size
+        )
+        shm_ip1_handle = shm.create_shared_memory_region(
+            shm_region_names[1] + "_data", "/" + shm_region_names[1], input1_byte_size
+        )
 
-            i = 0
-            if "OUTPUT0" in outputs:
-                if precreated_shm_regions is None:
-                    shm_op0_handle = shm.create_shared_memory_region(
-                        shm_region_names[2] + "_data",
-                        "/" + shm_region_names[2],
-                        output0_byte_size,
-                    )
-                else:
-                    shm_op0_handle = precreated_shm_regions[0]
-                i += 1
-            if "OUTPUT1" in outputs:
-                if precreated_shm_regions is None:
-                    shm_op1_handle = shm.create_shared_memory_region(
-                        shm_region_names[2 + i] + "_data",
-                        "/" + shm_region_names[2 + i],
-                        output1_byte_size,
-                    )
-                else:
-                    shm_op1_handle = precreated_shm_regions[i]
+        i = 0
+        if "OUTPUT0" in outputs:
+            if precreated_shm_regions is None:
+                shm_op0_handle = shm.create_shared_memory_region(
+                    shm_region_names[2] + "_data",
+                    "/" + shm_region_names[2],
+                    output0_byte_size,
+                )
+            else:
+                shm_op0_handle = precreated_shm_regions[0]
+            i += 1
+        if "OUTPUT1" in outputs:
+            if precreated_shm_regions is None:
+                shm_op1_handle = shm.create_shared_memory_region(
+                    shm_region_names[2 + i] + "_data",
+                    "/" + shm_region_names[2 + i],
+                    output1_byte_size,
+                )
+            else:
+                shm_op1_handle = precreated_shm_regions[i]
 
-            shm.set_shared_memory_region(shm_ip0_handle, input0_list)
-            shm.set_shared_memory_region(shm_ip1_handle, input1_list)
+        shm.set_shared_memory_region(shm_ip0_handle, input0_list)
+        shm.set_shared_memory_region(shm_ip1_handle, input1_list)
 
-        if use_cuda_shared_memory:
-            shm_ip0_handle = cudashm.create_shared_memory_region(
-                shm_region_names[0] + "_data", input0_byte_size, 0
-            )
-            shm_ip1_handle = cudashm.create_shared_memory_region(
-                shm_region_names[1] + "_data", input1_byte_size, 0
-            )
-            i = 0
-            if "OUTPUT0" in outputs:
-                if precreated_shm_regions is None:
-                    shm_op0_handle = cudashm.create_shared_memory_region(
-                        shm_region_names[2] + "_data", output0_byte_size, 0
-                    )
-                else:
-                    shm_op0_handle = precreated_shm_regions[0]
-                i += 1
-            if "OUTPUT1" in outputs:
-                if precreated_shm_regions is None:
-                    shm_op1_handle = cudashm.create_shared_memory_region(
-                        shm_region_names[2 + i] + "_data", output1_byte_size, 0
-                    )
-                else:
-                    shm_op1_handle = precreated_shm_regions[i]
+    if use_cuda_shared_memory:
+        shm_ip0_handle = cudashm.create_shared_memory_region(
+            shm_region_names[0] + "_data", input0_byte_size, 0
+        )
+        shm_ip1_handle = cudashm.create_shared_memory_region(
+            shm_region_names[1] + "_data", input1_byte_size, 0
+        )
+        i = 0
+        if "OUTPUT0" in outputs:
+            if precreated_shm_regions is None:
+                shm_op0_handle = cudashm.create_shared_memory_region(
+                    shm_region_names[2] + "_data", output0_byte_size, 0
+                )
+            else:
+                shm_op0_handle = precreated_shm_regions[0]
+            i += 1
+        if "OUTPUT1" in outputs:
+            if precreated_shm_regions is None:
+                shm_op1_handle = cudashm.create_shared_memory_region(
+                    shm_region_names[2 + i] + "_data", output1_byte_size, 0
+                )
+            else:
+                shm_op1_handle = precreated_shm_regions[i]
 
-            cudashm.set_shared_memory_region(shm_ip0_handle, input0_list)
-            cudashm.set_shared_memory_region(shm_ip1_handle, input1_list)
+        cudashm.set_shared_memory_region(shm_ip0_handle, input0_list)
+        cudashm.set_shared_memory_region(shm_ip1_handle, input1_list)
 
     return shm_region_names, [
         shm_ip0_handle,
@@ -345,27 +337,22 @@ def create_set_either_shm_region(
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return []
 
-    with CREATION_LOCK:
-        if use_cuda_shared_memory:
-            shm_ip_handle = cudashm.create_shared_memory_region(
-                shm_region_names[0] + "_data", input_byte_size, 0
-            )
-            shm_op_handle = cudashm.create_shared_memory_region(
-                shm_region_names[1] + "_data", output_byte_size, 0
-            )
-            cudashm.set_shared_memory_region(shm_ip_handle, input_list)
-        elif use_system_shared_memory:
-            shm_ip_handle = shm.create_shared_memory_region(
-                shm_region_names[0] + "_data",
-                "/" + shm_region_names[0],
-                input_byte_size,
-            )
-            shm_op_handle = shm.create_shared_memory_region(
-                shm_region_names[1] + "_data",
-                "/" + shm_region_names[1],
-                output_byte_size,
-            )
-            shm.set_shared_memory_region(shm_ip_handle, input_list)
+    if use_cuda_shared_memory:
+        shm_ip_handle = cudashm.create_shared_memory_region(
+            shm_region_names[0] + "_data", input_byte_size, 0
+        )
+        shm_op_handle = cudashm.create_shared_memory_region(
+            shm_region_names[1] + "_data", output_byte_size, 0
+        )
+        cudashm.set_shared_memory_region(shm_ip_handle, input_list)
+    elif use_system_shared_memory:
+        shm_ip_handle = shm.create_shared_memory_region(
+            shm_region_names[0] + "_data", "/" + shm_region_names[0], input_byte_size
+        )
+        shm_op_handle = shm.create_shared_memory_region(
+            shm_region_names[1] + "_data", "/" + shm_region_names[1], output_byte_size
+        )
+        shm.set_shared_memory_region(shm_ip_handle, input_list)
 
     return [shm_ip_handle, shm_op_handle]
 
