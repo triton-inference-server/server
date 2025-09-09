@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import pytest
@@ -109,20 +110,15 @@ class TestRestrictedAPIInvalidArguments:
 
     def _test_server_startup_failure(
         self,
-        model_repository,
-        tokenizer_model,
-        backend,
         malformed_api_arg,
         expected_error_pattern=None,
     ):
         """Helper method to test that server fails to start with malformed arguments."""
         args = [
             "--model-repository",
-            model_repository,
-            "--tokenizer",
-            tokenizer_model,
-            "--backend",
-            backend,
+            str(
+                Path(__file__).parent / f"test_models"
+            ),  # Hardcode to simple models to speed up tests
         ]
         if type(malformed_api_arg[0]) == list:
             for api_arg in malformed_api_arg:
@@ -138,49 +134,41 @@ class TestRestrictedAPIInvalidArguments:
                 pass  # Should not reach here
 
         if expected_error_pattern:
-            assert (
-                f"Invalid '--openai-restricted-api' configuration: {expected_error_pattern}"
-                in str(exc_info.value)
+            assert expected_error_pattern in str(
+                exc_info.value
             ), f"Expected error pattern '{expected_error_pattern}' not found in: {exc_info.value}"
 
-    def test_unknown_endpoint_names(self, model_repository, tokenizer_model, backend):
-        """Test that server handles unknown endpoint names gracefully."""
-        # Note: Unknown endpoint names might not cause startup failure,
-        # but they should be ignored or handled gracefully
-        malformed_args = [
+    @pytest.mark.parametrize(
+        "malformed_arg",
+        [
             ["unknown-endpoint", "auth-key", "auth-value"],
             ["invalid,inference", "auth-key", "auth-value"],  # Mix of invalid and valid
             ["inference,unknown", "auth-key", "auth-value"],  # Mix of valid and invalid
-        ]
+        ],
+    )
+    def test_unknown_endpoint_names(self, malformed_arg):
+        """Test that server handles unknown endpoint names gracefully."""
+        self._test_server_startup_failure(
+            malformed_arg,
+            expected_error_pattern="Unknown API",
+        )
 
-        for malformed_arg in malformed_args:
-            self._test_server_startup_failure(
-                model_repository,
-                tokenizer_model,
-                backend,
-                malformed_arg,
-                expected_error_pattern="Unknown API",
-            )
-
-    def test_duplicate_apis(self, model_repository, tokenizer_model, backend):
+    @pytest.mark.parametrize(
+        "malformed_arg",
+        [
+            ["inference,inference", "auth-key", "auth-value"],
+        ],
+    )
+    def test_duplicate_apis(self, malformed_arg):
         """Test that server handles duplicate APIs gracefully."""
-        malformed_args = [
-            ["inference,inference", "auth-key", "auth-value"],  # Duplicate APIs
-        ]
+        self._test_server_startup_failure(
+            malformed_arg,
+            expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
+        )
 
-        for malformed_arg in malformed_args:
-            self._test_server_startup_failure(
-                model_repository,
-                tokenizer_model,
-                backend,
-                malformed_arg,
-                expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
-            )
-
-    def test_conflict_configs(self, model_repository, tokenizer_model, backend):
-        """Test that server fails when duplicate APIs are specified in multiple arguments."""
-        # Test cases where the same API name appears in multiple --openai-restricted-api arguments
-        malformed_args = [
+    @pytest.mark.parametrize(
+        "malformed_arg",
+        [
             # API with different auth specs
             [
                 ["inference", "auth-key1", "value1"],
@@ -201,17 +189,15 @@ class TestRestrictedAPIInvalidArguments:
                 ["inference", "auth-key3", "value3"],
                 ["model-repository", "auth-key4", "value4"],
             ],
-        ]
-
-        for malformed_arg in malformed_args:
-            # Use the helper method with multiple --openai-restricted-api arguments
-            self._test_server_startup_failure(
-                model_repository,
-                tokenizer_model,
-                backend,
-                malformed_arg,
-                expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
-            )
+        ],
+    )
+    def test_conflict_configs(self, malformed_arg):
+        """Test that server fails when duplicate APIs are specified in multiple arguments."""
+        # Test cases where the same API name appears in multiple --openai-restricted-api arguments
+        self._test_server_startup_failure(
+            malformed_arg,
+            expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
+        )
 
 
 @pytest.mark.openai
@@ -289,26 +275,28 @@ class TestOpenAIServerRestrictedAPIs:
                 response, description=f"{description_prefix} Completions endpoint"
             )
 
-    def test_restricted_endpoints_with_auth(self, server_with_restrictions, model):
-        """Test restricted endpoints with different authentication scenarios."""
-        base_url = server_with_restrictions.url_root
-
-        # Test scenarios for restricted endpoints
-        auth_scenarios = [
+    @pytest.mark.parametrize(
+        "headers, should_succeed, description",
+        [
             (None, False, "No auth"),
             ({"admin-key": "admin-value"}, True, "Valid auth"),
             ({"admin-key": "wrong-value"}, False, "Invalid auth value"),
             ({"wrong-key": "admin-value"}, False, "Invalid auth key"),
-        ]
+        ],
+    )
+    def test_restricted_endpoints_with_auth(
+        self, server_with_restrictions, model, headers, should_succeed, description
+    ):
+        """Test restricted endpoints with different authentication scenarios."""
+        base_url = server_with_restrictions.url_root
 
-        for headers, should_succeed, description in auth_scenarios:
-            self._test_restricted_endpoints(
-                base_url,
-                model,
-                headers,
-                expected_success=should_succeed,
-                description_prefix=description,
-            )
+        self._test_restricted_endpoints(
+            base_url,
+            model,
+            headers,
+            expected_success=should_succeed,
+            description_prefix=description,
+        )
 
     def test_unrestricted_endpoints(self, server_with_restrictions):
         """Test that unrestricted endpoints work without authentication."""
@@ -432,38 +420,51 @@ class TestOpenAIServerMultipleRestrictions:
             description_prefix="Inference key",
         )
 
-    def test_endpoint_groups_with_wrong_auth(self, server_multiple_restrictions, model):
+    @pytest.mark.parametrize(
+        "model_headers, model_description, infer_headers, infer_description",
+        [
+            (None, "No auth", None, "No auth"),
+            (
+                {"infer-key": "infer-value"},
+                "Model key for inference endpoints",
+                {"model-key": "model-value"},
+                "Inference key for model endpoints",
+            ),
+            (
+                {"wrong-key": "wrong-value"},
+                "Completely wrong key",
+                {"wrong-key": "wrong-value"},
+                "Completely wrong key",
+            ),
+        ],
+    )
+    def test_endpoint_groups_with_wrong_auth(
+        self,
+        server_multiple_restrictions,
+        model,
+        model_headers,
+        model_description,
+        infer_headers,
+        infer_description,
+    ):
         """Test that endpoint groups are blocked with wrong authentication keys."""
         base_url = server_multiple_restrictions.url_root
 
         # Test scenarios where wrong auth keys are used
-        wrong_auth_scenarios = [
-            (None, "No auth"),
-            ({"infer-key": "infer-value"}, "Model key for inference endpoints"),
-            ({"wrong-key": "wrong-value"}, "Completely wrong key"),
-        ]
-        for headers, description in wrong_auth_scenarios:
-            self._test_model_repository_endpoints(
-                base_url,
-                model,
-                headers,
-                expected_success=False,
-                description_prefix=description,
-            )
-
-        wrong_auth_scenarios = [
-            (None, "No auth"),
-            ({"model-key": "model-value"}, "Inference key for model endpoints"),
-            ({"wrong-key": "wrong-value"}, "Completely wrong key"),
-        ]
-        for headers, description in wrong_auth_scenarios:
-            self._test_inference_endpoints(
-                base_url,
-                model,
-                headers,
-                expected_success=False,
-                description_prefix=description,
-            )
+        self._test_model_repository_endpoints(
+            base_url,
+            model,
+            model_headers,
+            expected_success=False,
+            description_prefix=model_description,
+        )
+        self._test_inference_endpoints(
+            base_url,
+            model,
+            infer_headers,
+            expected_success=False,
+            description_prefix=infer_description,
+        )
 
     def test_unrestricted_endpoints(self, server_multiple_restrictions):
         """Test that unrestricted endpoints work without authentication."""

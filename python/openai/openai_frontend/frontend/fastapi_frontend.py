@@ -45,12 +45,17 @@ class FastApiFrontend(OpenAIFrontend):
         host: str = "localhost",
         port: int = 8000,
         log_level: str = "info",
-        restricted_apis: RestrictedFeatures = None,
+        restricted_apis: list = None,
     ):
         self.host: str = host
         self.port: int = port
         self.log_level: str = log_level
-        self.restricted_apis: RestrictedFeatures = restricted_apis
+        if restricted_apis:
+            self.restricted_apis: RestrictedFeatures = RestrictedFeatures(
+                restricted_apis
+            )
+        else:
+            self.restricted_apis: RestrictedFeatures = None
         self.stopped: bool = False
 
         self.app = self._create_app()

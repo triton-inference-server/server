@@ -33,7 +33,6 @@ from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
-from frontend.fastapi.middleware.api_restriction import RestrictedFeatures
 from frontend.fastapi_frontend import FastApiFrontend
 
 
@@ -200,16 +199,6 @@ def parse_args():
 def main():
     args = parse_args()
 
-    openai_restricted_apis = None
-    try:
-        openai_restricted_apis = RestrictedFeatures(args.openai_restricted_api)
-    except ValueError as e:
-        print(
-            f"[ERROR] Invalid '--openai-restricted-api' configuration: {e}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     # Initialize a Triton Inference Server pointing at LLM models
     server: tritonserver.Server = tritonserver.Server(
         model_repository=args.model_repository,
@@ -231,13 +220,20 @@ def main():
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
-    openai_frontend: FastApiFrontend = FastApiFrontend(
-        engine=engine,
-        host=args.host,
-        port=args.openai_port,
-        log_level=args.uvicorn_log_level,
-        restricted_apis=openai_restricted_apis,
-    )
+    try:
+        openai_frontend: FastApiFrontend = FastApiFrontend(
+            engine=engine,
+            host=args.host,
+            port=args.openai_port,
+            log_level=args.uvicorn_log_level,
+            restricted_apis=args.openai_restricted_api,
+        )
+    except ValueError as e:
+        print(
+            f"[ERROR] Failed to initialize FastAPI frontend: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Optionally expose Triton KServe HTTP/GRPC Frontends
     kserve_http, kserve_grpc = None, None
