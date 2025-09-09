@@ -124,11 +124,13 @@ class TestRestrictedAPIInvalidArguments:
             "--backend",
             backend,
         ]
-        if type(malformed_api_arg) == list:
+        if type(malformed_api_arg[0]) == list:
             for api_arg in malformed_api_arg:
-                args.extend(["--openai-restricted-api", api_arg])
+                args.append("--openai-restricted-api")
+                args.extend(api_arg)
         else:
-            args.extend(["--openai-restricted-api", malformed_api_arg])
+            args.append("--openai-restricted-api")
+            args.extend(malformed_api_arg)
 
         # Server should fail to start with malformed arguments
         with pytest.raises((ValueError, Exception)) as exc_info:
@@ -141,40 +143,14 @@ class TestRestrictedAPIInvalidArguments:
                 in str(exc_info.value)
             ), f"Expected error pattern '{expected_error_pattern}' not found in: {exc_info.value}"
 
-    def test_invalid_argument_format(self, model_repository, tokenizer_model, backend):
-        """Test that server fails with invalid authentication specification format."""
-        malformed_args = [
-            "",  # Completely empty
-            ":",  # Just colon
-            "inference::",  # Double colon
-            "inference",  # Missing :auth_spec
-            "inference,model-repository",  # Missing :auth_spec
-            "inference:",  # Empty auth_spec
-            "inference,model-repository:",  # Empty auth_spec for multiple endpoints
-            "inference:invalid-format",  # Missing = in auth spec
-            "inference:header-name",  # Missing = and value
-            "inference:=value-only",  # Missing header name
-            "inference:header=",  # Missing value
-            "inference: = ",  # Empty header name and value
-        ]
-
-        for malformed_arg in malformed_args:
-            self._test_server_startup_failure(
-                model_repository,
-                tokenizer_model,
-                backend,
-                malformed_arg,
-                expected_error_pattern="'--openai-restricted-api' option format is '<api categories>:<key>=<value>'",
-            )
-
     def test_unknown_endpoint_names(self, model_repository, tokenizer_model, backend):
         """Test that server handles unknown endpoint names gracefully."""
         # Note: Unknown endpoint names might not cause startup failure,
         # but they should be ignored or handled gracefully
         malformed_args = [
-            "unknown-endpoint:auth-key=auth-value",
-            "invalid,inference:auth-key=auth-value",  # Mix of invalid and valid
-            "inference,unknown:auth-key=auth-value",  # Mix of valid and invalid
+            ["unknown-endpoint", "auth-key", "auth-value"],
+            ["invalid,inference", "auth-key", "auth-value"],  # Mix of invalid and valid
+            ["inference,unknown", "auth-key", "auth-value"],  # Mix of valid and invalid
         ]
 
         for malformed_arg in malformed_args:
@@ -186,10 +162,10 @@ class TestRestrictedAPIInvalidArguments:
                 expected_error_pattern="Unknown API",
             )
 
-    def test_duplicate_endpoint_names(self, model_repository, tokenizer_model, backend):
-        """Test that server handles duplicate endpoint names gracefully."""
+    def test_duplicate_apis(self, model_repository, tokenizer_model, backend):
+        """Test that server handles duplicate APIs gracefully."""
         malformed_args = [
-            "inference,inference:auth-key=auth-value",  # Duplicate endpoint
+            ["inference,inference", "auth-key", "auth-value"],  # Duplicate APIs
         ]
 
         for malformed_arg in malformed_args:
@@ -201,26 +177,29 @@ class TestRestrictedAPIInvalidArguments:
                 expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
             )
 
-    def test_duplicate_api_categories(self, model_repository, tokenizer_model, backend):
-        """Test that server fails when duplicate API categories are specified in multiple arguments."""
-        # Test cases where the same API category appears in multiple --openai-restricted-api arguments
+    def test_conflict_configs(self, model_repository, tokenizer_model, backend):
+        """Test that server fails when duplicate APIs are specified in multiple arguments."""
+        # Test cases where the same API name appears in multiple --openai-restricted-api arguments
         malformed_args = [
-            # Same category with different auth specs
-            ["inference:auth-key1=value1", "inference:auth-key2=value2"],
-            # Same category with same auth specs
-            ["inference:auth-key=value", "inference:auth-key=value"],
-            # Multiple categories with one duplicate
+            # API with different auth specs
             [
-                "inference:auth-key1=value1",
-                "model-repository:auth-key2=value2",
-                "inference:auth-key3=value3",
+                ["inference", "auth-key1", "value1"],
+                ["inference", "auth-key2", "value2"],
             ],
-            # All categories duplicated
+            # API with same auth specs
+            [["inference", "auth-key", "value"], ["inference", "auth-key", "value"]],
+            # Multiple APIs with one duplicate
             [
-                "inference:auth-key1=value1",
-                "model-repository:auth-key2=value2",
-                "inference:auth-key3=value3",
-                "model-repository:auth-key4=value4",
+                ["inference", "auth-key1", "value1"],
+                ["model-repository", "auth-key2", "value2"],
+                ["inference", "auth-key3", "value3"],
+            ],
+            # All APIs duplicated
+            [
+                ["inference", "auth-key1", "value1"],
+                ["model-repository", "auth-key2", "value2"],
+                ["inference", "auth-key3", "value3"],
+                ["model-repository", "auth-key4", "value4"],
             ],
         ]
 
@@ -250,7 +229,9 @@ class TestOpenAIServerRestrictedAPIs:
             "--backend",
             backend,
             "--openai-restricted-api",
-            "inference,model-repository:admin-key=admin-value",
+            "inference,model-repository",
+            "admin-key",
+            "admin-value",
         ]
 
         with OpenAIServer(args) as openai_server:
@@ -357,9 +338,13 @@ class TestOpenAIServerMultipleRestrictions:
             "--backend",
             backend,
             "--openai-restricted-api",
-            "model-repository:model-key=model-value",
+            "model-repository",
+            "model-key",
+            "model-value",
             "--openai-restricted-api",
-            "inference:infer-key=infer-value",
+            "inference",
+            "infer-key",
+            "infer-value",
         ]
 
         with OpenAIServer(args) as openai_server:

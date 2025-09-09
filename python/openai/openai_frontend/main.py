@@ -168,8 +168,10 @@ def parse_args():
         "--openai-restricted-api",
         type=str,
         default=None,
+        nargs=3,
+        metavar=("APIs", "Restricted Key", "Restricted Value"),
         action="append",
-        help="Restrict access to specific OpenAI API endpoints. Format: 'endpoint1,endpoint2[:<restricted-key>=<restricted-value>]' (e.g., 'inference,model-repository:<admin-key>=<admin-value>'). If not specified, all endpoints are allowed.",
+        help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
     )
 
     # KServe Predict v2 Frontend

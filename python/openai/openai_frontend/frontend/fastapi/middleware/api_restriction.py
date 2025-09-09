@@ -28,7 +28,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Mapping of API categories to their corresponding HTTP endpoints
+# Mapping of API to their corresponding HTTP endpoints
 ENDPOINT_MAPPING = {
     "inference": ["POST /v1/chat/completions", "POST /v1/completions"],
     "model-repository": ["GET /v1/models"],
@@ -37,56 +37,12 @@ ENDPOINT_MAPPING = {
 }
 
 
-def ParseGenericConfigOption(arg, first_delim, second_delim, option_name, config_name):
-    """
-    Parse a generic configuration option with the format: <name><first_delim><key><second_delim><value>
-
-    Args:
-        arg: The configuration string to parse (e.g., "inference:auth-key=secret-value")
-        first_delim: First delimiter character (e.g., ":")
-        second_delim: Second delimiter character (e.g., "=")
-        option_name: Name of the option for error messages (e.g., "openai-restricted-api")
-        config_name: Name of the config type for error messages (e.g., "api categories")
-
-    Returns:
-        tuple: (name_str, key_str, value_str) - Parsed components of the configuration
-
-    Raises:
-        ValueError: If the argument format is invalid or components are empty
-    """
-    # Format is "<string>,<string>=<string>"
-    error_msg = f"'--{option_name}' option format is '<{config_name}>{first_delim}<key>{second_delim}<value>', got '{arg}'\n"
-
-    # Split by first delimiter (e.g., "inference:key=value" -> ["inference", "key=value"])
-    parts = arg.split(first_delim, 1)
-    if len(parts) != 2:
-        raise ValueError(error_msg)
-    name_str, config_str = parts
-
-    # Split by second delimiter (e.g., "key=value" -> ["key", "value"])
-    parts = config_str.split(second_delim, 1)
-    if len(parts) != 2:
-        raise ValueError(error_msg)
-    key_str, value_str = parts
-
-    # Strip whitespace from all components
-    name_str = name_str.strip()
-    key_str = key_str.strip()
-    value_str = value_str.strip()
-
-    # Validate that no components are empty
-    if len(name_str) == 0 or len(key_str) == 0 or len(value_str) == 0:
-        raise ValueError(error_msg)
-
-    return name_str, key_str, value_str
-
-
 class RestrictedFeatures:
     """
     Manages API endpoint restrictions and their authentication requirements.
 
     This class parses command-line arguments for restricted API configurations
-    and provides methods to check if specific API categories are restricted
+    and provides methods to check if specific APIs are restricted
     and what authentication is required.
     """
 
@@ -96,7 +52,8 @@ class RestrictedFeatures:
 
         Args:
             args: List of --openai-restricted-api argument strings
-                 (e.g., ["inference:infer-key=infer-value", "model-repository:model-key=model-value"])
+                 (e.g., [["inference", "infer-key", "infer-value"],
+                         ["model-repository", "model-key", "model-value"]])
         """
         self._restrictions = {}
         self.ParseRestrictedFeatureOption(args)
@@ -109,60 +66,56 @@ class RestrictedFeatures:
             args: List of restriction configuration strings
 
         Raises:
-            ValueError: If argument format is invalid, unknown API category is specified,
-                       or duplicate API categories are found
+            ValueError: If argument format is invalid, unknown API is specified,
+                       or duplicate APIs are found
         """
-        for arg in args:
-            endpoint_str, key, value = ParseGenericConfigOption(
-                arg, ":", "=", "openai-restricted-api", "api categories"
-            )
-            endpoints = endpoint_str.split(",")
-
-            for endpoint in endpoints:
-                # Validate that the API category is valid
-                if endpoint not in ENDPOINT_MAPPING:
+        for apis, key, value in args:
+            api_list = apis.split(",")
+            for api in api_list:
+                # Validate that the API is valid
+                if api not in ENDPOINT_MAPPING:
                     raise ValueError(
-                        f"Unknown API '{endpoint}'. Available APIs: {list(ENDPOINT_MAPPING.keys())}"
+                        f"Unknown API '{api}'. Available APIs: {list(ENDPOINT_MAPPING.keys())}"
                     )
 
-                # Check for duplicate API categories across different arguments
-                if self.IsRestricted(endpoint):
+                # Check for duplicate APIs across different arguments
+                if self.IsRestricted(api):
                     raise ValueError(
-                        f"restricted api '{endpoint}' can not be specified in multiple config groups"
+                        f"restricted api '{api}' can not be specified in multiple config groups"
                     )
 
-                self.Insert(endpoint, (key, value))
+                self.Insert(api, (key, value))
 
     def RestrictionDict(self) -> dict[str, tuple[str, str]]:
         """
         Get a copy of the restrictions dictionary.
 
         Returns:
-            dict: Copy of the restrictions mapping category names to (header_key, header_value) tuples
+            dict: Copy of the restrictions mapping API names to (header_key, header_value) tuples
         """
         return self._restrictions.copy()
 
-    def Insert(self, category: str, restriction: tuple[str, str]):
+    def Insert(self, api: str, restriction: tuple[str, str]):
         """
-        Add a restriction for a specific API category.
+        Add a restriction for a specific API.
 
         Args:
-            category: The API category name (e.g., "inference", "model-repository")
+            api: The API name (e.g., "inference", "model-repository")
             restriction: Tuple of (header_key, header_value) for authentication
         """
-        self._restrictions[category] = restriction
+        self._restrictions[api] = restriction
 
-    def IsRestricted(self, category: str) -> bool:
+    def IsRestricted(self, api: str) -> bool:
         """
-        Check if a specific API category is restricted.
+        Check if a specific API is restricted.
 
         Args:
-            category: The API category name to check
+            api: The API name to check
 
         Returns:
-            bool: True if the category is restricted, False otherwise
+            bool: True if the API is restricted, False otherwise
         """
-        return category in self._restrictions
+        return api in self._restrictions
 
 
 class APIRestrictionMiddleware(BaseHTTPMiddleware):
@@ -191,13 +144,13 @@ class APIRestrictionMiddleware(BaseHTTPMiddleware):
         request_method = request.method
         request_path = request.url.path
 
-        # Check each restricted category to see if the request matches
+        # Check each restricted API to see if the request matches
         for (
-            restricted_category,
+            restricted_api,
             auth_spec,
         ) in self.restricted_apis.RestrictionDict().items():
-            # Check each endpoint in the category
-            for restricted_endpoint in ENDPOINT_MAPPING[restricted_category]:
+            # Check each endpoint in the API
+            for restricted_endpoint in ENDPOINT_MAPPING[restricted_api]:
                 restricted_method, restricted_path = restricted_endpoint.split(" ")
 
                 # Match both HTTP method and path prefix
