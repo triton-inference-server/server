@@ -44,7 +44,7 @@ pip3 uninstall -y torch
 pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable.html
 
 # Install CuPy for testing non_blocking compute streams
-pip3 install cupy-cuda12x
+pip3 install cupy-cuda13x
 
 if [ ${CUDA_VERSION%%.*} -gt 12 ]; then
     curl -L https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvrtc/linux-x86_64/cuda_nvrtc-linux-x86_64-12.9.86-archive.tar.xz \
