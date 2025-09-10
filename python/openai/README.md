@@ -638,3 +638,54 @@ function name: get_n_day_weather_forecast
 function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit", num_days: 1}
 tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit in next 1 days.
 ```
+
+## Limit Endpoint Access
+
+The OpenAI-compatible server supports restricting access to specific API endpoints through authentication headers. This feature allows you to protect sensitive endpoints while keeping others publicly accessible.
+
+### Configuration
+
+Use the `--openai-restricted-api` command-line argument to configure endpoint restrictions:
+
+```
+--openai-restricted-api <API_1>,<API_2>,... <restricted-key> <restricted-value>
+```
+
+- **`API`**: A comma-separated list of APIs to be included in this group. Note that currently a given API is not allowed to be included in multiple groups. The following protocols / APIs are recognized:
+  - **inference**: Chat completions and text completions endpoints
+    - `POST /v1/chat/completions`
+    - `POST /v1/completions`
+  - **model-repository**: Model listing and information endpoints
+    - `GET /v1/models`
+    - `GET /v1/models/{model_name}`
+  - **metrics**: Server metrics endpoint
+    - `GET /metrics`
+  - **health**: Health check endpoint
+    - `GET /health/ready`
+
+- **`restricted-key`**: The HTTP request header to be checked when a request is received.
+- **`restricted-value`**: The header value required to access the specified protocols.
+
+### Examples
+
+#### Restrict Inference API Endpoints Only
+```bash
+--openai-restricted-api "inference api-key my-secret-key"
+```
+
+Clients must include the header:
+```bash
+curl -H "api-key: my-secret-key" \
+     -X POST http://localhost:9000/v1/chat/completions \
+     -d '{"model": "my-model", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+#### Restrict Multiple API Endpoints
+```bash
+# Different authentication for different APIs
+--openai-restricted-api "inference user-key user-secret" \
+--openai-restricted-api "model-repository admin-key admin-secret"
+
+# Multiple APIs in single argument with shared authentication
+--openai-restricted-api "inference,model-repository shared-key shared-secret"
+```

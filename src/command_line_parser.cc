@@ -506,7 +506,7 @@ TritonParser::SetupOptions()
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",
        "<string>:<string>=<string>",
        "Specify restricted HTTP api setting. The format of this "
-       "flag is --http-restricted-api=<apis>,<key>=<value>. Where "
+       "flag is --http-restricted-api=<apis>:<key>=<value>. Where "
        "<api> is a comma-separated list of apis to be restricted. "
        "<key> will be additional header key to be checked when a HTTP request "
        "is received, and <value> is the value expected to be matched."
@@ -630,7 +630,7 @@ TritonParser::SetupOptions()
       {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
        "<string>:<string>=<string>",
        "Specify restricted GRPC protocol setting. The format of this "
-       "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
+       "flag is --grpc-restricted-protocol=<protocols>:<key>=<value>. Where "
        "<protocol> is a comma-separated list of protocols to be restricted. "
        "<key> will be additional header key to be checked when a GRPC request "
        "is received, and <value> is the value expected to be matched."

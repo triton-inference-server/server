@@ -28,6 +28,7 @@
 
 import argparse
 import signal
+import sys
 from functools import partial
 
 import tritonserver
@@ -162,6 +163,15 @@ def parse_args():
         choices=["debug", "info", "warning", "error", "critical", "trace"],
         help="log level for uvicorn",
     )
+    openai_group.add_argument(
+        "--openai-restricted-api",
+        type=str,
+        default=None,
+        nargs=3,
+        metavar=("APIs", "Restricted Key", "Restricted Value"),
+        action="append",
+        help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
+    )
 
     # KServe Predict v2 Frontend
     kserve_group = parser.add_argument_group("Triton KServe Frontend")
@@ -210,12 +220,20 @@ def main():
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
-    openai_frontend: FastApiFrontend = FastApiFrontend(
-        engine=engine,
-        host=args.host,
-        port=args.openai_port,
-        log_level=args.uvicorn_log_level,
-    )
+    try:
+        openai_frontend: FastApiFrontend = FastApiFrontend(
+            engine=engine,
+            host=args.host,
+            port=args.openai_port,
+            log_level=args.uvicorn_log_level,
+            restricted_apis=args.openai_restricted_api,
+        )
+    except ValueError as e:
+        print(
+            f"[ERROR] Failed to initialize FastAPI frontend: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Optionally expose Triton KServe HTTP/GRPC Frontends
     kserve_http, kserve_grpc = None, None
