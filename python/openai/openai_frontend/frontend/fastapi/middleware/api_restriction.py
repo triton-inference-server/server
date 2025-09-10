@@ -208,8 +208,6 @@ class APIRestrictionMiddleware(BaseHTTPMiddleware):
             dict: {"valid": bool, "message": str} - Authentication result and error message if invalid
         """
         expected_key, expected_value = auth_header
-        print(f"expected_key: {expected_key}")
-        print(f"expected_value: {expected_value}")
 
         # Get the actual header value from the request
         actual_value = request.headers.get(expected_key)
