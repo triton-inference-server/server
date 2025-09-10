@@ -66,8 +66,7 @@ class RestrictedFeatures:
             args: List of restriction configuration strings
 
         Raises:
-            ValueError: If argument format is invalid, unknown API is specified,
-                       or duplicate APIs are found
+            ValueError: If unknown API is specified or duplicate API configs are found
         """
         for apis, key, value in args:
             api_list = apis.split(",")

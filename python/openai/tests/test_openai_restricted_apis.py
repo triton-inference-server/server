@@ -34,58 +34,6 @@ import requests
 from tests.utils import OpenAIServer
 
 
-def make_get_request(
-    base_url: str,
-    endpoint: str,
-    headers: Optional[Dict[str, str]] = None,
-    timeout: int = 10,
-):
-    """Make a GET request to the specified endpoint."""
-    url = f"{base_url}{endpoint}"
-    response = requests.get(url, headers=headers, timeout=timeout)
-    return response
-
-
-def make_chat_completion_request(
-    base_url: str,
-    model: str,
-    messages: List[Dict[str, str]],
-    headers: Optional[Dict[str, str]] = None,
-    timeout: int = 10,
-    **kwargs,
-):
-    """Make a POST request to the chat completions endpoint."""
-    url = f"{base_url}/v1/chat/completions"
-    data = {
-        "model": model,
-        "messages": messages,
-        "max_tokens": kwargs.get("max_tokens", 10),
-        **{k: v for k, v in kwargs.items() if k != "max_tokens"},
-    }
-    response = requests.post(url, json=data, headers=headers, timeout=timeout)
-    return response
-
-
-def make_completion_request(
-    base_url: str,
-    model: str,
-    prompt: str,
-    headers: Optional[Dict[str, str]] = None,
-    timeout: int = 10,
-    **kwargs,
-):
-    """Make a POST request to the completions endpoint."""
-    url = f"{base_url}/v1/completions"
-    data = {
-        "model": model,
-        "prompt": prompt,
-        "max_tokens": kwargs.get("max_tokens", 10),
-        **{k: v for k, v in kwargs.items() if k != "max_tokens"},
-    }
-    response = requests.post(url, json=data, headers=headers, timeout=timeout)
-    return response
-
-
 def assert_response_success(
     response: requests.Response, expected_status: int = 200, description: str = ""
 ):
@@ -102,6 +50,132 @@ def assert_response_unauthorized(
     assert (
         response.status_code == expected_status
     ), f"{description} should be unauthorized with {expected_status}, got {response.status_code}"
+
+
+def make_get_request(
+    base_url: str,
+    endpoint: str,
+    headers: Optional[Dict[str, str]] = None,
+    timeout: int = 10,
+):
+    """Make a GET request to the specified endpoint."""
+    url = f"{base_url}{endpoint}"
+    response = requests.get(url, headers=headers, timeout=timeout)
+    return response
+
+
+def verify_inference_endpoints(
+    base_url, model, headers, expected_success, description_prefix
+):
+    def make_chat_request(
+        base_url: str,
+        model: str,
+        messages: List[Dict[str, str]],
+        headers: Optional[Dict[str, str]] = None,
+        max_tokens: int = 10,
+        timeout: int = 10,
+    ):
+        """Make a POST request to the chat completions endpoint."""
+        url = f"{base_url}/v1/chat/completions"
+        data = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+        }
+        response = requests.post(url, json=data, headers=headers, timeout=timeout)
+        return response
+
+    def make_completion_request(
+        base_url: str,
+        model: str,
+        prompt: str,
+        headers: Optional[Dict[str, str]] = None,
+        max_tokens: int = 10,
+        timeout: int = 10,
+    ):
+        """Make a POST request to the completions endpoint."""
+        url = f"{base_url}/v1/completions"
+        data = {
+            "model": model,
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+        }
+        response = requests.post(url, json=data, headers=headers, timeout=timeout)
+        return response
+
+    messages = [{"role": "user", "content": "Hello"}]
+    response = make_chat_request(base_url, model, messages, headers=headers)
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Chat completions endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Chat completions endpoint"
+        )
+
+    prompt = "Hello"
+    response = make_completion_request(base_url, model, prompt, headers=headers)
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Completions endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Completions endpoint"
+        )
+
+
+def verify_model_repository_endpoints(
+    base_url, model, headers, expected_success, description_prefix
+):
+    response = make_get_request(base_url, "/v1/models", headers=headers)
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Models endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Models endpoint"
+        )
+
+    response = make_get_request(base_url, f"/v1/models/{model}", headers=headers)
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Specific model endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Specific model endpoint"
+        )
+
+
+def verify_metrics_endpoint(base_url, headers, expected_success, description_prefix):
+    # Test metrics endpoint
+    response = make_get_request(base_url, "/metrics", headers=headers)
+    assert_response_success(response, description="Unrestricted Metrics endpoint")
+
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Metrics endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Metrics endpoint"
+        )
+
+
+def verify_health_endpoint(base_url, headers, expected_success, description_prefix):
+    # Test health endpoint
+    response = make_get_request(base_url, "/health/ready", headers=headers)
+    if expected_success:
+        assert_response_success(
+            response, description=f"{description_prefix} Health endpoint"
+        )
+    else:
+        assert_response_unauthorized(
+            response, description=f"{description_prefix} Health endpoint"
+        )
 
 
 @pytest.mark.openai
@@ -223,60 +297,8 @@ class TestOpenAIServerRestrictedAPIs:
         with OpenAIServer(args) as openai_server:
             yield openai_server
 
-    def _test_restricted_endpoints(
-        self, base_url, model, headers, expected_success=True, description_prefix=""
-    ):
-        """Helper method to test all restricted endpoints (models + inference)."""
-        messages = [{"role": "user", "content": "Hello"}]
-
-        # Test models endpoint
-        response = make_get_request(base_url, "/v1/models", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Models endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Models endpoint"
-            )
-
-        # Test specific model endpoint
-        response = make_get_request(base_url, f"/v1/models/{model}", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Specific model endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Specific model endpoint"
-            )
-
-        # Test chat completions endpoint
-        response = make_chat_completion_request(
-            base_url, model, messages, headers=headers
-        )
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Chat completions endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Chat completions endpoint"
-            )
-
-        # Test completions endpoint
-        response = make_completion_request(base_url, model, "Hello", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Completions endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Completions endpoint"
-            )
-
     @pytest.mark.parametrize(
-        "headers, should_succeed, description",
+        "headers, expected_success, description",
         [
             (None, False, "No auth"),
             ({"admin-key": "admin-value"}, True, "Valid auth"),
@@ -285,30 +307,28 @@ class TestOpenAIServerRestrictedAPIs:
         ],
     )
     def test_restricted_endpoints_with_auth(
-        self, server_with_restrictions, model, headers, should_succeed, description
+        self, server_with_restrictions, model, headers, expected_success, description
     ):
         """Test restricted endpoints with different authentication scenarios."""
         base_url = server_with_restrictions.url_root
 
-        self._test_restricted_endpoints(
-            base_url,
-            model,
-            headers,
-            expected_success=should_succeed,
-            description_prefix=description,
+        verify_model_repository_endpoints(
+            base_url, model, headers, expected_success, description
+        )
+        verify_inference_endpoints(
+            base_url, model, headers, expected_success, description
         )
 
     def test_unrestricted_endpoints(self, server_with_restrictions):
         """Test that unrestricted endpoints work without authentication."""
         base_url = server_with_restrictions.url_root
 
-        # Test metrics endpoint
-        response = make_get_request(base_url, "/metrics")
-        assert_response_success(response, description="Unrestricted Metrics endpoint")
-
-        # Test health endpoint
-        response = make_get_request(base_url, "/health/ready")
-        assert_response_success(response, description="Unrestricted Health endpoint")
+        verify_metrics_endpoint(
+            base_url, None, expected_success=True, description_prefix="Unrestricted"
+        )
+        verify_health_endpoint(
+            base_url, None, expected_success=True, description_prefix="Unrestricted"
+        )
 
 
 @pytest.mark.openai
@@ -338,62 +358,6 @@ class TestOpenAIServerMultipleRestrictions:
         with OpenAIServer(args) as openai_server:
             yield openai_server
 
-    def _test_model_repository_endpoints(
-        self, base_url, model, headers, expected_success=True, description_prefix=""
-    ):
-        """Helper method to test model repository endpoints."""
-        # Test models endpoint
-        response = make_get_request(base_url, "/v1/models", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Models endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Models endpoint"
-            )
-
-        # Test specific model endpoint
-        response = make_get_request(base_url, f"/v1/models/{model}", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Specific model endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Specific model endpoint"
-            )
-
-    def _test_inference_endpoints(
-        self, base_url, model, headers, expected_success=True, description_prefix=""
-    ):
-        """Helper method to test inference endpoints."""
-        messages = [{"role": "user", "content": "Hello"}]
-
-        # Test chat completions endpoint
-        response = make_chat_completion_request(
-            base_url, model, messages, headers=headers
-        )
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Chat completions endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Chat completions endpoint"
-            )
-
-        # Test completions endpoint
-        response = make_completion_request(base_url, model, "Hello", headers=headers)
-        if expected_success:
-            assert_response_success(
-                response, description=f"{description_prefix} Completions endpoint"
-            )
-        else:
-            assert_response_unauthorized(
-                response, description=f"{description_prefix} Completions endpoint"
-            )
-
     def test_endpoint_groups_with_correct_auth(
         self, server_multiple_restrictions, model
     ):
@@ -402,22 +366,22 @@ class TestOpenAIServerMultipleRestrictions:
 
         # Test model repository endpoints with model key
         model_headers = {"model-key": "model-value"}
-        self._test_model_repository_endpoints(
+        verify_model_repository_endpoints(
             base_url,
             model,
             model_headers,
             expected_success=True,
-            description_prefix="Model key",
+            description_prefix="Correct model key",
         )
 
         # Test inference endpoints with inference key
         infer_headers = {"infer-key": "infer-value"}
-        self._test_inference_endpoints(
+        verify_inference_endpoints(
             base_url,
             model,
             infer_headers,
             expected_success=True,
-            description_prefix="Inference key",
+            description_prefix="Correct inference key",
         )
 
     @pytest.mark.parametrize(
@@ -451,14 +415,14 @@ class TestOpenAIServerMultipleRestrictions:
         base_url = server_multiple_restrictions.url_root
 
         # Test scenarios where wrong auth keys are used
-        self._test_model_repository_endpoints(
+        verify_model_repository_endpoints(
             base_url,
             model,
             model_headers,
             expected_success=False,
             description_prefix=model_description,
         )
-        self._test_inference_endpoints(
+        verify_inference_endpoints(
             base_url,
             model,
             infer_headers,
@@ -470,10 +434,9 @@ class TestOpenAIServerMultipleRestrictions:
         """Test that unrestricted endpoints work without authentication."""
         base_url = server_multiple_restrictions.url_root
 
-        # Test metrics endpoint
-        response = make_get_request(base_url, "/metrics")
-        assert_response_success(response, description="Unrestricted Metrics endpoint")
-
-        # Test health endpoint
-        response = make_get_request(base_url, "/health/ready")
-        assert_response_success(response, description="Unrestricted Health endpoint")
+        verify_metrics_endpoint(
+            base_url, None, expected_success=True, description_prefix="Unrestricted"
+        )
+        verify_health_endpoint(
+            base_url, None, expected_success=True, description_prefix="Unrestricted"
+        )
