@@ -1239,10 +1239,15 @@ COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+RUN if [ "$(uname -m)" = "ppc64le" ]; then \
+        VARIANT="cpu"; \
+    else \
+        VARIANT="all"; \
+    fi &&\
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[$VARIANT] && \
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[$VARIANT];
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -1448,6 +1453,15 @@ RUN pip3 install --upgrade pip \\
 """
         else:
             df += """
+RUN if [ "$(uname -m)" = "ppc64le" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+        clang-15 \
+        && ln -s /usr/bin/clang-15 /usr/bin/clang -f \
+        && ln -s /usr/bin/clang++-15 /usr/bin/clang++ -f \
+        && pip3 install cython ninja; \
+    fi
+
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
