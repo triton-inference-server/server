@@ -34,7 +34,13 @@ from frontend.fastapi.middleware.api_restriction import (
     APIRestrictionMiddleware,
     RestrictedFeatures,
 )
-from frontend.fastapi.routers import chat, completions, models, observability
+from frontend.fastapi.routers import (
+    chat,
+    completions,
+    embeddings,
+    models,
+    observability,
+)
 from frontend.frontend import OpenAIFrontend
 
 
@@ -97,6 +103,7 @@ class FastApiFrontend(OpenAIFrontend):
         app.include_router(models.router)
         app.include_router(completions.router)
         app.include_router(chat.router)
+        app.include_router(embeddings.router)
 
         # NOTE: For debugging purposes, should generally be restricted or removed
         self._add_cors_middleware(app)

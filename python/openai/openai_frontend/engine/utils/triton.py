@@ -39,6 +39,7 @@ from schemas.openai import (
     CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
+    CreateEmbeddingRequest,
 )
 
 
@@ -49,6 +50,11 @@ def _create_vllm_inference_request(
     lora_name: str | None,
     default_max_tokens: int,
 ):
+    if isinstance(request, CreateEmbeddingRequest):
+        inputs = {}
+        inputs["text_input"] = request.input
+        return model.create_request(inputs=inputs)
+
     inputs = {}
     # Exclude non-sampling parameters so they aren't passed to vLLM
     excludes = {
@@ -134,6 +140,11 @@ def _create_trtllm_inference_request(
     lora_name: str | None,
     default_max_tokens: int,
 ):
+    if isinstance(request, CreateEmbeddingRequest):
+        inputs = {}
+        inputs["text_input"] = np.array(request.input, dtype=object)
+        return model.create_request(inputs=inputs)
+
     if lora_name is not None:
         raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
 

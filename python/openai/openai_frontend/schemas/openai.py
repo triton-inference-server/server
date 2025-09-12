@@ -634,6 +634,29 @@ class DoneEvent(BaseModel):
     data: Data
 
 
+class Embedding(BaseModel):
+    embedding: List[float]
+    index: int
+    object: str
+
+
+class CreateEmbeddingRequest(BaseModel):
+    # Explicitly return errors for unknown fields.
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+    input: Union[str, List[str]]
+    model: str
+    dimensions: Optional[int] = None
+    encoding_format: str = "float"
+    user: Optional[str] = None
+
+
+class CreateEmbeddingResponse(BaseModel):
+    object: str
+    data: List[Embedding]
+    model: str
+    usage: CompletionUsage
+
+
 class ListModelsResponse(BaseModel):
     object: Object
     data: List[Model]
@@ -917,11 +940,11 @@ class CreateChatCompletionRequest(BaseModel):
         description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
         examples=["user-1234"],
     )
-    function_call: Optional[
-        Union[FunctionCall3, ChatCompletionFunctionCallOption]
-    ] = Field(
-        None,
-        description='Deprecated in favor of `tool_choice`.\n\nControls which (if any) function is called by the model.\n`none` means the model will not call a function and instead generates a message.\n`auto` means the model can pick between generating a message or calling a function.\nSpecifying a particular function via `{"name": "my_function"}` forces the model to call that function.\n\n`none` is the default when no functions are present. `auto` is the default if functions are present.\n',
+    function_call: Optional[Union[FunctionCall3, ChatCompletionFunctionCallOption]] = (
+        Field(
+            None,
+            description='Deprecated in favor of `tool_choice`.\n\nControls which (if any) function is called by the model.\n`none` means the model will not call a function and instead generates a message.\n`auto` means the model can pick between generating a message or calling a function.\nSpecifying a particular function via `{"name": "my_function"}` forces the model to call that function.\n\n`none` is the default when no functions are present. `auto` is the default if functions are present.\n',
+        )
     )
     functions: Optional[List[ChatCompletionFunctions]] = Field(
         None,
@@ -940,3 +963,4 @@ class ObjectType:
     text_completion = Object1.text_completion
     chat_completion_chunk = Object4.chat_completion_chunk
     chat_completion = Object2.chat_completion
+    embedding = "embedding"

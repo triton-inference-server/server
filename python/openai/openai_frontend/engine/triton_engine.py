@@ -73,6 +73,9 @@ from schemas.openai import (
     CreateChatCompletionStreamResponse,
     CreateCompletionRequest,
     CreateCompletionResponse,
+    CreateEmbeddingRequest,
+    CreateEmbeddingResponse,
+    Embedding,
     FinishReason,
     Function1,
     Function2,
@@ -251,6 +254,54 @@ class TritonLLMEngine(LLMEngine):
             usage=usage,
         )
 
+    async def embeddings(
+        self, request: CreateEmbeddingRequest
+    ) -> CreateEmbeddingResponse:
+        model_name, lora_name = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
+        self._validate_embedding_request(request, metadata, lora_name)
+
+        if isinstance(request.input, str):
+            request.input = [request.input]
+
+        # Convert to Triton request format and perform inference
+        # Assuming embedding models are not decoupled and don't stream
+        responses = await metadata.model.infer(
+            metadata.request_converter(
+                metadata.model, request.input, request, lora_name, 0
+            )
+        )
+
+        output_tensor = responses.outputs["embedding"]
+        embedding_vectors = output_tensor.to_numpy()
+
+        embedding_data = []
+        for i, vector in enumerate(embedding_vectors):
+            embedding_data.append(
+                Embedding(
+                    index=i, object=ObjectType.embedding, embedding=vector.tolist()
+                )
+            )
+
+        # Calculate usage
+        prompt_tokens = 0
+        if metadata.tokenizer:
+            for text_input in request.input:
+                prompt_tokens += len(metadata.tokenizer.encode(text_input))
+
+        usage = CompletionUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=0,  # Embeddings don't have completion tokens
+            total_tokens=prompt_tokens,
+        )
+
+        return CreateEmbeddingResponse(
+            object="list",
+            data=embedding_data,
+            model=request.model,
+            usage=usage,
+        )
+
     def _get_chat_completion_response_message(
         self,
         request: CreateChatCompletionRequest,
@@ -373,6 +424,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
+        # It can also be used for embedding models.
         return _create_trtllm_inference_request
 
     def _get_model_and_lora_name(self, request_model_name: str):
@@ -703,6 +755,35 @@ class TritonLLMEngine(LLMEngine):
             raise Exception(
                 "`stream_options.include_usage` is currently only supported for the vLLM backend"
             )
+
+    def _validate_embedding_request(
+        self,
+        request: CreateEmbeddingRequest,
+        metadata: TritonModelMetadata,
+        lora_name: str | None,
+    ):
+        """
+        Validates an embedding request to align with currently supported features.
+        """
+
+        if not metadata:
+            raise Exception(f"Unknown model: {request.model}")
+
+        if not metadata.backend:
+            raise Exception("Unknown backend")
+
+        if not metadata.request_converter:
+            raise Exception(f"Unknown request format for model: {request.model}")
+
+        if (
+            metadata.lora_names is not None
+            and lora_name is not None
+            and lora_name not in metadata.lora_names
+        ):
+            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
+
+        if request.encoding_format != "float":
+            raise Exception("Only 'float' encoding_format is supported.")
 
     def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
