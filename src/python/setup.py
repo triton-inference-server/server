@@ -107,6 +107,6 @@ setup(
     zip_safe=False,
     cmdclass={"bdist_wheel": bdist_wheel},
     data_files=data_files,
-    install_requires=["tritonserver", "pydantic==2.11.9"],
+    install_requires=["tritonserver", "pydantic==2.10.6"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
 )
