@@ -3060,6 +3060,14 @@ HTTPAPIServer::EVBufferToJson(
     triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
     const size_t length, int n)
 {
+  if (length >= INT_MAX) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("request json buffer size " + std::to_string(length) +
+         " exceeds the maximum allowed size of " + std::to_string(INT_MAX))
+            .c_str());
+  }
+
   size_t offset = 0, remaining_length = length;
   char* json_base;
   std::vector<char> json_buffer;
