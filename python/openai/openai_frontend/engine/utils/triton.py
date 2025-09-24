@@ -372,9 +372,7 @@ def _get_vllm_lora_names(
         repo_paths = [repo_paths]
     for repo_path in repo_paths:
         model_path = os.path.join(repo_path, model_name)
-        if (not Path(model_path).is_relative_to(repo_path)) or (
-            os.path.normpath(model_path) != model_path
-        ):
+        if os.path.normpath(model_path) != model_path:
             raise ValueError(
                 f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
             )
