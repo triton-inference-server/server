@@ -426,6 +426,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+pip3 install perf_analyzer
 
 TEMP_RET=0
 REPETITION=10

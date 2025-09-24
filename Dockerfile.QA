@@ -348,7 +348,7 @@ RUN rm -f /usr/bin/python && \
 
 RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
                            "awscli<=1.36.40" six "grpcio-channelz<1.68" prettytable virtualenv \
-                           check-jsonschema perf_analyzer
+                           check-jsonschema
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \

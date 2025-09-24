@@ -45,6 +45,7 @@ CLIENT_LOG="./client.log"
 TEST_SCRIPT_PY=passive_instance_test.py
 EXPECTED_NUM_TESTS="1"
 
+pip3 install perf_analyzer
 PERF_ANALYZER=perf_analyzer
 MODEL=distributed_int32_int32_int32
 

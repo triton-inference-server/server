@@ -42,6 +42,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 # Clients
+pip3 install perf_analyzer
 PERF_ANALYZER=perf_analyzer
 IMAGE=../images/vulture.jpeg
 

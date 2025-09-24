@@ -52,6 +52,7 @@ MODEL_REPO="${PWD}/models"
 PERF_CLIENT=perf_analyzer
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
+pip3 install perf_analyzer
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then

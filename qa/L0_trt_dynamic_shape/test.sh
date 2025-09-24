@@ -41,6 +41,8 @@ fi
 TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
+pip3 install perf_analyzer
+
 CLIENT_LOG="./client.log"
 PERF_CLIENT=perf_analyzer
 TRT_OP_TEST=trt_dynamic_shape_test.py
