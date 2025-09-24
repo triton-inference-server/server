@@ -431,7 +431,7 @@ TEMP_RET=0
 REPETITION=10
 CONCURRENCY=20
 CLIENT_BS=1
-PERF_ANALYZER=../clients/perf_analyzer
+PERF_ANALYZER=perf_analyzer
 TEMP_CLIENT_LOG=temp_client.log
 
 set +e
