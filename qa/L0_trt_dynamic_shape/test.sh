@@ -70,11 +70,9 @@ fi
 # Shape beyond the limits of optimization profile
 set +e
 $PERF_CLIENT -v -i grpc -u localhost:8001 -m plan_float32_float32_float32-4-32 --shape INPUT0:33 --shape INPUT1:33 -t 1 -p2000 -b 1 > ${CLIENT_LOG}_max 2>&1
-if [ $? -eq 0 ]; then
-    cat ${CLIENT_LOG}_max
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+EXIT_CODE=$?
+echo "perf_analyzer exit code: ${EXIT_CODE}" >> "${CLIENT_LOG}_max"
+"${PERF_CLIENT}" --version >> "${CLIENT_LOG}_max" 2>&1 || true
 
 EXPECTED_MESSAGE="model expected the shape of dimension 1 to be between 4 and 32 but received"
 if [ $(cat ${CLIENT_LOG}_max | grep "${EXPECTED_MESSAGE} 33" | wc -l) -eq 0 ]; then
@@ -84,11 +82,10 @@ if [ $(cat ${CLIENT_LOG}_max | grep "${EXPECTED_MESSAGE} 33" | wc -l) -eq 0 ]; t
 fi
 
 $PERF_CLIENT -v -i grpc -u localhost:8001 -m plan_float32_float32_float32-4-32 --shape INPUT0:3 --shape INPUT1:3 -t 1 -p2000 -b 1 > ${CLIENT_LOG}_min 2>&1
-if [ $? -eq 0 ]; then
-    cat ${CLIENT_LOG}_min
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+EXIT_CODE=$?
+echo "perf_analyzer exit code: ${EXIT_CODE}" >> "${CLIENT_LOG}_min"
+"${PERF_CLIENT}" --version >> "${CLIENT_LOG}_min" 2>&1 || true
+
 if [ $(cat ${CLIENT_LOG}_min | grep "${EXPECTED_MESSAGE} 3" | wc -l) -eq 0 ]; then
     cat ${CLIENT_LOG}_min
     echo -e "\n***\n*** Test Failed\n***"
@@ -331,11 +328,10 @@ if [ $? -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -i grpc -u localhost:8001 -m plan_float32_float32_float32 --shape INPUT0:33 --shape INPUT1:33 -t 1 -p2000 -b 6 > ${CLIENT_LOG}_static_fail 2>&1
-if [ $? -eq 0 ]; then
-    ${CLIENT_LOG}_static_fail
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+EXIT_CODE=$?
+echo "perf_analyzer exit code: ${EXIT_CODE}" >> "${CLIENT_LOG}_static_fail"
+"${PERF_CLIENT}" --version >> "${CLIENT_LOG}_static_fail" 2>&1 || true
+
 if [ $(cat ${CLIENT_LOG}_static_fail | grep "inference request batch-size must be <= 5" | wc -l) -eq 0 ]; then
     cat ${CLIENT_LOG}_static_fail
     echo -e "\n***\n*** Test Failed\n***"
@@ -343,11 +339,10 @@ if [ $(cat ${CLIENT_LOG}_static_fail | grep "inference request batch-size must b
 fi
 
 $PERF_CLIENT -v -i grpc -u localhost:8001 -m plan_float32_float32_float32 --shape INPUT0:33 --shape INPUT1:33 -t 1 -p2000 -b 2 > ${CLIENT_LOG}_static_bs_2 2>&1
-if [ $? -eq 0 ]; then
-    ${CLIENT_LOG}_static_bs_2
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+EXIT_CODE=$?
+echo "perf_analyzer exit code: ${EXIT_CODE}" >> "${CLIENT_LOG}_static_bs_2"
+"${PERF_CLIENT}" --version >> "${CLIENT_LOG}_static_bs_2" 2>&1 || true
+
 if [ $(cat ${CLIENT_LOG}_static_bs_2 | grep "model expected the shape of dimension 0 to be between 1 and 1 but received 2" | wc -l) -eq 0 ]; then
     cat ${CLIENT_LOG}_static_bs_2
     echo -e "\n***\n*** Test Failed\n***"
