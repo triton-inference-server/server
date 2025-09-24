@@ -42,7 +42,7 @@ TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=perf_analyzer
 TRT_OP_TEST=trt_dynamic_shape_test.py
 
 DATADIR="./models"

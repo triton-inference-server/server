@@ -41,7 +41,7 @@ fi
 # Use "--request-count" throughout the test to PA stability criteria and
 # reduce flaky failures from PA unstable measurements.
 REQUEST_COUNT=10
-CLIENT=../clients/perf_client
+CLIENT=perf_analyzer
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
 

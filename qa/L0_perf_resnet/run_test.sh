@@ -54,7 +54,7 @@ rm -fr models && mkdir -p models && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]")
 
 MEASUREMENT_WINDOW=5000
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=perf_analyzer
 # Onnx and onnx-trt models are very slow on Jetson.
 if [ "$ARCH" == "aarch64" ]; then
     if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then
