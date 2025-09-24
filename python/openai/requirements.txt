@@ -29,7 +29,7 @@ fastapi==0.115.6
 # Fix httpx version to avoid bug in openai library:
 # https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
 httpx==0.27.2
-openai==1.107.3
+openai==1.60.0
 partial-json-parser # used for parsing partial JSON outputs
 # Minimum starlette version needed to address CVE:
 # https://github.com/advisories/GHSA-f96h-pmfr-66vw
