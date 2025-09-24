@@ -177,6 +177,10 @@ def _create_trtllm_inference_request(
     if guided_json is not None:
         inputs["guided_decoding_guide_type"] = [["json_schema"]]
         inputs["guided_decoding_guide"] = [[guided_json]]
+
+    inputs["return_num_input_tokens"] = np.bool_([[True]])
+    inputs["return_num_output_tokens"] = np.bool_([[True]])
+
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
@@ -265,11 +269,6 @@ def _get_usage_from_response(
     """
     Extracts token usage statistics from a Triton inference response.
     """
-    # TODO: Remove this check once TRT-LLM backend supports both "num_input_tokens"
-    # and "num_output_tokens", and also update the test cases accordingly.
-    if backend != "vllm":
-        return None
-
     prompt_tokens = None
     completion_tokens = None
 
