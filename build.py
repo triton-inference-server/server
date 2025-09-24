@@ -93,7 +93,7 @@ OVERRIDE_BACKEND_CMAKE_FLAGS = {}
 THIS_SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
 
 ELEMENTS = {
-    'backend': ['tag', 'org', 'lib'],
+    'backend': ['tag', 'org'],
     'repoagent': ['tag', 'org'],
     'cache': ['tag', 'org'],
     'filesystem': ['strict'],
@@ -2665,16 +2665,6 @@ if __name__ == "__main__":
                 default=[],
                 help=f'Select <org> for specified <{element}>, to use the fork of the corresponding repository from <org> instead of the default --github-organization value.',
             )
-        if 'lib' in properties:
-            group.add_argument(
-                f"--{element}-library-path",
-                action="append",
-                metavar=(f"<{element}>","<library_path>"),
-                nargs=2,
-                required=False,
-                default=[],
-                help=f'Specify library paths for specified <{element}> in build.',
-            )
 
     parser.add_argument(
         "--min-compute-capability",
@@ -2904,18 +2894,15 @@ if __name__ == "__main__":
         map[key]["tag"] = value
     def do_org(element, map, key, value):
         map[key]["org"] = value
-    def do_lib(element, map, key, value):
-        map[key]["lib"] = value
     attr_fns = {
         "enable": do_enable,
         "disable": do_disable,
         "tag": do_tag,
         "org": do_org,
-        "library_path": do_lib,
     }
     for element in ELEMENTS:
         map = getattr(FLAGS, element)
-        attr_names = [f"enable_{element}", f"disable_{element}", f"{element}_tag", f"{element}_org", f"{element}_library_path"]
+        attr_names = [f"enable_{element}", f"disable_{element}", f"{element}_tag", f"{element}_org"]
         for attr_name in attr_names:
             attr = getattr(FLAGS, attr_name, None)
             if not attr: continue
@@ -2951,7 +2938,6 @@ if __name__ == "__main__":
                 f'{element} "{key}"',
                 'at tag/branch "{}"'.format(info["tag"]) if "tag" in info else "",
                 'from org "{}"'.format(info["org"]) if "org" in info else "",
-                'with library path "{}"'.format(info["lib"]) if "lib" in info else "",
             ])))
 
     # Initialize map of docker images.
