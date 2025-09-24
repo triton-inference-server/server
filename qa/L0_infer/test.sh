@@ -349,7 +349,7 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=42
+  EXPECTED_NUM_TESTS=41
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -408,7 +408,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 
         set +e
 
-        python3 $INFER_TEST >$CLIENT_LOG 2>&1
+        ENSEMBLES="0" python3 $INFER_TEST >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             RET=1

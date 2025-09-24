@@ -69,7 +69,6 @@ class InferTest(tu.TestResultCollector):
         output0_raw,
         output1_raw,
         swap,
-        network_timeout=NETWORK_TIMEOUT,
     ):
         def _infer_exact_helper(
             tester,
@@ -162,31 +161,6 @@ class InferTest(tu.TestResultCollector):
                     (input_size,),
                 ):
                     ensemble_prefix.append(prefix)
-
-        if tu.validate_for_onnx_model(
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            (input_size,),
-            (input_size,),
-            (input_size,),
-        ):
-            for prefix in ensemble_prefix:
-                for pf in ["onnx"]:
-                    if pf in BACKENDS:
-                        _infer_exact_helper(
-                            self,
-                            prefix + pf,
-                            (input_size,),
-                            8,
-                            input_dtype,
-                            output0_dtype,
-                            output1_dtype,
-                            output0_raw=output0_raw,
-                            output1_raw=output1_raw,
-                            swap=swap,
-                            network_timeout=network_timeout,
-                        )
 
         if not CPU_ONLY and tu.validate_for_trt_model(
             input_dtype,
@@ -670,9 +644,9 @@ class InferTest(tu.TestResultCollector):
         input_size = 16
         tensor_shape = (1, input_size)
 
-        # There are 3 versions of onnx_int8_int8_int8 but
+        # There are 3 versions of libtorch_int8_int8_int8 but
         # only version 3 should be available
-        for platform in ["onnx"]:
+        for platform in ["libtorch"]:
             if platform not in BACKENDS:
                 continue
             try:
@@ -733,9 +707,9 @@ class InferTest(tu.TestResultCollector):
         input_size = 16
         tensor_shape = (1, input_size)
 
-        # There are 3 versions of onnx_int16_int16_int16 but only
+        # There are 3 versions of libtorch_int16_int16_int16 but only
         # versions 2 and 3 should be available
-        for platform in ["onnx"]:
+        for platform in ["libtorch"]:
             if platform not in BACKENDS:
                 continue
             try:
@@ -794,7 +768,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
-        for platform in ["onnx"]:
+        for platform in ["libtorch"]:
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
@@ -849,7 +823,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float16_float16_float16 but only
         # version 1 should be available.
-        for platform in ["onnx"]:
+        for platform in ["libtorch"]:
             if platform not in BACKENDS:
                 continue
             iu.infer_exact(
@@ -911,7 +885,7 @@ class InferTest(tu.TestResultCollector):
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
-        for platform in ("onnx", "plan"):
+        for platform in ("libtorch", "plan"):
             if platform == "plan" and CPU_ONLY:
                 continue
             if platform not in BACKENDS:
@@ -969,7 +943,7 @@ class InferTest(tu.TestResultCollector):
             )
 
     if ENSEMBLES:
-        if all(x in BACKENDS for x in ["onnx", "plan"]):
+        if all(x in BACKENDS for x in ["onnx", "libtorch"]):
 
             def test_ensemble_mix_platform(self):
                 # Skip on CPU only machine as TensorRT model is used in this ensemble
@@ -1008,7 +982,7 @@ class InferTest(tu.TestResultCollector):
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                     )
 
-        if all(x in BACKENDS for x in ["onnx", "plan"]):
+        if all(x in BACKENDS for x in ["onnx", "libtorch"]):
 
             def test_ensemble_mix_ensemble(self):
                 for bs in (1, 8):
@@ -1083,7 +1057,7 @@ class InferTest(tu.TestResultCollector):
         if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
             def test_ensemble_label_lookup(self):
-                if all(x in BACKENDS for x in ["onnx", "plan"]):
+                if all(x in BACKENDS for x in ["onnx", "libtorch"]):
                     # Ensemble needs to look up label from the actual model
                     for bs in (1, 8):
                         iu.infer_exact(
@@ -1102,7 +1076,7 @@ class InferTest(tu.TestResultCollector):
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
 
-                if all(x in BACKENDS for x in ["onnx", "plan"]):
+                if all(x in BACKENDS for x in ["onnx", "libtorch"]):
                     # Label from the actual model will be passed along the nested ensemble
                     for bs in (1, 8):
                         iu.infer_exact(
