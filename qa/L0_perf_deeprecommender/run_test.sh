@@ -29,7 +29,9 @@ STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
 DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 
-PERF_CLIENT=../clients/perf_client
+pip3 install perf_analyzer
+
+PERF_CLIENT=perf_analyzer
 REPORTER=../common/reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
