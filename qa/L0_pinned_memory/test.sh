@@ -38,10 +38,12 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+pip3 install perf_analyzer
+
 # Use "--request-count" throughout the test to PA stability criteria and
 # reduce flaky failures from PA unstable measurements.
 REQUEST_COUNT=10
-CLIENT=../clients/perf_client
+CLIENT=perf_analyzer
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
 
