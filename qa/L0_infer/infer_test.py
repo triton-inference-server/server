@@ -42,6 +42,7 @@ TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY",
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
 CPU_ONLY = os.environ.get("TRITON_SERVER_CPU_ONLY") is not None
 TEST_VALGRIND = bool(int(os.environ.get("TEST_VALGRIND", 0)))
+VALGRIND_TESTS = bool(int(os.environ.get("VALGRIND_TESTS", 0)))
 
 USE_GRPC = os.environ.get("USE_GRPC", 1) != "0"
 USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
@@ -69,7 +70,6 @@ class InferTest(tu.TestResultCollector):
         output0_raw,
         output1_raw,
         swap,
-        network_timeout=NETWORK_TIMEOUT,
     ):
         def _infer_exact_helper(
             tester,
@@ -162,31 +162,6 @@ class InferTest(tu.TestResultCollector):
                     (input_size,),
                 ):
                     ensemble_prefix.append(prefix)
-
-        if tu.validate_for_onnx_model(
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            (input_size,),
-            (input_size,),
-            (input_size,),
-        ):
-            for prefix in ensemble_prefix:
-                for pf in ["onnx"]:
-                    if pf in BACKENDS:
-                        _infer_exact_helper(
-                            self,
-                            prefix + pf,
-                            (input_size,),
-                            8,
-                            input_dtype,
-                            output0_dtype,
-                            output1_dtype,
-                            output0_raw=output0_raw,
-                            output1_raw=output1_raw,
-                            swap=swap,
-                            network_timeout=network_timeout,
-                        )
 
         if not CPU_ONLY and tu.validate_for_trt_model(
             input_dtype,
@@ -666,16 +641,59 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
-    def test_raw_version_latest_1(self):
-        input_size = 16
-        tensor_shape = (1, input_size)
+    if not VALGRIND_TESTS:
 
-        # There are 3 versions of onnx_int8_int8_int8 but
-        # only version 3 should be available
-        for platform in ["onnx"]:
-            if platform not in BACKENDS:
-                continue
-            try:
+        def test_raw_version_latest_1(self):
+            input_size = 16
+            tensor_shape = (1, input_size)
+
+            # There are 3 versions of onnx_int8_int8_int8 but
+            # only version 3 should be available
+            for platform in ["onnx"]:
+                if platform not in BACKENDS:
+                    continue
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.int8,
+                        np.int8,
+                        np.int8,
+                        model_version=1,
+                        swap=False,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.int8,
+                        np.int8,
+                        np.int8,
+                        model_version=2,
+                        swap=True,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
                 iu.infer_exact(
                     self,
                     platform,
@@ -684,218 +702,6 @@ class InferTest(tu.TestResultCollector):
                     np.int8,
                     np.int8,
                     np.int8,
-                    model_version=1,
-                    swap=False,
-                    use_http=USE_HTTP,
-                    use_grpc=USE_GRPC,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    platform,
-                    tensor_shape,
-                    1,
-                    np.int8,
-                    np.int8,
-                    np.int8,
-                    model_version=2,
-                    swap=True,
-                    use_http=USE_HTTP,
-                    use_grpc=USE_GRPC,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
-
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int8,
-                np.int8,
-                np.int8,
-                model_version=3,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-
-    def test_raw_version_latest_2(self):
-        input_size = 16
-        tensor_shape = (1, input_size)
-
-        # There are 3 versions of onnx_int16_int16_int16 but only
-        # versions 2 and 3 should be available
-        for platform in ["onnx"]:
-            if platform not in BACKENDS:
-                continue
-            try:
-                iu.infer_exact(
-                    self,
-                    platform,
-                    tensor_shape,
-                    1,
-                    np.int16,
-                    np.int16,
-                    np.int16,
-                    model_version=1,
-                    swap=False,
-                    use_http=USE_HTTP,
-                    use_grpc=USE_GRPC,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
-
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int16,
-                np.int16,
-                np.int16,
-                model_version=2,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int16,
-                np.int16,
-                np.int16,
-                model_version=3,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-
-    def test_raw_version_all(self):
-        input_size = 16
-        tensor_shape = (1, input_size)
-
-        # There are 3 versions of *_int32_int32_int32 and all should
-        # be available.
-        for platform in ["onnx"]:
-            if platform not in BACKENDS:
-                continue
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int32,
-                np.int32,
-                np.int32,
-                model_version=1,
-                swap=False,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int32,
-                np.int32,
-                np.int32,
-                model_version=2,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.int32,
-                np.int32,
-                np.int32,
-                model_version=3,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-
-    def test_raw_version_specific_1(self):
-        input_size = 16
-        tensor_shape = (1, input_size)
-
-        # There are 3 versions of *_float16_float16_float16 but only
-        # version 1 should be available.
-        for platform in ["onnx"]:
-            if platform not in BACKENDS:
-                continue
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.float16,
-                np.float16,
-                np.float16,
-                model_version=1,
-                swap=False,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
-
-            try:
-                iu.infer_exact(
-                    self,
-                    platform,
-                    tensor_shape,
-                    1,
-                    np.float16,
-                    np.float16,
-                    np.float16,
-                    model_version=2,
-                    swap=True,
-                    use_http=USE_HTTP,
-                    use_grpc=USE_GRPC,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
-
-            try:
-                iu.infer_exact(
-                    self,
-                    platform,
-                    tensor_shape,
-                    1,
-                    np.float16,
-                    np.float16,
-                    np.float16,
                     model_version=3,
                     swap=True,
                     use_http=USE_HTTP,
@@ -903,37 +709,201 @@ class InferTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
 
-    def test_raw_version_specific_1_3(self):
-        input_size = 16
-
-        # There are 3 versions of *_float32_float32_float32 but only
-        # versions 1 and 3 should be available.
-        for platform in ("onnx", "plan"):
-            if platform == "plan" and CPU_ONLY:
-                continue
-            if platform not in BACKENDS:
-                continue
+        def test_raw_version_latest_2(self):
+            input_size = 16
             tensor_shape = (1, input_size)
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.float32,
-                np.float32,
-                np.float32,
-                model_version=1,
-                swap=False,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
 
-            try:
+            # There are 3 versions of onnx_int16_int16_int16 but only
+            # versions 2 and 3 should be available
+            for platform in ["onnx"]:
+                if platform not in BACKENDS:
+                    continue
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.int16,
+                        np.int16,
+                        np.int16,
+                        model_version=1,
+                        swap=False,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.int16,
+                    np.int16,
+                    np.int16,
+                    model_version=2,
+                    swap=True,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.int16,
+                    np.int16,
+                    np.int16,
+                    model_version=3,
+                    swap=True,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+
+        def test_raw_version_all(self):
+            input_size = 16
+            tensor_shape = (1, input_size)
+
+            # There are 3 versions of onnx_int32_int32_int32 and all should
+            # be available.
+            for platform in ["onnx"]:
+                if platform not in BACKENDS:
+                    continue
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.int32,
+                    np.int32,
+                    np.int32,
+                    model_version=1,
+                    swap=False,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.int32,
+                    np.int32,
+                    np.int32,
+                    model_version=2,
+                    swap=True,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.int32,
+                    np.int32,
+                    np.int32,
+                    model_version=3,
+                    swap=True,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+
+        def test_raw_version_specific_1(self):
+            input_size = 16
+            tensor_shape = (1, input_size)
+
+            # There are 3 versions of onnx_float16_float16_float16 but only
+            # version 1 should be available.
+            for platform in ["onnx"]:
+                if platform not in BACKENDS:
+                    continue
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.float16,
+                    np.float16,
+                    np.float16,
+                    model_version=1,
+                    swap=False,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.float16,
+                        np.float16,
+                        np.float16,
+                        model_version=2,
+                        swap=True,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.float16,
+                        np.float16,
+                        np.float16,
+                        model_version=3,
+                        swap=True,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
+        def test_raw_version_specific_1_3(self):
+            input_size = 16
+
+            # There are 3 versions of *_float32_float32_float32 but only
+            # versions 1 and 3 should be available.
+            for platform in ("onnx", "plan"):
+                if platform == "plan" and CPU_ONLY:
+                    continue
+                if platform not in BACKENDS:
+                    continue
+                tensor_shape = (1, input_size)
                 iu.infer_exact(
                     self,
                     platform,
@@ -942,149 +912,58 @@ class InferTest(tu.TestResultCollector):
                     np.float32,
                     np.float32,
                     np.float32,
-                    model_version=2,
+                    model_version=1,
+                    swap=False,
+                    use_http=USE_HTTP,
+                    use_grpc=USE_GRPC,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                )
+
+                try:
+                    iu.infer_exact(
+                        self,
+                        platform,
+                        tensor_shape,
+                        1,
+                        np.float32,
+                        np.float32,
+                        np.float32,
+                        model_version=2,
+                        swap=True,
+                        use_http=USE_HTTP,
+                        use_grpc=USE_GRPC,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    )
+                except InferenceServerException as ex:
+                    self.assertTrue(
+                        ex.message().startswith("Request for unknown model")
+                    )
+
+                iu.infer_exact(
+                    self,
+                    platform,
+                    tensor_shape,
+                    1,
+                    np.float32,
+                    np.float32,
+                    np.float32,
+                    model_version=3,
                     swap=True,
                     use_http=USE_HTTP,
                     use_grpc=USE_GRPC,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
-            except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith("Request for unknown model"))
 
-            iu.infer_exact(
-                self,
-                platform,
-                tensor_shape,
-                1,
-                np.float32,
-                np.float32,
-                np.float32,
-                model_version=3,
-                swap=True,
-                use_http=USE_HTTP,
-                use_grpc=USE_GRPC,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-            )
+        if ENSEMBLES:
+            if all(x in BACKENDS for x in ["onnx", "libtorch"]):
 
-    if ENSEMBLES:
-        if all(x in BACKENDS for x in ["onnx", "plan"]):
-
-            def test_ensemble_mix_platform(self):
-                # Skip on CPU only machine as TensorRT model is used in this ensemble
-                if CPU_ONLY:
-                    return
-                for bs in (1, 8):
-                    iu.infer_exact(
-                        self,
-                        "mix_platform",
-                        (bs, 16),
-                        bs,
-                        np.float32,
-                        np.float32,
-                        np.float32,
-                        use_http=USE_HTTP,
-                        use_grpc=USE_GRPC,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    )
-
-        if "onnx" in BACKENDS:
-
-            def test_ensemble_mix_type(self):
-                for bs in (1, 8):
-                    iu.infer_exact(
-                        self,
-                        "mix_type",
-                        (bs, 16),
-                        bs,
-                        np.int32,
-                        np.float32,
-                        np.float32,
-                        use_http=USE_HTTP,
-                        use_grpc=USE_GRPC,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    )
-
-        if all(x in BACKENDS for x in ["onnx", "plan"]):
-
-            def test_ensemble_mix_ensemble(self):
-                for bs in (1, 8):
-                    iu.infer_exact(
-                        self,
-                        "mix_ensemble",
-                        (bs, 16),
-                        bs,
-                        np.int32,
-                        np.float32,
-                        np.float32,
-                        use_http=USE_HTTP,
-                        use_grpc=USE_GRPC,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    )
-
-        if all(
-            x in BACKENDS
-            for x in [
-                "onnx",
-            ]
-        ):
-
-            def test_ensemble_mix_batch_nobatch(self):
-                base_names = ["batch_to_nobatch", "nobatch_to_batch"]
-                for name in base_names:
-                    for bs in (1, 8):
-                        iu.infer_exact(
-                            self,
-                            name,
-                            (bs, 16),
-                            bs,
-                            np.float32,
-                            np.float32,
-                            np.float32,
-                            use_http=USE_HTTP,
-                            use_grpc=USE_GRPC,
-                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                        )
-                    iu.infer_exact(
-                        self,
-                        name + "_nobatch",
-                        (8, 16),
-                        1,
-                        np.float32,
-                        np.float32,
-                        np.float32,
-                        use_http=USE_HTTP,
-                        use_grpc=USE_GRPC,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    )
-
-                # batch -> nobatch -> batch
-                for bs in (1, 8):
-                    iu.infer_exact(
-                        self,
-                        "mix_nobatch_batch",
-                        (bs, 16),
-                        bs,
-                        np.float32,
-                        np.float32,
-                        np.float32,
-                        use_http=USE_HTTP,
-                        use_grpc=USE_GRPC,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    )
-
-        if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
-
-            def test_ensemble_label_lookup(self):
-                if all(x in BACKENDS for x in ["onnx", "plan"]):
-                    # Ensemble needs to look up label from the actual model
+                def test_ensemble_mix_platform(self):
+                    # Skip on CPU only machine as TensorRT model is used in this ensemble
+                    if CPU_ONLY:
+                        return
                     for bs in (1, 8):
                         iu.infer_exact(
                             self,
@@ -1094,16 +973,33 @@ class InferTest(tu.TestResultCollector):
                             np.float32,
                             np.float32,
                             np.float32,
-                            output0_raw=False,
-                            output1_raw=False,
                             use_http=USE_HTTP,
                             use_grpc=USE_GRPC,
                             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
 
-                if all(x in BACKENDS for x in ["onnx", "plan"]):
-                    # Label from the actual model will be passed along the nested ensemble
+            if "onnx" in BACKENDS:
+
+                def test_ensemble_mix_type(self):
+                    for bs in (1, 8):
+                        iu.infer_exact(
+                            self,
+                            "mix_type",
+                            (bs, 16),
+                            bs,
+                            np.int32,
+                            np.float32,
+                            np.float32,
+                            use_http=USE_HTTP,
+                            use_grpc=USE_GRPC,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                        )
+
+            if all(x in BACKENDS for x in ["onnx", "libtorch"]):
+
+                def test_ensemble_mix_ensemble(self):
                     for bs in (1, 8):
                         iu.infer_exact(
                             self,
@@ -1113,54 +1009,147 @@ class InferTest(tu.TestResultCollector):
                             np.int32,
                             np.float32,
                             np.float32,
-                            output0_raw=False,
-                            output1_raw=False,
                             use_http=USE_HTTP,
                             use_grpc=USE_GRPC,
                             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
 
-                if "onnx" in BACKENDS:
-                    # If label file is provided, it will use the provided label file directly
-                    try:
+            if all(
+                x in BACKENDS
+                for x in [
+                    "onnx",
+                ]
+            ):
+
+                def test_ensemble_mix_batch_nobatch(self):
+                    base_names = ["batch_to_nobatch", "nobatch_to_batch"]
+                    for name in base_names:
+                        for bs in (1, 8):
+                            iu.infer_exact(
+                                self,
+                                name,
+                                (bs, 16),
+                                bs,
+                                np.float32,
+                                np.float32,
+                                np.float32,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            )
                         iu.infer_exact(
                             self,
-                            "wrong_label",
-                            (1, 16),
+                            name + "_nobatch",
+                            (8, 16),
                             1,
-                            np.int32,
                             np.float32,
                             np.float32,
-                            output0_raw=False,
-                            output1_raw=False,
+                            np.float32,
                             use_http=USE_HTTP,
                             use_grpc=USE_GRPC,
                             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
-                    except AssertionError:
-                        # Sanity check that infer_exact failed since this ensemble is provided
-                        # with unexpected labels
-                        pass
 
-                if "onnx" in BACKENDS:
+                    # batch -> nobatch -> batch
                     for bs in (1, 8):
                         iu.infer_exact(
                             self,
-                            "label_override",
+                            "mix_nobatch_batch",
                             (bs, 16),
                             bs,
-                            np.int32,
                             np.float32,
                             np.float32,
-                            output0_raw=False,
-                            output1_raw=False,
+                            np.float32,
                             use_http=USE_HTTP,
                             use_grpc=USE_GRPC,
                             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         )
+
+            if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+
+                def test_ensemble_label_lookup(self):
+                    if all(x in BACKENDS for x in ["onnx", "libtorch"]):
+                        # Ensemble needs to look up label from the actual model
+                        for bs in (1, 8):
+                            iu.infer_exact(
+                                self,
+                                "mix_platform",
+                                (bs, 16),
+                                bs,
+                                np.float32,
+                                np.float32,
+                                np.float32,
+                                output0_raw=False,
+                                output1_raw=False,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            )
+
+                    if all(x in BACKENDS for x in ["onnx", "libtorch"]):
+                        # Label from the actual model will be passed along the nested ensemble
+                        for bs in (1, 8):
+                            iu.infer_exact(
+                                self,
+                                "mix_ensemble",
+                                (bs, 16),
+                                bs,
+                                np.int32,
+                                np.float32,
+                                np.float32,
+                                output0_raw=False,
+                                output1_raw=False,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            )
+
+                    if "onnx" in BACKENDS:
+                        # If label file is provided, it will use the provided label file directly
+                        try:
+                            iu.infer_exact(
+                                self,
+                                "wrong_label",
+                                (1, 16),
+                                1,
+                                np.int32,
+                                np.float32,
+                                np.float32,
+                                output0_raw=False,
+                                output1_raw=False,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            )
+                        except AssertionError:
+                            # Sanity check that infer_exact failed since this ensemble is provided
+                            # with unexpected labels
+                            pass
+
+                    if "onnx" in BACKENDS:
+                        for bs in (1, 8):
+                            iu.infer_exact(
+                                self,
+                                "label_override",
+                                (bs, 16),
+                                bs,
+                                np.int32,
+                                np.float32,
+                                np.float32,
+                                output0_raw=False,
+                                output1_raw=False,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            )
 
 
 if __name__ == "__main__":
