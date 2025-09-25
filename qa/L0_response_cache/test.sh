@@ -141,7 +141,7 @@ install_redis
 # Stop any existing redis server first for good measure
 stop_redis
 start_redis
-LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
     echo -e "\n***\n*** Response Cache Unit Test Failed\n***"
