@@ -39,14 +39,6 @@ if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
 fi
-if [[ ! -x "triton_client/bin/perf_analyzer" ]]; then
-    echo -e "*** perf_analyzer executable is not present\n"
-    RET=1
-fi
-if [[ ! -x "triton_client/bin/perf_client" ]]; then
-    echo -e "*** perf_client link is not present\n"
-    RET=1
-fi
 
 # Check static libraries
 for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_static.a; do
@@ -179,7 +171,7 @@ python -c """import tritonclient; import tritonclient.grpc; import tritonclient.
           import tritonclient.utils.cuda_shared_memory; import tritonclient.utils.shared_memory"""
 RET=$(($RET+$?))
 
-EXECUTABLES="perf_analyzer perf_client"
+EXECUTABLES="perf_analyzer"
 for l in $EXECUTABLES; do
   if [ $(which -a $l | grep "/usr/local/bin/$l" | wc -l) -ne 1 ]; then
     which -a $l
