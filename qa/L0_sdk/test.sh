@@ -34,7 +34,7 @@ set +e
 
 RET=0
 
-# Check image_client and perf_client
+# Check image_client
 if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
