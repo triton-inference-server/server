@@ -34,11 +34,17 @@ set +e
 
 RET=0
 
-# Check image_client
+# Check image_client and perf_analyzer
 if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
 fi
+
+if ! command -v perf_analyzer >/dev/null 2>&1; then
+    echo -e "*** perf_analyzer is not installed\n"
+    RET=1
+fi
+
 
 # Check static libraries
 for l in libgrpcclient.so libgrpcclient_static.a libhttpclient.so libhttpclient_static.a; do
