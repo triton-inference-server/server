@@ -93,7 +93,7 @@ OVERRIDE_BACKEND_CMAKE_FLAGS = {}
 THIS_SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
 
 ELEMENTS = {
-    'backend': ['tag', 'org'],
+    'backend': ['tag', 'org', 'cmake'],
     'repoagent': ['tag', 'org'],
     'cache': ['tag', 'org'],
     'filesystem': ['strict'],
@@ -403,10 +403,7 @@ def cmake_core_arg(name, type, value):
     # command-line specified value if one is given.
     if name in OVERRIDE_CORE_CMAKE_FLAGS:
         value = OVERRIDE_CORE_CMAKE_FLAGS[name]
-    if type is None:
-        type = ""
-    else:
-        type = ":{}".format(type)
+    type = ":{}".format(type) if type else ""
     return '"-D{}{}={}"'.format(name, type, value)
 
 
@@ -414,11 +411,7 @@ def cmake_core_enable(name, flag):
     # Return cmake -D setting to set name=flag?ON:OFF for core
     # build. Use command-line specified value for 'flag' if one is
     # given.
-    if name in OVERRIDE_CORE_CMAKE_FLAGS:
-        value = OVERRIDE_CORE_CMAKE_FLAGS[name]
-    else:
-        value = "ON" if flag else "OFF"
-    return '"-D{}:BOOL={}"'.format(name, value)
+    return cmake_core_arg(name, "BOOL", "ON" if flag else "OFF")
 
 
 def cmake_core_extra_args():
@@ -428,46 +421,47 @@ def cmake_core_extra_args():
     return args
 
 
-def cmake_backend_arg(backend, name, type, value):
-    # Return cmake -D setting to set name=value for backend build. Use
+def cmake_element_arg(element, element_val, name, type, value):
+    # Return cmake -D setting to set name=value for <element> build. Use
     # command-line specified value if one is given.
-    if backend in OVERRIDE_BACKEND_CMAKE_FLAGS:
-        if name in OVERRIDE_BACKEND_CMAKE_FLAGS[backend]:
-            value = OVERRIDE_BACKEND_CMAKE_FLAGS[backend][name]
-    if type is None:
-        type = ""
-    else:
-        type = ":{}".format(type)
+    element_flags = getattr(FLAGS, element)
+    if "cmake_override" in element_flags[element_val]:
+        value = element_flags[element_val]["cmake_override"].get(name, value)
+    type = ":{}".format(type) if type else ""
     return '"-D{}{}={}"'.format(name, type, value)
 
 
-def cmake_backend_enable(backend, name, flag):
-    # Return cmake -D setting to set name=flag?ON:OFF for backend
+def cmake_backend_arg(*args, **kwargs):
+    return cmake_element_arg('backend', *args, **kwargs)
+
+
+def cmake_element_enable(element, element_val, name, flag):
+    # Return cmake -D setting to set name=flag?ON:OFF for <element>
     # build. Use command-line specified value for 'flag' if one is
     # given.
-    value = None
-    if backend in OVERRIDE_BACKEND_CMAKE_FLAGS:
-        if name in OVERRIDE_BACKEND_CMAKE_FLAGS[backend]:
-            value = OVERRIDE_BACKEND_CMAKE_FLAGS[backend][name]
-    if value is None:
-        value = "ON" if flag else "OFF"
-    return '"-D{}:BOOL={}"'.format(name, value)
+    return cmake_element_arg(element, element_val, name, "BOOL", "ON" if flag else "OFF")
 
 
-def cmake_backend_extra_args(backend):
+def cmake_backend_enable(*args, **kwargs):
+    return cmake_element_enable('backend', *args, **kwargs)
+
+
+def cmake_element_extra_args(element, element_val):
     args = []
-    if backend in EXTRA_BACKEND_CMAKE_FLAGS:
-        for k, v in EXTRA_BACKEND_CMAKE_FLAGS[backend].items():
+    element_flags = getattr(FLAGS, element)
+    if "cmake_extra" in element_flags[element_val]:
+        for k, v in element_flags[element_val]["cmake_extra"].items():
             args.append('"-D{}={}"'.format(k, v))
     return args
 
 
+def cmake_backend_extra_args(backend):
+    return cmake_element_extra_args('backend', backend)
+
+
 def cmake_repoagent_arg(name, type, value):
     # For now there is no override for repo-agents
-    if type is None:
-        type = ""
-    else:
-        type = ":{}".format(type)
+    type = ":{}".format(type) if type else ""
     return '"-D{}{}={}"'.format(name, type, value)
 
 
@@ -485,10 +479,7 @@ def cmake_repoagent_extra_args():
 
 def cmake_cache_arg(name, type, value):
     # For now there is no override for caches
-    if type is None:
-        type = ""
-    else:
-        type = ":{}".format(type)
+    type = ":{}".format(type) if type else ""
     return '"-D{}{}={}"'.format(name, type, value)
 
 
@@ -2611,6 +2602,34 @@ if __name__ == "__main__":
         help="Enable all standard released Triton features, backends, repository agents, caches, endpoints, and file systems.",
     )
 
+    def add_cmake_args(element, parser):
+        dependent_kwargs = dict(
+            nargs=3,
+            metavar=(f"<{element}>","<name>","<value>"),
+        )
+        if element=="core":
+            # "core" is a special case: it is already a specific component, so no need to select a specific instance of its element type
+            dependent_kwargs = dict(
+                nargs=2,
+                metavar=("<name>","<value>"),
+            )
+        parser.add_argument(
+            f"--extra-{element}-cmake-arg",
+            action="append",
+            required=False,
+            default=[],
+            help=f"Extra CMake argument for {element} build. The argument is passed to CMake as -D<name>=<value> and is included after all CMake arguments added by build.py.",
+            **dependent_kwargs
+        )
+        parser.add_argument(
+            f"--override-{element}-cmake-arg",
+            action="append",
+            required=False,
+            default=[],
+            help=f"Override specified backend CMake argument in the {element} build. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the {element} build use --extra-{element}-cmake-arg.",
+            **dependent_kwargs
+        )
+
     element_groups = {}
     for element, properties in ELEMENTS.items():
         if 'strict' in properties:
@@ -2665,6 +2684,11 @@ if __name__ == "__main__":
                 default=[],
                 help=f'Select <org> for specified <{element}>, to use the fork of the corresponding repository from <org> instead of the default --github-organization value.',
             )
+        if 'cmake' in properties:
+            add_cmake_args(element, group)
+
+    # special case
+    add_cmake_args("core", element_groups["component"])
 
     parser.add_argument(
         "--min-compute-capability",
@@ -2685,42 +2709,6 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help="Do not create fresh clones of repos that have already been cloned.",
-    )
-    parser.add_argument(
-        "--extra-core-cmake-arg",
-        action="append",
-        metavar=("<name>","<value>"),
-        nargs=2,
-        required=False,
-        default=[],
-        help="Extra CMake argument. The argument is passed to CMake as -D<name>=<value> and is included after all CMake arguments added by build.py for the core builds.",
-    )
-    parser.add_argument(
-        "--override-core-cmake-arg",
-        action="append",
-        metavar=("<name>","<value>"),
-        nargs=2,
-        required=False,
-        default=[],
-        help="Override specified CMake argument in the build. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the core build use --extra-core-cmake-arg.",
-    )
-    parser.add_argument(
-        "--extra-backend-cmake-arg",
-        action="append",
-        metavar=("<backend>","<name>","<value>"),
-        nargs=3,
-        required=False,
-        default=[],
-        help="Extra CMake argument for a backend build. The argument is passed to CMake as -D<name>=<value> and is included after all CMake arguments added by build.py for the backend.",
-    )
-    parser.add_argument(
-        "--override-backend-cmake-arg",
-        action="append",
-        metavar=("<backend>","<name>","<value>"),
-        nargs=3,
-        required=False,
-        default=[],
-        help="Override specified backend CMake argument in the build. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
         "--release-version",
@@ -2869,6 +2857,9 @@ if __name__ == "__main__":
             default["tag"] = default_repo_tag
         if "org" in ELEMENTS[element]:
             default["org"] = FLAGS.github_organization
+        if "cmake" in ELEMENTS[element]:
+            default["cmake_extra"] = {}
+            default["cmake_override"] = {}
         return default
     for element, properties in ELEMENTS.items():
         setattr(FLAGS, f"{element}", {})
@@ -2894,15 +2885,24 @@ if __name__ == "__main__":
         map[key]["tag"] = value
     def do_org(element, map, key, value):
         map[key]["org"] = value
+    def do_cmake_extra(element, map, key, name, value):
+        map[key]["cmake_extra"][name] = value
+    def do_cmake_override(element, map, key, name, value):
+        map[key]["cmake_override"][name] = value
     attr_fns = {
         "enable": do_enable,
         "disable": do_disable,
         "tag": do_tag,
         "org": do_org,
+        "extracmakearg": do_cmake_extra,
+        "overridecmakearg": do_cmake_override,
     }
     for element in ELEMENTS:
         map = getattr(FLAGS, element)
-        attr_names = [f"enable_{element}", f"disable_{element}", f"{element}_tag", f"{element}_org"]
+        attr_names = [
+            f"enable_{element}", f"disable_{element}", f"{element}_tag", f"{element}_org",
+            f"extra_{element}_cmake_arg", f"override_{element}_cmake_arg",
+        ]
         for attr_name in attr_names:
             attr = getattr(FLAGS, attr_name, None)
             if not attr: continue
@@ -2931,6 +2931,8 @@ if __name__ == "__main__":
             FLAGS.backend["tensorrtllm"]["org"] = "https://github.com/NVIDIA"
 
     # Print final element info
+    def format_cmake_args(args):
+        return ', '.join(['"-D{}={}"'.format(n,v) for n,v in args.items()])
     for element in ELEMENTS:
         map = getattr(FLAGS, element)
         for key, info in map.items():
@@ -2939,6 +2941,20 @@ if __name__ == "__main__":
                 'at tag/branch "{}"'.format(info["tag"]) if "tag" in info else "",
                 'from org "{}"'.format(info["org"]) if "org" in info else "",
             ])))
+            if any(["cmake" in prop for prop in info]):
+                cmake_extra_str = format_cmake_args(info["cmake_extra"]) if "cmake_extra" in info else ""
+                if cmake_extra_str: log('  CMake extra: '+cmake_extra_str)
+                cmake_override_str = format_cmake_args(info["cmake_override"]) if "cmake_override" in info else ""
+                if cmake_override_str: log('  CMake override: '+cmake_override_str)
+
+    # Parse any explicitly specified cmake arguments
+    for key,val in FLAGS.extra_core_cmake_arg:
+        log('core: CMake extra "-D{}={}"'.format(key, val))
+        EXTRA_CORE_CMAKE_FLAGS[key] = val
+
+    for key,val in FLAGS.override_core_cmake_arg:
+        log('core: CMake override "-D{}={}"'.format(key, val))
+        OVERRIDE_CORE_CMAKE_FLAGS[key] = val
 
     # Initialize map of docker images.
     images = {}
@@ -2954,35 +2970,6 @@ if __name__ == "__main__":
     else:
         if "base" in images:
             images["buildbase"] = images["base"]
-
-    # Parse any explicitly specified cmake arguments
-    for key,val in FLAGS.extra_core_cmake_arg:
-        log('CMake core extra "-D{}={}"'.format(key, val))
-        EXTRA_CORE_CMAKE_FLAGS[key] = val
-
-    for key,val in FLAGS.override_core_cmake_arg:
-        log('CMake core override "-D{}={}"'.format(key, val))
-        OVERRIDE_CORE_CMAKE_FLAGS[key] = val
-
-    for be,key,val in FLAGS.extra_backend_cmake_arg:
-        fail_if(
-            be not in FLAGS.backend,
-            f'--extra-backend-cmake-arg specifies backend "{be}" which is not included in build',
-        )
-        log('backend "{}" CMake extra "-D{}={}"'.format(be, key, val))
-        if be not in EXTRA_BACKEND_CMAKE_FLAGS:
-            EXTRA_BACKEND_CMAKE_FLAGS[be] = {}
-        EXTRA_BACKEND_CMAKE_FLAGS[be][key] = val
-
-    for be,key,val in FLAGS.override_backend_cmake_arg:
-        fail_if(
-            be not in FLAGS.backend,
-            f'--override-backend-cmake-arg specifies backend "{be}" which is not included in build',
-        )
-        log('backend "{}" CMake override "-D{}={}"'.format(be, key, val))
-        if be not in OVERRIDE_BACKEND_CMAKE_FLAGS:
-            OVERRIDE_BACKEND_CMAKE_FLAGS[be] = {}
-        OVERRIDE_BACKEND_CMAKE_FLAGS[be][key] = [val]
 
     # Set the build, install, and cmake directories to use for the
     # generated build scripts and Dockerfiles. If building without
