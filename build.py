@@ -94,8 +94,8 @@ THIS_SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
 
 ELEMENTS = {
     'backend': ['tag', 'org', 'cmake'],
-    'repoagent': ['tag', 'org'],
-    'cache': ['tag', 'org'],
+    'repoagent': ['tag', 'org', 'cmake'],
+    'cache': ['tag', 'org', 'cmake'],
     'filesystem': ['strict'],
     'endpoint': ['strict'],
     'feature': ['strict'],
@@ -459,40 +459,28 @@ def cmake_backend_extra_args(backend):
     return cmake_element_extra_args('backend', backend)
 
 
-def cmake_repoagent_arg(name, type, value):
-    # For now there is no override for repo-agents
-    type = ":{}".format(type) if type else ""
-    return '"-D{}{}={}"'.format(name, type, value)
+def cmake_repoagent_arg(*args, **kwargs):
+    return cmake_element_arg('repoagent', *args, **kwargs)
 
 
-def cmake_repoagent_enable(name, flag):
-    # For now there is no override for repo-agents
-    value = "ON" if flag else "OFF"
-    return '"-D{}:BOOL={}"'.format(name, value)
+def cmake_repoagent_enable(*args, **kwargs):
+    return cmake_element_enable('repoagent', *args, **kwargs)
 
 
-def cmake_repoagent_extra_args():
-    # For now there is no extra args for repo-agents
-    args = []
-    return args
+def cmake_repoagent_extra_args(repoagent):
+    return cmake_element_extra_args('repoagent', repoagent)
 
 
-def cmake_cache_arg(name, type, value):
-    # For now there is no override for caches
-    type = ":{}".format(type) if type else ""
-    return '"-D{}{}={}"'.format(name, type, value)
+def cmake_cache_arg(*args, **kwargs):
+    return cmake_element_arg('cache', *args, **kwargs)
 
 
-def cmake_cache_enable(name, flag):
-    # For now there is no override for caches
-    value = "ON" if flag else "OFF"
-    return '"-D{}:BOOL={}"'.format(name, value)
+def cmake_cache_enable(*args, **kwargs):
+    return cmake_element_enable('cache', *args, **kwargs)
 
 
-def cmake_cache_extra_args():
-    # For now there is no extra args for caches
-    args = []
-    return args
+def cmake_cache_extra_args(cache):
+    return cmake_element_extra_args('cache', cache)
 
 
 def core_cmake_args(cmake_dir, install_dir):
@@ -563,17 +551,17 @@ def repoagent_cmake_args(images, ra, install_dir):
     args = []
 
     cargs = args + [
-        cmake_repoagent_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
-        cmake_repoagent_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_repoagent_arg(ra, "CMAKE_BUILD_TYPE", None, FLAGS.build_type),
+        cmake_repoagent_arg(ra, "CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_repoagent_arg(
-            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+            ra, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
         ),
-        cmake_repoagent_arg("TRITON_COMMON_REPO_TAG", "STRING", FLAGS.component["common"]["tag"]),
-        cmake_repoagent_arg("TRITON_CORE_REPO_TAG", "STRING", FLAGS.component["core"]["tag"]),
+        cmake_repoagent_arg(ra, "TRITON_COMMON_REPO_TAG", "STRING", FLAGS.component["common"]["tag"]),
+        cmake_repoagent_arg(ra, "TRITON_CORE_REPO_TAG", "STRING", FLAGS.component["core"]["tag"]),
     ]
 
-    cargs.append(cmake_repoagent_enable("TRITON_ENABLE_GPU", "gpu" in FLAGS.feature))
-    cargs += cmake_repoagent_extra_args()
+    cargs.append(cmake_repoagent_enable(ra, "TRITON_ENABLE_GPU", "gpu" in FLAGS.feature))
+    cargs += cmake_repoagent_extra_args(ra)
     cargs.append("..")
     return cargs
 
@@ -587,17 +575,17 @@ def cache_cmake_args(images, cache, install_dir):
     args = []
 
     cargs = args + [
-        cmake_cache_arg("CMAKE_BUILD_TYPE", None, FLAGS.build_type),
-        cmake_cache_arg("CMAKE_INSTALL_PREFIX", "PATH", install_dir),
+        cmake_cache_arg(cache, "CMAKE_BUILD_TYPE", None, FLAGS.build_type),
+        cmake_cache_arg(cache, "CMAKE_INSTALL_PREFIX", "PATH", install_dir),
         cmake_cache_arg(
-            "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
+            cache, "TRITON_REPO_ORGANIZATION", "STRING", FLAGS.github_organization
         ),
-        cmake_cache_arg("TRITON_COMMON_REPO_TAG", "STRING", FLAGS.component["common"]["tag"]),
-        cmake_cache_arg("TRITON_CORE_REPO_TAG", "STRING", FLAGS.component["core"]["tag"]),
+        cmake_cache_arg(cache, "TRITON_COMMON_REPO_TAG", "STRING", FLAGS.component["common"]["tag"]),
+        cmake_cache_arg(cache, "TRITON_CORE_REPO_TAG", "STRING", FLAGS.component["core"]["tag"]),
     ]
 
-    cargs.append(cmake_cache_enable("TRITON_ENABLE_GPU", 'gpu' in FLAGS.feature))
-    cargs += cmake_cache_extra_args()
+    cargs.append(cmake_cache_enable(cache, "TRITON_ENABLE_GPU", 'gpu' in FLAGS.feature))
+    cargs += cmake_cache_extra_args(cache)
     cargs.append("..")
     return cargs
 
