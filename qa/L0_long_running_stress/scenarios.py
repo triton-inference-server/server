@@ -99,7 +99,7 @@ class Scenario(metaclass=abc.ABCMeta):
 
 class PerfAnalyzerScenario(Scenario):
     # Some class static variables
-    command_ = "../clients/perf_analyzer"
+    command_ = "perf_analyzer"
     generation_mutex_ = threading.Lock()
 
     class ModelOption:
