@@ -364,6 +364,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
       mkdir nobatch_models
       mv ./models/*nobatch_* ./nobatch_models/.
       cp -fr ./models/nop_* ./nobatch_models/.
+      # These two models are required by test_ensemble_mix_batch_nobatch test case.
+      cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
+      cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
 
       for BATCHING_MODE in batch nobatch; do
         if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then

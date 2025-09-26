@@ -72,8 +72,8 @@ on how to perform incremental build.
 For Ubuntu-22.04, build.py supports both a Docker build and a
 non-Docker build.
 
-* [Build using Docker](#building-with-docker) and the TensorFlow and PyTorch
-  Docker images from [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
+* [Build using Docker](#building-with-docker) and the PyTorch
+  Docker image from [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
 
 * [Build without Docker](#building-without-docker).
 
@@ -190,14 +190,10 @@ If you want to build without GPU support you must specify individual
 feature flags and not include the `--enable-gpu` and
 `--enable-gpu-metrics` flags. Only the following backends are
 available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
-`square`, `tensorflow2`, `pytorch`, `onnxruntime`, `openvino`,
+`square`, `pytorch`, `onnxruntime`, `openvino`,
 `python` and `fil`.
 
-To include the TensorFlow2 backend in your CPU-only build, you must
-provide this additional flag to build.py:
-`--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
-
-CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs
+CPU-only builds of the PyTorch backends require some CUDA stubs
 and runtime dependencies that are not present in the CPU-only base container.
 These are retrieved from a GPU base container, which can be changed with the
 `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
@@ -401,17 +397,6 @@ and cmake_build or the equivalent commands to perform a build.
   that package by not specifying --filesystem=s3 when you run
   build.py. In general, you should start by running build.py with the
   minimal required feature set.
-
-* The
-  [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
-  backend extracts pre-built shared libraries from the TensorFlow NGC
-  container as part of the build. This container is only available for
-  Ubuntu-22.04 / x86-64, so if you require the TensorFlow backend for
-  your platform you will need download the TensorFlow container and
-  modify its build to produce shared libraries for your platform. You
-  must use the TensorFlow source and build scripts from within the NGC
-  container because they contain Triton-specific patches that are
-  required for the Triton TensorFlow backend.
 
 * By default, the
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend)

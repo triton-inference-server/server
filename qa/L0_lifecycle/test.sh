@@ -1666,7 +1666,7 @@ LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_load_gpu_limit
 # dependency of the Python model to be used
-pip install cuda-python
+pip install "cuda-python>=12,<13"
 rm -fr models config.pbtxt.*
 mkdir models
 cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_1 && \

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,65 +65,6 @@ to use the [NGC TensorRT
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt)
 corresponding to the Triton container. For example, if you are using
 the 24.12 version of Triton, use the 24.12 version of the TensorRT
-container.
-
-## TensorFlow
-
-TensorFlow allows users to [add custom
-operations](https://www.tensorflow.org/guide/create_op) which can then
-be used in TensorFlow models. You can load custom TensorFlow operations
-into Triton in two ways:
-* At model load time, by listing them in the model configuration.
-* At server launch time, by using LD_PRELOAD.
-
-To register your custom operations library via the the model configuration,
-you can include it as an additional field. See the below configuration as an example.
-
-```bash
-$ model_operations { op_library_filename: "path/to/libtfcustom.so" }
-```
-
-Note that even though the models are loaded at runtime, multiple models can use the custom
-operators. There is currently no way to deallocate the custom operators, so they will stay
-available until Triton is shut down.
-
-You can also register your custom operations library via LD_PRELOAD. For example,
-assuming your TensorFlow custom operations are compiled into libtfcustom.so,
-starting Triton with the following command makes those operations
-available to all TensorFlow models.
-
-```bash
-$ LD_PRELOAD=libtfcustom.so:${LD_PRELOAD} tritonserver --model-repository=/tmp/models ...
-```
-
-With this approach, all TensorFlow custom operations depend on a TensorFlow shared
-library that must be available to the custom shared library when it is
-loading. In practice, this means that you must make sure that
-/opt/tritonserver/backends/tensorflow1 or
-/opt/tritonserver/backends/tensorflow2 is on the library path before
-issuing the above command. There are several ways to control the
-library path and a common one is to use the LD_LIBRARY_PATH. You can
-set LD_LIBRARY_PATH in the "docker run" command or inside the
-container.
-
-```bash
-$ export LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:$LD_LIBRARY_PATH
-```
-
-A limitation of this approach is that the custom operations must be
-managed separately from the model repository itself. And more
-seriously, if there are custom layer name conflicts across multiple
-shared libraries there is currently no way to handle it.
-
-When building the custom operations shared library it is important to
-use the same version of TensorFlow as is being used in Triton. You can
-find the TensorFlow version in the [Triton Release
-Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html). A
-simple way to ensure you are using the correct version of TensorFlow
-is to use the [NGC TensorFlow
-container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow)
-corresponding to the Triton container. For example, if you are using
-the 24.12 version of Triton, use the 24.12 version of the TensorFlow
 container.
 
 ## PyTorch

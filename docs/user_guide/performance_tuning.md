@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ For additional material, see the
     [supported backends](https://github.com/triton-inference-server/backend),
     then we can simply try to deploy the model as described in the
     [Quickstart](../getting_started/quickstart.md) guide.
-    For the ONNXRuntime, TensorFlow SavedModel, and TensorRT backends, the
+    For the ONNXRuntime and TensorRT backends, the
     minimal model configuration can be inferred from the model using Triton's
     [AutoComplete](model_configuration.md#auto-generated-model-configuration)
     feature.
@@ -187,8 +187,8 @@ other frameworks.
 mkdir -p ./models/densenet_onnx/1
 
 # Download model and place it in model repository
-wget -O models/densenet_onnx/1/model.onnx
-https://contentmamluswest001.blob.core.windows.net/content/14b2744cf8d6418c87ffddc3f3127242/9502630827244d60a1214f250e3bbca7/08aed7327d694b8dbaee2c97b8d0fcba/densenet121-1.2.onnx
+wget -O models/densenet_onnx/1/model.onnx \
+    https://github.com/onnx/models/raw/main/validated/vision/classification/densenet-121/model/densenet-7.onnx
 ```
 
 2. Create a minimal [Model Configuration](model_configuration.md) for the

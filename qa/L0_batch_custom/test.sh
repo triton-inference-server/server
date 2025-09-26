@@ -88,6 +88,7 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
 (cd backend/examples/batching_strategies/volume_batching &&
  mkdir build &&
  cd build &&
+ export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
@@ -98,6 +99,7 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
  (cd backend/examples/batching_strategies/single_batching &&
  mkdir build &&
  cd build &&
+ export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \

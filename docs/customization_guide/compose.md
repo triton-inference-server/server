@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,12 +52,11 @@ should be used to create a image based on the NGC 24.12 Triton release.
 `compose.py` provides `--backend`, `--repoagent` options that allow you to
 specify which backends and repository agents to include in the custom image.
 For example, the following creates a new docker image that
-contains only the Pytorch and Tensorflow backends and the checksum
-repository agent.
+contains only the Pytorch backends and the checksum repository agent.
 
 Example:
 ```
-python3 compose.py --backend pytorch --backend tensorflow --repoagent checksum
+python3 compose.py --backend pytorch --repoagent checksum
 ```
 will provide a container `tritonserver` locally. You can access the container
 with
@@ -111,7 +110,7 @@ it would be better to [build it yourself](#build-it-yourself) by using
 
 CPU-only containers are not yet available for customization. Please see
  [build documentation](build.md) for instructions to build a full CPU-only
- container. When including TensorFlow or PyTorch backends in the composed
+ container. When including PyTorch backend in the composed
  container, an additional `gpu-min` container is needed
 since this container provided the CUDA stubs and runtime dependencies which are
 not provided in the CPU only min container.

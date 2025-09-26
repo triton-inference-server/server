@@ -49,9 +49,10 @@ ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=perf_analyzer
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
+pip3 install perf_analyzer
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then

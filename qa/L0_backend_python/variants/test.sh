@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@ rm -rf python_backend
 
 git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
 (cd python_backend/ && mkdir builddir && cd builddir && \
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
   cmake -DTRITON_ENABLE_GPU=OFF -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
   make -j18 install)
 

@@ -47,6 +47,7 @@ from tritonclient import utils
 
 class SystemSharedMemoryTestBase(tu.TestResultCollector):
     DEFAULT_SHM_BYTE_SIZE = 64
+    SYS_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 
     def setUp(self):
         self._setup_client()
@@ -113,10 +114,6 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
             shm_op1_handle,
         ]
         # Implicit assumption that input and output byte_sizes are 64 bytes for now
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-        input1_data = np.ones(shape=16, dtype=np.int32)
-        shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-        shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
         self.triton_client.register_system_shared_memory(
             "input0_data", "/input0_data", register_byte_size, offset=register_offset
         )
@@ -128,6 +125,16 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
         )
         self.triton_client.register_system_shared_memory(
             "output1_data", "/output1_data", register_byte_size, offset=register_offset
+        )
+
+        # Write data to shared memory regions
+        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+        input1_data = np.ones(shape=16, dtype=np.int32)
+        shm.set_shared_memory_region(
+            shm_ip0_handle, [input0_data], offset=register_offset
+        )
+        shm.set_shared_memory_region(
+            shm_ip1_handle, [input1_data], offset=register_offset
         )
         self.shm_names = ["input0_data", "input1_data", "output0_data", "output1_data"]
 
@@ -292,6 +299,39 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         self._shm_handles.append(shm_ip2_handle)
         self._cleanup_shm_handles()
 
+    def test_large_shm_register_offset(self):
+        # Test for out of bounds read vulnerability when registering system shared memory with large offset
+        for platform in ["python", "onnx", "libtorch", "plan", "openvino"]:
+            model_name = f"{platform}_int32_int32_int32"
+
+            # Test for large offset
+            error_msg = []
+            # Create a large shm size (page_size * 1024 is large enough to reproduce a segfault).
+            # Register offset at 1 page before the end of the shm region to give enough space for the input/output data.
+            create_byte_size = self.SYS_PAGE_SIZE * 1024
+            register_offset = self.SYS_PAGE_SIZE * 1023
+            self._configure_server(
+                create_byte_size=create_byte_size,
+                register_offset=register_offset,
+            )
+
+            iu.shm_basic_infer(
+                self,
+                self.triton_client,
+                self._shm_handles[0],
+                self._shm_handles[1],
+                self._shm_handles[2],
+                self._shm_handles[3],
+                error_msg,
+                register_offset=register_offset,
+                protocol=self.protocol,
+                use_system_shared_memory=True,
+                override_model_name=model_name,
+            )
+            self.triton_client.unregister_system_shared_memory()
+            if len(error_msg) > 0:
+                raise Exception(str(error_msg))
+
     def test_mixed_raw_shm(self):
         # Mix of shared memory and RAW inputs
         error_msg = []
@@ -332,7 +372,12 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_infer_offset_out_of_bound(self):
         # Shared memory offset outside output region - Throws error
         error_msg = []
-        self._configure_server()
+        create_byte_size = self.SYS_PAGE_SIZE + self.DEFAULT_SHM_BYTE_SIZE
+        register_offset = self.SYS_PAGE_SIZE
+        self._configure_server(
+            create_byte_size=create_byte_size,
+            register_offset=register_offset,
+        )
         if self.protocol == "http":
             # -32 when placed in an int64 signed type, to get a negative offset
             # by overflowing
@@ -362,8 +407,13 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
     def test_infer_byte_size_out_of_bound(self):
         # Shared memory byte_size outside output region - Throws error
         error_msg = []
-        self._configure_server()
-        offset = 60
+        create_byte_size = self.SYS_PAGE_SIZE + self.DEFAULT_SHM_BYTE_SIZE
+        register_offset = self.SYS_PAGE_SIZE
+        self._configure_server(
+            create_byte_size=create_byte_size,
+            register_offset=register_offset,
+        )
+        offset = 1
         byte_size = self.DEFAULT_SHM_BYTE_SIZE
 
         iu.shm_basic_infer(
@@ -516,16 +566,45 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         """
         # This matches kTritonSharedMemoryRegionPrefix in the server code.
         reserved_prefix = "triton_python_backend_shm_region_"
-
-        # The shared memory key cannot start with the reserved prefix.
         shm_name = "my_test_shm_name"
-        shm_key = f"{reserved_prefix}_my_test_shm_key"
 
-        with self.assertRaisesRegex(
-            utils.InferenceServerException,
-            f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'",
-        ) as e:
-            self.triton_client.register_system_shared_memory(shm_name, shm_key, 10000)
+        # The shared memory key cannot start with the reserved prefix,
+        # regardless of leading slashes.
+        shm_keys_to_test = [
+            f"{reserved_prefix}_my_test_shm_key",
+            f"/{reserved_prefix}_my_test_shm_key",
+            f"///{reserved_prefix}_my_test_shm_key",
+        ]
+
+        for shm_key in shm_keys_to_test:
+            with self.subTest(shm_key=shm_key):
+                expected_msg = f"cannot register shared memory region '{shm_name}' with key '{shm_key}' as the key contains the reserved prefix '{reserved_prefix}'"
+                with self.assertRaisesRegex(
+                    utils.InferenceServerException, expected_msg
+                ):
+                    self.triton_client.register_system_shared_memory(
+                        shm_name, shm_key, 10000
+                    )
+
+    def test_register_invalid_shm_key(self):
+        """
+        Test that registration fails if attempting to use an invalid name for the shm key.
+        """
+        shm_name = "my_test_shm_name"
+        shm_keys_to_test = [
+            "/",
+            "///",
+        ]
+
+        for shm_key in shm_keys_to_test:
+            with self.subTest(shm_key=shm_key):
+                expected_msg = f"cannot register shared memory region '{shm_name}' - invalid shm key '{shm_key}'"
+                with self.assertRaisesRegex(
+                    utils.InferenceServerException, expected_msg
+                ):
+                    self.triton_client.register_system_shared_memory(
+                        shm_name, shm_key, 10000
+                    )
 
 
 def callback(user_data, result, error):

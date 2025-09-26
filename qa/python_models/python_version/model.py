@@ -50,8 +50,6 @@ class TritonPythonModel:
         self.model_config = args["model_config"]
         # This is to make sure that /bin/bash is not picking up
         # the wrong shared libraries after installing PyTorch.
-        # Tensorflow uses a shared library which is common with
-        # bash.
         os.system("/bin/bash --help")
         print(
             f"Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and PyTorch version is {torch.__version__}",

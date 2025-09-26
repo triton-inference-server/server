@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1367,11 +1367,13 @@ def shm_basic_infer(
     big_shm_name="",
     big_shm_size=64,
     default_shm_byte_size=64,
+    register_offset=0,
     shm_output_offset=0,
     shm_output_byte_size=64,
     protocol="http",
     use_system_shared_memory=False,
     use_cuda_shared_memory=False,
+    override_model_name=None,
 ):
     # Lazy shm imports...
     if use_system_shared_memory:
@@ -1381,6 +1383,16 @@ def shm_basic_infer(
     else:
         raise Exception("No shared memory type specified")
 
+    if override_model_name is None:
+        model_name = "simple"
+    else:
+        model_name = override_model_name
+
+    if model_name.startswith("libtorch"):
+        output_names = ["OUTPUT__0", "OUTPUT__1"]
+    else:
+        output_names = ["OUTPUT0", "OUTPUT1"]
+
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input1_data = np.ones(shape=16, dtype=np.int32)
     inputs = []
@@ -1388,13 +1400,17 @@ def shm_basic_infer(
     if protocol == "http":
         inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
         inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
-        outputs.append(httpclient.InferRequestedOutput("OUTPUT0", binary_data=True))
-        outputs.append(httpclient.InferRequestedOutput("OUTPUT1", binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput(output_names[0], binary_data=True)
+        )
+        outputs.append(
+            httpclient.InferRequestedOutput(output_names[1], binary_data=False)
+        )
     else:
         inputs.append(grpcclient.InferInput("INPUT0", [1, 16], "INT32"))
         inputs.append(grpcclient.InferInput("INPUT1", [1, 16], "INT32"))
-        outputs.append(grpcclient.InferRequestedOutput("OUTPUT0"))
-        outputs.append(grpcclient.InferRequestedOutput("OUTPUT1"))
+        outputs.append(grpcclient.InferRequestedOutput(output_names[0]))
+        outputs.append(grpcclient.InferRequestedOutput(output_names[1]))
 
     inputs[0].set_shared_memory("input0_data", default_shm_byte_size)
 
@@ -1414,9 +1430,9 @@ def shm_basic_infer(
 
     try:
         results = triton_client.infer(
-            "simple", inputs, model_version="", outputs=outputs
+            model_name, inputs, model_version="", outputs=outputs
         )
-        output = results.get_output("OUTPUT0")
+        output = results.get_output(output_names[0])
         if protocol == "http":
             output_datatype = output["datatype"]
             output_shape = output["shape"]
@@ -1427,11 +1443,16 @@ def shm_basic_infer(
 
         if use_system_shared_memory:
             output_data = shm.get_contents_as_numpy(
-                shm_op0_handle, output_dtype, output_shape
+                shm_op0_handle,
+                output_dtype,
+                output_shape,
+                offset=register_offset + shm_output_offset,
             )
         elif use_cuda_shared_memory:
             output_data = cudashm.get_contents_as_numpy(
-                shm_op0_handle, output_dtype, output_shape
+                shm_op0_handle,
+                output_dtype,
+                output_shape,
             )
 
         tester.assertTrue(

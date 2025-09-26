@@ -93,7 +93,7 @@ class OpenAIServer:
             ["python3", script_path] + cli_args,
             env=env,
             stdout=sys.stdout,
-            stderr=sys.stderr,
+            stderr=subprocess.PIPE,  # Capture stderr
         )
         # Wait until health endpoint is responsive
         self._wait_for_server(
@@ -121,7 +121,19 @@ class OpenAIServer:
             except Exception as err:
                 result = self.proc.poll()
                 if result is not None and result != 0:
-                    raise RuntimeError("Server exited unexpectedly.") from err
+                    # Capture stderr output for better error messages
+                    stderr_output = ""
+                    try:
+                        stderr_output = self.proc.stderr.read().decode("utf-8").strip()
+                    except Exception:
+                        pass  # If we can't read stderr, just use the generic message
+
+                    if stderr_output:
+                        raise RuntimeError(
+                            f"Server exited unexpectedly: {stderr_output}"
+                        ) from err
+                    else:
+                        raise RuntimeError("Server exited unexpectedly.") from err
 
                 time.sleep(0.5)
                 if time.time() - start > timeout:

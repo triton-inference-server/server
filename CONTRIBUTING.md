@@ -88,7 +88,7 @@ proposed change so that the Triton team can provide feedback.
     documentation for instructions on running these tests.
 
 - Triton Inference Server's default build assumes recent versions of
-  dependencies (CUDA, TensorFlow, PyTorch, TensorRT,
+  dependencies (CUDA, PyTorch, TensorRT,
   etc.). Contributions that add compatibility with older versions of
   those dependencies will be considered, but NVIDIA cannot guarantee
   that all possible build configurations work, are not broken by

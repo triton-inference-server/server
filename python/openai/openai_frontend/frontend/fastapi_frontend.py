@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,10 @@ import uvicorn
 from engine.triton_engine import TritonLLMEngine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from frontend.fastapi.middleware.api_restriction import (
+    APIRestrictionMiddleware,
+    RestrictedFeatures,
+)
 from frontend.fastapi.routers import chat, completions, models, observability
 from frontend.frontend import OpenAIFrontend
 
@@ -41,10 +45,17 @@ class FastApiFrontend(OpenAIFrontend):
         host: str = "localhost",
         port: int = 8000,
         log_level: str = "info",
+        restricted_apis: list = None,
     ):
         self.host: str = host
         self.port: int = port
         self.log_level: str = log_level
+        if restricted_apis:
+            self.restricted_apis: RestrictedFeatures = RestrictedFeatures(
+                restricted_apis
+            )
+        else:
+            self.restricted_apis: RestrictedFeatures = None
         self.stopped: bool = False
 
         self.app = self._create_app()
@@ -89,6 +100,8 @@ class FastApiFrontend(OpenAIFrontend):
 
         # NOTE: For debugging purposes, should generally be restricted or removed
         self._add_cors_middleware(app)
+        if self.restricted_apis != None:
+            self._add_api_restriction_middleware(app)
 
         return app
 
@@ -106,4 +119,12 @@ class FastApiFrontend(OpenAIFrontend):
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+        )
+
+    def _add_api_restriction_middleware(self, app: FastAPI):
+        app.add_middleware(
+            APIRestrictionMiddleware, restricted_apis=self.restricted_apis
+        )
+        print(
+            f"[INFO] API restrictions enabled. Restricted API endpoints: {self.restricted_apis.RestrictionDict()}"
         )

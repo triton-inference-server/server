@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,13 +25,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+import argparse
+import json
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:25.08-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: gs://triton-inference-server-repository/model_repository
-  numGpus: 1
+import numpy as np
 
-service:
-  type: LoadBalancer
+
+def generate_input_data(num_inputs, batch_size, output_file):
+    data = {"data": []}
+    for _ in range(num_inputs):
+        input_data = np.random.rand(batch_size, 1024).astype(np.float32)
+        entry = {"INPUT0": input_data.flatten().tolist()}
+        data["data"].append(entry)
+
+    with open(output_file, "w") as f:
+        json.dump(data, f)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Generate random input data for perf_analyzer."
+    )
+    parser.add_argument(
+        "--num-inputs", type=int, help="Number of unique random inputs to generate."
+    )
+    parser.add_argument("--batch-size", type=int, help="The batch size for each input.")
+    parser.add_argument(
+        "--output-file", type=str, help="The name of the output JSON file."
+    )
+    args = parser.parse_args()
+
+    generate_input_data(args.num_inputs, args.batch_size, args.output_file)
+    print(f"Successfully generated {args.num_inputs} inputs in '{args.output_file}'.")

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -100,7 +100,7 @@ specific
 [backend](https://github.com/triton-inference-server/backend/blob/main/README.md).
 Within each version sub-directory there must be the files required by
 that backend. For example, models that use framework backends such as
-TensorRT, PyTorch, ONNX, OpenVINO and TensorFlow must provide the
+TensorRT, PyTorch, ONNX and OpenVINO must provide the
 [framework-specific model files](#model-files).
 
 ## Model Repository Locations
@@ -417,40 +417,6 @@ A minimal model repository for a TorchScript model is:
       config.pbtxt
       1/
         model.pt
-```
-
-### TensorFlow Models
-
-TensorFlow saves models in one of two formats: *GraphDef* or
-*SavedModel*. Triton supports both formats.
-
-A TensorFlow GraphDef is a single file that by default must be named
-model.graphdef. A TensorFlow SavedModel is a directory containing
-multiple files. By default the directory must be named
-model.savedmodel. These default names can be overridden using the
-*default_model_filename* property in the [model
-configuration](model_configuration.md).
-
-A minimal model repository for a TensorFlow
-GraphDef model is:
-
-```
-  <model-repository-path>/
-    <model-name>/
-      config.pbtxt
-      1/
-        model.graphdef
-```
-
-A minimal model repository for a TensorFlow SavedModel model is:
-
-```
-  <model-repository-path>/
-    <model-name>/
-      config.pbtxt
-      1/
-        model.savedmodel/
-           <saved-model files>
 ```
 
 ### OpenVINO Models
