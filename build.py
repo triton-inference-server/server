@@ -2636,20 +2636,22 @@ if __name__ == "__main__":
         if not 'required' in properties:
             group.add_argument(
                 f"--enable-{element}",
-                metavar=f"<{element}>",
-                action="append",
+                metavar=f"<{element}> [<{element}> ...]",
+                nargs='*',
+                action="extend",
                 required=False,
                 default=[],
-                help=f"Enable requested {element}",
+                help=f"Enable requested {element}(s)",
                 **kwargs
             )
             group.add_argument(
                 f"--disable-{element}",
-                metavar=f"<{element}>",
-                action="append",
+                metavar=f"<{element}> [<{element}> ...]",
+                nargs='*',
+                action="extend",
                 required=False,
                 default=[],
-                help=f"Disable requested {element} (remove from --enable-all standard list)",
+                help=f"Disable requested {element}(s) (remove from --enable-all standard list)",
                 **kwargs
             )
         if 'tag' in properties:
