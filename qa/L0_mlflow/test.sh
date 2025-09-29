@@ -41,6 +41,11 @@ rm -fr *.log *.json
 # the default installation of python.
 apt remove -y python3-blinker
 
+apt update -qq && apt install python3-venv -y
+python3 -m venv .venv
+
+source .venv/bin/activate
+
 RET=0
 
 # Set up MLflow and dependencies used by the test
