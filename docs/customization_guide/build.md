@@ -158,8 +158,8 @@ $ ./build.py -v --enable-all
 ```
 
 If you want to enable only certain Triton features, backends, and
-repository agents, there are two options:  
-a. do not specify `--enable-all`, and instead specify the individual flags as documented by `--help`.  
+repository agents, there are two options:
+a. do not specify `--enable-all`, and instead specify the individual flags as documented by `--help`.
 b. specify `--enable-all` and then disable selected features that you wish to omit using the `--disable-...` arguments, also documented by `--help`.
 
 #### Building With Specific GitHub Branches and Organization
@@ -328,7 +328,7 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```bash
-python build.py --cmake-dir <path/to/repo>/build --build-dir /tmp/citritonbuild --no-container-pull --image base win10-py3-min --enable-feature logging --enable-feature stats --enable-feature tracing --enable-feature gpu --enable-endpoint grpc --enable-endpoint http --component-tag common <container tag> --component-tag core <container tag> --component-tag backend <container tag> --component-tag thirdparty <container tag> --enable-backend ensemble --enable-backend tensorrt --backend-tag tensorrt <container tag> --enable-backend onnxruntime --backend-tag onnxruntime <container tag> --enable-backend openvino --backend-tag openvino <container tag> --enable-backend python --backend-tag python <container tag>
+python build.py --cmake-dir <path/to/repo>/build --build-dir /tmp/citritonbuild --no-container-pull --image base win10-py3-min --enable-feature logging stats tracing gpu --enable-endpoint grpc http --component-tag common <container tag> --component-tag core <container tag> --component-tag backend <container tag> --component-tag thirdparty <container tag> --enable-backend ensemble tensorrt onnxruntime openvino python --backend-tag tensorrt <container tag> --backend-tag onnxruntime <container tag> --backend-tag openvino <container tag> --backend-tag python <container tag>
 ```
 
 If you are building on *main* branch then `<container tag>` will
@@ -341,7 +341,6 @@ tag>` at all (nor the preceding colon). You can use a different
 branch/tag in the build. For example, if you have a branch called
 "mybranch" in the
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
-repo that you want to use in the build, you would specify
 repo that you want to use in the build, you would specify
 `--backend-tag onnxruntime mybranch`.
 
