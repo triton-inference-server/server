@@ -141,7 +141,6 @@ RUN mkdir -p qa/common && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/backend_tensor_size_test qa/L0_input_validation/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
-    rm -f qa/L0_response_cache/response_cache_test && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
     cp bin/request_cancellation_test qa/L0_request_cancellation/. && \
     cp bin/triton_json_test qa/L0_json/. && \
