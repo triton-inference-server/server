@@ -154,8 +154,8 @@ $ ./build.py -v --enable-all
 ```
 
 If you want to enable only certain Triton features, backends, and
-repository agents, there are two options:  
-a. do not specify `--enable-all`, and instead specify the individual flags as documented by `--help`.  
+repository agents, there are two options:
+a. do not specify `--enable-all`, and instead specify the individual flags as documented by `--help`.
 b. specify `--enable-all` and then disable selected features that you wish to omit using the `--disable-...` arguments, also documented by `--help`.
 
 #### Building With Specific GitHub Branches and Organization
