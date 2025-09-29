@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -64,11 +64,12 @@ void
 WriteEVBufferToFile(const std::string& file_name, evbuffer* evb)
 {
   std::ofstream fs(file_name);
+  std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
   struct evbuffer_iovec* buffer_array = nullptr;
   int buffer_count = evbuffer_peek(evb, -1, NULL, NULL, 0);
   if (buffer_count > 0) {
-    buffer_array = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+    buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+    buffer_array = buffer_array_holder.get();
     ASSERT_EQ(
         evbuffer_peek(evb, -1, NULL, buffer_array, buffer_count), buffer_count)
         << "unexpected error getting buffers for result";
@@ -85,11 +86,12 @@ EVBufferToContiguousBuffer(evbuffer* evb, std::vector<char>* buffer)
 {
   *buffer = std::vector<char>(evbuffer_get_length(evb));
   {
+    std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
     struct evbuffer_iovec* buffer_array = nullptr;
     int buffer_count = evbuffer_peek(evb, -1, NULL, NULL, 0);
     if (buffer_count > 0) {
-      buffer_array = static_cast<struct evbuffer_iovec*>(
-          alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+      buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+      buffer_array = buffer_array_holder.get();
       ASSERT_EQ(
           evbuffer_peek(evb, -1, NULL, buffer_array, buffer_count),
           buffer_count)
@@ -276,11 +278,12 @@ TEST_F(DataCompressorTest, DeflateTwoBuffer)
       << "Failed to create compressed evbuffer";
   // Reconstruct the compressed buffer to be two buffers
   if (evbuffer_peek(compressed, -1, NULL, NULL, 0) == 1) {
+    std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
     struct evbuffer_iovec* buffer_array = nullptr;
     int buffer_count = evbuffer_peek(compressed, -1, NULL, NULL, 0);
     if (buffer_count > 0) {
-      buffer_array = static_cast<struct evbuffer_iovec*>(
-          alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+      buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+      buffer_array = buffer_array_holder.get();
       ASSERT_EQ(
           evbuffer_peek(compressed, -1, NULL, buffer_array, buffer_count),
           buffer_count)
@@ -357,11 +360,12 @@ TEST_F(DataCompressorTest, GzipTwoBuffer)
       << "Failed to create compressed evbuffer";
   // Reconstruct the compressed buffer to be two buffers
   if (evbuffer_peek(compressed, -1, NULL, NULL, 0) == 1) {
+    std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
     struct evbuffer_iovec* buffer_array = nullptr;
     int buffer_count = evbuffer_peek(compressed, -1, NULL, NULL, 0);
     if (buffer_count > 0) {
-      buffer_array = static_cast<struct evbuffer_iovec*>(
-          alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+      buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+      buffer_array = buffer_array_holder.get();
       ASSERT_EQ(
           evbuffer_peek(compressed, -1, NULL, buffer_array, buffer_count),
           buffer_count)
