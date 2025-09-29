@@ -32,7 +32,6 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.08-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
-ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
@@ -41,7 +40,6 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
-ARG TRITON_PERF_ANALYZER_BUILD=1
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=4.4.0-1
 
@@ -97,7 +95,6 @@ RUN rm -f /usr/bin/python && \
 # Build the client library and examples
 ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CLIENT_REPO_SUBDIR
-ARG TRITON_PA_REPO_SUBDIR
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_CLIENT_REPO_TAG
@@ -106,14 +103,10 @@ ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
-ARG TRITON_PERF_ANALYZER_BUILD
-
-ENV TRITON_PERF_ANALYZER_BUILD=${TRITON_PERF_ANALYZER_BUILD}
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
-COPY ${TRITON_PA_REPO_SUBDIR} perf_analyzer
 
 WORKDIR /workspace/client_build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
@@ -124,63 +117,11 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_PERF_ANALYZER=OFF \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
-          -DTRITON_ENABLE_PYTHON_HTTP=OFF -DTRITON_ENABLE_PYTHON_GRPC=OFF \
+          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN cmake --build . -v --parallel --target cc-clients java-clients
-
-# TODO: PA will rebuild the CC clients since it depends on it.
-# This should be optimized so that we do not have to build
-# the CC clients twice. Similarly, because the SDK expectation is
-# that PA is packaged with the python client, we hold off on building
-# the python client until now. Post-migration we should focus
-# effort on de-tangling these flows.
-WORKDIR /workspace/pa_build
-# NOTE: If TRITON_PERF_ANALYZER_BUILD=0, the Performance Analyzer (PA) binaries must already exist
-# in the path specified by the ARG TRITON_PA_REPO_SUBDIR.
-RUN if [ "$TRITON_PERF_ANALYZER_BUILD" = "1" ]; then \
-        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
-          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
-          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
-          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-          -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-          -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
-          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-          -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-          -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
-          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
-          -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
-          -DTRITON_ENABLE_CC_HTTP=ON \
-          -DTRITON_ENABLE_CC_GRPC=ON \
-          -DTRITON_ENABLE_PYTHON_HTTP=ON \
-          -DTRITON_ENABLE_PYTHON_GRPC=ON \
-          -DTRITON_PACKAGE_PERF_ANALYZER=ON \
-          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
-        /workspace/perf_analyzer && \
-        cmake --build . -v --parallel --target perf-analyzer python-clients && \
-        pip3 install build && \
-        cd /workspace/perf_analyzer/genai-perf && \
-        python3 -m build --wheel --outdir /workspace/install/python; \
-    else \
-        ls /workspace/perf_analyzer/ && \
-        tar -xzf /workspace/perf_analyzer/perf_analyzer*.tar.gz -C /workspace/install/bin && \
-        echo "Perf Analyzer binaries was extracted and not build" && \
-        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
-          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
-          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
-          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-          -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
-          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-          -DTRITON_ENABLE_PYTHON_HTTP=ON \
-          -DTRITON_ENABLE_PYTHON_GRPC=ON \
-          -DTRITON_PACKAGE_PERF_ANALYZER=ON \
-          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
-        /workspace/perf_analyzer && \
-        cmake --build . -v --parallel --target python-clients && \
-        mkdir -p /workspace/install/python && \
-        cp /workspace/perf_analyzer/genai_perf-*.whl /workspace/install/python/; \
-    fi
+RUN cmake --build . -v --parallel --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
@@ -235,7 +176,6 @@ WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=sdk_build /workspace/client/ client/
-COPY --from=sdk_build /workspace/perf_analyzer/ perf_analyzer/
 COPY --from=sdk_build /workspace/install/ install/
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
@@ -253,8 +193,6 @@ COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_cli
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
-RUN pip3 install install/python/genai_perf-*.whl
-
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
@@ -262,6 +200,9 @@ RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
+
+# Install GenAI-Perf
+RUN pip3 install genai-perf
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \

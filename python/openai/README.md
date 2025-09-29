@@ -34,13 +34,6 @@
 
 ## Pre-requisites
 
-> [!WARNING]
-> **CuPy CUDA 13 Compatibility Issue**: The Triton Inference Server Image has been upgraded to CUDA 13. You may encounter issues when using CuPy before it officially supports CUDA 13 (see [this issue](https://github.com/cupy/cupy/issues/9286) requesting CUDA 13 support). Some issues may be resolved by linking CUDA 12 shared objects to CUDA 13, for example:
-> ```bash
-> ln -sf /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.13.0.48 /usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.12
-> export LD_LIBRARY_PATH="/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
-> ```
-
 1. Docker + NVIDIA Container Runtime
 2. A correctly configured `HF_TOKEN` for access to HuggingFace models.
     - The current examples and testing primarily use the
@@ -644,4 +637,55 @@ Example output:
 function name: get_n_day_weather_forecast
 function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit", num_days: 1}
 tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit in next 1 days.
+```
+
+## Limit Endpoint Access
+
+The OpenAI-compatible server supports restricting access to specific API endpoints through authentication headers. This feature allows you to protect sensitive endpoints while keeping others publicly accessible.
+
+### Configuration
+
+Use the `--openai-restricted-api` command-line argument to configure endpoint restrictions:
+
+```
+--openai-restricted-api <API_1>,<API_2>,... <restricted-key> <restricted-value>
+```
+
+- **`API`**: A comma-separated list of APIs to be included in this group. Note that currently a given API is not allowed to be included in multiple groups. The following protocols / APIs are recognized:
+  - **inference**: Chat completions and text completions endpoints
+    - `POST /v1/chat/completions`
+    - `POST /v1/completions`
+  - **model-repository**: Model listing and information endpoints
+    - `GET /v1/models`
+    - `GET /v1/models/{model_name}`
+  - **metrics**: Server metrics endpoint
+    - `GET /metrics`
+  - **health**: Health check endpoint
+    - `GET /health/ready`
+
+- **`restricted-key`**: The HTTP request header to be checked when a request is received.
+- **`restricted-value`**: The header value required to access the specified protocols.
+
+### Examples
+
+#### Restrict Inference API Endpoints Only
+```bash
+--openai-restricted-api "inference api-key my-secret-key"
+```
+
+Clients must include the header:
+```bash
+curl -H "api-key: my-secret-key" \
+     -X POST http://localhost:9000/v1/chat/completions \
+     -d '{"model": "my-model", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+#### Restrict Multiple API Endpoints
+```bash
+# Different authentication for different APIs
+--openai-restricted-api "inference user-key user-secret" \
+--openai-restricted-api "model-repository admin-key admin-secret"
+
+# Multiple APIs in single argument with shared authentication
+--openai-restricted-api "inference,model-repository shared-key shared-secret"
 ```

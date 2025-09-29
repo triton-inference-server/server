@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,17 +34,13 @@ set +e
 
 RET=0
 
-# Check image_client and perf_client
+# Check image_client and perf_analyzer
 if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
 fi
-if [[ ! -x "triton_client/bin/perf_analyzer" ]]; then
-    echo -e "*** perf_analyzer executable is not present\n"
-    RET=1
-fi
-if [[ ! -x "triton_client/bin/perf_client" ]]; then
-    echo -e "*** perf_client link is not present\n"
+if ! command -v perf_analyzer >/dev/null 2>&1; then
+    echo -e "*** perf_analyzer is not installed\n"
     RET=1
 fi
 
@@ -179,7 +175,7 @@ python -c """import tritonclient; import tritonclient.grpc; import tritonclient.
           import tritonclient.utils.cuda_shared_memory; import tritonclient.utils.shared_memory"""
 RET=$(($RET+$?))
 
-EXECUTABLES="perf_analyzer perf_client"
+EXECUTABLES="perf_analyzer"
 for l in $EXECUTABLES; do
   if [ $(which -a $l | grep "/usr/local/bin/$l" | wc -l) -ne 1 ]; then
     which -a $l
