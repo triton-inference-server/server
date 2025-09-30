@@ -38,6 +38,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | Torch version | TensorRT version | TensorRT-LLM version | CUDA version | CUDA Driver version | Size |
 | --- | ---  | --- | --- | --- | --- | --- | --- | --- |
+| 25.09 | nvcr.io/nvidia/tritonserver:25.09-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.6 | 10.11.0.33 | 1.0.0 | 12.9.1.010 | 575.57.08 | 14.25 GB |
 | 25.08 | nvcr.io/nvidia/tritonserver:25.08-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.5 | 10.11.0.33 | 0.21.0 | 12.9.0.043 | 575.51.03 | 20.49 GB |
 | 25.07 | nvcr.io/nvidia/tritonserver:25.07-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0+79aa17489c.nv25.4 | 10.10.0.31 | 0.20.0 | 12.9.0.036 | 575.51.03 | 18.3G |
 | 25.06 | nvcr.io/nvidia/tritonserver:25.06-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0+79aa17489c.nv25.4 | 10.10.0.31 | 0.20.0 | 12.9.0.036 | 575.51.03 | 18.3G |
@@ -60,7 +61,8 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | vLLM version | CUDA version | CUDA Driver version | Size |
 | --- | --- | --- | --- | --- | --- | --- |
-| 25.08 | nvcr.io/nvidia/tritonserver:25.08-vllm-python-py3 | Python 3.12.3  | 0.9.2+4ef1e343.nv25.8.post1.cu130 | 12.9.0.043 | 575.51.03 | 8.1G |
+| 25.09 | nvcr.io/nvidia/tritonserver:25.09-vllm-python-py3 | Python 3.12.3  | 0.10.1.1+381074ae.nv25.9.cu130 | 13.0.1.012 | 580.82.07 | 7.78G |
+| 25.08 | nvcr.io/nvidia/tritonserver:25.08-vllm-python-py3 | Python 3.12.3  | 0.9.2+4ef1e343.nv25.8.post1.cu130 | 13.0.1.012 | 580.82.07 | 8.1G |
 | 25.07 | nvcr.io/nvidia/tritonserver:25.07-vllm-python-py3 | Python 3.12.3  | 0.9.0rc1+1958ee56.nv25.6.cu129 | 12.9.0.043 | 575.51.03 | 10G |
 | 25.06 | nvcr.io/nvidia/tritonserver:25.06-vllm-python-py3 | Python 3.12.3  | 0.9.0rc1+1958ee56.nv25.6.cu129 | 12.9.0.043 | 575.51.03 | 10G |
 | 25.05 | nvcr.io/nvidia/tritonserver:25.05-vllm-python-py3 | Python 3.12.3  | 0.8.4+dc1a3e10.nv25.5.cu129 | 12.9.0.043 | 575.51.03 | 10G |
@@ -82,6 +84,7 @@
 
 | Triton release version	 | ONNX Runtime	 |
 | --- | --- |
+| 25.09 | 1.23.0 |
 | 25.08 | 1.23.0+1d1712fdaf |
 | 25.07 | 1.22.0 |
 | 25.06 | 1.22.0 |
