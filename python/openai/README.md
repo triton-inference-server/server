@@ -341,8 +341,8 @@ python3 openai_frontend/main.py --model-repository path/to/models --tokenizer me
   - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
 ```bash
 # MODEL should be the client-facing model name in your model repository for a pipeline like TRT-LLM.
-# For example, this could also be "ensemble", or something like "gpt2" if generated from Triton CLI
-MODEL="tensorrt_llm_bls"
+# For example, this could also be "tensorrt_llm_bls", or something like "gpt2" if generated from Triton CLI
+MODEL="ensemble"
 curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "'${MODEL}'",
   "messages": [{"role": "user", "content": "Say this is a test!"}]
@@ -354,13 +354,13 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
+  "id": "cmpl-1e8ef90b-9def-11f0-8b68-89e7c3fd7d95",
   "choices": [
     {
       "finish_reason": "stop",
       "index": 0,
       "message": {
-        "content": "It looks like you're testing the system!",
+        "content": "It looks like you're ready to see if I'm functioning properly. What would",
         "tool_calls": null,
         "role": "assistant",
         "function_call": null
@@ -368,11 +368,15 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
       "logprobs": null
     }
   ],
-  "created": 1728948689,
-  "model": "llama-3-8b-instruct",
+  "created": 1759231078,
+  "model": "ensemble",
   "system_fingerprint": null,
   "object": "chat.completion",
-  "usage": null
+  "usage": {
+    "completion_tokens": 16,
+    "prompt_tokens": 42,
+    "total_tokens": 58
+  }
 }
 ```
 

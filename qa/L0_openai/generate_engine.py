@@ -25,7 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from argparse import ArgumentParser
 
-from tensorrt_llm import LLM, BuildConfig
+from tensorrt_llm import BuildConfig
+from tensorrt_llm._tensorrt_engine import LLM
 from tensorrt_llm.plugin import PluginConfig
 
 

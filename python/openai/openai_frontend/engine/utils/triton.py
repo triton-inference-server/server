@@ -284,10 +284,20 @@ def _get_usage_from_response(
                 input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
             )
             prompt_tokens = prompt_tokens_ptr[0]
+        elif input_token_tensor.data_type == tritonserver.DataType.INT32:
+            prompt_tokens_ptr = ctypes.cast(
+                input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_int32)
+            )
+            prompt_tokens = prompt_tokens_ptr[0]
 
         if output_token_tensor.data_type == tritonserver.DataType.UINT32:
             completion_tokens_ptr = ctypes.cast(
                 output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            completion_tokens = completion_tokens_ptr[0]
+        elif output_token_tensor.data_type == tritonserver.DataType.INT32:
+            completion_tokens_ptr = ctypes.cast(
+                output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_int32)
             )
             completion_tokens = completion_tokens_ptr[0]
 

@@ -51,7 +51,7 @@ def infer_test_environment(tool_call_parser):
         import tensorrt_llm as _
 
         backend = "tensorrtllm"
-        model = "tensorrt_llm_bls"
+        model = "ensemble"
         return backend, model
     except ImportError:
         print("No tensorrt_llm installation found.")
