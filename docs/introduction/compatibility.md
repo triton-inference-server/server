@@ -38,7 +38,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | Torch version | TensorRT version | TensorRT-LLM version | CUDA version | CUDA Driver version | Size |
 | --- | ---  | --- | --- | --- | --- | --- | --- | --- |
-| 25.09 | nvcr.io/nvidia/tritonserver:25.09-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.6 | 10.11.0.33 | 1.0.0 | 12.9.1.010 | 575.57.08 | 14.25 GB |
+| 25.09 | nvcr.io/nvidia/tritonserver:25.09-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.6 | 10.11.0.33 | 1.0.0 | 12.9.1.010 | 575.57.08 | 16.25 GB |
 | 25.08 | nvcr.io/nvidia/tritonserver:25.08-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.5 | 10.11.0.33 | 0.21.0 | 12.9.0.043 | 575.51.03 | 20.49 GB |
 | 25.07 | nvcr.io/nvidia/tritonserver:25.07-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0+79aa17489c.nv25.4 | 10.10.0.31 | 0.20.0 | 12.9.0.036 | 575.51.03 | 18.3G |
 | 25.06 | nvcr.io/nvidia/tritonserver:25.06-trtllm-python-py3 | Python 3.12.3  | 2.7.0a0+79aa17489c.nv25.4 | 10.10.0.31 | 0.20.0 | 12.9.0.036 | 575.51.03 | 18.3G |
