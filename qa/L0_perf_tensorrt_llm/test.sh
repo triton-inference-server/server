@@ -43,13 +43,7 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_LOG="${NAME}_server.log"
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
-
-function clone_tensorrt_llm_backend_repo {
-    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
-    apt-get update && apt-get install git-lfs -y --no-install-recommends
-    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
-    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
-}
+source ../common/trtllm_util.sh
 
 # Update Open MPI to a version compatible with SLURM.
 function upgrade_openmpi {
@@ -93,125 +87,6 @@ function upgrade_openmpi {
     source ~/.bashrc
     cd "$BASE_DIR"
     mpirun --version
-}
-
-function build_gpt2_base_model {
-    # Download weights from HuggingFace Transformers
-    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
-    rm pytorch_model.bin model.safetensors
-    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
-        echo "Downloading pytorch_model.bin failed."
-        exit 1
-    fi
-    cd ${GPT_DIR}
-
-    # Convert weights from HF Tranformers to FT format
-    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
-    cd ${BASE_DIR}
-}
-
-function build_gpt2_tensorrt_engine {
-    # Build TensorRT engines
-    cd ${GPT_DIR}
-    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
-        --gpt_attention_plugin float16 \
-        --remove_input_padding enable \
-        --paged_kv_cache enable \
-        --gemm_plugin float16 \
-        --workers "${NUM_GPUS}" \
-        --output_dir "${ENGINES_DIR}"
-
-    cd ${BASE_DIR}
-}
-
-function replace_config_tags {
-    tag_to_replace="${1}"
-    new_value="${2}"
-    config_file_path="${3}"
-    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
-}
-
-function prepare_model_repository {
-    rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
-    rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
-    mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
-
-    replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-}
-
-# Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
-# success, 1 on failure
-function wait_for_server_ready() {
-    local wait_time_secs="${1:-30}"
-    shift
-    local spids=("$@")
-
-    WAIT_RET=0
-
-    for _ in $(seq "$wait_time_secs"); do
-        for pid in "${spids[@]}"; do
-            if ! kill -0 "$pid" >/dev/null 2>&1; then
-                echo "=== Server not running."
-                WAIT_RET=1
-                return
-            fi
-        done
-
-        sleep 1
-
-        if curl -s --fail localhost:8000/v2/health/ready &&
-            curl -s --fail -w "%{http_code}" -o /dev/null -d '{"log_verbose_level":1}' localhost:8000/v2/logging; then
-            return
-        fi
-    done
-
-    echo "=== Timeout $wait_time_secs secs. Server not ready."
-    WAIT_RET=1
-}
-
-function run_server {
-    python3 ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
-    sleep 2 # allow time to obtain the pid(s)
-    # Read PIDs into an array, trimming whitespaces
-    readarray -t SERVER_PID < <(pgrep "tritonserver")
-
-    wait_for_server_ready ${SERVER_TIMEOUT} "${SERVER_PID[@]}"
-    if [ "$WAIT_RET" != "0" ]; then
-        # Cleanup
-        kill "${SERVER_PID[@]}" >/dev/null 2>&1 || true
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-}
-
-function kill_server {
-    pgrep tritonserver | xargs kill -SIGINT
-    for pid in "${SERVER_PID[@]}"; do
-        echo "Waiting for proc ${pid} to terminate..."
-        while kill -0 $pid >/dev/null 2>&1; do
-            sleep 1
-        done
-    done
 }
 
 upgrade_openmpi
