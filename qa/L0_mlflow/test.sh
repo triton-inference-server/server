@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,6 +40,11 @@ rm -fr *.log *.json
 # but it is unknown whether this test should rely on
 # the default installation of python.
 apt remove -y python3-blinker
+
+apt update -qq && apt install python3-venv -y
+python3 -m venv .venv
+
+source .venv/bin/activate
 
 RET=0
 
