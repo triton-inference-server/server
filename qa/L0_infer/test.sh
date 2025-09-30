@@ -234,7 +234,7 @@ function generate_model_repository() {
       create_nop_version_dir `pwd`/models
 
       if [[ $BACKENDS == *"onnx"* ]]; then
-        # ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
+        ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
 
         ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
 
@@ -366,7 +366,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
       cp -fr ./models/nop_* ./nobatch_models/.
       if [[ $BACKENDS == *"onnx"* ]]; then
         # These two models are required by test_ensemble_mix_batch_nobatch test case.
-        # cp -frv ./models/onnx_float32_float32_float32 ./nobatch_models/.
+        cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
         cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
       fi
 
