@@ -369,8 +369,8 @@ class LoRATest(unittest.TestCase):
 @pytest.mark.parametrize(
     "model_repository,model_name,expect_error",
     [
-        ("openai_model_repository", "", True), # Empty string as model name.
-        ("openai_model_repository", "     ", True), # Whitespace-only model name.
+        ("openai_model_repository", "", True),  # Empty string as model name.
+        ("openai_model_repository", "     ", True),  # Whitespace-only model name.
         ("openai_model_repository", "invalid/path", True),
         ("openai_model_repository", "invalid\\path", True),
         ("openai_model_repository", "../outside/repo", True),
