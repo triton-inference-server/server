@@ -196,7 +196,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             print(f"[DEBUG] Actual status code: {response.status_code}")
             try:
                 print(f"[DEBUG] Error response: {response.json()}")
-            except:
+            except ValueError:
                 print(
                     f"[DEBUG] Error response (not JSON): {response.content.decode()}"
                 )
