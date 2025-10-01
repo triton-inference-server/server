@@ -35,7 +35,7 @@ class TestCompletions:
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
 
-    def test_completions_defaults(self, client, model: str, prompt: str, backend: str):
+    def test_completions_defaults(self, client, model: str, prompt: str):
         response = client.post(
             "/v1/completions",
             json={"model": model, "prompt": prompt},
@@ -48,10 +48,7 @@ class TestCompletions:
         assert response.json()["choices"][0]["text"].strip()
 
         usage = response.json().get("usage")
-        if backend == "vllm":
-            assert usage is not None
-        else:
-            assert usage is None
+        assert usage is not None
 
     @pytest.mark.parametrize(
         "sampling_parameter, value",
@@ -371,12 +368,7 @@ class TestCompletions:
     def test_multi_lora(self):
         pass
 
-    def test_usage_response(self, client, model: str, prompt: str, backend: str):
-        if backend != "vllm":
-            pytest.skip(
-                "Usage reporting is currently available only for the vLLM backend."
-            )
-
+    def test_usage_response(self, client, model: str, prompt: str):
         response = client.post(
             "/v1/completions",
             json={"model": model, "prompt": prompt},
