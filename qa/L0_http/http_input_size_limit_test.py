@@ -184,11 +184,22 @@ class InferSizeLimitTest(tu.TestResultCollector):
             shape_size * BYTES_PER_FP32 < 64 * MB
         )  # Verify we're actually under the 64MB limit
 
+        headers = {"Content-Type": "application/json"}
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
         )
 
         # Should succeed with 200 OK
+        if response.status_code != 200:
+            print(f"\n[DEBUG] test_default_limit_rejection_json - FAILED SUCCESS CASE")
+            print(f"[DEBUG] Expected status code: 200")
+            print(f"[DEBUG] Actual status code: {response.status_code}")
+            try:
+                print(f"[DEBUG] Error response: {response.json()}")
+            except:
+                print(
+                    f"[DEBUG] Error response (not JSON): {response.content.decode()}"
+                )
         self.assertEqual(
             200,
             response.status_code,
@@ -342,6 +353,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Should succeed with 200 OK
+        if response.status_code != 200:
+            print(f"\n[DEBUG] test_large_input_json - FAILED SUCCESS CASE")
+            print(f"[DEBUG] Expected status code: 200")
+            print(f"[DEBUG] Actual status code: {response.status_code}")
+            try:
+                print(f"[DEBUG] Error response: {response.json()}")
+            except:
+                print(
+                    f"[DEBUG] Error response (not JSON): {response.content.decode()}"
+                )
         self.assertEqual(
             200,
             response.status_code,
