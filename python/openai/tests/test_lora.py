@@ -373,6 +373,7 @@ class LoRATest(unittest.TestCase):
         ("openai_model_repository", "invalid/path", True),
         ("openai_model_repository", "invalid\\path", True),
         ("openai_model_repository", "../outside/repo", True),
+        ("openai_model_repository", "../test_models/identity_py", True),
         ("test_models", "identity_py", False),
         ("test_models", "mock_llm", False),
     ],
