@@ -26,18 +26,17 @@
 
 import json
 import os
-import pytest
 import shutil
 import unittest
 
+import pytest
 from huggingface_hub import snapshot_download
 from openai import BadRequestError, NotFoundError
-
-from .utils import OpenAIServer
 
 from ..openai_frontend.engine.utils.triton import (
     _get_vllm_lora_names as get_vllm_lora_names,
 )
+from .utils import OpenAIServer
 
 
 def is_vllm_installed():
