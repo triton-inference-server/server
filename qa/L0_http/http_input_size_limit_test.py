@@ -360,6 +360,54 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
+    def test_large_string_in_json(self):
+        """Test JSON request with large string input"""
+        model = "simple_identity"
+
+        # Create a string that is larger (a very large payload about 2GB) than the default limit of 64MB
+        large_string_size = 2222 * 1024222
+        large_string = "A" * large_string_size
+
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "BYTES",
+                    "shape": [1, 1],
+                    "data": [large_string],
+                }
+            ]
+        }
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, json=payload
+        )
+
+        # Should fail with 400 bad request
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected error code for oversized JSON request, got: {}".format(
+                response.status_code
+            ),
+        )
+
+        # Verify error message
+        error_msg = response.content.decode()
+        self.assertIn(
+            "Request JSON size",
+            error_msg,
+        )
+        self.assertIn(
+            "exceeds the maximum allowed value",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
