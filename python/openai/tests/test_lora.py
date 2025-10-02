@@ -39,6 +39,40 @@ from openai_frontend.engine.utils.triton import (
 from .utils import OpenAIServer
 
 
+@pytest.mark.parametrize(
+    "model_repository,model_name,expect_error",
+    [
+        ("openai_model_repository", "", True),  # Empty string as model name.
+        ("openai_model_repository", "     ", True),  # Whitespace-only model name.
+        ("openai_model_repository", "invalid/path", True),
+        ("openai_model_repository", "invalid\\path", True),
+        ("openai_model_repository", "../outside/repo", True),
+        ("openai_model_repository", "../test_models/identity_py", True),
+        ("test_models", "../test_models/identity_py", True),
+        ("test_models", "identity_py", False),
+        ("test_models", "mock_llm", False),
+    ],
+)
+def test_get_vllm_lora_name(model_repository: str, model_name: str, expect_error: bool):
+    try:
+        get_vllm_lora_names(model_repository, model_name, 1)
+    except ValueError as e:
+        if expect_error:
+            assert (
+                f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
+                == str(e)
+            )
+        else:
+            raise pytest.fail(
+                f"(model_repository='{model_repository}', model_name='{model_name}') raised ValueError unexpectedly: {e}"
+            )
+    else:
+        if expect_error:
+            raise pytest.fail(
+                f"(model_repository='{model_repository}', model_name='{model_name}') did not raise ValueError as expected."
+            )
+
+
 def is_vllm_installed():
     try:
         import vllm as _
@@ -363,42 +397,6 @@ class LoRATest(unittest.TestCase):
             #   request with a well-formed LoRA model name will be inferenced.
             self._test_completions(client, "doll")
             self._test_chat_completion(client, "doll")
-
-
-@pytest.mark.parametrize(
-    "model_repository,model_name,expect_error",
-    [
-        ("openai_model_repository", "", True),  # Empty string as model name.
-        ("openai_model_repository", "     ", True),  # Whitespace-only model name.
-        ("openai_model_repository", "invalid/path", True),
-        ("openai_model_repository", "invalid\\path", True),
-        ("openai_model_repository", "../outside/repo", True),
-        ("openai_model_repository", "../test_models/identity_py", True),
-        ("test_models", "../test_models/identity_py", True),
-        ("test_models", "identity_py", False),
-        ("test_models", "mock_llm", False),
-    ],
-)
-def test_get_vllm_lora_name(
-    model_repository: str, model_name: str, expect_error: bool
-):
-    try:
-        get_vllm_lora_names(model_repository, model_name, 1)
-    except ValueError as e:
-        if expect_error:
-            assert (
-                f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
-                == str(e)
-            )
-        else:
-            raise pytest.fail(
-                f"(model_repository='{model_repository}', model_name='{model_name}') raised ValueError unexpectedly: {e}"
-            )
-    else:
-        if expect_error:
-            raise pytest.fail(
-                f"(model_repository='{model_repository}', model_name='{model_name}') did not raise ValueError as expected."
-            )
 
 
 if __name__ == "__main__":
