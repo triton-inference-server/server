@@ -380,7 +380,7 @@ class LoRATest(unittest.TestCase):
     ],
 )
 def test_get_vllm_lora_name(
-    self, model_repository: str, model_name: str, expect_error: bool
+    model_repository: str, model_name: str, expect_error: bool
 ):
     try:
         get_vllm_lora_names(model_repository, model_name, 1)
