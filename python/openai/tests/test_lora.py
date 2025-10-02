@@ -33,7 +33,7 @@ import pytest
 from huggingface_hub import snapshot_download
 from openai import BadRequestError, NotFoundError
 
-from ..openai_frontend.engine.utils.triton import (
+from openai_frontend.engine.utils.triton import (
     _get_vllm_lora_names as get_vllm_lora_names,
 )
 from .utils import OpenAIServer
