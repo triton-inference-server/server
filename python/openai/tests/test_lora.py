@@ -385,7 +385,10 @@ def test_get_vllm_lora_name(
         get_vllm_lora_names(model_repository, model_name, 1)
     except ValueError as e:
         if expect_error:
-            assert f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names." == str(e)
+            assert (
+                f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
+                == str(e)
+            )
         else:
             raise pytest.fail(
                 f"(model_repository='{model_repository}', model_name='{model_name}') raised ValueError unexpectedly: {e}"
