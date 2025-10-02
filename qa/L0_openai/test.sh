@@ -60,7 +60,6 @@ function prepare_tensorrtllm() {
 
     mkdir -p ${MODEL_REPO}
     cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
-
     # Ensemble model is not needed for the test
     rm -rf ${MODEL_REPO}/ensemble
 
