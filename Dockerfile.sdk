@@ -167,7 +167,6 @@ RUN apt-get update && \
             python3-pip \
             python3-setuptools \
             python3-wheel \
-            software-properties-common \
             vim \
             wget && \
     pip3 install "grpcio<1.68" "grpcio-tools<1.68"
