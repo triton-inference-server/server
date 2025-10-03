@@ -39,7 +39,6 @@ rm -fr *.log *.json
 # install a higher version of python which uses blinker 1.6,
 # but it is unknown whether this test should rely on
 # the default installation of python.
-apt remove -y python3-blinker
 
 apt update -qq && apt install python3-venv -y
 python3 -m venv .venv
