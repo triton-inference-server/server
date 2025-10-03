@@ -96,7 +96,7 @@ building with Docker.
 
 * In the *build* subdirectory of the server repo, generate the
   docker_build script, the cmake_build script and the Dockerfiles
-  needed to build Triton. If you use the --dryrun flag, build.py will
+  needed to build Triton. If you use the `--dryrun` flag, build.py will
   stop here so that you can examine these files.
 
 * Run the docker_build script to perform the Docker-based build. The
@@ -105,13 +105,15 @@ building with Docker.
   * Build the *tritonserver_buildbase* Docker image that collects all
     the build dependencies needed to build Triton. The
     *tritonserver_buildbase* image is based on a minimal/base
-    image. When building with GPU support (--enable-gpu), the *min*
+    image. When building with GPU support (`--enable-feature gpu`), the *min*
     image is the
     [\<xx.yy\>-py3-min](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
     image pulled from [NGC](https://ngc.nvidia.com) that contains the
     CUDA, cuDNN, TensorRT and other dependencies that are required to
     build Triton. When building without GPU support, the *min* image
     is the standard ubuntu:22.04 image.
+
+    * The flag `--use-buildbase` can be specified to automate the use of the *tritonserver_buildbase* image to build backends that require a base image.
 
   * Run the cmake_build script within the *tritonserver_buildbase*
     image to actually build Triton. The cmake_build script performs
@@ -149,17 +151,18 @@ building with Docker.
 
 By default, build.py does not enable any of Triton's optional features
 but you can enable all features, backends, and repository agents with
-the --enable-all flag. The -v flag turns on verbose output.
+the `--enable-all` flag. The `-v` flag turns on verbose output.
 
 ```bash
 $ ./build.py -v --enable-all
 ```
 
-If you want to enable only certain Triton features, backends and
-repository agents, do not specify --enable-all. Instead you must
-specify the individual flags as documented by --help.
+If you want to enable only certain Triton features, backends, and
+repository agents, there are two options:
+a. do not specify `--enable-all`, and instead specify the individual flags as documented by `--help`.
+b. specify `--enable-all` and then disable selected features that you wish to omit using the `--disable-...` arguments, also documented by `--help`.
 
-#### Building With Specific GitHub Branches
+#### Building With Specific GitHub Branches and Organization
 
 As described above, the build is performed in the server repo, but
 source from several other repos is fetched during the build
@@ -168,7 +171,7 @@ other repos, but if you want to control which branch is used in these
 other repos you can as shown in the following example.
 
 ```bash
-$ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> ... --backend=tensorrt:<container tag> ... --repoagent=checksum:<container tag> ...
+$ ./build.py ... --component-tag common <container tag> --component-tag core <container tag> --component-tag backend <container tag> --component-tag thirdparty <container tag> ... --backend-tag tensorrt <container tag> ... --repoagent-tag checksum <container tag> ...
 ```
 
 If you are building on a release branch then `<container tag>` will
@@ -182,13 +185,18 @@ instead use the corresponding branch/tag in the build. For example, if
 you have a branch called "mybranch" in the
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
 repo that you want to use in the build, you would specify
---backend=onnxruntime:mybranch.
+`--backend-tag onnxruntime mybranch`.
+
+If you want to build a backend from an alternative organization or user `<org>`, you can include a similar argument:
+```bash
+$ ./build.py ... --backend-org onnxruntime https://github.com/<org>
+```
 
 #### CPU-Only Build
 
 If you want to build without GPU support you must specify individual
-feature flags and not include the `--enable-gpu` and
-`--enable-gpu-metrics` flags. Only the following backends are
+feature flags and not include the `--enable-feature gpu` and
+`--enable-feature gpu-metrics` flags. Only the following backends are
 available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 `square`, `pytorch`, `onnxruntime`, `openvino`,
 `python` and `fil`.
@@ -196,7 +204,7 @@ available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 CPU-only builds of the PyTorch backends require some CUDA stubs
 and runtime dependencies that are not present in the CPU-only base container.
 These are retrieved from a GPU base container, which can be changed with the
-`--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
+`--image gpu-base nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
 
 ### Building Without Docker
 
@@ -209,7 +217,7 @@ repo branch for the release you are interested in building (or the
 *main* branch to build from the development branch).
 
 To determine what dependencies are required by the build, run build.py
-with the --dryrun flag, and then looking in the build subdirectory at
+with the `--dryrun` flag, and then looking in the build subdirectory at
 Dockerfile.buildbase.
 
 ```bash
@@ -217,8 +225,8 @@ $ ./build.py -v --enable-all
 ```
 
 From Dockerfile.buildbase you can see what dependencies you need to
-install on your host system. Note that when building with --enable-gpu
-(or --enable-all), Dockerfile.buildbase depends on the
+install on your host system. Note that when building with `--enable-feature gpu`
+(or `--enable-all`), Dockerfile.buildbase depends on the
 [\<xx.yy\>-py3-min](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 image pulled from [NGC](https://ngc.nvidia.com). Unfortunately, a
 Dockerfile is not currently available for the
@@ -228,7 +236,7 @@ cuDNN](#cuda-cublas-cudnn) and [TensorRT](#tensorrt) dependencies as
 described below.
 
 Once you have installed these dependencies on your build system you
-can then use build.py with the --no-container-build flag to build
+can then use build.py with the `--no-container-build` flag to build
 Triton.
 
 ```bash
@@ -271,8 +279,8 @@ difference is that the minimal/base image used as the base of
 Dockerfile.buildbase image can be built from the provided
 [Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
 file as described in [Windows 10 "Min" Image](#windows-10-min-image). When running build.py
-use the --image flag to specify the tag that you assigned to this
-image. For example, --image=base,win10-py3-min.
+use the `--image` flag to specify the tag that you assigned to this
+image. For example, `--image base win10-py3-min`.
 
 ### Windows and Docker
 
@@ -320,7 +328,7 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```bash
-python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag> --backend=python:<container tag>
+python build.py --cmake-dir <path/to/repo>/build --build-dir /tmp/citritonbuild --no-container-pull --image base win10-py3-min --enable-feature logging stats tracing gpu --enable-endpoint grpc http --component-tag common <container tag> --component-tag core <container tag> --component-tag backend <container tag> --component-tag thirdparty <container tag> --enable-backend ensemble tensorrt onnxruntime openvino python --backend-tag tensorrt <container tag> --backend-tag onnxruntime <container tag> --backend-tag openvino <container tag> --backend-tag python <container tag>
 ```
 
 If you are building on *main* branch then `<container tag>` will
@@ -334,7 +342,12 @@ branch/tag in the build. For example, if you have a branch called
 "mybranch" in the
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
 repo that you want to use in the build, you would specify
---backend=onnxruntime:mybranch.
+`--backend-tag onnxruntime mybranch`.
+
+If you want to build a backend from an alternative organization or user `<org>`, you can include a similar argument:
+```bash
+python build.py ... --backend-org onnxruntime https://github.com/<org>
+```
 
 ### Extract Build Artifacts
 
@@ -394,7 +407,7 @@ and cmake_build or the equivalent commands to perform a build.
   depends on that package. For example, Triton supports the S3
   filesystem by building the aws-sdk-cpp package. If aws-sdk-cpp
   doesn't build for your platform then you can remove the need for
-  that package by not specifying --filesystem=s3 when you run
+  that package by not specifying `--enable-filesystem s3` when you run
   build.py. In general, you should start by running build.py with the
   minimal required feature set.
 
@@ -496,7 +509,7 @@ re-running `make` (or `msbuild.exe`).
 
 ### Building with Debug Symbols
 
-To build with Debug symbols, use the --build-type=Debug argument while
+To build with Debug symbols, use the `--build-type Debug` argument while
 launching build.py. If building directly with CMake use
--DCMAKE_BUILD_TYPE=Debug. You can then launch the built server with
+`-DCMAKE_BUILD_TYPE=Debug`. You can then launch the built server with
 gdb and see the debug symbols/information in the gdb trace.
