@@ -30,6 +30,7 @@ import sys
 sys.path.append("../common")
 
 import unittest
+import json
 
 import numpy as np
 import requests
@@ -167,8 +168,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Input just under the 64MB limit (should succeed)
-        # (2^24 - 32) elements * 4 bytes = 64MB - 128 bytes = 67,108,736 bytes
-        shape_size = DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS
+        # The test creates a JSON payload with data, which adds overhead compared
+        # to raw binary format. We adjust the shape size to ensure the final
+        # JSON payload is under the size limit. An element of '1.0' is roughly 5
+        # bytes in JSON, compared to 4 bytes as a raw FP32.
+        shape_size = (DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
         payload = {
             "inputs": [
@@ -180,9 +184,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
-        assert (
-            shape_size * BYTES_PER_FP32 < 64 * MB
-        )  # Verify we're actually under the 64MB limit
+        # Verify we're actually under the 64MB limit
+        self.assertLess(len(json.dumps(payload)), DEFAULT_LIMIT_BYTES)
 
         headers = {"Content-Type": "application/json"}
         response = requests.post(
@@ -331,8 +334,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Input just under the 128MB configured limit (should succeed)
-        # (2^25 - 32) elements * 4 bytes = 128MB - 128 bytes = 134,217,600 bytes
-        shape_size = INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS
+        # The test creates a JSON payload with data, which adds overhead compared
+        # to raw binary format. We adjust the shape size to ensure the final
+        # JSON payload is under the size limit. An element of '1.0' is roughly 5
+        # bytes in JSON, compared to 4 bytes as a raw FP32.
+        shape_size = (INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
         payload = {
             "inputs": [
@@ -344,9 +350,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
-        assert (
-            shape_size * BYTES_PER_FP32 < 128 * MB
-        )  # Verify we're actually under the 128MB limit
+        # Verify we're actually under the 128MB limit
+        self.assertLess(len(json.dumps(payload)), INCREASED_LIMIT_BYTES)
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
