@@ -29,8 +29,8 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
 import json
+import unittest
 
 import numpy as np
 import requests
@@ -200,9 +200,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             try:
                 print(f"[DEBUG] Error response: {response.json()}")
             except ValueError:
-                print(
-                    f"[DEBUG] Error response (not JSON): {response.content.decode()}"
-                )
+                print(f"[DEBUG] Error response (not JSON): {response.content.decode()}")
         self.assertEqual(
             200,
             response.status_code,
@@ -365,9 +363,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             try:
                 print(f"[DEBUG] Error response: {response.json()}")
             except:
-                print(
-                    f"[DEBUG] Error response (not JSON): {response.content.decode()}"
-                )
+                print(f"[DEBUG] Error response (not JSON): {response.content.decode()}")
         self.assertEqual(
             200,
             response.status_code,
