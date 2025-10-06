@@ -1,4 +1,4 @@
-// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -876,6 +876,10 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
+
+    // We need to make sure that the previous request was released before
+    // reusing it.
+    request_release_future.get();
   }
 
   // The TRITONSERVER_InferenceRequest object can be reused for
@@ -906,10 +910,6 @@ main(int argc, char** argv)
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
 
-    // We need to make sure that the previous request was released before
-    // reusing it.
-    request_release_future.get();
-
     // Register a new promise for the request callback barrier.
     barrier = std::make_unique<std::promise<void>>();
     request_release_future = barrier->get_future();
@@ -936,6 +936,10 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
+
+    // We need to make sure that the previous request was released before
+    // reusing it.
+    request_release_future.get();
   }
 
   // There are other TRITONSERVER_InferenceRequest APIs that allow
@@ -967,7 +971,7 @@ main(int argc, char** argv)
 
     // Register a new promise for the request callback barrier.
     barrier = std::make_unique<std::promise<void>>();
-    request_release_future.get();
+    request_release_future = barrier->get_future();
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -993,6 +997,10 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
+
+    // Make sure the request is released before deleting it. If not, release
+    // callback will segfault after barrier is destructed.
+    request_release_future.get();
   }
 
   FAIL_IF_ERR(
