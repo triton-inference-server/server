@@ -349,7 +349,7 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=42
+  EXPECTED_NUM_TESTS=36
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -364,9 +364,11 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
       mkdir nobatch_models
       mv ./models/*nobatch_* ./nobatch_models/.
       cp -fr ./models/nop_* ./nobatch_models/.
-      # These two models are required by test_ensemble_mix_batch_nobatch test case.
-      cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
-      cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
+      if [[ $BACKENDS == *"onnx"* ]]; then
+        # These two models are required by test_ensemble_mix_batch_nobatch test case.
+        cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
+        cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
+      fi
 
       for BATCHING_MODE in batch nobatch; do
         if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
@@ -406,7 +408,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 
         set +e
 
-        python3 $INFER_TEST >$CLIENT_LOG 2>&1
+        VALGRIND_TESTS="1" python3 $INFER_TEST >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             RET=1

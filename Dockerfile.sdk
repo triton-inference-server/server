@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.08-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:25.09-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
@@ -167,7 +167,6 @@ RUN apt-get update && \
             python3-pip \
             python3-setuptools \
             python3-wheel \
-            software-properties-common \
             vim \
             wget && \
     pip3 install "grpcio<1.68" "grpcio-tools<1.68"
