@@ -170,7 +170,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Test case 2: Input just under the 64MB limit (should succeed)
         # The test creates a JSON payload with data, which adds overhead compared
         # to raw binary format. We adjust the shape size to ensure the final
-        # JSON payload is under the size limit. An element of '1.0' is roughly 5
+        # JSON payload is under the size limit. An element is roughly 5
         # bytes in JSON, compared to 4 bytes as a raw FP32.
         shape_size = (DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
@@ -187,20 +187,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify we're actually under the 64MB limit
         self.assertLess(len(json.dumps(payload)), DEFAULT_LIMIT_BYTES)
 
-        headers = {"Content-Type": "application/json"}
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
         )
 
         # Should succeed with 200 OK
-        if response.status_code != 200:
-            print(f"\n[DEBUG] test_default_limit_rejection_json - FAILED SUCCESS CASE")
-            print(f"[DEBUG] Expected status code: 200")
-            print(f"[DEBUG] Actual status code: {response.status_code}")
-            try:
-                print(f"[DEBUG] Error response: {response.json()}")
-            except ValueError:
-                print(f"[DEBUG] Error response (not JSON): {response.content.decode()}")
         self.assertEqual(
             200,
             response.status_code,
@@ -334,7 +325,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Test case 2: Input just under the 128MB configured limit (should succeed)
         # The test creates a JSON payload with data, which adds overhead compared
         # to raw binary format. We adjust the shape size to ensure the final
-        # JSON payload is under the size limit. An element of '1.0' is roughly 5
+        # JSON payload is under the size limit. An element is roughly 5
         # bytes in JSON, compared to 4 bytes as a raw FP32.
         shape_size = (INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
@@ -356,14 +347,6 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Should succeed with 200 OK
-        if response.status_code != 200:
-            print(f"\n[DEBUG] test_large_input_json - FAILED SUCCESS CASE")
-            print(f"[DEBUG] Expected status code: 200")
-            print(f"[DEBUG] Actual status code: {response.status_code}")
-            try:
-                print(f"[DEBUG] Error response: {response.json()}")
-            except:
-                print(f"[DEBUG] Error response (not JSON): {response.content.decode()}")
         self.assertEqual(
             200,
             response.status_code,
@@ -386,8 +369,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """Test JSON request with large string input"""
         model = "simple_identity"
 
-        # Create a string that is larger (a very large payload about 2GB) than the default limit of 64MB
-        large_string_size = 2222 * 1024222
+        # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
+        large_string_size = 2**31 + 64
         large_string = "A" * large_string_size
 
         payload = {
