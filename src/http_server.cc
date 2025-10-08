@@ -2366,8 +2366,7 @@ HTTPAPIServer::GetContentLength(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("Unable to parse ") + kContentLengthHeader +
              ", value is out of range [ " +
-             std::to_string(std::numeric_limits<std::int32_t>::min()) +
-             ", " +
+             std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
              std::to_string(std::numeric_limits<std::int32_t>::max()) +
              " ], got: " + content_length_c_str)
                 .c_str());
