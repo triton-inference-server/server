@@ -40,6 +40,7 @@ import test_util as tu
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
 BYTES_PER_FP32 = 4
 MB = 2**20  # 1 MB = 1,048,576 bytes
+GB = 2**30  # 1 GB = 1,073,741,824 bytes
 DEFAULT_LIMIT_BYTES = 64 * MB  # 64MB default limit
 INCREASED_LIMIT_BYTES = 128 * MB  # 128MB increased limit
 
@@ -185,7 +186,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             ]
         }
         # Verify we're actually under the 64MB limit
-        self.assertLess(len(json.dumps(payload)), DEFAULT_LIMIT_BYTES)
+        self.assertLess(len(json.dumps(payload).encode("utf-8")), DEFAULT_LIMIT_BYTES)
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
@@ -340,7 +341,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             ]
         }
         # Verify we're actually under the 128MB limit
-        self.assertLess(len(json.dumps(payload)), INCREASED_LIMIT_BYTES)
+        self.assertLess(len(json.dumps(payload).encode("utf-8")), INCREASED_LIMIT_BYTES)
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
@@ -370,7 +371,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
         model = "simple_identity"
 
         # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
-        large_string_size = 2**31 + 64
+        # (2^31 + 64) elements * 1 bytes = 2GB + 64 bytes = 2,147,483,712 bytes
+        large_string_size = 2 * GB + 64
         large_string = "A" * large_string_size
 
         payload = {
