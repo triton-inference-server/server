@@ -2361,6 +2361,16 @@ HTTPAPIServer::GetContentLength(
              ", got: " + content_length_c_str)
                 .c_str());
       }
+      catch (const std::out_of_range& oor) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse ") + kContentLengthHeader +
+             ", value is out of range [ " +
+             std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
+             std::to_string(std::numeric_limits<std::int32_t>::max()) +
+             " ], got: " + content_length_c_str)
+                .c_str());
+      }
     }
   } else {
     // The Content-Length doesn't reflect the actual request body size
