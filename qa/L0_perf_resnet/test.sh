@@ -43,15 +43,12 @@ rm -f *.log  *.csv *.tjson *.json
 PROTOCOLS="grpc http triton_c_api"
 
 TRT_MODEL_NAME="resnet50_fp32_plan"
-TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
 PYT_MODEL_NAME="resnet50_fp32_libtorch"
 ONNX_MODEL_NAME="resnet50_fp32_onnx"
 
 # The base model name should be the prefix to the
 # respective optimized model name.
-TFTRT_MODEL_NAME="resnet50v1.5_fp16_savedmodel_trt"
 ONNXTRT_MODEL_NAME="resnet50_fp32_onnx_trt"
-TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 
 ARCH=${ARCH:="x86_64"}
 REPODIR=${REPODIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -67,15 +64,10 @@ STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
 
-MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
+MODEL_NAMES="${TRT_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
 
-# Disable TF-TRT test on Jetson due to Segfault
-# Disable ORT-TRT test on Jetson due to support being disabled
-if [ "$ARCH" == "aarch64" ]; then
-    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME}"
-else
-    OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
-fi
+OPTIMIZED_MODEL_NAMES="${ONNXTRT_MODEL_NAME}"
+
 
 # Create optimized models
 rm -fr optimized_model_store && mkdir optimized_model_store
@@ -86,21 +78,15 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     sed -i "s/^name: \"${BASE_MODEL}\"/name: \"${MODEL_NAME}\"/" ${CONFIG_PATH}
     echo "optimization { execution_accelerators {" >> ${CONFIG_PATH}
     echo "gpu_execution_accelerator : [ {" >> ${CONFIG_PATH}
-    if [ "${MODEL_NAME}" = "${TFAMP_MODEL_NAME}" ] ; then
-        echo "name : \"auto_mixed_precision\" " >> ${CONFIG_PATH}
-    else
-        echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
-        if [ "${MODEL_NAME}" = "${TFTRT_MODEL_NAME}" ] ; then
-            echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
-        fi
+    echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
 
-        if [ "${MODEL_NAME}" = "${ONNXTRT_MODEL_NAME}" ] ; then
-            echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
-            echo "parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" }" >> ${CONFIG_PATH}
-            echo "parameters { key: \"trt_engine_cache_enable\" value: \"1\" }" >> ${CONFIG_PATH}
-            echo "parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } " >> ${CONFIG_PATH}
-        fi
+    if [ "${MODEL_NAME}" = "${ONNXTRT_MODEL_NAME}" ] ; then
+        echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
+        echo "parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" }" >> ${CONFIG_PATH}
+        echo "parameters { key: \"trt_engine_cache_enable\" value: \"1\" }" >> ${CONFIG_PATH}
+        echo "parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } " >> ${CONFIG_PATH}
     fi
+
     echo "} ]" >> ${CONFIG_PATH}
     echo "}}" >> ${CONFIG_PATH}
 done
@@ -214,25 +200,3 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 bash -x run_test.sh
     done
 done
-
-# FIXME Disable the following due to
-# https://jirasw.nvidia.com/browse/DLIS-2933.
-#
-# Needs this additional test configuration for comparing against TFS.
-if [ "$ARCH" == "x86_64" ]; then
-   MODEL_NAME=${TF_MODEL_NAME}
-   REPO=$REPODIR/perf_model_store
-   STATIC_BATCH=128
-   INSTANCE_CNT=1
-   CONCURRENCY=1
-   FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
-   MODEL_NAME=${MODEL_NAME} \
-       MODEL_FRAMEWORK=${FRAMEWORK} \
-       MODEL_PATH="$REPO/${MODEL_NAME}" \
-       STATIC_BATCH=${STATIC_BATCH} \
-       PERF_CLIENT_PROTOCOL="grpc" \
-       INSTANCE_CNT=${INSTANCE_CNT} \
-       CONCURRENCY=${CONCURRENCY} \
-       ARCH=${ARCH} \
-       bash -x run_test.sh
-fi
