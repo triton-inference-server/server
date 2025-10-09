@@ -689,3 +689,5 @@ curl -H "api-key: my-secret-key" \
 # Multiple APIs in single argument with shared authentication
 --openai-restricted-api "inference,model-repository shared-key shared-secret"
 ```
+
+#### Add a note about usage metrics limitation
