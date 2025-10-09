@@ -88,24 +88,9 @@ if [ $? -ne 0 ]; then
 fi
 rm tensorrt_models/deeprecommender_plan/model.onnx
 
-OPTIMIZED_MODEL_NAMES="deeprecommender_graphdef_trt"
-
-# Create optimized models (TF-TRT and ONNX-TRT)
-rm -fr optimized_model_store && mkdir optimized_model_store
-for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
-    BASE_MODEL=$(echo ${MODEL_NAME} | cut -d '_' -f 1,2)
-    cp -r $REPODIR/perf_model_store/${BASE_MODEL} optimized_model_store/${MODEL_NAME}
-    CONFIG_PATH="optimized_model_store/${MODEL_NAME}/config.pbtxt"
-    sed -i "s/^name: \"${BASE_MODEL}\"/name: \"${MODEL_NAME}\"/" ${CONFIG_PATH}
-    echo "optimization { execution_accelerators {" >> ${CONFIG_PATH}
-    echo "gpu_execution_accelerator : [ {" >> ${CONFIG_PATH}
-    echo "name : \"tensorrt\" " >> ${CONFIG_PATH}
-    echo "} ]" >> ${CONFIG_PATH}
-    echo "}}" >> ${CONFIG_PATH}
-done
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
+for FRAMEWORK in plan onnx libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
@@ -173,7 +158,7 @@ fi
 rm tensorrt_models/deeprecommender_plan/model.onnx
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
+for FRAMEWORK in plan onnx libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
