@@ -326,6 +326,7 @@ cat > $TORCHSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+pip3 install onnxscript
 set -e
 set -x
 python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
