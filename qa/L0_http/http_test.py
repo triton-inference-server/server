@@ -364,8 +364,11 @@ class HttpTest(tu.TestResultCollector):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "'file:1/model.onnx' exceeds the maximum allowed data size limit "
-                "INT_MAX",
+                "Request JSON size",
+                error_message,
+            )
+            self.assertIn(
+                "exceeds the maximum allowed value",
                 error_message,
             )
         except ValueError:
