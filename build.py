@@ -73,7 +73,7 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.63.0dev",
     "triton_container_version": "25.11dev",
-    "upstream_container_version": "25.09",
+    "upstream_container_version": "25.10",
     "ort_version": "1.23.1",
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
