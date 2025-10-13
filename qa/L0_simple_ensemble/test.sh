@@ -202,14 +202,14 @@ parameters: {
 EOF
 
 
-SERVER_LOG="./not_on_path_server.log"
+SERVER_LOG="./invalid_max_ensemble_inflight_responses_server.log"
 rm -f $SERVER_LOG
 
 run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** FAILED: unexpected success starting $SERVER\n***"
-    kill_server
-    RET=1
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
 
 set +e
