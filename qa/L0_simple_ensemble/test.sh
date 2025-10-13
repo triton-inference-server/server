@@ -180,6 +180,58 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+
+# Test invalid values for max_ensemble_inflight_responses parameter
+mkdir -p `pwd`/models/ensemble_invalid_negative_limit/1
+mkdir -p `pwd`/models/ensemble_invalid_string_limit/1
+
+cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_negative_limit/
+cat <<EOF >> `pwd`/models/ensemble_invalid_negative_limit/config.pbtxt                         
+parameters: {
+  key: "max_ensemble_inflight_responses"
+  value: { string_value: "-5" }
+}
+EOF
+
+cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_string_limit/
+cat <<EOF >> `pwd`/models/ensemble_invalid_string_limit/config.pbtxt                         
+parameters: {
+  key: "max_ensemble_inflight_responses"
+  value: { string_value: "invalid_value" }
+}
+EOF
+
+
+SERVER_LOG="./not_on_path_server.log"
+rm -f $SERVER_LOG
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** FAILED: unexpected success starting $SERVER\n***"
+    kill_server
+    RET=1
+fi
+
+set +e
+# Verify valid config was parsed correctly
+if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configured with max_ensemble_inflight_responses: 4" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Expected configuration message not found\n***"
+    RET=1
+fi
+
+# Verify negative value was rejected
+if ! grep -q "Ignoring 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_negative_limit': value must be positive, got -5" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Expected error message not found\n***"
+    RET=1
+fi
+
+# Verify invalid string was rejected  
+if ! grep -q "Failed to parse 'max_ensemble_inflight_responses' for ensemble 'ensemble_invalid_string_limit': stoll" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Expected error message not found\n***"
+    RET=1
+fi
+set -e
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
