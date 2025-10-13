@@ -38,7 +38,6 @@ import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
 
-
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
 
@@ -226,8 +225,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 try:
                     client.stop_stream()
                     client.close()
-                except:
-                    pass
+                except Exception as e:
+                    print(f"Exception during client cleanup: {e}")
 
 
 if __name__ == "__main__":
