@@ -28,7 +28,7 @@
 platform: "ensemble"
 max_batch_size: 0
 
-# Backpressure configuration - limits inflight responses from 
+# Backpressure configuration - limits inflight responses from
 # decoupled step to avoid unbounded memory growth
 parameters: {
   key: "max_ensemble_inflight_responses"

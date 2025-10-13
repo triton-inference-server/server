@@ -186,7 +186,7 @@ mkdir -p `pwd`/models/ensemble_invalid_negative_limit/1
 mkdir -p `pwd`/models/ensemble_invalid_string_limit/1
 
 cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_negative_limit/
-cat <<EOF >> `pwd`/models/ensemble_invalid_negative_limit/config.pbtxt                         
+cat <<EOF >> `pwd`/models/ensemble_invalid_negative_limit/config.pbtxt
 parameters: {
   key: "max_ensemble_inflight_responses"
   value: { string_value: "-5" }
@@ -194,7 +194,7 @@ parameters: {
 EOF
 
 cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_string_limit/
-cat <<EOF >> `pwd`/models/ensemble_invalid_string_limit/config.pbtxt                         
+cat <<EOF >> `pwd`/models/ensemble_invalid_string_limit/config.pbtxt
 parameters: {
   key: "max_ensemble_inflight_responses"
   value: { string_value: "invalid_value" }
@@ -225,7 +225,7 @@ if ! grep -q "Ignoring 'max_ensemble_inflight_responses' for ensemble model 'ens
     RET=1
 fi
 
-# Verify invalid string was rejected  
+# Verify invalid string was rejected
 if ! grep -q "Failed to parse 'max_ensemble_inflight_responses' for ensemble 'ensemble_invalid_string_limit': stoll" $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Expected error message not found\n***"
     RET=1
