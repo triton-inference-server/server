@@ -25,11 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-name: "ensemble_disabled_max_inflight_responses"
 platform: "ensemble"
 max_batch_size: 0
-
-# No backpressure parameter - tests backward compatibility
 
 input [
   {
