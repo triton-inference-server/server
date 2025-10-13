@@ -226,7 +226,7 @@ if ! grep -q "Ignoring 'max_ensemble_inflight_responses' for ensemble model 'ens
 fi
 
 # Verify invalid string was rejected
-if ! grep -q "Failed to parse 'max_ensemble_inflight_responses' for ensemble 'ensemble_invalid_string_limit': stoll" $SERVER_LOG; then
+if ! grep -q "Failed to parse 'max_ensemble_inflight_responses' for ensemble 'ensemble_invalid_string_limit'" $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Expected error message not found\n***"
     RET=1
 fi
