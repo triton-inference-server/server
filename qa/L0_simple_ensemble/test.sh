@@ -184,6 +184,7 @@ wait $SERVER_PID
 # Test invalid values for max_ensemble_inflight_responses parameter
 mkdir -p `pwd`/models/ensemble_invalid_negative_limit/1
 mkdir -p `pwd`/models/ensemble_invalid_string_limit/1
+mkdir -p `pwd`/models/ensemble_large_value_limit/1
 
 cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_negative_limit/
 cat <<EOF >> `pwd`/models/ensemble_invalid_negative_limit/config.pbtxt
@@ -201,39 +202,52 @@ parameters: {
 }
 EOF
 
+cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_large_value_limit/
+cat <<EOF >> `pwd`/models/ensemble_large_value_limit/config.pbtxt
+parameters: {
+  key: "max_ensemble_inflight_responses"
+  value: { string_value: "12345678901" }
+}
+EOF
 
 SERVER_LOG="./invalid_max_ensemble_inflight_responses_server.log"
 rm -f $SERVER_LOG
 
 run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** FAILED: unexpected success starting $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
     cat $SERVER_LOG
-    exit 1
+    RET=1
 fi
 
 set +e
-# Verify valid config was parsed correctly
+# Verify valid config was loaded successfully
 if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configured with max_ensemble_inflight_responses: 4" $SERVER_LOG; then
-    echo -e "\n***\n*** FAILED: Expected configuration message not found\n***"
+    echo -e "\n***\n*** FAILED: Valid model did not load successfully\n***"
     RET=1
 fi
 
-# Verify negative value was rejected
-if ! grep -q "Ensemble model 'ensemble_invalid_negative_limit': max_ensemble_inflight_responses must be greater than 0. Received '-5'. Falling back to default value (0)." $SERVER_LOG; then
-    echo -e "\n***\n*** FAILED: Expected error message not found\n***"
+# Verify negative value caused model load failure
+if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_negative_limit': value must be positive, got -5" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Negative value should fail model load\n***"
     RET=1
 fi
 
-# Verify invalid string was rejected
-if ! grep -q "Ensemble model 'ensemble_invalid_string_limit': failed to parse max_ensemble_inflight_responses='invalid_value'. Falling back to default value (0)." $SERVER_LOG; then
-    echo -e "\n***\n*** FAILED: Expected error message not found\n***"
+# Verify invalid string caused model load failure
+if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_string_limit': cannot parse value 'invalid_value'" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Invalid string should fail model load\n***"
+    RET=1
+fi
+
+# Verify very large value caused model load failure
+if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_large_value_limit': value exceeds maximum allowed (2147483647)" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Large value should fail model load\n***"
     RET=1
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
