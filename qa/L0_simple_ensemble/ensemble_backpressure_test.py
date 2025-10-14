@@ -30,12 +30,12 @@ import sys
 
 sys.path.append("../common")
 
+import time
 import queue
 import unittest
-from functools import partial
 from contextlib import ExitStack
+from functools import partial
 
-import time
 import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
