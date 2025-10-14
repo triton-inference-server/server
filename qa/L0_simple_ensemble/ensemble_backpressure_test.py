@@ -30,8 +30,8 @@ import sys
 
 sys.path.append("../common")
 
-import time
 import queue
+import time
 import unittest
 from contextlib import ExitStack
 from functools import partial
