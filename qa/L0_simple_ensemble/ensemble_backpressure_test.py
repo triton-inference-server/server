@@ -33,13 +33,18 @@ sys.path.append("../common")
 import queue
 import unittest
 from functools import partial
+from contextlib import ExitStack
 
+import time
 import numpy as np
 import test_util as tu
 import tritonclient.grpc as grpcclient
+from tritonclient.utils import InferenceServerException
 
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
+MODEL_ENSEMBLE_ENABLED = "ensemble_enabled_max_inflight_responses"
+MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_responses"
 
 
 class UserData:
@@ -86,8 +91,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 result, Exception, f"Callback returned an exception: {result}"
             )
 
-            # Add response to list if it has data (not empty final-only response)
             response = result.get_response()
+            # Add response to list if it has data (not empty final-only response)
             if len(response.outputs) > 0:
                 responses.append(result)
 
@@ -98,111 +103,72 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
         return responses
 
+    def _run_inference(self, model_name, expected_count):
+        """
+        Helper function to run inference and verify responses.
+        """
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
+            try:
+                inputs, outputs = self._prepare_infer_args(expected_count)
+                triton_client.start_stream(callback=partial(callback, user_data))
+                triton_client.async_stream_infer(
+                    model_name=model_name, inputs=inputs, outputs=outputs
+                )
+
+                # Collect and verify responses
+                responses = self._collect_responses(user_data)
+                self.assertEqual(
+                    len(responses),
+                    expected_count,
+                    f"Expected {expected_count} responses, got {len(responses)}",
+                )
+
+                # Verify correctness of responses
+                for idx, resp in enumerate(responses):
+                    output = resp.as_numpy("OUT")
+                    self.assertEqual(
+                        output[0], idx, f"Response {idx} has incorrect value"
+                    )
+            finally:
+                triton_client.stop_stream()
+
     def test_backpressure_limits_inflight(self):
         """
         Test that max_ensemble_inflight_responses correctly limits concurrent
-        responses and prevents unbounded memory growth.
+        responses.
         """
-        model_name = "ensemble_enabled_max_inflight_responses"
-        expected_count = 16
-        user_data = UserData()
-
-        with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
-            try:
-                inputs, outputs = self._prepare_infer_args(expected_count)
-
-                triton_client.start_stream(callback=partial(callback, user_data))
-
-                triton_client.async_stream_infer(
-                    model_name=model_name, inputs=inputs, outputs=outputs
-                )
-
-                # Collect responses
-                responses = self._collect_responses(user_data)
-
-                # Verify we received the expected number of responses
-                self.assertEqual(
-                    len(responses),
-                    expected_count,
-                    f"Expected {expected_count} responses, got {len(responses)}",
-                )
-
-                # Verify correctness of responses
-                for idx, resp in enumerate(responses):
-                    output = resp.as_numpy("OUT")
-                    self.assertEqual(
-                        output[0], idx, f"Response {idx} has incorrect value"
-                    )
-
-            finally:
-                triton_client.stop_stream()
+        self._run_inference(model_name=MODEL_ENSEMBLE_ENABLED, expected_count=32)
 
     def test_backpressure_disabled(self):
         """
-        Test that ensemble model without max_ensemble_inflight_responses parameter
-        works fine (original behavior).
+        Test that an ensemble model without max_ensemble_inflight_responses parameter works correctly.
         """
-        model_name = "ensemble_disabled_max_inflight_responses"
-        expected_count = 16
-        user_data = UserData()
-
-        with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
-            try:
-                inputs, outputs = self._prepare_infer_args(expected_count)
-
-                triton_client.start_stream(callback=partial(callback, user_data))
-
-                triton_client.async_stream_infer(
-                    model_name=model_name, inputs=inputs, outputs=outputs
-                )
-
-                # Collect responses
-                responses = self._collect_responses(user_data)
-
-                # Verify we received the expected number of responses
-                self.assertEqual(
-                    len(responses),
-                    expected_count,
-                    f"Expected {expected_count} responses, got {len(responses)}",
-                )
-
-                # Verify correctness of responses
-                for idx, resp in enumerate(responses):
-                    output = resp.as_numpy("OUT")
-                    self.assertEqual(
-                        output[0], idx, f"Response {idx} has incorrect value"
-                    )
-
-            finally:
-                triton_client.stop_stream()
+        self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED, expected_count=32)
 
     def test_backpressure_concurrent_requests(self):
         """
         Test that backpressure works correctly with multiple concurrent requests.
         Each request should have independent backpressure state.
         """
-        model_name = "ensemble_enabled_max_inflight_responses"
         num_concurrent = 8
         expected_per_request = 8
+        user_datas = [UserData() for _ in range(num_concurrent)]
 
-        clients = []
-        user_datas = []
+        with ExitStack() as stack:
+            clients = [
+                stack.enter_context(grpcclient.InferenceServerClient(SERVER_URL))
+                for _ in range(num_concurrent)
+            ]
 
-        try:
             inputs, outputs = self._prepare_infer_args(expected_per_request)
 
-            # Create separate client for each concurrent request
+            # Start all concurrent requests
             for i in range(num_concurrent):
-                client = grpcclient.InferenceServerClient(SERVER_URL)
-                user_data = UserData()
-
-                client.start_stream(callback=partial(callback, user_data))
-                client.async_stream_infer(
-                    model_name=model_name, inputs=inputs, outputs=outputs
+                clients[i].start_stream(callback=partial(callback, user_datas[i]))
+                clients[i].async_stream_infer(
+                    model_name=MODEL_ENSEMBLE_ENABLED, inputs=inputs, outputs=outputs
                 )
-
-                clients.append(client)
-                user_datas.append(user_data)
 
             # Collect and verify responses for all requests
             for i, ud in enumerate(user_datas):
@@ -212,21 +178,95 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                     expected_per_request,
                     f"Request {i}: expected {expected_per_request} responses, got {len(responses)}",
                 )
-
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):
                     output = resp.as_numpy("OUT")
                     self.assertEqual(
-                        output[0], idx, f"Response {idx} has incorrect value"
+                        output[0],
+                        idx,
+                        f"Response {idx} for request {i} has incorrect value",
                     )
 
-        finally:
+            # Stop all streams
             for client in clients:
+                client.stop_stream()
+
+    def test_backpressure_request_cancellation(self):
+        """
+        Test that cancellation unblocks producers waiting on backpressure and that
+        the client receives a cancellation error.
+        """
+        # Use a large count to ensure the producer gets blocked by backpressure.
+        # The model is configured with max_ensemble_inflight_responses = 4.
+        input_value = 32
+        user_data = UserData()
+
+        with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
+            inputs, outputs = self._prepare_infer_args(input_value)
+            triton_client.start_stream(callback=partial(callback, user_data))
+
+            # Start the request
+            triton_client.async_stream_infer(
+                model_name=MODEL_ENSEMBLE_ENABLED, inputs=inputs, outputs=outputs
+            )
+
+            responses = []
+            try:
+                result = user_data._response_queue.get(timeout=5)
+                if isinstance(result, InferenceServerException):
+                    self.fail(f"Got error before cancellation: {result}")
+                resp = result.get_response()
+                if len(resp.outputs) > 0:
+                    responses.append(result)
+            except queue.Empty:
+                self.fail("Stream did not produce any response before cancellation.")
+
+            # Cancel the stream. This should unblock any waiting producers and result in a CANCELLED error.
+            triton_client.stop_stream(cancel_requests=True)
+
+            # Allow some time for cancellation
+            time.sleep(1)
+
+            cancellation_found = False
+            while True:
                 try:
-                    client.stop_stream()
-                    client.close()
-                except Exception as e:
-                    print(f"Exception during client cleanup: {e}")
+                    result = user_data._response_queue.get(timeout=1)
+                    if isinstance(result, InferenceServerException):
+                        self.assertEqual(
+                            result.status(),
+                            "StatusCode.CANCELLED",
+                            f"Expected CANCELLED status, got: {result.status()}",
+                        )
+                        cancellation_found = True
+                        break
+                    else:
+                        response = result.get_response()
+                        if len(response.outputs) > 0:
+                            responses.append(result)
+                        # Check for final response
+                        final = response.parameters.get("triton_final_response")
+                        if final and final.bool_param:
+                            break
+                except queue.Empty:
+                    break
+
+            # Verify the cancellation error was received
+            self.assertTrue(
+                cancellation_found,
+                "Did not receive the expected cancellation error from the server.",
+            )
+
+            # Verify we received only a partial set of responses
+            self.assertLess(
+                len(responses),
+                input_value,
+                "Expected partial responses due to cancellation, but received all of them.",
+            )
+            self.assertGreater(
+                len(responses),
+                0,
+                "Expected to receive at least one response before cancellation.",
+            )
 
 
 if __name__ == "__main__":
