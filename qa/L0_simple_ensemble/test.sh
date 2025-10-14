@@ -220,17 +220,20 @@ if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configure
 fi
 
 # Verify negative value was rejected
-if ! grep -q "Ignoring 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_negative_limit': value must be positive, got -5" $SERVER_LOG; then
+if ! grep -q "Ensemble model 'ensemble_invalid_negative_limit': max_ensemble_inflight_responses must be greater than 0. Received '-5'. Falling back to default value (0)." $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Expected error message not found\n***"
     RET=1
 fi
 
 # Verify invalid string was rejected
-if ! grep -q "Failed to parse 'max_ensemble_inflight_responses' for ensemble 'ensemble_invalid_string_limit'" $SERVER_LOG; then
+if ! grep -q "Ensemble model 'ensemble_invalid_string_limit': failed to parse max_ensemble_inflight_responses='invalid_value'. Falling back to default value (0)." $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Expected error message not found\n***"
     RET=1
 fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
