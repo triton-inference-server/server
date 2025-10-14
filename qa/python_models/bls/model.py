@@ -1,4 +1,4 @@
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import gc
 import os
 import sys
 import threading
@@ -179,17 +178,42 @@ class PBBLSTest(unittest.TestCase):
         input0 = pb_utils.Tensor("INPUT0", np.random.randn(*[1, 16]))
 
         if self._is_decoupled:
-            infer_request = pb_utils.InferenceRequest(
+            infer_request1 = pb_utils.InferenceRequest(
                 model_name="square_int32", inputs=[], requested_output_names=["OUT"]
             )
-            infer_responses = infer_request.exec(decoupled=True)
-            for infer_response in infer_responses:
+            input0_np = np.array([4.0], dtype=np.float32)
+            input0 = pb_utils.Tensor("IN", input0_np)
+            infer_request2 = pb_utils.InferenceRequest(
+                model_name="square_int32",
+                inputs=[input0],
+                requested_output_names=["OUT"],
+            )
+
+            # Send request and get response in reverse order
+            infer_responses1 = infer_request1.exec(decoupled=True)
+            infer_responses2 = infer_request2.exec(decoupled=True)
+
+            response_count = 0
+            for infer_response in infer_responses2:
+                self.assertTrue(infer_response.has_error())
+                self.assertIn(
+                    "inference input 'IN' data-type is 'FP32', but model 'square_int32' expects 'INT32'",
+                    infer_response.error().message(),
+                )
+                self.assertTrue(len(infer_response.output_tensors()) == 0)
+                response_count += 1
+            self.assertEqual(response_count, 1)
+
+            response_count = 0
+            for infer_response in infer_responses1:
                 self.assertTrue(infer_response.has_error())
                 self.assertIn(
                     "expected 1 inputs but got 0 inputs for model 'square_int32'. Got input(s) [], but missing required input(s) ['IN']. Please provide all required input(s).",
                     infer_response.error().message(),
                 )
                 self.assertTrue(len(infer_response.output_tensors()) == 0)
+                response_count += 1
+            self.assertEqual(response_count, 1)
         else:
             infer_request = pb_utils.InferenceRequest(
                 model_name="add_sub",
@@ -592,6 +616,7 @@ class PBBLSTest(unittest.TestCase):
         if self._is_decoupled:
             infer_responses = infer_request.exec(decoupled=True)
 
+            response_count = 0
             for infer_response in infer_responses:
                 # Because the model doesn't exist, the inference response must have an
                 # error
@@ -604,6 +629,8 @@ class PBBLSTest(unittest.TestCase):
                 # Make sure that the inference requests can be performed properly after
                 # an error.
                 self.assertTrue(bls_square())
+                response_count += 1
+            self.assertEqual(response_count, 1)
         else:
             infer_response = infer_request.exec()
 
@@ -740,15 +767,10 @@ class PBBLSTest(unittest.TestCase):
             )
 
             # case 2. Call for-loop to get all the responses multiple times.
-            infer_responses = self._test_response_iterator_square(
-                5, response_value, infer_responses
-            )
-            infer_responses = self._test_response_iterator_square(
-                5, response_value, infer_responses
-            )
-            infer_responses = self._test_response_iterator_square(
-                5, response_value, infer_responses
-            )
+            for _ in range(3):
+                infer_responses = self._test_response_iterator_square(
+                    5, response_value, infer_responses
+                )
 
             # case 3. Break from the iteration, then use Next() and for-loop to
             # get the remaining responses.
@@ -762,6 +784,7 @@ class PBBLSTest(unittest.TestCase):
                 response_count += 1
                 if response_count == 2:
                     break
+            self.assertEqual(response_count, 2)
 
             infer_response = next(infer_responses)
             self.assertFalse(infer_response.has_error())
@@ -774,7 +797,8 @@ class PBBLSTest(unittest.TestCase):
                 2, response_value, infer_responses
             )
 
-            # case 4. Delete the iterator before all the responses have been
+            ### Test ResponseIterator destructor ###
+            # case 4. Delete the iterator explicitly before all the responses have been
             # retrieved.
             infer_responses = infer_request.exec(decoupled=True)
 
@@ -785,6 +809,26 @@ class PBBLSTest(unittest.TestCase):
             self.assertEqual(response_value, output0.as_numpy())
 
             del infer_responses
+
+            # case 5. Delete the iterator without getting any response multiple times
+            for _ in range(3):
+                infer_request.exec(decoupled=True)
+
+            # case 6. Cancel the request before all the responses have been
+            # retrieved.
+            infer_responses = infer_request.exec(decoupled=True)
+
+            infer_response = next(infer_responses)
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
+            self.assertIsNotNone(output0)
+            self.assertEqual(response_value, output0.as_numpy())
+
+            infer_responses.cancel()
+
+            infer_responses = self._test_response_iterator_square(
+                4, response_value, infer_responses
+            )
 
     def test_preferred_memory(self):
         self.assertTrue(bls_libtorch("libtorch_gpu", "CPU"))
