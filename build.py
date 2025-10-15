@@ -1586,7 +1586,7 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends openmpi-bin
+      && apt-get install -y --no-install-recommends openmpi-bin python3-pip
 RUN pip3 install patchelf==0.17.2
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
