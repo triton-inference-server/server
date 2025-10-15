@@ -78,7 +78,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
     "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.10.2",
+    "vllm_version": "0.10.1.1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -879,6 +879,7 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
         else:
             if target_machine == "aarch64":
                 return """
+ENV DEBIAN_FRONTEND=noninteractive
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -894,6 +895,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
             else:
                 return """
+ENV DEBIAN_FRONTEND=noninteractive
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \\
@@ -1323,7 +1325,7 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
 
     # libnvshmem3-cuda-13 is needed by pytorch backend but will be required by vLLM and TensorRT-LLM
     # on platforms other than IGPU we still using CUDA 12 it means we need to add this conditionally
-    if target_platform() not in ["igpu", "windows", "rhel"]:
+    if target_platform() not in ["igpu", "windows", "rhel"] and enable_gpu:
         backend_dependencies += " libnvshmem3-cuda-13"
 
     # openssh-server is needed for fastertransformer
@@ -1351,6 +1353,21 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
 """.format(
         gpu_enabled=gpu_enabled
     )
+
+    if enable_gpu:
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
+        # This segment will break the RHEL SBSA build. Need to determine whether
+        # this is necessary to incorporate.
+        if target_platform() != "rhel":
+            df += """
+# Extra defensive wiring for CUDA Compat lib
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
+    && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
+    && ldconfig \\
+    && rm -f ${_CUDA_COMPAT_PATH}/lib
+"""
+    else:
+        df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
     if target_platform() == "rhel":
         df += """
@@ -1415,21 +1432,6 @@ ENV TCMALLOC_RELEASE_RATE 200
         fastertransformer_buildscript = importlib.util.module_from_spec(spec)
         exec(response.content, fastertransformer_buildscript.__dict__)
         df += fastertransformer_buildscript.create_postbuild(is_multistage_build=False)
-
-    if enable_gpu:
-        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine)
-        # This segment will break the RHEL SBSA build. Need to determine whether
-        # this is necessary to incorporate.
-        if target_platform() != "rhel":
-            df += """
-# Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
-    && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \\
-    && ldconfig \\
-    && rm -f ${_CUDA_COMPAT_PATH}/lib
-"""
-    else:
-        df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
     # Add dependencies needed for python backend
     if "python" in backends:
