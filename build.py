@@ -1322,12 +1322,12 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
         if target_machine == "aarch64":
             backend_dependencies += " libgfortran5"
 
-        if "CUDA_VERSION" in os.environ:
-            cuda_version_major = int(os.environ["CUDA_VERSION"].split(".")[0])
-            if cuda_version_major >= 13:
-                backend_dependencies += " libnvshmem3-cuda-{}".format(
-                    cuda_version_major
-                )
+        if (
+            target_platform != "igpu"
+            or target_platform != "windows"
+            or target_platform != "rhel"
+        ):
+            backend_dependencies += " libnvshmem3-cuda-13"
 
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
