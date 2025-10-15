@@ -1318,8 +1318,17 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
         backend_dependencies = "libgomp1"
 
     # libgfortran5 is needed by pytorch backend on ARM
-    if ("pytorch" in backends) and (target_machine == "aarch64"):
-        backend_dependencies += " libgfortran5"
+    if "pytorch" in backends:
+        if target_machine == "aarch64":
+            backend_dependencies += " libgfortran5"
+
+        if "CUDA_VERSION" in os.environ:
+            cuda_version_major = int(os.environ["CUDA_VERSION"].split(".")[0])
+            if cuda_version_major >= 13:
+                backend_dependencies += " libnvshmem3-cuda-{}".format(
+                    cuda_version_major
+                )
+
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
         backend_dependencies += " openssh-server"
