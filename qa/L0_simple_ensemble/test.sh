@@ -31,17 +31,16 @@ SIMPLE_TEST_PY=./ensemble_test.py
 
 CLIENT_LOG="./client.log"
 
+TEST_MODEL_DIR="`pwd`/models"
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=${TEST_MODEL_DIR}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 # ensure ensemble models have version sub-directory
-mkdir -p `pwd`/models/ensemble_add_sub_int32_int32_int32/1
-mkdir -p `pwd`/models/ensemble_partial_add_sub/1
-mkdir -p `pwd`/models/ensemble_enabled_max_inflight_responses/1
-mkdir -p `pwd`/models/ensemble_disabled_max_inflight_responses/1
+mkdir -p ${TEST_MODEL_DIR}/ensemble_add_sub_int32_int32_int32/1
+mkdir -p ${TEST_MODEL_DIR}/ensemble_partial_add_sub/1
 
 rm -f $CLIENT_LOG $SERVER_LOG
 
@@ -148,14 +147,29 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test ensemble backpressure feature (max_ensemble_inflight_responses parameter)
+######## Test ensemble backpressure feature (max_ensemble_inflight_responses parameter)
+MODEL_DIR="`pwd`/backpressure_test_models"
+mkdir -p ${MODEL_DIR}/slow_consumer/1
+cp ../python_models/ground_truth/model.py ${MODEL_DIR}/slow_consumer/1
+cp ../python_models/ground_truth/config.pbtxt ${MODEL_DIR}/slow_consumer/
+sed -i 's/name: "ground_truth"/name: "slow_consumer"/g' ${MODEL_DIR}/slow_consumer/config.pbtxt
+
+mkdir -p ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/1
+mkdir -p ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/1
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/
+cat <<EOF >> ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/config.pbtxt
+parameters: {
+  key: "max_ensemble_inflight_responses"
+  value: { string_value: "4" }
+}
+EOF
+
+BACKPRESSURE_TEST_PY=./ensemble_backpressure_test.py
 SERVER_LOG="./ensemble_backpressure_test_server.log"
 CLIENT_LOG="./ensemble_backpressure_test_client.log"
-BACKPRESSURE_TEST_PY=./ensemble_backpressure_test.py
-
 rm -f $SERVER_LOG $CLIENT_LOG
 
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=${MODEL_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -180,36 +194,51 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
+# Verify valid config was loaded successfully
+if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configured with max_ensemble_inflight_responses: 4" $SERVER_LOG; then
+    echo -e "\n***\n*** FAILED: Valid model did not load successfully\n***"
+    RET=1
+fi
+set -e
 
-# Test invalid values for max_ensemble_inflight_responses parameter
-mkdir -p `pwd`/models/ensemble_invalid_negative_limit/1
-mkdir -p `pwd`/models/ensemble_invalid_string_limit/1
-mkdir -p `pwd`/models/ensemble_large_value_limit/1
 
-cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_negative_limit/
-cat <<EOF >> `pwd`/models/ensemble_invalid_negative_limit/config.pbtxt
+######## Test invalid values for max_ensemble_inflight_responses parameter
+INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
+rm -rf ${INVALID_PARAM_MODEL_DIR}
+
+mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/1
+mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/1
+mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/1
+
+cp -r ${MODEL_DIR}/decoupled_producer ${INVALID_PARAM_MODEL_DIR}/
+cp -r ${MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
+
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/
+cat <<EOF >> ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/config.pbtxt
 parameters: {
   key: "max_ensemble_inflight_responses"
   value: { string_value: "-5" }
 }
 EOF
 
-cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_invalid_string_limit/
-cat <<EOF >> `pwd`/models/ensemble_invalid_string_limit/config.pbtxt
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/
+cat <<EOF >> ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/config.pbtxt
 parameters: {
   key: "max_ensemble_inflight_responses"
   value: { string_value: "invalid_value" }
 }
 EOF
 
-cp `pwd`/models/ensemble_disabled_max_inflight_responses/config.pbtxt `pwd`/models/ensemble_large_value_limit/
-cat <<EOF >> `pwd`/models/ensemble_large_value_limit/config.pbtxt
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/
+cat <<EOF >> ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/config.pbtxt
 parameters: {
   key: "max_ensemble_inflight_responses"
   value: { string_value: "12345678901" }
 }
 EOF
 
+SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
 SERVER_LOG="./invalid_max_ensemble_inflight_responses_server.log"
 rm -f $SERVER_LOG
 
@@ -223,12 +252,6 @@ if [ "$SERVER_PID" != "0" ]; then
 fi
 
 set +e
-# Verify valid config was loaded successfully
-if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configured with max_ensemble_inflight_responses: 4" $SERVER_LOG; then
-    echo -e "\n***\n*** FAILED: Valid model did not load successfully\n***"
-    RET=1
-fi
-
 # Verify negative value caused model load failure
 if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_negative_limit': value must be positive, got -5" $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Negative value should fail model load\n***"
@@ -242,7 +265,7 @@ if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for en
 fi
 
 # Verify very large value caused model load failure
-if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_large_value_limit': value exceeds maximum allowed (2147483647)" $SERVER_LOG; then
+if ! grep -q "Invalid argument: Invalid 'max_ensemble_inflight_responses' for ensemble model 'ensemble_invalid_large_value_limit': value exceeds maximum allowed (2147483647)" $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Large value should fail model load\n***"
     RET=1
 fi

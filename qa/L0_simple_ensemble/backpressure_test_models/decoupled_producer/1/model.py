@@ -25,58 +25,30 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-platform: "ensemble"
-max_batch_size: 0
+import numpy as np
+import triton_python_backend_utils as pb_utils
 
-# Backpressure configuration - limits inflight responses from
-# decoupled step to avoid unbounded memory growth
-parameters: {
-  key: "max_ensemble_inflight_responses"
-  value: { string_value: "4" }
-}
 
-input [
-  {
-    name: "IN"
-    data_type: TYPE_INT32
-    dims: [ 1 ]
-  }
-]
+class TritonPythonModel:
+    """
+    Decoupled model that produces N responses based on input value.
+    """
 
-output [
-  {
-    name: "OUT"
-    data_type: TYPE_INT32
-    dims: [ 1 ]
-  }
-]
+    def execute(self, requests):
+        for request in requests:
+            # Get input - number of responses to produce
+            in_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
+            count = in_tensor.as_numpy()[0]
 
-ensemble_scheduling {
-  step [
-    {
-      model_name: "decoupled_producer"
-      model_version: -1
-      input_map {
-        key: "IN"
-        value: "IN"
-      }
-      output_map {
-        key: "OUT"
-        value: "intermediate"
-      }
-    },
-    {
-      model_name: "slow_consumer"
-      model_version: -1
-      input_map {
-        key: "IN"
-        value: "intermediate"
-      }
-      output_map {
-        key: "OUT"
-        value: "OUT"
-      }
-    }
-  ]
-}
+            response_sender = request.get_response_sender()
 
+            # Produce 'count' responses, each with 0.5 as the output value
+            for i in range(count):
+                out_tensor = pb_utils.Tensor("OUT", np.array([0.5], dtype=np.float32))
+                response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
+                response_sender.send(response)
+
+            # Send final flag
+            response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+
+        return None

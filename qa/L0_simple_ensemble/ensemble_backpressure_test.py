@@ -43,6 +43,7 @@ from tritonclient.utils import InferenceServerException
 
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
+EXPECTED_INFER_OUTPUT = 0.5
 MODEL_ENSEMBLE_ENABLED = "ensemble_enabled_max_inflight_responses"
 MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_responses"
 
@@ -128,7 +129,9 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 for idx, resp in enumerate(responses):
                     output = resp.as_numpy("OUT")
                     self.assertEqual(
-                        output[0], idx, f"Response {idx} has incorrect value"
+                        output[0],
+                        EXPECTED_INFER_OUTPUT,
+                        msg=f"Response {idx} has  - {output[0]}",
                     )
             finally:
                 triton_client.stop_stream()
@@ -183,8 +186,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                     output = resp.as_numpy("OUT")
                     self.assertEqual(
                         output[0],
-                        idx,
-                        f"Response {idx} for request {i} has incorrect value",
+                        EXPECTED_INFER_OUTPUT,
+                        msg=f"Response {idx} for request {i} has incorrect value - {output[0]}",
                     )
 
             # Stop all streams
