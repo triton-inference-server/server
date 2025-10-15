@@ -1318,12 +1318,13 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
         backend_dependencies = "libgomp1"
 
     # libgfortran5 is needed by pytorch backend on ARM
-    if "pytorch" in backends:
-        if target_machine == "aarch64":
-            backend_dependencies += " libgfortran5"
+    if ("pytorch" in backends) and (target_machine == "aarch64"):
+        backend_dependencies += " libgfortran5"
 
-        if target_platform() not in ["igpu", "windows", "rhel"]:
-            backend_dependencies += " libnvshmem3-cuda-13"
+    # libnvshmem3-cuda-13 is needed by pytorch backend but will be required by vLLM and TensorRT-LLM
+    # on platforms other than IGPU we still using CUDA 12 it means we need to add this conditionally
+    if target_platform() not in ["igpu", "windows", "rhel"]:
+        backend_dependencies += " libnvshmem3-cuda-13"
 
     # openssh-server is needed for fastertransformer
     if "fastertransformer" in backends:
