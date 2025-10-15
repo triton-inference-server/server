@@ -1322,11 +1322,7 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
         if target_machine == "aarch64":
             backend_dependencies += " libgfortran5"
 
-        if (
-            target_platform != "igpu"
-            or target_platform != "windows"
-            or target_platform != "rhel"
-        ):
+        if target_platform() not in ["igpu", "windows", "rhel"]:
             backend_dependencies += " libnvshmem3-cuda-13"
 
     # openssh-server is needed for fastertransformer
