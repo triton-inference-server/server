@@ -662,7 +662,7 @@ def pytorch_cmake_args(images):
         )
         if target_platform() == "igpu":
             cargs.append(
-                cmake_backend_enable("pytorch", "TRITON_PYTORCH_NVSHMEM", True)
+                cmake_backend_enable("pytorch", "TRITON_PYTORCH_NVSHMEM", False)
             )
     return cargs
 
