@@ -1524,7 +1524,7 @@ ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{libs_arch}/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb
+      && rm /tmp/cuda-keyring.deb \\
       && apt update -qq \\
       && apt install --yes --no-install-recommends libnvshmem3-cuda-13 \\
       && rm -rf /var/lib/apt/lists/* \\
