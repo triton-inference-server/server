@@ -1514,6 +1514,12 @@ ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
+    if "openvino" in backends:
+        df += """
+# point opencl to openvino related drivers
+RUN mkdir -p /etc/OpenCL/vendors && echo  /opt/tritonserver/backends/openvino/libigdrcl.so > /etc/OpenCL/vendors/intel_openvino.icd 
+"""
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
