@@ -1312,8 +1312,13 @@ ENV UCX_MEM_EVENTS no
 
     # Necessary for libtorch.so to find correct HPCX libraries
     if "pytorch" in backends:
-        df += """
+        if not enable_gpu:
+            df += """
 ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
+"""
+        else:
+            df += f"""
+ENV LD_LIBRARY_PATH /usr/lib/{target_machine}-linux-gnu/nvshmem/13/:/opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${{LD_LIBRARY_PATH}}
 """
 
     backend_dependencies = ""
