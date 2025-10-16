@@ -1514,6 +1514,22 @@ ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
+    if target_platform() not in ["igpu", "windows", "rhel"]:
+        libs_arch = "aarch64" if target_machine == "aarch64" else "x86_64"
+        df += f"""
+RUN curl -o /tmp/cuda-keyring.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{libs_arch}/cuda-keyring_1.1-1_all.deb \\
+      && apt install /tmp/cuda-keyring.deb \\
+      && rm /tmp/cuda-keyring.deb
+      && apt update -qq \\
+      && apt install --yes --no-install-recommends libnvshmem3-cuda-13 \\
+      && rm -rf /var/lib/apt/lists/* \\
+      && dpkg -L libnvshmem3-cuda-13 | grep libnvshmem_host.so | sed -e 's/libnvshmem_host.*//g' | sort -u > /etc/ld.so.conf.d/libnvshmem3-cuda-13.conf \\
+      && ldconfig
+""".format(
+            libs_arch=libs_arch
+        )
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
