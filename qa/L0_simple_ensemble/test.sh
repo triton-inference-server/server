@@ -157,7 +157,7 @@ cp ../python_models/ground_truth/model.py ${MODEL_DIR}/slow_consumer/1
 cp ../python_models/ground_truth/config.pbtxt ${MODEL_DIR}/slow_consumer/
 sed -i 's/name: "ground_truth"/name: "slow_consumer"/g' ${MODEL_DIR}/slow_consumer/config.pbtxt
 
-# Create ensemble with backpressure enabled (limit = 4)
+# Create ensemble with "max_inflight_responses = 4"
 rm -rf ${MODEL_DIR}/ensemble_enabled_max_inflight_responses
 mkdir -p ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/1
 cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/
@@ -203,16 +203,16 @@ fi
 set -e
 
 
-######## Test invalid protobuf value (negative uint32 should fail at parse time)
+######## Test invalid value for "max_inflight_responses"
 INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
-rm -rf ${INVALID_PARAM_MODEL_DIR}
+SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
+SERVER_LOG="./invalid_max_inflight_responses_server.log"
+rm -rf $SERVER_LOG ${INVALID_PARAM_MODEL_DIR}
 
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/1
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/1
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/1
-
-cp -r ${MODEL_DIR}/decoupled_producer ${INVALID_PARAM_MODEL_DIR}/
-cp -r ${MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
+cp -r ${MODEL_DIR}/decoupled_producer ${MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
 
 # max_inflight_responses = -5
 cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/
@@ -229,13 +229,6 @@ cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_
 sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_responses: 12345678901/g' \
   ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/config.pbtxt
 
-cp -r ${MODEL_DIR}/decoupled_producer ${INVALID_PARAM_MODEL_DIR}/
-cp -r ${MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
-
-
-SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
-SERVER_LOG="./invalid_max_inflight_responses_server.log"
-rm -f $SERVER_LOG
 
 run_server
 if [ "$SERVER_PID" != "0" ]; then

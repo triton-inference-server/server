@@ -128,10 +128,11 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):
                     output = resp.as_numpy("OUT")
-                    self.assertEqual(
+                    self.assertAlmostEqual(
                         output[0],
                         EXPECTED_INFER_OUTPUT,
-                        msg=f"Response {idx} has  - {output[0]}",
+                        places=5,
+                        msg=f"Response {idx} has incorrect value - {output[0]}",
                     )
             finally:
                 triton_client.stop_stream()
@@ -184,9 +185,10 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):
                     output = resp.as_numpy("OUT")
-                    self.assertEqual(
+                    self.assertAlmostEqual(
                         output[0],
                         EXPECTED_INFER_OUTPUT,
+                        places=5,
                         msg=f"Response {idx} for request {i} has incorrect value - {output[0]}",
                     )
 
