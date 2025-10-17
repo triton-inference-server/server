@@ -62,7 +62,7 @@ def callback(user_data, result, error):
 
 class EnsembleBackpressureTest(tu.TestResultCollector):
     """
-    Tests for ensemble backpressure feature (max_ensemble_inflight_responses).
+    Tests for ensemble backpressure feature (max_inflight_responses).
     """
 
     def _prepare_infer_args(self, input_value):
@@ -138,14 +138,14 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
     def test_backpressure_limits_inflight(self):
         """
-        Test that max_ensemble_inflight_responses correctly limits concurrent
+        Test that max_inflight_responses correctly limits concurrent
         responses.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_ENABLED, expected_count=32)
 
     def test_backpressure_disabled(self):
         """
-        Test that an ensemble model without max_ensemble_inflight_responses parameter works correctly.
+        Test that an ensemble model without max_inflight_responses parameter works correctly.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED, expected_count=32)
 
@@ -200,7 +200,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         the client receives a cancellation error.
         """
         # Use a large count to ensure the producer gets blocked by backpressure.
-        # The model is configured with max_ensemble_inflight_responses = 4.
+        # The model is configured with max_inflight_responses = 4.
         input_value = 32
         user_data = UserData()
 
