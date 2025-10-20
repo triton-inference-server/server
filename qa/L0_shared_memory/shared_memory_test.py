@@ -305,7 +305,7 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
         platforms = (
             ["python", "onnx", "libtorch", "plan", "openvino"]
             if os.environ.get("BACKENDS") is None
-            else os.environ.get("BACKENDS").split(" ")
+            else os.environ.get("BACKENDS").split()
         )
         for platform in platforms:
             model_name = f"{platform}_int32_int32_int32"
