@@ -219,7 +219,7 @@ ensemble_scheduling {
 
 **Configuration:**
 * **`max_inflight_responses: 16`**: For each ensemble request (not globally), at most 16 responses from `dali_preprocess`
-  can wait for `onnx_inference` to process. Once this per-request limit is reached, `dali_preprocess` is blocked until the downstream step completes a response.
+  can wait for `onnx_inference` to process. Once this per-step limit is reached, `dali_preprocess` is blocked until the downstream step completes a response.
 * **Default (`0`)**: No limit - allows unlimited inflight responses (original behavior).
 
 ### When to Use This Feature
