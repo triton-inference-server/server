@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,6 +33,8 @@ class HandlerBase {
   virtual ~HandlerBase() = default;
   virtual void Start() = 0;
   virtual void Stop() = 0;
+  // Notify handler that completion queue is shutting down
+  virtual void NotifyCQShutdown() = 0;
 };
 
 class ICallData {

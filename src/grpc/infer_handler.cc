@@ -657,7 +657,7 @@ InferRequestComplete(
 void
 ModelInferHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(cq_);
+  auto context = CreateContext();
   context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);
 
@@ -1108,8 +1108,13 @@ ModelInferHandler::InferResponseComplete(
       }
 
       // Send state back to the queue so that state can be released
-      // in the next cycle.
-      state->context_->PutTaskBackToQueue(state);
+      // in the next cycle. If CQ is shutting down, don't enqueue.
+      if (!state->context_->PutTaskBackToQueue(state)) {
+        // CQ is shutting down, cleanup without enqueuing
+        LOG_VERBOSE(1)
+            << "InferResponseComplete: not requeueing state due to shutdown, "
+            << state->unique_id_;
+      }
       delete response_release_payload;
     }
     return;

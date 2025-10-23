@@ -110,7 +110,7 @@ StreamOutputBufferAttributes(
 void
 ModelStreamInferHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(cq_, NEXT_UNIQUE_ID);
+  auto context = CreateContext();
   context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);
 
@@ -695,7 +695,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-      state->context_->PutTaskBackToQueue(state);
+      if (!state->context_->PutTaskBackToQueue(state)) {
+        LOG_VERBOSE(1) << "StreamInferResponseComplete: not requeueing state "
+                          "due to shutdown, "
+                       << state->unique_id_;
+      }
       delete response_release_payload;
     }
 
@@ -823,7 +827,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     // that state object can be released.
     if (is_complete) {
       state->step_ = Steps::CANCELLED;
-      state->context_->PutTaskBackToQueue(state);
+      if (!state->context_->PutTaskBackToQueue(state)) {
+        LOG_VERBOSE(1) << "StreamInferResponseComplete: not requeueing state "
+                          "due to shutdown, "
+                       << state->unique_id_;
+      }
       delete response_release_payload;
     }
 
@@ -854,7 +862,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         // The response queue is empty and complete final flag is received, so
         // mark the state as 'WRITEREADY' so it can be cleaned up later.
         state->step_ = Steps::WRITEREADY;
-        state->context_->PutTaskBackToQueue(state);
+        if (!state->context_->PutTaskBackToQueue(state)) {
+          LOG_VERBOSE(1) << "StreamInferResponseComplete: not requeueing state "
+                            "due to shutdown, "
+                         << state->unique_id_;
+        }
       }
       state->complete_ = is_complete;
     }
