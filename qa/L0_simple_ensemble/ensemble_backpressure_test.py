@@ -144,7 +144,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         responses.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_ENABLED, expected_count=32)
-    
+
     def test_backpressure_limit_one(self):
         """
         Test edge case: max_inflight_requests=1.
