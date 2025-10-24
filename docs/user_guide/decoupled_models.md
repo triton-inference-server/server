@@ -97,7 +97,7 @@ each time with a new response. You can take a look at [grpc_server.cc](https://g
 
 ### Using Decoupled Models in Ensembles
 
-When using decoupled models within an [ensemble](ensemble_models.md), you may encounter unbounded memory growth if a decoupled model produces responses faster than downstream models can consume them. To address this, Triton provides the `max_inflight_responses` configuration field, which limits the number of concurrent inflight responses at each ensemble step.
+When using decoupled models within an [ensemble](ensemble_models.md), you may encounter unbounded memory growth if a decoupled model produces responses faster than downstream models can consume them, because these responses are buffered until the downstream models are ready to process them. To address this, Triton provides the `max_inflight_requests` configuration field, which limits the number of concurrent inflight requests at each ensemble step.
 
 For more details and examples, see [Managing Memory Usage in Ensembles with Decoupled Models](ensemble_models.md#managing-memory-usage-in-ensembles-with-decoupled-models).
 

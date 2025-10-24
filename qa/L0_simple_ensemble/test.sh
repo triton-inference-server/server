@@ -147,9 +147,9 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-######## Test ensemble backpressure feature (max_inflight_responses parameter)
+######## Test ensemble backpressure feature (max_inflight_requests parameter)
 MODEL_DIR="`pwd`/backpressure_test_models"
-mkdir -p ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/1
+mkdir -p ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/1
 
 rm -rf ${MODEL_DIR}/slow_consumer
 mkdir -p ${MODEL_DIR}/slow_consumer/1
@@ -157,12 +157,21 @@ cp ../python_models/ground_truth/model.py ${MODEL_DIR}/slow_consumer/1
 cp ../python_models/ground_truth/config.pbtxt ${MODEL_DIR}/slow_consumer/
 sed -i 's/name: "ground_truth"/name: "slow_consumer"/g' ${MODEL_DIR}/slow_consumer/config.pbtxt
 
-# Create ensemble with "max_inflight_responses = 4"
-rm -rf ${MODEL_DIR}/ensemble_enabled_max_inflight_responses
-mkdir -p ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/1
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_responses: 4/g' \
-  ${MODEL_DIR}/ensemble_enabled_max_inflight_responses/config.pbtxt
+# Create ensemble with "max_inflight_requests = 4"
+rm -rf ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4
+mkdir -p ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/1
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/
+sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: 4/g' \
+  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/config.pbtxt
+
+# Create ensemble with "max_inflight_requests = 1"
+rm -rf ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1
+mkdir -p ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/1
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/
+sed -i 's/platform: "ensemble"/name: "ensemble_max_inflight_requests_limit_1"\nplatform: "ensemble"/g' \
+  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/config.pbtxt
+sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: 1/g' \
+  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/config.pbtxt
 
 BACKPRESSURE_TEST_PY=./ensemble_backpressure_test.py
 SERVER_LOG="./ensemble_backpressure_test_server.log"
@@ -182,7 +191,7 @@ python $BACKPRESSURE_TEST_PY -v >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 4
+    check_test_results $TEST_RESULT_FILE 5
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -196,17 +205,17 @@ wait $SERVER_PID
 
 set +e
 # Verify valid config was loaded successfully
-if ! grep -q "Ensemble model 'ensemble_enabled_max_inflight_responses' configured with max_inflight_responses: 4" $SERVER_LOG; then
+if ! grep -q "Ensemble model 'ensemble_max_inflight_requests_limit_4' configured with max_inflight_requests: 4" $SERVER_LOG; then
     echo -e "\n***\n*** FAILED: Valid model did not load successfully\n***"
     RET=1
 fi
 set -e
 
 
-######## Test invalid value for "max_inflight_responses"
+######## Test invalid value for "max_inflight_requests"
 INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
 SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
-SERVER_LOG="./invalid_max_inflight_responses_server.log"
+SERVER_LOG="./invalid_max_inflight_requests_server.log"
 rm -rf $SERVER_LOG ${INVALID_PARAM_MODEL_DIR}
 
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/1
@@ -214,19 +223,19 @@ mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/1
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/1
 cp -r ${MODEL_DIR}/decoupled_producer ${MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
 
-# max_inflight_responses = -5
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_responses: -5/g' \
+# max_inflight_requests = -5
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/
+sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: -5/g' \
   ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/config.pbtxt
 
-# max_inflight_responses = "invalid_value"
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_responses: "invalid_value"/g' \
+# max_inflight_requests = "invalid_value"
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/
+sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: "invalid_value"/g' \
   ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/config.pbtxt
 
-# max_inflight_responses = 12345678901
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_responses/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_responses: 12345678901/g' \
+# max_inflight_requests = 12345678901
+cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/
+sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: 12345678901/g' \
   ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/config.pbtxt
 
 

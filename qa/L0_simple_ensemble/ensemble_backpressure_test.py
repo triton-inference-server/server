@@ -44,8 +44,9 @@ from tritonclient.utils import InferenceServerException
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
 EXPECTED_INFER_OUTPUT = 0.5
-MODEL_ENSEMBLE_ENABLED = "ensemble_enabled_max_inflight_responses"
-MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_responses"
+MODEL_ENSEMBLE_ENABLED = "ensemble_max_inflight_requests_limit_4"
+MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_requests"
+MODEL_ENSEMBLE_LIMIT_ONE = "ensemble_max_inflight_requests_limit_1"
 
 
 class UserData:
@@ -62,7 +63,7 @@ def callback(user_data, result, error):
 
 class EnsembleBackpressureTest(tu.TestResultCollector):
     """
-    Tests for ensemble backpressure feature (max_inflight_responses).
+    Tests for ensemble backpressure feature (max_inflight_requests).
     """
 
     def _prepare_infer_args(self, input_value):
@@ -139,14 +140,20 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
     def test_backpressure_limits_inflight(self):
         """
-        Test that max_inflight_responses correctly limits concurrent
+        Test that max_inflight_requests correctly limits concurrent
         responses.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_ENABLED, expected_count=32)
+    
+    def test_backpressure_limit_one(self):
+        """
+        Test edge case: max_inflight_requests=1.
+        """
+        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_ONE, expected_count=16)
 
     def test_backpressure_disabled(self):
         """
-        Test that an ensemble model without max_inflight_responses parameter works correctly.
+        Test that an ensemble model without max_inflight_requests parameter works correctly.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED, expected_count=32)
 
@@ -202,7 +209,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         the client receives a cancellation error.
         """
         # Use a large count to ensure the producer gets blocked by backpressure.
-        # The model is configured with max_inflight_responses = 4.
+        # The model is configured with max_inflight_requests = 4.
         input_value = 32
         user_data = UserData()
 
