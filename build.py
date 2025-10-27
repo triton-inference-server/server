@@ -1283,10 +1283,9 @@ RUN ldconfig && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
 
-# There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
-# Downgrade to ompi v4.1.5rc2 to avoid the issue.
-RUN rm -fr /opt/hpcx/ompi
-COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1465,14 +1464,6 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
-    if "tensorrtllm" in backends:
-        df += """
-# Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)
-RUN apt-get update \\
-    && apt-get install -y --no-install-recommends \\
-        openssh-client \\
-    && rm -rf /var/lib/apt/lists/*
-    """
 
     if "vllm" in backends:
         df += f"""
