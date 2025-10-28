@@ -28,6 +28,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
 import numpy as np
@@ -365,13 +366,24 @@ def _get_guided_json_from_tool(
 def _get_vllm_lora_names(
     model_repository: str | list[str], model_name: str, model_version: int
 ) -> None | List[str]:
+    if (
+        len(model_name) == 0
+        or model_name.isspace()
+        or "/" in model_name
+        or "\\" in model_name
+    ):
+        raise ValueError(
+            f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
+        )
     lora_names = []
     repo_paths = model_repository
     if isinstance(repo_paths, str):
         repo_paths = [repo_paths]
     for repo_path in repo_paths:
         model_path = os.path.join(repo_path, model_name)
-        if os.path.normpath(model_path) != model_path:
+        if (not Path(model_path).is_relative_to(repo_path)) or (
+            os.path.normpath(model_path) != model_path
+        ):
             raise ValueError(
                 f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
             )

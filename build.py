@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.62.0dev",
-    "triton_container_version": "25.10dev",
-    "upstream_container_version": "25.08",
-    "ort_version": "1.23.0",
+    "release_version": "2.63.0dev",
+    "triton_container_version": "25.11dev",
+    "upstream_container_version": "25.09",
+    "ort_version": "1.23.1",
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
     "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.9.2",
+    "vllm_version": "0.10.1.1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -1384,7 +1384,6 @@ RUN apt-get update \\
               libgoogle-perftools-dev \\
               libjemalloc-dev \\
               libnuma-dev \\
-              software-properties-common \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\

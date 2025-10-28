@@ -29,6 +29,7 @@ import sys
 
 sys.path.append("../common")
 
+import json
 import unittest
 
 import numpy as np
@@ -39,6 +40,7 @@ import test_util as tu
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
 BYTES_PER_FP32 = 4
 MB = 2**20  # 1 MB = 1,048,576 bytes
+GB = 2**30  # 1 GB = 1,073,741,824 bytes
 DEFAULT_LIMIT_BYTES = 64 * MB  # 64MB default limit
 INCREASED_LIMIT_BYTES = 128 * MB  # 128MB increased limit
 
@@ -167,8 +169,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Input just under the 64MB limit (should succeed)
-        # (2^24 - 32) elements * 4 bytes = 64MB - 128 bytes = 67,108,736 bytes
-        shape_size = DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS
+        # The test creates a JSON payload with data, which adds overhead compared
+        # to raw binary format. We adjust the shape size to ensure the final
+        # JSON payload is under the size limit. An element is roughly 5
+        # bytes in JSON, compared to 4 bytes as a raw FP32.
+        shape_size = (DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
         payload = {
             "inputs": [
@@ -180,9 +185,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
-        assert (
-            shape_size * BYTES_PER_FP32 < 64 * MB
-        )  # Verify we're actually under the 64MB limit
+        # Verify we're actually under the 64MB limit
+        self.assertLess(len(json.dumps(payload).encode("utf-8")), DEFAULT_LIMIT_BYTES)
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
@@ -320,8 +324,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Input just under the 128MB configured limit (should succeed)
-        # (2^25 - 32) elements * 4 bytes = 128MB - 128 bytes = 134,217,600 bytes
-        shape_size = INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS
+        # The test creates a JSON payload with data, which adds overhead compared
+        # to raw binary format. We adjust the shape size to ensure the final
+        # JSON payload is under the size limit. An element is roughly 5
+        # bytes in JSON, compared to 4 bytes as a raw FP32.
+        shape_size = (INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
 
         payload = {
             "inputs": [
@@ -333,9 +340,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
                 }
             ]
         }
-        assert (
-            shape_size * BYTES_PER_FP32 < 128 * MB
-        )  # Verify we're actually under the 128MB limit
+        # Verify we're actually under the 128MB limit
+        self.assertLess(len(json.dumps(payload).encode("utf-8")), INCREASED_LIMIT_BYTES)
 
         response = requests.post(
             self._get_infer_url(model), headers=headers, json=payload
@@ -358,6 +364,55 @@ class InferSizeLimitTest(tu.TestResultCollector):
             shape_size,
             result["outputs"][0]["shape"][1],
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
+        )
+
+    def test_large_string_in_json(self):
+        """Test JSON request with large string input"""
+        model = "simple_identity"
+
+        # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
+        # (2^31 + 64) elements * 1 bytes = 2GB + 64 bytes = 2,147,483,712 bytes
+        large_string_size = 2 * GB + 64
+        large_string = "A" * large_string_size
+
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "BYTES",
+                    "shape": [1, 1],
+                    "data": [large_string],
+                }
+            ]
+        }
+
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, json=payload
+        )
+
+        # Should fail with 400 bad request
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected error code for oversized JSON request, got: {}".format(
+                response.status_code
+            ),
+        )
+
+        # Verify error message
+        error_msg = response.content.decode()
+        self.assertIn(
+            "Request JSON size",
+            error_msg,
+        )
+        self.assertIn(
+            "exceeds the maximum allowed value",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
         )
 
 

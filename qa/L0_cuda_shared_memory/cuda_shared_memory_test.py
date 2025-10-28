@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -723,7 +723,11 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "'raw_handle' exceeds the maximum allowed data size limit INT_MAX",
+                "Request JSON size",
+                error_message,
+            )
+            self.assertIn(
+                "exceeds the maximum allowed value",
                 error_message,
             )
         except ValueError:
