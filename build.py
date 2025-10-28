@@ -1282,10 +1282,6 @@ RUN ldconfig && \\
     pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libprotobuf-dev \
-    && rm -rf /var/lib/apt/lists/*
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
