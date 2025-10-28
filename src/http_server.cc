@@ -2361,6 +2361,16 @@ HTTPAPIServer::GetContentLength(
              ", got: " + content_length_c_str)
                 .c_str());
       }
+      catch (const std::out_of_range& oor) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse ") + kContentLengthHeader +
+             ", value is out of range [ " +
+             std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
+             std::to_string(std::numeric_limits<std::int32_t>::max()) +
+             " ], got: " + content_length_c_str)
+                .c_str());
+      }
     }
   } else {
     // The Content-Length doesn't reflect the actual request body size
@@ -3060,6 +3070,16 @@ HTTPAPIServer::EVBufferToJson(
     triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
     const size_t length, int n)
 {
+  if (length > max_input_size_) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("Request JSON size of " + std::to_string(length) +
+         " bytes exceeds the maximum allowed value of " +
+         std::to_string(max_input_size_) +
+         " bytes. Use --http-max-input-size to increase the limit.")
+            .c_str());
+  }
+
   size_t offset = 0, remaining_length = length;
   char* json_base;
   std::vector<char> json_buffer;

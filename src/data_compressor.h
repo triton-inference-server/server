@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021-2025, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -93,11 +93,12 @@ class DataCompressor {
         &stream, deflateEnd);
 
     // Get the addr and size of each chunk of memory in 'source'
+    std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
     struct evbuffer_iovec* buffer_array = nullptr;
     int buffer_count = evbuffer_peek(source, -1, NULL, NULL, 0);
     if (buffer_count > 0) {
-      buffer_array = static_cast<struct evbuffer_iovec*>(
-          alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+      buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+      buffer_array = buffer_array_holder.get();
       if (evbuffer_peek(source, -1, NULL, buffer_array, buffer_count) !=
           buffer_count) {
         return TRITONSERVER_ErrorNew(
@@ -201,11 +202,12 @@ class DataCompressor {
               &stream, inflateEnd);
 
           // Get the addr and size of each chunk of memory in 'source'
+          std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
           struct evbuffer_iovec* buffer_array = nullptr;
           int buffer_count = evbuffer_peek(source, -1, NULL, NULL, 0);
           if (buffer_count > 0) {
-            buffer_array = static_cast<struct evbuffer_iovec*>(
-                alloca(sizeof(struct evbuffer_iovec) * buffer_count));
+            buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
+            buffer_array = buffer_array_holder.get();
             if (evbuffer_peek(source, -1, NULL, buffer_array, buffer_count) !=
                 buffer_count) {
               return TRITONSERVER_ErrorNew(

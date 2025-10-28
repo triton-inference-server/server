@@ -99,6 +99,7 @@ echo "python environment 3.${PYTHON_ENV_VERSION}"
 # copy the stub out to /opt/tritonserver/backends/python/triton_python_backend_stub
 cp python_backend/builddir/triton_python_backend_stub /opt/tritonserver/backends/python/triton_python_backend_stub
 # Set up environment and stub for each test
+apt-get update -qq && apt-get install -y software-properties-common
 add-apt-repository ppa:deadsnakes/ppa -y
 apt-get update && apt-get -y install \
                             "python3.${PYTHON_ENV_VERSION}-dev" \

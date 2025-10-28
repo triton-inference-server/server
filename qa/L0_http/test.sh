@@ -760,6 +760,7 @@ MODELDIR=http_input_size_limit_test_models
 mkdir -p $MODELDIR
 rm -rf ${MODELDIR}/*
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+cp -r ./models/simple_identity ${MODELDIR}/.
 
 # First run with default size limit - large inputs should fail
 SERVER_ARGS="--model-repository=${MODELDIR}"
@@ -785,6 +786,13 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_rejec
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for JSON input\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_large_string_in_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for large string in JSON\n***"
     RET=1
 fi
 set -e
