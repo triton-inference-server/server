@@ -1505,7 +1505,10 @@ ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
-    if target_platform() not in ["igpu", "windows", "rhel"]:
+    if (
+        target_platform() not in ["igpu", "windows", "rhel"]
+        and "tensorrtllm" not in backends
+    ):
         repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
         df += f"""
 RUN curl -o /tmp/cuda-keyring.deb \\
