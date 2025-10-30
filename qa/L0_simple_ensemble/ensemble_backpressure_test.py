@@ -46,7 +46,7 @@ DEFAULT_RESPONSE_TIMEOUT = 60
 EXPECTED_INFER_OUTPUT = 0.5
 MODEL_ENSEMBLE_ENABLED = "ensemble_max_inflight_requests_limit_4"
 MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_requests"
-MODEL_ENSEMBLE_LIMIT_ONE = "ensemble_max_inflight_requests_limit_1"
+MODEL_ENSEMBLE_LIMIT_1 = "ensemble_max_inflight_requests_limit_1"
 
 
 class UserData:
