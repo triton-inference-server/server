@@ -1155,29 +1155,27 @@ TraceManager::TraceSetting::SampleTrace(const TraceStartOptions& start_options)
   bool should_sample = false;
 
 #ifndef _WIN32
-  // Imitate OTEL's ParentBased sampler (i.e. sample if parent is sampled else use root sampler, in our case the rate option).                                                              █
-  bool has_sampled_parent = false;
+  bool has_parent = false;
+  bool parent_is_sampled = false;
   if (mode_ == TRACE_MODE_OPENTELEMETRY) {
     auto active_span = otel_trace_api::GetSpan(start_options.propagated_context);
-    if (active_span->GetContext().IsValid() &&
-        active_span->GetContext().IsSampled()) {
-      has_sampled_parent = true;
+    if (active_span->GetContext().IsValid()) {
+      has_parent = true;
+      parent_is_sampled = active_span->GetContext().IsSampled();
     }
   }
 #endif
 
-  if (honor_parent_sampling_ && has_sampled_parent) {
-    should_sample = true;
+  // Imitate OTEL's ParentBased sampler (i.e. use parent's sampling flag, fallback on a root sampler, in our case the rate option).
+  if (honor_parent_sampling_ && has_parent) {
+    // ParentBased sampler: respect parent's sampling decision
+    should_sample = parent_is_sampled;
   } else {
     std::lock_guard<std::mutex> lk(mu_);
     if (rate_ != 0) {
-      // If `count_` hits 0, `Valid()` returns false for this and all
-      // following requests (unless `count_` is updated by a user).
-      // At this point we only trace requests for which
       if (!Valid()) {
         return nullptr;
       }
-	  // `sample_` counts all requests, coming to server.
       bool count_rate_hit = (((++sample_) % rate_) == 0);
       if (count_rate_hit && (count_ > 0 || count_ == -1)) {
         if (count_ > 0) {
