@@ -655,6 +655,8 @@ Use the `--openai-restricted-api` command-line argument to configure endpoint re
   - **inference**: Chat completions and text completions endpoints
     - `POST /v1/chat/completions`
     - `POST /v1/completions`
+  - **embedding**: Embedding endpoint
+    - `POST /v1/embeddings`
   - **model-repository**: Model listing and information endpoints
     - `GET /v1/models`
     - `GET /v1/models/{model_name}`
