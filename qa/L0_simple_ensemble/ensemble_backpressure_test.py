@@ -105,14 +105,14 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
         return responses
 
-    def _run_inference(self, model_name, expected_count):
+    def _run_inference(self, model_name, expected_reposnes_count=32):
         """
         Helper function to run inference and verify responses.
         """
         user_data = UserData()
         with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
             try:
-                inputs, outputs = self._prepare_infer_args(expected_count)
+                inputs, outputs = self._prepare_infer_args(expected_reposnes_count)
                 triton_client.start_stream(callback=partial(callback, user_data))
                 triton_client.async_stream_infer(
                     model_name=model_name, inputs=inputs, outputs=outputs
@@ -122,8 +122,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 responses = self._collect_responses(user_data)
                 self.assertEqual(
                     len(responses),
-                    expected_count,
-                    f"Expected {expected_count} responses, got {len(responses)}",
+                    expected_reposnes_count,
+                    f"Expected {expected_reposnes_count} responses, got {len(responses)}",
                 )
 
                 # Verify correctness of responses
@@ -143,19 +143,19 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         Test that max_inflight_requests correctly limits concurrent
         responses.
         """
-        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_4, expected_count=32)
+        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_4)
 
     def test_backpressure_limit_one(self):
         """
         Test edge case: max_inflight_requests=1.
         """
-        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_1, expected_count=32)
+        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_1)
 
     def test_backpressure_disabled(self):
         """
         Test that an ensemble model without max_inflight_requests parameter works correctly.
         """
-        self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED, expected_count=32)
+        self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED)
 
     def test_backpressure_concurrent_requests(self):
         """
