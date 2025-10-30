@@ -44,8 +44,8 @@ from tritonclient.utils import InferenceServerException
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
 EXPECTED_INFER_OUTPUT = 0.5
-MODEL_ENSEMBLE_LIMIT_4 = "ensemble_max_inflight_requests_limit_4"
 MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_requests"
+MODEL_ENSEMBLE_LIMIT_4 = "ensemble_max_inflight_requests_limit_4"
 MODEL_ENSEMBLE_LIMIT_1 = "ensemble_max_inflight_requests_limit_1"
 
 
@@ -143,13 +143,13 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         Test that max_inflight_requests correctly limits concurrent
         responses.
         """
-        self._run_inference(model_name=MODEL_ENSEMBLE_ENABLED, expected_count=32)
+        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_4, expected_count=32)
 
     def test_backpressure_limit_one(self):
         """
         Test edge case: max_inflight_requests=1.
         """
-        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_ONE, expected_count=16)
+        self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_1, expected_count=32)
 
     def test_backpressure_disabled(self):
         """
