@@ -29,7 +29,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from this import d
 
 EMBEDDING_OUTPUT_FLOAT = [
     -0.1914404183626175,

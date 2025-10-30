@@ -410,7 +410,7 @@ class TritonLLMEngine(LLMEngine):
     ) -> Union[list[float], str]:
         if encoding_format == "float":
             return embedding
-        elif encoding_format == "base64":
+        else:
             embedding_bytes = np.array(embedding, dtype="float32").tobytes()
             return base64.b64encode(embedding_bytes).decode("utf-8")
 

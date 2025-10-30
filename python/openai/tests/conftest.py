@@ -87,7 +87,7 @@ def backend(tool_call_parser):
 
 
 @pytest.fixture(scope="session")
-def model(backend, tool_call_parser):
+def model(tool_call_parser):
     env_model = os.environ.get("TEST_MODEL")
 
     if not env_model:
