@@ -242,7 +242,6 @@ The optimal value depends on your specific deployment, including batch size, req
   no synchronization overhead is incurred.
 * **Minimal overhead when enabled**: Uses a blocking/wakeup mechanism per ensemble step, where upstream models are paused ("blocked") when the inflight requests limit is reached and resumed ("woken up") as downstream models complete processing them. This synchronization ensures memory usage stays within bounds, though it may increase latency.
 
-  
   **Note**: This blocking does not cancel or internally time out intermediate requests, but clients may experience increased end-to-end latency.
 
 ## Additional Resources
