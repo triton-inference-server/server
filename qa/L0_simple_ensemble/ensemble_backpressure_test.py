@@ -105,7 +105,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
         return responses
 
-    def _run_inference(self, model_name, expected_reposnes_count=32):
+    def _run_inference(self, model_name, expected_responses_count=32):
         """
         Helper function to run inference and verify responses.
         """
