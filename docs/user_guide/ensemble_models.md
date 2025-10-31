@@ -225,7 +225,6 @@ ensemble_scheduling {
 ### When to Use This Feature
 
 Use `max_inflight_requests` when your ensemble pipeline includes:
-* **Processing bottlenecks**: When upstream steps (e.g., preprocessing) are significantly faster than downstream steps (e.g., inference).
 * **Streaming or decoupled models**: When models produce multiple responses per request more quickly than downstream steps can process them.
 * **Memory constraints**: Risk of unbounded memory growth from accumulating requests.
 
