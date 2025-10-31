@@ -301,6 +301,98 @@ See the
 [vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
 on how to serve a model with LoRA adapters.
 
+### Embedding Models
+Currently, OpenAI-Compatible Frontend supports loading embedding models and embeddings endpoints via vLLM backend. Check [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html#embedding) for all supported embedding models from vLLM.
+
+1. Launch the container and install dependencies:
+  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
+  - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
+    access gated models, make sure this is set in your local environment if needed.
+
+```bash
+docker run -it --net=host --gpus all --rm \
+  -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
+  -e HF_TOKEN \
+  nvcr.io/nvidia/tritonserver:25.10-vllm-python-py3
+```
+
+2. Launch the OpenAI-compatible Triton Inference Server:
+```bash
+cd /opt/tritonserver/python/openai
+
+# NOTE: Embeddings endpoint does not require "--tokenizer"
+python3 openai_frontend/main.py --model-repository tests/vllm_embedding_models
+```
+
+<details>
+<summary>Example output</summary>
+
+```
+...
++------------------+---------+--------+
+| Model            | Version | Status |
++------------------+---------+--------+
+| all-MiniLM-L6-v2 | 1       | READY  | <- Correct Model Loaded in Triton
++------------------+---------+--------+
+...
+Found model: name='all-MiniLM-L6-v2', backend='vllm'
+[WARNING] Adding CORS for the following origins: ['http://localhost']
+INFO:     Started server process [133]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
+```
+
+</details>
+
+3. Send a `/v1/embeddings` request:
+  - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
+```bash
+MODEL="all-MiniLM-L6-v2"
+curl -s http://localhost:9000/v1/embeddings \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "'${MODEL}'",
+    "input": "The food was delicious and the waiter...",
+    "dimensions": 10,
+    "encoding_format": "float"
+  }' | jq
+```
+
+<details>
+<summary>Example output</summary>
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [
+        -0.1914404183626175,
+        0.4000193178653717,
+        0.058502197265625,
+        0.18909454345703125,
+        -0.4690297544002533,
+        0.004936536308377981,
+        0.45893096923828125,
+        -0.31141534447669983,
+        0.18299102783203125,
+        -0.4907582700252533
+      ],
+      "index": 0
+    }
+  ],
+  "model": "all-MiniLM-L6-v2",
+  "usage": {
+    "prompt_tokens": 12,
+    "total_tokens": 12
+  }
+}
+```
+
+</details>
+
 ## TensorRT-LLM
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
