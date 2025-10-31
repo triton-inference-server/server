@@ -112,7 +112,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
         user_data = UserData()
         with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
             try:
-                inputs, outputs = self._prepare_infer_args(expected_reposnes_count)
+                inputs, outputs = self._prepare_infer_args(expected_responses_count)
                 triton_client.start_stream(callback=partial(callback, user_data))
                 triton_client.async_stream_infer(
                     model_name=model_name, inputs=inputs, outputs=outputs
@@ -122,8 +122,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 responses = self._collect_responses(user_data)
                 self.assertEqual(
                     len(responses),
-                    expected_reposnes_count,
-                    f"Expected {expected_reposnes_count} responses, got {len(responses)}",
+                    expected_responses_count,
+                    f"Expected {expected_responses_count} responses, got {len(responses)}",
                 )
 
                 # Verify correctness of responses
