@@ -138,26 +138,26 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             finally:
                 triton_client.stop_stream()
 
-    def test_backpressure_limits_inflight(self):
+    def test_max_inflight_requests_limit_4(self):
         """
         Test that max_inflight_requests correctly limits concurrent
         responses.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_4)
 
-    def test_backpressure_limit_one(self):
+    def test_max_inflight_requests_limit_1(self):
         """
         Test edge case: max_inflight_requests=1.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_LIMIT_1)
 
-    def test_backpressure_disabled(self):
+    def test_max_inflight_requests_limit_disabled(self):
         """
         Test that an ensemble model without max_inflight_requests parameter works correctly.
         """
         self._run_inference(model_name=MODEL_ENSEMBLE_DISABLED)
 
-    def test_backpressure_concurrent_requests(self):
+    def test_max_inflight_requests_limit_concurrent_requests(self):
         """
         Test that backpressure works correctly with multiple concurrent requests.
         Each request should have independent backpressure state.
@@ -178,7 +178,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             for i in range(num_concurrent):
                 clients[i].start_stream(callback=partial(callback, user_datas[i]))
                 clients[i].async_stream_infer(
-                    model_name=MODEL_ENSEMBLE_ENABLED, inputs=inputs, outputs=outputs
+                    model_name=MODEL_ENSEMBLE_LIMIT_4, inputs=inputs, outputs=outputs
                 )
 
             # Collect and verify responses for all requests
@@ -203,7 +203,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             for client in clients:
                 client.stop_stream()
 
-    def test_backpressure_request_cancellation(self):
+    def test_max_inflight_requests_limit_request_cancellation(self):
         """
         Test that cancellation unblocks producers waiting on backpressure and that
         the client receives a cancellation error.
@@ -219,7 +219,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
             # Start the request
             triton_client.async_stream_infer(
-                model_name=MODEL_ENSEMBLE_ENABLED, inputs=inputs, outputs=outputs
+                model_name=MODEL_ENSEMBLE_LIMIT_4, inputs=inputs, outputs=outputs
             )
 
             responses = []
