@@ -606,8 +606,14 @@ ReadDataFromJsonHelper(
         const char* cstr;
         size_t len = 0;
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
-        if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
-            expected_cnt) {
+        // Quick sanity check to ensure we don't write beyond `expected_cnt`.
+        int32_t actual_cnt = *counter + len + sizeof(uint32_t);
+        if (actual_cnt < 0) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              "Unable to parse 'data' field: string length is negative");
+        }
+        if (static_cast<int64_t>(actual_cnt) > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               "Shape does not match true shape of 'data' field");
