@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -95,7 +95,15 @@ your application should be cognizant that the callback function you registered w
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
 each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc)
 
-### Knowing When a Decoupled Inference Request is Complete
+### Using Decoupled Models in Ensembles
+
+When using decoupled models within an [ensemble pipeline](ensemble_models.md), you may encounter unbounded memory growth if the decoupled model produces responses faster than downstream models can consume them.
+
+To prevent unbounded memory growth in this scenario, consider using the `max_inflight_requests` configuration field. This field limits the maximum number of concurrent inflight requests permitted at each ensemble step for each inference request.
+
+For more details and examples, see [Managing Memory Usage in Ensemble Models](ensemble_models.md#managing-memory-usage-in-ensemble-models).
+
+## Knowing When a Decoupled Inference Request is Complete
 
 An inference request is considered complete when a response containing the
 `TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag is received from a model/backend.
