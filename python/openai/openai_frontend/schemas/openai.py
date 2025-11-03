@@ -157,6 +157,14 @@ class CreateCompletionRequest(BaseModel):
         description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
         examples=["user-1234"],
     )
+    guided_decoding_guide_type: Optional[str] = Field(
+        None,
+        description="The type of guided decoding to use.\n",
+    )
+    guided_decoding_guide: Optional[str] = Field(
+        None,
+        description="The guide to use for guided decoding.\n",
+    )
 
 
 class FinishReason(Enum):
@@ -928,6 +936,14 @@ class CreateChatCompletionRequest(BaseModel):
         description="Deprecated in favor of `tools`.\n\nA list of functions the model may generate JSON inputs for.\n",
         max_length=128,
         min_length=1,
+    )
+    guided_decoding_guide_type: Optional[str] = Field(
+        None,
+        description="The type of guided decoding to use.\n",
+    )
+    guided_decoding_guide: Optional[Union[str, List[str], Dict[str, Any]]] = Field(
+        None,
+        description="The guide to use for guided decoding.\n",
     )
 
 
