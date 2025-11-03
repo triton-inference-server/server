@@ -73,12 +73,12 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.63.0dev",
     "triton_container_version": "25.11dev",
-    "upstream_container_version": "25.09",
+    "upstream_container_version": "25.10",
     "ort_version": "1.23.1",
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
     "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.10.1.1",
+    "vllm_version": "0.10.2",
     "rhel_py_version": "3.12.3",
 }
 
@@ -660,6 +660,10 @@ def pytorch_cmake_args(images):
         cargs.append(
             cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
         )
+        if target_platform() == "igpu":
+            cargs.append(
+                cmake_backend_enable("pytorch", "TRITON_PYTORCH_NVSHMEM", False)
+            )
     return cargs
 
 
@@ -1278,11 +1282,6 @@ RUN ldconfig && \\
     pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
-
-# There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
-# Downgrade to ompi v4.1.5rc2 to avoid the issue.
-RUN rm -fr /opt/hpcx/ompi
-COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1461,14 +1460,6 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
-    if "tensorrtllm" in backends:
-        df += """
-# Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)
-RUN apt-get update \\
-    && apt-get install -y --no-install-recommends \\
-        openssh-client \\
-    && rm -rf /var/lib/apt/lists/*
-    """
 
     if "vllm" in backends:
         df += f"""
@@ -1513,6 +1504,25 @@ ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages
 # Update Python path to include DALI
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
+
+    if (
+        target_platform() not in ["igpu", "windows", "rhel"]
+        and "tensorrtllm" not in backends
+    ):
+        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+        df += f"""
+RUN curl -o /tmp/cuda-keyring.deb \\
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{repo_arch}/cuda-keyring_1.1-1_all.deb \\
+      && apt install /tmp/cuda-keyring.deb \\
+      && rm /tmp/cuda-keyring.deb \\
+      && apt update -qq \\
+      && apt install --yes --no-install-recommends libnvshmem3-cuda-13 \\
+      && rm -rf /var/lib/apt/lists/* \\
+      && dpkg -L libnvshmem3-cuda-13 | grep libnvshmem_host.so | sed -e 's/libnvshmem_host.*//g' | sort -u > /etc/ld.so.conf.d/libnvshmem3-cuda-13.conf \\
+      && ldconfig
+""".format(
+            repo_arch=repo_arch
+        )
 
     df += """
 WORKDIR /opt/tritonserver

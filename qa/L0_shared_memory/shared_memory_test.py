@@ -301,7 +301,13 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
 
     def test_large_shm_register_offset(self):
         # Test for out of bounds read vulnerability when registering system shared memory with large offset
-        for platform in ["python", "onnx", "libtorch", "plan", "openvino"]:
+
+        platforms = (
+            ["python", "onnx", "libtorch", "plan", "openvino"]
+            if os.environ.get("BACKENDS") is None
+            else os.environ.get("BACKENDS").split()
+        )
+        for platform in platforms:
             model_name = f"{platform}_int32_int32_int32"
 
             # Test for large offset

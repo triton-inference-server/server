@@ -160,7 +160,7 @@ done
 # Test large system shared memory offset
 rm -rf models/*
 # prepare add_sub model of various backends
-BACKENDS="python onnx libtorch plan openvino"
+BACKENDS=${BACKENDS:-"python onnx libtorch plan openvino"}
 for backend in ${BACKENDS} ; do
     model="${backend}_int32_int32_int32"
     model_dir="models/${model}"
