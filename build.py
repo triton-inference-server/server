@@ -1080,6 +1080,7 @@ RUN apt-get update \\
             build-essential \\
             git \\
             gperf \\
+            libboost-dev=1.83.* \\
             libre2-dev \\
             libssl-dev \\
             libtool \\
@@ -1109,14 +1110,6 @@ RUN pip3 install --upgrade \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3
-
-# Install boost version >= 1.78 for boost::span
-# Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \\
-          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
-      && (cd /tmp && tar xzf boost.tar.gz) \\
-      && mv /tmp/boost_1_80_0/boost /usr/include/boost
-
 """
 
         if FLAGS.enable_gpu:
