@@ -95,7 +95,7 @@ class LLMEngine(Protocol):
         """
         pass
 
-    def embed(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
+    def embedding(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
         """
         Returns a CreateEmbeddingResponse.
         """

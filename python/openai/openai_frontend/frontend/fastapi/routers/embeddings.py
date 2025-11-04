@@ -44,7 +44,7 @@ async def create_embedding(
         raise HTTPException(status_code=500, detail="No attached inference engine")
 
     try:
-        response = await raw_request.app.engine.embed(request)
+        response = await raw_request.app.engine.embedding(request)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"{e}")

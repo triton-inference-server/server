@@ -367,7 +367,9 @@ class TritonLLMEngine(LLMEngine):
             usage=usage,
         )
 
-    async def embed(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
+    async def embedding(
+        self, request: CreateEmbeddingRequest
+    ) -> CreateEmbeddingResponse:
         # Validate request and convert to Triton format
         model_name, _ = self._get_model_and_lora_name(request.model)
         metadata = self.model_metadata.get(model_name)

@@ -47,8 +47,8 @@ from schemas.openai import (
 
 
 class RequestKind(Enum):
-    GENERATE = "generate"
-    EMBED = "embed"
+    GENERATE = 1
+    EMBED = 2
 
 
 def _create_vllm_generate_request(
