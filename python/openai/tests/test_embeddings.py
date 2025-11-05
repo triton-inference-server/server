@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import base64
+import os
 from pathlib import Path
 
 import numpy as np
@@ -418,15 +419,11 @@ EMBEDDING_OUTPUT_FLOAT = [
 ]
 
 
-@pytest.mark.fastapi
+@pytest.mark.skipif(
+    os.environ.get("IMAGE_KIND") == "TRTLLM",
+    reason="TRT-LLM backend does not support embedding requests",
+)
 class TestEmbeddings:
-    @pytest.fixture(scope="class", autouse=True)
-    def check_backend(backend: str):
-        if backend != "vllm":
-            pytest.skip(
-                "TRT-LLM backend and Python backend do not support embedding requests"
-            )
-
     @pytest.fixture(scope="class")
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
