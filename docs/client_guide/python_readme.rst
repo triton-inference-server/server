@@ -1,4 +1,4 @@
-..
+.. 
 .. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
@@ -25,106 +25,106 @@
 .. (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .. OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. raw:: html
+Triton Inference Server In-Process Python API
+=============================================
 
+Starting with release 24.01, Triton Inference Server includes a Python package
+that allows developers to embed Triton Inference Server instances in their
+Python applications. The in-process Python API matches the functionality of
+the in-process C API while providing a higher-level abstraction.
 
-Triton Inference Server In-Process Python API [BETA]
-====================================================
+.. note::
+   As the API is in BETA, please expect some changes. All feedback is welcome.
 
-Starting with release 24.01 Triton Inference Server will include a
-Python package enabling developers to embed Triton Inference Server
-instances in their Python applications. The in-process Python API is
-designed to match the functionality of the in-process C API while
-providing a higher level abstraction. At its core the API relies on a
-1:1 python binding of the C API and provides all the flexibility and
-power of the C API with a simpler to use interface.
+Contents
+--------
 
-   [!Note] As the API is in BETA please expect some changes as we test
-   out different features and get feedback. All feedback is weclome and
-   we look forward to hearing from you!
+- `Requirements <#requirements>`__
+- `Installation <#installation>`__
+- `Hello World <#hello-world>`__
+- `Stable Diffusion <#stable-diffusion>`__
+- `Ray Serve Deployment <../tutorials/Triton_Inference_Server_Python_API/examples/rayserve>`__
 
-| `Requirements <#requirements>`__ \| `Installation <#installation>`__
-  \| `Hello World <#hello-world>`__ \| `Stable
-  Diffusion <#stable-diffusion>`__ \| `Ray Serve
-  Deployment <../tutorials/Triton_Inference_Server_Python_API/examples/rayserve>`__ \|
 Requirements
 ------------
 
-The following instructions require a linux system with Docker installed.
-For CUDA support, make sure your CUDA driver meets the requirements in
-“NVIDIA Driver” section of Deep Learning Framework support matrix:
-https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html
+- Linux system with Docker installed.
+- CUDA driver meeting the requirements in the
+  `NVIDIA Deep Learning Framework support matrix <https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`__.
 
 Installation
 ------------
 
-The tutorial and Python API package are designed to be installed and run
-within the ``nvcr.io/nvidia/tritonserver:24.01-py3`` docker image.
+The tutorial and Python API package are designed to run within the
+``nvcr.io/nvidia/tritonserver:24.01-py3`` Docker image.
 
-A set of convenience scripts are provided to create a docker image based
-on the ``nvcr.io/nvidia/tritonserver:24.01-py3`` image with the Python
-API installed plus additional dependencies required for the examples.
+Convenience scripts are provided to create a Docker image with the Python API
+and example dependencies.
 
 Triton Inference Server 24.01 + Python API
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------------
 
 Clone Repository
 ^^^^^^^^^^^^^^^^
 
-.. code:: bash
+.. code-block:: bash
+
    git clone https://github.com/triton-inference-server/tutorials.git
    cd tutorials/Triton_Inference_Server_Python_API
+
 Build ``triton-python-api:r24.01`` Image
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code:: bash
+.. code-block:: bash
+
    ./build.sh
+
 Supported Backends
 ^^^^^^^^^^^^^^^^^^
 
-The built image includes all the backends shipped by default in the
-tritonserver ``nvcr.io/nvidia/tritonserver:24.01-py3`` container.
+The built image includes all backends shipped by default in the
+``nvcr.io/nvidia/tritonserver:24.01-py3`` container:
 
 ::
 
    dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorrt
 
 Included Models
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
-The ``default`` build includes an ``identity`` model that can be used
-for exercising basic operations including sending input tensors of
-different data types. The ``identity`` model copies provided inputs of
-``shape [-1, -1]`` to outputs of shape ``[-1, -1]``. Inputs are named
-``data_type_input`` and outputs are named ``data_type_output``
-(e.g. ``string_input``, ``string_output``, ``fp16_input``,
-``fp16_output``).
+The ``default`` build includes an ``identity`` model for testing input/output operations:
+
+- Inputs: ``data_type_input`` (string, fp16, etc.)  
+- Outputs: ``data_type_output``
 
 Hello World
 -----------
 
-Start ``triton-python-api:r24.01`` Container
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Start Container
+^^^^^^^^^^^^^^
 
-The following command starts a container and volume mounts the current
-directory as ``workspace``.
+.. code-block:: bash
 
-.. code:: bash
    ./run.sh
+
 Enter Python Shell
-~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^
 
-.. code:: bash
+.. code-block:: bash
+
    python3
-Create and Start a Server Instance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: python
+In-Process Server Example
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
    import tritonserver
    server = tritonserver.Server(model_repository="/workspace/identity-models")
    server.start()
+
 List Models
-~~~~~~~~~~~
+^^^^^^^^^^^
 
 ::
 
@@ -133,131 +133,97 @@ List Models
 Example Output
 ^^^^^^^^^^^^^^
 
-``server.models()`` returns a dictionary of the available models with
-their current state.
+.. code-block:: python
 
-.. code:: python
    {('identity', 1): {'name': 'identity', 'version': 1, 'state': 'READY'}}
-Send an Inference Request
-~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: python
+Send an Inference Request
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
    model = server.model("identity")
    responses = model.infer(inputs={"string_input":[["hello world!"]]})
-Iterate through Responses
-~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``model.infer()`` returns an iterator that can be used to process the
-results of an inference request.
+Iterate Responses
+^^^^^^^^^^^^^^^^^
 
-.. code:: python
+.. code-block:: python
+
    for response in responses:
        print(response.outputs["string_output"].to_string_array())
-.. _example-output-1:
 
-Example Output
-^^^^^^^^^^^^^^
+gRPC Python Client
+-----------------
 
-.. code:: python
-   [['hello world!']]
-Stable Diffusion
-----------------
+.. code-block:: python
 
-This example is based on the
-`Popular_Models_Guide/StableDiffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.html>`__
-tutorial.
+   import tritonclient.grpc as grpcclient
+   import numpy as np
 
-Build ``triton-python-api:r24.01-diffusion`` Image and Stable Diffusion Models
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   # Connect to server
+   url = "localhost:8001"
+   client = grpcclient.InferenceServerClient(url)
 
-Please note the following command will take many minutes depending on
-your hardware configuration and network connection.
+   # Input data
+   input_data = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)
 
-.. code:: bash
-      ./build.sh --framework diffusion --build-models
-.. _supported-backends-1:
+   # Send request
+   response = client.infer(model_name="identity",
+                           inputs={"input": input_data})
 
-Supported Backends
-^^^^^^^^^^^^^^^^^^
+   # Output
+   print(response.as_numpy("output"))
 
-The built image includes all the backends shipped by default in the
-tritonserver ``nvcr.io/nvidia/tritonserver:24.01-py3`` container.
+Stable Diffusion Example
+-----------------------
 
-::
+Build diffusion image
+^^^^^^^^^^^^^^^^^^^^
 
-   dali  fil  identity  onnxruntime  openvino  python  pytorch  repeat  square  tensorrt
+.. code-block:: bash
 
-.. _included-models-1:
-
-Included Models
-^^^^^^^^^^^^^^^
-
-The ``diffusion`` build includes a ``stable_diffustion`` pipeline that
-takes a text prompt and returns a generated image. For more details on
-the models and pipeline please see the
-`Popular_Models_Guide/StableDiffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.html>`__
-tutorial.
+   ./build.sh --framework diffusion --build-models
 
 Start Container
-~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^
 
-The following command starts a container and volume mounts the current
-directory as ``workspace``.
+.. code-block:: bash
 
-.. code:: bash
    ./run.sh --framework diffusion
-.. _enter-python-shell-1:
 
-Enter Python Shell
-~~~~~~~~~~~~~~~~~~
+Python In-Process Server
+^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code:: bash
-   python3
-.. _create-and-start-a-server-instance-1:
+.. code-block:: python
 
-Create and Start a Server Instance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code:: python
    import tritonserver
    import numpy
    from PIL import Image
+
    server = tritonserver.Server(model_repository="/workspace/diffusion-models")
    server.start()
-.. _list-models-1:
 
 List Models
-~~~~~~~~~~~
+^^^^^^^^^^^
 
 ::
 
    server.models()
 
-.. _example-output-2:
+Send Request and Save Image
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Example Output
-^^^^^^^^^^^^^^
+.. code-block:: python
 
-.. code:: python
-   {('stable_diffusion', 1): {'name': 'stable_diffusion', 'version': 1, 'state': 'READY'}, ('text_encoder', 1): {'name': 'text_encoder', 'version': 1, 'state': 'READY'}, ('vae', 1): {'name': 'vae', 'version': 1, 'state': 'READY'}}
-.. _send-an-inference-request-1:
-
-Send an Inference Request
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code:: python
    model = server.model("stable_diffusion")
    responses = model.infer(inputs={"prompt":[["butterfly in new york, realistic, 4k, photograph"]]})
-Iterate through Responses and save image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: python
    for response in responses:
        generated_image = numpy.from_dlpack(response.outputs["generated_image"])
        generated_image = generated_image.squeeze().astype(numpy.uint8)
        image_ = Image.fromarray(generated_image)
        image_.save("sample_generated_image.jpg")
-.. _example-output-3:
 
 Example Output
 ^^^^^^^^^^^^^^
