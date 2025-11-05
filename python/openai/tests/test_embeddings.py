@@ -31,6 +31,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+# Results on A6000 GPU. The results vary slightly across GPU models.
 EMBEDDING_OUTPUT_FLOAT = [
     -0.1914404183626175,
     0.4000193178653717,
@@ -434,6 +435,10 @@ class TestEmbeddings:
         return "all-MiniLM-L6-v2"
 
     @pytest.fixture(scope="class")
+    def tokenizer_model(self):
+        return None
+
+    @pytest.fixture(scope="class")
     def model_repository(self):
         # Override with embeddings-specific repository
         return str(Path(__file__).parent / "vllm_embedding_models")
@@ -450,14 +455,17 @@ class TestEmbeddings:
         assert embedding is not None
         if encoding_format == "base64":
             embedding = np.frombuffer(base64.b64decode(embedding), dtype=np.float32)
+
+        # The results vary slightly across GPU models
         result = np.allclose(
-            EMBEDDING_OUTPUT_FLOAT[:dims], embedding, rtol=1e-5, atol=0.0
+            EMBEDDING_OUTPUT_FLOAT[:dims], embedding, rtol=0, atol=1e-3
         )
-        assert result, "Embedding does not match expected output"
+        assert (
+            result
+        ), f"Embeddings do not match expected output\nExpect {EMBEDDING_OUTPUT_FLOAT[:dims]},\ngot{embedding}"
 
         assert response.json()["data"][0]["object"] == "embedding"
         assert response.json()["data"][0]["index"] == 0
-
         assert response.json()["model"] == model
 
         usage = response.json().get("usage")
