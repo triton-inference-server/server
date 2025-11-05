@@ -481,7 +481,7 @@ class TestEmbeddings:
 
         self._check_embedding_response(response, model)
 
-    # TODO: Python model cannot unload gracefully if raise error.
+    # FIXME: Python model cannot unload gracefully if raise error.
     # def test_chat_completions_defaults(
     #     self, client, model: str, messages: List[dict], backend: str
     # ):
@@ -535,6 +535,41 @@ class TestEmbeddings:
             response, model, dims=dimensions, encoding_format=encoding_format
         )
 
+    def test_embeddings_empty_request(self, client):
+        response = client.post("/v1/embeddings", json={})
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["msg"] == "Field required"
+
+    def test_embeddings_no_model(self, client, input: str):
+        response = client.post("/v1/embeddings", json={"input": input})
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["msg"] == "Field required"
+
+    @pytest.mark.parametrize(
+        "model, error_code",
+        [
+            ("", 400),
+            (123, 422),
+            ("Invalid", 400),
+            (None, 422),
+        ],
+    )
+    def test_embeddings_invalid_model(self, client, model: str, input, error_code: int):
+        print("Model:", model)
+        # Message validation requires min_length of 1
+        response = client.post("/v1/embeddings", json={"model": model, "input": input})
+        assert response.status_code == error_code
+        if error_code == 400:
+            assert response.json()["detail"] == f"Unknown model: {model}"
+        else:
+            assert (
+                response.json()["detail"][0]["msg"] == "Input should be a valid string"
+            )
+
+    def test_embeddings_no_input(self, client, model: str):
+        response = client.post("/v1/embeddings", json={"model": model})
+        assert response.status_code == 422
+
     @pytest.mark.parametrize(
         "input",
         [
@@ -542,7 +577,7 @@ class TestEmbeddings:
             [],
         ],
     )
-    def test_embeddings_no_input(self, client, model: str, input):
+    def test_embeddings_empty_input(self, client, model: str, input):
         # Message validation requires min_length of 1
         response = client.post("/v1/embeddings", json={"model": model, "input": input})
         assert response.status_code == 422
@@ -550,3 +585,18 @@ class TestEmbeddings:
             response.json()["detail"][0]["msg"]
             == "Value should have at least 1 item after validation, not 0"
         )
+
+    @pytest.mark.parametrize(
+        "input",
+        [
+            123,
+            1.5,
+            0,
+            None,
+        ],
+    )
+    def test_embeddings_invalid_input(self, client, model: str, input):
+        # Message validation requires min_length of 1
+        response = client.post("/v1/embeddings", json={"model": model, "input": input})
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["msg"] == "Input should be a valid string"
