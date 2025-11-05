@@ -421,9 +421,11 @@ EMBEDDING_OUTPUT_FLOAT = [
 @pytest.mark.fastapi
 class TestEmbeddings:
     @pytest.fixture(scope="class", autouse=True)
-    def check_backend(self, backend: str):
+    def check_backend(backend: str):
         if backend != "vllm":
-            pytest.skip("These tests only run with vLLM backend")
+            pytest.skip(
+                "TRT-LLM backend and Python backend do not support embedding requests"
+            )
 
     @pytest.fixture(scope="class")
     def client(self, fastapi_client_class_scope):
