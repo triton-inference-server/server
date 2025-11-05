@@ -47,8 +47,8 @@ from schemas.openai import (
 
 
 class RequestKind(Enum):
-    GENERATE = 1
-    EMBED = 2
+    GENERATION = 1
+    EMBEDDING = 2
 
 
 def _create_vllm_generate_request(
@@ -273,7 +273,7 @@ class _StreamingUsageAccumulator:
 
     def update(self, response: tritonserver.InferenceResponse):
         """Extracts usage from a response and updates the token counts."""
-        usage = _get_usage_from_response(response, self.backend, RequestKind.GENERATE)
+        usage = _get_usage_from_response(response, self.backend, RequestKind.GENERATION)
         if usage:
             # The prompt_tokens is received with every chunk but should only be set once.
             if not self._prompt_tokens_set:
@@ -332,14 +332,14 @@ def _get_usage_from_response(
             completion_tokens = completion_tokens_ptr[0]
 
         if prompt_tokens is not None:
-            if request_type == RequestKind.GENERATE and completion_tokens is not None:
+            if request_type == RequestKind.GENERATION and completion_tokens is not None:
                 total_tokens = prompt_tokens + completion_tokens
                 return CompletionUsage(
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
                 )
-            elif request_type == RequestKind.EMBED:
+            elif request_type == RequestKind.EMBEDDING:
                 return EmbeddingUsage(
                     prompt_tokens=prompt_tokens,
                     total_tokens=prompt_tokens,

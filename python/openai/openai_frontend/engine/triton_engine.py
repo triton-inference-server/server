@@ -244,7 +244,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         usage = _get_usage_from_response(
-            response, metadata.backend, RequestKind.GENERATE
+            response, metadata.backend, RequestKind.GENERATION
         )
 
         return CreateChatCompletionResponse(
@@ -348,7 +348,7 @@ class TritonLLMEngine(LLMEngine):
         text = _get_output(response)
 
         usage = _get_usage_from_response(
-            response, metadata.backend, RequestKind.GENERATE
+            response, metadata.backend, RequestKind.GENERATION
         )
 
         choice = Choice(
@@ -392,7 +392,9 @@ class TritonLLMEngine(LLMEngine):
         embedding_json = _get_output(response)
         embedding_list = json.loads(embedding_json)
 
-        usage = _get_usage_from_response(response, metadata.backend, RequestKind.EMBED)
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.EMBEDDING
+        )
 
         embedding = self._get_embedding(embedding_list, request.encoding_format)
         embedding_obj = EmbeddingObject(
@@ -433,14 +435,14 @@ class TritonLLMEngine(LLMEngine):
 
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
-            if request_type == RequestKind.GENERATE:
+            if request_type == RequestKind.GENERATION:
                 return _create_vllm_generate_request
             else:
                 return _create_vllm_embedding_request
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
-        if request_type == RequestKind.GENERATE:
+        if request_type == RequestKind.GENERATION:
             return _create_trtllm_generate_request
         else:
             return _create_trtllm_embedding_request
@@ -489,10 +491,10 @@ class TritonLLMEngine(LLMEngine):
                 lora_names=lora_names,
                 create_time=self.create_time,
                 inference_request_converter=self._determine_request_converter(
-                    backend, RequestKind.GENERATE
+                    backend, RequestKind.GENERATION
                 ),
                 embedding_request_converter=self._determine_request_converter(
-                    backend, RequestKind.EMBED
+                    backend, RequestKind.EMBEDDING
                 ),
             )
             model_metadata[name] = metadata
