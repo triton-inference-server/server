@@ -2817,7 +2817,7 @@ if __name__ == "__main__":
         FLAGS.build_secret = []
 
     FLAGS.boost_url = os.getenv(
-        "BOOST_URL",
+        "TRITON_BOOST_URL",
         "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz",
     )
     FLAGS.boost_sha256 = (
