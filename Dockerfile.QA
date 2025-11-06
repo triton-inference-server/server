@@ -186,12 +186,14 @@ RUN cd tritonbuild/identity && \
     make -j16 install
 
 # L0_backend_python test require triton_shm_monitor
+ARG TRITON_BOOST_URL="https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz"
 RUN cd tritonbuild/python && \
     rm -rf install build && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/python/install \
         -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
         -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+        -DTRITON_BOOST_URL:STRING=${TRITON_BOOST_URL} \
         -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
     make -j16 triton-shm-monitor install
 

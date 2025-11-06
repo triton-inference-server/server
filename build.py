@@ -1002,14 +1002,16 @@ RUN pip3 install --upgrade pip \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3
-
+"""
+    df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \\
-          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
+      && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
+
     if FLAGS.enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
     df += """
@@ -1113,14 +1115,15 @@ RUN pip3 install --upgrade \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3
+"""
 
+        df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \\
-          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
+      && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
-
 """
 
         if FLAGS.enable_gpu:
@@ -2813,6 +2816,13 @@ if __name__ == "__main__":
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
 
+    FLAGS.boost_url = os.getenv(
+        "TRITON_BOOST_URL",
+        "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz",
+    )
+    FLAGS.boost_sha256 = (
+        "4b2136f98bdd1f5857f1c3dea9ac2018effe65286cf251534b6ae20cc45e1847"
+    )
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
