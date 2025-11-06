@@ -30,7 +30,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # Mapping of API to their corresponding HTTP endpoints
 ENDPOINT_MAPPING = {
-    "inference": ["POST /v1/chat/completions", "POST /v1/completions"],
+    "inference": [
+        "POST /v1/chat/completions",
+        "POST /v1/completions",
+        "POST /v1/embeddings",
+    ],
     "model-repository": ["GET /v1/models"],
     "metrics": ["GET /metrics"],
     "health": ["GET /health/ready"],

@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,8 @@ from schemas.openai import (
     CreateChatCompletionResponse,
     CreateCompletionRequest,
     CreateCompletionResponse,
+    CreateEmbeddingRequest,
+    CreateEmbeddingResponse,
     Model,
 )
 
@@ -90,5 +92,11 @@ class LLMEngine(Protocol):
             'data: [DONE]\n\n'
 
         If request.stream is False, this returns a CreateCompletionResponse.
+        """
+        pass
+
+    def embedding(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
+        """
+        Returns a CreateEmbeddingResponse.
         """
         pass

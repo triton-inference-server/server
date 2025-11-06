@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 import uuid
@@ -38,18 +39,24 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Tuple,
+    Union,
 )
 
+import numpy as np
 import tritonserver
 from engine.engine import LLMEngine
 from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
-    _create_trtllm_inference_request,
-    _create_vllm_inference_request,
+    RequestKind,
+    _create_trtllm_embedding_request,
+    _create_trtllm_generate_request,
+    _create_vllm_embedding_request,
+    _create_vllm_generate_request,
     _get_output,
     _get_usage_from_response,
     _get_vllm_lora_names,
@@ -73,6 +80,9 @@ from schemas.openai import (
     CreateChatCompletionStreamResponse,
     CreateCompletionRequest,
     CreateCompletionResponse,
+    CreateEmbeddingRequest,
+    CreateEmbeddingResponse,
+    EmbeddingObject,
     FinishReason,
     Function1,
     Function2,
@@ -97,7 +107,8 @@ class TritonModelMetadata:
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
-    request_converter: Callable
+    inference_request_converter: Callable
+    embedding_request_converter: Callable
 
 
 class TritonLLMEngine(LLMEngine):
@@ -189,7 +200,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(
+            metadata.inference_request_converter(
                 metadata.model, prompt, request, lora_name, self.default_max_tokens
             )
         )
@@ -232,7 +243,9 @@ class TritonLLMEngine(LLMEngine):
             backend=metadata.backend,
         )
 
-        usage = _get_usage_from_response(response, metadata.backend)
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.GENERATION
+        )
 
         return CreateChatCompletionResponse(
             id=request_id,
@@ -311,7 +324,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(
+            metadata.inference_request_converter(
                 metadata.model,
                 request.prompt,
                 request,
@@ -334,7 +347,9 @@ class TritonLLMEngine(LLMEngine):
         response = responses[0]
         text = _get_output(response)
 
-        usage = _get_usage_from_response(response, metadata.backend)
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.GENERATION
+        )
 
         choice = Choice(
             finish_reason=FinishReason.stop,
@@ -352,6 +367,57 @@ class TritonLLMEngine(LLMEngine):
             usage=usage,
         )
 
+    async def embedding(
+        self, request: CreateEmbeddingRequest
+    ) -> CreateEmbeddingResponse:
+        # Validate request and convert to Triton format
+        model_name, _ = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
+        self._validate_embedding_request(request, metadata)
+
+        # Convert to Triton request format and perform inference
+        responses = metadata.model.async_infer(
+            metadata.embedding_request_converter(
+                metadata.model,
+                request,
+            )
+        )
+
+        # Response validation with decoupled models in mind
+        responses = [response async for response in responses]
+        _validate_triton_responses_non_streaming(responses)
+        response = responses[0]
+
+        # Extract embedding from response (currently stored as JSON string in text_output)
+        embedding_json = _get_output(response)
+        embedding_list = json.loads(embedding_json)
+
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.EMBEDDING
+        )
+
+        embedding = self._get_embedding(embedding_list, request.encoding_format)
+        embedding_obj = EmbeddingObject(
+            embedding=embedding, index=0, object="embedding"
+        )
+
+        return CreateEmbeddingResponse(
+            object="list",
+            data=[embedding_obj],
+            model=request.model,
+            usage=usage,
+        )
+
+    @staticmethod
+    def _get_embedding(
+        embedding: List[float], encoding_format: Literal["float", "base64"]
+    ) -> Union[list[float], str]:
+        if encoding_format == "float":
+            return embedding
+        else:
+            embedding_bytes = np.array(embedding, dtype="float32").tobytes()
+            return base64.b64encode(embedding_bytes).decode("utf-8")
+
     # TODO: This behavior should be tested further
     def _get_first_response_role(
         self, conversation: List[Dict], add_generation_prompt: bool, default_role: str
@@ -362,18 +428,24 @@ class TritonLLMEngine(LLMEngine):
         return conversation[-1]["role"]
 
     # TODO: Expose explicit flag to catch edge cases
-    def _determine_request_converter(self, backend: str):
+    def _determine_request_converter(self, backend: str, request_type: RequestKind):
         # Allow manual override of backend request format if provided by user
         if self.backend:
             backend = self.backend
 
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
-            return _create_vllm_inference_request
+            if request_type == RequestKind.GENERATION:
+                return _create_vllm_generate_request
+            else:
+                return _create_vllm_embedding_request
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
-        return _create_trtllm_inference_request
+        if request_type == RequestKind.GENERATION:
+            return _create_trtllm_generate_request
+        else:
+            return _create_trtllm_embedding_request
 
     def _get_model_and_lora_name(self, request_model_name: str):
         if self.lora_separator is None or len(self.lora_separator) == 0:
@@ -418,7 +490,12 @@ class TritonLLMEngine(LLMEngine):
                 tokenizer=self.tokenizer,
                 lora_names=lora_names,
                 create_time=self.create_time,
-                request_converter=self._determine_request_converter(backend),
+                inference_request_converter=self._determine_request_converter(
+                    backend, RequestKind.GENERATION
+                ),
+                embedding_request_converter=self._determine_request_converter(
+                    backend, RequestKind.EMBEDDING
+                ),
             )
             model_metadata[name] = metadata
 
@@ -671,8 +748,15 @@ class TritonLLMEngine(LLMEngine):
         if not metadata.backend:
             raise Exception("Unknown backend")
 
-        if not metadata.request_converter:
-            raise Exception(f"Unknown request format for model: {request.model}")
+        if not metadata.inference_request_converter:
+            raise Exception(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise Exception(
+                f"Unknown embedding request format for model: {request.model}"
+            )
 
         if (
             metadata.lora_names is not None
@@ -807,8 +891,15 @@ class TritonLLMEngine(LLMEngine):
         if not metadata.backend:
             raise Exception("Unknown backend")
 
-        if not metadata.request_converter:
-            raise Exception(f"Unknown request format for model: {request.model}")
+        if not metadata.inference_request_converter:
+            raise Exception(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise Exception(
+                f"Unknown embedding request format for model: {request.model}"
+            )
 
         if (
             metadata.lora_names is not None
@@ -851,6 +942,32 @@ class TritonLLMEngine(LLMEngine):
         ):
             raise Exception(
                 "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            )
+
+    def _validate_embedding_request(
+        self,
+        request: CreateEmbeddingRequest,
+        metadata: TritonModelMetadata,
+    ):
+        """
+        Validates an embedding request to align with currently supported features.
+        """
+
+        # Reject missing internal information needed to do inference
+        if not metadata:
+            raise Exception(f"Unknown model: {request.model}")
+
+        if not metadata.backend:
+            raise Exception("Unknown backend")
+
+        if not metadata.inference_request_converter:
+            raise Exception(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise Exception(
+                f"Unknown embedding request format for model: {request.model}"
             )
 
     def _should_stream_with_auto_tool_parsing(

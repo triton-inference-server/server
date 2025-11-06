@@ -28,6 +28,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
@@ -40,10 +41,17 @@ from schemas.openai import (
     CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
+    CreateEmbeddingRequest,
+    EmbeddingUsage,
 )
 
 
-def _create_vllm_inference_request(
+class RequestKind(Enum):
+    GENERATION = 1
+    EMBEDDING = 2
+
+
+def _create_vllm_generate_request(
     model,
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
@@ -128,7 +136,7 @@ def _create_vllm_inference_request(
     return model.create_request(inputs=inputs)
 
 
-def _create_trtllm_inference_request(
+def _create_trtllm_generate_request(
     model,
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
@@ -181,6 +189,35 @@ def _create_trtllm_inference_request(
     # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
     # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
+
+
+def _create_vllm_embedding_request(
+    model,
+    request: CreateEmbeddingRequest,
+):
+    inputs = {}
+    embedding_request = {}
+    embedding_request["input"] = request.input
+
+    pooling_params = {}
+    dims = request.dimensions
+    if dims is not None:
+        pooling_params["dimensions"] = [dims]
+    embedding_request["pooling_params"] = pooling_params
+
+    inputs["embedding_request"] = [json.dumps(embedding_request)]
+    inputs["return_num_input_tokens"] = np.bool_([True])
+    inputs["return_num_output_tokens"] = np.bool_([True])
+    return model.create_request(inputs=inputs)
+
+
+def _create_trtllm_embedding_request(
+    model,
+    request: CreateEmbeddingRequest,
+):
+    raise Exception(
+        "TRT-LLM backend and Python backend do not support embedding requests"
+    )
 
 
 def _construct_string_from_pointer(pointer: int, size: int) -> str:
@@ -236,7 +273,7 @@ class _StreamingUsageAccumulator:
 
     def update(self, response: tritonserver.InferenceResponse):
         """Extracts usage from a response and updates the token counts."""
-        usage = _get_usage_from_response(response, self.backend)
+        usage = _get_usage_from_response(response, self.backend, RequestKind.GENERATION)
         if usage:
             # The prompt_tokens is received with every chunk but should only be set once.
             if not self._prompt_tokens_set:
@@ -262,7 +299,8 @@ class _StreamingUsageAccumulator:
 def _get_usage_from_response(
     response: tritonserver._api._response.InferenceResponse,
     backend: str,
-) -> Optional[CompletionUsage]:
+    request_type: RequestKind,
+) -> Optional[CompletionUsage | EmbeddingUsage]:
     """
     Extracts token usage statistics from a Triton inference response.
     """
@@ -293,13 +331,19 @@ def _get_usage_from_response(
             )
             completion_tokens = completion_tokens_ptr[0]
 
-        if prompt_tokens is not None and completion_tokens is not None:
-            total_tokens = prompt_tokens + completion_tokens
-            return CompletionUsage(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            )
+        if prompt_tokens is not None:
+            if request_type == RequestKind.GENERATION and completion_tokens is not None:
+                total_tokens = prompt_tokens + completion_tokens
+                return CompletionUsage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
+            elif request_type == RequestKind.EMBEDDING:
+                return EmbeddingUsage(
+                    prompt_tokens=prompt_tokens,
+                    total_tokens=prompt_tokens,
+                )
 
     return None
 

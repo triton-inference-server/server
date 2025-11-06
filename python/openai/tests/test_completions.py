@@ -29,7 +29,6 @@ import copy
 import pytest
 
 
-@pytest.mark.fastapi
 class TestCompletions:
     @pytest.fixture(scope="class")
     def client(self, fastapi_client_class_scope):
