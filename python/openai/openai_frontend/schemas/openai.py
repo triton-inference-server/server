@@ -31,7 +31,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel, confloat, conint
 
@@ -601,14 +601,21 @@ class Model(BaseModel):
     owned_by: str = Field(..., description="The organization that owns the model.")
 
 
-class CompletionUsage(BaseModel):
-    completion_tokens: int = Field(
-        ..., description="Number of tokens in the generated completion."
-    )
+class BaseUsage(BaseModel):
     prompt_tokens: int = Field(..., description="Number of tokens in the prompt.")
     total_tokens: int = Field(
         ...,
         description="Total number of tokens used in the request (prompt + completion).",
+    )
+
+
+class EmbeddingUsage(BaseUsage):
+    pass
+
+
+class CompletionUsage(BaseUsage):
+    completion_tokens: int = Field(
+        ..., description="Number of tokens in the generated completion."
     )
 
 
@@ -940,3 +947,69 @@ class ObjectType:
     text_completion = Object1.text_completion
     chat_completion_chunk = Object4.chat_completion_chunk
     chat_completion = Object2.chat_completion
+
+
+class EmbeddingObject(BaseModel):
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+
+    object: Literal["embedding"] = Field(
+        description="The object type, which is always 'embedding'.",
+    )
+    embedding: Union[List[float], str] = Field(
+        ...,
+        description="The embedding vector, which is a list of floats or a base64-encoded string.",
+    )
+    index: int = Field(
+        ...,
+        description="The index of the embedding in the list of embeddings.",
+    )
+
+
+class CreateEmbeddingRequest(BaseModel):
+    # Explicitly return errors for unknown fields.
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+
+    input: Union[str, List[int]] = Field(
+        ...,
+        description="Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays.",
+        min_length=1,
+        examples=["The food was delicious and the waiter..."],
+    )
+    model: Union[str, Model2] = Field(
+        ...,
+        description="ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.",
+        examples=["text-embedding-ada-002"],
+    )
+    dimensions: Optional[int] = Field(
+        None,
+        description="The number of dimensions the resulting output embeddings should have. Only supported in text-embedding-3 and later models.",
+    )
+    encoding_format: Optional[Literal["float", "base64"]] = Field(
+        "float",
+        description="The format to return the embeddings in.",
+    )
+    user: Optional[str] = Field(
+        None,
+        description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
+        examples=["user-1234"],
+    )
+
+
+class CreateEmbeddingResponse(BaseModel):
+    model_config: ConfigDict = ConfigDict(extra="forbid")
+
+    object: Literal["list"] = Field(
+        description="The object type, which is always 'list'.",
+    )
+    data: List[EmbeddingObject] = Field(
+        ...,
+        description="The list of embeddings.",
+    )
+    model: Union[str, Model2] = Field(
+        ...,
+        description="The model used to generate the embeddings.",
+    )
+    usage: Optional[EmbeddingUsage] = Field(
+        ...,
+        description="The usage for the request.",
+    )

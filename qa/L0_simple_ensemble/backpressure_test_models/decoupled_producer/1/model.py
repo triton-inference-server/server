@@ -1,5 +1,4 @@
-<!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,11 +23,32 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--->
-# [Triton Inference Server Release 25.10](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-25-10.html#rel-25-10)
 
-The Triton Inference Server container image, release 25.10, is available
-on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
-is open source
-on [GitHub](https://github.com/triton-inference-server/server). Release notes can
-be found on the [GitHub Release Page](https://github.com/triton-inference-server/server/releases)
+
+import numpy as np
+import triton_python_backend_utils as pb_utils
+
+
+class TritonPythonModel:
+    """
+    Decoupled model that produces N responses based on input value.
+    """
+
+    def execute(self, requests):
+        for request in requests:
+            # Get input - number of responses to produce
+            in_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
+            count = in_tensor.as_numpy()[0]
+
+            response_sender = request.get_response_sender()
+
+            # Produce 'count' responses, each with 0.5 as the output value
+            for i in range(count):
+                out_tensor = pb_utils.Tensor("OUT", np.array([0.5], dtype=np.float32))
+                response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
+                response_sender.send(response)
+
+            # Send final flag
+            response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+
+        return None

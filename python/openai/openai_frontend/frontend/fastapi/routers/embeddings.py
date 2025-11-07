@@ -1,5 +1,4 @@
-<!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,11 +23,28 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--->
-# [Triton Inference Server Release 25.10](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-25-10.html#rel-25-10)
 
-The Triton Inference Server container image, release 25.10, is available
-on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
-is open source
-on [GitHub](https://github.com/triton-inference-server/server). Release notes can
-be found on the [GitHub Release Page](https://github.com/triton-inference-server/server/releases)
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from schemas.openai import CreateEmbeddingRequest, CreateEmbeddingResponse
+
+router = APIRouter()
+
+
+@router.post(
+    "/v1/embeddings", response_model=CreateEmbeddingResponse, tags=["Embeddings"]
+)
+async def create_embedding(
+    request: CreateEmbeddingRequest, raw_request: Request
+) -> CreateEmbeddingResponse | StreamingResponse:
+    """
+    Creates embedding for the provided input text.
+    """
+    if not raw_request.app.engine:
+        raise HTTPException(status_code=500, detail="No attached inference engine")
+
+    try:
+        response = await raw_request.app.engine.embedding(request)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"{e}")

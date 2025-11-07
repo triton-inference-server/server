@@ -35,7 +35,6 @@ from fastapi.testclient import TestClient
 from tests.utils import setup_fastapi_app, setup_server
 
 
-@pytest.mark.fastapi
 class TestChatCompletions:
     @pytest.fixture(scope="class")
     def client(self, fastapi_client_class_scope):
@@ -552,7 +551,6 @@ class TestChatCompletions:
 
 # For tests that won't use the same pytest fixture for server startup across
 # the whole class test suite.
-@pytest.mark.fastapi
 class TestChatCompletionsTokenizers:
     # Re-use a single Triton server for different frontend configurations
     @pytest.fixture(scope="class")
