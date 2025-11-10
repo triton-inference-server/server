@@ -435,7 +435,12 @@ nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt" ]; then
-    cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
+    if [ ! -d "/usr/src/tensorrt/samples/python" ]; then
+        git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
+        cd /workspace/TensorRT/samples/python/onnx_custom_plugin
+    else
+        cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
+    fi
 else
     git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
