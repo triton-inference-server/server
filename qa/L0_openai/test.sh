@@ -27,6 +27,16 @@
 
 ### Helpers ###
 
+function download_tensorrt_llm_models {
+    TENSORRTLLM_VERSION="$1"
+    TENSORRTLLM_DIR="$2"
+    rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
+    git clone --filter=blob:none --no-checkout https://github.com/NVIDIA/TensorRT-LLM.git ${TENSORRTLLM_DIR}
+    cd ${TENSORRTLLM_DIR}
+    git sparse-checkout set triton_backend/all_models
+    git checkout ${TENSORRTLLM_VERSION}
+}
+
 function install_deps() {
     # Install python bindings for tritonserver and tritonfrontend
     # pip install /opt/tritonserver/python/triton*.whl
@@ -38,8 +48,13 @@ function install_deps() {
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
-        prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/
-        prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/
+        # TODO: Remove this when the next stable version of TRT-LLM is available
+        TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
+        TENSORRTLLM_VERSION="v1.2.0rc2"
+        download_tensorrt_llm_models ${TENSORRTLLM_VERSION} ${TENSORRTLLM_DIR}
+
+        prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/ ${TENSORRTLLM_DIR}
+        prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/ ${TENSORRTLLM_DIR}
     else
         prepare_vllm
     fi
@@ -57,9 +72,10 @@ function prepare_tensorrtllm() {
     MODEL="$1"
     MODEL_REPO="$2"
     ENGINE_PATH="$3"
+    TENSORRTLLM_DIR="$4"
 
     mkdir -p ${MODEL_REPO}
-    cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
+    cp ${TENSORRTLLM_DIR}/triton_backend/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
     # Ensemble model is not needed for the test
     rm -rf ${MODEL_REPO}/ensemble
 
