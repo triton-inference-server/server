@@ -32,9 +32,10 @@ function download_tensorrt_llm_models {
     TENSORRTLLM_DIR="$2"
     rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
     git clone --filter=blob:none --no-checkout https://github.com/NVIDIA/TensorRT-LLM.git ${TENSORRTLLM_DIR}
-    cd ${TENSORRTLLM_DIR}
+    pushd ${TENSORRTLLM_DIR}
     git sparse-checkout set triton_backend/all_models
     git checkout ${TENSORRTLLM_VERSION}
+    popd
 }
 
 function install_deps() {
