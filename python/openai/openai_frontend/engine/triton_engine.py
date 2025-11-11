@@ -926,7 +926,6 @@ class TritonLLMEngine(LLMEngine):
         if request.stream_options and not request.stream:
             raise Exception("`stream_options` can only be used when `stream` is True")
 
-
     def _validate_embedding_request(
         self,
         request: CreateEmbeddingRequest,
