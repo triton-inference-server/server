@@ -926,14 +926,6 @@ class TritonLLMEngine(LLMEngine):
         if request.stream_options and not request.stream:
             raise Exception("`stream_options` can only be used when `stream` is True")
 
-        if (
-            request.stream_options
-            and request.stream_options.include_usage
-            and metadata.backend != "vllm"
-        ):
-            raise Exception(
-                "`stream_options.include_usage` is currently only supported for the vLLM backend"
-            )
 
     def _validate_embedding_request(
         self,
