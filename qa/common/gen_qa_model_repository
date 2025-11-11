@@ -434,10 +434,11 @@ chmod -R 777 $VOLUME_FORMATDESTDIR
 nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
-if [ -d "/usr/src/tensorrt" ] && [ ! -d "/usr/src/tensorrt/samples/python" ]; then
+if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
+    rm -rf /workspace/TensorRT
+    git clone -b "release/${TENSORRT_VERSION}" --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
