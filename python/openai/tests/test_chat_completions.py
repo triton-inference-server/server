@@ -588,7 +588,7 @@ class TestChatCompletionsTokenizers:
                 json={"model": model, "messages": messages},
             )
 
-        assert response.status_code == 400
+        assert response.status_code == 500
         assert response.json()["detail"] == "Unknown tokenizer"
 
     def test_chat_completions_custom_tokenizer(
@@ -675,7 +675,7 @@ class TestChatCompletionsTokenizers:
                 json={"model": model, "messages": messages},
             )
 
-        assert response.status_code == 400
+        assert response.status_code == 500
         # Error may vary based on transformers version
         expected_errors = [
             "cannot use apply_chat_template()",

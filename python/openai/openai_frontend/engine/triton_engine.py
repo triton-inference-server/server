@@ -89,6 +89,7 @@ from schemas.openai import (
     Model,
     ObjectType,
 )
+from utils.utils import ClientError, ServerError
 
 
 # TODO: Improve type hints
@@ -740,21 +741,21 @@ class TritonLLMEngine(LLMEngine):
 
         # Reject missing internal information needed to do inference
         if not metadata:
-            raise Exception(f"Unknown model: {request.model}")
+            raise ClientError(f"Unknown model: {request.model}")
 
         if not metadata.tokenizer:
-            raise Exception("Unknown tokenizer")
+            raise ServerError("Unknown tokenizer")
 
         if not metadata.backend:
-            raise Exception("Unknown backend")
+            raise ServerError("Unknown backend")
 
         if not metadata.inference_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown inference request format for model: {request.model}"
             )
 
         if not metadata.embedding_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown embedding request format for model: {request.model}"
             )
 
@@ -763,28 +764,28 @@ class TritonLLMEngine(LLMEngine):
             and lora_name is not None
             and lora_name not in metadata.lora_names
         ):
-            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
+            raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.n and request.n > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
         if request.logit_bias is not None or request.logprobs:
-            raise Exception("logit bias and log probs not currently supported")
+            raise ClientError("logit bias and log probs not currently supported")
 
         self._verify_chat_tool_call_settings(request=request)
 
         if request.stream_options and not request.stream:
-            raise Exception("`stream_options` can only be used when `stream` is True")
+            raise ClientError("`stream_options` can only be used when `stream` is True")
 
         if (
             request.stream_options
             and request.stream_options.include_usage
             and metadata.backend != "vllm"
         ):
-            raise Exception(
+            raise ClientError(
                 "`stream_options.include_usage` is currently only supported for the vLLM backend"
             )
 
@@ -794,7 +795,7 @@ class TritonLLMEngine(LLMEngine):
             and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
             and not request.tools
         ):
-            raise Exception(
+            raise ClientError(
                 '"required" tool choice requires CreateChatCompletionRequest.tools to be provided'
             )
 
@@ -803,7 +804,7 @@ class TritonLLMEngine(LLMEngine):
             and isinstance(request.tool_choice.root, ChatCompletionNamedToolChoice)
             and not request.tools
         ):
-            raise Exception(
+            raise ClientError(
                 "Named tool choice requires CreateChatCompletionRequest.tools to be provided"
             )
 
@@ -812,14 +813,16 @@ class TritonLLMEngine(LLMEngine):
             and request.tool_choice.root == ChatCompletionToolChoiceOption1.auto
             and self.tool_call_parser is None
         ):
-            raise Exception('"auto" tool choice requires --tool-call-parser to be set')
+            raise ClientError(
+                '"auto" tool choice requires --tool-call-parser to be set'
+            )
 
         if (
             request.tool_choice is None
             and request.tools
             and self.tool_call_parser is None
         ):
-            raise Exception(
+            raise ClientError(
                 "having tools in the request requires --tool-call-parser to be set"
             )
 
@@ -886,18 +889,18 @@ class TritonLLMEngine(LLMEngine):
         """
         # Reject missing internal information needed to do inference
         if not metadata:
-            raise Exception(f"Unknown model: {request.model}")
+            raise ClientError(f"Unknown model: {request.model}")
 
         if not metadata.backend:
-            raise Exception("Unknown backend")
+            raise ServerError("Unknown backend")
 
         if not metadata.inference_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown inference request format for model: {request.model}"
             )
 
         if not metadata.embedding_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown embedding request format for model: {request.model}"
             )
 
@@ -906,41 +909,41 @@ class TritonLLMEngine(LLMEngine):
             and lora_name is not None
             and lora_name not in metadata.lora_names
         ):
-            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
+            raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.suffix is not None:
-            raise Exception("suffix is not currently supported")
+            raise ClientError("suffix is not currently supported")
 
         if not request.prompt:
-            raise Exception("prompt must be non-empty")
+            raise ClientError("prompt must be non-empty")
 
         # Currently only support single string as input
         if not isinstance(request.prompt, str):
-            raise Exception("only single string input is supported")
+            raise ClientError("only single string input is supported")
 
         if request.n and request.n > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
         if request.best_of and request.best_of > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
             )
 
         if request.logit_bias is not None or request.logprobs is not None:
-            raise Exception("logit bias and log probs not supported")
+            raise ClientError("logit bias and log probs not supported")
 
         if request.stream_options and not request.stream:
-            raise Exception("`stream_options` can only be used when `stream` is True")
+            raise ClientError("`stream_options` can only be used when `stream` is True")
 
         if (
             request.stream_options
             and request.stream_options.include_usage
             and metadata.backend != "vllm"
         ):
-            raise Exception(
+            raise ClientError(
                 "`stream_options.include_usage` is currently only supported for the vLLM backend"
             )
 
@@ -955,18 +958,18 @@ class TritonLLMEngine(LLMEngine):
 
         # Reject missing internal information needed to do inference
         if not metadata:
-            raise Exception(f"Unknown model: {request.model}")
+            raise ClientError(f"Unknown model: {request.model}")
 
         if not metadata.backend:
-            raise Exception("Unknown backend")
+            raise ServerError("Unknown backend")
 
         if not metadata.inference_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown inference request format for model: {request.model}"
             )
 
         if not metadata.embedding_request_converter:
-            raise Exception(
+            raise ServerError(
                 f"Unknown embedding request format for model: {request.model}"
             )
 
