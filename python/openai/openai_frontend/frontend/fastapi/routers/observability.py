@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
+from utils.utils import StatusCode
 
 router = APIRouter()
 
@@ -38,12 +39,14 @@ def metrics(request: Request) -> PlainTextResponse:
 @router.get("/health/ready", tags=["Utilities"])
 def ready(request: Request) -> Response:
     if not request.app.engine:
-        raise HTTPException(status_code=500, detail="No attached inference engine")
+        raise HTTPException(
+            status_code=StatusCode.SERVER_ERROR, detail="No attached inference engine"
+        )
 
     if not request.app.engine.ready():
         raise HTTPException(
-            status_code=400,
+            status_code=StatusCode.CLIENT_ERROR,
             detail="Attached inference engine is not ready for inference requests.",
         )
 
-    return Response(status_code=200)
+    return Response(status_code=StatusCode.SUCCESS)
