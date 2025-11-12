@@ -132,7 +132,9 @@ RET=0
 for MODEL in $(ls models); do
     # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
     # Tracked here: https://nvbugs/3954104
-    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+    # Skip the resnet50_fp32_onnx model as the inference hangs on A100 with batch size > 1.
+    # Tracked here: https://linear.app/nvidia/issue/TRI-304
+    if [[ "$MODEL" == "resnet50_fp32_libtorch" || "$MODEL" == "resnet50_fp32_onnx" ]]; then
         continue
     fi
 
