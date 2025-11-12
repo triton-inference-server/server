@@ -27,6 +27,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from schemas.openai import CreateEmbeddingRequest, CreateEmbeddingResponse
+from utils.utils import ClientError, ServerError, StatusCode
 
 router = APIRouter()
 
@@ -41,10 +42,16 @@ async def create_embedding(
     Creates embedding for the provided input text.
     """
     if not raw_request.app.engine:
-        raise HTTPException(status_code=500, detail="No attached inference engine")
+        raise HTTPException(
+            status_code=StatusCode.SERVER_ERROR, detail="No attached inference engine"
+        )
 
     try:
         response = await raw_request.app.engine.embedding(request)
         return response
+    except ClientError as e:
+        raise HTTPException(status_code=StatusCode.CLIENT_ERROR, detail=f"{e}")
+    except ServerError as e:
+        raise HTTPException(status_code=StatusCode.SERVER_ERROR, detail=f"{e}")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"{e}")
+        raise HTTPException(status_code=StatusCode.SERVER_ERROR, detail=f"{e}")
