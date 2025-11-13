@@ -44,6 +44,7 @@ from schemas.openai import (
     CreateEmbeddingRequest,
     EmbeddingUsage,
 )
+from utils.utils import ClientError, ServerError
 
 
 class RequestKind(Enum):
@@ -144,7 +145,9 @@ def _create_trtllm_generate_request(
     default_max_tokens: int,
 ):
     if lora_name is not None:
-        raise Exception("LoRA selection is currently not supported for TRT-LLM backend")
+        raise ClientError(
+            "LoRA selection is currently not supported for TRT-LLM backend"
+        )
 
     inputs = {}
     inputs["text_input"] = [[prompt]]
@@ -219,7 +222,7 @@ def _create_trtllm_embedding_request(
     model,
     request: CreateEmbeddingRequest,
 ):
-    raise Exception(
+    raise ClientError(
         "TRT-LLM backend and Python backend do not support embedding requests"
     )
 
@@ -254,11 +257,11 @@ def _to_string(tensor: tritonserver.Tensor) -> str:
     # there is only a single string, so enforce it to avoid obscure errors.
     volume = _get_volume(tensor.shape)
     if volume != 1:
-        raise Exception(
+        raise ServerError(
             f"Expected to find 1 string in the output, found {volume} instead."
         )
     if tensor.size < 4:
-        raise Exception(
+        raise ServerError(
             f"Expected string buffer to contain its serialized byte size, but found size of {tensor.size}."
         )
 
@@ -377,11 +380,13 @@ def _validate_triton_responses_non_streaming(
 ):
     num_responses = len(responses)
     if num_responses == 1 and responses[0].final != True:
-        raise Exception("Unexpected internal error with incorrect response flags")
+        raise ServerError("Unexpected internal error with incorrect response flags")
     if num_responses == 2 and responses[-1].final != True:
-        raise Exception("Unexpected internal error with incorrect response flags")
+        raise ServerError("Unexpected internal error with incorrect response flags")
     if num_responses > 2:
-        raise Exception(f"Unexpected number of responses: {num_responses}, expected 1.")
+        raise ServerError(
+            f"Unexpected number of responses: {num_responses}, expected 1."
+        )
 
 
 def _get_guided_json_from_tool(
@@ -400,7 +405,7 @@ def _get_guided_json_from_tool(
 
         tools = {tool.function.name: tool.function for tool in request.tools}
         if tool_name not in tools:
-            raise ValueError(f"Tool '{tool_name}' has not been passed in `tools`.")
+            raise ClientError(f"Tool '{tool_name}' has not been passed in `tools`.")
         tool = tools[tool_name]
         return tool.parameters.model_dump_json()
 

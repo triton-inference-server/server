@@ -38,6 +38,7 @@ from schemas.openai import (
     ChatCompletionRequestUserMessage,
     Type1,
 )
+from utils.utils import ClientError
 
 
 class ConversationMessage(TypedDict, total=False):
@@ -80,7 +81,9 @@ def _parse_chat_message_content_parts(
             parse_res = {"type": "text", "text": part.root.text}
             content.append(parse_res)
         else:
-            raise TypeError(f"only text message is supported, but got {part.root.type}")
+            raise ClientError(
+                f"only text message is supported, but got {part.root.type}"
+            )
 
     return ConversationMessage(role=role, content=content)
 
