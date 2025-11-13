@@ -446,13 +446,13 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
+  "id": "cmpl-5ad4f860-bf13-11f0-b137-b75b7f0a8586",
   "choices": [
     {
       "finish_reason": "stop",
       "index": 0,
       "message": {
-        "content": "It looks like you're testing the system!",
+        "content": "It looks like you're ready to see if I'm functioning properly. What would",
         "tool_calls": null,
         "role": "assistant",
         "function_call": null
@@ -460,11 +460,15 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
       "logprobs": null
     }
   ],
-  "created": 1728948689,
-  "model": "llama-3-8b-instruct",
+  "created": 1762875029,
+  "model": "tensorrt_llm_bls",
   "system_fingerprint": null,
   "object": "chat.completion",
-  "usage": null
+  "usage": {
+    "prompt_tokens": 42,
+    "total_tokens": 58,
+    "completion_tokens": 16
+  }
 }
 ```
 
