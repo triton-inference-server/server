@@ -780,15 +780,6 @@ class TritonLLMEngine(LLMEngine):
         if request.stream_options and not request.stream:
             raise ClientError("`stream_options` can only be used when `stream` is True")
 
-        if (
-            request.stream_options
-            and request.stream_options.include_usage
-            and metadata.backend != "vllm"
-        ):
-            raise ClientError(
-                "`stream_options.include_usage` is currently only supported for the vLLM backend"
-            )
-
     def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
             request.tool_choice
@@ -937,15 +928,6 @@ class TritonLLMEngine(LLMEngine):
 
         if request.stream_options and not request.stream:
             raise ClientError("`stream_options` can only be used when `stream` is True")
-
-        if (
-            request.stream_options
-            and request.stream_options.include_usage
-            and metadata.backend != "vllm"
-        ):
-            raise ClientError(
-                "`stream_options.include_usage` is currently only supported for the vLLM backend"
-            )
 
     def _validate_embedding_request(
         self,
