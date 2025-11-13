@@ -185,6 +185,10 @@ def _create_trtllm_generate_request(
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
 
+    # Enable token usage calculation for TensorRT-LLM v1.0.0+
+    inputs["return_num_input_tokens"] = np.bool_([[True]])
+    inputs["return_num_output_tokens"] = np.bool_([[True]])
+
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
         inputs["guided_decoding_guide_type"] = [["json_schema"]]
@@ -307,10 +311,10 @@ def _get_usage_from_response(
     """
     Extracts token usage statistics from a Triton inference response.
     """
-    # TODO: Remove this check once TRT-LLM backend supports both "num_input_tokens"
-    # and "num_output_tokens", and also update the test cases accordingly.
-    if backend != "vllm":
-        return None
+    # Enable usage calculation for TensorRT-LLM backend (v1.0.0+ supports token usage)
+    # TODO: Update test cases to verify usage calculation for TensorRT-LLM
+    # if backend != "vllm":
+    #     return None
 
     prompt_tokens = None
     completion_tokens = None
@@ -322,15 +326,26 @@ def _get_usage_from_response(
         input_token_tensor = response.outputs["num_input_tokens"]
         output_token_tensor = response.outputs["num_output_tokens"]
 
+        # Handle both UINT32 (vLLM) and INT32 (TensorRT-LLM) data types
         if input_token_tensor.data_type == tritonserver.DataType.UINT32:
             prompt_tokens_ptr = ctypes.cast(
                 input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            prompt_tokens = prompt_tokens_ptr[0]
+        elif input_token_tensor.data_type == tritonserver.DataType.INT32:
+            prompt_tokens_ptr = ctypes.cast(
+                input_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_int32)
             )
             prompt_tokens = prompt_tokens_ptr[0]
 
         if output_token_tensor.data_type == tritonserver.DataType.UINT32:
             completion_tokens_ptr = ctypes.cast(
                 output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_uint32)
+            )
+            completion_tokens = completion_tokens_ptr[0]
+        elif output_token_tensor.data_type == tritonserver.DataType.INT32:
+            completion_tokens_ptr = ctypes.cast(
+                output_token_tensor.data_ptr, ctypes.POINTER(ctypes.c_int32)
             )
             completion_tokens = completion_tokens_ptr[0]
 
