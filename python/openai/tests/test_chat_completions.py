@@ -40,9 +40,7 @@ class TestChatCompletions:
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
 
-    def test_chat_completions_defaults(
-        self, client, model: str, messages: List[dict], backend: str
-    ):
+    def test_chat_completions_defaults(self, client, model: str, messages: List[dict]):
         response = client.post(
             "/v1/chat/completions",
             json={"model": model, "messages": messages},
@@ -54,10 +52,7 @@ class TestChatCompletions:
         assert message["role"] == "assistant"
 
         usage = response.json().get("usage")
-        if backend == "vllm":
-            assert usage is not None
-        else:
-            assert usage is None
+        assert usage is not None
 
     def test_chat_completions_system_prompt(self, client, model: str):
         # NOTE: Currently just sanity check that there are no issues when a
@@ -535,14 +530,7 @@ class TestChatCompletions:
     def test_request_logit_bias(self):
         pass
 
-    def test_usage_response(
-        self, client, model: str, messages: List[dict], backend: str
-    ):
-        if backend != "vllm":
-            pytest.skip(
-                "Usage reporting is currently available only for the vLLM backend."
-            )
-
+    def test_usage_response(self, client, model: str, messages: List[dict]):
         response = client.post(
             "/v1/chat/completions",
             json={"model": model, "messages": messages},
