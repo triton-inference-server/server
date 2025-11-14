@@ -341,10 +341,6 @@ class TestAsyncClientToolCalling:
         # validate if steaming and non-streaming generates the same content
         assert "".join(chunks) == choice.message.content
 
-    @pytest.mark.skipif(
-        os.environ.get("IMAGE_KIND") == "TRTLLM",
-        reason="latest release version of Tensorrt LLM 0.18 doesn't support guided decoding",
-    )
     @pytest.mark.asyncio
     async def test_tool_call_with_named_tool_choice(
         self, client: openai.AsyncOpenAI, model: str
@@ -448,10 +444,6 @@ class TestAsyncClientToolCalling:
         assert choice.message.role == role_name
         assert choice.message.tool_calls[0].function.name == function_name
 
-    @pytest.mark.skipif(
-        os.environ.get("IMAGE_KIND") == "TRTLLM",
-        reason="latest release version of Tensorrt LLM 0.18 doesn't support guided decoding",
-    )
     @pytest.mark.asyncio
     async def test_tool_call_with_required_tool_choice(
         self, client: openai.AsyncOpenAI, model: str
