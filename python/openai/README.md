@@ -606,10 +606,9 @@ tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It i
 
 #### Named Tool Calling
 
-The OpenAI frontend supports named function calling, utilizing guided decoding in the vLLM and TensorRT-LLM backends. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
+The OpenAI frontend supports named function calling, utilizing structured outputs in the vLLM backend and guided decoding in TensorRT-LLM backend. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
 
 > [!NOTE]
-> The latest release of TensorRT-LLM (v0.18.0) does not yet support guided decoding. To enable this feature, use a build from the main branch of TensorRT-LLM.
 > For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
 
 Example for making a named tool calling request:

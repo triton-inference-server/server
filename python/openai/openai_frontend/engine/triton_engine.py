@@ -678,7 +678,8 @@ class TritonLLMEngine(LLMEngine):
             # check to make sure we haven't "forgotten" to stream
             # any tokens that were generated but previously
             # matched by partial json parsing, such as '}'.
-            # only happens if we are NOT using guided decoding
+            # only happens if we are NOT using structured outputs
+            # or guided decoding
             if (
                 self._should_check_for_unstreamed_tool_arg_tokens(
                     response_delta=response_delta,
