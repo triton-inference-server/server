@@ -114,11 +114,11 @@ def _create_vllm_generate_request(
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
-        from vllm.sampling_params import GuidedDecodingParams
+        from vllm.sampling_params import StructuredOutputsParams
 
         sampling_parameters_json = json.loads(sampling_parameters)
-        sampling_parameters_json["guided_decoding"] = json.dumps(
-            asdict(GuidedDecodingParams.from_optional(json=guided_json))
+        sampling_parameters_json["structured_outputs"] = json.dumps(
+            asdict(StructuredOutputsParams.from_optional(json=guided_json))
         )
         sampling_parameters = json.dumps(sampling_parameters_json)
 
