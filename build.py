@@ -1246,10 +1246,10 @@ COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[$VARIANT] && \
+    find /opt/tritonserver/python -maxdepth 1 -type f -name \
+    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[$VARIANT];
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -1297,6 +1297,7 @@ def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_mach
     df = """
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+ARG VARIANT=all
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
@@ -1512,8 +1513,9 @@ ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
         target_platform() not in ["igpu", "windows", "rhel"]
         and "tensorrtllm" not in backends
     ):
-        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
-        df += f"""
+        if FLAGS.build_variant != "cpu" :
+            repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+            df += f"""
 RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{repo_arch}/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
@@ -1910,6 +1912,10 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 f"--secret id=PYTORCH_TRITON_URL",
                 f"--secret id=NVPL_SLIM_URL",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+            ]
+        if  FLAGS.build_variant:
+            finalargs += [
+                "--build-arg VARIANT="+(FLAGS.build_variant),
             ]
         finalargs += [
             "-t",
@@ -2777,6 +2783,13 @@ if __name__ == "__main__":
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
+        "--build_variant",
+        required=False,
+        type=str,
+        default="all",
+        help="Can be set to all or cpu,Default value is all."
+    )
+    parser.add_argument(
         "--build-secret",
         action="append",
         required=False,
@@ -2815,6 +2828,9 @@ if __name__ == "__main__":
         FLAGS.extra_backend_cmake_arg = []
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
+    if hasattr(FLAGS, 'build_variant') and FLAGS.build_variant not in ["all", "cpu"]:
+        raise ValueError(f"Invalid build_variant value: {FLAGS.build_variant}. Expected 'all' or 'cpu'.")
+
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
