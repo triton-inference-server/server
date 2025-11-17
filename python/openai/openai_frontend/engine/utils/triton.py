@@ -110,17 +110,15 @@ def _create_vllm_generate_request(
 
     if lora_name is not None:
         sampling_parameters["lora_name"] = lora_name
-    sampling_parameters = json.dumps(sampling_parameters)
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
         from vllm.sampling_params import StructuredOutputsParams
 
-        sampling_parameters_json = json.loads(sampling_parameters)
-        sampling_parameters_json["structured_outputs"] = json.dumps(
-            asdict(StructuredOutputsParams.from_optional(json=guided_json))
+        sampling_parameters["structured_outputs"] = json.dumps(
+            asdict(StructuredOutputsParams(json=guided_json))
         )
-        sampling_parameters = json.dumps(sampling_parameters_json)
+    sampling_parameters = json.dumps(sampling_parameters)
 
     exclude_input_in_output = True
     echo = getattr(request, "echo", None)
@@ -382,13 +380,12 @@ def _validate_triton_responses_non_streaming(
     responses: List[tritonserver._api._response.InferenceResponse],
 ):
     num_responses = len(responses)
-    if num_responses == 1 and responses[0].final != True:
-        raise ServerError("Unexpected internal error with incorrect response flags")
-    if num_responses == 2 and responses[-1].final != True:
-        raise ServerError("Unexpected internal error with incorrect response flags")
-    if num_responses > 2:
+    if 1 <= num_responses <= 2:
+        if responses[-1].final != True:
+            raise ServerError("Unexpected internal error with incorrect response flags")
+    else:
         raise ServerError(
-            f"Unexpected number of responses: {num_responses}, expected 1."
+            f"Unexpected number of responses: {num_responses}, expected 1 or 2."
         )
 
 
