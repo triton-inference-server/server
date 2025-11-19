@@ -1500,6 +1500,12 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
 
 ARG PYVER=3.12
 ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
+ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
+    TRITON_CUDART_PATH=/usr/local/cuda/include \\
+    TRITON_CUOBJDUMP_PATH=/usr/local/cuda/bin/cuobjdump \\
+    TRITON_CUPTI_PATH=/usr/local/cuda/include \\
+    TRITON_NVDISASM_PATH=/usr/local/cuda/bin/nvdisasm \\
+    TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 """
 
     if "dali" in backends:
