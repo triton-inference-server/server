@@ -122,8 +122,9 @@ def _create_vllm_generate_request(
         )
         sampling_parameters = json.dumps(sampling_parameters_json)
 
-    if request.echo is not None:
-        inputs[echo_tensor_name] = np.bool_([not request.echo])
+    echo = getattr(request, "echo", None)
+    if echo is not None:
+        inputs[echo_tensor_name] = np.bool_([not echo])
 
     inputs["text_input"] = [prompt]
     inputs["stream"] = np.bool_([request.stream])
@@ -184,8 +185,9 @@ def _create_trtllm_generate_request(
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
     # Only limited TRT-LLM models support "echo" (inflight_batcher_llm, disaggregated_serving, llmapi)
-    if request.echo is not None and echo_tensor_name is not None:
-        inputs[echo_tensor_name] = np.bool_([[not request.echo]])
+    echo = getattr(request, "echo", None)
+    if echo is not None and echo_tensor_name is not None:
+        inputs[echo_tensor_name] = np.bool_([[not echo]])
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
