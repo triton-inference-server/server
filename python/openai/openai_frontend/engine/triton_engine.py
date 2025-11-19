@@ -105,6 +105,8 @@ class TritonModelMetadata:
     tokenizer: Optional[Any]
     # LoRA names supported by the backend
     lora_names: Optional[List[str]]
+    # Name of the input tensor enabling "echo" parameter in /v1/completions endpoint
+    echo_tensor_name: Optional[str]
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
@@ -202,7 +204,12 @@ class TritonLLMEngine(LLMEngine):
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
             metadata.inference_request_converter(
-                metadata.model, prompt, request, lora_name, self.default_max_tokens
+                metadata.model,
+                prompt,
+                request,
+                lora_name,
+                metadata.echo_tensor_name,
+                self.default_max_tokens,
             )
         )
 
@@ -330,6 +337,7 @@ class TritonLLMEngine(LLMEngine):
                 request.prompt,
                 request,
                 lora_name,
+                metadata.echo_tensor_name,
                 self.default_max_tokens,
             )
         )
@@ -484,12 +492,22 @@ class TritonLLMEngine(LLMEngine):
                     self.server.options.model_repository, name, model.version
                 )
 
+            echo_tensor_name = None
+            for input in model.config()["input"]:
+                if input["name"] in [
+                    "exclude_input_in_output",
+                    "sampling_param_exclude_input_from_output",
+                ]:
+                    echo_tensor_name = input["name"]
+                    break
+
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
                 tokenizer=self.tokenizer,
                 lora_names=lora_names,
+                echo_tensor_name=echo_tensor_name,
                 create_time=self.create_time,
                 inference_request_converter=self._determine_request_converter(
                     backend, RequestKind.GENERATION
