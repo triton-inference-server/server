@@ -122,12 +122,14 @@ def _create_vllm_generate_request(
         )
         sampling_parameters = json.dumps(sampling_parameters_json)
 
+    exclude_input_in_output = True
     echo = getattr(request, "echo", None)
     if echo is not None:
-        inputs[echo_tensor_name] = np.bool_([not echo])
+        exclude_input_in_output = not echo
 
     inputs["text_input"] = [prompt]
     inputs["stream"] = np.bool_([request.stream])
+    inputs[echo_tensor_name] = np.bool_([exclude_input_in_output])
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
