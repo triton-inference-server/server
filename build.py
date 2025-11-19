@@ -1240,16 +1240,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
         argmap, backends, FLAGS.enable_gpu, target_machine()
     )
 
-    df += """
+    df += f"""
 WORKDIR /opt
 COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+    "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -2783,6 +2783,13 @@ if __name__ == "__main__":
         "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
         "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
         "Ensure that the required environment variables for these secrets are set before running the build.",
+    )
+    parser.add_argument(
+        "--triton-wheels-dependencies-group",
+        required=False,
+        type=str,
+        default="all",
+        help="The group of dependencies for Triton wheels to be installed. Default value is 'all'.",
     )
     FLAGS = parser.parse_args()
 
