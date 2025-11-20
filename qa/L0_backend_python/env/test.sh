@@ -48,7 +48,7 @@ install_conda
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
-TORCH_VERSION="2.6.0"
+TORCH_VERSION="2.9.0"
 conda install numpy=1.26.4 -y
 if [ $TRITON_RHEL -eq 1 ]; then
     TORCH_VERISON="2.17.0"
