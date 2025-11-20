@@ -56,10 +56,10 @@ conda update -n base -c defaults conda -y
 # been setup correctly.
 if [ ${PYTHON_ENV_VERSION} = "11" ]; then
     create_conda_env "3.11" "python-3-11"
-    conda install pytorch=2.6.0 -y
+    conda install pytorch=2.8.0 -y
     conda install -c conda-forge libstdcxx-ng=14 -y
     conda install numpy=1.23.5 -y
-    EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and PyTorch version is 2.6.0"
+    EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and PyTorch version is 2.8.0"
     create_python_backend_stub
     conda-pack -o python3.11.tar.gz
     path_to_conda_pack="$PWD/python-3-11"
