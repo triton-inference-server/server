@@ -35,12 +35,6 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-if [ -n "${CUDA_ARCH_LIST}" ] ; then
-    echo "CUDA_ARCH_LIST is set to: ${CUDA_ARCH_LIST}"
-    export CUDAARCHS=$(echo "${CUDA_ARCH_LIST}" | sed 's/\.//g; s/ /-real;/g; s/$/-real/');
-    echo "CUDAARCHS is set to: ${CUDAARCHS}";
-fi
-
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
