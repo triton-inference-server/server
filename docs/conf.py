@@ -221,6 +221,10 @@ html_static_path = ["_static"]
 html_theme_options = {
     "collapse_navigation": False,
     "github_url": "https://github.com/triton-inference-server/server",
+    "logo": {
+        "image_light": "_static/nvidia-logo-horiz-rgb-blk-for-screen.png",
+        "image_dark": "_static/nvidia-logo-horiz-rgb-blk-for-screen.png",  # Using same for now
+    },
     "switcher": {
         # use for local testing
         # "json_url": "http://localhost:8000/_static/switcher.json",

@@ -38,6 +38,7 @@ RUN pip3 install --extra-index-url https://pypi.nvidia.com \
         breathe \
         exhale \
         httplib2 \
+        "markdown-it-py<4.0.0" \
         myst-nb \
         nbclient \
         nbsphinx \
