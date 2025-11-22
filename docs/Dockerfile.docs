@@ -77,7 +77,8 @@ RUN pip3 install \
 
 RUN pip3 install \
       --extra-index-url https://pypi.nvidia.com \
-      nvidia-sphinx-theme
+      nvidia-sphinx-theme \
+      sphinx==7.4.7
 
 RUN curl -fL https://install-cli.jfrog.io | sh
 
