@@ -61,6 +61,43 @@ from sphinx import search
 # at the end of the file.
 # current_dir = os.getcwd()
 # os.chdir("docs")
+# -- Setup logger ------------------------------------------------------------
+
+import logging
+from logging.handlers import RotatingFileHandler
+
+def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_count=5):
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Prevent adding multiple handlers if the function is called multiple times
+    if not logger.handlers:
+        # Create handlers
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count
+        )
+        console_handler = logging.StreamHandler()
+
+        # Set the logging level for handlers
+        file_handler.setLevel(level)
+        console_handler.setLevel(level)
+
+        # Create a logging format
+        GREY = "\033[90m"
+        RESET = "\033[0m"
+        formatter = logging.Formatter(
+            f"{GREY}%(asctime)s - %(name)s - %(levelname)s - {RESET}%(message)s"
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+
+        # Add handlers to the logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+    return logger
+
+logger = setup_logger(os.path.basename(__file__), os.environ.get('TRITON_SERVER_DOCS_LOG_FILE', '/tmp/docs.log'))
+logger.info(f"Defined logger for {os.path.basename(__file__)}")
 
 # -- Project information -----------------------------------------------------
 
@@ -70,14 +107,19 @@ author = "NVIDIA"
 
 # Get the version of Triton this is building.
 version_long = "0.0.0"
+logger.info(f"Getting version from ../TRITON_VERSION")
 with open("../TRITON_VERSION") as f:
     version_long = f.readline()
     version_long = version_long.strip()
+    logger.info(f"Version: {version_long}")
+
 
 version_short = re.match(r"^[\d]+\.[\d]+\.[\d]+", version_long).group(0)
+logger.info(f"Version short: {version_short}")
 version_short_split = version_short.split(".")
+logger.info(f"Version short split: {version_short_split}")
 one_before = f"{version_short_split[0]}.{int(version_short_split[1]) - 1}.{version_short_split[2]}"
-
+logger.info(f"One before: {one_before}")
 
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
@@ -194,6 +236,8 @@ html_theme_options.update(
     }
 )
 
+logger.info(f"html_theme_options: {html_theme_options}")
+
 deploy_ngc_org = "nvidia"
 deploy_ngc_team = "triton"
 myst_substitutions = {
@@ -203,6 +247,7 @@ myst_substitutions = {
     else deploy_ngc_org,
 }
 
+logger.info(f"myst_substitutions: {myst_substitutions}")
 
 def ultimateReplace(app, docname, source):
     result = source[0]
@@ -219,6 +264,7 @@ ultimate_replacements = {
     if deploy_ngc_team
     else deploy_ngc_org,
 }
+logger.info(f"ultimate_replacements: {ultimate_replacements}")
 
 # bibtex_bibfiles = ["references.bib"]
 # To test that style looks good with common bibtex config
@@ -233,6 +279,7 @@ nb_execution_mode = "off"  # Global execution disable
 # SETUP SWITCHER
 ###############################
 switcher_path = os.path.join(html_static_path[0], "switcher.json")
+logger.info(f"switcher_path: {switcher_path}")
 versions = []
 # Triton 2 releases
 correction = -1 if "dev" in version_long else 0
