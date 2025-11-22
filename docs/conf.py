@@ -41,7 +41,6 @@ import re
 import subprocess
 from datetime import date
 from logging.handlers import RotatingFileHandler
-from packaging.version import Version
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -301,7 +300,12 @@ tags_list = sorted(tags.stdout.strip().splitlines(), key=Version, reverse=True)
 logger.info(f"Found source tags: {tags_list}")
 
 for v in tags_list:
-    versions.append((v.replace('v', ''), f"triton-inference-server-{v.replace('v', '').replace('.', '')}"))
+    versions.append(
+        (
+            v.replace("v", ""),
+            f"triton-inference-server-{v.replace('v', '').replace('.', '')}",
+        )
+    )
 
 logger.info(f"Defined dictionary of versions: {versions}")
 
@@ -362,6 +366,7 @@ with open(switcher_path, "w") as f:
 
 
 logger.info("Configuration completed...")
+
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
