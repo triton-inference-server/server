@@ -52,8 +52,6 @@ RUN pip3 install --extra-index-url https://pypi.nvidia.com \
         sphinx-tabs \
         sphinxcontrib-bibtex
 
-RUN pip3 install rst-to-myst[sphinx]==0.4.0 
-
 RUN apt-get install -y --no-install-recommends \
         curl \
         unzip
