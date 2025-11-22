@@ -29,7 +29,7 @@ FROM sphinxdoc/sphinx:8.2.3
 # various documentation dependencies
 RUN apt-get update -q=2 \
     && apt-get install -y --no-install-recommends \
-        git 
+        git
 
 RUN git config --global --add safe.directory "*"
 
@@ -61,7 +61,7 @@ RUN curl -kL https://github.com/pseudomuto/protoc-gen-doc/releases/download/v1.3
     && tar -xvf /tmp/protoc-gen-doc.tar.gz --strip-components=1 -C /usr/local/bin/ \
     && rm /tmp/protoc-gen-doc.tar.gz
 
-RUN curl -fL https://getcli.jfrog.io | sh
+RUN curl -fL https://install-cli.jfrog.io | sh
 
 # Set visitor script to be included on every HTML page
 ENV VISITS_COUNTING_SCRIPT="//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js"
