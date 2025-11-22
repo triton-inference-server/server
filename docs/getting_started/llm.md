@@ -345,7 +345,7 @@ Login to Hugging Face (with User Access Tokens) to get the Phi-3 tokenizer. This
       --measurement-interval 4000 \
       --url localhost:8001
 
-More details on performance benchmarking with GenAI-Perf can be found [here](https://github.com/triton-inference-server/perf_analyzer/blob/main/genai-perf/README.md).
+More details on performance benchmarking with GenAI-Perf can be found [here](../perf_analyzer/genai-perf/README.md).
 
 ## Reference Configurations
 

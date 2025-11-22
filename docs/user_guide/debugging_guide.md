@@ -1,5 +1,5 @@
 <!--
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,7 +59,7 @@ Before proceeding, please see if the model configuration documentation [here](./
     - [Custom_models](https://github.com/triton-inference-server/server/tree/main/qa/custom_models), [ensemble_models](https://github.com/triton-inference-server/server/tree/main/qa/ensemble_models), and [python_models](https://github.com/triton-inference-server/server/tree/main/qa/python_models) include examples of configs for their respective use cases.
     - [L0_model_config](https://github.com/triton-inference-server/server/tree/main/qa/L0_model_config) tests many types of incomplete model configs.
 
-Note that if you are running into an issue with [perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md) or [Model Analyzer](https://github.com/triton-inference-server/model_analyzer), try loading the model onto Triton directly. This checks if the configuration is incorrect or the perf_analyzer or Model Analyzer options need to be updated.
+Note that if you are running into an issue with [perf_analyzer](../perf_analyzer/README.md) or [Model Analyzer](https://github.com/triton-inference-server/model_analyzer), try loading the model onto Triton directly. This checks if the configuration is incorrect or the perf_analyzer or Model Analyzer options need to be updated.
 
 ## Model Issues
 **Step 1. Run Models Outside of Triton**
@@ -74,7 +74,7 @@ If your error message only occurs in one or a few places in the Triton code, you
 
 **Step 3. Build with Debug Flags**
 
-The next step is building with debug flags. We unfortunately don’t provide a debug container, so you’d need to follow the [build guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md) to build the container, which includes a [section on adding debug symbols](https://github.com/triton-inference-server/server/blob/main/docs/build.md#building-with-debug-symbols). Once you do so, you can install GDB (`apt-get install gdb`) in the container and run Triton in GDB (`gdb --args tritonserver…`). If needed, you can open a second terminal to run a script in another container. If the server segfaults, you can enter `backtrace`, which will provide you a call stack that lets you know where the error got generated. You should then be able to trace the source of the error. If the bug still exists after debugging, we’ll need this to expedite our work.
+The next step is building with debug flags. We unfortunately don’t provide a debug container, so you’d need to follow the [build guide](../customization_guide/build.md) to build the container, which includes a [section on adding debug symbols](https://github.com/triton-inference-server/server/blob/main/docs/build.md#building-with-debug-symbols). Once you do so, you can install GDB (`apt-get install gdb`) in the container and run Triton in GDB (`gdb --args tritonserver…`). If needed, you can open a second terminal to run a script in another container. If the server segfaults, you can enter `backtrace`, which will provide you a call stack that lets you know where the error got generated. You should then be able to trace the source of the error. If the bug still exists after debugging, we’ll need this to expedite our work.
 
 Advanced GDB users can also examine variable values, add breakpoints, and more to find the cause of their issue.
 

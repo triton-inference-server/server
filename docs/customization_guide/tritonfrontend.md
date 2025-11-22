@@ -1,5 +1,5 @@
 <!--
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -142,9 +142,9 @@ With this workflow, you can avoid having to stop each service after client reque
 
 ## Known Issues
 - The following features are not currently supported when launching the Triton frontend services through the python bindings:
-    - [Tracing](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md)
-    - [Shared Memory](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md)
-    - [Restricted Protocols](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#limit-endpoint-access-beta)
+    - [Tracing](../user_guide/trace.md)
+    - [Shared Memory](../protocol/extension_shared_memory.md)
+    - [Restricted Protocols](inference_protocols.md#limit-endpoint-access-beta)
     - VertexAI
     - Sagemaker
 - After a running server has been stopped, if the client sends an inference request, a Segmentation Fault will occur.

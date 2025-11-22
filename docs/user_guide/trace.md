@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -419,7 +419,7 @@ The meaning of the trace timestamps is:
 ## Tracing for BLS models
 
 Triton does not collect traces for child models invoked from
-[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting)
+[BLS](../python_backend/README.md#business-logic-scripting)
 models by default.
 
 To include child models into collected traces, user needs to provide the `trace`
@@ -651,4 +651,4 @@ found [here](https://github.com/open-telemetry/opentelemetry-cpp/tree/v1.8.3/exp
 
 - Triton does not support configuration of the opentelemetry trace settings
 during a Triton run and opentelemetry specific settings are not available
-for the retrieval through [Triton's trace extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
+for the retrieval through [Triton's trace extension](../protocol/extension_trace.md).

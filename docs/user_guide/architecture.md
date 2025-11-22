@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,13 +38,13 @@ scheduler. Triton implements [multiple scheduling and batching
 algorithms](#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
 batching of inference requests and then passes the requests to the
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](../backend/README.md)
 corresponding to the model type. The backend performs inferencing
 using the inputs provided in the batched requests to produce the
 requested outputs. The outputs are then returned.
 
 Triton supports a [backend C
-API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+API](../backend/README.md#triton-backend-api)
 that allows Triton to be extended with new functionality such as
 custom pre- and post-processing operations or even a new deep-learning
 framework.
@@ -819,7 +819,7 @@ You can find additional end-to-end ensemble examples in the links below:
 * [This guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles)
 explores the concept of ensembles with a running example.
 * [Preprocessing in Python Backend Using
-  Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)
+  Ensemble](../python_backend/README.md#preprocessing)
 * [Accelerating Inference with NVIDIA Triton Inference Server and NVIDIA
   DALI](https://developer.nvidia.com/blog/accelerating-inference-with-triton-inference-server-and-dali/)
 * [Using RAPIDS AI with NVIDIA Triton Inference

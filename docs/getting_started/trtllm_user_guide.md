@@ -1,5 +1,5 @@
 <!--
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,7 +61,7 @@ for Triton, and
 Only the *mandatory parameters* need to be set in the model config file. Feel free
 to modify the optional parameters as needed. To learn more about the
 parameters, model inputs, and outputs, see the
-[model config documentation](ttps://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
+[model config documentation](https://github.com/triton-inference-server/server/blob/main/docs/getting_started/ttps:/github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
 
 ## Advanced Configuration Options and Deployment Strategies
 
@@ -89,7 +89,7 @@ as well as deploying them on Kubernetes.
 [GenAI-Perf](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf)
 is a command line tool for measuring the throughput and latency of LLMs served
 by Triton Inference Server. Check out the
-[Quick Start](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#quick-start)
+[Quick Start](../perf_analyzer/genai-perf/README.md#quick-start)
 to learn how to use GenAI-Perf to benchmark your LLM models.
 
 ## Performance Best Practices
@@ -101,7 +101,7 @@ to learn how to optimize your TensorRT-LLM models for better performance.
 ## Metrics
 
 Triton Server provides
-[metrics](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/metrics.md)
+[metrics](../user_guide/metrics.md)
 indicating GPU and request statistics.
 See the
 [Triton Metrics](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#triton-metrics)

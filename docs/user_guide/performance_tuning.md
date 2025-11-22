@@ -61,7 +61,7 @@ For additional material, see the
     - If your model does not come from a supported backend, you can look into
     the [Python Backend](https://github.com/triton-inference-server/python_backend)
     or writing a
-    [Custom C++ Backend](https://github.com/triton-inference-server/backend/blob/main/examples/README.md)
+    [Custom C++ Backend](../backend/examples/README.md)
     to support your model. The Python Backend provides a simple interface to
     execute requests through a generic python script, but may not be as
     performant as a Custom C++ Backend.  Depending on your use case, the Python
@@ -73,7 +73,7 @@ For additional material, see the
     verify that we can run inference requests and get a baseline performance
     benchmark of your model.
     Triton's
-    [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
+    [Perf Analyzer](../perf_analyzer/README.md)
     tool specifically fits this purpose. Here is a simplified output for
     demonstration purposes:
 
@@ -103,7 +103,7 @@ For additional material, see the
     There are many variables that can be tweaked just within your model
     configuration (`config.pbtxt`) to obtain different results.
     - As your model, config, or use case evolves,
-    [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
+    [Perf Analyzer](../perf_analyzer/README.md)
     is a great tool to quickly verify model functionality and performance.
 
 3. How can I improve my model performance?
@@ -112,13 +112,13 @@ For additional material, see the
     [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
     tool can help.
     Model Analyzer can automatically or
-    [manually](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md)
+    [manually](../model_analyzer/docs/config_search.md)
     search through config combinations to find the optimal triton configuration
     to meet your constraints.  After running Model Analyzer to find the optimal
     configurations for your model/use case, you can transfer the generated
     config files to your [Model Repository](model_repository.md).
     Model Analyzer provides a
-    [Quickstart](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/quick_start.md)
+    [Quickstart](../model_analyzer/docs/quick_start.md)
     guide with some examples to walk through.
     - Upon serving the model with the newly optimized configuration file found
     by Model Analyzer and running Perf Analyzer again, you should expect to find
@@ -130,13 +130,13 @@ For additional material, see the
     The [ONNXRuntime
     Backend](https://github.com/triton-inference-server/onnxruntime_backend),
     for example, has several
-    [parameters](https://github.com/triton-inference-server/onnxruntime_backend#model-config-options)
+    [parameters](../onnxruntime_backend/README.md#model-config-options)
     that affect the level of parallelization when executing inference on a
     model.
     These backend-specific options may be worth investigating if the defaults
     are not providing sufficient performance.  To tune custom sets of
     parameters, Model Analyzer supports
-    [Manual Configuration Search](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md).
+    [Manual Configuration Search](../model_analyzer/docs/config_search.md).
     - To learn more about further optimizations for your model configuration,
     see the [Optimization](optimization.md) docs.
 
@@ -197,7 +197,7 @@ wget -O models/densenet_onnx/1/model.onnx \
 
 > **Note**
 > This is a slightly simplified version of another [example
-config](../examples/model_repository/densenet_onnx/config.pbtxt) that utilizes
+config](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/densenet_onnx/config.pbtxt) that utilizes
 other [Model Configuration](model_configuration.md) features not necessary for
 this example.
 

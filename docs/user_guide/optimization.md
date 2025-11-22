@@ -44,7 +44,7 @@ single GPU.
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
 yourself with
-[Performance Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md).
+[Performance Analyzer](../perf_analyzer/README.md).
 The Performance Analyzer is an essential tool for optimizing your model's
 performance.
 
@@ -53,7 +53,7 @@ options, we will use a ONNX Inception model that you can obtain
 by following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](../examples/model_repository/inception_graphdef/config.pbtxt).
+features](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/inception_graphdef/config.pbtxt).
 
 ```
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
@@ -82,7 +82,7 @@ latency.
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
 batching](model_configuration.md#dynamic-batcher).
-[This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
+[This example](../tutorials/Conceptual_Guide/Part_2-improving_resource_utilization/README.md#dynamic-batching--concurrent-model-execution)
  sheds more light on conceptual details. If your model does not
 support batching then you can skip ahead to [Model
 Instances](#model-instances).
@@ -95,7 +95,7 @@ larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop Triton, add the following line to the end of the [model
 configuration file for
-inception_graphdef](../examples/model_repository/inception_graphdef/config.pbtxt),
+inception_graphdef](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/inception_graphdef/config.pbtxt),
 and then restart Triton.
 
 ```
@@ -163,7 +163,7 @@ remove any dynamic batching settings you may have previously added to
 the model configuration (we discuss combining dynamic batcher and
 multiple model instances below), add the following lines to the end of
 the [model configuration
-file](../examples/model_repository/inception_graphdef/config.pbtxt), and
+file](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/inception_graphdef/config.pbtxt), and
 then restart Triton.
 
 ```
@@ -231,7 +231,7 @@ applied to an ONNX model, we will use an ONNX DenseNet model that you
 can obtain by following [QuickStart](../getting_started/quickstart.md). As a baseline we
 use perf_analyzer to determine the performance of the model using a
 [basic model configuration that does not enable any performance
-features](../examples/model_repository/densenet_onnx/config.pbtxt).
+features](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/densenet_onnx/config.pbtxt).
 
 ```
 $ perf_analyzer -m densenet_onnx --percentile=95 --concurrency-range 1:4

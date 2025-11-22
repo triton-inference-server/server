@@ -29,9 +29,9 @@
 # Model Configuration
 
 **Is this your first time writing a config file?** Check out
-[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#model-configuration)
+[this guide](../tutorials/Conceptual_Guide/Part_1-model_deployment/README.md#model-configuration)
  or this
-[example](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace#examples)!
+[example](../tutorials/HuggingFace/README.md#examples)!
 
 Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
@@ -52,7 +52,7 @@ should also be consulted.
 
 A minimal model configuration must specify the [*platform* and/or
 *backend*
-properties](https://github.com/triton-inference-server/backend/blob/main/README.md#backends),
+properties](../backend/README.md#backends),
 the *max_batch_size* property, and the input and output tensors of the
 model.
 
@@ -92,7 +92,7 @@ the same as the model repository directory containing the model. If
 *name* is specified it must match the name of the model repository
 directory containing the model.  The required values for *platform*
 and *backend* are described in the [backend
-documentation](https://github.com/triton-inference-server/backend/blob/main/README.md#backends).
+documentation](../backend/README.md#backends).
 
 ### Model Transaction Policy
 
@@ -284,7 +284,7 @@ default values.
 
 Triton can derive all the required settings automatically for
 most of the TensorRT saved-model, ONNX models, and OpenVINO models.
-For Python models, [`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
+For Python models, [`auto_complete_config`](../python_backend/README.md#auto_complete_config)
 function can be implemented in Python backend to provide
 [`max_batch_size`](#maximum-batch-size), [`input`](#inputs-and-outputs)
 and [`output`](#inputs-and-outputs) properties using `set_max_batch_size`,
@@ -727,7 +727,7 @@ GPU 0 and two execution instances on GPUs 1 and 2.
   ]
 ```
 For a more detailed example of using instance groups, see
- [this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#concurrent-model-execution).
+ [this guide](../tutorials/Conceptual_Guide/Part_2-improving_resource_utilization/README.md#concurrent-model-execution).
 ### CPU Model Instance
 
 The instance group setting is also used to enable execution of a model
@@ -880,7 +880,7 @@ documentation for the currently available settings.
 ## Model Warmup
 
 When a model is loaded by Triton the corresponding
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](../backend/README.md)
 initializes for that model.  For some backends, some or all of this
 initialization is deferred until the model receives its first
 inference request (or first few inference requests). As a result, the

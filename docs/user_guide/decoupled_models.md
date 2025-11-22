@@ -41,9 +41,9 @@ delivered.
 
 ### C++ Backend
 
-Read carefully about the [Triton Backend API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
-[Inference Requests and Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#inference-requests-and-responses)
-and [Decoupled Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#decoupled-responses).
+Read carefully about the [Triton Backend API](../backend/README.md#triton-backend-api),
+[Inference Requests and Responses](../backend/README.md#inference-requests-and-responses)
+and [Decoupled Responses](../backend/README.md#decoupled-responses).
 The [repeat backend](https://github.com/triton-inference-server/repeat_backend)
 and [square backend](https://github.com/triton-inference-server/square_backend)
 demonstrate how the Triton Backend API can be used to implement a decoupled
@@ -61,7 +61,7 @@ as it leads to eager batching.
 ### Python model using Python Backend
 
 Read carefully about the [Python Backend](https://github.com/triton-inference-server/python_backend),
-and specifically [`execute`](https://github.com/triton-inference-server/python_backend#execute).
+and specifically [`execute`](../python_backend/README.md#execute).
 
 The [decoupled examples](https://github.com/triton-inference-server/python_backend/tree/main/examples/decoupled)
 demonstrates how decoupled API can be used to implement a decoupled
@@ -87,7 +87,7 @@ exactly one response per request. Even standard ModelInfer RPC in the GRPC endpo
 does not support decoupled responses. In order to run inference on a decoupled
 model, the client must use the bi-directional streaming RPC. See
 [here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py) demonstrates
+for more details. The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
@@ -128,7 +128,7 @@ An inference request is considered complete when a response containing the
    `TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag directly in their response
    handling / callback logic.
 
-The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py)
+The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py)
 demonstrates an example of opting-in through the streaming GRPC
 Python client API and programmatically identifying when a final response
 is received through the `"triton_final_response"` response parameter.
