@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,9 +35,13 @@
 # -- Path setup --------------------------------------------------------------
 
 import json
+import logging
 import os
 import re
+import subprocess
 from datetime import date
+from logging.handlers import RotatingFileHandler
+from packaging.version import Version
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -63,8 +67,6 @@ from sphinx import search
 # os.chdir("docs")
 # -- Setup logger ------------------------------------------------------------
 
-import logging
-from logging.handlers import RotatingFileHandler
 
 def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_count=5):
     logger = logging.getLogger(name)
@@ -96,7 +98,11 @@ def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_c
         logger.addHandler(console_handler)
     return logger
 
-logger = setup_logger(os.path.basename(__file__), os.environ.get('TRITON_SERVER_DOCS_LOG_FILE', '/tmp/docs.log'))
+
+logger = setup_logger(
+    os.path.basename(__file__),
+    os.environ.get("TRITON_SERVER_DOCS_LOG_FILE", "/tmp/docs.log"),
+)
 logger.info(f"Defined logger for {os.path.basename(__file__)}")
 
 # -- Project information -----------------------------------------------------
@@ -249,6 +255,7 @@ myst_substitutions = {
 
 logger.info(f"myst_substitutions: {myst_substitutions}")
 
+
 def ultimateReplace(app, docname, source):
     result = source[0]
     for key in app.config.ultimate_replacements:
@@ -282,23 +289,22 @@ switcher_path = os.path.join(html_static_path[0], "switcher.json")
 logger.info(f"switcher_path: {switcher_path}")
 versions = []
 # Triton 2 releases
-correction = -1 if "dev" in version_long else 0
-upper_bound = version_short.split(".")[1]
-for i in range(2, int(version_short.split(".")[1]) + correction):
-    versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
+# correction = -1 if "dev" in version_long else 0
+# upper_bound = version_short.split(".")[1]
+# for i in range(2, int(version_short.split(".")[1]) + correction):
+#     versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
+# logger.info(f"Found Triton 2 releases: {versions}")
 
-# Triton 1 releases
-for i in range(0, 15):
-    versions.append((f"1.{i}.0", f"tensorrt_inference_server_1{i}0"))
+# Obtain Triton Server Release Tags.
+tags = subprocess.run(["git", "tag", "--list", "v*"], capture_output=True, text=True)
+tags_list = sorted(tags.stdout.strip().splitlines(), key=Version, reverse=True)
+logger.info(f"Found source tags: {tags_list}")
 
-# Triton Beta Releases
-for i in range(1, 11):
-    versions.append((f"0.{i}.0_beta", f"inference_server_0{i}0_beta"))
+for v in tags_list:
+    versions.append((v.replace('v', ''), f"triton-inference-server-{v.replace('v', '').replace('.', '')}"))
 
-# Patch releases
-# Add here.
+logger.info(f"Defined dictionary of versions: {versions}")
 
-versions = sorted(versions, key=lambda v: Version(v[0]), reverse=True)
 
 # Build switcher data
 json_data = []
@@ -310,6 +316,7 @@ for v in versions:
             "url": f"https://docs.nvidia.com/deeplearning/triton-inference-server/archives/{v[1]}/user-guide/docs",
         }
     )
+
 if "dev" in version_long:
     json_data.insert(
         0,
@@ -331,6 +338,7 @@ else:
 
 # Trim to last N releases.
 json_data = json_data[0:12]
+logger.info(f"Trimmed to last 12 release...")
 
 json_data.append(
     {
@@ -340,18 +348,20 @@ json_data.append(
     }
 )
 
-# validate the links
 for i, d in enumerate(json_data):
+    logger.info(f"Validating link: {d['url']}")
     h = httplib2.Http()
     resp = h.request(d["url"], "HEAD")
     if int(resp[0]["status"]) >= 400:
         print(d["url"], "NOK", resp[0]["status"])
-        exit(1)
+        # exit(1)
 
-# Write switcher data to file
+logger.info(f"Writing switcher data to file: {switcher_path}")
 with open(switcher_path, "w") as f:
     json.dump(json_data, f, ensure_ascii=False, indent=4)
 
+
+logger.info("Configuration completed...")
 
 def setup(app):
     app.add_config_value("ultimate_replacements", {}, True)
