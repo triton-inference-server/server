@@ -87,7 +87,7 @@ def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_c
         BLUE = "\033[94m"
         RESET = "\033[0m"
         formatter = logging.Formatter(
-            f"{GREY}%(asctime)s - %(name)s - %(levelname)s - {RESET}%(message)s"
+            f"{BLUE}%(asctime)s - %(name)s - %(levelname)s - {RESET}%(message)s"
         )
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
