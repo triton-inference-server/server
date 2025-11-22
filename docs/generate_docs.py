@@ -258,10 +258,10 @@ def replace_url_with_relpath(url, src_doc_path):
 
 def replace_relpath_with_url(relpath, src_doc_path):
     """
-    Replace relative paths with GitHub URLs for:
-    1. Files that are not ".md" type inside the current repo.
-    2. Directories without "README.md" or not ending with "#<section>".
-    3. Paths that don't exist (would show 404 page).
+    This function replaces relative paths with Triton Inference Server GitHub URLs in following cases.
+    1. Relative path is a file that is not ".md" type inside the current repo.
+    2. Relative path is a directory but not (has "README.md" and ends with "#<section>").
+    3. Relative path does not exist (shows 404 page).
 
     Examples:
         ../examples/model_repository
