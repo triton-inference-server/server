@@ -287,12 +287,6 @@ nb_execution_mode = "off"  # Global execution disable
 switcher_path = os.path.join(html_static_path[0], "switcher.json")
 logger.info(f"switcher_path: {switcher_path}")
 versions = []
-# Triton 2 releases
-# correction = -1 if "dev" in version_long else 0
-# upper_bound = version_short.split(".")[1]
-# for i in range(2, int(version_short.split(".")[1]) + correction):
-#     versions.append((f"2.{i}.0", f"triton-inference-server-2{i}0"))
-# logger.info(f"Found Triton 2 releases: {versions}")
 
 # Obtain Triton Server Release Tags.
 tags = subprocess.run(["git", "tag", "--list", "v*"], capture_output=True, text=True)
