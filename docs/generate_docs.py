@@ -122,7 +122,7 @@ parser.add_argument(
     "--github-organization",
     type=str,
     default=os.environ.get(
-        "TRITON_SERVER_REPO_ORT", "https://github.com/triton-inference-server"
+        "TRITON_SERVER_REPO_ORG", "https://github.com/triton-inference-server"
     ),
     help="GitHub organization name",
 )
