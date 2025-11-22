@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,7 +52,7 @@ about the APIs in [tritonserver.h](https://github.com/triton-inference-server/co
 In addition, [gRPC endpoint](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) can
 now detect cancellation from the client and attempt to terminate request.
 At present, only gRPC python client supports issuing request cancellation
-to the server endpoint. See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
+to the server endpoint. See [request-cancellation](../client/README.md#request-cancellation)
 for more details on how to issue requests from the client-side.
 See gRPC guide on RPC [cancellation](https://grpc.io/docs/guides/cancellation/) for
 finer details.
@@ -97,6 +97,6 @@ in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/i
 for more details. The backend upon detecting request cancellation can stop processing
 it any further.
 The Python models running behind Python backend can also query the cancellation status
-of request and response_sender. See [this](https://github.com/triton-inference-server/python_backend#request-cancellation-handling)
+of request and response_sender. See [this](../python_backend/README.md#request-cancellation-handling)
 section in python backend documentation for more details.
 

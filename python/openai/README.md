@@ -166,8 +166,8 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 </details>
 
 5. Benchmark with `genai-perf`:
-- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
-- Or try using genai-perf from the [SDK container](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
+- To install genai-perf in this container, see the instructions [here](../perf_analyzer/genai-perf/README.md#install-perf-analyzer-ubuntu-python-38)
+- Or try using genai-perf from the [SDK container](../perf_analyzer/genai-perf/README.md#install-perf-analyzer-ubuntu-python-38)
 
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -298,7 +298,7 @@ adapter listed on the `multi_lora.json`. Note: The LoRA name inclusion is
 limited to locally stored models, inference requests are not limited though.
 
 See the
-[vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
+[vLLM documentation](../vllm_backend/docs/llama_multi_lora_tutorial.md)
 on how to serve a model with LoRA adapters.
 
 ### Embedding Models
@@ -498,16 +498,16 @@ See `python3 openai_frontend/main.py --help` for more information on the
 available arguments and default values.
 
 For more information on the `tritonfrontend` python bindings, see the docs
-[here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
+[here](../customization_guide/tritonfrontend.md).
 
 ## Model Parallelism Support
 
-- [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
+- [x] vLLM ([EngineArgs](../vllm_backend/README.md#using-the-vllm-backend))
     - ex: Configure `tensor_parallel_size: 2` in the
       [model.json](https://github.com/triton-inference-server/vllm_backend/blob/main/samples/model_repository/vllm_model/1/model.json)
-- [x] TensorRT-LLM ([Orchestrator Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#orchestrator-mode))
+- [x] TensorRT-LLM ([Orchestrator Mode](../tensorrtllm_backend/README.md#orchestrator-mode))
     - Set the following environment variable: `export TRTLLM_ORCHESTRATOR=1`
-- [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
+- [ ] TensorRT-LLM ([Leader Mode](../tensorrtllm_backend/README.md#leader-mode))
     - Not currently supported
 
 ## Tool Calling
@@ -598,7 +598,7 @@ function_arguments = tool_calls.choices[0].message.tool_calls[0].function.argume
 
 print(f"function name: " f"{function_name}")
 print(f"function arguments: {function_arguments}")
-print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
+print(f"tool calling result: {available_tools[function_name](https://github.com/triton-inference-server/server/blob/main/docs/client_guide/**json.loads(function_arguments))}")
 ```
 
 Example output:
@@ -613,7 +613,7 @@ tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It i
 The OpenAI frontend supports named function calling, utilizing structured outputs in the vLLM backend and guided decoding in TensorRT-LLM backend. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
 
 > [!NOTE]
-> For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
+> For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](../tensorrtllm_backend/docs/guided_decoding.md)
 
 Example for making a named tool calling request:
 
@@ -724,7 +724,7 @@ function_arguments = tool_calls.choices[0].message.tool_calls[0].function.argume
 
 print(f"function name: {function_name}")
 print(f"function arguments: {function_arguments}")
-print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
+print(f"tool calling result: {available_tools[function_name](https://github.com/triton-inference-server/server/blob/main/docs/client_guide/**json.loads(function_arguments))}")
 ```
 
 Example output:

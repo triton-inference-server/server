@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -368,18 +368,18 @@ class TritonPythonModel:
 ```
 
 Note that the model loading API is only supported if the server is running in
-[explicit model control mode](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_management.md#model-control-mode-explicit).
+[explicit model control mode](model_management.md#model-control-mode-explicit).
 Additionally, the model loading API should only be used after the server has
 been running, which means that the BLS model should not be loaded during server
 startup. You can use different
-[client endpoints](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_repository.md)
+[client endpoints](../protocol/extension_model_repository.md)
 to load the model after the server has been started. The model loading API is
 currently not supported during the `auto_complete_config` and `finalize`
 functions.
 
 ## Using BLS with Stateful Models
 
-[Stateful models](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/architecture.md#stateful-models)
+[Stateful models](architecture.md#stateful-models)
 require setting additional flags in the inference request to indicate the
 start and end of a sequence. The `flags` argument in the `pb_utils.InferenceRequest`
 object can be used to indicate whether the request is the first or last request

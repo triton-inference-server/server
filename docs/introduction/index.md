@@ -63,13 +63,13 @@ scheduler. Triton implements [multiple scheduling and batching
 algorithms](#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
 batching of inference requests and then passes the requests to the
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](../backend/README.md)
 corresponding to the model type. The backend performs inferencing
 using the inputs provided in the batched requests to produce the
 requested outputs. The outputs are then returned.
 
 Triton supports a [backend C
-API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+API](../backend/README.md#triton-backend-api)
 that allows Triton to be extended with new functionality such as
 custom pre- and post-processing operations or even a new deep-learning
 framework.
@@ -89,7 +89,7 @@ framework such as Kubernetes.
 Major features include:
 
 - [Supports multiple deep learning
-  frameworks](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton)
+  frameworks](../backend/README.md#where-can-i-find-all-the-backends-that-are-available-for-triton)
 - [Supports multiple machine learning
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model

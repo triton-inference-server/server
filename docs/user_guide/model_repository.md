@@ -29,7 +29,7 @@
 # Model Repository
 
 **Is this your first time setting up a model repository?** Check out
-[these tutorials](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#setting-up-the-model-repository)
+[these tutorials](../tutorials/Conceptual_Guide/Part_1-model_deployment/README.md#setting-up-the-model-repository)
  to begin your Triton journey!
 
 The Triton Inference Server serves models from one or more model
@@ -90,14 +90,14 @@ for more information.
 Each <model-name> directory may include an optional sub-directory configs.
 Within the configs directory there must be zero or more <custom-config-file>
 with .pbtxt file extension. For more information about how the custom model
-configuration is handled by Triton see [Custom Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#custom-model-configuration).
+configuration is handled by Triton see [Custom Model Configuration](model_configuration.md#custom-model-configuration).
 
 Each <model-name> directory must have at least one numeric
 sub-directory representing a version of the model. For more
 information about how the model versions are handled by Triton see
 [Model Versions](#model-versions). Each model is executed by a
 specific
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md).
+[backend](../backend/README.md).
 Within each version sub-directory there must be the files required by
 that backend. For example, models that use framework backends such as
 TensorRT, PyTorch, ONNX and OpenVINO must provide the
@@ -332,7 +332,7 @@ any given time.
 
 The contents of each model version sub-directory is determined by the
 type of the model and the requirements of the
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](../backend/README.md)
 that supports the model.
 
 ### TensorRT Models
@@ -463,7 +463,7 @@ allows you to run a [DALI pipeline](https://github.com/NVIDIA/DALI) as
 a model within Triton. In order to use this backend, you need to generate
 a file, by default named `model.dali`, and include it in your model repository.
 Please refer to [DALI backend documentation
-](https://github.com/triton-inference-server/dali_backend#how-to-use) for the
+](../dali_backend/README.md#how-to-use) for the
 description, how to generate `model.dali`. The default model file name can be
 overridden using the *default_model_filename* property in the
 [model configuration](model_configuration.md).

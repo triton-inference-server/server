@@ -99,7 +99,7 @@ available through the [HTTP/REST, GRPC, and C
 APIs](../customization_guide/inference_protocols.md).
 
 A client application,
-[perf_analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md),
+[perf_analyzer](../perf_analyzer/README.md),
 allows you to measure the performance of an individual model using a synthetic
 load. The perf_analyzer application is designed to show you the tradeoff of
 latency vs. throughput.

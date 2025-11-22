@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,7 +46,7 @@ dynamically created batches, the maximum time that requests can be
 delayed in the scheduler to allow other requests to join the dynamic
 batch, and queue properties such a queue size, priorities, and
 time-outs. Refer to
-[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#what-is-dynamic-batching)
+[this guide](../tutorials/Conceptual_Guide/Part_2-improving_resource_utilization/README.md#what-is-dynamic-batching)
 for a more detailed example of dynamic batching.
 
 ### Recommended Configuration Process
@@ -69,7 +69,7 @@ dynamic batcher configurations.
 ```
 
 * Use the
-  [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+  [Performance Analyzer](../client/src/c++/perf_analyzer/README.md)
   to determine the latency and throughput provided by the default dynamic
   batcher configuration.
 
@@ -207,7 +207,7 @@ in that order. If found, it will load it. This lets you easily share a custom ba
 among all models using the same backend.
 
 For a tutorial of how to create and use a custom batching library, please see the
-[backend examples directory](https://github.com/triton-inference-server/backend/tree/main/examples#volume-batching).
+[backend examples directory](../backend/examples/README.md#volume-batching).
 
 ## Sequence Batcher
 

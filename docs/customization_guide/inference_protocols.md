@@ -100,7 +100,7 @@ These options can be used to configure a secured channel for communication. The 
 * `--grpc-server-key`
 * `--grpc-root-cert`
 
-For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#ssltls)
+For client-side documentation, see [Client-Side GRPC SSL/TLS](../client/README.md#ssltls)
 
 For more details on overview of authentication in gRPC, refer [here](https://grpc.io/docs/guides/auth/).
 
@@ -110,7 +110,7 @@ Triton allows the on-wire compression of request/response messages by exposing f
 
 * `--grpc-infer-response-compression-level`
 
-For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression-1)
+For client-side documentation, see [Client-Side GRPC Compression](../client/README.md#compression-1)
 
 Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html).
 
@@ -128,7 +128,7 @@ These options can be used to configure the KeepAlive settings:
 * `--grpc-http2-min-recv-ping-interval-without-data`
 * `--grpc-http2-max-ping-strikes`
 
-For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
+For client-side documentation, see [Client-Side GRPC KeepAlive](../client/README.md#grpc-keepalive).
 
 #### GRPC Status Codes
 
@@ -138,7 +138,7 @@ Triton implements GRPC error handling for streaming requests when a specific fla
 
 GRPC status codes can be used for better visibility and monitoring. For more details, see [gRPC Status Codes](https://grpc.io/docs/guides/status-codes/)
 
-For client-side documentation, see [Client-Side GRPC Status Codes](https://github.com/triton-inference-server/client/tree/main#GRPC-Status-Codes)
+For client-side documentation, see [Client-Side GRPC Status Codes](../client/README.md#GRPC-Status-Codes)
 
 #### GRPC Inference Handler Threads
 
@@ -173,12 +173,12 @@ multiple groups. The following protocols / APIs are recognized:
   * `health` : Health endpoint defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health-1). For GRPC endpoint, this value also exposes [GRPC health check protocol](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
   * `metadata` : Server / model metadata endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata-1).
   * `inference` : Inference endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference-1).
-  * `shared-memory` : [Shared-memory endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md).
-  * `model-config` : [Model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md).
-  * `model-repository` : [Model repository endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_repository.md).
-  * `statistics` : [statistics endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md).
-  * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
-  * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
+  * `shared-memory` : [Shared-memory endpoint](../protocol/extension_shared_memory.md).
+  * `model-config` : [Model configuration endpoint](../protocol/extension_model_configuration.md).
+  * `model-repository` : [Model repository endpoint](../protocol/extension_model_repository.md).
+  * `statistics` : [statistics endpoint](../protocol/extension_statistics.md).
+  * `trace` : [trace endpoint](../protocol/extension_trace.md).
+  * `logging` : [logging endpoint](../protocol/extension_logging.md).
 
 * `restricted-key` : The GRPC / HTTP request header
 to be checked when a request is received. The

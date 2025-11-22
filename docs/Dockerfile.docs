@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # various documentation dependencies
 RUN apt-get update -q=2 \
@@ -53,6 +53,7 @@ RUN wget https://github.com/pseudomuto/protoc-gen-doc/releases/download/v1.3.2/p
     && rm /tmp/protoc-gen-doc.tar.gz
 
 # install sphinx et al
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN pip3 install \
       ablog \
       attrs  \
@@ -75,8 +76,13 @@ RUN pip3 install \
       sphinxcontrib-bibtex
 
 RUN pip3 install \
-      --index-url https://urm.nvidia.com/artifactory/api/pypi/ct-omniverse-pypi/simple/ \
-      nvidia-sphinx-theme
+      --extra-index-url https://pypi.nvidia.com \
+      nvidia-sphinx-theme \
+      sphinx==7.4.7
+
+RUN curl -fL https://install-cli.jfrog.io | sh
+
+RUN git config --global --add safe.directory "*"
 
 # Set visitor script to be included on every HTML page
 ENV VISITS_COUNTING_SCRIPT="//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js"
