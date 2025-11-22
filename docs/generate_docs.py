@@ -290,7 +290,7 @@ def replace_relpath_with_url(relpath, src_doc_path):
 
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
 
-    # Handle directory with README.md and valid hashtag
+    # For example, target_path of "../protocol#restricted-protocols" should be "<path-to-server>/server/docs/protocol/README.md"
     if (
         os.path.isdir(target_path)
         and valid_hashtag
