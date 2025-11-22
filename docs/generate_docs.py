@@ -28,11 +28,11 @@
 
 import argparse
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import re
 import subprocess
 from functools import partial
+from logging.handlers import RotatingFileHandler
 
 # Global constants
 server_abspath = os.environ.get("SERVER_ABSPATH", os.getcwd())
@@ -66,6 +66,7 @@ hyperlink_reg = re.compile(r"((?<!\!)\[[^\]]+\]\s*\(\s*)([^)]+?)(\s*\))")
 with open(f"{server_docs_abspath}/exclusions.txt") as f:
     exclude_patterns = f.read().strip().split("\n")
 
+
 # Setup logger once
 def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_count=5):
     logger = logging.getLogger(name)
@@ -74,7 +75,9 @@ def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_c
     # Prevent adding multiple handlers if the function is called multiple times
     if not logger.handlers:
         # Create handlers
-        file_handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count)
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count
+        )
         console_handler = logging.StreamHandler()
 
         # Set the logging level for handlers
@@ -84,7 +87,9 @@ def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_c
         # Create a logging format
         GREY = "\033[90m"
         RESET = "\033[0m"
-        formatter = logging.Formatter(f'{GREY}%(asctime)s - %(name)s - %(levelname)s - {RESET}%(message)s')
+        formatter = logging.Formatter(
+            f"{GREY}%(asctime)s - %(name)s - %(levelname)s - {RESET}%(message)s"
+        )
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 
@@ -93,17 +98,19 @@ def setup_logger(name, log_file, level=logging.INFO, max_bytes=1048576, backup_c
         logger.addHandler(console_handler)
     return logger
 
+
 parser = argparse.ArgumentParser(description="Setup Triton Server Docs")
 parser.add_argument(
-  "--repo-tag", 
-  type=str, 
-  default=os.environ.get('TRITON_SERVER_REPO_TAG', 'main'),
-  help="Repository tags in format value")
+    "--repo-tag",
+    type=str,
+    default=os.environ.get("TRITON_SERVER_REPO_TAG", "main"),
+    help="Repository tags in format value",
+)
 parser.add_argument(
-  "--log-file", 
-  type=str, 
-  default=os.environ.get('TRITON_SERVER_DOCS_LOG_FILE', '/tmp/docs.log'), 
-  help="The path to the log file",
+    "--log-file",
+    type=str,
+    default=os.environ.get("TRITON_SERVER_DOCS_LOG_FILE", "/tmp/docs.log"),
+    help="The path to the log file",
 )
 parser.add_argument(
     "--repo-file",
@@ -112,16 +119,19 @@ parser.add_argument(
     " one repository name per line, newline separated.",
 )
 parser.add_argument(
-  "--github-organization", 
-  type=str, 
-  default=os.environ.get('TRITON_SERVER_REPO_ORT', 'https://github.com/triton-inference-server'), 
-  help="GitHub organization name",
+    "--github-organization",
+    type=str,
+    default=os.environ.get(
+        "TRITON_SERVER_REPO_ORT", "https://github.com/triton-inference-server"
+    ),
+    help="GitHub organization name",
 )
 args = parser.parse_args()
 
 
 logger = setup_logger(os.path.basename(__file__), args.log_file)
 logger.info(f"Defined arguments: {args}")
+
 
 def run_command(command):
     """Run command using subprocess and log execution."""
@@ -144,11 +154,11 @@ def clone_from_github(repo, tag, org):
     if tag:
         if re.match("model_navigator", repo):
             tag = "main"
-        
+
         clone_command = ["git", "clone", "--branch", tag, "--single-branch", repo_url]
     else:
         clone_command = ["git", "clone", repo_url]
-    
+
     subprocess.run(clone_command, check=True)
     logger.info(f"Successfully cloned... {org}/{repo}.git@{tag}")
 
@@ -166,10 +176,12 @@ def is_excluded(file_path):
 def get_git_repo_name(file_path):
     """Return the Git repo name of given file path."""
     directory = os.path.dirname(file_path)
-    remote_url = subprocess.check_output(
-        ["git", "-C", directory, "remote", "get-url", "origin"]
-    ).decode().strip()
-    
+    remote_url = (
+        subprocess.check_output(["git", "-C", directory, "remote", "get-url", "origin"])
+        .decode()
+        .strip()
+    )
+
     # Extract repository name from the remote URL
     if remote_url.endswith(".git"):
         remote_url = remote_url[:-4]
@@ -194,21 +206,27 @@ def replace_url_with_relpath(url, src_doc_path):
     target_repo_name = m.group(1)
     logger.info(f"Found target repository: {target_repo_name}")
     target_relpath_from_target_repo = os.path.normpath(m.groups("")[1])
-    logger.info(f"Found target relative path from target repository: {target_relpath_from_target_repo}")
-    section = url[len(m.group(0)):]
+    logger.info(
+        f"Found target relative path from target repository: {target_relpath_from_target_repo}"
+    )
+    section = url[len(m.group(0)) :]
     logger.info(f"Found section: {section}")
     valid_hashtag = section not in ["", "#"] and section.startswith("#")
 
     target_path = (
         os.path.join(server_abspath, target_relpath_from_target_repo)
         if target_repo_name == "server"
-        else os.path.join(server_docs_abspath, target_repo_name, target_relpath_from_target_repo)
+        else os.path.join(
+            server_docs_abspath, target_repo_name, target_relpath_from_target_repo
+        )
     )
     logger.info(f"Found target path: {target_path}")
     # Return URL if it points to a path outside server/docs
     if os.path.commonpath([server_docs_abspath, target_path]) != server_docs_abspath:
         return url
-    logger.info(f"Target path is under server/docs directory: {os.path.commonpath([server_docs_abspath, target_path]) == server_docs_abspath}")
+    logger.info(
+        f"Target path is under server/docs directory: {os.path.commonpath([server_docs_abspath, target_path]) == server_docs_abspath}"
+    )
     # Check if target is valid for conversion
     is_md_file = (
         os.path.isfile(target_path)
@@ -229,7 +247,9 @@ def replace_url_with_relpath(url, src_doc_path):
         target_path = os.path.join(target_path, "README.md")
     else:
         return url
-    logger.info(f"Target path is a valid .md file or a directory with README.md: {is_md_file or is_dir_with_readme}")
+    logger.info(
+        f"Target path is a valid .md file or a directory with README.md: {is_md_file or is_dir_with_readme}"
+    )
 
     relpath = os.path.relpath(target_path, start=os.path.dirname(src_doc_path))
     logger.info(f"Found relative path: {relpath}")
@@ -248,25 +268,28 @@ def replace_relpath_with_url(relpath, src_doc_path):
         ../examples/model_repository/inception_graphdef/config.pbtxt
     """
     target_path = relpath.rsplit("#", 1)[0]
-    section = relpath[len(target_path):]
+    section = relpath[len(target_path) :]
     valid_hashtag = section not in ["", "#"]
-    
+
     if relpath.startswith("#"):
         target_path = os.path.basename(src_doc_path)
-    
-    target_path = os.path.normpath(os.path.join(os.path.dirname(src_doc_path), target_path))
+
+    target_path = os.path.normpath(
+        os.path.join(os.path.dirname(src_doc_path), target_path)
+    )
     src_git_repo_name = get_git_repo_name(src_doc_path)
-    
+
     src_repo_abspath = (
-        server_abspath if src_git_repo_name == "server"
+        server_abspath
+        if src_git_repo_name == "server"
         else os.path.join(server_docs_abspath, src_git_repo_name)
     )
-    
+
     # Assert target path is under the current repo directory
     assert os.path.commonpath([src_repo_abspath, target_path]) == src_repo_abspath
-    
+
     target_path_from_src_repo = os.path.relpath(target_path, start=src_repo_abspath)
-    
+
     # Handle directory with README.md and valid hashtag
     if (
         os.path.isdir(target_path)
@@ -275,16 +298,17 @@ def replace_relpath_with_url(relpath, src_doc_path):
     ):
         relpath = os.path.join(relpath.rsplit("#", 1)[0], "README.md") + section
         target_path = os.path.join(target_path, "README.md")
-    
+
     # Keep relpath if it's a valid .md file in docs
     if (
         os.path.isfile(target_path)
         and os.path.splitext(target_path)[1] == ".md"
-        and os.path.commonpath([server_docs_abspath, target_path]) == server_docs_abspath
+        and os.path.commonpath([server_docs_abspath, target_path])
+        == server_docs_abspath
         and not is_excluded(target_path)
     ):
         return relpath
-    
+
     return f"https://github.com/triton-inference-server/{src_git_repo_name}/blob/main/{target_path_from_src_repo}{section}"
 
 

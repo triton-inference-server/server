@@ -34,7 +34,8 @@ RUN apt-get update -q=2 \
 RUN git config --global --add safe.directory "*"
 
 RUN pip3 install --extra-index-url https://pypi.nvidia.com \
-        nvidia-sphinx-theme
+        nvidia-sphinx-theme \
+        httplib2
 
 # # install protobuf
 # RUN wget https://github.com/google/protobuf/releases/download/v3.6.1/protoc-3.6.1-linux-x86_64.zip -O /tmp/proto.zip \
