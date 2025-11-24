@@ -51,6 +51,9 @@ TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
 TRITON_MODELS_GENERATION_BASE_SCRIPT_FILE="$(readlink -f $0)"
 TRITON_MODELS_GENERATION_PROFILE_PATH=${TRITON_MODELS_GENERATION_PROFILE_PATH:=${TRITON_MODELS_GENERATION_BASE_SCRIPT_FILE}.profile}
 
+# change working directory to the script directory
+cd ${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}
+
 source ${TRITON_MODELS_GENERATION_PROFILE_PATH}
 
 ############################################################################
