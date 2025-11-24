@@ -61,6 +61,7 @@ def _create_vllm_generate_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    echo_tensor_name: str | None,
     default_max_tokens: int,
 ):
     inputs = {}
@@ -155,7 +156,7 @@ def _create_vllm_generate_request(
 
     inputs["text_input"] = [prompt]
     inputs["stream"] = np.bool_([request.stream])
-    inputs["exclude_input_in_output"] = np.bool_([exclude_input_in_output])
+    inputs[echo_tensor_name] = np.bool_([exclude_input_in_output])
     # Pass sampling_parameters as serialized JSON string input to support List
     # fields like 'stop' that aren't supported by TRITONSERVER_Parameters yet.
     inputs["sampling_parameters"] = [sampling_parameters]
@@ -169,6 +170,7 @@ def _create_trtllm_generate_request(
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
     lora_name: str | None,
+    echo_tensor_name: str | None,
     default_max_tokens: int,
 ):
     if lora_name is not None:
@@ -211,6 +213,10 @@ def _create_trtllm_generate_request(
         inputs["seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
+    # Only limited TRT-LLM models support "echo" (inflight_batcher_llm, disaggregated_serving, llmapi)
+    echo = getattr(request, "echo", None)
+    if echo is not None and echo_tensor_name is not None:
+        inputs[echo_tensor_name] = np.bool_([[not echo]])
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
@@ -219,9 +225,6 @@ def _create_trtllm_generate_request(
 
     inputs["return_num_input_tokens"] = np.bool_([[True]])
     inputs["return_num_output_tokens"] = np.bool_([[True]])
-
-    # FIXME: TRT-LLM doesn't currently support runtime changes of 'echo' and it
-    # is configured at model load time, so we don't handle it here for now.
     return model.create_request(inputs=inputs)
 
 

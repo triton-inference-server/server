@@ -367,6 +367,19 @@ class TestCompletions:
     def test_multi_lora(self):
         pass
 
+    @pytest.mark.parametrize("echo", [False, True])
+    def test_echo(self, client, model: str, prompt: str, echo: bool):
+        response = client.post(
+            "/v1/completions", json={"model": model, "prompt": prompt, "echo": echo}
+        )
+
+        response_text = response.json()["choices"][0]["text"].strip()
+        if echo:
+            assert response_text.startswith(prompt)
+        else:
+            # TODO: Consider using a different prompt. In TRT-LLM model, the second response may contain the prompt in the middle of the response even if echo is False, e.g. " Briefly explained.\nWhat is machine learning? She learns from data\nmachine learning".
+            assert prompt not in response_text
+
     def test_usage_response(self, client, model: str, prompt: str):
         response = client.post(
             "/v1/completions",

@@ -92,20 +92,15 @@ class TestOpenAIClient:
 
     @pytest.mark.parametrize("echo", [False, True])
     def test_openai_client_completion_echo(
-        self, client: openai.OpenAI, echo: bool, backend: str, model: str, prompt: str
+        self, client: openai.OpenAI, echo: bool, model: str, prompt: str
     ):
-        if backend == "tensorrtllm":
-            pytest.skip(
-                reason="TRT-LLM backend currently only supports setting this parameter at model load time",
-            )
-
         completion = client.completions.create(prompt=prompt, model=model, echo=echo)
 
-        print(f"Completion results: {completion}")
         response = completion.choices[0].text
         if echo:
-            assert prompt in response
+            assert response.startswith(prompt)
         else:
+            # TODO: Consider using a different prompt. In TRT-LLM model, the second response may contain the prompt in the middle of the response even if echo is False, e.g. " Briefly explained.\nWhat is machine learning? She learns from data\nmachine learning".
             assert prompt not in response
 
     @pytest.mark.skip(reason="Not Implemented Yet")
