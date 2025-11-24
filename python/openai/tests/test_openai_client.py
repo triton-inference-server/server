@@ -677,7 +677,7 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
     ):
         """Test that top_logprobs > 20 raises schema validation error."""
-        with pytest.raises(openai.BadRequestError) as exc_info:
+        with pytest.raises(openai.UnprocessableEntityError) as exc_info:
             await client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -693,7 +693,7 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, model: str, prompt: str
     ):
         """Test that logprobs > 5 raises schema validation error."""
-        with pytest.raises(openai.BadRequestError) as exc_info:
+        with pytest.raises(openai.UnprocessableEntityError) as exc_info:
             await client.completions.create(
                 model=model,
                 prompt=prompt,
