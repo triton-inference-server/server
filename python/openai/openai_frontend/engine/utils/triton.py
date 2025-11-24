@@ -31,19 +31,19 @@ import sys
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, List, Optional, Union, Dict
+from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
 import tritonserver
 from pydantic import BaseModel
 from schemas.openai import (
     ChatCompletionNamedToolChoice,
+    ChatCompletionTokenLogprob,
     ChatCompletionToolChoiceOption1,
     CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
     CreateEmbeddingRequest,
-    ChatCompletionTokenLogprob,
     EmbeddingUsage,
     Logprobs,
     TopLogprob,

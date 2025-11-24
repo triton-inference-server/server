@@ -897,9 +897,7 @@ class TritonLLMEngine(LLMEngine):
             chunk_logprobs = None
             if request.logprobs is not None and request.logprobs > 0:
                 chunk_logprobs = (
-                    _get_openai_completion_format_logprobs_from_vllm_response(
-                        response
-                    )
+                    _get_openai_completion_format_logprobs_from_vllm_response(response)
                 )
                 # Adjust text offsets based on accumulated output
                 if chunk_logprobs and chunk_logprobs.text_offset:
