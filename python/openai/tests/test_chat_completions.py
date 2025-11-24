@@ -157,10 +157,7 @@ class TestChatCompletions:
         unsupported_parameters = ["logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
-            assert (
-                response.json()["detail"]
-                == "logit bias is not currently supported"
-            )
+            assert response.json()["detail"] == "logit bias is not currently supported"
             return
 
         assert response.status_code == 200
@@ -544,7 +541,9 @@ class TestChatCompletions:
             usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
         )
 
-    def test_chat_completions_logprobs(self, client, backend: str, model: str, messages: List[dict]):
+    def test_chat_completions_logprobs(
+        self, client, backend: str, model: str, messages: List[dict]
+    ):
         """Test logprobs parameter for chat completions."""
         response = client.post(
             "/v1/chat/completions",
@@ -560,35 +559,38 @@ class TestChatCompletions:
         # TRT-LLM should raise an error
         if backend == "tensorrtllm":
             assert response.status_code == 400
-            assert "logprobs are currently not supported for TensorRT-LLM backend" in response.json()["detail"]
+            assert (
+                "logprobs are currently not supported for TensorRT-LLM backend"
+                in response.json()["detail"]
+            )
             return
 
         assert response.status_code == 200
         response_json = response.json()
-        
+
         # Check that logprobs are present in the response
         choice = response_json["choices"][0]
         assert "logprobs" in choice
         logprobs = choice["logprobs"]
-        
+
         if logprobs is not None:
             assert "content" in logprobs
             content = logprobs["content"]
             assert isinstance(content, list)
             assert len(content) > 0
-            
+
             # Validate structure of each token logprob
             for token_logprob in content:
                 assert "token" in token_logprob
                 assert "logprob" in token_logprob
                 assert "bytes" in token_logprob
                 assert "top_logprobs" in token_logprob
-                
+
                 assert isinstance(token_logprob["token"], str)
                 assert isinstance(token_logprob["logprob"], (int, float))
                 assert isinstance(token_logprob["bytes"], list)
                 assert isinstance(token_logprob["top_logprobs"], list)
-                
+
                 # Validate top_logprobs structure
                 for top_logprob in token_logprob["top_logprobs"]:
                     assert "token" in top_logprob
@@ -608,7 +610,7 @@ class TestChatCompletions:
 
         assert response.status_code == 200
         response_json = response.json()
-        
+
         # logprobs should be None when logprobs=False
         choice = response_json["choices"][0]
         assert choice.get("logprobs") is None
@@ -626,7 +628,10 @@ class TestChatCompletions:
 
         # Should raise validation error
         assert response.status_code == 400
-        assert "`top_logprobs` can only be used when `logprobs` is True" in response.json()["detail"]
+        assert (
+            "`top_logprobs` can only be used when `logprobs` is True"
+            in response.json()["detail"]
+        )
 
 
 # For tests that won't use the same pytest fixture for server startup across
