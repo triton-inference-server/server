@@ -654,9 +654,14 @@ class TestAsyncOpenAIClient:
         # At least some chunks should have logprobs
         assert chunks_with_logprobs > 0
 
+    @pytest.mark.parametrize("top_logprobs_value", [0, 5])
     @pytest.mark.asyncio
     async def test_top_logprobs_requires_logprobs(
-        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+        self,
+        client: openai.AsyncOpenAI,
+        model: str,
+        messages: List[dict],
+        top_logprobs_value: int,
     ):
         """
         Test that top_logprobs without logprobs raises an error
@@ -665,7 +670,7 @@ class TestAsyncOpenAIClient:
             await client.chat.completions.create(
                 model=model,
                 messages=messages,
-                top_logprobs=2,  # Without logprobs=True
+                top_logprobs=top_logprobs_value,  # Without logprobs=True
                 max_tokens=5,
             )
         assert "`top_logprobs` can only be used when `logprobs` is True" in str(

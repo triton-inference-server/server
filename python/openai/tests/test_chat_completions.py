@@ -616,22 +616,24 @@ class TestChatCompletions:
         assert choice.get("logprobs") is None
 
         # Test that top_logprobs without logprobs raises an error
-        response = client.post(
-            "/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": messages,
-                "top_logprobs": 2,
-                "max_tokens": 10,
-            },
-        )
+        # Test multiple values including edge case top_logprobs=0
+        for top_logprobs_value in [0, 2, 10]:
+            response = client.post(
+                "/v1/chat/completions",
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "top_logprobs": top_logprobs_value,
+                    "max_tokens": 10,
+                },
+            )
 
-        # Should raise validation error
-        assert response.status_code == 400
-        assert (
-            "`top_logprobs` can only be used when `logprobs` is True"
-            in response.json()["detail"]
-        )
+            # Should raise validation error for any value when logprobs is not True
+            assert response.status_code == 400
+            assert (
+                "`top_logprobs` can only be used when `logprobs` is True"
+                in response.json()["detail"]
+            )
 
         # Test that top_logprobs > 20 is rejected by schema validation
         response = client.post(
