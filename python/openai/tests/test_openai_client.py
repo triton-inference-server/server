@@ -498,9 +498,8 @@ class TestAsyncOpenAIClient:
                     top_logprobs=2,
                     max_tokens=10,
                 )
-            assert (
-                "logprobs are currently available only for the vLLM backend"
-                in str(exc_info.value)
+            assert "logprobs are currently available only for the vLLM backend" in str(
+                exc_info.value
             )
             return
 
@@ -541,9 +540,8 @@ class TestAsyncOpenAIClient:
                     logprobs=3,
                     max_tokens=10,
                 )
-            assert (
-                "logprobs are currently available only for the vLLM backend"
-                in str(exc_info.value)
+            assert "logprobs are currently available only for the vLLM backend" in str(
+                exc_info.value
             )
             return
 
@@ -587,9 +585,8 @@ class TestAsyncOpenAIClient:
                 # Try to consume the stream (error should happen before streaming starts)
                 async for _ in stream:
                     pass
-            assert (
-                "logprobs are currently available only for the vLLM backend"
-                in str(exc_info.value)
+            assert "logprobs are currently available only for the vLLM backend" in str(
+                exc_info.value
             )
             return
 
@@ -631,9 +628,8 @@ class TestAsyncOpenAIClient:
                 # Try to consume the stream (error should happen before streaming starts)
                 async for _ in stream:
                     pass
-            assert (
-                "logprobs are currently available only for the vLLM backend"
-                in str(exc_info.value)
+            assert "logprobs are currently available only for the vLLM backend" in str(
+                exc_info.value
             )
             return
 
