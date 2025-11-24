@@ -57,6 +57,8 @@ from engine.utils.triton import (
     _create_trtllm_generate_request,
     _create_vllm_embedding_request,
     _create_vllm_generate_request,
+    _get_openai_chat_format_logprobs_from_vllm_response,
+    _get_openai_completion_format_logprobs_from_vllm_response,
     _get_output,
     _get_usage_from_response,
     _get_vllm_lora_names,
@@ -86,6 +88,7 @@ from schemas.openai import (
     FinishReason,
     Function1,
     Function2,
+    Logprobs2,
     Model,
     ObjectType,
 )
@@ -248,13 +251,22 @@ class TritonLLMEngine(LLMEngine):
             response, metadata.backend, RequestKind.GENERATION
         )
 
+        # Parse logprobs if requested
+        logprobs_data = None
+        if request.logprobs:
+            openai_logprobs = _get_openai_chat_format_logprobs_from_vllm_response(
+                response
+            )
+            if openai_logprobs:
+                logprobs_data = Logprobs2(content=openai_logprobs)
+
         return CreateChatCompletionResponse(
             id=request_id,
             choices=[
                 ChatCompletionChoice(
                     index=0,
                     message=response_message,
-                    logprobs=None,
+                    logprobs=logprobs_data,
                     finish_reason=finish_reason,
                 )
             ],
@@ -352,10 +364,17 @@ class TritonLLMEngine(LLMEngine):
             response, metadata.backend, RequestKind.GENERATION
         )
 
+        # Parse logprobs if requested
+        logprobs_data = None
+        if request.logprobs is not None and request.logprobs > 0:
+            logprobs_data = _get_openai_completion_format_logprobs_from_vllm_response(
+                response
+            )
+
         choice = Choice(
             finish_reason=FinishReason.stop,
             index=0,
-            logprobs=None,
+            logprobs=logprobs_data,
             text=text,
         )
         return CreateCompletionResponse(
@@ -587,6 +606,15 @@ class TritonLLMEngine(LLMEngine):
             )
             previous_text = current_text
 
+            # Parse logprobs for this chunk if requested
+            chunk_logprobs = None
+            if request.logprobs:
+                openai_logprobs = _get_openai_chat_format_logprobs_from_vllm_response(
+                    response
+                )
+                if openai_logprobs:
+                    chunk_logprobs = Logprobs2(content=openai_logprobs)
+
             # if the response delta is None (e.g. because it was a
             # "control token" for tool calls or the parser otherwise
             # wasn't ready to send a token, then
@@ -600,7 +628,7 @@ class TritonLLMEngine(LLMEngine):
             choice = ChatCompletionStreamingResponseChoice(
                 index=0,
                 delta=response_delta,
-                logprobs=None,
+                logprobs=chunk_logprobs,
                 finish_reason=finish_reason,
             )
 
@@ -772,8 +800,19 @@ class TritonLLMEngine(LLMEngine):
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
-        if request.logit_bias is not None or request.logprobs:
-            raise ClientError("logit bias and log probs not currently supported")
+        if request.logit_bias is not None:
+            raise ClientError("logit bias is not currently supported")
+
+        # Logprobs are only supported for vLLM backend currently
+        if metadata.backend == "tensorrtllm" and (
+            request.logprobs is not None or request.top_logprobs is not None
+        ):
+            raise ClientError(
+                "logprobs are currently not supported for TensorRT-LLM backend"
+            )
+
+        if request.top_logprobs and not request.logprobs:
+            raise ClientError("`top_logprobs` can only be used when `logprobs` is True")
 
         self._verify_chat_tool_call_settings(request=request)
 
@@ -828,16 +867,34 @@ class TritonLLMEngine(LLMEngine):
         model = request.model
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
+        current_offset = 0
 
         async for response in responses:
             if include_usage:
                 usage_accumulator.update(response)
 
             text = _get_output(response)
+
+            # Parse logprobs for this chunk if requested
+            chunk_logprobs = None
+            if request.logprobs is not None and request.logprobs > 0:
+                chunk_logprobs = (
+                    _get_openai_completion_format_logprobs_from_vllm_response(
+                        response
+                    )
+                )
+                # Adjust text offsets based on accumulated output
+                if chunk_logprobs and chunk_logprobs.text_offset:
+                    chunk_logprobs.text_offset = [
+                        offset + current_offset for offset in chunk_logprobs.text_offset
+                    ]
+
+            current_offset += len(text)
+
             choice = Choice(
                 finish_reason=FinishReason.stop if response.final else None,
                 index=0,
-                logprobs=None,
+                logprobs=chunk_logprobs,
                 text=text,
             )
             chunk = CreateCompletionResponse(
@@ -923,8 +980,18 @@ class TritonLLMEngine(LLMEngine):
                 f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
             )
 
-        if request.logit_bias is not None or request.logprobs is not None:
-            raise ClientError("logit bias and log probs not supported")
+        if request.logit_bias is not None:
+            raise ClientError("logit bias is not supported")
+
+        # Logprobs are only supported for vLLM backend currently
+        if (
+            request.logprobs is not None
+            and request.logprobs > 0
+            and metadata.backend == "tensorrtllm"
+        ):
+            raise ClientError(
+                "logprobs are currently not supported for TensorRT-LLM backend"
+            )
 
         if request.stream_options and not request.stream:
             raise ClientError("`stream_options` can only be used when `stream` is True")

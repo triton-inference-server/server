@@ -487,3 +487,196 @@ class TestAsyncOpenAIClient:
                 stream_options={"include_usage": True},
             )
         assert "`stream_options` can only be used when `stream` is True" in str(e.value)
+
+    @pytest.mark.asyncio
+    async def test_chat_completion_logprobs(
+        self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
+    ):
+        """Test logprobs for chat completions."""
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            with pytest.raises(openai.BadRequestError) as exc_info:
+                await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    logprobs=True,
+                    top_logprobs=2,
+                    max_tokens=10,
+                )
+            assert (
+                "logprobs are currently not supported for TensorRT-LLM backend"
+                in str(exc_info.value)
+            )
+            return
+
+        chat_completion = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            logprobs=True,
+            top_logprobs=2,
+            max_tokens=10,
+        )
+
+        assert chat_completion.choices[0].message.content
+        assert chat_completion.choices[0].logprobs is not None
+
+        logprobs = chat_completion.choices[0].logprobs
+        assert logprobs.content is not None
+        assert len(logprobs.content) > 0
+
+        # Validate each token logprob
+        for token_logprob in logprobs.content:
+            assert token_logprob.token
+            assert isinstance(token_logprob.logprob, float)
+            assert isinstance(token_logprob.bytes, list)
+            assert token_logprob.top_logprobs is not None
+            assert len(token_logprob.top_logprobs) > 0
+
+    @pytest.mark.asyncio
+    async def test_completion_logprobs(
+        self, client: openai.AsyncOpenAI, backend: str, model: str, prompt: str
+    ):
+        """Test logprobs for completions."""
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            with pytest.raises(openai.BadRequestError) as exc_info:
+                await client.completions.create(
+                    model=model,
+                    prompt=prompt,
+                    logprobs=3,
+                    max_tokens=10,
+                )
+            assert (
+                "logprobs are currently not supported for TensorRT-LLM backend"
+                in str(exc_info.value)
+            )
+            return
+
+        completion = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            logprobs=3,
+            max_tokens=10,
+        )
+
+        assert completion.choices[0].text
+        assert completion.choices[0].logprobs is not None
+
+        logprobs = completion.choices[0].logprobs
+        assert logprobs.tokens is not None
+        assert logprobs.token_logprobs is not None
+        assert logprobs.text_offset is not None
+        assert logprobs.top_logprobs is not None
+
+        num_tokens = len(logprobs.tokens)
+        assert len(logprobs.token_logprobs) == num_tokens
+        assert len(logprobs.text_offset) == num_tokens
+        assert len(logprobs.top_logprobs) == num_tokens
+
+    @pytest.mark.asyncio
+    async def test_chat_streaming_with_logprobs(
+        self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
+    ):
+        """Test streaming chat completions with logprobs."""
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            with pytest.raises(openai.BadRequestError) as exc_info:
+                stream = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=10,
+                    stream=True,
+                    logprobs=True,
+                    top_logprobs=2,
+                )
+                # Try to consume the stream (error should happen before streaming starts)
+                async for _ in stream:
+                    pass
+            assert (
+                "logprobs are currently not supported for TensorRT-LLM backend"
+                in str(exc_info.value)
+            )
+            return
+
+        stream = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=10,
+            stream=True,
+            logprobs=True,
+            top_logprobs=2,
+        )
+
+        chunks_with_logprobs = 0
+        async for chunk in stream:
+            if chunk.choices[0].logprobs is not None:
+                chunks_with_logprobs += 1
+                logprobs = chunk.choices[0].logprobs
+                assert logprobs.content is not None
+                assert len(logprobs.content) > 0
+
+        # At least some chunks should have logprobs
+        assert chunks_with_logprobs > 0
+
+    @pytest.mark.asyncio
+    async def test_completion_streaming_with_logprobs(
+        self, client: openai.AsyncOpenAI, backend: str, model: str, prompt: str
+    ):
+        """Test streaming completions with logprobs."""
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            with pytest.raises(openai.BadRequestError) as exc_info:
+                stream = await client.completions.create(
+                    model=model,
+                    prompt=prompt,
+                    max_tokens=10,
+                    stream=True,
+                    logprobs=3,
+                )
+                # Try to consume the stream (error should happen before streaming starts)
+                async for _ in stream:
+                    pass
+            assert (
+                "logprobs are currently not supported for TensorRT-LLM backend"
+                in str(exc_info.value)
+            )
+            return
+
+        stream = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            max_tokens=10,
+            stream=True,
+            logprobs=3,
+        )
+
+        chunks_with_logprobs = 0
+        async for chunk in stream:
+            if chunk.choices[0].logprobs is not None:
+                chunks_with_logprobs += 1
+                logprobs = chunk.choices[0].logprobs
+                assert logprobs.tokens is not None
+                assert logprobs.token_logprobs is not None
+                assert logprobs.text_offset is not None
+                assert logprobs.top_logprobs is not None
+
+        # At least some chunks should have logprobs
+        assert chunks_with_logprobs > 0
+
+    @pytest.mark.asyncio
+    async def test_top_logprobs_requires_logprobs(
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+    ):
+        """
+        Test that top_logprobs without logprobs raises an error
+        """
+        with pytest.raises(openai.BadRequestError) as exc_info:
+            await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                top_logprobs=2,  # Without logprobs=True
+                max_tokens=5,
+            )
+        assert "`top_logprobs` can only be used when `logprobs` is True" in str(
+            exc_info.value
+        )

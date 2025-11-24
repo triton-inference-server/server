@@ -154,12 +154,12 @@ class TestChatCompletions:
         )
 
         # FIXME: Add support and remove this check
-        unsupported_parameters = ["logprobs", "logit_bias"]
+        unsupported_parameters = ["logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
             assert (
                 response.json()["detail"]
-                == "logit bias and log probs not currently supported"
+                == "logit bias is not currently supported"
             )
             return
 
@@ -523,10 +523,6 @@ class TestChatCompletions:
         pass
 
     @pytest.mark.skip(reason="Not Implemented Yet")
-    def test_request_logprobs(self):
-        pass
-
-    @pytest.mark.skip(reason="Not Implemented Yet")
     def test_request_logit_bias(self):
         pass
 
@@ -547,6 +543,90 @@ class TestChatCompletions:
         assert (
             usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
         )
+
+    def test_chat_completions_logprobs(self, client, backend: str, model: str, messages: List[dict]):
+        """Test logprobs parameter for chat completions."""
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": True,
+                "top_logprobs": 2,
+                "max_tokens": 10,
+            },
+        )
+
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            assert response.status_code == 400
+            assert "logprobs are currently not supported for TensorRT-LLM backend" in response.json()["detail"]
+            return
+
+        assert response.status_code == 200
+        response_json = response.json()
+        
+        # Check that logprobs are present in the response
+        choice = response_json["choices"][0]
+        assert "logprobs" in choice
+        logprobs = choice["logprobs"]
+        
+        if logprobs is not None:
+            assert "content" in logprobs
+            content = logprobs["content"]
+            assert isinstance(content, list)
+            assert len(content) > 0
+            
+            # Validate structure of each token logprob
+            for token_logprob in content:
+                assert "token" in token_logprob
+                assert "logprob" in token_logprob
+                assert "bytes" in token_logprob
+                assert "top_logprobs" in token_logprob
+                
+                assert isinstance(token_logprob["token"], str)
+                assert isinstance(token_logprob["logprob"], (int, float))
+                assert isinstance(token_logprob["bytes"], list)
+                assert isinstance(token_logprob["top_logprobs"], list)
+                
+                # Validate top_logprobs structure
+                for top_logprob in token_logprob["top_logprobs"]:
+                    assert "token" in top_logprob
+                    assert "logprob" in top_logprob
+                    assert "bytes" in top_logprob
+
+        # Test that logprobs=False returns no logprobs
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": False,
+                "max_tokens": 10,
+            },
+        )
+
+        assert response.status_code == 200
+        response_json = response.json()
+        
+        # logprobs should be None when logprobs=False
+        choice = response_json["choices"][0]
+        assert choice.get("logprobs") is None
+
+        # Test that top_logprobs without logprobs raises an error
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "top_logprobs": 2,
+                "max_tokens": 10,
+            },
+        )
+
+        # Should raise validation error
+        assert response.status_code == 400
+        assert "`top_logprobs` can only be used when `logprobs` is True" in response.json()["detail"]
 
 
 # For tests that won't use the same pytest fixture for server startup across

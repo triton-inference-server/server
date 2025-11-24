@@ -81,10 +81,10 @@ class TestCompletions:
         print("Response:", response.json())
 
         # FIXME: Add support and remove this check
-        unsupported_parameters = ["logprobs", "logit_bias"]
+        unsupported_parameters = ["logit_bias"]
         if sampling_parameter in unsupported_parameters:
             assert response.status_code == 400
-            assert response.json()["detail"] == "logit bias and log probs not supported"
+            assert response.json()["detail"] == "logit bias is not supported"
             return
 
         assert response.status_code == 200
@@ -384,3 +384,76 @@ class TestCompletions:
         assert (
             usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
         )
+
+    def test_completions_logprobs(self, client, backend: str, model: str, prompt: str):
+        """Test logprobs parameter for completions."""
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 3,
+                "max_tokens": 10,
+            },
+        )
+
+        # TRT-LLM should raise an error
+        if backend == "tensorrtllm":
+            assert response.status_code == 400
+            assert "logprobs are not currently supported for TensorRT-LLM backend" in response.json()["detail"]
+            return
+
+        assert response.status_code == 200
+        response_json = response.json()
+        
+        # Check that logprobs are present in the response
+        choice = response_json["choices"][0]
+        assert "logprobs" in choice
+        logprobs = choice["logprobs"]
+        
+        if logprobs is not None:
+            assert "text_offset" in logprobs
+            assert "token_logprobs" in logprobs
+            assert "tokens" in logprobs
+            assert "top_logprobs" in logprobs
+            
+            assert isinstance(logprobs["text_offset"], list)
+            assert isinstance(logprobs["token_logprobs"], list)
+            assert isinstance(logprobs["tokens"], list)
+            assert isinstance(logprobs["top_logprobs"], list)
+            
+            # All lists should have the same length
+            num_tokens = len(logprobs["tokens"])
+            assert len(logprobs["text_offset"]) == num_tokens
+            assert len(logprobs["token_logprobs"]) == num_tokens
+            assert len(logprobs["top_logprobs"]) == num_tokens
+            
+            # Validate each token
+            for i in range(num_tokens):
+                assert isinstance(logprobs["tokens"][i], str)
+                assert isinstance(logprobs["token_logprobs"][i], (int, float))
+                assert isinstance(logprobs["text_offset"][i], int)
+                assert isinstance(logprobs["top_logprobs"][i], dict)
+                
+                # Validate top_logprobs dict contains token -> logprob mappings
+                for token, logprob in logprobs["top_logprobs"][i].items():
+                    assert isinstance(token, str)
+                    assert isinstance(logprob, (int, float))
+
+        # Test that logprobs=0 returns no logprobs
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 0,
+                "max_tokens": 10,
+            },
+        )
+
+        assert response.status_code == 200
+        response_json = response.json()
+        
+        # logprobs should be None when logprobs=0
+        choice = response_json["choices"][0]
+        assert choice.get("logprobs") is None
