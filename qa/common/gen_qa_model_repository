@@ -54,7 +54,19 @@ TRITON_MODELS_GENERATION_PROFILE_PATH=${TRITON_MODELS_GENERATION_PROFILE_PATH:=$
 # change working directory to the script directory
 cd ${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}
 
-source ${TRITON_MODELS_GENERATION_PROFILE_PATH}
+# source ${TRITON_MODELS_GENERATION_PROFILE_PATH}
+
+TRITON_VERSION=${TRITON_VERSION:=25.10}
+ONNX_VERSION=1.16.1
+ONNX_OPSET=0
+OPENVINO_VERSION=2024.5.0
+UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
+CUDA_DEVICE=${NV_GPU:=0}
+
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
+MODEL_TYPE=${MODEL_TYPE:-""}
 
 ############################################################################
 # Check if Docker volume exists
