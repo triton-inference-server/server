@@ -556,11 +556,11 @@ class TestChatCompletions:
             },
         )
 
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             assert response.status_code == 400
             assert (
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in response.json()["detail"]
             )
             return
@@ -631,6 +631,24 @@ class TestChatCompletions:
         assert (
             "`top_logprobs` can only be used when `logprobs` is True"
             in response.json()["detail"]
+        )
+
+        # Test that top_logprobs > 20 is rejected by schema validation
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": True,
+                "top_logprobs": 25,  # Exceeds maximum of 20
+                "max_tokens": 5,
+            },
+        )
+
+        # Should raise schema validation error
+        assert response.status_code == 422
+        assert "Input should be less than or equal to 20" in str(
+            response.json()["detail"]
         )
 
 

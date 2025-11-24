@@ -822,11 +822,11 @@ class TritonLLMEngine(LLMEngine):
             raise ClientError("logit bias is not currently supported")
 
         # Logprobs are only supported for vLLM backend currently
-        if metadata.backend == "tensorrtllm" and (
+        if metadata.backend != "vllm" and (
             request.logprobs is not None or request.top_logprobs is not None
         ):
             raise ClientError(
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
             )
 
         if request.top_logprobs and not request.logprobs:
@@ -1003,10 +1003,10 @@ class TritonLLMEngine(LLMEngine):
         if (
             request.logprobs is not None
             and request.logprobs > 0
-            and metadata.backend == "tensorrtllm"
+            and metadata.backend != "vllm"
         ):
             raise ClientError(
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
             )
 
         if request.stream_options and not request.stream:

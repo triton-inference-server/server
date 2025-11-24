@@ -410,11 +410,11 @@ class TestCompletions:
             },
         )
 
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             assert response.status_code == 400
             assert (
-                "logprobs are not currently supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in response.json()["detail"]
             )
             return
@@ -473,3 +473,20 @@ class TestCompletions:
         # logprobs should be None when logprobs=0
         choice = response_json["choices"][0]
         assert choice.get("logprobs") is None
+
+        # Test that logprobs > 5 is rejected by schema validation
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 7,
+                "max_tokens": 5,
+            },
+        )
+
+        # Should raise schema validation error
+        assert response.status_code == 422
+        assert "Input should be less than or equal to 5" in str(
+            response.json()["detail"]
+        )

@@ -488,8 +488,8 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
     ):
         """Test logprobs for chat completions."""
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             with pytest.raises(openai.BadRequestError) as exc_info:
                 await client.chat.completions.create(
                     model=model,
@@ -499,7 +499,7 @@ class TestAsyncOpenAIClient:
                     max_tokens=10,
                 )
             assert (
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in str(exc_info.value)
             )
             return
@@ -532,8 +532,8 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, backend: str, model: str, prompt: str
     ):
         """Test logprobs for completions."""
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             with pytest.raises(openai.BadRequestError) as exc_info:
                 await client.completions.create(
                     model=model,
@@ -542,7 +542,7 @@ class TestAsyncOpenAIClient:
                     max_tokens=10,
                 )
             assert (
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in str(exc_info.value)
             )
             return
@@ -573,8 +573,8 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
     ):
         """Test streaming chat completions with logprobs."""
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             with pytest.raises(openai.BadRequestError) as exc_info:
                 stream = await client.chat.completions.create(
                     model=model,
@@ -588,7 +588,7 @@ class TestAsyncOpenAIClient:
                 async for _ in stream:
                     pass
             assert (
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in str(exc_info.value)
             )
             return
@@ -618,8 +618,8 @@ class TestAsyncOpenAIClient:
         self, client: openai.AsyncOpenAI, backend: str, model: str, prompt: str
     ):
         """Test streaming completions with logprobs."""
-        # TRT-LLM should raise an error
-        if backend == "tensorrtllm":
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
             with pytest.raises(openai.BadRequestError) as exc_info:
                 stream = await client.completions.create(
                     model=model,
@@ -632,7 +632,7 @@ class TestAsyncOpenAIClient:
                 async for _ in stream:
                     pass
             assert (
-                "logprobs are currently not supported for TensorRT-LLM backend"
+                "logprobs are currently available only for the vLLM backend"
                 in str(exc_info.value)
             )
             return
@@ -675,3 +675,34 @@ class TestAsyncOpenAIClient:
         assert "`top_logprobs` can only be used when `logprobs` is True" in str(
             exc_info.value
         )
+
+    @pytest.mark.asyncio
+    async def test_chat_top_logprobs_exceeds_max(
+        self, client: openai.AsyncOpenAI, model: str, messages: List[dict]
+    ):
+        """Test that top_logprobs > 20 raises schema validation error."""
+        with pytest.raises(openai.BadRequestError) as exc_info:
+            await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                logprobs=True,
+                top_logprobs=25,  # Exceeds maximum of 20
+                max_tokens=5,
+            )
+        # Pydantic validation error
+        assert "less than or equal to 20" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_completion_logprobs_exceeds_max(
+        self, client: openai.AsyncOpenAI, model: str, prompt: str
+    ):
+        """Test that logprobs > 5 raises schema validation error."""
+        with pytest.raises(openai.BadRequestError) as exc_info:
+            await client.completions.create(
+                model=model,
+                prompt=prompt,
+                logprobs=7,  # Exceeds maximum of 5
+                max_tokens=5,
+            )
+        # Pydantic validation error
+        assert "less than or equal to 5" in str(exc_info.value).lower()
