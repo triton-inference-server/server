@@ -89,8 +89,8 @@ TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
 TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
 TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
 TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
 
-VOLUME_SHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
 VOLUME_RESHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 VOLUME_SEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
 VOLUME_DYNASEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
@@ -287,10 +287,10 @@ set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-chmod -R 777 $VOLUME_SHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SHAPETENSOR_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_MODEL
 chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
