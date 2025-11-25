@@ -107,8 +107,7 @@ TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITO
 TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
 TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
-
-VOLUME_IMAGEMODELSDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 log_message.status "define: script names"
 
@@ -264,8 +263,8 @@ fi
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 # Export torchvision image models to ONNX
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
-chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 EOF
 
 log_message.status "run: chmod a+x ${TORCHSCRIPT}"
