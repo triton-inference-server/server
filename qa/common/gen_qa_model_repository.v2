@@ -89,7 +89,7 @@ TRITON_MODELS_GEN_DEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_m
 TRITON_MODELS_GEN_DEST_DIR_VARIABLE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_model_repository
 TRITON_MODELS_GEN_DEST_DIR_IDENTITY=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_identity_model_repository
 TRITON_MODELS_GEN_DEST_DIR_IDENTITY_BIG=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_identity_big_model_repository
-TRITON_MODELS_GEN_SHAPEDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_shapetensor_model_repository
+TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_shapetensor_model_repository
 TRITON_MODELS_GEN_RESHAPEDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_reshape_model_repository
 TRITON_MODELS_GEN_SEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_model_repository
 TRITON_MODELS_GEN_DYNASEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_dyna_sequence_model_repository
@@ -286,10 +286,10 @@ set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_SHAPEDEST_DIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_SHAPEDEST_DIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_SHAPEDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_SHAPEDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$TRITON_MODELS_GEN_DEST_DIR_VARIABLE
