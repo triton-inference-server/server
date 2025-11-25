@@ -92,9 +92,8 @@ TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identi
 TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
 TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
 
-
-VOLUME_DYNASEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
 VOLUME_DYNASEQIMPLICITDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
 VOLUME_VARSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
 VOLUME_ENSEMBLEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
@@ -156,8 +155,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$T
 chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
 # chmod -R 777 $SVOLUME_EQDESTDIR
-# python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
-# chmod -R 777 $VOLUME_DYNASEQDESTDIR
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+# chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 EOF
 
 log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
@@ -206,8 +205,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
 chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
@@ -256,8 +255,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --models_dir=$
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
   nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
   chmod -R 777 $VOLUME_TORCHTRTDESTDIR
@@ -309,8 +308,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
