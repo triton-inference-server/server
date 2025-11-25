@@ -100,11 +100,11 @@ TRITON_MODELS_GEN_DEST_DIR_ENSEMBLE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERS
 TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_plugin_model_repository
 TRITON_MODELS_GEN_DEST_DIR_RAGGED=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ragged_model_repository
 TRITON_MODELS_GEN_DEST_DIR_FORMAT=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_format_model_repository
-TRITON_MODELS_GEN_DATADEPENDENTDIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_data_dependent_model_repository
+TRITON_MODELS_GEN_DEST_DIR_DATA_DEPENDENT=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_data_dependent_model_repository
 TRITON_MODELS_GEN_IMPLICITSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_implicit_model_repository
-TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_implicit_model_repository
-TRITON_MODELS_GEN_INITIALSTATEIMPLICITSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_initial_state_implicit_model_repository
-TRITON_MODELS_GEN_VARINITIALSTATEIMPLICITSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_initial_state_implicit_model_repository
+TRITON_MODELS_GEN_DEST_DIR_VAR_IMPLICIT_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_implicit_model_repository
+TRITON_MODELS_GEN_DEST_DIR_INITIAL_STATE_IMPLICIT_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_initial_state_implicit_model_repository
+TRITON_MODELS_GEN_DEST_DIR_VAR_INITIAL_STATE_IMPLICIT_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_initial_state_implicit_model_repository
 TRITON_MODELS_GEN_TORCHTRTDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/torchtrt_model_store
 TRITON_MODELS_GEN_SCALARMODELSDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_scalar_models
 TRITON_MODELS_GEN_IMAGEMODELSDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_dynamic_batch_image_model_repository
@@ -317,8 +317,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_d
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_RAGGED
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MODELS_GEN_DEST_DIR_FORMAT
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_FORMAT
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MODELS_GEN_DATADEPENDENTDIR
-chmod -R 777 $TRITON_MODELS_GEN_DATADEPENDENTDIR
+nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DATA_DEPENDENT
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DATA_DEPENDENT
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
