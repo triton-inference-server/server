@@ -341,10 +341,10 @@ fi
 
 log_message.status "check: engine installation"
 if which -s docker ; then
-    log_message.info "Docker engine is installed."
+    log_message.info "Docker is installed."
 elif which -s enroot ; then
-    log_message.info "Enroot is installed." ;
+    log_message.info "NVIDIA Enroot is installed." ;
 else
-    log_message.warning "Neither Docker nor Enroot is installed." ;
-    log_message.warning "Please install either Docker or Enroot to generate the models." ;
+    log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
+    log_message.warning "Please install either Docker or NVIDIA Enroot to generate the models." ;
 fi
