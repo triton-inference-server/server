@@ -329,4 +329,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-
+log_message.status "Checking if Docker engine is installed"
+if which -s docker ; then
+    log_message.info "Docker engine is installed."
+elif which -s enroot ; then
+    log_message.info "Enroot is installed." ;
+else
+    log_message.warning "Neither Docker nor Enroot is installed." ;
+    log_message.warning "Please install either Docker or Enroot to generate the models." ;
+fi
