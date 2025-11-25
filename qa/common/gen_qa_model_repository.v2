@@ -99,9 +99,9 @@ TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_m
 TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
 TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
 TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
 
 
-VOLUME_FORMATDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
 VOLUME_DATADEPENDENTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
 VOLUME_IMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
 VOLUME_VARIMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
@@ -317,8 +317,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt 
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
-chmod -R 777 $VOLUME_FORMATDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MDLS_QA_TRT_FORMAT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
 nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
