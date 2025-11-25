@@ -97,8 +97,9 @@ TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION
 TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
 TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
 TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
 
-VOLUME_PLGDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+
 VOLUME_RAGGEDDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
 VOLUME_FORMATDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
 VOLUME_DATADEPENDENTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
@@ -328,9 +329,9 @@ else
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.
-LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
-chmod -R 777 $VOLUME_PLGDESTDIR
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $TRITON_MDLS_QA_TRT_PLUGIN_MODEL/.
+LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL
+chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 EOF
 
 log_message.status "run: chmod a+x ${TRTSCRIPT}"
