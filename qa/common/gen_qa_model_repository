@@ -49,7 +49,6 @@
 ############################################################################
 TRITON_MDLS_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
 TRITON_MDLS_BASE_SCRIPT_FILE="$(readlink -f $0)"
-TRITON_MDLS_PROFILE_PATH=${TRITON_MDLS_PROFILE_PATH:=${TRITON_MDLS_BASE_SCRIPT_FILE}.profile}
 
 log_message.info() { local message=$@ ; echo -e "\033[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
 log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} \033[0m"; } ;
@@ -80,8 +79,6 @@ log_message.status "define: Docker engine parameters"
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
-
-# log_message.info "Define NVIDIA Enroot engine parameters"
 
 log_message.status "define: model output directories"
 TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
