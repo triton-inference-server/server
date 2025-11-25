@@ -471,9 +471,6 @@ def _get_openai_chat_format_logprobs_from_vllm_response(
             token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
         )
 
-        if not sorted_tokens:
-            continue
-
         # The first token (lowest rank) is the selected token
         selected_token_id, selected_token_data = sorted_tokens[0]
         selected_token = selected_token_data["decoded_token"]
@@ -536,9 +533,6 @@ def _get_openai_completion_format_logprobs_from_vllm_response(
         sorted_tokens = sorted(
             token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
         )
-
-        if not sorted_tokens:
-            continue
 
         # The first token (lowest rank) is the selected token
         selected_token_id, selected_token_data = sorted_tokens[0]
