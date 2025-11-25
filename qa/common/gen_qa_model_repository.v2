@@ -78,7 +78,7 @@ PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 
 log_message.status "define: Docker engine parameters"
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
-DOCKER_TRITON_MODELS_GEN_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
+DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 
 # log_message.info "Define NVIDIA Enroot engine parameters"
 
