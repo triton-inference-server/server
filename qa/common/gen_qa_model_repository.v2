@@ -97,7 +97,7 @@ TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE_IMPLICIT=${TRITON_MODELS_GEN_BUILD_DIR}
 TRITON_MODELS_GEN_DEST_DIR_VARIABLE_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_model_repository
 TRITON_MODELS_GEN_DEST_DIR_ENSEMBLE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ensemble_model_repository
 # TRITON_MODELS_GEN_DEST_DIR_NOSHAPE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_noshape_model_repository
-TRITON_MODELS_GEN_PLGDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_plugin_model_repository
+TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_plugin_model_repository
 TRITON_MODELS_GEN_RAGGEDDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ragged_model_repository
 TRITON_MODELS_GEN_FORMATDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_format_model_repository
 TRITON_MODELS_GEN_DATADEPENDENTDIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_data_dependent_model_repository
@@ -327,9 +327,9 @@ else
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $TRITON_MODELS_GEN_PLGDEST_DIR/.
-LD_PRELOAD=$TRITON_MODELS_GEN_PLGDEST_DIR/libcustomHardmaxPlugin.so python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$TRITON_MODELS_GEN_PLGDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_PLGDEST_DIR
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN/.
+LD_PRELOAD=$TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN/libcustomHardmaxPlugin.so python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN
 EOF
 
 log_message.status "run: chmod a+x ${TRTSCRIPT}"
