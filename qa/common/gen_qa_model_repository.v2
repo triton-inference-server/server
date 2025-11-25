@@ -65,7 +65,7 @@ TRITON_VERSION=${TRITON_VERSION:=25.10}
 ONNX_VERSION=1.16.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
-UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:24.04}
+UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
@@ -79,6 +79,7 @@ PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 log_message.status "define: Docker engine parameters"
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
 # log_message.info "Define NVIDIA Enroot engine parameters"
 
@@ -323,7 +324,7 @@ chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 if [ -d "/usr/src/tensorrt" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
+    git clone -b release/\${TRT_VERSION%.*.*} --depth 1 https://github.com/NVIDIA/TensorRT.git
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
@@ -342,6 +343,157 @@ fi
 log_message.status "check: engine installation"
 if which -s docker ; then
     log_message.info "Docker is installed."
+
+    if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
+        log_message.status "docker volume: $DOCKER_VOLUME does not exist. Creating..."
+        docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
+        log_message.status "docker volume: $DOCKER_VOLUME created"
+        docker volume inspect $DOCKER_VOLUME
+    else
+        log_message.status "docker volume: $DOCKER_VOLUME in use"
+        docker volume inspect $DOCKER_VOLUME
+    fi
+
+    log_message.status "docker pull: $UBUNTU_IMAGE"
+    docker pull $UBUNTU_IMAGE
+
+    log_message.status "docker volume: create destination directory on volume"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE \
+        mkdir -p gen_srcdir ${TRITON_VERSION}
+
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE \
+        mkdir -p \
+        $TRITON_MDLS_BLD_DIR \
+        $TRITON_MDLS_SRC_DIR \
+        $TRITON_MDLS_QA_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_BIG_MODEL \
+        $TRITON_MDLS_QA_SHAPETENSOR_MODEL \
+        $TRITON_MDLS_QA_RESHAPE_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_ENSEMBLE_MODEL \
+        $TRITON_MDLS_QA_NOSHAPE_MODEL \
+        $TRITON_MDLS_QA_TRT_PLUGIN_MODEL \
+        $TRITON_MDLS_QA_RAGGED_MODEL \
+        $TRITON_MDLS_QA_TRT_FORMAT_MODEL \
+        $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_TORCHTRT_MODEL \
+        $TRITON_MDLS_QA_SCALAR_MODELS \
+        $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+
+    log_message.status "docker container: create container $DOCKER_VOLUME_CONTAINER"
+    docker create \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        --name $DOCKER_VOLUME_CONTAINER \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE
+
+    log_message.status "docker container: copy script to container"
+    docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
+
+    if [[ "aarch64" != $(uname -m) ]] ; then
+
+        log_message.status "docker run: $OPENVINOSCRIPT"
+        docker run \
+            --rm \
+            --label RUNNER_ID=$RUNNER_ID \
+            --label PROJECT_NAME=$PROJECT_NAME \
+            $DOCKER_GPU_ARGS \
+            -v $DOCKER_VOLUME:/mnt \
+            $UBUNTU_IMAGE \
+            bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+
+        if [ $? -ne 0 ]; then
+            log_message.error "docker run: ${OPENVINOSCRIPT} failed"
+            exit 1
+        fi
+    fi # [[ "aarch64" != $(uname -m) ]]
+
+    log_message.status "docker run: $ONNXSCRIPT"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        $DOCKER_GPU_ARGS \
+        -v $DOCKER_VOLUME:/mnt \
+        $UBUNTU_IMAGE \
+        bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+
+    if [ $? -ne 0 ]; then
+        log_message.error "docker run: ${ONNXSCRIPT} failed"
+        exit 1
+    fi
+
+    log_message.status "docker pull: $PYTORCH_IMAGE"
+    docker pull $PYTORCH_IMAGE
+
+    log_message.status "docker run: $TORCHSCRIPT"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        $DOCKER_GPU_ARGS \
+        -v $DOCKER_VOLUME:/mnt \
+        $PYTORCH_IMAGE \
+        bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+
+    if [ $? -ne 0 ]; then
+        log_message.error "docker run: ${TORCHSCRIPT} failed"
+        exit 1
+    fi
+
+    if [ "$MODEL_TYPE" != "igpu" ] ; then
+        log_message.status "docker pull: $TENSORRT_IMAGE"
+        docker pull $TENSORRT_IMAGE
+
+        log_message.status "docker run: $TRTSCRIPT"
+        docker run \
+            --rm \
+            --label RUNNER_ID=$RUNNER_ID \
+            --label PROJECT_NAME=$PROJECT_NAME \
+            $DOCKER_GPU_ARGS \
+            -v $DOCKER_VOLUME:/mnt \
+            -e TRT_VERBOSE \
+            $TENSORRT_IMAGE \
+            bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+
+        if [ $? -ne 0 ]; then
+            log_message.error "docker run: ${TRTSCRIPT} failed"
+            exit 1
+        fi
+    fi # [ "$MODEL_TYPE" != "igpu" ]
+
+    if [ -z $CI ] ; then
+        log_message.status "docker cp:copying generated models to /tmp/"
+        docker cp $DOCKER_VOLUME_CONTAINER:$TRITON_MDLS_BLD_DIR/$TRITON_VERSION /tmp/
+        log_message.status "docker rm: removing docker container $DOCKER_VOLUME_CONTAINER"
+        docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
+        log_message.status "docker volume rm: removing docker volume $DOCKER_VOLUME"
+        docker volume rm $DOCKER_VOLUME
+    fi # [ -z $CI ]
+
 elif which -s enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
 else
