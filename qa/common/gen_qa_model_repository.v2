@@ -88,8 +88,8 @@ TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
 TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
 TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
 TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
+TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
 
-VOLUME_IDENTITYBIGDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
 VOLUME_SHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
 VOLUME_RESHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 VOLUME_SEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
@@ -298,8 +298,8 @@ chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
-chmod -R 777 $VOLUME_IDENTITYBIGDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$TRITON_MDLS_QA_IDENTITY_BIG_MODEL
+chmod -R 777 $TRITON_MDLS_QA_IDENTITY_BIG_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
 chmod -R 777 $VOLUME_RESHAPEDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
