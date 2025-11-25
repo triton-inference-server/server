@@ -56,7 +56,7 @@ log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:
 log_message.warning() { local message=$@ ; echo -e "\033[33m$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} \033[0m"; } ;
 log_message.error() { local message=$@ ; echo -e "\033[31m$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} \033[0m"; } ;
 
-log_message.status "Changing working directory to the script directory"
+log_message.status "Changing working directory to the script directory to: " "${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}"
 
 cd ${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}
 
@@ -329,3 +329,5 @@ if [ $? -ne 0 ]; then
     log_message.error "Failed: chmod $TRTSCRIPT"
     exit 1
 fi
+
+
