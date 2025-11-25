@@ -47,18 +47,18 @@
 ## all the models needed for CI testing.
 ##
 ############################################################################
-TRITON_MODELS_GEN_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
-TRITON_MODELS_GEN_BASE_SCRIPT_FILE="$(readlink -f $0)"
-TRITON_MODELS_GEN_PROFILE_PATH=${TRITON_MODELS_GEN_PROFILE_PATH:=${TRITON_MODELS_GEN_BASE_SCRIPT_FILE}.profile}
+TRITON_MDLS_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
+TRITON_MDLS_BASE_SCRIPT_FILE="$(readlink -f $0)"
+TRITON_MDLS_PROFILE_PATH=${TRITON_MDLS_PROFILE_PATH:=${TRITON_MDLS_BASE_SCRIPT_FILE}.profile}
 
 log_message.info() { local message=$@ ; echo -e "\033[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
 log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} \033[0m"; } ;
 log_message.warning() { local message=$@ ; echo -e "\033[33m$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} \033[0m"; } ;
 log_message.error() { local message=$@ ; echo -e "\033[31m$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} \033[0m"; } ;
 
-log_message.status "Changing working directory to the script directory to: " "${TRITON_MODELS_GEN_BASE_SCRIPT_DIR}"
+log_message.status "Changing working directory to the script directory to: " "${TRITON_MDLS_BASE_SCRIPT_DIR}"
 
-cd ${TRITON_MODELS_GEN_BASE_SCRIPT_DIR}
+cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
 TRITON_VERSION=${TRITON_VERSION:=25.10}
@@ -83,31 +83,31 @@ DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 # log_message.info "Define NVIDIA Enroot engine parameters"
 
 log_message.status "define: model output directories"
-TRITON_MODELS_GEN_BUILD_DIR=${TRITON_MODELS_GEN_BUILD_DIR:=/mnt/$CI_JOB_ID}
-TRITON_MODELS_GEN_SRC_DIR=${TRITON_MODELS_GEN_SRC_DIR:=$TRITON_MODELS_GEN_BUILD_DIR/gen_srcdir}
-VOLUME_DESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_model_repository
-VOLUME_VARDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
-VOLUME_IDENTITYDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_IDENTITYBIGDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_SHAPEDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-VOLUME_RESHAPEDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-VOLUME_SEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-VOLUME_DYNASEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-VOLUME_DYNASEQIMPLICITDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-VOLUME_VARSEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-VOLUME_ENSEMBLEDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-VOLUME_NOSHAPEDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-VOLUME_PLGDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-VOLUME_RAGGEDDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-VOLUME_FORMATDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-VOLUME_DATADEPENDENTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-VOLUME_IMPLICITSEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-VOLUME_VARIMPLICITSEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-VOLUME_TORCHTRTDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
-VOLUME_SCALARMODELSDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
-VOLUME_IMAGEMODELSDESTDIR=$TRITON_MODELS_GEN_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
+TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
+VOLUME_DESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
+VOLUME_VARDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
+VOLUME_IDENTITYDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
+VOLUME_IDENTITYBIGDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+VOLUME_SHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+VOLUME_RESHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+VOLUME_SEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+VOLUME_DYNASEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+VOLUME_DYNASEQIMPLICITDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+VOLUME_VARSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+VOLUME_ENSEMBLEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+VOLUME_NOSHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+VOLUME_PLGDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+VOLUME_RAGGEDDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+VOLUME_FORMATDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+VOLUME_DATADEPENDENTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+VOLUME_IMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+VOLUME_VARIMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+VOLUME_TORCHTRTDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
+VOLUME_SCALARMODELSDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
+VOLUME_IMAGEMODELSDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 log_message.status "define: script names"
 
@@ -146,15 +146,15 @@ pip3 install openvino==$OPENVINO_VERSION
 # Since variable shape tensors are not allowed, identity models may fail to generate.
 # TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
 # TODO Add sequence models after DLIS-2864 adds support for sequence/control inputs.
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --openvino --models_dir=$VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --openvino --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
-# python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --openvino --models_dir=$VOLUME_IDENTITYDESTDIR
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --openvino --models_dir=$VOLUME_IDENTITYDESTDIR
 # chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
 chmod -R 777 $VOLUME_RESHAPEDESTDIR
-# python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$VOLUME_SEQDESTDIR
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$VOLUME_SEQDESTDIR
 # chmod -R 777 $SVOLUME_EQDESTDIR
-# python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
 # chmod -R 777 $VOLUME_DYNASEQDESTDIR
 EOF
 
@@ -184,40 +184,40 @@ ln -s /usr/bin/python3 /usr/bin/python
 pip3 install "protobuf<=3.20.1"  "numpy<=1.23.5" # TODO: Remove current line DLIS-3838
 pip3 install --upgrade onnx==${ONNX_VERSION}
 
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IDENTITYDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IDENTITYDESTDIR
 chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_RESHAPEDESTDIR
 chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_INITIALSTATEIMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_INITIALSTATEIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQDESTDIR
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
 chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
 chmod -R 777 $VOLUME_SCALARMODELSDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
 chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
 EOF
 
@@ -238,32 +238,32 @@ nvidia-smi || true
 pip3 install onnxscript
 set -e
 set -x
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
 chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
 chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --libtorch --models_dir=$VOLUME_IMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --models_dir=$VOLUME_IMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
+  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
   chmod -R 777 $VOLUME_TORCHTRTDESTDIR
 fi
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
 # Export torchvision image models to ONNX
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
 chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
 EOF
 
@@ -286,38 +286,38 @@ set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
 chmod -R 777 $VOLUME_SHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
 chmod -R 777 $VOLUME_DESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$VOLUME_IDENTITYDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$VOLUME_IDENTITYDESTDIR
 chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
 chmod -R 777 $VOLUME_IDENTITYBIGDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
 chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
 chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
 chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
 chmod -R 777 $VOLUME_FORMATDESTDIR
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
+nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
 chmod -R 777 $VOLUME_DATADEPENDENTDIR
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt" ]; then
@@ -328,7 +328,7 @@ else
 fi
 rm -rf build && mkdir build && \
 cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.
-LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
+LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
 chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
 
