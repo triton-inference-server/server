@@ -85,7 +85,7 @@ DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 log_message.status "define: model output directories"
 TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
 TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
-VOLUME_DESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
+TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
 VOLUME_VARDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
 VOLUME_IDENTITYDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
 VOLUME_IDENTITYBIGDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
@@ -146,8 +146,8 @@ pip3 install openvino==$OPENVINO_VERSION
 # Since variable shape tensors are not allowed, identity models may fail to generate.
 # TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
 # TODO Add sequence models after DLIS-2864 adds support for sequence/control inputs.
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --openvino --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --openvino --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --openvino --models_dir=$VOLUME_IDENTITYDESTDIR
 # chmod -R 777 $VOLUME_IDENTITYDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
@@ -184,8 +184,8 @@ ln -s /usr/bin/python3 /usr/bin/python
 pip3 install "protobuf<=3.20.1"  "numpy<=1.23.5" # TODO: Remove current line DLIS-3838
 pip3 install --upgrade onnx==${ONNX_VERSION}
 
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IDENTITYDESTDIR
@@ -238,8 +238,8 @@ nvidia-smi || true
 pip3 install onnxscript
 set -e
 set -x
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
@@ -290,8 +290,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --mod
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
 chmod -R 777 $VOLUME_SHAPEDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
 chmod -R 777 $VOLUME_VARDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
