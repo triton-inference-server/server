@@ -60,7 +60,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 
 cd ${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}
 
-log_message.status "Setting default values"
+log_message.status "define: default values"
 TRITON_VERSION=${TRITON_VERSION:=25.10}
 ONNX_VERSION=1.16.1
 ONNX_OPSET=0
@@ -71,8 +71,18 @@ TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
 MODEL_TYPE=${MODEL_TYPE:-""}
 
+log_message.status "define: CI related parameters"
+CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
+RUNNER_ID=${RUNNER_ID:=0}
+PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 
-log_message.status "Defining volume directories"
+log_message.status "define: Docker engine parameters"
+DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
+DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
+
+# log_message.info "Define NVIDIA Enroot engine parameters"
+
+log_message.status "define: model output directories"
 VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
 VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
 VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
@@ -99,7 +109,7 @@ VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
-log_message.status "Defining script names"
+log_message.status "define: script names"
 
 OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.v2.sh
 log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
@@ -113,8 +123,8 @@ log_message.info "PyTorch script: " "${TORCHSCRIPT}"
 TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.v2.sh
 log_message.info "TensorRT script: " "${TRTSCRIPT}"
 
-log_message.status "Creating OpenVINO script"
-cat > $OPENVINOSCRIPT <<EOF
+log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
+cat > ${OPENVINOSCRIPT} <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -148,16 +158,16 @@ chmod -R 777 $VOLUME_RESHAPEDESTDIR
 # chmod -R 777 $VOLUME_DYNASEQDESTDIR
 EOF
 
-log_message.status "chmod a+x $OPENVINOSCRIPT"
+log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
 chmod a+x $OPENVINOSCRIPT
 
 if [ $? -ne 0 ]; then
-    log_message.error "Failed: chmod $OPENVINOSCRIPT"
+    log_message.error "failed: chmod ${OPENVINOSCRIPT}"
     exit 1
 fi
 
-log_message.status "chmod a+x $ONNXSCRIPT"
-cat > $ONNXSCRIPT <<EOF
+log_message.status "create: ONNX script - ${ONNXSCRIPT}"
+cat > ${ONNXSCRIPT} <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -211,15 +221,15 @@ python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_
 chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
 EOF
 
-log_message.status "chmod a+x $ONNXSCRIPT"
-chmod a+x $ONNXSCRIPT
+log_message.status "run: chmod a+x ${ONNXSCRIPT}"
+chmod a+x ${ONNXSCRIPT}
 if [ $? -ne 0 ]; then
-    log_message.error "Failed: chmod $ONNXSCRIPT"
+    log_message.error "failed: chmod ${ONNXSCRIPT}"
     exit 1
 fi
 
-log_message.status "Creating PyTorch script"
-cat > $TORCHSCRIPT <<EOF
+log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
+cat > ${TORCHSCRIPT} <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -257,15 +267,15 @@ python3 $VOLUME_SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --m
 chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
 EOF
 
-log_message.status "chmod a+x $TORCHSCRIPT"
-chmod a+x $TORCHSCRIPT
+log_message.status "run: chmod a+x ${TORCHSCRIPT}"
+chmod a+x ${TORCHSCRIPT}
 if [ $? -ne 0 ]; then
-    log_message.error "Failed: chmod $TORCHSCRIPT"
+    log_message.error "failed: chmod ${TORCHSCRIPT}"
     exit 1
 fi
 
-log_message.status "Creating TensorRT script"
-cat > $TRTSCRIPT <<EOF
+log_message.status "create: TensorRT script - ${TRTSCRIPT}"
+cat > ${TRTSCRIPT} <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -322,14 +332,14 @@ LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/g
 chmod -R 777 $VOLUME_PLGDESTDIR
 EOF
 
-log_message.status "chmod a+x $TRTSCRIPT"
-chmod a+x $TRTSCRIPT
+log_message.status "run: chmod a+x ${TRTSCRIPT}"
+chmod a+x ${TRTSCRIPT}
 if [ $? -ne 0 ]; then
-    log_message.error "Failed: chmod $TRTSCRIPT"
+    log_message.error "failed: chmod ${TRTSCRIPT}"
     exit 1
 fi
 
-log_message.status "Checking if Docker engine is installed"
+log_message.status "check: engine installation"
 if which -s docker ; then
     log_message.info "Docker engine is installed."
 elif which -s enroot ; then
