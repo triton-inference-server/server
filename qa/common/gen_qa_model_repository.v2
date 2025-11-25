@@ -106,9 +106,8 @@ TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VER
 TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
 TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
+TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
 
-
-VOLUME_SCALARMODELSDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
 VOLUME_IMAGEMODELSDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 log_message.status "define: script names"
@@ -212,8 +211,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --on
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
-chmod -R 777 $VOLUME_SCALARMODELSDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_SCALAR_MODELS
+chmod -R 777 $TRITON_MDLS_QA_SCALAR_MODELS
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_model_repository
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --variable --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_variable_model_repository
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_reshape_model_repository
