@@ -98,7 +98,7 @@ TRITON_MODELS_GEN_DEST_DIR_VARIABLE_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TR
 TRITON_MODELS_GEN_DEST_DIR_ENSEMBLE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ensemble_model_repository
 # TRITON_MODELS_GEN_DEST_DIR_NOSHAPE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_noshape_model_repository
 TRITON_MODELS_GEN_DEST_DIR_TRT_PLUGIN=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_plugin_model_repository
-TRITON_MODELS_GEN_RAGGEDDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ragged_model_repository
+TRITON_MODELS_GEN_DEST_DIR_RAGGED=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ragged_model_repository
 TRITON_MODELS_GEN_FORMATDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_format_model_repository
 TRITON_MODELS_GEN_DATADEPENDENTDIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_trt_data_dependent_model_repository
 TRITON_MODELS_GEN_IMPLICITSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_implicit_model_repository
@@ -208,8 +208,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE_IMPLICIT
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE_IMPLICIT
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_RAGGEDDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_RAGGEDDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_DEST_DIR_RAGGED
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_RAGGED
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_SCALARMODELSDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_SCALARMODELSDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_models.py --ensemble --models_dir=$TRITON_MODELS_GEN_DEST_DIR_ENSEMBLE/qa_model_repository
@@ -260,8 +260,8 @@ if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
   nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MODELS_GEN_TORCHTRTDEST_DIR
   chmod -R 777 $TRITON_MODELS_GEN_TORCHTRTDEST_DIR
 fi
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MODELS_GEN_RAGGEDDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_RAGGEDDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MODELS_GEN_DEST_DIR_RAGGED
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_RAGGED
 # Export torchvision image models to ONNX
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$TRITON_MODELS_GEN_IMAGEMODELSDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_IMAGEMODELSDEST_DIR
@@ -313,8 +313,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variab
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_VARIABLE_SEQUENCE
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE_IMPLICIT
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE_IMPLICIT
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_RAGGEDDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_RAGGEDDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DEST_DIR_RAGGED
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_RAGGED
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MODELS_GEN_FORMATDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_FORMATDEST_DIR
 nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MODELS_GEN_DATADEPENDENTDIR
