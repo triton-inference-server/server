@@ -93,8 +93,8 @@ TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapete
 TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
 TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
 
-VOLUME_DYNASEQIMPLICITDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
 VOLUME_VARSEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
 VOLUME_ENSEMBLEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
 VOLUME_NOSHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
@@ -207,8 +207,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX
 chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
@@ -312,8 +312,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
 chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
 chmod -R 777 $VOLUME_RAGGEDDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
