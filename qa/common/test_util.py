@@ -266,12 +266,15 @@ def get_dtype_name(dtype):
 
 
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
-    return "{}_{}_{}_{}".format(
-        pf,
-        get_dtype_name(input_dtype),
-        get_dtype_name(output0_dtype),
-        get_dtype_name(output1_dtype),
-    )
+    if output1_dtype is None:
+        return f"{pf}_{get_dtype_name(input_dtype)}_{get_dtype_name(output0_dtype)}"
+    else:
+        return "{}_{}_{}_{}".format(
+            pf,
+            get_dtype_name(input_dtype),
+            get_dtype_name(output0_dtype),
+            get_dtype_name(output1_dtype),
+        )
 
 
 def get_sequence_model_name(pf, dtype):
