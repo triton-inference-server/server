@@ -90,8 +90,8 @@ TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_m
 TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
 TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
 TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 
-VOLUME_RESHAPEDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
 VOLUME_SEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
 VOLUME_DYNASEQDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
 VOLUME_DYNASEQIMPLICITDESTDIR=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
@@ -151,8 +151,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --openvino --models_dir=$TRITON_MD
 chmod -R 777 $TRITON_MDLS_QA_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --openvino --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 # chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$VOLUME_SEQDESTDIR
 # chmod -R 777 $SVOLUME_EQDESTDIR
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
@@ -191,8 +191,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARSEQDESTDIR
@@ -245,8 +245,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
@@ -300,8 +300,8 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-compat --model
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$TRITON_MDLS_QA_IDENTITY_BIG_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_BIG_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
 chmod -R 777 $VOLUME_SEQDESTDIR
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
