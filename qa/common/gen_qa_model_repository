@@ -47,135 +47,82 @@
 ## all the models needed for CI testing.
 ##
 ############################################################################
+TRITON_MDLS_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
+TRITON_MDLS_BASE_SCRIPT_FILE="$(readlink -f $0)"
 
+log_message.info() { local message=$@ ; echo -e "\033[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
+log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} \033[0m"; } ;
+log_message.warning() { local message=$@ ; echo -e "\033[33m$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} \033[0m"; } ;
+log_message.error() { local message=$@ ; echo -e "\033[31m$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} \033[0m"; } ;
+
+log_message.status "Changing working directory to the script directory to: " "${TRITON_MDLS_BASE_SCRIPT_DIR}"
+
+cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
+
+log_message.status "define: default values"
 TRITON_VERSION=${TRITON_VERSION:=25.10}
-
-# ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.16.1
 ONNX_OPSET=0
-
-# OPENVINO version
 OPENVINO_VERSION=2024.5.0
-
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
-
-DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 MODEL_TYPE=${MODEL_TYPE:-""}
 
-############################################################################
-# Check if Docker volume exists
-############################################################################
+log_message.status "define: CI related parameters"
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
-DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 RUNNER_ID=${RUNNER_ID:=0}
-PROJECT_NAME=${CI_PROJECT_NAME:=tritonserver}
+PROJECT_NAME=${PROJECT_NAME:=tritonserver}
+
+log_message.status "define: Docker engine parameters"
+DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
-if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
-    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
-    docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
-    docker volume inspect $DOCKER_VOLUME
-else
-    echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
-    docker volume inspect $DOCKER_VOLUME
-fi
+log_message.status "define: model output directories"
+TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
+TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
+TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
+TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
+TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
+TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
+TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
+TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
 
+log_message.status "define: script names"
 
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE \
-    mkdir -p gen_srcdir ${TRITON_VERSION}
+OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.v2.sh
+log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
 
-docker create \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    --name $DOCKER_VOLUME_CONTAINER \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE
+ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.v2.sh
+log_message.info "ONNX script: " "${ONNXSCRIPT}"
 
-docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
+TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.v2.sh
+log_message.info "PyTorch script: " "${TORCHSCRIPT}"
 
-VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
-VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
-VOLUME_DESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_model_repository
-VOLUME_VARDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
-VOLUME_IDENTITYDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
-VOLUME_IDENTITYBIGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-VOLUME_SHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-VOLUME_RESHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-VOLUME_SEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-VOLUME_DYNASEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-VOLUME_DYNASEQIMPLICITDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-VOLUME_VARSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-VOLUME_ENSEMBLEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-VOLUME_NOSHAPEDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-VOLUME_PLGDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-VOLUME_RAGGEDDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-VOLUME_FORMATDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-VOLUME_DATADEPENDENTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-VOLUME_IMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-VOLUME_VARIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-VOLUME_INITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-VOLUME_TORCHTRTDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
-VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
-VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.v2.sh
+log_message.info "TensorRT script: " "${TRTSCRIPT}"
 
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    -v $DOCKER_VOLUME:/mnt \
-    -w /mnt/$CI_JOB_ID \
-    $UBUNTU_IMAGE \
-    mkdir -p \
-        $VOLUME_BUILD_DIR \
-        $VOLUME_SRCDIR \
-        $VOLUME_DESTDIR \
-        $VOLUME_VARDESTDIR \
-        $VOLUME_IDENTITYDESTDIR \
-        $VOLUME_SIGDEFDESTDIR \
-        $VOLUME_IDENTITYBIGDESTDIR \
-        $VOLUME_TFPARAMETERSDESTDIR \
-        $VOLUME_SHAPEDESTDIR \
-        $VOLUME_RESHAPEDESTDIR \
-        $VOLUME_SEQDESTDIR \
-        $VOLUME_DYNASEQDESTDIR \
-        $VOLUME_DYNASEQIMPLICITDESTDIR \
-        $VOLUME_VARSEQDESTDIR \
-        $VOLUME_ENSEMBLEDESTDIR \
-        $VOLUME_NOSHAPEDESTDIR \
-        $VOLUME_PLGDESTDIR \
-        $VOLUME_RAGGEDDESTDIR \
-        $VOLUME_FORMATDESTDIR \
-        $VOLUME_DATADEPENDENTDIR \
-        $VOLUME_IMPLICITSEQDESTDIR \
-        $VOLUME_VARIMPLICITSEQDESTDIR \
-        $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
-        $VOLUME_TORCHTRTDESTDIR \
-        $VOLUME_SCALARMODELSDESTDIR \
-        $VOLUME_IMAGEMODELSDESTDIR
-
-ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
-OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
-TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.cmds
-TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.cmds
-
-# OPENVINO
-#
-# OpenVINO is not available on ARM so skip
-if [[ "aarch64" != $(uname -m) ]] ; then
-
+log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
 cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -198,47 +145,27 @@ pip3 install openvino==$OPENVINO_VERSION
 # Since variable shape tensors are not allowed, identity models may fail to generate.
 # TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
 # TODO Add sequence models after DLIS-2864 adds support for sequence/control inputs.
-python3 $VOLUME_SRCDIR/gen_qa_models.py --openvino --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --openvino --models_dir=$VOLUME_IDENTITYDESTDIR
-# chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --openvino --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --openvino --models_dir=$VOLUME_SEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --openvino --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --openvino --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
+# chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
 # chmod -R 777 $SVOLUME_EQDESTDIR
-# python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$VOLUME_DYNASEQDESTDIR
-# chmod -R 777 $VOLUME_DYNASEQDESTDIR
+# python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+# chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 EOF
 
+log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
 chmod a+x $OPENVINOSCRIPT
+
 if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
+    log_message.error "failed: chmod ${OPENVINOSCRIPT}"
     exit 1
 fi
 
-docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
-docker pull $UBUNTU_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $OPENVINOSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $UBUNTU_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$OPENVINOSCRIPT
-
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
-fi
-
-fi # [[ "aarch64" != $(uname -m) ]]
-
-# ONNX
+log_message.status "create: ONNX script - ${ONNXSCRIPT}"
 cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -256,70 +183,51 @@ ln -s /usr/bin/python3 /usr/bin/python
 pip3 install "protobuf<=3.20.1"  "numpy<=1.23.5" # TODO: Remove current line DLIS-3838
 pip3 install --upgrade onnx==${ONNX_VERSION}
 
-python3 $VOLUME_SRCDIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_INITIALSTATEIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$VOLUME_SCALARMODELSDESTDIR
-chmod -R 777 $VOLUME_SCALARMODELSDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_identity_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_sequence_model_repository
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$VOLUME_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-chmod -R 777 $VOLUME_ENSEMBLEDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
+chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ort_scalar_models.py --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_SCALAR_MODELS
+chmod -R 777 $TRITON_MDLS_QA_SCALAR_MODELS
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --ensemble --variable --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_variable_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_reshape_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_identity_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_sequence_model_repository
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$TRITON_MDLS_QA_ENSEMBLE_MODEL/qa_variable_sequence_model_repository
+chmod -R 777 $TRITON_MDLS_QA_ENSEMBLE_MODEL
 EOF
 
-chmod a+x $ONNXSCRIPT
+log_message.status "run: chmod a+x ${ONNXSCRIPT}"
+chmod a+x ${ONNXSCRIPT}
 if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
+    log_message.error "failed: chmod ${ONNXSCRIPT}"
     exit 1
 fi
 
-docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
-docker pull $UBUNTU_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $UBUNTU_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
-
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
-fi
-
-# PyTorch
+log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
 cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -329,66 +237,49 @@ nvidia-smi || true
 pip3 install onnxscript
 set -e
 set -x
-python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --libtorch --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
+chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --models_dir=$TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $VOLUME_SRCDIR/gen_qa_torchtrt_models.py --models_dir=$VOLUME_TORCHTRTDESTDIR
-  chmod -R 777 $VOLUME_TORCHTRTDESTDIR
+  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
+  chmod -R 777 $TRITON_MDLS_QA_TORCHTRT_MODEL
 fi
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 # Export torchvision image models to ONNX
-python3 $VOLUME_SRCDIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$VOLUME_IMAGEMODELSDESTDIR
-chmod -R 777 $VOLUME_IMAGEMODELSDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+
+export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$TRITON_MDLS_QA_CUSTOM_OPS
+mkdir -p $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/
+cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/.
+chmod -R 777 $TRITON_MDLS_QA_CUSTOM_OPS
 EOF
 
-chmod a+x $TORCHSCRIPT
+log_message.status "run: chmod a+x ${TORCHSCRIPT}"
+chmod a+x ${TORCHSCRIPT}
 if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
+    log_message.error "failed: chmod ${TORCHSCRIPT}"
     exit 1
 fi
 
-docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-
-docker pull $PYTORCH_IMAGE
-
-echo -e "\033[34m[ INFO ] - Running:  $TORCHSCRIPT \033[0m "
-
-docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    $PYTORCH_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TORCHSCRIPT
-
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
-fi
-
-# TensorRT
-
-docker pull ${TENSORRT_IMAGE}
-TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
-
+log_message.status "create: TensorRT script - ${TRTSCRIPT}"
 cat > $TRTSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
@@ -400,86 +291,216 @@ set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$VOLUME_SHAPEDESTDIR
-chmod -R 777 $VOLUME_SHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --models_dir=$VOLUME_DESTDIR
-chmod -R 777 $VOLUME_DESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VOLUME_VARDESTDIR
-chmod -R 777 $VOLUME_VARDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$VOLUME_IDENTITYDESTDIR
-chmod -R 777 $VOLUME_IDENTITYDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$VOLUME_IDENTITYBIGDESTDIR
-chmod -R 777 $VOLUME_IDENTITYBIGDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$VOLUME_RESHAPEDESTDIR
-chmod -R 777 $VOLUME_RESHAPEDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$VOLUME_SEQDESTDIR
-chmod -R 777 $VOLUME_SEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$VOLUME_IMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_IMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VOLUME_VARIMPLICITSEQDESTDIR
-chmod -R 777 $VOLUME_VARIMPLICITSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$VOLUME_DYNASEQDESTDIR
-chmod -R 777 $VOLUME_DYNASEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VOLUME_VARSEQDESTDIR
-chmod -R 777 $VOLUME_VARSEQDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$VOLUME_DYNASEQIMPLICITDESTDIR
-chmod -R 777 $VOLUME_DYNASEQIMPLICITDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$VOLUME_RAGGEDDESTDIR
-chmod -R 777 $VOLUME_RAGGEDDESTDIR
-python3 $VOLUME_SRCDIR/gen_qa_trt_format_models.py --models_dir=$VOLUME_FORMATDESTDIR
-chmod -R 777 $VOLUME_FORMATDESTDIR
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $VOLUME_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$VOLUME_DATADEPENDENTDIR
-chmod -R 777 $VOLUME_DATADEPENDENTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$TRITON_MDLS_QA_SHAPETENSOR_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SHAPETENSOR_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_MODEL
+chmod -R 777 $TRITON_MDLS_QA_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-compat --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
+chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$TRITON_MDLS_QA_IDENTITY_BIG_MODEL
+chmod -R 777 $TRITON_MDLS_QA_IDENTITY_BIG_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
+chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MDLS_QA_TRT_FORMAT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
+nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
+chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/${TENSORRT_VERSION} https://github.com/NVIDIA/TensorRT.git
+    git clone -b release/\${TRT_VERSION%.*.*} --depth 1 https://github.com/NVIDIA/TensorRT.git
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $VOLUME_PLGDESTDIR/.
-LD_PRELOAD=$VOLUME_PLGDESTDIR/libcustomHardmaxPlugin.so python3 $VOLUME_SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$VOLUME_PLGDESTDIR
-chmod -R 777 $VOLUME_PLGDESTDIR
+cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $TRITON_MDLS_QA_TRT_PLUGIN_MODEL/.
+LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL
+chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 EOF
 
-chmod a+x $TRTSCRIPT
+log_message.status "run: chmod a+x ${TRTSCRIPT}"
+chmod a+x ${TRTSCRIPT}
 if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
+    log_message.error "failed: chmod ${TRTSCRIPT}"
     exit 1
 fi
 
-if [ "$MODEL_TYPE" != "igpu" ] ; then
-  docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-  docker pull $TENSORRT_IMAGE
+log_message.status "check: engine installation"
+if which -s docker ; then
+    log_message.info "Docker is installed."
 
-  echo -e "\033[34m[ INFO ] - Running:  $TRTSCRIPT \033[0m "
+    if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
+        log_message.status "docker volume: $DOCKER_VOLUME does not exist. Creating..."
+        docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
+        log_message.status "docker volume: $DOCKER_VOLUME created"
+        docker volume inspect $DOCKER_VOLUME
+    else
+        log_message.status "docker volume: $DOCKER_VOLUME in use"
+        docker volume inspect $DOCKER_VOLUME
+    fi
 
-  docker run \
-    --rm \
-    --label RUNNER_ID=$RUNNER_ID \
-    --label PROJECT_NAME=$PROJECT_NAME \
-    $DOCKER_GPU_ARGS \
-    -v $DOCKER_VOLUME:/mnt \
-    -e TRT_VERBOSE \
-    $TENSORRT_IMAGE \
-    bash -xe $VOLUME_SRCDIR/$TRTSCRIPT
+    log_message.status "docker pull: $UBUNTU_IMAGE"
+    docker pull $UBUNTU_IMAGE
 
-  if [ $? -ne 0 ]; then
-      echo -e "Failed"
-      exit 1
-  fi
+    log_message.status "docker volume: create destination directory on volume"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE \
+        mkdir -p gen_srcdir ${TRITON_VERSION}
 
-fi
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE \
+        mkdir -p \
+        $TRITON_MDLS_BLD_DIR \
+        $TRITON_MDLS_SRC_DIR \
+        $TRITON_MDLS_QA_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_BIG_MODEL \
+        $TRITON_MDLS_QA_SHAPETENSOR_MODEL \
+        $TRITON_MDLS_QA_RESHAPE_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_ENSEMBLE_MODEL \
+        $TRITON_MDLS_QA_NOSHAPE_MODEL \
+        $TRITON_MDLS_QA_TRT_PLUGIN_MODEL \
+        $TRITON_MDLS_QA_RAGGED_MODEL \
+        $TRITON_MDLS_QA_TRT_FORMAT_MODEL \
+        $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_TORCHTRT_MODEL \
+        $TRITON_MDLS_QA_SCALAR_MODELS \
+        $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 
-if [ -z $CI ] ; then
-    echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
-    docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
-    echo -e "\033[34m[ INFO ] - Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
-    docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
-    echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
-    docker volume rm $DOCKER_VOLUME
+    log_message.status "docker container: create container $DOCKER_VOLUME_CONTAINER"
+    docker create \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        --name $DOCKER_VOLUME_CONTAINER \
+        -v $DOCKER_VOLUME:/mnt \
+        -w /mnt/$CI_JOB_ID \
+        $UBUNTU_IMAGE
+
+    log_message.status "docker container: copy script to container"
+    docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
+
+    if [[ "aarch64" != $(uname -m) ]] ; then
+
+        log_message.status "docker run: $OPENVINOSCRIPT"
+        docker run \
+            --rm \
+            --label RUNNER_ID=$RUNNER_ID \
+            --label PROJECT_NAME=$PROJECT_NAME \
+            $DOCKER_GPU_ARGS \
+            -v $DOCKER_VOLUME:/mnt \
+            $UBUNTU_IMAGE \
+            bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+
+        if [ $? -ne 0 ]; then
+            log_message.error "docker run: ${OPENVINOSCRIPT} failed"
+            exit 1
+        fi
+    fi # [[ "aarch64" != $(uname -m) ]]
+
+    log_message.status "docker run: $ONNXSCRIPT"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        $DOCKER_GPU_ARGS \
+        -v $DOCKER_VOLUME:/mnt \
+        $UBUNTU_IMAGE \
+        bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+
+    if [ $? -ne 0 ]; then
+        log_message.error "docker run: ${ONNXSCRIPT} failed"
+        exit 1
+    fi
+
+    log_message.status "docker pull: $PYTORCH_IMAGE"
+    docker pull $PYTORCH_IMAGE
+
+    log_message.status "docker run: $TORCHSCRIPT"
+    docker run \
+        --rm \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        $DOCKER_GPU_ARGS \
+        -v $DOCKER_VOLUME:/mnt \
+        $PYTORCH_IMAGE \
+        bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+
+    if [ $? -ne 0 ]; then
+        log_message.error "docker run: ${TORCHSCRIPT} failed"
+        exit 1
+    fi
+
+    if [ "$MODEL_TYPE" != "igpu" ] ; then
+        log_message.status "docker pull: $TENSORRT_IMAGE"
+        docker pull $TENSORRT_IMAGE
+
+        log_message.status "docker run: $TRTSCRIPT"
+        docker run \
+            --rm \
+            --label RUNNER_ID=$RUNNER_ID \
+            --label PROJECT_NAME=$PROJECT_NAME \
+            $DOCKER_GPU_ARGS \
+            -v $DOCKER_VOLUME:/mnt \
+            -e TRT_VERBOSE \
+            $TENSORRT_IMAGE \
+            bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+
+        if [ $? -ne 0 ]; then
+            log_message.error "docker run: ${TRTSCRIPT} failed"
+            exit 1
+        fi
+    fi # [ "$MODEL_TYPE" != "igpu" ]
+
+    if [ -z $CI ] ; then
+        log_message.status "docker cp:copying generated models to /tmp/"
+        docker cp $DOCKER_VOLUME_CONTAINER:$TRITON_MDLS_BLD_DIR/$TRITON_VERSION /tmp/
+        log_message.status "docker rm: removing docker container $DOCKER_VOLUME_CONTAINER"
+        docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
+        log_message.status "docker volume rm: removing docker volume $DOCKER_VOLUME"
+        docker volume rm $DOCKER_VOLUME
+    fi # [ -z $CI ]
+
+elif which -s enroot ; then
+    log_message.info "NVIDIA Enroot is installed." ;
+else
+    log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
+    log_message.warning "Please install either Docker or NVIDIA Enroot to generate the models." ;
 fi
