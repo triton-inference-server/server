@@ -47,20 +47,17 @@
 ## all the models needed for CI testing.
 ##
 ############################################################################
-TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
-TRITON_MODELS_GENERATION_BASE_SCRIPT_FILE="$(readlink -f $0)"
-TRITON_MODELS_GENERATION_PROFILE_PATH=${TRITON_MODELS_GENERATION_PROFILE_PATH:=${TRITON_MODELS_GENERATION_BASE_SCRIPT_FILE}.profile}
-
-# change working directory to the script directory
-cd ${TRITON_MODELS_GENERATION_BASE_SCRIPT_DIR}
-
-# source ${TRITON_MODELS_GENERATION_PROFILE_PATH}
 
 TRITON_VERSION=${TRITON_VERSION:=25.10}
+
+# ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.16.1
 ONNX_OPSET=0
+
+# OPENVINO version
 OPENVINO_VERSION=2024.5.0
-UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:24.04}
+
+UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
@@ -77,34 +74,34 @@ RUNNER_ID=${RUNNER_ID:=0}
 PROJECT_NAME=${CI_PROJECT_NAME:=tritonserver}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 
-# if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
-#     echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
-#     docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
-#     docker volume inspect $DOCKER_VOLUME
-# else
-#     echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
-#     docker volume inspect $DOCKER_VOLUME
-# fi
+if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
+    echo -e "\033[34m[ INFO ] - Docker volume $DOCKER_VOLUME does not exist. Creating... \033[0m "
+    docker volume create $DOCKER_VOLUME --label RUNNER_ID=$RUNNER_ID --label PROJECT_NAME=$PROJECT_NAME
+    docker volume inspect $DOCKER_VOLUME
+else
+    echo -e "\033[34m[ INFO ] - Docker volume in use: $DOCKER_VOLUME \033[0m "
+    docker volume inspect $DOCKER_VOLUME
+fi
 
 
-# docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     -v $DOCKER_VOLUME:/mnt \
-#     -w /mnt/$CI_JOB_ID \
-#     $UBUNTU_IMAGE \
-#     mkdir -p gen_srcdir ${TRITON_VERSION}
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    -v $DOCKER_VOLUME:/mnt \
+    -w /mnt/$CI_JOB_ID \
+    $UBUNTU_IMAGE \
+    mkdir -p gen_srcdir ${TRITON_VERSION}
 
-# docker create \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     --name $DOCKER_VOLUME_CONTAINER \
-#     -v $DOCKER_VOLUME:/mnt \
-#     -w /mnt/$CI_JOB_ID \
-#     $UBUNTU_IMAGE
+docker create \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    --name $DOCKER_VOLUME_CONTAINER \
+    -v $DOCKER_VOLUME:/mnt \
+    -w /mnt/$CI_JOB_ID \
+    $UBUNTU_IMAGE
 
-# docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
+docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
 
 VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}
 VOLUME_SRCDIR=${VOLUME_SRCDIR:=$VOLUME_BUILD_DIR/gen_srcdir}
@@ -133,41 +130,41 @@ VOLUME_SCALARMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_scalar_models
 VOLUME_IMAGEMODELSDESTDIR=$VOLUME_BUILD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
 
 
-# docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     -v $DOCKER_VOLUME:/mnt \
-#     -w /mnt/$CI_JOB_ID \
-#     $UBUNTU_IMAGE \
-#     mkdir -p \
-#         $VOLUME_BUILD_DIR \
-#         $VOLUME_SRCDIR \
-#         $VOLUME_DESTDIR \
-#         $VOLUME_VARDESTDIR \
-#         $VOLUME_IDENTITYDESTDIR \
-#         $VOLUME_SIGDEFDESTDIR \
-#         $VOLUME_IDENTITYBIGDESTDIR \
-#         $VOLUME_TFPARAMETERSDESTDIR \
-#         $VOLUME_SHAPEDESTDIR \
-#         $VOLUME_RESHAPEDESTDIR \
-#         $VOLUME_SEQDESTDIR \
-#         $VOLUME_DYNASEQDESTDIR \
-#         $VOLUME_DYNASEQIMPLICITDESTDIR \
-#         $VOLUME_VARSEQDESTDIR \
-#         $VOLUME_ENSEMBLEDESTDIR \
-#         $VOLUME_NOSHAPEDESTDIR \
-#         $VOLUME_PLGDESTDIR \
-#         $VOLUME_RAGGEDDESTDIR \
-#         $VOLUME_FORMATDESTDIR \
-#         $VOLUME_DATADEPENDENTDIR \
-#         $VOLUME_IMPLICITSEQDESTDIR \
-#         $VOLUME_VARIMPLICITSEQDESTDIR \
-#         $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
-#         $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
-#         $VOLUME_TORCHTRTDESTDIR \
-#         $VOLUME_SCALARMODELSDESTDIR \
-#         $VOLUME_IMAGEMODELSDESTDIR
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    -v $DOCKER_VOLUME:/mnt \
+    -w /mnt/$CI_JOB_ID \
+    $UBUNTU_IMAGE \
+    mkdir -p \
+        $VOLUME_BUILD_DIR \
+        $VOLUME_SRCDIR \
+        $VOLUME_DESTDIR \
+        $VOLUME_VARDESTDIR \
+        $VOLUME_IDENTITYDESTDIR \
+        $VOLUME_SIGDEFDESTDIR \
+        $VOLUME_IDENTITYBIGDESTDIR \
+        $VOLUME_TFPARAMETERSDESTDIR \
+        $VOLUME_SHAPEDESTDIR \
+        $VOLUME_RESHAPEDESTDIR \
+        $VOLUME_SEQDESTDIR \
+        $VOLUME_DYNASEQDESTDIR \
+        $VOLUME_DYNASEQIMPLICITDESTDIR \
+        $VOLUME_VARSEQDESTDIR \
+        $VOLUME_ENSEMBLEDESTDIR \
+        $VOLUME_NOSHAPEDESTDIR \
+        $VOLUME_PLGDESTDIR \
+        $VOLUME_RAGGEDDESTDIR \
+        $VOLUME_FORMATDESTDIR \
+        $VOLUME_DATADEPENDENTDIR \
+        $VOLUME_IMPLICITSEQDESTDIR \
+        $VOLUME_VARIMPLICITSEQDESTDIR \
+        $VOLUME_INITIALSTATEIMPLICITSEQDESTDIR \
+        $VOLUME_VARINITIALSTATEIMPLICITSEQDESTDIR \
+        $VOLUME_TORCHTRTDESTDIR \
+        $VOLUME_SCALARMODELSDESTDIR \
+        $VOLUME_IMAGEMODELSDESTDIR
 
 ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.cmds
 OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.cmds
@@ -219,20 +216,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
+docker cp $OPENVINOSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-# docker pull $UBUNTU_IMAGE
+docker pull $UBUNTU_IMAGE
 
 echo -e "\033[34m[ INFO ] - Running:  $OPENVINOSCRIPT \033[0m "
 
-# docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     $DOCKER_GPU_ARGS \
-#     -v $DOCKER_VOLUME:/mnt \
-#     $UBUNTU_IMAGE \
-#     bash -xe $VOLUME_SRCDIR/$OPENVINOSCRIPT
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    $UBUNTU_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$OPENVINOSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -302,20 +299,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
+docker cp $ONNXSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-# docker pull $UBUNTU_IMAGE
+docker pull $UBUNTU_IMAGE
 
 echo -e "\033[34m[ INFO ] - Running:  $ONNXSCRIPT \033[0m "
 
-# docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     $DOCKER_GPU_ARGS \
-#     -v $DOCKER_VOLUME:/mnt \
-#     $UBUNTU_IMAGE \
-#     bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    $UBUNTU_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$ONNXSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -367,20 +364,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
+docker cp $TORCHSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
 
-# docker pull $PYTORCH_IMAGE
+docker pull $PYTORCH_IMAGE
 
 echo -e "\033[34m[ INFO ] - Running:  $TORCHSCRIPT \033[0m "
 
-# docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     $DOCKER_GPU_ARGS \
-#     -v $DOCKER_VOLUME:/mnt \
-#     $PYTORCH_IMAGE \
-#     bash -xe $VOLUME_SRCDIR/$TORCHSCRIPT
+docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    $PYTORCH_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$TORCHSCRIPT
 
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -389,8 +386,8 @@ fi
 
 # TensorRT
 
-# docker pull ${TENSORRT_IMAGE}
-# TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
+docker pull ${TENSORRT_IMAGE}
+TENSORRT_VERSION="$(docker inspect ${TENSORRT_IMAGE} --format '{{index .Config.Labels "com.nvidia.tensorrt.version"}}' | cut -d . -f -2)"
 
 cat > $TRTSCRIPT <<EOF
 #!/bin/bash
@@ -456,20 +453,20 @@ if [ $? -ne 0 ]; then
 fi
 
 if [ "$MODEL_TYPE" != "igpu" ] ; then
-#   docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
-#   docker pull $TENSORRT_IMAGE
+  docker cp $TRTSCRIPT $DOCKER_VOLUME_CONTAINER:$VOLUME_SRCDIR
+  docker pull $TENSORRT_IMAGE
 
   echo -e "\033[34m[ INFO ] - Running:  $TRTSCRIPT \033[0m "
 
-#   docker run \
-#     --rm \
-#     --label RUNNER_ID=$RUNNER_ID \
-#     --label PROJECT_NAME=$PROJECT_NAME \
-#     $DOCKER_GPU_ARGS \
-#     -v $DOCKER_VOLUME:/mnt \
-#     -e TRT_VERBOSE \
-#     $TENSORRT_IMAGE \
-#     bash -xe $VOLUME_SRCDIR/$TRTSCRIPT
+  docker run \
+    --rm \
+    --label RUNNER_ID=$RUNNER_ID \
+    --label PROJECT_NAME=$PROJECT_NAME \
+    $DOCKER_GPU_ARGS \
+    -v $DOCKER_VOLUME:/mnt \
+    -e TRT_VERBOSE \
+    $TENSORRT_IMAGE \
+    bash -xe $VOLUME_SRCDIR/$TRTSCRIPT
 
   if [ $? -ne 0 ]; then
       echo -e "Failed"
@@ -478,11 +475,11 @@ if [ "$MODEL_TYPE" != "igpu" ] ; then
 
 fi
 
-# if [ -z $CI ] ; then
-#     echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
-#     docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
-#     echo -e "\033[34m[ INFO ] - Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
-#     docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
-#     echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
-#     docker volume rm $DOCKER_VOLUME
-# fi
+if [ -z $CI ] ; then
+    echo -e "\033[34m[ INFO ] - Copying generated models to /tmp/ \033[0m "
+    docker cp $DOCKER_VOLUME_CONTAINER:$VOLUME_BUILD_DIR/$TRITON_VERSION /tmp/
+    echo -e "\033[34m[ INFO ] - Removing Docker container $DOCKER_VOLUME_CONTAINER \033[0m "
+    docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
+    echo -e "\033[34m[ INFO ] - Removing Docker volume $DOCKER_VOLUME \033[0m "
+    docker volume rm $DOCKER_VOLUME
+fi
