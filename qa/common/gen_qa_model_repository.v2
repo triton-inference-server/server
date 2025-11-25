@@ -92,7 +92,7 @@ TRITON_MODELS_GEN_DEST_DIR_IDENTITY_BIG=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_
 TRITON_MODELS_GEN_DEST_DIR_SHAPETENSOR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_shapetensor_model_repository
 TRITON_MODELS_GEN_DEST_DIR_RESHAPE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_reshape_model_repository
 TRITON_MODELS_GEN_DEST_DIR_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_sequence_model_repository
-TRITON_MODELS_GEN_DYNASEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_dyna_sequence_model_repository
+TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_dyna_sequence_model_repository
 TRITON_MODELS_GEN_DYNASEQIMPLICITDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_dyna_sequence_implicit_model_repository
 TRITON_MODELS_GEN_VARSEQDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_variable_sequence_model_repository
 TRITON_MODELS_GEN_ENSEMBLEDEST_DIR=${TRITON_MODELS_GEN_BUILD_DIR}/${TRITON_VERSION}/qa_ensemble_model_repository
@@ -154,8 +154,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_reshape_models.py --openvino --models_
 chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_RESHAPE
 # python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$TRITON_MODELS_GEN_DEST_DIR_SEQUENCE
 # chmod -R 777 $STRITON_MODELS_GEN_EQDEST_DIR
-# python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$TRITON_MODELS_GEN_DYNASEQDEST_DIR
-# chmod -R 777 $TRITON_MODELS_GEN_DYNASEQDEST_DIR
+# python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
+# chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
 EOF
 
 log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
@@ -204,8 +204,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset
 chmod -R 777 $TRITON_MODELS_GEN_IMPLICITSEQDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_DYNASEQDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_DYNASEQDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_DYNASEQIMPLICITDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_DYNASEQIMPLICITDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MODELS_GEN_RAGGEDDEST_DIR
@@ -254,8 +254,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --libtorch --models
 chmod -R 777 $TRITON_MODELS_GEN_IMPLICITSEQDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MODELS_GEN_DYNASEQDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_DYNASEQDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
   nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MODELS_GEN_TORCHTRTDEST_DIR
   chmod -R 777 $TRITON_MODELS_GEN_TORCHTRTDEST_DIR
@@ -307,8 +307,8 @@ python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --tensorrt --models
 chmod -R 777 $TRITON_MODELS_GEN_IMPLICITSEQDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_VARIMPLICITSEQDEST_DIR
-python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DYNASEQDEST_DIR
-chmod -R 777 $TRITON_MODELS_GEN_DYNASEQDEST_DIR
+python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
+chmod -R 777 $TRITON_MODELS_GEN_DEST_DIR_DYNA_SEQUENCE
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$TRITON_MODELS_GEN_VARSEQDEST_DIR
 chmod -R 777 $TRITON_MODELS_GEN_VARSEQDEST_DIR
 python3 $TRITON_MODELS_GEN_SRC_DIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$TRITON_MODELS_GEN_DYNASEQIMPLICITDEST_DIR
