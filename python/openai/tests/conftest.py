@@ -32,6 +32,13 @@ from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line(
+        "markers", "openai: mark test to run with OpenAI server (subprocess)"
+    )
+
+
 ### TEST ENVIRONMENT SETUP ###
 def infer_test_environment(tool_call_parser):
     # Infer the test environment for simplicity in local dev/testing.
