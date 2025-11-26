@@ -590,7 +590,7 @@ class TestChatCompletionsTokenizers:
         # Tokenizers can be provided by a local file path to a directory containing
         # the relevant files such as tokenizer.json and tokenizer_config.json.
         custom_tokenizer_path = str(Path(__file__).parent / "custom_tokenizer")
-        download_cmd = f"huggingface-cli download --local-dir {custom_tokenizer_path} {tokenizer_model} --include *.json"
+        download_cmd = f"hf download --local-dir {custom_tokenizer_path} {tokenizer_model} --include *.json"
         print(f"Running download command: {download_cmd}")
         subprocess.run(download_cmd.split(), check=True)
 

@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.63.0dev",
+    "release_version": "2.64.0dev",
     "triton_container_version": "25.11dev",
-    "upstream_container_version": "25.10",
+    "upstream_container_version": "25.11",
     "ort_version": "1.23.2",
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
     "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.10.2",
+    "vllm_version": "0.11.0",
     "rhel_py_version": "3.12.3",
 }
 
@@ -1500,6 +1500,15 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
 
 ARG PYVER=3.12
 ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
+"""
+    if "tensorrtllm" in backends or "vllm" in backends:
+        df += """
+ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
+    TRITON_CUDART_PATH=/usr/local/cuda/include \\
+    TRITON_CUOBJDUMP_PATH=/usr/local/cuda/bin/cuobjdump \\
+    TRITON_CUPTI_PATH=/usr/local/cuda/include \\
+    TRITON_NVDISASM_PATH=/usr/local/cuda/bin/nvdisasm \\
+    TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 """
 
     if "dali" in backends:
