@@ -287,7 +287,8 @@ ParseModelConfig(
     }
   }
 
-  *is_torch_model = (model_metadata["platform"] == "pytorch_libtorch");
+  *is_torch_model = (model_metadata["platform"] == "pytorch_libtorch"
+                    || model_metadata["platform"] == "pytorch2_libtorch");
   return nullptr;
 }
 
