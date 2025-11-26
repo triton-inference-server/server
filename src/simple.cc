@@ -305,7 +305,8 @@ ParseModelMetadata(
 
   *is_int = (strcmp(seen_data_type.c_str(), "INT32") == 0);
   *is_torch_model =
-      (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0);
+      (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0)
+      || (strcmp(model_metadata["platform"].GetString(), "pytorch2_libtorch") == 0);
   return nullptr;
 }
 
