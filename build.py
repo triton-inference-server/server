@@ -32,6 +32,7 @@ import os
 import os.path
 import pathlib
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -692,17 +693,17 @@ def onnxruntime_cmake_args(images, library_paths):
             )
 
     if target_platform() == "windows":
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
     else:
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
         else:
@@ -758,17 +759,17 @@ def openvino_cmake_args():
         )
     ]
     if target_platform() == "windows":
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "openvino", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
     else:
-        if "base" in images:
+        if "buildbase" in images:
             cargs.append(
                 cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "openvino", "TRITON_BUILD_CONTAINER", None, images["buildbase"]
                 )
             )
         else:
@@ -805,9 +806,9 @@ def dali_cmake_args():
 
 def fil_cmake_args(images):
     cargs = [cmake_backend_enable("fil", "TRITON_FIL_DOCKER_BUILD", True)]
-    if "base" in images:
+    if "buildbase" in images:
         cargs.append(
-            cmake_backend_arg("fil", "TRITON_BUILD_CONTAINER", None, images["base"])
+            cmake_backend_arg("fil", "TRITON_BUILD_CONTAINER", None, images["buildbase"])
         )
     else:
         cargs.append(
@@ -1806,6 +1807,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 "--pull",
             ]
 
+        if FLAGS.no_container_cache:
+            baseargs += [
+                "--no-cache",
+            ]
+
         # Windows docker runs in a VM and memory needs to be specified
         # explicitly (at least for some configurations of docker).
         if target_platform() == "windows":
@@ -2076,14 +2082,14 @@ def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
 def backend_build(
     be,
     cmake_script,
-    tag,
+    tag_org,
     build_dir,
     install_dir,
-    github_organization,
     images,
     components,
     library_paths,
 ):
+    tag, github_organization = tag_org
     repo_build_dir = os.path.join(build_dir, be, "build")
     repo_install_dir = os.path.join(build_dir, be, "install")
 
@@ -2096,8 +2102,8 @@ def backend_build(
     if be == "tensorrtllm":
         github_organization = (
             "https://github.com/NVIDIA"
-            if "triton-inference-server" in FLAGS.github_organization
-            else FLAGS.github_organization
+            if "triton-inference-server" in github_organization
+            else github_organization
         )
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
@@ -2146,11 +2152,11 @@ def backend_build(
 def backend_clone(
     be,
     clone_script,
-    tag,
+    tag_org,
     build_dir,
     install_dir,
-    github_organization,
 ):
+    tag, github_organization = tag_org
     clone_script.commentln(8)
     clone_script.comment(f"'{be}' backend")
     clone_script.comment("Delete this section to remove backend from build")
@@ -2487,6 +2493,12 @@ if __name__ == "__main__":
         help="Do not use Docker --pull argument when building container.",
     )
     parser.add_argument(
+        "--no-container-cache",
+        action="store_true",
+        required=False,
+        help="Use Docker --no-cache argument when building container.",
+    )
+    parser.add_argument(
         "--container-memory",
         default=None,
         required=False,
@@ -2599,6 +2611,12 @@ if __name__ == "__main__":
         required=False,
         help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
     )
+    parser.add_argument(
+        "--use-buildbase",
+        default=False,
+        action="store_true",
+        help='Use local temporary "buildbase" Docker image as "base" image to build backends',
+    )
 
     parser.add_argument(
         "--enable-all",
@@ -2678,7 +2696,7 @@ if __name__ == "__main__":
         "--backend",
         action="append",
         required=False,
-        help='Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).',
+        help='Include specified backend in build as <backend-name>[:<repo-tag>][:<org>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main). <org> allows using a forked repository instead of the default --github-organization value.',
     )
     parser.add_argument(
         "--repo-tag",
@@ -2745,6 +2763,12 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
         help="This flag sets the upstream container version for Triton Inference Server to be built. Default: the latest released version.",
+    )
+    parser.add_argument(
+        "--default-repo-tag",
+        required=False,
+        default=None,
+        help="Override the calculated default-repo-tag value",
     )
     parser.add_argument(
         "--ort-version",
@@ -2888,6 +2912,8 @@ if __name__ == "__main__":
         cver = FLAGS.triton_container_version
     if not cver.endswith("dev"):
         default_repo_tag = "r" + cver
+    if FLAGS.default_repo_tag:
+        default_repo_tag = FLAGS.default_repo_tag
     log("default repo-tag: {}".format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
@@ -2907,11 +2933,14 @@ if __name__ == "__main__":
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
     for be in FLAGS.backend:
-        parts = be.split(":")
+        pattern = r"(https?:\/\/[^\s:]+)|:"
+        parts = list(filter(None,re.split(pattern, be)))
         if len(parts) == 1:
             parts.append(default_repo_tag)
-        log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
-        backends[parts[0]] = parts[1]
+        if len(parts) == 2:
+            parts.append(FLAGS.github_organization)
+        log('backend "{}" at tag/branch "{}" from org "{}"'.format(parts[0], parts[1], parts[2]))
+        backends[parts[0]] = parts[1:]
 
     if "vllm" in backends:
         if "python" not in backends:
@@ -2959,6 +2988,11 @@ if __name__ == "__main__":
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
+    if FLAGS.use_buildbase:
+        images["buildbase"] = "tritonserver_buildbase"
+    else:
+        if "base" in images:
+            images["buildbase"] = images["base"]
 
     # Initialize map of library paths for each backend.
     library_paths = {}
@@ -3117,7 +3151,6 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
                 )
             else:
                 backend_build(
@@ -3126,7 +3159,6 @@ if __name__ == "__main__":
                     backends[be],
                     script_build_dir,
                     script_install_dir,
-                    github_organization,
                     images,
                     components,
                     library_paths,
