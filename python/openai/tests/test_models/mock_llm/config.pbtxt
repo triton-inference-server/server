@@ -41,6 +41,12 @@ input [
     name: "stream"
     data_type: TYPE_BOOL
     dims: [ 1, 1 ]
+  },
+  {
+    name: "return_logprobs"
+    data_type: TYPE_BOOL
+    dims: [ 1, 1 ]
+    optional: true
   }
 ]
 
