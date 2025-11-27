@@ -559,7 +559,7 @@ class TestAsyncOpenAIClient:
         # Assert both streaming and non-streaming produce logprobs
         assert len(stream_logprobs) > 0, "Streaming should produce logprobs"
         assert len(stream_logprobs) == len(logprobs.content), "Same number of tokens"
-        
+
         # Validate streaming logprobs structure
         for stream_token in stream_logprobs:
             assert stream_token.token
@@ -652,12 +652,12 @@ class TestAsyncOpenAIClient:
         # Assert both streaming and non-streaming produce logprobs
         assert len(stream_tokens) > 0, "Streaming should produce logprobs"
         assert len(stream_tokens) == len(logprobs.tokens), "Same number of tokens"
-        
+
         # Validate streaming logprobs structure
         assert len(stream_token_logprobs) == len(stream_tokens)
         assert len(stream_text_offsets) == len(stream_tokens)
         assert len(stream_top_logprobs) == len(stream_tokens)
-        
+
         for i in range(len(stream_tokens)):
             assert isinstance(stream_tokens[i], str)
             assert isinstance(stream_token_logprobs[i], float)
