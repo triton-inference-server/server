@@ -68,6 +68,7 @@ from engine.utils.triton import (
 from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
+    ChatCompletionLogprobs,
     ChatCompletionMessageToolCall,
     ChatCompletionMessageToolCallChunk,
     ChatCompletionNamedToolChoice,
@@ -88,7 +89,6 @@ from schemas.openai import (
     FinishReason,
     Function1,
     Function2,
-    Logprobs2,
     Model,
     ObjectType,
 )
@@ -265,7 +265,7 @@ class TritonLLMEngine(LLMEngine):
                 response
             )
             if openai_logprobs:
-                logprobs_data = Logprobs2(content=openai_logprobs)
+                logprobs_data = ChatCompletionLogprobs(content=openai_logprobs)
 
         return CreateChatCompletionResponse(
             id=request_id,
@@ -631,7 +631,7 @@ class TritonLLMEngine(LLMEngine):
                     response
                 )
                 if openai_logprobs:
-                    chunk_logprobs = Logprobs2(content=openai_logprobs)
+                    chunk_logprobs = ChatCompletionLogprobs(content=openai_logprobs)
 
             # if the response delta is None (e.g. because it was a
             # "control token" for tool calls or the parser otherwise

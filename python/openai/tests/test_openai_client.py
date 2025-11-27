@@ -487,7 +487,7 @@ class TestAsyncOpenAIClient:
     async def test_chat_completion_logprobs(
         self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
     ):
-        """Test logprobs for chat completions."""
+        """Test logprobs for chat completions and compare streaming vs non-streaming."""
         # Non-vLLM backends should raise an error
         if backend != "vllm":
             with pytest.raises(openai.BadRequestError) as exc_info:
@@ -503,12 +503,18 @@ class TestAsyncOpenAIClient:
             )
             return
 
+        # Test non-streaming
+        seed = 0
+        temperature = 0.0
         chat_completion = await client.chat.completions.create(
             model=model,
             messages=messages,
             logprobs=True,
             top_logprobs=2,
             max_tokens=10,
+            temperature=temperature,
+            seed=seed,
+            stream=False,
         )
 
         assert chat_completion.choices[0].message.content
@@ -525,6 +531,40 @@ class TestAsyncOpenAIClient:
             assert isinstance(token_logprob.bytes, list)
             assert token_logprob.top_logprobs is not None
             assert len(token_logprob.top_logprobs) > 0
+
+        # Test streaming and compare with non-streaming
+        stream = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            logprobs=True,
+            top_logprobs=2,
+            max_tokens=10,
+            temperature=temperature,
+            seed=seed,
+            stream=True,
+        )
+
+        chunks = []
+        stream_logprobs = []
+        async for chunk in stream:
+            if chunk.choices[0].delta.content:
+                chunks.append(chunk.choices[0].delta.content)
+            if chunk.choices[0].logprobs and chunk.choices[0].logprobs.content:
+                stream_logprobs.extend(chunk.choices[0].logprobs.content)
+
+        # Assert streaming output matches non-streaming
+        streamed_output = "".join(chunks)
+        assert streamed_output == chat_completion.choices[0].message.content
+
+        # Assert logprobs from streaming match non-streaming
+        assert len(stream_logprobs) > 0, "Streaming should produce logprobs"
+        assert len(stream_logprobs) == len(logprobs.content)
+        for i, (stream_token, non_stream_token) in enumerate(
+            zip(stream_logprobs, logprobs.content)
+        ):
+            assert stream_token.token == non_stream_token.token
+            assert stream_token.logprob == non_stream_token.logprob
+            assert stream_token.bytes == non_stream_token.bytes
 
     @pytest.mark.asyncio
     async def test_completion_logprobs(
@@ -545,11 +585,17 @@ class TestAsyncOpenAIClient:
             )
             return
 
+        # Test non-streaming
+        seed = 0
+        temperature = 0.0
         completion = await client.completions.create(
             model=model,
             prompt=prompt,
             logprobs=3,
             max_tokens=10,
+            temperature=temperature,
+            seed=seed,
+            stream=False,
         )
 
         assert completion.choices[0].text
@@ -566,93 +612,48 @@ class TestAsyncOpenAIClient:
         assert len(logprobs.text_offset) == num_tokens
         assert len(logprobs.top_logprobs) == num_tokens
 
-    @pytest.mark.asyncio
-    async def test_chat_streaming_with_logprobs(
-        self, client: openai.AsyncOpenAI, backend: str, model: str, messages: List[dict]
-    ):
-        """Test streaming chat completions with logprobs."""
-        # Non-vLLM backends should raise an error
-        if backend != "vllm":
-            with pytest.raises(openai.BadRequestError) as exc_info:
-                stream = await client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=10,
-                    stream=True,
-                    logprobs=True,
-                    top_logprobs=2,
-                )
-                # Try to consume the stream (error should happen before streaming starts)
-                async for _ in stream:
-                    pass
-            assert "logprobs are currently available only for the vLLM backend" in str(
-                exc_info.value
-            )
-            return
-
-        stream = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=10,
-            stream=True,
-            logprobs=True,
-            top_logprobs=2,
-        )
-
-        chunks_with_logprobs = 0
-        async for chunk in stream:
-            if chunk.choices[0].logprobs is not None:
-                chunks_with_logprobs += 1
-                logprobs = chunk.choices[0].logprobs
-                assert logprobs.content is not None
-                assert len(logprobs.content) > 0
-
-        # At least some chunks should have logprobs
-        assert chunks_with_logprobs > 0
-
-    @pytest.mark.asyncio
-    async def test_completion_streaming_with_logprobs(
-        self, client: openai.AsyncOpenAI, backend: str, model: str, prompt: str
-    ):
-        """Test streaming completions with logprobs."""
-        # Non-vLLM backends should raise an error
-        if backend != "vllm":
-            with pytest.raises(openai.BadRequestError) as exc_info:
-                stream = await client.completions.create(
-                    model=model,
-                    prompt=prompt,
-                    max_tokens=10,
-                    stream=True,
-                    logprobs=3,
-                )
-                # Try to consume the stream (error should happen before streaming starts)
-                async for _ in stream:
-                    pass
-            assert "logprobs are currently available only for the vLLM backend" in str(
-                exc_info.value
-            )
-            return
-
+        # Test streaming and compare with non-streaming
         stream = await client.completions.create(
             model=model,
             prompt=prompt,
-            max_tokens=10,
-            stream=True,
             logprobs=3,
+            max_tokens=10,
+            temperature=temperature,
+            seed=seed,
+            stream=True,
         )
 
-        chunks_with_logprobs = 0
-        async for chunk in stream:
-            if chunk.choices[0].logprobs is not None:
-                chunks_with_logprobs += 1
-                logprobs = chunk.choices[0].logprobs
-                assert logprobs.tokens is not None
-                assert logprobs.token_logprobs is not None
-                assert logprobs.text_offset is not None
-                assert logprobs.top_logprobs is not None
+        chunks = []
+        stream_tokens = []
+        stream_token_logprobs = []
+        stream_text_offsets = []
+        stream_top_logprobs = []
 
-        # At least some chunks should have logprobs
-        assert chunks_with_logprobs > 0
+        async for chunk in stream:
+            if chunk.choices[0].text:
+                chunks.append(chunk.choices[0].text)
+            if chunk.choices[0].logprobs:
+                lp = chunk.choices[0].logprobs
+                if lp.tokens:
+                    stream_tokens.extend(lp.tokens)
+                if lp.token_logprobs:
+                    stream_token_logprobs.extend(lp.token_logprobs)
+                if lp.text_offset:
+                    stream_text_offsets.extend(lp.text_offset)
+                if lp.top_logprobs:
+                    stream_top_logprobs.extend(lp.top_logprobs)
+
+        # Assert streaming output matches non-streaming
+        streamed_output = "".join(chunks)
+        assert streamed_output == completion.choices[0].text
+
+        # Assert logprobs from streaming match non-streaming
+        assert len(stream_tokens) > 0, "Streaming should produce logprobs"
+        assert len(stream_tokens) == len(logprobs.tokens)
+        assert stream_tokens == logprobs.tokens
+        assert stream_token_logprobs == logprobs.token_logprobs
+        assert stream_text_offsets == logprobs.text_offset
+        assert stream_top_logprobs == logprobs.top_logprobs
 
     @pytest.mark.parametrize("top_logprobs_value", [0, 5])
     @pytest.mark.asyncio

@@ -427,36 +427,37 @@ class TestCompletions:
         assert "logprobs" in choice
         logprobs = choice["logprobs"]
 
-        if logprobs is not None:
-            assert "text_offset" in logprobs
-            assert "token_logprobs" in logprobs
-            assert "tokens" in logprobs
-            assert "top_logprobs" in logprobs
+        assert logprobs is not None
+        assert "text_offset" in logprobs
+        assert "token_logprobs" in logprobs
+        assert "tokens" in logprobs
+        assert "top_logprobs" in logprobs
 
-            assert isinstance(logprobs["text_offset"], list)
-            assert isinstance(logprobs["token_logprobs"], list)
-            assert isinstance(logprobs["tokens"], list)
-            assert isinstance(logprobs["top_logprobs"], list)
+        assert isinstance(logprobs["text_offset"], list)
+        assert isinstance(logprobs["token_logprobs"], list)
+        assert isinstance(logprobs["tokens"], list)
+        assert isinstance(logprobs["top_logprobs"], list)
 
-            # All lists should have the same length
-            num_tokens = len(logprobs["tokens"])
-            assert len(logprobs["text_offset"]) == num_tokens
-            assert len(logprobs["token_logprobs"]) == num_tokens
-            assert len(logprobs["top_logprobs"]) == num_tokens
+        # All lists should have the same length
+        num_tokens = len(logprobs["tokens"])
+        assert len(logprobs["text_offset"]) == num_tokens
+        assert len(logprobs["token_logprobs"]) == num_tokens
+        assert len(logprobs["top_logprobs"]) == num_tokens
 
-            # Validate each token
-            for i in range(num_tokens):
-                assert isinstance(logprobs["tokens"][i], str)
-                assert isinstance(logprobs["token_logprobs"][i], (int, float))
-                assert isinstance(logprobs["text_offset"][i], int)
-                assert isinstance(logprobs["top_logprobs"][i], dict)
+        # Validate each token
+        for i in range(num_tokens):
+            assert isinstance(logprobs["tokens"][i], str)
+            assert isinstance(logprobs["token_logprobs"][i], (int, float))
+            assert isinstance(logprobs["text_offset"][i], int)
+            assert isinstance(logprobs["top_logprobs"][i], dict)
 
-                # Validate top_logprobs dict contains token -> logprob mappings
-                for token, logprob in logprobs["top_logprobs"][i].items():
-                    assert isinstance(token, str)
-                    assert isinstance(logprob, (int, float))
+            # Validate top_logprobs dict contains token -> logprob mappings
+            for token, logprob in logprobs["top_logprobs"][i].items():
+                assert isinstance(token, str)
+                assert isinstance(logprob, (int, float))
 
-        # Test that logprobs=0 returns no logprobs
+    def test_completions_logprobs_zero(self, client, model: str, prompt: str):
+        """Test that logprobs=0 returns no logprobs."""
         response = client.post(
             "/v1/completions",
             json={
@@ -474,13 +475,14 @@ class TestCompletions:
         choice = response_json["choices"][0]
         assert choice.get("logprobs") is None
 
-        # Test that logprobs > 5 is rejected by schema validation
+    def test_completions_logprobs_validation(self, client, model: str, prompt: str):
+        """Test that logprobs > 5 is rejected by schema validation."""
         response = client.post(
             "/v1/completions",
             json={
                 "model": model,
                 "prompt": prompt,
-                "logprobs": 7,
+                "logprobs": 7,  # Exceeds maximum of 5
                 "max_tokens": 5,
             },
         )

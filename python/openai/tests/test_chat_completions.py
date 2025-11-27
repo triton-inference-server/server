@@ -573,31 +573,34 @@ class TestChatCompletions:
         assert "logprobs" in choice
         logprobs = choice["logprobs"]
 
-        if logprobs is not None:
-            assert "content" in logprobs
-            content = logprobs["content"]
-            assert isinstance(content, list)
-            assert len(content) > 0
+        assert logprobs is not None
+        assert "content" in logprobs
+        content = logprobs["content"]
+        assert isinstance(content, list)
+        assert len(content) > 0
 
-            # Validate structure of each token logprob
-            for token_logprob in content:
-                assert "token" in token_logprob
-                assert "logprob" in token_logprob
-                assert "bytes" in token_logprob
-                assert "top_logprobs" in token_logprob
+        # Validate structure of each token logprob
+        for token_logprob in content:
+            assert "token" in token_logprob
+            assert "logprob" in token_logprob
+            assert "bytes" in token_logprob
+            assert "top_logprobs" in token_logprob
 
-                assert isinstance(token_logprob["token"], str)
-                assert isinstance(token_logprob["logprob"], (int, float))
-                assert isinstance(token_logprob["bytes"], list)
-                assert isinstance(token_logprob["top_logprobs"], list)
+            assert isinstance(token_logprob["token"], str)
+            assert isinstance(token_logprob["logprob"], (int, float))
+            assert isinstance(token_logprob["bytes"], list)
+            assert isinstance(token_logprob["top_logprobs"], list)
 
-                # Validate top_logprobs structure
-                for top_logprob in token_logprob["top_logprobs"]:
-                    assert "token" in top_logprob
-                    assert "logprob" in top_logprob
-                    assert "bytes" in top_logprob
+            # Validate top_logprobs structure
+            for top_logprob in token_logprob["top_logprobs"]:
+                assert "token" in top_logprob
+                assert "logprob" in top_logprob
+                assert "bytes" in top_logprob
 
-        # Test that logprobs=False returns no logprobs
+    def test_chat_completions_logprobs_false(
+        self, client, model: str, messages: List[dict]
+    ):
+        """Test that logprobs=False returns no logprobs."""
         response = client.post(
             "/v1/chat/completions",
             json={
@@ -615,27 +618,32 @@ class TestChatCompletions:
         choice = response_json["choices"][0]
         assert choice.get("logprobs") is None
 
-        # Test that top_logprobs without logprobs raises an error
-        # Test multiple values including edge case top_logprobs=0
-        for top_logprobs_value in [0, 2, 10]:
-            response = client.post(
-                "/v1/chat/completions",
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "top_logprobs": top_logprobs_value,
-                    "max_tokens": 10,
-                },
-            )
+    @pytest.mark.parametrize("top_logprobs_value", [0, 5])
+    def test_chat_completions_top_logprobs_without_logprobs(
+        self, client, model: str, messages: List[dict], top_logprobs_value: int
+    ):
+        """Test that top_logprobs without logprobs raises validation error."""
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "top_logprobs": top_logprobs_value,
+                "max_tokens": 10,
+            },
+        )
 
-            # Should raise validation error for any value when logprobs is not True
-            assert response.status_code == 400
-            assert (
-                "`top_logprobs` can only be used when `logprobs` is True"
-                in response.json()["detail"]
-            )
+        # Should raise validation error for any value when logprobs is not True
+        assert response.status_code == 400
+        assert (
+            "`top_logprobs` can only be used when `logprobs` is True"
+            in response.json()["detail"]
+        )
 
-        # Test that top_logprobs > 20 is rejected by schema validation
+    def test_chat_completions_top_logprobs_validation(
+        self, client, model: str, messages: List[dict]
+    ):
+        """Test that top_logprobs > 20 is rejected by schema validation."""
         response = client.post(
             "/v1/chat/completions",
             json={
