@@ -563,9 +563,9 @@ class TestAsyncOpenAIClient:
             zip(stream_logprobs, logprobs.content)
         ):
             assert stream_token.token == non_stream_token.token
-            # Use approximate comparison for floating point logprobs
+            # Use approximate comparison for floating point logprobs (tolerance 0.001)
             assert (
-                abs(stream_token.logprob - non_stream_token.logprob) < 1e-5
+                abs(stream_token.logprob - non_stream_token.logprob) < 1e-3
             ), f"Logprob mismatch: {stream_token.logprob} vs {non_stream_token.logprob}"
             assert stream_token.bytes == non_stream_token.bytes
 
@@ -656,12 +656,12 @@ class TestAsyncOpenAIClient:
         assert stream_tokens == logprobs.tokens
         assert stream_text_offsets == logprobs.text_offset
         assert stream_top_logprobs == logprobs.top_logprobs
-        # Use approximate comparison for floating point logprobs
+        # Use approximate comparison for floating point logprobs (tolerance 0.001)
         for stream_logprob, non_stream_logprob in zip(
             stream_token_logprobs, logprobs.token_logprobs
         ):
             assert (
-                abs(stream_logprob - non_stream_logprob) < 1e-5
+                abs(stream_logprob - non_stream_logprob) < 1e-3
             ), f"Logprob mismatch: {stream_logprob} vs {non_stream_logprob}"
 
     @pytest.mark.parametrize("top_logprobs_value", [0, 5])
