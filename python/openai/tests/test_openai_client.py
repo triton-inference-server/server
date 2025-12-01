@@ -26,6 +26,7 @@
 
 from typing import List
 
+import numpy as np
 import openai
 import pytest
 
@@ -560,13 +561,16 @@ class TestAsyncOpenAIClient:
         assert len(stream_logprobs) > 0, "Streaming should produce logprobs"
         assert len(stream_logprobs) == len(logprobs.content), "Same number of tokens"
 
-        # Validate streaming logprobs structure
-        for stream_token in stream_logprobs:
-            assert stream_token.token
-            assert isinstance(stream_token.logprob, float)
-            assert isinstance(stream_token.bytes, list)
-            assert stream_token.top_logprobs is not None
-            assert len(stream_token.top_logprobs) > 0
+        # Compare tokens and logprob values (using np.allclose for float comparison)
+        stream_tokens_list = [t.token for t in stream_logprobs]
+        non_stream_tokens_list = [t.token for t in logprobs.content]
+        stream_logprobs_values = [t.logprob for t in stream_logprobs]
+        non_stream_logprobs_values = [t.logprob for t in logprobs.content]
+
+        assert stream_tokens_list == non_stream_tokens_list, "Tokens should match"
+        assert np.allclose(
+            stream_logprobs_values, non_stream_logprobs_values, rtol=0, atol=1e-3
+        ), "Logprob values should be close"
 
     @pytest.mark.asyncio
     async def test_completion_logprobs(
@@ -649,21 +653,13 @@ class TestAsyncOpenAIClient:
         streamed_output = "".join(chunks)
         assert streamed_output == completion.choices[0].text
 
-        # Assert both streaming and non-streaming produce logprobs
-        assert len(stream_tokens) > 0, "Streaming should produce logprobs"
-        assert len(stream_tokens) == len(logprobs.tokens), "Same number of tokens"
-
-        # Validate streaming logprobs structure
-        assert len(stream_token_logprobs) == len(stream_tokens)
-        assert len(stream_text_offsets) == len(stream_tokens)
-        assert len(stream_top_logprobs) == len(stream_tokens)
-
-        for i in range(len(stream_tokens)):
-            assert isinstance(stream_tokens[i], str)
-            assert isinstance(stream_token_logprobs[i], float)
-            assert isinstance(stream_text_offsets[i], int)
-            assert isinstance(stream_top_logprobs[i], dict)
-            assert len(stream_top_logprobs[i]) > 0
+        # Compare values (using np.allclose for float comparison)
+        assert stream_tokens == logprobs.tokens, "Tokens should match"
+        assert stream_text_offsets == logprobs.text_offset, "Text offsets should match"
+        assert stream_top_logprobs == logprobs.top_logprobs, "Top logprobs should match"
+        assert np.allclose(
+            stream_token_logprobs, logprobs.token_logprobs, rtol=0, atol=1e-3
+        ), "Token logprob values should be close"
 
     @pytest.mark.parametrize("top_logprobs_value", [0, 5])
     @pytest.mark.asyncio
