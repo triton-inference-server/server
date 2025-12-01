@@ -864,8 +864,8 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
     && dnf clean expire-cache \\
     && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core.aarch64=1:{} \\
-                 datacenter-gpu-manager-4-devel.aarch64=1:{}
+                 datacenter-gpu-manager-4-core-{} \\
+                 datacenter-gpu-manager-4-devel-{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
@@ -877,8 +877,8 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
     && dnf clean expire-cache \\
     && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core.x86_64=1:{} \\
-                 datacenter-gpu-manager-4-devel.x86_64=1:{}
+                 datacenter-gpu-manager-4-core-{} \\
+                 datacenter-gpu-manager-4-devel-{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
