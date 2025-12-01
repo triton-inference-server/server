@@ -77,7 +77,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.23.2",
     "ort_openvino_version": "2025.3.0",
     "standalone_openvino_version": "2025.3.0",
-    "dcgm_version": "4.4.0-1",
+    "dcgm_version": "4.4.2-1",
     "vllm_version": "0.11.0",
     "rhel_py_version": "3.12.3",
 }
@@ -862,6 +862,7 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
                  datacenter-gpu-manager-4-core=1:{} \\
                  datacenter-gpu-manager-4-devel=1:{}
@@ -874,6 +875,7 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
                  datacenter-gpu-manager-4-core=1:{} \\
                  datacenter-gpu-manager-4-devel=1:{}
@@ -889,7 +891,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                   datacenter-gpu-manager-4-core=1:{} \\
                   datacenter-gpu-manager-4-dev=1:{}
@@ -904,7 +906,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
           https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                    datacenter-gpu-manager-4-core=1:{} \\
                    datacenter-gpu-manager-4-dev=1:{}
