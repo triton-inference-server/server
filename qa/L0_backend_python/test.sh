@@ -522,7 +522,7 @@ SUBTESTS="lifecycle argument_validation logging custom_metrics parameters"
 # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     # TODO: Reimplement restart on decoupled data pipeline and enable restart.
-    SUBTESTS+=" model_control examples request_rescheduling"
+    SUBTESTS+=" model_control examples request_rescheduling model_ready_check"
 fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts
