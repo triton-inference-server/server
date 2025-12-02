@@ -345,7 +345,7 @@ if [ $? -ne 0 ]; then
 fi
 
 log_message.status "check: engine installation"
-if which -s docker ; then
+if which docker ; then
     log_message.info "Docker is installed."
 
     if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
@@ -498,7 +498,7 @@ if which -s docker ; then
         docker volume rm $DOCKER_VOLUME
     fi # [ -z $CI ]
 
-elif which -s enroot ; then
+elif which enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
 else
     log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
