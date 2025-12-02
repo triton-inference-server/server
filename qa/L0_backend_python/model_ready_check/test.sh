@@ -68,7 +68,7 @@ for SIGNAL in 11 9; do
     fi
 
     # 2. Find the stub process PID
-    stub_pid=$(pgrep -f "triton_python_backend_stub*")
+    stub_pid=$(pgrep -f "triton_python_backend_stub")
 
     if [ -z "$stub_pid" ]; then
         echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Could not find stub process \n***"
