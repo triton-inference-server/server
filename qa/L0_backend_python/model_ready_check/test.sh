@@ -60,7 +60,7 @@ for SIGNAL in 11 9; do
 
     set +e
 
-    # 1. Verify model is initially ready    
+    # 1. Verify model is initially ready
     echo "Checking Initial Readiness..."
     python3 -m unittest check_model_ready.ModelReadyTest.test_model_ready
     if [ $? -ne 0 ]; then
