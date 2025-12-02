@@ -77,7 +77,7 @@ class ModelReadyTest(unittest.TestCase):
             is_ready = self.client_grpc.is_model_ready(self.model_name)
             self.assertFalse(
                 is_ready,
-                f"[gRPC] Model {self.model_name} should be NOT READY but is READY",
+                f"[gRPC] Model {self.model_name} should be NOT READY but is READY.",
             )
         except Exception as e:
             self.fail(f"[gRPC] Unexpected error: {str(e)}")
