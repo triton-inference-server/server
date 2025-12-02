@@ -89,7 +89,7 @@ for SIGNAL in 11 9; do
             echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Model reported ready after kill \n***"
             RET=1
         else
-            echo "***\n  Model Ready Check Passed for Signal $SIGNAL"
+            echo -e "\n***\n  Model Ready Check Passed for Signal $SIGNAL"
         fi
     fi
 
