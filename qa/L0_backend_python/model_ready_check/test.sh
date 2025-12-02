@@ -42,14 +42,11 @@ cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.
 
 #
 # Test Model Ready Check (TRITONBACKEND_ModelInstanceReady)
-# Test with different signals to simulate various crash/exit scenarios:
+# Test with different signals to simulate various crash/exit scenarios
 # 11 (SIGSEGV) - Segmentation fault / crash
 # 9  (SIGKILL) - Force kill
-#
 for SIGNAL in 11 9; do
-    echo "----------------------------------------------------------------"
-    echo "Testing Model Ready Check with Signal $SIGNAL"
-    echo "----------------------------------------------------------------"
+    echo -e "\n***\n*** Testing Model Ready Check with Signal $SIGNAL\n***"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -72,7 +69,7 @@ for SIGNAL in 11 9; do
 
     # 2. Find the stub process PID
     stub_pid=$(pgrep -f "triton_python_backend_stub*")
-    
+
     if [ -z "$stub_pid" ]; then
         echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Could not find stub process \n***"
         RET=1
