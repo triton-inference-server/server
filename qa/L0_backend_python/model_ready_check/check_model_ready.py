@@ -67,7 +67,7 @@ class ModelReadyTest(unittest.TestCase):
             is_ready = self.client_http.is_model_ready(self.model_name)
             self.assertFalse(
                 is_ready,
-                f"[HTTP] Model {self.model_name} should be NOT READY but is READY.",
+                f"[HTTP] Model {self.model_name} should be NOT READY but is READY",
             )
         except Exception as e:
             self.fail(f"[HTTP] Unexpected error: {str(e)}")
