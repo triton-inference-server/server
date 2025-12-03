@@ -1535,6 +1535,16 @@ RUN curl -o /tmp/cuda-keyring.deb \\
             repo_arch=repo_arch
         )
 
+    if target_platform() == "rhel":
+        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+        df += """
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/{repo_arch}/cuda-rhel8.repo \\
+    && dnf clean expire-cache \\
+    && dnf install --assumeyes libnvshmem3-cuda-13
+""".format(
+            repo_arch=repo_arch
+        )
+
     df += """
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
