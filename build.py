@@ -1519,31 +1519,10 @@ ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
-    if target_platform() not in ["igpu", "windows", "rhel"]:
-        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
-        df += f"""
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{repo_arch}/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends libnvshmem3-cuda-13 \\
-      && rm -rf /var/lib/apt/lists/* \\
-      && dpkg -L libnvshmem3-cuda-13 | grep libnvshmem_host.so | sed -e 's/libnvshmem_host.*//g' | sort -u > /etc/ld.so.conf.d/libnvshmem3-cuda-13.conf \\
-      && ldconfig
-""".format(
-            repo_arch=repo_arch
-        )
-
     if target_platform() == "rhel":
-        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
         df += """
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/{repo_arch}/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf install --assumeyes libnvshmem3-cuda-13
-""".format(
-            repo_arch=repo_arch
-        )
+RUN dirname  $(find /usr -name "libcudart*.so" -o  -name "libnvinf*.so" -o -name "libnvshm*" ) | sort -u > /etc/ld.so.conf.d/triton-cuda-libs.conf && ldconfig
+"""
 
     df += """
 WORKDIR /opt/tritonserver
