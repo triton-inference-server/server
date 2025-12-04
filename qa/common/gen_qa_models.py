@@ -1028,7 +1028,6 @@ def create_libtorch_modelfile(
     output1_dtype,
     swap=False,
 ):
-    print("<<<< create_libtorch_modelfile >>>>", flush=True)
     if not tu.validate_for_libtorch_model(
         input_dtype,
         output0_dtype,
@@ -1296,7 +1295,6 @@ def create_torch_aoti_modelfile(
     output1_dtype,
     swap=False,
 ):
-    print("<<<< create_torch_inductor_modelfile >>>>", flush=True)
     if not tu.validate_for_libtorch_model(
         input_dtype,
         output0_dtype,
@@ -1353,7 +1351,6 @@ def create_libtorch_modelconfig(
     output0_label_cnt,
     version_policy,
 ):
-    print("<<<< create_libtorch_modelconfig >>>>", flush=True)
     if not tu.validate_for_libtorch_model(
         input_dtype,
         output0_dtype,
@@ -1455,7 +1452,6 @@ def create_torch_aoti_modelconfig(
     output0_label_cnt,
     version_policy,
 ):
-    print("<<<< create_torch_aoti_modelconfig >>>>", flush=True)
     if max_batch <= 0:
         raise ValueError("torch aot inductor model must have max_batch > 0")
     if not tu.validate_for_libtorch_model(
