@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,7 +46,10 @@ def generate_model(model_dir):
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, "model.pt2")
 
-    ep = torch.export.export(model, (torch.randn(4), torch.randn(4)),)
+    ep = torch.export.export(
+      model,
+      (torch.randn(4), torch.randn(4)),
+    )
 
     torch.export.save(ep, model_path)
 

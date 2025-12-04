@@ -1328,6 +1328,7 @@ def create_torch_aoti_modelfile(
         def __init__(self, swap):
             self.swap = swap
             super(AddSubNet2, self).__init__()
+
         def forward(self, INPUT0, INPUT1):
             op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
             op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
