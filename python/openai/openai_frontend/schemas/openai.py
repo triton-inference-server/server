@@ -530,7 +530,7 @@ class ChatCompletionTokenLogprob(BaseModel):
     )
 
 
-class Logprobs2(BaseModel):
+class ChatCompletionLogprobs(BaseModel):
     content: List[ChatCompletionTokenLogprob] = Field(
         ...,
         description="A list of message content tokens with log probability information.",
@@ -539,7 +539,7 @@ class Logprobs2(BaseModel):
 
 class ChatCompletionStreamingResponseChoice(BaseModel):
     delta: ChatCompletionStreamResponseDelta
-    logprobs: Optional[Logprobs2] = Field(
+    logprobs: Optional[ChatCompletionLogprobs] = Field(
         None, description="Log probability information for the choice."
     )
     finish_reason: ChatCompletionFinishReason | None = Field(
@@ -730,7 +730,7 @@ class ChatCompletionChoice(BaseModel):
         ..., description="The index of the choice in the list of choices."
     )
     message: ChatCompletionResponseMessage
-    logprobs: Logprobs2 | None = Field(
+    logprobs: ChatCompletionLogprobs | None = Field(
         ..., description="Log probability information for the choice."
     )
 
