@@ -1384,6 +1384,7 @@ def create_libtorch_modelconfig(
     )
     config_dir = models_dir + "/" + model_name
     config = """
+backend: "pytorch"
 name: "{}"
 platform: "pytorch_libtorch"
 max_batch_size: {}
