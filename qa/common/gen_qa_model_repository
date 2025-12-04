@@ -80,50 +80,54 @@ DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
-log_message.status "define: model output directories"
-TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
-TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
-TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
-TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
-TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
-TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
-TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
-TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
-TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
+function define_model_output_directories() {
+    log_message.status "define: model output directories"
+    TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
+    TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
+    TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
+    TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
+    TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
+    TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+    TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+    TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+    TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+    TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+    TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+    TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+    TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+    TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+    TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+    TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+    TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
+    TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
+    TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+    TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
+}
 
-log_message.status "define: script names"
+function define_models_generation_scripts() {
+    log_message.status "define: script names"
+    SCRIPT_NAME_SUFFIX=${SCRIPT_NAME_SUFFIX:-v2}
 
-OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.v2.sh
-log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
+    OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
 
-ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.v2.sh
-log_message.info "ONNX script: " "${ONNXSCRIPT}"
+    ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "ONNX script: " "${ONNXSCRIPT}"
 
-TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.v2.sh
-log_message.info "PyTorch script: " "${TORCHSCRIPT}"
+    TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "PyTorch script: " "${TORCHSCRIPT}"
 
-TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.v2.sh
-log_message.info "TensorRT script: " "${TRTSCRIPT}"
+    TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "TensorRT script: " "${TRTSCRIPT}"
 
-log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
-cat > $OPENVINOSCRIPT <<EOF
+    log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
+    cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -157,16 +161,16 @@ chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 # chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
-chmod a+x $OPENVINOSCRIPT
+    log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
+    chmod a+x $OPENVINOSCRIPT
 
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${OPENVINOSCRIPT}"
-    exit 1
-fi
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${OPENVINOSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: ONNX script - ${ONNXSCRIPT}"
-cat > $ONNXSCRIPT <<EOF
+    log_message.status "create: ONNX script - ${ONNXSCRIPT}"
+    cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -220,15 +224,15 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --variable --m
 chmod -R 777 $TRITON_MDLS_QA_ENSEMBLE_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${ONNXSCRIPT}"
-chmod a+x ${ONNXSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${ONNXSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${ONNXSCRIPT}"
+    chmod a+x ${ONNXSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${ONNXSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
-cat > $TORCHSCRIPT <<EOF
+    log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
+    cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -272,15 +276,15 @@ cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $TRITON_MDLS_QA_CUSTO
 chmod -R 777 $TRITON_MDLS_QA_CUSTOM_OPS
 EOF
 
-log_message.status "run: chmod a+x ${TORCHSCRIPT}"
-chmod a+x ${TORCHSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${TORCHSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${TORCHSCRIPT}"
+    chmod a+x ${TORCHSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${TORCHSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: TensorRT script - ${TRTSCRIPT}"
-cat > $TRTSCRIPT <<EOF
+    log_message.status "create: TensorRT script - ${TRTSCRIPT}"
+    cat > $TRTSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -337,12 +341,14 @@ LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so python3 $T
 chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${TRTSCRIPT}"
-chmod a+x ${TRTSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${TRTSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${TRTSCRIPT}"
+    chmod a+x ${TRTSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${TRTSCRIPT}"
+        exit 1
+    fi
+
+}
 
 log_message.status "check: engine installation"
 if which docker-remove-upon-merge ; then
@@ -500,6 +506,10 @@ if which docker-remove-upon-merge ; then
 
 elif which enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
+    enroot import docker://$UBUNTU_IMAGE
+
+
+
 else
     log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
     log_message.warning "Please install either Docker or NVIDIA Enroot to generate the models." ;
