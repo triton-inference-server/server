@@ -345,7 +345,7 @@ if [ $? -ne 0 ]; then
 fi
 
 log_message.status "check: engine installation"
-if which docker ; then
+if which docker-remove-upon-merge ; then
     log_message.info "Docker is installed."
 
     if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
