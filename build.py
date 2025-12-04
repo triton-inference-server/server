@@ -1518,8 +1518,9 @@ ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
     if target_platform() not in ["igpu", "windows", "rhel"]:
-        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
-        df += f"""
+        if FLAGS.triton_wheels_dependencies_group != "cpu" :
+           repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+           df += f"""
 RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{repo_arch}/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
