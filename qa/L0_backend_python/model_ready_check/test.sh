@@ -25,20 +25,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./model_ready_check_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
 SERVER_ARGS="--model-repository=${MODELDIR}/model_ready_check/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./model_ready_check_server.log"
 
 RET=0
 rm -fr *.log ./models
 
-mkdir -p models/identity_fp32/1/
-cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+MODEL_NAME="identity_fp32"
+mkdir -p models/$MODEL_NAME/1/
+cp ../../python_models/$MODEL_NAME/model.py ./models/$MODEL_NAME/1/model.py
+cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtxt
 
 #
 # Test Model Ready Check (TRITONBACKEND_ModelInstanceReady)
@@ -47,6 +46,8 @@ cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.
 # 9  (SIGKILL) - Force kill
 for SIGNAL in 11 9; do
     echo -e "\n***\n*** Testing Model Ready Check with Signal $SIGNAL\n***"
+    SERVER_LOG="./model_ready_check_signal_${SIGNAL}_server.log"
+    CLIENT_LOG="./model_ready_check_${SIGNAL}_client.log"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -59,7 +60,7 @@ for SIGNAL in 11 9; do
 
     # 1. Verify model is initially ready
     echo "Checking Initial Readiness..."
-    python3 -m unittest check_model_ready.ModelReadyTest.test_model_ready
+    python3 -m unittest check_model_ready.ModelReadyTest.test_model_ready >> ${CLIENT_LOG} 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Initial readiness check failed \n***"
         RET=1
@@ -84,12 +85,19 @@ for SIGNAL in 11 9; do
 
         # 4. Verify model is now NOT ready
         echo "Checking Not Ready Status..."
-        python3 -m unittest check_model_ready.ModelReadyTest.test_model_not_ready
+        python3 -m unittest check_model_ready.ModelReadyTest.test_model_not_ready >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Model reported ready after kill \n***"
             RET=1
         else
-            echo -e "\n***\n  Model Ready Check Passed for Signal $SIGNAL"
+            # 5. Verify correct error message in logs
+            if grep -q "Stub process '${MODEL_NAME}_0_0' is not alive" $SERVER_LOG; then
+                 echo -e "\n***\n  Model Ready Check Passed for Signal $SIGNAL \n***"
+            else
+                 echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Expected error message not found in the server logs \n***"
+                 cat $SERVER_LOG
+                 RET=1
+            fi
         fi
     fi
 
