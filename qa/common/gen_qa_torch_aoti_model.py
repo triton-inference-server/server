@@ -47,8 +47,8 @@ def generate_model(model_dir):
     model_path = os.path.join(model_dir, "model.pt2")
 
     ep = torch.export.export(
-      model,
-      (torch.randn(4), torch.randn(4)),
+        model,
+        (torch.randn(4), torch.randn(4)),
     )
 
     torch.export.save(ep, model_path)
