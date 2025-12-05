@@ -135,13 +135,6 @@ nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --form
 nvidia-smi || true
 set -e
 set -x
-export DEBIAN_FRONTEND=noninteractive
-apt-get update && \
-    apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
-            protobuf-compiler python3 python3-dev python3-pip wget gnupg2 \
-            software-properties-common
-ln -s /usr/bin/python3 /usr/bin/python
-
 pip3 install  "numpy<=1.23.5" setuptools
 
 pip3 install openvino==$OPENVINO_VERSION
@@ -269,7 +262,8 @@ chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 
-export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
+export TORCH_EXTENSIONS_DIR=/tmp/.cache/torch_extensions/
+mkdir -p \${TORCH_EXTENSIONS_DIR}
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$TRITON_MDLS_QA_CUSTOM_OPS
 mkdir -p $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/
 cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/.
@@ -353,6 +347,10 @@ EOF
 log_message.status "check: engine installation"
 if which docker-remove-upon-merge ; then
     log_message.info "Docker is installed."
+
+    define_model_output_directories
+
+    SCRIPT_NAME_SUFFIX=docker.v2 define_models_generation_scripts
 
     if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
         log_message.status "docker volume: $DOCKER_VOLUME does not exist. Creating..."
@@ -506,7 +504,56 @@ if which docker-remove-upon-merge ; then
 
 elif which enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
-    enroot import docker://$UBUNTU_IMAGE
+
+    TRITON_MDLS_BLD_DIR="/tmp/$CI_JOB_ID" define_model_output_directories
+
+    SCRIPT_NAME_SUFFIX=enroot.v1 define_models_generation_scripts
+
+    log_message.status "cleanup models folder if exists: $TRITON_MDLS_BLD_DIR"
+    rm -rf $TRITON_MDLS_BLD_DIR
+
+    log_message.status "create models directory structure in: $TRITON_MDLS_BLD_DIR"
+     mkdir -p \
+        $TRITON_MDLS_BLD_DIR \
+        $TRITON_MDLS_SRC_DIR \
+        $TRITON_MDLS_QA_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_BIG_MODEL \
+        $TRITON_MDLS_QA_SHAPETENSOR_MODEL \
+        $TRITON_MDLS_QA_RESHAPE_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_ENSEMBLE_MODEL \
+        $TRITON_MDLS_QA_NOSHAPE_MODEL \
+        $TRITON_MDLS_QA_TRT_PLUGIN_MODEL \
+        $TRITON_MDLS_QA_RAGGED_MODEL \
+        $TRITON_MDLS_QA_TRT_FORMAT_MODEL \
+        $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_TORCHTRT_MODEL \
+        $TRITON_MDLS_QA_SCALAR_MODELS \
+        $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+
+    log_message.status "copy scripts to: $TRITON_MDLS_SRC_DIR"
+    cp -rv $TRITON_MDLS_BASE_SCRIPT_DIR/* $TRITON_MDLS_SRC_DIR/
+
+    # log_message.status "enroot import: $UBUNTU_IMAGE to openvino.ubuntu.$CI_JOB_ID.enroot.sqsh"
+    # enroot import --output openvino.ubuntu.$CI_JOB_ID.enroot.sqsh docker://$UBUNTU_IMAGE
+    # enroot create --name openvino.ubuntu.$CI_JOB_ID openvino.ubuntu.$CI_JOB_ID.enroot.sqsh
+    # enroot start -m /tmp/$CI_JOB_ID:/tmp/$CI_JOB_ID openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+
+    log_message.status "enroot import: $PYTORCH_IMAGE to /tmp/pytorch.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/pytorch.$CI_JOB_ID.enroot.sqsh docker://$PYTORCH_IMAGE
+    log_message.status "enroot create: pytorch.$CI_JOB_ID"
+    enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
+    log_message.status "enroot start: pytorch.$CI_JOB_ID"
+    enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
 
 
