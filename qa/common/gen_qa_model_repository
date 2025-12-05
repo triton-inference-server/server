@@ -583,9 +583,14 @@ elif which enroot ; then
     log_message.status "enroot start: pytorch.$CI_JOB_ID"
     enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
-
+    log_message.status "enroot import: $TENSORRT_IMAGE to /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh docker://$TENSORRT_IMAGE
+    log_message.status "enroot create: tensorrt.$CI_JOB_ID"
+    enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
+    log_message.status "enroot start: tensorrt.$CI_JOB_ID"
+    enroot start --rw -m /tmp:/tmp tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
 else
     log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
-    log_message.warning "Please install either Docker or NVIDIA Enroot to generate the models." ;
+    log_message.warning "Please install Docker or NVIDIA Enroot to generate the models." ;
 fi
