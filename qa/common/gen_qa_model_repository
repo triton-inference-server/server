@@ -135,6 +135,22 @@ nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --form
 nvidia-smi || true
 set -e
 set -x
+export DEBIAN_FRONTEND=noninteractive
+apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        libprotobuf-dev \
+        protobuf-compiler \
+        python3 \
+        python3-dev \
+        python3-pip \
+        wget \
+        gnupg2 \
+        software-properties-common
+
+ln -s /usr/bin/python3 /usr/bin/python
+
 pip3 install  "numpy<=1.23.5" setuptools
 
 pip3 install openvino==$OPENVINO_VERSION
@@ -543,13 +559,25 @@ elif which enroot ; then
     log_message.status "copy scripts to: $TRITON_MDLS_SRC_DIR"
     cp -rv $TRITON_MDLS_BASE_SCRIPT_DIR/* $TRITON_MDLS_SRC_DIR/
 
-    # log_message.status "enroot import: $UBUNTU_IMAGE to openvino.ubuntu.$CI_JOB_ID.enroot.sqsh"
-    # enroot import --output openvino.ubuntu.$CI_JOB_ID.enroot.sqsh docker://$UBUNTU_IMAGE
-    # enroot create --name openvino.ubuntu.$CI_JOB_ID openvino.ubuntu.$CI_JOB_ID.enroot.sqsh
-    # enroot start -m /tmp/$CI_JOB_ID:/tmp/$CI_JOB_ID openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    log_message.status "enroot import: $UBUNTU_IMAGE to ubuntu.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh docker://$UBUNTU_IMAGE
+
+
+    log_message.status "enroot create: openvino.ubuntu.$CI_JOB_ID"
+    enroot create --name openvino.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
+    log_message.info "enroot start: openvino.ubuntu.$CI_JOB_ID"
+    enroot start --root --rw -m /tmp:/tmp openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+
+
+    log_message.status "enroot create: onnxruntime.ubuntu.$CI_JOB_ID"
+    enroot create --name onnxruntime.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
+    log_message.info "enroot start: onnxruntime.ubuntu.$CI_JOB_ID"
+    enroot start --root --rw -m /tmp:/tmp onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+
 
     log_message.status "enroot import: $PYTORCH_IMAGE to /tmp/pytorch.$CI_JOB_ID.enroot.sqsh"
     enroot import --output /tmp/pytorch.$CI_JOB_ID.enroot.sqsh docker://$PYTORCH_IMAGE
+
     log_message.status "enroot create: pytorch.$CI_JOB_ID"
     enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
     log_message.status "enroot start: pytorch.$CI_JOB_ID"
