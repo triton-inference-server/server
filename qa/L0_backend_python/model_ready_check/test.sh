@@ -45,7 +45,7 @@ cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtx
 # 11 (SIGSEGV) - Segmentation fault / crash
 # 9  (SIGKILL) - Force kill
 for SIGNAL in 11 9; do
-    echo -e "\n***\n*** Testing Model Ready Check with Signal $SIGNAL\n***"
+    echo -e "\n***\n*** Testing model_ready_check with Signal $SIGNAL\n***"
     SERVER_LOG="./model_ready_check_signal_${SIGNAL}_server.log"
     CLIENT_LOG="./model_ready_check_${SIGNAL}_client.log"
 
@@ -58,43 +58,45 @@ for SIGNAL in 11 9; do
 
     set +e
 
-    # 1. Verify model is initially ready
+    # Verify model is initially ready
     echo "Checking Initial Readiness..."
     python3 -m unittest check_model_ready.ModelReadyTest.test_model_ready >> ${CLIENT_LOG} 2>&1
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Initial readiness check failed \n***"
+        echo -e "\n***\n*** Test model_ready_check Failed (Signal $SIGNAL): Initial readiness check failed \n***"
         RET=1
         kill_server
         exit 1
     fi
 
-    # 2. Find the stub process PID
+    # Find the stub process PID
     stub_pid=$(pgrep -f "triton_python_backend_stub")
 
     if [ -z "$stub_pid" ]; then
-        echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Could not find stub process \n***"
+        echo -e "\n***\n*** Test model_ready_check Failed (Signal $SIGNAL): Could not find stub process \n***"
         RET=1
         kill_server
     else
         echo "Found stub process: $stub_pid"
 
-        # 3. Kill the stub process
+        # Kill the stub process
         echo "Killing stub with signal $SIGNAL..."
         kill -$SIGNAL $stub_pid
         sleep 1
 
-        # 4. Verify model is now NOT ready
+        # Verify model is now NOT ready
         echo "Checking Not Ready Status..."
         python3 -m unittest check_model_ready.ModelReadyTest.test_model_not_ready >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Model reported ready after kill \n***"
+            echo -e "\n***\n*** Test model_ready_check Failed (Signal $SIGNAL): Model reported ready after kill \n***"
             RET=1
         else
-            # 5. Verify correct error message in logs
-            if grep -q "Stub process '${MODEL_NAME}_0_0' is not alive" $SERVER_LOG; then
-                 echo -e "\n***\n  Model Ready Check Passed for Signal $SIGNAL \n***"
+            # Verify correct error message in logs
+            # Expect 2 occurrences: HTTP and gRPC checks
+            error_count=$(grep -c "Model '${MODEL_NAME}' version 1 is not ready: Stub process '${MODEL_NAME}_0_0' is not healthy." $SERVER_LOG)
+            if [ "$error_count" -eq 2 ]; then
+                 echo -e "\n***\n Test model_ready_check Passed for Signal $SIGNAL \n***"
             else
-                 echo -e "\n***\n*** Model Ready Check Failed (Signal $SIGNAL): Expected error message not found in the server logs \n***"
+                 echo -e "\n***\n*** Test model_ready_check Failed (Signal $SIGNAL): Expected 2 error messages, found $error_count \n***"
                  cat $SERVER_LOG
                  RET=1
             fi
