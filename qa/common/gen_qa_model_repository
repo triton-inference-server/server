@@ -69,6 +69,8 @@ PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
 MODEL_TYPE=${MODEL_TYPE:-""}
+TRITON_MODELS_USE_DOCKER=${TRITON_MODELS_USE_DOCKER:-"1"}
+TRITON_MODELS_USE_ENROOT=${TRITON_MODELS_USE_ENROOT:-"1"}
 
 log_message.status "define: CI related parameters"
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
@@ -361,7 +363,7 @@ EOF
 }
 
 log_message.status "check: engine installation"
-if which docker ; then
+if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     log_message.info "Docker is installed."
 
     define_model_output_directories
@@ -518,7 +520,7 @@ if which docker ; then
         docker volume rm $DOCKER_VOLUME
     fi # [ -z $CI ]
 
-elif which enroot ; then
+elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
 
     TRITON_MDLS_BLD_DIR="/tmp/$CI_JOB_ID" define_model_output_directories
