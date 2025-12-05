@@ -27,22 +27,26 @@ import ctypes
 import json
 import os
 import re
+import sys
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import numpy as np
 import tritonserver
 from pydantic import BaseModel
 from schemas.openai import (
     ChatCompletionNamedToolChoice,
+    ChatCompletionTokenLogprob,
     ChatCompletionToolChoiceOption1,
     CompletionUsage,
     CreateChatCompletionRequest,
     CreateCompletionRequest,
     CreateEmbeddingRequest,
     EmbeddingUsage,
+    Logprobs,
+    TopLogprob,
 )
 from utils.utils import ClientError, ServerError
 
@@ -83,6 +87,8 @@ def _create_vllm_generate_request(
         "max_completion_tokens",
         # will be handled explicitly
         "max_tokens",
+        "logprobs",
+        "top_logprobs",
     }
 
     # NOTE: The exclude_none is important, as internals may not support
@@ -92,6 +98,7 @@ def _create_vllm_generate_request(
         exclude_none=True,
     )
 
+    request_logprobs = False
     # Indicates CreateChatCompletionRequest
     if hasattr(request, "max_completion_tokens"):
         if request.max_completion_tokens is not None:
@@ -102,11 +109,31 @@ def _create_vllm_generate_request(
         # If neither is set, use a default value for max_tokens
         else:
             sampling_parameters["max_tokens"] = default_max_tokens
+
+        # Handle logprobs for chat completions
+        # OpenAI API: logprobs (bool), top_logprobs (int 0-20)
+        # vLLM API: logprobs (int) - number of top token logprobs to return
+        if request.logprobs and request.top_logprobs is not None:
+            sampling_parameters["logprobs"] = request.top_logprobs
+            request_logprobs = True
+        elif request.logprobs:
+            # If logprobs=True but top_logprobs not specified, default to 1
+            sampling_parameters["logprobs"] = 1
+            request_logprobs = True
     # Indicates CreateCompletionRequest
-    elif request.max_tokens is not None:
-        sampling_parameters["max_tokens"] = request.max_tokens
     else:
-        sampling_parameters["max_tokens"] = default_max_tokens
+        if request.max_tokens is not None:
+            sampling_parameters["max_tokens"] = request.max_tokens
+        else:
+            sampling_parameters["max_tokens"] = default_max_tokens
+
+        # Handle logprobs for completions
+        # OpenAI API: logprobs (int 0-5) - number of top token log probs
+        # vLLM API: logprobs (int) - same behavior, pass directly
+        if request.logprobs is not None and request.logprobs > 0:
+            sampling_parameters["logprobs"] = request.logprobs
+            request_logprobs = True
+    inputs["return_logprobs"] = np.bool_([request_logprobs])
 
     if lora_name is not None:
         sampling_parameters["lora_name"] = lora_name
@@ -374,6 +401,161 @@ def _get_output(response: tritonserver._api._response.InferenceResponse) -> str:
         return _to_string(tensor)
 
     return ""
+
+
+def _get_logprobs_from_response(
+    response: tritonserver._api._response.InferenceResponse,
+) -> Optional[List[Dict]]:
+    """
+    Extracts logprobs from a Triton inference response (vLLM backend).
+
+    Returns:
+        List of dictionaries containing logprobs data, or None if not available.
+        Format: [
+            {
+                token_id: {
+                    "logprob": float,
+                    "rank": int,
+                    "decoded_token": str
+                }
+            },
+            ...
+        ]
+    """
+    if "logprobs" not in response.outputs:
+        return None
+
+    logprobs_tensor = response.outputs["logprobs"]
+    if logprobs_tensor is None:
+        return None
+
+    # The logprobs are stored as JSON string (vLLM backend)
+    logprobs_str = _to_string(logprobs_tensor)
+
+    if logprobs_str == "null":
+        return None
+
+    try:
+        logprobs_data = json.loads(logprobs_str)
+        return logprobs_data
+    except json.JSONDecodeError:
+        return None
+
+
+def _get_openai_chat_format_logprobs_from_vllm_response(
+    response: tritonserver._api._response.InferenceResponse,
+) -> Optional[List[ChatCompletionTokenLogprob]]:
+    """
+    Convert logprobs from a Triton inference response (vLLM backend) to OpenAI chat completion format.
+
+    Args:
+        response: Triton inference response containing logprobs output.
+
+    Returns:
+        List of ChatCompletionTokenLogprob objects, or None if no logprobs available.
+    """
+    vllm_logprobs = _get_logprobs_from_response(response)
+
+    if not vllm_logprobs:
+        return None
+
+    openai_logprobs = []
+    for token_logprobs_dict in vllm_logprobs:
+        if not token_logprobs_dict:
+            continue
+
+        # Sort by rank to identify the selected token (rank=1 is always the chosen token)
+        sorted_tokens = sorted(
+            token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
+        )
+
+        # The first token (lowest rank) is the selected token
+        selected_token_id, selected_token_data = sorted_tokens[0]
+        selected_token = selected_token_data["decoded_token"]
+        selected_logprob = selected_token_data["logprob"]
+
+        # Convert to bytes representation
+        token_bytes = list(selected_token.encode("utf-8"))
+
+        top_logprobs_list = []
+        for token_id, token_data in sorted_tokens:
+            decoded_token = token_data["decoded_token"]
+            top_logprobs_list.append(
+                TopLogprob(
+                    token=decoded_token,
+                    logprob=token_data["logprob"],
+                    bytes=list(decoded_token.encode("utf-8")),
+                )
+            )
+
+        openai_logprobs.append(
+            ChatCompletionTokenLogprob(
+                token=selected_token,
+                logprob=selected_logprob,
+                bytes=token_bytes,
+                top_logprobs=top_logprobs_list,
+            )
+        )
+
+    return openai_logprobs
+
+
+def _get_openai_completion_format_logprobs_from_vllm_response(
+    response: tritonserver._api._response.InferenceResponse,
+) -> Optional[Logprobs]:
+    """
+    Convert logprobs from a Triton inference response (vLLM backend) to OpenAI completion format.
+
+    Args:
+        response: Triton inference response containing logprobs output.
+
+    Returns:
+        Logprobs object for completions API, or None if no logprobs available.
+    """
+    vllm_logprobs = _get_logprobs_from_response(response)
+
+    if not vllm_logprobs:
+        return None
+
+    text_offset = []
+    token_logprobs = []
+    tokens = []
+    top_logprobs = []
+
+    current_offset = 0
+    for token_logprobs_dict in vllm_logprobs:
+        if not token_logprobs_dict:
+            continue
+
+        # Sort by rank to identify the selected token (rank=1 is always the chosen token)
+        sorted_tokens = sorted(
+            token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
+        )
+
+        # The first token (lowest rank) is the selected token
+        selected_token_id, selected_token_data = sorted_tokens[0]
+        selected_token = selected_token_data["decoded_token"]
+        selected_logprob = selected_token_data["logprob"]
+
+        text_offset.append(current_offset)
+        token_logprobs.append(selected_logprob)
+        tokens.append(selected_token)
+
+        # Build top_logprobs dict for this position
+        top_logprobs_dict = {}
+        for token_id, token_data in sorted_tokens:
+            decoded_token = token_data["decoded_token"]
+            top_logprobs_dict[decoded_token] = token_data["logprob"]
+        top_logprobs.append(top_logprobs_dict)
+
+        current_offset += len(selected_token)
+
+    return Logprobs(
+        text_offset=text_offset,
+        token_logprobs=token_logprobs,
+        tokens=tokens,
+        top_logprobs=top_logprobs,
+    )
 
 
 def _validate_triton_responses_non_streaming(
