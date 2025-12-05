@@ -361,7 +361,7 @@ EOF
 }
 
 log_message.status "check: engine installation"
-if which docker-remove-upon-merge ; then
+if which docker ; then
     log_message.info "Docker is installed."
 
     define_model_output_directories
