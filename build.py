@@ -711,7 +711,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    FLAGS.triton_container_version,
+                    FLAGS.upstream_container_version,
                 )
             )
 
@@ -2880,12 +2880,11 @@ if __name__ == "__main__":
     # backends, repo-agents, and caches if a repo-tag is not given
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
-    default_repo_tag = "main"
-    cver = FLAGS.upstream_container_version
-    if cver is None:
-        cver = FLAGS.triton_container_version
-    if not cver.endswith("dev"):
-        default_repo_tag = "r" + cver
+    default_repo_tag = (
+        "main"
+        if FLAGS.triton_container_version.endswith("dev")
+        else "r" + FLAGS.triton_container_version
+    )
     log("default repo-tag: {}".format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
