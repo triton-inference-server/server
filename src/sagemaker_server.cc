@@ -654,7 +654,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     if (sagemaker_models_list_.find(model_name_hash) ==
         sagemaker_models_list_.end()) {
       LOG_VERBOSE(1) << "Model " << target_model << " with model hash "
-                    << model_name_hash << " is not loaded." << std::endl;
+                     << model_name_hash << " is not loaded." << std::endl;
       evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
       return;
     }
