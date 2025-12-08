@@ -51,6 +51,17 @@ namespace ni = triton::server;
 
 namespace {
 
+// Size Constants
+constexpr size_t KB = 1024;                    // 1 KB = 1,024 bytes
+constexpr size_t MB = 1024 * KB;               // 1 MB = 1,048,576 bytes
+
+// Triton's default HTTP max input size
+constexpr size_t DEFAULT_MAX_INPUT_SIZE = 64 * MB;  // 64 MB
+
+// Test data sizes for decompression limit tests
+constexpr size_t LARGE_TEST_DATA_SIZE = 4 * MB;     // 4 MB - compresses well
+constexpr size_t SMALL_LIMIT_SIZE = 1 * MB;         // 1 MB - limit for rejection tests
+
 struct TritonServerError {
   TritonServerError(TRITONSERVER_Error_Code code, const char* msg)
       : code_(code), msg_(msg)
@@ -618,6 +629,102 @@ TEST_F(DataCompressorTest, CompressGzipBuffer)
   // Write compressed data to file which will be validated by other compression
   // tool
   WriteEVBufferToFile("generated_gzip_compressed_data", compressed);
+}
+
+// This test verifies that the max_decompressed_size parameter correctly
+// limits the memory allocation during decompression.
+TEST_F(DataCompressorTest, DecompressionSizeLimitGzip)
+{
+  // Create a large buffer with repeated data (compresses extremely well)
+  std::unique_ptr<char[]> large_data(new char[LARGE_TEST_DATA_SIZE]);
+  memset(large_data.get(), 'A', LARGE_TEST_DATA_SIZE);
+
+  // Convert to evbuffer and compress
+  auto source = evbuffer_new();
+  ASSERT_TRUE((source != nullptr)) << "Failed to create source evbuffer";
+  ASSERT_EQ(evbuffer_add(source, large_data.get(), LARGE_TEST_DATA_SIZE), 0)
+      << "Failed to initialize source evbuffer";
+
+  auto compressed = evbuffer_new();
+  ASSERT_TRUE((compressed != nullptr))
+      << "Failed to create compressed evbuffer";
+
+  auto err = ni::DataCompressor::CompressData(
+      ni::DataCompressor::Type::GZIP, source, compressed);
+  ASSERT_TRUE((err == nullptr))
+      << "Failed to compress data: " << TRITONSERVER_ErrorMessage(err);
+
+  // Verify compression ratio is high
+  size_t compressed_size = evbuffer_get_length(compressed);
+  ASSERT_LT(compressed_size, LARGE_TEST_DATA_SIZE / 100)
+      << "Expected high compression ratio for repeated data";
+
+  // Test 1: Decompression with limit larger than data should succeed
+  {
+    auto decompressed = evbuffer_new();
+    ASSERT_TRUE((decompressed != nullptr))
+        << "Failed to create decompressed evbuffer";
+
+    err = ni::DataCompressor::DecompressData(
+        ni::DataCompressor::Type::GZIP, compressed, decompressed,
+        LARGE_TEST_DATA_SIZE + KB);  // Limit slightly larger than actual size
+    ASSERT_TRUE((err == nullptr))
+        << "Decompression with sufficient limit should succeed: "
+        << TRITONSERVER_ErrorMessage(err);
+
+    size_t decompressed_size = evbuffer_get_length(decompressed);
+    ASSERT_EQ(decompressed_size, LARGE_TEST_DATA_SIZE)
+        << "Decompressed size should match original";
+
+    evbuffer_free(decompressed);
+  }
+
+  // Test 2: Decompression with limit smaller than data should fail
+  {
+    auto decompressed = evbuffer_new();
+    ASSERT_TRUE((decompressed != nullptr))
+        << "Failed to create decompressed evbuffer";
+
+    // Limit is SMALL_LIMIT_SIZE (1 MB), but data decompresses to LARGE_TEST_DATA_SIZE (4 MB)
+    err = ni::DataCompressor::DecompressData(
+        ni::DataCompressor::Type::GZIP, compressed, decompressed,
+        SMALL_LIMIT_SIZE);
+
+    ASSERT_TRUE((err != nullptr))
+        << "Decompression should fail when exceeding size limit";
+    ASSERT_EQ(TRITONSERVER_ErrorCode(err), TRITONSERVER_ERROR_INVALID_ARG)
+        << "Error code should be INVALID_ARG";
+
+    std::string error_msg = TRITONSERVER_ErrorMessage(err);
+    ASSERT_TRUE(error_msg.find("exceeds the maximum allowed") != std::string::npos)
+        << "Error message should mention size limit exceeded: " << error_msg;
+
+    evbuffer_free(decompressed);
+  }
+
+  // Test 3: Decompression with no limit (0) should succeed
+  {
+    auto decompressed = evbuffer_new();
+    ASSERT_TRUE((decompressed != nullptr))
+        << "Failed to create decompressed evbuffer";
+
+    err = ni::DataCompressor::DecompressData(
+        ni::DataCompressor::Type::GZIP, compressed, decompressed,
+        0);  // No limit
+
+    ASSERT_TRUE((err == nullptr))
+        << "Decompression with no limit should succeed: "
+        << TRITONSERVER_ErrorMessage(err);
+
+    size_t decompressed_size = evbuffer_get_length(decompressed);
+    ASSERT_EQ(decompressed_size, LARGE_TEST_DATA_SIZE)
+        << "Decompressed size should match original";
+
+    evbuffer_free(decompressed);
+  }
+
+  evbuffer_free(source);
+  evbuffer_free(compressed);
 }
 
 }  // namespace

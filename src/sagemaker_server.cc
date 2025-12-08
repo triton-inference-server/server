@@ -436,7 +436,8 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       case DataCompressor::Type::GZIP: {
         decompressed_buffer = evbuffer_new();
         err = DataCompressor::DecompressData(
-            compression_type, req->buffer_in, decompressed_buffer);
+            compression_type, req->buffer_in, decompressed_buffer,
+            max_input_size_);
         break;
       }
       case DataCompressor::Type::UNKNOWN: {
