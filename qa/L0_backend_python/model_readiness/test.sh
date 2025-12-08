@@ -40,7 +40,7 @@ cp ../../python_models/$MODEL_NAME/model.py ./models/$MODEL_NAME/1/model.py
 cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtxt
 
 #
-# Test Model Ready Check (TRITONBACKEND_ModelInstanceReady)
+# Test Model Readiness (TRITONBACKEND_ModelInstanceReady)
 # Test with different signals to simulate various crash/exit scenarios
 # 11 (SIGSEGV) - Segmentation fault / crash
 # 9  (SIGKILL) - Force kill
