@@ -60,7 +60,7 @@ for SIGNAL in 11 9; do
 
     # Verify model is initially ready
     echo "Checking Initial Readiness..."
-    python3 -m unittest test_model_readiness.ModelReadinessTest.test_is_model_ready >> ${CLIENT_LOG} 2>&1
+    python3 -m unittest test_model_readiness.TestModelReadiness.test_model_ready >> ${CLIENT_LOG} 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test model_readiness Failed (Signal $SIGNAL): Initial readiness check failed \n***"
         RET=1
@@ -85,7 +85,7 @@ for SIGNAL in 11 9; do
 
         # Verify model is now NOT ready
         echo "Checking Not Ready Status..."
-        python3 -m unittest test_model_readiness.ModelReadinessTest.test_is_model_not_ready >> ${CLIENT_LOG} 2>&1
+        python3 -m unittest test_model_readiness.TestModelReadiness.test_model_not_ready >> ${CLIENT_LOG} 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test model_readiness Failed (Signal $SIGNAL): Model reported ready after kill \n***"
             RET=1
