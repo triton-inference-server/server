@@ -182,10 +182,13 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
 
-          if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
-              sagemaker_models_list_.end()) {
-            evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
-            return;
+          {
+            std::lock_guard<std::mutex> lock(models_list_mutex_);
+            if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
+                sagemaker_models_list_.end()) {
+              evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+              return;
+            }
           }
           LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path";
 
