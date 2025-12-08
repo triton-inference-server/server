@@ -30,7 +30,7 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
 
-class ModelReadyTest(unittest.TestCase):
+class ModelReadinessTest(unittest.TestCase):
     def setUp(self):
         self.model_name = "identity_fp32"
         self.url_http = "localhost:8000"
@@ -38,7 +38,7 @@ class ModelReadyTest(unittest.TestCase):
         self.client_http = httpclient.InferenceServerClient(url=self.url_http)
         self.client_grpc = grpcclient.InferenceServerClient(url=self.url_grpc)
 
-    def test_model_ready(self):
+    def test_is_model_ready(self):
         print(f"\nTesting if model '{self.model_name}' is READY ...")
 
         # Check HTTP
@@ -59,7 +59,7 @@ class ModelReadyTest(unittest.TestCase):
         except Exception as e:
             self.fail(f"[gRPC] Unexpected error: {str(e)}")
 
-    def test_model_not_ready(self):
+    def test_is_model_not_ready(self):
         print(f"\nTesting if model '{self.model_name}' is NOT READY ...")
 
         # Check HTTP
