@@ -243,7 +243,7 @@ chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torch-aoti --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$VOLUME_IDENTITYDESTDIR
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
