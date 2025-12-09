@@ -823,14 +823,12 @@ class TritonLLMEngine(LLMEngine):
             raise ClientError("logit bias is not currently supported")
 
         # Logprobs are only supported for vLLM backend currently
-        if metadata.backend != "vllm" and (
-            request.logprobs is not None or request.top_logprobs is not None
-        ):
+        if metadata.backend != "vllm" and (request.logprobs or request.top_logprobs):
             raise ClientError(
                 "logprobs are currently available only for the vLLM backend"
             )
 
-        if request.top_logprobs is not None and not request.logprobs:
+        if request.top_logprobs and not request.logprobs:
             raise ClientError("`top_logprobs` can only be used when `logprobs` is True")
 
         self._verify_chat_tool_call_settings(request=request)
