@@ -569,21 +569,37 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     enroot create --name openvino.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: openvino.ubuntu.$CI_JOB_ID"
     enroot start --root --rw -m /tmp:/tmp openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${OPENVINOSCRIPT} failed"
+        exit 1
+    fi
 
 
     log_message.status "enroot create: onnxruntime.ubuntu.$CI_JOB_ID"
     enroot create --name onnxruntime.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: onnxruntime.ubuntu.$CI_JOB_ID"
     enroot start --root --rw -m /tmp:/tmp onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${ONNXSCRIPT} failed"
+        exit 1
+    fi
 
 
     log_message.status "enroot import: $PYTORCH_IMAGE to /tmp/pytorch.$CI_JOB_ID.enroot.sqsh"
     enroot import --output /tmp/pytorch.$CI_JOB_ID.enroot.sqsh docker://$PYTORCH_IMAGE
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot import: ${PYTORCH_IMAGE} failed"
+        exit 1
+    fi
 
     log_message.status "enroot create: pytorch.$CI_JOB_ID"
     enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
     log_message.status "enroot start: pytorch.$CI_JOB_ID"
     enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${TORCHSCRIPT} failed"
+        exit 1
+    fi
 
     log_message.status "enroot import: $TENSORRT_IMAGE to /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh"
     enroot import --output /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh docker://$TENSORRT_IMAGE
@@ -591,6 +607,10 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
     log_message.status "enroot start: tensorrt.$CI_JOB_ID"
     enroot start --rw -m /tmp:/tmp tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${TRTSCRIPT} failed"
+        exit 1
+    fi
 
 else
     log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
