@@ -344,7 +344,7 @@ chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/\${TRT_VERSION%.*.*} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+    git clone -b release/\$( echo \$TRT_VERSION | cut -d . -f -2) --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
