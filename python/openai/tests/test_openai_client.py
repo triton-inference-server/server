@@ -669,10 +669,16 @@ class TestAsyncOpenAIClient:
         model: str,
         messages: List[dict],
         top_logprobs_value: int,
+        backend: str,
     ):
         """
         Test that top_logprobs without logprobs raises an error
         """
+        if backend != "vllm":
+            pytest.skip(
+                reason="logprobs are currently available only for the vLLM backend"
+            )
+
         with pytest.raises(openai.BadRequestError) as exc_info:
             await client.chat.completions.create(
                 model=model,

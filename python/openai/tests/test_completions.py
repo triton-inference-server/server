@@ -87,6 +87,19 @@ class TestCompletions:
             assert response.json()["detail"] == "logit bias is not supported"
             return
 
+        # TRT-LLM backend doesn't support logprobs
+        if (
+            sampling_parameter == "logprobs"
+            and value is not None
+            and model == "tensorrt_llm_bls"
+        ):
+            assert response.status_code == 400
+            assert (
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
+            )
+            return
+
         assert response.status_code == 200
         assert response.json()["choices"][0]["text"].strip()
 
