@@ -458,9 +458,10 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         # Test case 1: Payload that decompresses to 64MB + 1MB (over limit) should fail
         large_target_size = DEFAULT_LIMIT_BYTES + MB
-        large_compressed_data, large_uncompressed_size = self._create_compressed_payload(
-            large_target_size
-        )
+        (
+            large_compressed_data,
+            large_uncompressed_size,
+        ) = self._create_compressed_payload(large_target_size)
 
         # Verify uncompressed size is over 64MB limit
         self.assertGreater(
@@ -497,9 +498,10 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         # Test case 2: Payload that decompresses to 64MB - 1MB (under limit) should succeed
         small_target_size = DEFAULT_LIMIT_BYTES - MB
-        small_compressed_data, small_uncompressed_size = self._create_compressed_payload(
-            small_target_size
-        )
+        (
+            small_compressed_data,
+            small_uncompressed_size,
+        ) = self._create_compressed_payload(small_target_size)
 
         # Verify uncompressed size is under 64MB limit
         self.assertLess(
@@ -538,9 +540,10 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         # Test case 1: Input that decompresses to 128MB + 1MB (over limit) should fail
         large_target_size = INCREASED_LIMIT_BYTES + MB
-        large_compressed_data, large_uncompressed_size = self._create_compressed_payload(
-            large_target_size
-        )
+        (
+            large_compressed_data,
+            large_uncompressed_size,
+        ) = self._create_compressed_payload(large_target_size)
 
         # Verify sizes
         self.assertGreater(
@@ -569,9 +572,10 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         # Test case 2: Input that decompresses to 128MB - 1MB (under limit) should succeed
         small_target_size = INCREASED_LIMIT_BYTES - MB
-        small_compressed_data, small_uncompressed_size = self._create_compressed_payload(
-            small_target_size
-        )
+        (
+            small_compressed_data,
+            small_uncompressed_size,
+        ) = self._create_compressed_payload(small_target_size)
 
         # Verify sizes
         self.assertLess(

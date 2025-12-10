@@ -176,7 +176,8 @@ class DataCompressor {
                                     ? source_byte_size
                                     : (1 << 20 /* 1MB */);
 
-    if (max_decompressed_size > 0 && output_buffer_size > max_decompressed_size) {
+    if (max_decompressed_size > 0 &&
+        output_buffer_size > max_decompressed_size) {
       output_buffer_size = max_decompressed_size;
     }
 
@@ -232,7 +233,8 @@ class DataCompressor {
               reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
           stream.avail_out = output_buffer_size;
 
-          // Track total decompressed size and current buffer size for limit checking
+          // Track total decompressed size and current buffer size for limit
+          // checking
           size_t total_decompressed = 0;
           size_t current_buffer_size = output_buffer_size;
 
@@ -253,9 +255,11 @@ class DataCompressor {
                     total_decompressed >= max_decompressed_size) {
                   return TRITONSERVER_ErrorNew(
                       TRITONSERVER_ERROR_INVALID_ARG,
-                      ("Decompressed data size exceeds the maximum allowed value of " +
+                      ("Decompressed data size exceeds the maximum allowed "
+                       "value of " +
                        std::to_string(max_decompressed_size) +
-                       " bytes. Use --http-max-input-size to increase the limit.")
+                       " bytes. Use --http-max-input-size to increase the "
+                       "limit.")
                           .c_str());
                 }
 
@@ -269,7 +273,8 @@ class DataCompressor {
                 // Calculate next buffer size, capped by remaining limit
                 current_buffer_size = output_buffer_size;
                 if (max_decompressed_size > 0) {
-                  size_t remaining_size = max_decompressed_size - total_decompressed;
+                  size_t remaining_size =
+                      max_decompressed_size - total_decompressed;
                   if (current_buffer_size > remaining_size) {
                     current_buffer_size = remaining_size;
                   }
@@ -298,10 +303,12 @@ class DataCompressor {
           if (current_reserved_space.iov_base != nullptr) {
             size_t final_chunk_size = current_buffer_size - stream.avail_out;
             if (max_decompressed_size > 0 &&
-                (total_decompressed + final_chunk_size) > max_decompressed_size) {
+                (total_decompressed + final_chunk_size) >
+                    max_decompressed_size) {
               return TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
-                  ("Decompressed data size exceeds the maximum allowed value of " +
+                  ("Decompressed data size exceeds the maximum allowed value "
+                   "of " +
                    std::to_string(max_decompressed_size) +
                    " bytes. Use --http-max-input-size to increase the limit.")
                       .c_str());
@@ -311,7 +318,8 @@ class DataCompressor {
                 CommitEVBuffer(
                     decompressed_data, &current_reserved_space,
                     final_chunk_size),
-                "unexpected error committing output buffer for decompression: ");
+                "unexpected error committing output buffer for "
+                "decompression: ");
           }
           break;
         }
