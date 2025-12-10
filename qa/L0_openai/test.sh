@@ -46,7 +46,7 @@ function install_deps() {
     pushd openai/
     # NOTE: Should be pre-installed in container, but can uncomment if needed
     # pip install -r requirements.txt
-    pip install -r requirements-test.txt
+    # pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         # TODO: Remove this when the next stable version of TRT-LLM is available
@@ -97,6 +97,19 @@ function prepare_tensorrtllm() {
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${ENGINE_PATH},triton_max_batch_size:64,postprocessing_instance_count:1
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32,prompt_embedding_table_data_type:TYPE_FP16
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:${TRITON_BACKEND},triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True,prompt_embedding_table_data_type:TYPE_FP16,guided_decoding_backend:${GUIDED_DECODING_BACKEND},xgrammar_tokenizer_info_path:${XGRAMMAR_TOKENIZER_INFO_PATH}
+
+    # 4. Prepare lora adapters
+    # FIXME: Remove this WAR when it is fixed in the future stable version of TRT-LLM.
+    sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm/config.pbtxt
+    sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt
+    pushd ${MODEL_REPO}/tensorrt_llm/1
+    for lora_name in silk-road/luotuo-lora-7b-0.1 kunishou/Japanese-Alpaca-LoRA-7b-v0; do
+        name=$(basename $lora_name)
+        git-lfs clone https://huggingface.co/$lora_name
+        python3 /app/examples/hf_lora_convert.py -i $name -o $name-weights --storage-type float16
+        rm -rf $name
+    done
+    popd
 }
 
 function pre_test() {
