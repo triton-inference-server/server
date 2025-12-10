@@ -49,6 +49,8 @@ function install_deps() {
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
+        pip uninstall torch torchvision
+        pip install onnx==1.19.1 torch torchvision
         # TODO: Remove this when the next stable version of TRT-LLM is available
         TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
         TENSORRTLLM_VERSION="v1.2.0rc2"
