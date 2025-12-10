@@ -670,9 +670,11 @@ TEST_F(DataCompressorTest, DecompressionSizeLimitGzip)
   memset(over_data.get(), 'C', OVER_LIMIT_DATA_SIZE);
 
   // Compress each data set
-  auto under_compressed = CompressWithGzip(under_data.get(), UNDER_LIMIT_DATA_SIZE);
+  auto under_compressed =
+      CompressWithGzip(under_data.get(), UNDER_LIMIT_DATA_SIZE);
   auto at_compressed = CompressWithGzip(at_data.get(), DEFAULT_MAX_INPUT_SIZE);
-  auto over_compressed = CompressWithGzip(over_data.get(), OVER_LIMIT_DATA_SIZE);
+  auto over_compressed =
+      CompressWithGzip(over_data.get(), OVER_LIMIT_DATA_SIZE);
 
   // Test 1: 63 MB data with 64 MB limit - should succeed
   {
@@ -706,11 +708,11 @@ TEST_F(DataCompressorTest, DecompressionSizeLimitGzip)
     auto err = ni::DataCompressor::DecompressData(
         ni::DataCompressor::Type::GZIP, over_compressed, decompressed,
         DEFAULT_MAX_INPUT_SIZE);
-    ASSERT_TRUE((err != nullptr))
-        << "65 MB data should fail with 64 MB limit";
+    ASSERT_TRUE((err != nullptr)) << "65 MB data should fail with 64 MB limit";
     ASSERT_EQ(TRITONSERVER_ErrorCode(err), TRITONSERVER_ERROR_INVALID_ARG);
     std::string error_msg = TRITONSERVER_ErrorMessage(err);
-    ASSERT_TRUE(error_msg.find("exceeds the maximum allowed") != std::string::npos)
+    ASSERT_TRUE(
+        error_msg.find("exceeds the maximum allowed") != std::string::npos)
         << "Error message should mention size limit: " << error_msg;
     evbuffer_free(decompressed);
   }
@@ -745,9 +747,12 @@ TEST_F(DataCompressorTest, DecompressionSizeLimitDeflate)
   memset(over_data.get(), 'C', OVER_LIMIT_DATA_SIZE);
 
   // Compress each data set
-  auto under_compressed = CompressWithDeflate(under_data.get(), UNDER_LIMIT_DATA_SIZE);
-  auto at_compressed = CompressWithDeflate(at_data.get(), DEFAULT_MAX_INPUT_SIZE);
-  auto over_compressed = CompressWithDeflate(over_data.get(), OVER_LIMIT_DATA_SIZE);
+  auto under_compressed =
+      CompressWithDeflate(under_data.get(), UNDER_LIMIT_DATA_SIZE);
+  auto at_compressed =
+      CompressWithDeflate(at_data.get(), DEFAULT_MAX_INPUT_SIZE);
+  auto over_compressed =
+      CompressWithDeflate(over_data.get(), OVER_LIMIT_DATA_SIZE);
 
   // Test 1: 63 MB data with 64 MB limit - should succeed
   {
@@ -781,11 +786,11 @@ TEST_F(DataCompressorTest, DecompressionSizeLimitDeflate)
     auto err = ni::DataCompressor::DecompressData(
         ni::DataCompressor::Type::DEFLATE, over_compressed, decompressed,
         DEFAULT_MAX_INPUT_SIZE);
-    ASSERT_TRUE((err != nullptr))
-        << "65 MB data should fail with 64 MB limit";
+    ASSERT_TRUE((err != nullptr)) << "65 MB data should fail with 64 MB limit";
     ASSERT_EQ(TRITONSERVER_ErrorCode(err), TRITONSERVER_ERROR_INVALID_ARG);
     std::string error_msg = TRITONSERVER_ErrorMessage(err);
-    ASSERT_TRUE(error_msg.find("exceeds the maximum allowed") != std::string::npos)
+    ASSERT_TRUE(
+        error_msg.find("exceeds the maximum allowed") != std::string::npos)
         << "Error message should mention size limit: " << error_msg;
     evbuffer_free(decompressed);
   }
