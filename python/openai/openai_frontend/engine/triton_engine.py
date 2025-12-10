@@ -495,10 +495,16 @@ class TritonLLMEngine(LLMEngine):
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
         # One tokenizer and creation time shared for all loaded models for now.
         model_metadata = {}
+        
+        # Mapping of custom model identifiers to their corresponding Hugging Face model names
+        HF_MODEL_NAME_MAP = {
+            "llama-3.1-8b-instruct": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "mistral-nemo-instruct-2407": "mistralai/Mistral-Nemo-Instruct-2407",
+        }
 
         # Read all triton models and store the necessary metadata for each
         for name, _ in self.server.models().keys():
-            model = self.server.model(name)
+            model = self.server.model(name)           
             backend = model.config()["backend"]
             # Explicitly handle ensembles to avoid any runtime validation errors
             if not backend and model.config()["platform"] == "ensemble":
@@ -510,6 +516,12 @@ class TritonLLMEngine(LLMEngine):
                 lora_names = _get_vllm_lora_names(
                     self.server.options.model_repository, name, model.version
                 )
+            # Map to Hugging Face model name if available
+            hf_model_name = HF_MODEL_NAME_MAP.get(name, name)
+            # Try to get tokenizer for the mapped model name
+            tokenizer_override = get_tokenizer(hf_model_name)
+            # Use the override tokenizer if available; otherwise fall back to default
+            tokenizer = tokenizer_override if tokenizer_override else self.tokenizer            
 
             echo_tensor_name = None
             for input in model.config()["input"]:
@@ -524,7 +536,8 @@ class TritonLLMEngine(LLMEngine):
                 name=name,
                 backend=backend,
                 model=model,
-                tokenizer=self.tokenizer,
+                # tokenizer=self.tokenizer,
+                tokenizer=tokenizer,
                 lora_names=lora_names,
                 echo_tensor_name=echo_tensor_name,
                 create_time=self.create_time,
