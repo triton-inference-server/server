@@ -828,7 +828,7 @@ class TritonLLMEngine(LLMEngine):
                 "logprobs are currently available only for the vLLM backend"
             )
 
-        if request.top_logprobs and not request.logprobs:
+        if request.top_logprobs is not None and not request.logprobs:
             raise ClientError("`top_logprobs` can only be used when `logprobs` is True")
 
         self._verify_chat_tool_call_settings(request=request)

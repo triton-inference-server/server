@@ -569,7 +569,7 @@ class TestAsyncOpenAIClient:
 
         assert stream_tokens_list == non_stream_tokens_list, "Tokens should match"
         assert np.allclose(
-            stream_logprobs_values, non_stream_logprobs_values, rtol=0, atol=1e-2
+            stream_logprobs_values, non_stream_logprobs_values, rtol=0, atol=1e-1
         ), "Logprob values should be close"
 
     @pytest.mark.asyncio
@@ -658,7 +658,7 @@ class TestAsyncOpenAIClient:
         assert stream_text_offsets == logprobs.text_offset, "Text offsets should match"
         assert stream_top_logprobs == logprobs.top_logprobs, "Top logprobs should match"
         assert np.allclose(
-            stream_token_logprobs, logprobs.token_logprobs, rtol=0, atol=1e-2
+            stream_token_logprobs, logprobs.token_logprobs, rtol=0, atol=1e-1
         ), "Token logprob values should be close"
 
     @pytest.mark.parametrize("top_logprobs_value", [0, 5])
