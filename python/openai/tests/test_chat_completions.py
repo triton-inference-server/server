@@ -160,6 +160,19 @@ class TestChatCompletions:
             assert response.json()["detail"] == "logit bias is not currently supported"
             return
 
+        # TRT-LLM backend doesn't support logprobs
+        if (
+            param_key == "logprobs"
+            and param_value is True
+            and model == "tensorrt_llm_bls"
+        ):
+            assert response.status_code == 400
+            assert (
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
+            )
+            return
+
         assert response.status_code == 200
         assert response.json()["choices"][0]["message"]["content"]
         assert response.json()["choices"][0]["message"]["role"] == "assistant"
@@ -620,9 +633,19 @@ class TestChatCompletions:
 
     @pytest.mark.parametrize("top_logprobs_value", [0, 5])
     def test_chat_completions_top_logprobs_without_logprobs(
-        self, client, model: str, messages: List[dict], top_logprobs_value: int
+        self,
+        client,
+        model: str,
+        messages: List[dict],
+        top_logprobs_value: int,
+        backend: str,
     ):
         """Test that top_logprobs without logprobs raises validation error."""
+        if backend != "vllm":
+            pytest.skip(
+                reason="logprobs are currently available only for the vLLM backend"
+            )
+
         response = client.post(
             "/v1/chat/completions",
             json={

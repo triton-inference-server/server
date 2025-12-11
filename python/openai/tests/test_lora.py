@@ -200,6 +200,12 @@ class LoRATest(unittest.TestCase):
                         data_type: TYPE_BOOL
                         dims: [1]
                         optional: true
+                    },
+                    {
+                        name: "return_logprobs"
+                        data_type: TYPE_BOOL
+                        dims: [1]
+                        optional: true
                     }
                 ]
                 output [
