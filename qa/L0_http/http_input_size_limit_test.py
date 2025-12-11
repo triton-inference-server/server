@@ -29,6 +29,8 @@ import sys
 
 sys.path.append("../common")
 
+import gzip
+import io
 import json
 import unittest
 
@@ -58,7 +60,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
         return "http://localhost:8000/v2/models/{}/infer".format(model_name)
 
-    def test_default_limit_rejection_raw_binary(self):
+    def test_default_limit_raw_binary(self):
         """Test raw binary inputs with default limit"""
         model = "onnx_zero_1_float32"
 
@@ -124,7 +126,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Response data does not match input data",
         )
 
-    def test_default_limit_rejection_json(self):
+    def test_default_limit_json(self):
         """Test JSON inputs with default limit"""
         model = "onnx_zero_1_float32"
 
@@ -414,6 +416,193 @@ class InferSizeLimitTest(tu.TestResultCollector):
             "Use --http-max-input-size to increase the limit",
             error_msg,
         )
+
+    def _create_compressed_payload(self, target_size):
+        """Helper to create a gzip-compressed JSON payload of specified decompressed size."""
+        shape_size = 1000  # Small actual data
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": [1, shape_size],
+                    "data": [1.0] * shape_size,
+                }
+            ]
+        }
+        json_str = json.dumps(payload, indent=4)
+
+        # Pad with whitespace to reach target size (whitespace before closing brace is valid JSON)
+        padding_needed = target_size - len(json_str)
+        padded_json = json_str[:-1] + (" " * padding_needed) + json_str[-1]
+
+        # Compress the payload
+        compressed_buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=compressed_buffer, mode="wb") as gz:
+            gz.write(padded_json.encode("utf-8"))
+
+        return compressed_buffer.getvalue(), len(padded_json.encode("utf-8"))
+
+    def test_default_limit_compressed(self):
+        """Test compressed inputs with default 64MB limit.
+
+        This test verifies that the --http-max-input-size limit is enforced on
+        the decompressed data size, not just the compressed request size.
+        """
+        model = "onnx_zero_1_float32"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+        }
+
+        # Test case 1: Payload that decompresses to 64MB + 1MB (over limit) should fail
+        large_target_size = DEFAULT_LIMIT_BYTES + MB
+        (
+            large_compressed_data,
+            large_uncompressed_size,
+        ) = self._create_compressed_payload(large_target_size)
+
+        # Verify uncompressed size is over 64MB limit
+        self.assertGreater(
+            large_uncompressed_size,
+            DEFAULT_LIMIT_BYTES,
+            f"Large payload should decompress to > 64MB, got {large_uncompressed_size}",
+        )
+
+        # Verify compressed size is under the limit
+        self.assertLess(
+            len(large_compressed_data),
+            DEFAULT_LIMIT_BYTES,
+            f"Compressed size should be under limit, got {len(large_compressed_data)}",
+        )
+
+        response = requests.post(
+            self._get_infer_url(model), data=large_compressed_data, headers=headers
+        )
+
+        # Should fail with 400 bad request - decompressed size exceeds limit
+        self.assertEqual(
+            400,
+            response.status_code,
+            f"Expected 400 for compressed request that decompresses to >64MB, got: {response.status_code}",
+        )
+
+        # Verify error message contains size limit info
+        error_msg = response.content.decode()
+        self.assertIn(
+            "exceeds the maximum allowed value",
+            error_msg,
+            "Expected error message about exceeding max input size",
+        )
+
+        # Test case 2: Payload that decompresses to 64MB - 1MB (under limit) should succeed
+        small_target_size = DEFAULT_LIMIT_BYTES - MB
+        (
+            small_compressed_data,
+            small_uncompressed_size,
+        ) = self._create_compressed_payload(small_target_size)
+
+        # Verify uncompressed size is under 64MB limit
+        self.assertLess(
+            small_uncompressed_size,
+            DEFAULT_LIMIT_BYTES,
+            f"Small payload should decompress to < 64MB, got {small_uncompressed_size}",
+        )
+
+        response = requests.post(
+            self._get_infer_url(model), data=small_compressed_data, headers=headers
+        )
+
+        # Should succeed with 200 OK
+        self.assertEqual(
+            200,
+            response.status_code,
+            f"Expected 200 for compressed request within limit, got: {response.status_code}",
+        )
+
+        # Verify we got a valid response
+        result = response.json()
+        self.assertIn("outputs", result, "Response missing outputs field")
+
+    def test_large_input_compressed(self):
+        """Test compressed inputs with custom 128MB limit set.
+
+        This test verifies that compressed inputs work correctly when the
+        --http-max-input-size limit is increased.
+        """
+        model = "onnx_zero_1_float32"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+        }
+
+        # Test case 1: Input that decompresses to 128MB + 1MB (over limit) should fail
+        large_target_size = INCREASED_LIMIT_BYTES + MB
+        (
+            large_compressed_data,
+            large_uncompressed_size,
+        ) = self._create_compressed_payload(large_target_size)
+
+        # Verify sizes
+        self.assertGreater(
+            large_uncompressed_size,
+            INCREASED_LIMIT_BYTES,
+            f"Large payload should decompress to > 128MB, got {large_uncompressed_size}",
+        )
+
+        response = requests.post(
+            self._get_infer_url(model), data=large_compressed_data, headers=headers
+        )
+
+        # Should fail with 400 bad request
+        self.assertEqual(
+            400,
+            response.status_code,
+            f"Expected 400 for compressed request exceeding 128MB limit, got: {response.status_code}",
+        )
+
+        error_msg = response.content.decode()
+        self.assertIn(
+            "exceeds the maximum allowed value",
+            error_msg,
+            "Expected error message about exceeding max input size",
+        )
+
+        # Test case 2: Input that decompresses to 128MB - 1MB (under limit) should succeed
+        small_target_size = INCREASED_LIMIT_BYTES - MB
+        (
+            small_compressed_data,
+            small_uncompressed_size,
+        ) = self._create_compressed_payload(small_target_size)
+
+        # Verify sizes
+        self.assertLess(
+            small_uncompressed_size,
+            INCREASED_LIMIT_BYTES,
+            f"Small payload should decompress to < 128MB, got {small_uncompressed_size}",
+        )
+        self.assertGreater(
+            small_uncompressed_size,
+            DEFAULT_LIMIT_BYTES,
+            f"Small payload should decompress to > 64MB (default), got {small_uncompressed_size}",
+        )
+
+        response = requests.post(
+            self._get_infer_url(model), data=small_compressed_data, headers=headers
+        )
+
+        # Should succeed with 200 OK
+        self.assertEqual(
+            200,
+            response.status_code,
+            f"Expected 200 for compressed request within 128MB limit, got: {response.status_code}",
+        )
+
+        # Verify we got a valid response
+        result = response.json()
+        self.assertIn("outputs", result, "Response missing outputs field")
 
 
 if __name__ == "__main__":
