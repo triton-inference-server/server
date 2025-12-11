@@ -507,7 +507,10 @@ class TritonLLMEngine(LLMEngine):
             print(f"Found model: {name=}, {backend=}")
 
             lora_configs = _parse_lora_configs(
-                self.server.options.model_repository, name, model.version, self.backend
+                self.server.options.model_repository,
+                name,
+                model.version,
+                backend if self.backend is None else self.backend,
             )
 
             echo_tensor_name = None
@@ -1086,9 +1089,9 @@ class TritonLLMEngine(LLMEngine):
     def _get_lora_config(
         self, model_name: str, lora_name: Optional[str]
     ) -> TritonLoraConfig:
-        if lora_name is None:
-            return None
         model_metadata = self.model_metadata.get(model_name)
+        if lora_name is None or model_metadata.lora_configs is None:
+            return None
         for lora_config in model_metadata.lora_configs:
             if lora_config.name == lora_name:
                 return lora_config

@@ -62,8 +62,8 @@ class TritonLoraConfig:
     name: str
 
     # Unique fields for TensorRT-LLM backend
-    task_id: Optional[int]
-    path: Optional[str]
+    task_id: Optional[int] = None
+    path: Optional[str] = None
     is_registered: Optional[bool] = False
 
 
@@ -681,6 +681,7 @@ def _parse_lora_configs(
             with open(lora_config_path, "r") as f:
                 lora_config = json.load(f)
                 for lora_name, lora_path in lora_config.items():
+                    print(f"backend: {backend}")
                     if backend == "vllm":
                         lora_configs.append(TritonLoraConfig(name=lora_name))
                     else:
