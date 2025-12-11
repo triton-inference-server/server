@@ -824,7 +824,7 @@ class TritonLLMEngine(LLMEngine):
 
         # Logprobs are only supported for vLLM backend currently
         if metadata.backend != "vllm" and (
-            request.logprobs is not None or request.top_logprobs is not None
+            request.logprobs or request.top_logprobs is not None
         ):
             raise ClientError(
                 "logprobs are currently available only for the vLLM backend"
