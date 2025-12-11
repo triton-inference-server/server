@@ -241,8 +241,8 @@ pytest -v tests/
 ### LoRA Adapters
 
 If the command line argument `--lora-separator=<separator_string>` is provided
-when starting the OpenAI Frontend, a vLLM LoRA adaptor listed on the
-`multi_lora.json` may be selected by appending the LoRA name to the model name,
+when starting the OpenAI Frontend, a LoRA adaptor listed in `multi_lora.json`
+may be selected by appending the LoRA name to the model name,
 separated by the LoRA separator, on the inference request in
 `<model_name><separator_string><lora_name>` format.
 
@@ -299,7 +299,12 @@ limited to locally stored models, inference requests are not limited though.
 
 See the
 [vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
-on how to serve a model with LoRA adapters.
+on how to serve a vLLM model with LoRA adapters.
+
+Similarly, see [TensorRT-LLM document](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/lora.md)
+on how to prepare LoRA-enabled TensorRT-LLM engines and generate LoRA tensors.
+The path of LoRA adapter in `multi_lora.json` is the directory of
+`model.lora_config.npy` and `model.lora_weights.npy` tensors.
 
 ### Embedding Models
 Currently, OpenAI-Compatible Frontend supports loading embedding models and embeddings endpoints via vLLM backend. Check [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html#embedding) for all supported embedding models from vLLM.
