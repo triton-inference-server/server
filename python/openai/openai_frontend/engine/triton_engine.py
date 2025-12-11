@@ -823,7 +823,9 @@ class TritonLLMEngine(LLMEngine):
             raise ClientError("logit bias is not currently supported")
 
         # Logprobs are only supported for vLLM backend currently
-        if metadata.backend != "vllm" and (request.logprobs or request.top_logprobs):
+        if metadata.backend != "vllm" and (
+            request.logprobs or request.top_logprobs is not None
+        ):
             raise ClientError(
                 "logprobs are currently available only for the vLLM backend"
             )
