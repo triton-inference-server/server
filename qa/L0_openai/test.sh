@@ -46,7 +46,7 @@ function install_deps() {
     pushd openai/
     # NOTE: Should be pre-installed in container, but can uncomment if needed
     # pip install -r requirements.txt
-    # pip install -r requirements-test.txt
+    pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         # TODO: Remove this when the next stable version of TRT-LLM is available
