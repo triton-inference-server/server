@@ -28,6 +28,7 @@ import json
 import os
 import re
 import sys
+import traceback
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -56,11 +57,21 @@ class RequestKind(Enum):
     EMBEDDING = 2
 
 
+@dataclass
+class TritonLoraConfig:
+    name: str
+
+    # Unique fields for TensorRT-LLM backend
+    task_id: Optional[int] = None
+    path: Optional[str] = None
+    is_registered: Optional[bool] = False
+
+
 def _create_vllm_generate_request(
     model,
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
-    lora_name: str | None,
+    lora_config: TritonLoraConfig | None,
     echo_tensor_name: str | None,
     default_max_tokens: int,
 ):
@@ -135,8 +146,8 @@ def _create_vllm_generate_request(
             request_logprobs = True
     inputs["return_logprobs"] = np.bool_([request_logprobs])
 
-    if lora_name is not None:
-        sampling_parameters["lora_name"] = lora_name
+    if lora_config is not None:
+        sampling_parameters["lora_name"] = lora_config.name
 
     guided_json = _get_guided_json_from_tool(request)
     if guided_json is not None:
@@ -167,15 +178,10 @@ def _create_trtllm_generate_request(
     model,
     prompt,
     request: CreateChatCompletionRequest | CreateCompletionRequest,
-    lora_name: str | None,
+    lora_config: TritonLoraConfig | None,
     echo_tensor_name: str | None,
     default_max_tokens: int,
 ):
-    if lora_name is not None:
-        raise ClientError(
-            "LoRA selection is currently not supported for TRT-LLM backend"
-        )
-
     inputs = {}
     inputs["text_input"] = [[prompt]]
     inputs["stream"] = np.bool_([[request.stream]])
@@ -220,6 +226,21 @@ def _create_trtllm_generate_request(
     if guided_json is not None:
         inputs["guided_decoding_guide_type"] = [["json_schema"]]
         inputs["guided_decoding_guide"] = [[guided_json]]
+
+    if lora_config is not None:
+        # To perform inference with a specific LoRA for the first time `lora_task_id` `lora_weights` and `lora_config` must all be given.
+        # The LoRA will be cached, so that subsequent requests for the same task only require `lora_task_id`.
+        inputs["lora_task_id"] = np.uint64([[lora_config.task_id]])
+        if not lora_config.is_registered:
+            lora_weights_data = np.load(
+                os.path.join(lora_config.path, "model.lora_weights.npy")
+            )
+            lora_config_data = np.load(
+                os.path.join(lora_config.path, "model.lora_config.npy")
+            )
+            inputs["lora_weights"] = lora_weights_data
+            inputs["lora_config"] = lora_config_data
+            lora_config.is_registered = True
 
     inputs["return_num_input_tokens"] = np.bool_([[True]])
     inputs["return_num_output_tokens"] = np.bool_([[True]])
@@ -594,9 +615,9 @@ def _get_guided_json_from_tool(
     return None
 
 
-def _get_vllm_lora_names(
-    model_repository: str | list[str], model_name: str, model_version: int
-) -> None | List[str]:
+def _parse_lora_configs(
+    model_repository: str | list[str], model_name: str, model_version: int, backend: str
+) -> None | List[tuple[str, str]]:
     if (
         len(model_name) == 0
         or model_name.isspace()
@@ -606,7 +627,9 @@ def _get_vllm_lora_names(
         raise ValueError(
             f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
         )
-    lora_names = []
+
+    lora_configs = []
+    lora_task_id = 1
     repo_paths = model_repository
     if isinstance(repo_paths, str):
         repo_paths = [repo_paths]
@@ -618,6 +641,7 @@ def _get_vllm_lora_names(
             raise ValueError(
                 f"Invalid model name: '{model_name}'. Model names must be valid file-system-path segment names."
             )
+
         model_path = os.path.normpath(model_path)
         if not os.path.isdir(model_path):
             # Cloud path?
@@ -632,26 +656,60 @@ def _get_vllm_lora_names(
                 # Model directory is malformed?
                 return None
         version_path = os.path.join(model_path, str(model_version))
-        is_lora_enabled = False
-        model_file_path = os.path.join(version_path, "model.json")
-        try:
-            with open(model_file_path, "r") as f:
-                config = json.load(f)
-                if "enable_lora" in config:
-                    # The value could be a string or a bool.
-                    is_lora_enabled = str(config["enable_lora"]).lower() == "true"
-        except Exception:
-            # Model directory or model.json is malformed?
-            return None
-        if is_lora_enabled != True:
-            continue
         lora_config_path = os.path.join(version_path, "multi_lora.json")
+
+        if backend == "vllm":
+            is_lora_enabled = False
+            model_file_path = os.path.join(version_path, "model.json")
+            try:
+                with open(model_file_path, "r") as f:
+                    config = json.load(f)
+                    if "enable_lora" in config:
+                        # The value could be a string or a bool.
+                        is_lora_enabled = str(config["enable_lora"]).lower() == "true"
+            except Exception:
+                # Model directory or model.json is malformed?
+                return None
+            if is_lora_enabled != True:
+                continue
+        else:
+            # TRT-LLM backend does not use model.json
+            if not os.path.exists(lora_config_path):
+                continue
+
         try:
             with open(lora_config_path, "r") as f:
                 lora_config = json.load(f)
-                for lora_name in lora_config.keys():
-                    lora_names.append(lora_name)
-        except Exception:
+                for lora_name, lora_path in lora_config.items():
+                    print(f"backend: {backend}")
+                    if backend == "vllm":
+                        lora_configs.append(TritonLoraConfig(name=lora_name))
+                    else:
+                        lora_weights_path = os.path.join(
+                            lora_path, "model.lora_weights.npy"
+                        )
+                        lora_config_path = os.path.join(
+                            lora_path, "model.lora_config.npy"
+                        )
+                        if not os.path.exists(lora_weights_path):
+                            raise ServerError(
+                                f"LoRA weights file not found for '{lora_name}' at path: {lora_weights_path}"
+                            )
+                        if not os.path.exists(lora_config_path):
+                            raise ServerError(
+                                f"LoRA config file not found for '{lora_name}' at path: {lora_config_path}"
+                            )
+
+                        lora_configs.append(
+                            TritonLoraConfig(
+                                name=lora_name, path=lora_path, task_id=lora_task_id
+                            )
+                        )
+                        lora_task_id += 1
+        except ServerError as e:
+            raise e
+        except Exception as e:
             # LoRA is enabled but its list is not provided or malformed?
+            print(traceback.format_exc())
             return None
-    return lora_names
+    return lora_configs
