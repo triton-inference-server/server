@@ -53,6 +53,7 @@ from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
     RequestKind,
+    TritonLoraConfig,
     _create_trtllm_embedding_request,
     _create_trtllm_generate_request,
     _create_vllm_embedding_request,
@@ -61,7 +62,7 @@ from engine.utils.triton import (
     _get_openai_completion_format_logprobs_from_vllm_response,
     _get_output,
     _get_usage_from_response,
-    _get_vllm_lora_names,
+    _parse_lora_configs,
     _StreamingUsageAccumulator,
     _validate_triton_responses_non_streaming,
 )
@@ -107,7 +108,7 @@ class TritonModelMetadata:
     # Tokenizers used for chat templates
     tokenizer: Optional[Any]
     # LoRA names supported by the backend
-    lora_names: Optional[List[str]]
+    lora_configs: Optional[List[TritonLoraConfig]]
     # Name of the input tensor enabling "echo" parameter in /v1/completions endpoint
     echo_tensor_name: Optional[str]
     # Time that model was loaded by Triton
@@ -160,11 +161,11 @@ class TritonLLMEngine(LLMEngine):
             if (
                 self.lora_separator is not None
                 and len(self.lora_separator) > 0
-                and metadata.lora_names is not None
+                and metadata.lora_configs is not None
             ):
-                for lora_name in metadata.lora_names:
+                for lora_config in metadata.lora_configs:
                     model_names.append(
-                        f"{metadata.name}{self.lora_separator}{lora_name}"
+                        f"{metadata.name}{self.lora_separator}{lora_config.name}"
                     )
 
             for model_name in model_names:
@@ -210,7 +211,7 @@ class TritonLLMEngine(LLMEngine):
                 metadata.model,
                 prompt,
                 request,
-                lora_name,
+                self._get_lora_config(model_name, lora_name),
                 metadata.echo_tensor_name,
                 self.default_max_tokens,
             )
@@ -348,7 +349,7 @@ class TritonLLMEngine(LLMEngine):
                 metadata.model,
                 request.prompt,
                 request,
-                lora_name,
+                self._get_lora_config(model_name, lora_name),
                 metadata.echo_tensor_name,
                 self.default_max_tokens,
             )
@@ -505,11 +506,12 @@ class TritonLLMEngine(LLMEngine):
                 backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
 
-            lora_names = None
-            if self.backend == "vllm" or backend == "vllm":
-                lora_names = _get_vllm_lora_names(
-                    self.server.options.model_repository, name, model.version
-                )
+            lora_configs = _parse_lora_configs(
+                self.server.options.model_repository,
+                name,
+                model.version,
+                backend if self.backend is None else self.backend,
+            )
 
             echo_tensor_name = None
             for input in model.config()["input"]:
@@ -525,7 +527,7 @@ class TritonLLMEngine(LLMEngine):
                 backend=backend,
                 model=model,
                 tokenizer=self.tokenizer,
-                lora_names=lora_names,
+                lora_configs=lora_configs,
                 echo_tensor_name=echo_tensor_name,
                 create_time=self.create_time,
                 inference_request_converter=self._determine_request_converter(
@@ -807,9 +809,10 @@ class TritonLLMEngine(LLMEngine):
             )
 
         if (
-            metadata.lora_names is not None
+            metadata.lora_configs is not None
             and lora_name is not None
-            and lora_name not in metadata.lora_names
+            and lora_name
+            not in [lora_config.name for lora_config in metadata.lora_configs]
         ):
             raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
@@ -970,9 +973,10 @@ class TritonLLMEngine(LLMEngine):
             )
 
         if (
-            metadata.lora_names is not None
+            metadata.lora_configs is not None
             and lora_name is not None
-            and lora_name not in metadata.lora_names
+            and lora_name
+            not in [lora_config.name for lora_config in metadata.lora_configs]
         ):
             raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
@@ -1081,3 +1085,14 @@ class TritonLLMEngine(LLMEngine):
             tool_choice_required_function_name = None
 
         return tool_choice_function_name or tool_choice_required_function_name
+
+    def _get_lora_config(
+        self, model_name: str, lora_name: Optional[str]
+    ) -> TritonLoraConfig:
+        model_metadata = self.model_metadata.get(model_name)
+        if lora_name is None or model_metadata.lora_configs is None:
+            return None
+        for lora_config in model_metadata.lora_configs:
+            if lora_config.name == lora_name:
+                return lora_config
+        raise ClientError(f"Unknown LoRA: {lora_name}; for model: {model_name}")
