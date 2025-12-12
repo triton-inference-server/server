@@ -310,6 +310,8 @@ The path of LoRA adapter in `multi_lora.json` is the directory of
 
 <details>
 <summary>For example</summary>
+
+model repository
 ```
 inflight_batcher_llm
 ├── postprocessing
@@ -336,8 +338,9 @@ inflight_batcher_llm
     |   └── multi_lora.json
     └── config.pbtxt
 ```
-```
+
 multi_lora.json
+```
 {
   "doll": "inflight_batcher_llm/tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
   "sheep": "inflight_batcher_llm/tensorrt_llm_bls/1/Japanese-Alpaca-LoRA-7b-v0-weights"
