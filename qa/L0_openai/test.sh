@@ -102,10 +102,10 @@ function prepare_tensorrtllm() {
     # FIXME: Remove this WAR when it is fixed in the future stable version of TRT-LLM.
     sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm/config.pbtxt
     sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt
-    pushd ${MODEL_REPO}/tensorrt_llm/1
+    pushd ${MODEL_REPO}/tensorrt_llm_bls/1
     for lora_name in silk-road/luotuo-lora-7b-0.1 kunishou/Japanese-Alpaca-LoRA-7b-v0; do
         name=$(basename $lora_name)
-        git-lfs clone https://huggingface.co/$lora_name
+        git clone https://huggingface.co/$lora_name
         python3 /app/examples/hf_lora_convert.py -i $name -o $name-weights --storage-type float16
         rm -rf $name
     done
