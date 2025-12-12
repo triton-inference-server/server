@@ -24,6 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import traceback
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from schemas.openai import CreateCompletionRequest, CreateCompletionResponse
@@ -54,6 +56,8 @@ async def create_completion(
     except ClientError as e:
         raise HTTPException(status_code=StatusCode.CLIENT_ERROR, detail=f"{e}")
     except ServerError as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=StatusCode.SERVER_ERROR, detail=f"{e}")
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=StatusCode.SERVER_ERROR, detail=f"{e}")
