@@ -25,12 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-# OpenAI-Compatible Frontend for Triton Inference Server (Beta)
-
-> [!NOTE]
-> The OpenAI-Compatible API is currently in BETA. Its features and functionality
-> are subject to change as we collect feedback. We're excited to hear any thoughts
-> you have and what features you'd like to see!
+# OpenAI-Compatible Frontend for Triton Inference Server
 
 ## Pre-requisites
 
