@@ -1322,10 +1322,10 @@ def create_torch_aoti_modelfile(
     except OSError:
         pass  # ignore existing dir
 
-    class AddSubNet2(nn.Module):
+    class AddSubNet(nn.Module):
         def __init__(self, swap):
             self.swap = swap
-            super(AddSubNet2, self).__init__()
+            super(AddSubNet, self).__init__()
 
         def forward(self, INPUT0, INPUT1):
             op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
@@ -1333,7 +1333,7 @@ def create_torch_aoti_modelfile(
             return op0, op1
 
     ep = torch.export.export(
-        AddSubNet2(swap), (torch.randn(*input_shape), torch.randn(*input_shape))
+        AddSubNet(swap), (torch.randn(*input_shape), torch.randn(*input_shape))
     )
     torch.export.save(ep, model_version_dir + "/model.pt2")
 
