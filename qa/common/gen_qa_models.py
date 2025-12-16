@@ -1335,7 +1335,7 @@ def create_torch_aoti_modelfile(
     ep = torch.export.export(
         AddSubNet(swap), (torch.randn(*input_shape), torch.randn(*input_shape))
     )
-    torch.export.save(ep, model_version_dir + "/model.pt2")
+    torch._inductor.aoti_compile_and_package(ep, package_path=model_version_dir + "/model.pt2")
 
 
 def create_libtorch_modelconfig(
