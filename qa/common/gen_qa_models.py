@@ -1336,6 +1336,7 @@ def create_torch_aoti_modelfile(
         AddSubNet(swap), (torch.randn(*input_shape), torch.randn(*input_shape))
     )
     torch._inductor.aoti_compile_and_package(ep, package_path=model_version_dir + "/model.pt2")
+    torch._inductor.aoti_load_package
 
 
 def create_libtorch_modelconfig(
