@@ -50,7 +50,7 @@
 TRITON_MDLS_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
 TRITON_MDLS_BASE_SCRIPT_FILE="$(readlink -f $0)"
 
-log_message.info() { local message=$@ ; echo -e "\033[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
+log_message.info() { local message=$@ ; echo -e "\093[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
 log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} \033[0m"; } ;
 log_message.warning() { local message=$@ ; echo -e "\033[33m$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} \033[0m"; } ;
 log_message.error() { local message=$@ ; echo -e "\033[31m$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} \033[0m"; } ;
@@ -129,7 +129,7 @@ cat > $OPENVINOSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\033[34mGenerating OpenVINO models\033[0m"
+echo -e "\093[34mGenerating OpenVINO models\033[0m"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -173,7 +173,7 @@ cat > $ONNXSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\033[34mGenerating ONNX models\033[0m"
+echo -e "\093[34mGenerating ONNX models\033[0m"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -236,7 +236,7 @@ cat > $TORCHSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\033[34mGenerating PyTorch models\033[0m"
+echo -e "\093[34mGenerating PyTorch models\033[0m"
 pip3 install onnxscript
 set -e
 PATH=$PATH:/usr/local/cuda-13.0/bin
@@ -294,7 +294,7 @@ cat > $TRTSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\033[34mGenerating TensorRT models\033[0m"
+echo -e "\093[34mGenerating TensorRT models\033[0m"
 set -e
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
