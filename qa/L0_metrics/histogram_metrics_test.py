@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -114,7 +114,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
     def test_ensemble_decoupled(self):
         wait_secs = 1
         responses_per_req = 3
-        total_reqs = 3
+        total_iters = 3
         delta = 0.2
 
         # Infer
@@ -133,7 +133,7 @@ class TestHistogramMetrics(tu.TestResultCollector):
         inputs[1].set_data_from_numpy(input_data_1)
 
         # Send requests to ensemble decoupled model
-        for request_num in range(1, total_reqs + 1):
+        for iter_cnt in range(1, total_iters + 1):
             ensemble_model_name = "ensemble"
             decoupled_model_name = "async_execute_decouple"
             non_decoupled_model_name = "async_execute"
@@ -144,40 +144,40 @@ class TestHistogramMetrics(tu.TestResultCollector):
             # Checks metrics output
             histogram_dict = self.get_histogram_metrics(FIRST_RESPONSE_HISTOGRAM)
 
-            def check_existing_metrics(model_name, wait_secs_per_req, delta):
-                metric_count = get_histogram_metric_key(
+            def check_histogram(model_name, request_cnt, wait_secs_per_req, delta):
+                histogram_count_key = get_histogram_metric_key(
                     FIRST_RESPONSE_HISTOGRAM, model_name, "1", "count"
                 )
-                metric_sum = get_histogram_metric_key(
+                histogram_sum_key = get_histogram_metric_key(
                     FIRST_RESPONSE_HISTOGRAM, model_name, "1", "sum"
                 )
                 # Test histogram count
-                self.assertIn(metric_count, histogram_dict)
-                self.assertEqual(histogram_dict[metric_count], request_num)
+                self.assertIn(histogram_count_key, histogram_dict)
+                self.assertEqual(
+                    histogram_dict[histogram_count_key], request_cnt * iter_cnt
+                )
                 # Test histogram sum
-                self.assertIn(metric_sum, histogram_dict)
+                self.assertIn(histogram_sum_key, histogram_dict)
                 self.assertTrue(
-                    wait_secs_per_req * MILLIS_PER_SEC * request_num
-                    <= histogram_dict[metric_sum]
-                    < (wait_secs_per_req + delta) * MILLIS_PER_SEC * request_num
+                    wait_secs_per_req * MILLIS_PER_SEC * request_cnt * iter_cnt
+                    <= histogram_dict[histogram_sum_key]
+                    < (wait_secs_per_req + delta)
+                    * MILLIS_PER_SEC
+                    * request_cnt
+                    * iter_cnt
                 )
                 # Prometheus histogram buckets are tested in metrics_api_test.cc::HistogramAPIHelper
 
             # Test ensemble model metrics
-            check_existing_metrics(ensemble_model_name, 2 * wait_secs, 2 * delta)
+            check_histogram(ensemble_model_name, 1, wait_secs * 2, 2 * delta)
 
             # Test decoupled model metrics
-            check_existing_metrics(decoupled_model_name, wait_secs, delta)
+            check_histogram(decoupled_model_name, 1, wait_secs, delta)
 
             # Test non-decoupled model metrics
-            non_decoupled_model_count = get_histogram_metric_key(
-                FIRST_RESPONSE_HISTOGRAM, non_decoupled_model_name, "1", "count"
+            check_histogram(
+                non_decoupled_model_name, responses_per_req, wait_secs, delta
             )
-            non_decoupled_model_sum = get_histogram_metric_key(
-                FIRST_RESPONSE_HISTOGRAM, non_decoupled_model_name, "1", "sum"
-            )
-            self.assertNotIn(non_decoupled_model_count, histogram_dict)
-            self.assertNotIn(non_decoupled_model_sum, histogram_dict)
 
     def test_buckets_override(self):
         model_name = "async_execute_decouple"
