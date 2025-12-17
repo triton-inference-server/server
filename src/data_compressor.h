@@ -277,6 +277,18 @@ class DataCompressor {
                 if (max_decompressed_size > 0) {
                   size_t remaining_size =
                       max_decompressed_size - total_decompressed;
+                  // If no space remains but decompression needs more, we've hit
+                  // the limit
+                  if (remaining_size == 0) {
+                    return TRITONSERVER_ErrorNew(
+                        TRITONSERVER_ERROR_INVALID_ARG,
+                        ("Decompressed data size exceeds the maximum allowed "
+                         "value of " +
+                         std::to_string(max_decompressed_size) +
+                         " bytes. Use --http-max-input-size to increase the "
+                         "limit.")
+                            .c_str());
+                  }
                   if (current_buffer_size > remaining_size) {
                     current_buffer_size = remaining_size;
                   }
