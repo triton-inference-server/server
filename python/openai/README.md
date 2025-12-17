@@ -25,12 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-# OpenAI-Compatible Frontend for Triton Inference Server (Beta)
-
-> [!NOTE]
-> The OpenAI-Compatible API is currently in BETA. Its features and functionality
-> are subject to change as we collect feedback. We're excited to hear any thoughts
-> you have and what features you'd like to see!
+# OpenAI-Compatible Frontend for Triton Inference Server
 
 ## Pre-requisites
 
@@ -241,8 +236,8 @@ pytest -v tests/
 ### LoRA Adapters
 
 If the command line argument `--lora-separator=<separator_string>` is provided
-when starting the OpenAI Frontend, a vLLM LoRA adaptor listed on the
-`multi_lora.json` may be selected by appending the LoRA name to the model name,
+when starting the OpenAI Frontend, a LoRA adaptor listed in `multi_lora.json`
+may be selected by appending the LoRA name to the model name,
 separated by the LoRA separator, on the inference request in
 `<model_name><separator_string><lora_name>` format.
 
@@ -297,9 +292,56 @@ the same `<model_name><separator_string><lora_name>` format for each LoRA
 adapter listed on the `multi_lora.json`. Note: The LoRA name inclusion is
 limited to locally stored models, inference requests are not limited though.
 
+#### vLLM
 See the
 [vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
-on how to serve a model with LoRA adapters.
+on how to serve a vLLM model with LoRA adapters.
+
+#### TensorRT-LLM
+Similarly, see [TensorRT-LLM document](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/lora.md)
+on how to prepare LoRA-enabled TensorRT-LLM engines and generate LoRA tensors.
+The path of LoRA adapter in `multi_lora.json` is the directory of
+`model.lora_config.npy` and `model.lora_weights.npy` tensors.
+
+<details>
+<summary>For example</summary>
+
+model repository
+```
+inflight_batcher_llm
+├── postprocessing
+|   ├── 1
+|   |   └── model.py
+|   └── config.pbtxt
+├── preprocessing
+|   ├── 1
+|   |   └── model.py
+|   └── config.pbtxt
+├── tensorrt_llm
+|   ├── 1
+|   |   └── model.py
+|   └── config.pbtxt
+└── tensorrt_llm_bls
+    ├── 1
+    |   ├── Japanese-Alpaca-LoRA-7b-v0-weights
+    |   |   ├── model.lora_config.npy
+    |   |   └── model.lora_weights.npy
+    |   ├── luotuo-lora-7b-0.1-weights
+    |   |   ├── model.lora_config.npy
+    |   |   └── model.lora_weights.npy
+    |   ├── model.py
+    |   └── multi_lora.json
+    └── config.pbtxt
+```
+
+multi_lora.json
+```
+{
+  "doll": "inflight_batcher_llm/tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
+  "sheep": "inflight_batcher_llm/tensorrt_llm_bls/1/Japanese-Alpaca-LoRA-7b-v0-weights"
+}
+```
+</details>
 
 ### Embedding Models
 Currently, OpenAI-Compatible Frontend supports loading embedding models and embeddings endpoints via vLLM backend. Check [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html#embedding) for all supported embedding models from vLLM.
