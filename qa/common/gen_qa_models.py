@@ -40,7 +40,6 @@ from gen_common import (
     np_to_trt_dtype,
     openvino_save_model,
 )
-from server.qa.L0_model_config.autofill_noplatform_success.python.model_transaction_policy_decoupled_false import model
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
