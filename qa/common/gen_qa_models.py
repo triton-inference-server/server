@@ -40,6 +40,7 @@ from gen_common import (
     np_to_trt_dtype,
     openvino_save_model,
 )
+from server.qa.L0_model_config.autofill_noplatform_success.python.model_transaction_policy_decoupled_false import model
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -348,6 +349,7 @@ def create_plan_dynamic_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
@@ -467,6 +469,7 @@ def create_plan_fixed_rf_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -554,6 +557,7 @@ def create_plan_fixed_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -726,6 +730,7 @@ def create_plan_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
@@ -879,6 +884,7 @@ def create_onnx_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     batch_dim = [] if max_batch == 0 else [None]
@@ -984,6 +990,7 @@ def create_onnx_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     config_dir = models_dir + "/" + model_name
 
     # [TODO] move create_general_modelconfig() out of emu as it is general
@@ -1048,6 +1055,7 @@ def create_libtorch_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1312,6 +1320,7 @@ def create_libtorch_pt2_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1367,6 +1376,7 @@ def create_torch_aoti_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1437,6 +1447,7 @@ def create_libtorch_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1538,6 +1549,7 @@ def create_libtorch_pt2_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1641,6 +1653,7 @@ def create_torch_aoti_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1730,6 +1743,7 @@ def create_openvino_modelfile(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating model {model_name}\033[0m")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     in0 = ov.opset1.parameter(
@@ -1794,6 +1808,7 @@ def create_openvino_modelconfig(
         output0_dtype,
         output1_dtype,
     )
+    print(f"\033[32mCreating config for {model_name}\033[0m")
     config_dir = models_dir + "/" + model_name
 
     # platform is empty and backend is 'openvino' for openvino model
